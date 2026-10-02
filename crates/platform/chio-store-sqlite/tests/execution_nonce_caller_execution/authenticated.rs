@@ -18,6 +18,9 @@ mod monetary;
 #[path = "authenticated/private_evidence.rs"]
 mod private_evidence;
 
+#[path = "authenticated/schema_migration.rs"]
+mod schema_migration;
+
 pub(super) fn fixture() -> TestResult<(Fixture, Keypair)> {
     let mut fixture = Fixture::with_nonce_ttl(300)?;
     let executor = Keypair::generate();

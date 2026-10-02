@@ -8,8 +8,8 @@ This module hosts:
   the ``_ENV_DENY_PREFIXES`` / ``_ENV_DENY_SUFFIXES`` /
   ``_ENV_DENY_EXACT`` tables.
 
-- :func:`harden_git_argv`: defense-in-depth ``--no-verify`` injection
-  on ``git commit`` invocations and rejection of explicit ``--verify``.
+- :func:`harden_git_argv`: disable commit hooks with a final
+  ``core.hooksPath`` override and reject explicit ``--verify``.
   Source of truth: ``_harden_git_run_argv`` in
   ``sdks/python/chio-hermes/src/chio_hermes/executors.py:401``.
 
@@ -273,18 +273,15 @@ _GIT_GLOBAL_OPTIONS_WITH_VALUES: frozenset[str] = frozenset(
 
 
 def harden_git_argv(argv: list[str]) -> list[str]:
-    """Inject ``--no-verify`` into ``git commit`` argv; reject ``--verify``.
+    """Disable hooks for a direct ``git commit``; reject explicit ``--verify``.
 
-    Mirrors ``chio_hermes.executors._harden_git_run_argv``:
+    Insert ``-c core.hooksPath=/dev/null`` after caller-supplied global options
+    so it takes precedence over their hook configuration. ``--no-verify``
+    alone does not suppress prepare-commit-msg, post-commit or reference hooks.
+    Retain that flag as defense in depth. Repeated hardening is idempotent.
 
-    - Locate the ``commit`` subcommand (which may follow leading global
-      options like ``-c name=value``).
-    - If ``--verify`` is in the tail, raise ``PermissionError`` (the
-      caller is trying to override the hardening).
-    - If ``--no-verify`` is already there, return ``argv`` unchanged.
-    - Otherwise insert ``--no-verify`` immediately after ``commit``.
-
-    Returns a new list; does not mutate ``argv``.
+    Returns a new list without mutating ``argv``. Other Git commands and
+    non-hook execution mechanisms are outside this helper's contract.
     """
     subcommand_idx = _git_subcommand_index(argv)
     if subcommand_idx is None or argv[subcommand_idx] != "commit":
@@ -295,9 +292,13 @@ def harden_git_argv(argv: list[str]) -> list[str]:
             "git_run: explicit --verify is forbidden; "
             "commit hooks must stay disabled (use a shell tool for hooks)"
         )
-    if "--no-verify" in tail:
-        return list(argv)
-    return [*argv[: subcommand_idx + 1], "--no-verify", *tail]
+    prefix = argv[:subcommand_idx]
+    hook_override = ["-c", "core.hooksPath=/dev/null"]
+    if prefix[-2:] != hook_override:
+        prefix = [*prefix, *hook_override]
+    if "--no-verify" not in tail:
+        tail = ["--no-verify", *tail]
+    return [*prefix, "commit", *tail]
 
 
 def _git_subcommand_index(argv: list[str]) -> int | None:

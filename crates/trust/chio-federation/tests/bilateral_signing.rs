@@ -377,3 +377,227 @@ fn detached_dual_signatures(
         .unwrap();
     (org_a_signature, org_b_signature)
 }
+
+// ---------------------------------------------------------------------------
+// Preimage discipline: a co-signing key also signs receipts, so the co-sign
+// endpoints must reconstruct the content they are asked to sign and refuse
+// anything they cannot rebuild.
+// ---------------------------------------------------------------------------
+
+/// The canonical signing preimage of a receipt attributed to `kernel_key`.
+/// A signature over these bytes IS a receipt issued by that kernel.
+fn receipt_signing_preimage(kernel_key: &chio_core_types::crypto::PublicKey) -> Vec<u8> {
+    let mut body = sample_receipt(&Keypair::generate()).body();
+    body.kernel_key = kernel_key.clone();
+    let body = chio_core_types::receipt::body::prepare_receipt_body_for_signing(body).unwrap();
+    chio_core_types::canonical::canonical_json_bytes(
+        &chio_core_types::receipt::signing::ChioReceiptSigningBody::from(&body),
+    )
+    .unwrap()
+}
+
+fn kernel_identity(
+    kernel_id: &str,
+    keypair: &Keypair,
+) -> chio_federation::bilateral_dsse::KernelIdentity {
+    chio_federation::bilateral_dsse::KernelIdentity {
+        kernel_id: kernel_id.to_string(),
+        passport_key_fingerprint: chio_federation::bilateral_dsse::Keyid::from_public_key(
+            &keypair.public_key(),
+        ),
+        alg: "ed25519".to_string(),
+    }
+}
+
+fn dsse_pae_preimage(org_a_kp: &Keypair, org_b_kp: &Keypair) -> Vec<u8> {
+    let receipt = sample_receipt(org_b_kp);
+    let predicate = chio_federation::bilateral_dsse::build_predicate(
+        &receipt,
+        kernel_identity("kernel.org-a", org_a_kp),
+        kernel_identity("kernel.org-b", org_b_kp),
+        &receipt.tool_name,
+        1_734_000_000_000,
+    )
+    .unwrap();
+    let statement = chio_federation::bilateral_dsse::build_statement(&receipt, predicate).unwrap();
+    chio_federation::bilateral_dsse::pae(
+        chio_federation::bilateral_dsse::PAYLOAD_TYPE_IN_TOTO,
+        &statement.canonical_bytes().unwrap(),
+    )
+}
+
+fn dsse_binding<'a>(
+    org_a_public: &'a chio_core_types::crypto::PublicKey,
+    org_b_public: &'a chio_core_types::crypto::PublicKey,
+) -> chio_federation::bilateral_dsse::DssePreimageBinding<'a> {
+    chio_federation::bilateral_dsse::DssePreimageBinding {
+        org_a_kernel_id: "kernel.org-a",
+        org_a_public_key: org_a_public,
+        org_b_kernel_id: "kernel.org-b",
+        org_b_public_key: org_b_public,
+    }
+}
+
+#[test]
+fn cosigning_body_reconstruction_accepts_only_the_body_it_can_rebuild() {
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let receipt = sample_receipt(&tool_host_kp);
+    let body = CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
+    let bytes = body.canonical_bytes().unwrap();
+
+    chio_federation::bilateral::reconstruct_cosigning_body(&bytes, "kernel.org-a", "kernel.org-b")
+        .expect("the canonical body rebuilds from the receipt it carries");
+
+    // A receipt signing preimage is not a co-signing body: the key that would
+    // sign it also signs receipts, so this is the forgery the reconstruction
+    // exists to refuse.
+    let forgery = receipt_signing_preimage(&origin_kp.public_key());
+    assert!(matches!(
+        chio_federation::bilateral::reconstruct_cosigning_body(
+            &forgery,
+            "kernel.org-a",
+            "kernel.org-b"
+        ),
+        Err(BilateralCoSigningError::CanonicalJson(_))
+    ));
+
+    // Neither is a DSSE pre-authentication encoding.
+    let pae = dsse_pae_preimage(&origin_kp, &tool_host_kp);
+    assert!(matches!(
+        chio_federation::bilateral::reconstruct_cosigning_body(
+            &pae,
+            "kernel.org-a",
+            "kernel.org-b"
+        ),
+        Err(BilateralCoSigningError::CanonicalJson(_))
+    ));
+
+    // A body addressed to another pair of kernels is refused before any rebuild.
+    assert_eq!(
+        chio_federation::bilateral::reconstruct_cosigning_body(
+            &bytes,
+            "kernel.org-a",
+            "kernel.org-c"
+        )
+        .err(),
+        Some(BilateralCoSigningError::PeerIdentityMismatch)
+    );
+
+    // A body that parses but does not re-canonicalise to the bytes presented
+    // (here the embedded receipt JSON carries insignificant whitespace) is
+    // refused: the signer signs only what it rebuilt.
+    let mut loose = body.clone();
+    loose.receipt_canonical_json = format!(" {}", loose.receipt_canonical_json);
+    let loose_bytes = loose.canonical_bytes().unwrap();
+    assert_eq!(
+        chio_federation::bilateral::reconstruct_cosigning_body(
+            &loose_bytes,
+            "kernel.org-a",
+            "kernel.org-b"
+        )
+        .err(),
+        Some(BilateralCoSigningError::ReceiptMismatch)
+    );
+}
+
+#[test]
+fn dsse_pae_reconstruction_accepts_only_the_preimage_it_can_rebuild() {
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let origin_public = origin_kp.public_key();
+    let tool_host_public = tool_host_kp.public_key();
+    let pae = dsse_pae_preimage(&origin_kp, &tool_host_kp);
+
+    chio_federation::bilateral_dsse::reconstruct_dsse_pae(
+        &pae,
+        dsse_binding(&origin_public, &tool_host_public),
+    )
+    .expect("a real pae preimage rebuilds from the statement it carries");
+
+    // The cross-family case: a receipt signing preimage handed to the DSSE
+    // endpoint.
+    let forgery = receipt_signing_preimage(&origin_public);
+    assert!(matches!(
+        chio_federation::bilateral_dsse::reconstruct_dsse_pae(
+            &forgery,
+            dsse_binding(&origin_public, &tool_host_public)
+        ),
+        Err(BilateralCoSigningError::CanonicalJson(_))
+    ));
+
+    // A canonical co-signing body is not a pae preimage either.
+    let receipt = sample_receipt(&tool_host_kp);
+    let body_bytes = CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b")
+        .unwrap()
+        .canonical_bytes()
+        .unwrap();
+    assert!(matches!(
+        chio_federation::bilateral_dsse::reconstruct_dsse_pae(
+            &body_bytes,
+            dsse_binding(&origin_public, &tool_host_public)
+        ),
+        Err(BilateralCoSigningError::CanonicalJson(_))
+    ));
+
+    // A statement that does not name this kernel, with this kernel's key, as
+    // the origin is refused.
+    let third_party = Keypair::generate().public_key();
+    assert_eq!(
+        chio_federation::bilateral_dsse::reconstruct_dsse_pae(
+            &pae,
+            dsse_binding(&third_party, &tool_host_public)
+        )
+        .err(),
+        Some(BilateralCoSigningError::PeerIdentityMismatch)
+    );
+
+    // Truncated framing fails closed rather than signing a prefix.
+    assert!(matches!(
+        chio_federation::bilateral_dsse::reconstruct_dsse_pae(
+            &pae[..pae.len() - 1],
+            dsse_binding(&origin_public, &tool_host_public)
+        ),
+        Err(BilateralCoSigningError::CanonicalJson(_))
+    ));
+}
+
+#[test]
+fn in_process_cosigner_refuses_a_receipt_preimage_on_the_dsse_profile() {
+    use chio_federation::bilateral::BilateralCoSigningProtocol;
+    use chio_federation::bilateral::DsseCoSigningRequest;
+
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let cosigner =
+        InProcessCoSigner::new("kernel.org-a", origin_kp.clone(), tool_host_kp.public_key());
+
+    // The peer authenticates bytes of its own choosing: the canonical signing
+    // preimage of a receipt it invented and attributed to the origin kernel.
+    let forgery = receipt_signing_preimage(&origin_kp.public_key());
+    let request = DsseCoSigningRequest::new(
+        "kernel.org-a".to_string(),
+        "kernel.org-b".to_string(),
+        forgery.clone(),
+        tool_host_kp.sign(&forgery),
+    );
+    assert!(matches!(
+        cosigner.request_dsse_cosignature(&request),
+        Err(BilateralCoSigningError::CanonicalJson(_))
+    ));
+
+    // The real preimage still co-signs.
+    let pae = dsse_pae_preimage(&origin_kp, &tool_host_kp);
+    let request = DsseCoSigningRequest::new(
+        "kernel.org-a".to_string(),
+        "kernel.org-b".to_string(),
+        pae.clone(),
+        tool_host_kp.sign(&pae),
+    );
+    let response = cosigner
+        .request_dsse_cosignature(&request)
+        .expect("a real pae preimage co-signs");
+    assert!(origin_kp
+        .public_key()
+        .verify(&pae, &response.org_a_signature));
+}

@@ -24,7 +24,7 @@ fn exact_v2_migration_creates_no_release_acknowledgements() -> TestResult {
             [],
             |row| row.get::<_, i64>(0)
         )?,
-        3
+        4
     );
     assert_eq!(
         connection.query_row(
@@ -221,7 +221,7 @@ fn exact_unstamped_legacy_source_is_stamped_only_after_successful_migration() ->
             [],
             |row| row.get::<_, i32>(0)
         )?,
-        3
+        4
     );
     Ok(())
 }

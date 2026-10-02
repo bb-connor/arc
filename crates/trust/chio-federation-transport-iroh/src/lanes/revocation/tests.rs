@@ -1369,3 +1369,72 @@ async fn request_manifest_catchup_over_iroh_falls_back_to_inline_without_publish
     }
     router.shutdown().await.ok();
 }
+
+/// A subject source that always names the same capability, so the snapshot
+/// the bridge installs can be checked for the leaf set as well as the root.
+#[derive(Debug)]
+struct FixedSubjects(&'static str);
+
+impl RevokedSubjectSource for FixedSubjects {
+    fn revoked_at(&self, _root: &EpochRoot) -> BTreeSet<RevocationViewSubject> {
+        BTreeSet::from([RevocationViewSubject::new(self.0)])
+    }
+}
+
+#[test]
+fn view_sink_installs_the_root_epoch_hash_and_issue_time() {
+    let signer = signer("did:chio:oracle", SEED_A);
+    let view = Arc::new(RevocationView::new());
+    let sink = RevocationViewSink::new(Arc::clone(&view));
+
+    let root = signed_root(&signer, 7);
+    sink.merge_batch(std::slice::from_ref(&root))
+        .expect("batch merges");
+
+    let snapshot = view.load();
+    assert_eq!(snapshot.epoch, root.root.epoch);
+    assert_eq!(snapshot.root_hash, root.root.root_hash);
+    assert_eq!(snapshot.issued_at_unix_ms, root.root.issued_at_unix_ms);
+    assert!(
+        snapshot.revoked.is_empty(),
+        "the lane carries no leaf set, so the default sink names no subject"
+    );
+}
+
+#[test]
+fn view_sink_installs_only_the_highest_epoch_of_a_batch() {
+    let signer = signer("did:chio:oracle", SEED_A);
+    let view = Arc::new(RevocationView::new());
+    let sink = RevocationViewSink::new(Arc::clone(&view));
+
+    // Out of order on purpose: one monotone compare-and-swap for the batch,
+    // never a partial walk that leaves an intermediate epoch installed.
+    sink.merge_batch(&[
+        signed_root(&signer, 4),
+        signed_root(&signer, 9),
+        signed_root(&signer, 6),
+    ])
+    .expect("batch merges");
+    assert_eq!(view.current_epoch(), 9);
+
+    // A replayed or reordered push advances nothing and still reports success,
+    // so a duplicate delivery never resets the lane.
+    sink.merge_batch(&[signed_root(&signer, 5)])
+        .expect("a stale batch merges nothing");
+    assert_eq!(view.current_epoch(), 9);
+}
+
+#[test]
+fn view_sink_stamps_the_locally_materialised_leaf_set() {
+    let signer = signer("did:chio:oracle", SEED_A);
+    let view = Arc::new(RevocationView::new());
+    let sink = RevocationViewSink::new(Arc::clone(&view))
+        .with_subject_source(Arc::new(FixedSubjects("cap-revoked")));
+
+    sink.merge_root(&signed_root(&signer, 3))
+        .expect("root merges");
+
+    let snapshot = view.load();
+    assert!(snapshot.is_revoked(&RevocationViewSubject::new("cap-revoked")));
+    assert!(!snapshot.is_revoked(&RevocationViewSubject::new("cap-live")));
+}

@@ -1,0 +1,37 @@
+\section{The rule}
+
+A buyer agent at one company asks a vendor at a second to stage a refund.
+The vendor must decide before touching its ledger whether these arguments,
+under this agreement, remain authorized and whether the permitted effect was
+already attempted. Caller identity alone does not answer those questions.
+Retries and replacement agents must not manufacture another authorization.
+
+\dfn{Effective authority is decided inside the kernel that dispatches, against
+roots the receiver activated itself; nothing carried in a request can add a
+root. Signed, content-addressed evidence crosses the organization boundary.}
+The kernel may trust configured capability issuers, but a credential has effect
+only through this local decision. The receiver owns its active agreements,
+pinned keys, validity windows, budgets, and continuation-consumption state.
+This applies established end-to-end and trust-management principles
+\cite{saltzer1984,keynote,howell2000} to the dispatch boundary.
+
+A kernel-signed receipt records the decision. An inbound co-signed statement
+names receiver-held evidence and gates admission. An outbound statement binds
+the newly durable receipt and gates the response; its countersigner reconstructs
+the typed preimage and checks participant identities and key fingerprints.
+That check does not independently reproduce the receiver's policy evaluation.
+Authorization, outcome, and accounting records share cryptographic bindings;
+the property does not require them to be one physical object.
+
+The interface specifies which evidence is authenticated, which local state it
+resolves, and when that state is consumed. Some facts travel as explicit
+references; others can be recovered through a receiver-issued opaque handle.
+OAuth permits that design \cite{rfc6749,rfc8693}. Our comparison measures one
+selected profile and its omitted bindings, not the expressive limits of those
+formats. The research question is whether independent organizations can
+procure, delegate, verify and settle agent work through a common contract while
+retaining local authority. Discovery, messaging and market evidence must bind
+to that contract. Our experiments establish local implementation properties;
+independent deployment and reduced application-specific recovery remain open.
+Python--Rust work, bounded subcontracts and agreed releases establish neither
+independent operation nor novelty.

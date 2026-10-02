@@ -1,0 +1,78 @@
+\section{The receipt}
+\label{sec:receipt}
+
+A receipt is a JSON object with a fixed field set, encoded canonically under
+RFC 8785 \cite{rfc8785}. Three of its projections are hashed, and they nest:
+$b$ drops the \code{id}, the \code{signature}, and the two optional fields
+recording how it was signed; the canonical receipt body $\beta$ is $b$ plus the
+\code{id}; $r$ is the whole receipt as it travels. Write $D$ for SHA-256 of the
+canonical encoding and $k$ for the kernel key published in the body; signatures
+are Ed25519 \cite{rfc8032}.
+
+\[
+\mathit{id} \;=\; D(b),
+\qquad
+\sigma \;=\; \mathrm{Ed25519}_{k}\bigl(\mathrm{JCS}(\{\,\texttt{body}\!: b,\;
+\texttt{id}\!: \mathit{id}\,\})\bigr)
+\]
+
+\noindent
+Each projection has its own wire field: $\mathit{id}$ names the receipt,
+$D(\beta)$ is the subject digest of a co-signed statement, inbound or outbound,
+and $D(r)$ is a binding reference's \code{remote_receipt_sha256}. No two agree,
+because $\beta$ adds the \code{id} to $b$ and $r$ adds $\sigma$ to $\beta$. The
+signature covers a fourth preimage, the object above, which the optional BBS
+signature joins as a third key, so that field is covered by $\sigma$ and not by
+$\mathit{id}$. A receipt renamed is a receipt unsigned.
+Three properties follow.
+
+\dfn{Recompute and refuse.} Where the path holds the evaluated content the
+signer is handed the content, not a digest: it recomputes the digest inside the
+trust boundary and refuses to sign if the body's claimed digest differs.
+
+\dfn{Decisions, not successes.} A denial is a receipt of the same shape, built,
+signed, and persisted on the same path as an allow. Three fields fix what kind
+of statement a receipt is, so a weaker one cannot pose as a stronger one:
+\code{receipt_kind} separates a mediated decision from a passive trace,
+\code{boundary_class} says whether the kernel could have prevented the effect or
+only observed it, and \code{trust_level} records the evidence class. A body
+claiming a decision on a kind that cannot make one is not signed; a message
+rejected before it had a decision to record returns its code and no receipt.
+
+\dfn{Permission, proof, and price in one object.} When the exercised grant
+carries monetary caps the hold taken before dispatch is reconciled into the
+receipt's financial block: \code{cost_charged}, \code{currency},
+\code{budget_remaining}, \code{budget_total}, the delegation depth, and the root
+budget holder. The receipt an auditor reads to learn the call was allowed is the
+object a biller reads to learn what it cost. Settlement between organizations is
+out of scope, and that is our whole claim about commerce.
+
+The vendor kernel's receipt for the refund step, abridged at the metadata:
+\begin{lstlisting}
+{ "id": "d342a59d...6fba2e3f", "timestamp": 1766000001,
+  "capability_id": "lease-vendor-c-refund", "tool_server": "vendor-c.payments",
+  "tool_name": "stage_refund",
+  "action": { "parameters": { "caseRef": "refund-250", "tool": "stage_refund",
+                              "workflowId": "wf-chio-refund-001" },
+              "parameter_hash": "47e6e096...d5a6464b" },
+  "decision": { "verdict": "allow" }, "trust_level": "mediated",
+  "receipt_kind": "mediated_decision", "boundary_class": "prevent",
+  "tool_origin": "caller_executed", "redaction_mode": "none",
+  "content_hash": "c9abf68a...d9803987",
+  "policy_hash":  "82cfea63...fb2ca3fd",
+  "metadata": { "attribution": { "delegation_depth": 0, "grant_index": 0, ... },
+    "chio_runtime": { "accepted": true, "destructive": true,
+      "lease_id": "lease-vendor-c-refund", "step_index": 2,
+      "reserved_treaty_continuation_id": "continuation:runtime-loopback:2" }, ... },
+  "kernel_key": "31debe55...cfa498bc",
+  "signature":  "a9e4762e...1ba28505" }
+\end{lstlisting}
+
+\noindent
+Checked on these bytes: $b$ hashes to \code{d342a59d\ldots{}6fba2e3f}, the
+object's \code{id}; $\beta$ to \code{31118bb6\ldots{}4781b3f9}, the subject
+digest of the statement the vendor mints over it after persisting it
+(Section~\ref{sec:cross}); $r$ to \code{63f1f35a\ldots{}8c93e3e8}, that
+statement's \code{remote_receipt_sha256}. The signing preimage over $b$ verifies
+under the embedded kernel key. This receipt carries no financial block because
+the exercised grant carries no cap.

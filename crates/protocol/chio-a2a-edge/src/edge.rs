@@ -7,6 +7,7 @@ struct DeferredA2aTask {
     request: CrossProtocolExecutionRequest,
     response: TaskResponse,
     deadline: AuthorityDeadline,
+    v1_output_mode: Option<V1OutputMode>,
 }
 
 /// The A2A edge server.
@@ -22,6 +23,7 @@ pub struct ChioA2aEdge {
     /// Maps ambiguous unqualified tool names to the qualified published IDs.
     ambiguous_skill_ids: BTreeMap<String, Vec<String>>,
     task_counter: u64,
+    task_namespace: String,
     tasks: BTreeMap<String, DeferredA2aTask>,
 }
 
@@ -228,8 +230,11 @@ impl ChioA2aEdge {
                         description: skill_candidate.description.clone(),
                         tags: skill_candidate.tags.clone(),
                         examples: None,
-                        input_modes: vec!["text".to_string()],
-                        output_modes: vec!["text".to_string()],
+                        input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+                        output_modes: vec![
+                            "text/plain".to_string(),
+                            "application/json".to_string(),
+                        ],
                         bridge_fidelity: skill_candidate.fidelity.clone(),
                     });
                 }
@@ -267,6 +272,10 @@ impl ChioA2aEdge {
             skill_bindings,
             ambiguous_skill_ids,
             task_counter: 0,
+            // A random identifier prevents stale client task records from
+            // aliasing unrelated work after this process loses its task table.
+            // This public value is not a trust root.
+            task_namespace: chio_core::crypto::Keypair::generate().public_key().to_hex(),
             tasks: BTreeMap::new(),
         })
     }
@@ -333,12 +342,12 @@ impl ChioA2aEdge {
                 protocol_version: "1.0".to_string(),
             }],
             capabilities: AgentCapabilities {
-                streaming: true,
+                streaming: false,
                 push_notifications: false,
                 state_transition_history: false,
             },
-            default_input_modes: vec!["text".to_string()],
-            default_output_modes: vec!["text".to_string()],
+            default_input_modes: vec!["text/plain".to_string(), "application/json".to_string()],
+            default_output_modes: vec!["text/plain".to_string(), "application/json".to_string()],
             skills: self.skills.clone(),
         }
     }
@@ -371,7 +380,10 @@ impl ChioA2aEdge {
             .task_counter
             .checked_add(1)
             .ok_or(A2aEdgeError::TaskCapacity)?;
-        Ok(format!("a2a-task-{}", self.task_counter))
+        Ok(format!(
+            "a2a-task-{}-{}",
+            self.task_namespace, self.task_counter
+        ))
     }
 
     fn prune_deferred_tasks(&mut self, now: ClockReading) -> Result<(), ClockError> {
@@ -622,6 +634,7 @@ impl ChioA2aEdge {
                 request: orchestrated_request,
                 response: response.clone(),
                 deadline,
+                v1_output_mode: None,
             },
         );
         Ok(response)
@@ -644,6 +657,14 @@ impl ChioA2aEdge {
         };
         let should_respond = id.is_some();
         let id = id.unwrap_or(Value::Null);
+        if matches!(method.as_str(), "SendMessage" | "GetTask" | "CancelTask") {
+            let response = self.handle_v1_jsonrpc(id, &method, params, kernel, execution);
+            return if should_respond {
+                response
+            } else {
+                response.suppress_wire_response()
+            };
+        }
         if let Err(response) = Self::ensure_jsonrpc_params_object_for_supported_method(
             &id,
             &method,

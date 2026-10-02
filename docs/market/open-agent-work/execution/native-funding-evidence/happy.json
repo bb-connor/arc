@@ -1,0 +1,46 @@
+{
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "fundingTransaction": "0x8d84084a92803dcd4899e09ac4b6fb018aa17cc11d4696c06808ed7befbf7edb",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded"
+  },
+  "first": {
+    "allocationId": "0x27bf33a8b94eb9e744a42ee3317ba0d497f03d807eae42df400740a719af9526",
+    "authorityUuid": "01a0a1f8-20bc-7ab0-9f9f-5aaf0cebfc38",
+    "authorizationId": "funded-27bf33a8b94eb9e744a42ee3317ba0d497f03d807eae42df400740a719af9526",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:1db21a2ba4d8e5a605eabf93bad765763a2dd9171422c96f80a276cc19ba1b26:0",
+    "nativeAuthorizationId": "funded-27bf33a8b94eb9e744a42ee3317ba0d497f03d807eae42df400740a719af9526",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: claim decision and ERC20 withdrawal have not been observed",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "1db21a2ba4d8e5a605eabf93bad765763a2dd9171422c96f80a276cc19ba1b26",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "startupReconciliationError": null
+  },
+  "replay": {
+    "allocationId": "0x27bf33a8b94eb9e744a42ee3317ba0d497f03d807eae42df400740a719af9526",
+    "authorityUuid": "01a0a1f8-20bc-7ab0-9f9f-5aaf0cebfc38",
+    "authorizationId": "funded-27bf33a8b94eb9e744a42ee3317ba0d497f03d807eae42df400740a719af9526",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:1db21a2ba4d8e5a605eabf93bad765763a2dd9171422c96f80a276cc19ba1b26:0",
+    "nativeAuthorizationId": "funded-27bf33a8b94eb9e744a42ee3317ba0d497f03d807eae42df400740a719af9526",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "1db21a2ba4d8e5a605eabf93bad765763a2dd9171422c96f80a276cc19ba1b26",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "startupReconciliationError": "durable admission failed: payment rail unavailable: claim decision and ERC20 withdrawal have not been observed"
+  }
+}

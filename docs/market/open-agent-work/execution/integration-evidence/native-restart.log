@@ -1,0 +1,139 @@
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 3m 27s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-c608ca76d0a26201)
+security::adapters::tests::native_flow::support::process_recovery::baseline_before_participants: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_capture_before_connector: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_capture_transaction_rollback: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_database_commit_before_anchor: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_effect_started: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_evaluation_started: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_output_resolved: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_release_acknowledged: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_release_checkpointed: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_return_persisted: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_reversible_reservation: test
+security::adapters::tests::native_flow::support::process_recovery::baseline_terminal_projected: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report: test
+security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification: test
+security::adapters::tests::native_flow::support::process_recovery::combined_capture_transaction_rollback: test
+security::adapters::tests::native_flow::support::process_recovery::combined_database_commit_before_anchor: test
+security::adapters::tests::native_flow::support::process_recovery::combined_effect_started: test
+security::adapters::tests::native_flow::support::process_recovery::combined_release_checkpointed: test
+security::adapters::tests::native_flow::support::process_recovery::combined_reversible_reservation: test
+security::adapters::tests::native_flow::support::process_recovery::competing_native_recovery_workers_converge_on_original_terminalization: test
+security::adapters::tests::native_flow::support::process_recovery::cumulative_capture_transaction_rollback: test
+security::adapters::tests::native_flow::support::process_recovery::cumulative_database_commit_before_anchor: test
+security::adapters::tests::native_flow::support::process_recovery::cumulative_release_checkpointed: test
+security::adapters::tests::native_flow::support::process_recovery::declassification_capture_transaction_rollback: test
+security::adapters::tests::native_flow::support::process_recovery::declassification_database_commit_before_anchor: test
+security::adapters::tests::native_flow::support::process_recovery::declassification_effect_started: test
+security::adapters::tests::native_flow::support::process_recovery::declassification_output_joined: test
+security::adapters::tests::native_flow::support::process_recovery::declassification_release_checkpointed: test
+security::adapters::tests::native_flow::support::process_recovery::late_caller_report_cannot_replace_native_unknown_outcome: test
+security::adapters::tests::native_flow::support::process_recovery::nonce_capture_transaction_rollback: test
+security::adapters::tests::native_flow::support::process_recovery::nonce_database_commit_before_anchor: test
+security::adapters::tests::native_flow::support::process_recovery::nonce_effect_started: test
+security::adapters::tests::native_flow::support::process_recovery::nonce_release_checkpointed: test
+security::adapters::tests::native_flow::support::process_recovery::races::duplicate_native_start_cannot_steal_the_live_operation: test
+security::adapters::tests::native_flow::support::process_recovery::races::revocation_after_native_capture_fences_connector_handoff: test
+security::adapters::tests::native_flow::support::process_recovery::races::revocation_wins_before_native_capture: test
+
+47 tests, 0 benchmarks
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 18m 47s
+     Running unittests src/lib.rs (target/debug/deps/chio_control_plane-c608ca76d0a26201)
+
+running 47 tests
+test security::adapters::tests::native_flow::support::process_recovery::baseline_before_participants ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_capture_before_connector ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_capture_transaction_rollback ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_database_commit_before_anchor ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_effect_started ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_evaluation_started ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_output_resolved ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_release_acknowledged ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_release_checkpointed ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_return_persisted ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_reversible_reservation ... ok
+test security::adapters::tests::native_flow::support::process_recovery::baseline_terminal_projected ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_atomic_capture ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_claim_before_effect ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_durable_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_effect_without_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_output_join ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_raw_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_acknowledgement ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_release_checkpoint ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_after_terminal_projection ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_abort_before_atomic_capture ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_release ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_combined_disclosure_abort_after_report ... ok
+test security::adapters::tests::native_flow::support::process_recovery::caller::native_caller_output_recovery_rejects_changed_classification ... ok
+test security::adapters::tests::native_flow::support::process_recovery::combined_capture_transaction_rollback ... ok
+test security::adapters::tests::native_flow::support::process_recovery::combined_database_commit_before_anchor ... ok
+test security::adapters::tests::native_flow::support::process_recovery::combined_effect_started ... ok
+test security::adapters::tests::native_flow::support::process_recovery::combined_release_checkpointed ... ok
+test security::adapters::tests::native_flow::support::process_recovery::combined_reversible_reservation ... ok
+test security::adapters::tests::native_flow::support::process_recovery::competing_native_recovery_workers_converge_on_original_terminalization ... ok
+test security::adapters::tests::native_flow::support::process_recovery::cumulative_capture_transaction_rollback ... ok
+test security::adapters::tests::native_flow::support::process_recovery::cumulative_database_commit_before_anchor ... ok
+test security::adapters::tests::native_flow::support::process_recovery::cumulative_release_checkpointed ... ok
+test security::adapters::tests::native_flow::support::process_recovery::declassification_capture_transaction_rollback ... ok
+test security::adapters::tests::native_flow::support::process_recovery::declassification_database_commit_before_anchor ... ok
+test security::adapters::tests::native_flow::support::process_recovery::declassification_effect_started ... ok
+test security::adapters::tests::native_flow::support::process_recovery::declassification_output_joined ... ok
+test security::adapters::tests::native_flow::support::process_recovery::declassification_release_checkpointed ... ok
+test security::adapters::tests::native_flow::support::process_recovery::late_caller_report_cannot_replace_native_unknown_outcome ... ok
+test security::adapters::tests::native_flow::support::process_recovery::nonce_capture_transaction_rollback ... ok
+test security::adapters::tests::native_flow::support::process_recovery::nonce_database_commit_before_anchor ... ok
+test security::adapters::tests::native_flow::support::process_recovery::nonce_effect_started ... ok
+test security::adapters::tests::native_flow::support::process_recovery::nonce_release_checkpointed ... ok
+test security::adapters::tests::native_flow::support::process_recovery::races::duplicate_native_start_cannot_steal_the_live_operation ... ok
+test security::adapters::tests::native_flow::support::process_recovery::races::revocation_after_native_capture_fences_connector_handoff ... ok
+test security::adapters::tests::native_flow::support::process_recovery::races::revocation_wins_before_native_capture ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 1087 filtered out; finished in 1201.31s
+
+native process failure and restart passed (47 exact tests)
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 6m 39s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+admission_operation::sequencer::tests::identical_fences_exclude_duplicate_live_operations_until_drop: test
+admission_operation::sequencer::tests::identical_store_fences_share_one_mutation_sequence: test
+admission_operation::sequencer::tests::poisoned_live_registry_denies_acquisition_and_drop_does_not_panic: test
+admission_operation::sequencer::tests::unrelated_live_operations_do_not_hold_the_mutation_lock: test
+admission_operation::sequencer::tests::unwinding_releases_live_ownership_without_poisoning_the_registry: test
+
+5 tests, 0 benchmarks
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 23.11s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+
+running 5 tests
+test admission_operation::sequencer::tests::identical_fences_exclude_duplicate_live_operations_until_drop ... ok
+test admission_operation::sequencer::tests::identical_store_fences_share_one_mutation_sequence ... ok
+test admission_operation::sequencer::tests::poisoned_live_registry_denies_acquisition_and_drop_does_not_panic ... ok
+test admission_operation::sequencer::tests::unrelated_live_operations_do_not_hold_the_mutation_lock ... ok
+test admission_operation::sequencer::tests::unwinding_releases_live_ownership_without_poisoning_the_registry ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1435 filtered out; finished in 0.06s
+
+live admission ownership passed (5 exact tests)

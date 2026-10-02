@@ -1,0 +1,35 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 19.04s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-b067e73033312bae)
+
+running 27 tests
+test funded_work::tests::allocation_matches_the_independent_contract_vector ... ok
+test funded_work::tests::allocation_rejects_lossy_or_ambiguous_money ... ok
+test funded_work::tests::native::admission_without_a_payment_participant_remains_inspectable ... ok
+test funded_work::tests::native::changed_request_and_unavailable_observer_cannot_reserve ... ok
+test funded_work::tests::native::concurrent_retries_cannot_duplicate_native_dispatch_or_hold ... ok
+test funded_work::tests::native::fresh_native_authority_cannot_inherit_funded_agreement ... ok
+test funded_work::tests::native::invalid_observations_deny_before_any_native_operation_hold_or_dispatch ... ok
+test funded_work::tests::native::observation_lost_during_authorization_keeps_original_native_identity ... ok
+test funded_work::tests::native::original_capability_expiry_and_scope_deny_before_reservation ... ok
+test funded_work::tests::native::resigning_another_request_cannot_reuse_the_original_deposit ... ok
+test funded_work::tests::native::restart_and_replay_preserve_one_operation_and_original_hold ... ok
+test funded_work::tests::native::retention_capacity_denies_before_an_additional_native_reservation ... ok
+test funded_work::tests::native::signed_agreement_rejects_identity_and_signature_substitution ... ok
+test funded_work::tests::native::verified_funding_creates_one_native_operation_and_hold ... ok
+test funded_work::tests::observer::receiver_verifies_exact_funded_state_and_confirmed_ancestry ... ok
+test funded_work::tests::observer::stale_chain_time_cannot_be_refreshed_by_a_new_receiver_timestamp ... ok
+test https::tests::advertised_origin_cannot_change_scheme_or_route ... ok
+test https::tests::public_enrollment_rejects_keys_and_malformed_certificates ... ok
+test subcontract::tests::disclosure_reconstructs_authentication_without_nested_private_data ... ok
+test subcontract::tests::even_valid_promisor_signatures_cannot_widen_the_exact_procurement ... ok
+test subcontract::tests::four_keys_and_exact_disclosure_are_required ... ok
+test subcontract::tests::parent_signature_cannot_replace_specialist_evidence ... ok
+test tests::authentication_review_observes_inheritance_and_explicit_anonymous_alternatives ... ok
+test tests::authentication_review_rejects_ambiguous_or_unsupported_security_semantics ... ok
+test tests::buyer_rejects_widened_offers_even_when_provider_resigns_them ... ok
+test tests::release_vectors_require_exact_joint_authority_and_completed_receipt ... ok
+test work_buyer::tests::conflicting_verified_terminals_cannot_change_the_first_accounting_choice ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 43.55s

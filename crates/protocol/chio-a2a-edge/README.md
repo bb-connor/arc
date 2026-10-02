@@ -10,6 +10,26 @@ upstream MCP server) and `chio-mcp-edge` (the MCP hosting runtime).
 
 ## Responsibilities
 
+The JSON-RPC handler accepts A2A 1.0 `SendMessage`, `GetTask`, and `CancelTask`
+with standard untagged message parts, task states, and result envelopes.
+`message.messageId` becomes the kernel request id. The caller's authenticated
+execution context supplies authority; message metadata cannot supply it.
+The older slash-form methods remain available for existing integrations.
+
+`SendMessage` blocks by default. With `configuration.returnImmediately: true`,
+it retains a task for execution on `GetTask`. Results and cancellations remain
+retrievable within the existing in-memory task TTL. The 1.0 path limits all
+retained tasks, including completed results. Each edge instance generates a
+fresh task namespace, so a restarted provider rejects old identifiers rather
+than resolving them to unrelated work. This is not durable provider recovery or
+deduplication of repeated `SendMessage` calls.
+
+The Agent Card advertises `text/plain` and `application/json`, and does not
+advertise SSE streaming. Multi-turn contexts, tenant routing, history, file
+parts and message extensions are rejected by this bounded 1.0 projection.
+The HTTP host remains responsible for authentication, request size limits,
+TLS and protocol-version header enforcement.
+
 - Turn a set of Chio `ToolManifest`s into an A2A Agent Card: resolve each
   tool's target protocol, evaluate `BridgeFidelity`, assign collision-safe
   skill ids, and publish only skills whose fidelity resolves to

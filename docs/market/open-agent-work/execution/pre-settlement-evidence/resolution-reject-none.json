@@ -1,0 +1,130 @@
+{
+  "after": {
+    "allocationId": "0x008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+    "authorityUuid": "01a0a349-1aa3-7592-9d2a-621294115318",
+    "authorizationId": "funded-008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:7de1a1913212aee5db6845bf23ca5241f98ef8cde9ee51786c61ddfd9fee71c6:0",
+    "nativeAuthorizationId": "funded-008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Resolved",
+    "nativeState": "Completed",
+    "operationId": "7de1a1913212aee5db6845bf23ca5241f98ef8cde9ee51786c61ddfd9fee71c6",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5",
+    "startupReconciliationError": null
+  },
+  "before": {
+    "allocationId": "0x008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+    "authorityUuid": "01a0a349-1aa3-7592-9d2a-621294115318",
+    "authorizationId": "funded-008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:7de1a1913212aee5db6845bf23ca5241f98ef8cde9ee51786c61ddfd9fee71c6:0",
+    "nativeAuthorizationId": "funded-008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "7de1a1913212aee5db6845bf23ca5241f98ef8cde9ee51786c61ddfd9fee71c6",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5",
+    "startupReconciliationError": null
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 1,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x3e8606bf81daa2a40593780d60c615b9817e3b969fa9e0dca298e9a64f8a28c9",
+    "paid": "0",
+    "payerBalance": "1000",
+    "refunded": "100",
+    "state": "Refunded",
+    "transactions": {
+      "pay": [],
+      "record": [
+        {
+          "hash": "0x621d120624d7d8d4c3c559b1b484a5304e2a5777a91273a6161f122ce751fdb3",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [
+        {
+          "hash": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5",
+          "nonce": 2,
+          "status": 1
+        }
+      ],
+      "submit": [
+        {
+          "hash": "0x9be05ca2a399673adbd714c93d5faa94d13468e2f2fde83b05332e4119f7704b",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "financial": {
+    "budget_remaining": 0,
+    "budget_total": 100,
+    "cost_breakdown": {
+      "payment": {
+        "authorization_id": "funded-008e9a1ced3ba4cff07ca5ef2d60f60388b7d2b315c76e9c061a53572665347d",
+        "contractual_resolution": {
+          "evidenceDigest": "f112a619bb71553ef9c6042b11048884c5e919729cf5a8c0ba4b00aadc287447",
+          "evidenceId": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5",
+          "kind": "contractual_capture_waiver",
+          "operationId": "7de1a1913212aee5db6845bf23ca5241f98ef8cde9ee51786c61ddfd9fee71c6",
+          "operationVersion": 7
+        },
+        "preauthorized_units": 100,
+        "rail": "experimental-claim-allocation-v1",
+        "rail_mode": "reversible_hold",
+        "recorded_units": 100,
+        "transaction_id": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5"
+      }
+    },
+    "cost_charged": 0,
+    "currency": "XTS",
+    "delegation_depth": 0,
+    "grant_index": 0,
+    "payment_reference": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5",
+    "root_budget_holder": "ce5ec7fc33037a3380d96532dcf6fa020a46b92901d538a3a00da94eb8c030ac",
+    "settlement_status": "failed"
+  },
+  "killedSignal": null,
+  "resolution": {
+    "recordSha256": "9974c591d7a7d7dc18cae64ac1d8b72f9f4f990e71eae7209e311bb07396a3cc",
+    "refundTransaction": "0xf7388291b556502a1b85fcfe5f6e213eb789988f18d5db9b40a867fa4e8cded5",
+    "resolutionSha256": "f112a619bb71553ef9c6042b11048884c5e919729cf5a8c0ba4b00aadc287447",
+    "resolved": true
+  },
+  "sourceAfter": {
+    "budget_authorization_holds": "3ed0843f0d0489c5099d33f81f6e62aa6de9a470e692612443d66eac00925d03",
+    "budget_mutation_events": "0536033fcb6e119447fcd82c4048eaa87f621c6710e516cfff438bd386fc55b1",
+    "payment_journal": "f2b7b289677b53b6daffdfe509c44098931c00c10da33daf18bb89b1df1076f1",
+    "rawOutcome": "d657ae97c8d09f9f1a98a4323cbfda257dc2087dba1044891f6e73b0186161bb"
+  },
+  "sourceBefore": {
+    "budget_authorization_holds": "3ed0843f0d0489c5099d33f81f6e62aa6de9a470e692612443d66eac00925d03",
+    "budget_mutation_events": "0536033fcb6e119447fcd82c4048eaa87f621c6710e516cfff438bd386fc55b1",
+    "payment_journal": "f2b7b289677b53b6daffdfe509c44098931c00c10da33daf18bb89b1df1076f1",
+    "rawOutcome": "d657ae97c8d09f9f1a98a4323cbfda257dc2087dba1044891f6e73b0186161bb"
+  }
+}

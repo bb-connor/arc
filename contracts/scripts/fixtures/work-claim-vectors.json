@@ -1,0 +1,75 @@
+{
+  "schema": "chio.experimental.work-claim-abi-vector.v1",
+  "scope": "Deterministic local fixture with opaque Keccak label commitments, not registered canonical work artifacts or company keys.",
+  "domain": {
+    "name": "ChioWorkClaimEscrow",
+    "version": "1",
+    "chainId": 31337,
+    "verifyingContract": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab"
+  },
+  "terms": {
+    "agreementDigest": "0xe1d5e7977e7776858f77e42aa5505a28cdb0b6c35bad05a57ec1ac95c5d42547",
+    "payer": "0xffcf8fdee72ac11b5c542428b35eef5769c409f0",
+    "beneficiary": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+    "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d",
+    "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+    "amount": "100",
+    "submitBy": 1789344002,
+    "challengeUntil": 1789344004,
+    "resolveBy": 1789344006,
+    "refundAfter": 1789344008
+  },
+  "allocationAbiTypes": [
+    "uint256",
+    "address",
+    "tuple(bytes32 agreementDigest,address payer,address beneficiary,address verifier,address token,uint256 amount,uint64 submitBy,uint64 challengeUntil,uint64 resolveBy,uint64 refundAfter)"
+  ],
+  "allocationId": "0x2d47eebb8e6cbeec1b78ee266bf5540826afe1f9d3e80b1dabb8d35aeb9a228b",
+  "decisionTypes": {
+    "ChioWorkDecision": [
+      {
+        "name": "allocationId",
+        "type": "bytes32"
+      },
+      {
+        "name": "agreementDigest",
+        "type": "bytes32"
+      },
+      {
+        "name": "commitment",
+        "type": "bytes32"
+      },
+      {
+        "name": "decisionDigest",
+        "type": "bytes32"
+      },
+      {
+        "name": "accepted",
+        "type": "bool"
+      },
+      {
+        "name": "beneficiary",
+        "type": "address"
+      },
+      {
+        "name": "token",
+        "type": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256"
+      }
+    ]
+  },
+  "decision": {
+    "allocationId": "0x2d47eebb8e6cbeec1b78ee266bf5540826afe1f9d3e80b1dabb8d35aeb9a228b",
+    "agreementDigest": "0xe1d5e7977e7776858f77e42aa5505a28cdb0b6c35bad05a57ec1ac95c5d42547",
+    "commitment": "0xdf2e094cda4de966de648b49bb33e4cc78940d8747c74548217090b9a507ce9f",
+    "decisionDigest": "0x3771f41d52effa49bfd5d89204c37ca95d65b6d8b04ae9d6da2655cdd131e1a2",
+    "accepted": true,
+    "beneficiary": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+    "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+    "amount": "100"
+  },
+  "decisionAuthorizationHash": "0xa97c61c44f6e8b76c6253fab4d062bf0c922a47fc6b36dc94fd6b76aa3e0b782"
+}

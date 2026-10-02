@@ -18,13 +18,20 @@ The reference model must stay small and separate from production implementation 
 
 The normalized proof-facing AST is treated as a third implementation surface, not as the oracle. A passing test should mean the reference model, production runtime type, and normalized type agree on the current bounded semantics.
 
-The treaty predicate oracle covers the production-shaped fields and
-constructors represented by `PredicateLang.AdmissionView` and
-`PredicateLang.Predicate`. It compares that bounded model with
-`chio-runtime-core` but does not replace the production admission hook,
-signature verification, continuation validation, evidence resolution, or
-storage checks. Property tests use bounded trees that remain below the
-production evaluator's depth and node limits.
+The treaty predicate oracle covers the bounded receipt-predicate fragment.
+`SpecTreatyReceiptView`, `SpecTreatyPredicateAtom`, and `SpecTreatyPredicate`
+in `src/spec.rs` are an independent Rust interpretation of `ReceiptView`,
+`Atom`, and `Predicate` in
+`formal/lean4/Chio/Chio/Treaty/ReceiptPredicate.lean`, and
+`tests/treaty_predicate_diff.rs` compares that model with the
+`chio-runtime-core` bounded evaluator over shared generated data. No Lean is
+executed. The admission-projection language in `PredicateLang.lean`
+(`AdmissionView`, `AtomTag`) has no differential oracle here; its only Rust
+relationship is the abstraction-anchor mirror in `formal/proof-manifest.toml`.
+The oracle does not replace the production admission hook, signature
+verification, continuation validation, evidence resolution, or storage
+checks. Property tests use bounded trees that remain below the production
+evaluator's depth and node limits.
 
 ## Counterexample Regressions
 

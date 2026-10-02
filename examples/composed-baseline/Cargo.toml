@@ -1,0 +1,39 @@
+[package]
+name = "chio-composed-baseline"
+description = "A receiver-side composition of off-the-shelf parts (pinned peer identity, a signing policy engine, a replay table, a tool server) measured against the same corpora as the Chio cross-organization receiver"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+license = "Apache-2.0"
+repository = "https://github.com/backbay-labs/chio"
+publish = false
+
+# Its own workspace root. This project is deliberately not a member of the Chio
+# workspace: it is the alternative, not part of the system under comparison, and
+# it carries its own lockfile so the parts it composes are pinned independently.
+[workspace]
+
+[lib]
+name = "chio_composed_baseline"
+path = "src/lib.rs"
+
+[[bin]]
+name = "run-composed-baseline"
+path = "src/bin/run_composed_baseline.rs"
+
+[dependencies]
+# The one Chio dependency, and it is deliberate: the baseline signs, hashes and
+# canonicalizes with exactly the primitives the Chio receiver uses, so a latency
+# difference between the two is a difference in what they check, never a
+# difference in whose Ed25519 or whose RFC 8785 encoder was linked.
+chio-core-types = { path = "../../crates/core/chio-core-types" }
+rusqlite = { version = "0.39", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.release]
+debug = false

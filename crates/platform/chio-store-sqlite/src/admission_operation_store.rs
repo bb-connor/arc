@@ -84,6 +84,7 @@ mod obligation;
 mod participant;
 mod projection;
 mod retained_request;
+pub(crate) use retained_request::load_retained_request_tx;
 mod runtime_participant;
 mod runtime_replay;
 mod schema;
@@ -108,6 +109,8 @@ pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantStateInitialization,
 };
+pub(crate) mod contractual_resolution;
+mod contractual_resolution_read;
 mod store;
 pub(crate) use store::claim_lease_tx;
 
@@ -149,6 +152,7 @@ pub(crate) fn resolve_recovery_authority<'a>(
     }
 }
 mod threshold_approval;
+pub(crate) mod unknown_release;
 
 use commit_chain::append_operation_commit;
 pub(crate) use commit_chain::{
@@ -216,7 +220,7 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 34;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 36;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
@@ -236,6 +240,8 @@ const MAX_RECOVERY_LEASE_DURATION_MS: u64 = 5 * 60 * 1_000;
 const COMBINED_CAPTURE_OPERATION_MUTATION_KIND: &str = "compare_and_swap";
 
 const ADMISSION_OPERATION_SCHEMA: &str = include_str!("admission_operation_store.sql");
+const UNKNOWN_PAYMENT_RELEASE_SCHEMA: &str =
+    include_str!("admission_operation_unknown_release.sql");
 const GOVERNED_APPROVAL_CLAIM_SCHEMA: &str =
     include_str!("admission_operation_governed_approval_claim.sql");
 const RUNTIME_REPLAY_MIGRATION_SCHEMA: &str =
@@ -315,6 +321,19 @@ impl SqliteAdmissionOperationStore {
         let transaction = self.begin_read(&mut connection)?;
         schema::observe_authority_time(&transaction, &self.serving_owner)
             .map(chio_security_types::clock::UnixMillis::new)
+    }
+
+    /// Export an already committed unknown outcome under the supplied local key.
+    /// This reads the qualified store and never reopens the operation or moves money.
+    /// Receivers must pin the expected signer and bind the exported request locally.
+    pub fn export_outcome_unknown_projection(
+        &self,
+        operation_id: &AdmissionOperationId,
+        signer: &chio_core::crypto::Keypair,
+    ) -> Result<SignedAdmissionTerminalProjectionV1, AdmissionOperationStoreError> {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        projection::export_outcome_unknown_projection(&transaction, operation_id, signer)
     }
 
     pub(crate) fn open_alongside(
@@ -1335,7 +1354,18 @@ fn decode_row(raw: RawOperationRow) -> Result<StoredOperation, AdmissionOperatio
 }
 
 fn load_by_operation_id_tx(
-    transaction: &Transaction<'_>,
+    transaction: &Connection,
+    operation_id: &AdmissionOperationId,
+) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
+    let stored = load_by_operation_id_without_terminal_projection_tx(transaction, operation_id)?;
+    if let Some(stored) = &stored {
+        verify_stored_terminal_projection(transaction, stored)?;
+    }
+    Ok(stored)
+}
+
+fn load_by_operation_id_without_terminal_projection_tx(
+    transaction: &Connection,
     operation_id: &AdmissionOperationId,
 ) -> Result<Option<StoredOperation>, AdmissionOperationStoreError> {
     let raw = transaction
@@ -1367,7 +1397,6 @@ fn load_by_operation_id_tx(
         runtime_participant::verify_operation(transaction, &stored.operation)?;
         governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
         dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
-        verify_stored_terminal_projection(transaction, stored)?;
     }
     Ok(stored)
 }

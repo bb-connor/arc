@@ -1,0 +1,11 @@
+{
+  "schema": "chio.experimental.funded-w0-checker.v1",
+  "checkerId": "openapi-explicit-auth-v1",
+  "predicate": "Exact sorted inventory of declared authentication for supported inline OpenAPI 3.1.0 operations. No deployed API security claim.",
+  "inputMaxBytes": 65536,
+  "outputMaxBytes": 65536,
+  "jsonMaxDepth": 16,
+  "pythonSourceSha256": "3293712bc70c426462ceae97551b9efd3936fdab722960577a7b7b2afce74ef9",
+  "pythonProtocolSha256": "5891d6d04e4f329f24078df332269e319a8e5f3cac031af5e0af93ef82523907",
+  "rustSourceSha256": "bc491412dd649ba4fbd49c5409c39740acd30bbfa6618ef81c40188235828919"
+}

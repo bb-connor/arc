@@ -1,0 +1,11 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-conformance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-conformance)
+    Finished `test` profile [unoptimized] target(s) in 2m 51s
+     Running tests/a2a_client_edge_interop.rs (target/debug/deps/a2a_client_edge_interop-e2b8c3c9a3d8129e)
+
+running 2 tests
+test a2a_client_calls_kernel_edge_and_reads_bound_task ... ok
+test a2a_client_receives_signed_kernel_denial_without_tool_dispatch ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+

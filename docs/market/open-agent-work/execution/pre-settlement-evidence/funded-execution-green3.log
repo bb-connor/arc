@@ -1,0 +1,35 @@
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+warning: function `setup_with_requirements` is never used
+  --> src/funded_work/smoke.rs:56:15
+   |
+56 | pub(super) fn setup_with_requirements(
+   |               ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-federated-work` (bin "chio-federated-work" test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 19.18s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-ec8305597a8f01bf)
+
+running 9 tests
+test funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing ... ok
+test funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle ... ok
+test funded_work::tests::evidence::authenticated_wrong_result_is_rejected_without_replacing_execution ... ok
+test funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+ok
+test funded_work::tests::execution_authority::accepted_execution_decision_replays_after_finding_expiry ... ok
+test funded_work::tests::execution_authority::invalid_execution_standing_cannot_mint_either_financial_decision ... ok
+test funded_work::tests::successors::legacy_funding_cannot_acquire_a_waiver_after_execution ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 53 filtered out; finished in 47.16s

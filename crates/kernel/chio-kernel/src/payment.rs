@@ -17,6 +17,14 @@ pub use types::*;
 mod journal;
 pub use journal::*;
 
+mod contractual_resolution;
+pub use contractual_resolution::*;
+mod contractual_resolution_record;
+pub use contractual_resolution_record::*;
+
+mod unknown_release;
+pub use unknown_release::*;
+
 /// Trait for executing payments against an external rail.
 pub trait PaymentAdapter: Send + Sync {
     fn rail_id(&self) -> &'static str {
@@ -71,6 +79,9 @@ pub trait PaymentAdapter: Send + Sync {
     /// This query must remain answerable when `authorization_id` is absent so
     /// recovery can close the crash window after authorization but before the
     /// rail-assigned identifier reaches the local journal.
+    /// `NoAuthorization` must also rule out an outstanding authorization that
+    /// could still complete for this reference. Eventually consistent absence
+    /// is insufficient; return `Unavailable` while that outcome is uncertain.
     fn settlement_state(
         &self,
         reference: &str,

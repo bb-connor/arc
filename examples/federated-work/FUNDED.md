@@ -1,0 +1,302 @@
+# Verified funding, native settlement and surviving child obligations
+
+The experimental entry point connects a private-chain `ChioWorkClaimEscrow`
+allocation to one durable native operation and one budget hold. The kernel
+executes the existing W0 OpenAPI checker. Recovery retains the original request,
+operation, hold and allocation, including when the worker is killed before its
+acknowledgement reaches the native journal.
+
+The admission-only command leaves the contract **Funded** and native payment
+**pending**. The lifecycle command continues through a native Finding artifact,
+custody retrieval, independent W0 verification, observed claim and decision,
+and an actual mock ERC20 payout or refund on those same identities. The resolution
+command completes explicitly authorized capture waivers while retaining consumed
+work cost. The child command proves an earned child can collect after its native
+parent dies and the parent allocation refunds.
+
+## Reproduce
+
+Use Rust, Node and the locked contract dependencies. From the repository root:
+
+```sh
+cd contracts
+pnpm install --frozen-lockfile --ignore-scripts
+cd ..
+CARGO_TARGET_DIR=target cargo build --locked --manifest-path examples/federated-work/Cargo.toml
+python3 -B examples/federated-work/funded_smoke.py
+```
+
+For the lifecycle, set `CHIO_FUNDED_PYTHON` to a Python environment installed from
+`python_buyer/requirements.txt` with `pip install --require-hashes -r ...`:
+
+```sh
+export CHIO_FUNDED_PYTHON=/absolute/path/to/venv/bin/python
+python3 -B examples/federated-work/funded_lifecycle.py
+python3 -B examples/federated-work/funded_resolution.py
+python3 -B examples/federated-work/funded_child.py
+CHIO_FUNDED_PYTHON="$CHIO_FUNDED_PYTHON" CARGO_TARGET_DIR=target cargo test --locked \
+  --manifest-path examples/federated-work/Cargo.toml funded_work::tests -- --ignored --test-threads=1
+```
+
+`experimental-funded-lifecycle STATE MODE [FAULT]` supports `pay`, `reject`,
+`absent` and `unavailable`. `preexpired` exercises an independent caller's
+separate timeout transaction. With a fault, `pay-expired` and `reject-expired`
+advance fixture time past the original deadlines after killing the worker.
+The harness enumerates the supported fault points. Each invocation requires
+new empty state; each recovery within that invocation reopens the same state.
+The implementation digest intentionally rejects older experimental databases.
+On Unix, `unknown` kills the worker after W0 executes but before native outcome
+recording, then refunds without replay. `undispatched` kills after allocation
+binding but before acknowledgement, then refunds and completes the original
+pre-dispatch release. Both are exercised by the lifecycle harness.
+
+The smoke runs the normal path and four actual SIGKILL scenarios. It checks
+the original native IDs, authoritative SQLite operation/hold counts, actual
+W0 invocation count, native payment state, budget hold disposition and independent
+contract/token balances. Node owns a fresh
+in-process Ganache chain. The native worker can request only the fixed lifecycle operations for
+its one allocation over an owned local socket. There is no external RPC option,
+external key input or legacy credit fallback. Process-loss scenarios require
+Unix.
+
+To retain a private reproduction directory and print its public summary:
+
+```sh
+state=$(mktemp -d /tmp/chio-native-funding-XXXXXX)
+target/debug/chio-federated-work experimental-funded-smoke "$state"
+```
+
+Append `after-stage`, `before-bind`, `after-hold` or `after-tool` for a killed-worker run. State
+must be empty. The directory contains generated private keys and capability
+material; retain only the emitted summary as public evidence.
+
+Run the standalone Rust checks explicitly; root workspace tests exclude this
+example:
+
+```sh
+CARGO_TARGET_DIR=target cargo test --locked --manifest-path examples/federated-work/Cargo.toml
+CARGO_TARGET_DIR=target cargo clippy --locked --manifest-path examples/federated-work/Cargo.toml --all-targets -- -D warnings
+cargo test -p chio-kernel --test durable_admission_sqlite
+```
+
+## Admission contract
+
+`chio.experimental.native-funded-w0-agreement.v2` is a registered experimental
+agreement. Buyer and provider signatures cover the receiver policy digest,
+native authority UUID, complete original request digest, original request ID,
+chain/deployment/code pins, actors, amount and deadlines, plus the exact original
+Finding verifier context and required facets. Amounts use canonical
+positive decimal strings bounded by `2^53 - 1`. The profile fixes the price at
+100 mock base units; native `XTS` units map one-to-one to that pinned token.
+
+The receiver owns the funding source. Work requests cannot supply an observation
+or a `finalized` flag. Rust independently checks the allocation ABI, exact Funded
+event, successful transaction, exact incoming token transfer, immutable work
+terms, unclaimed state, token backing and block-pinned reads. The receiver also
+checks code hashes, genesis, contiguous ancestry, two descendant blocks and a
+separate head read. The chain head must be recent; the observation must complete
+within 30 seconds. Original capability expiry cannot exceed `submitBy` and is
+checked again by native admission before dispatch.
+
+`chio.experimental.local-confirmed-funding.v1` describes a single owned private
+chain on chain ID 31337. Its confirmation rule does not establish public-chain
+finality, independent witnesses, fraud/dispute coverage, independent companies,
+cross-border operation or attested host confinement. An observer or receiver
+host compromise remains outside this profile. Existing legacy channel funding
+and public settlement-proof formats retain their original meanings.
+
+The journal commits the signed agreement and exact request before entering the
+kernel. The kernel's opt-in `require_durable_request_retention` setting retains
+the original request on direct admission, without creating a nonce-preflight
+hold. The funding adapter reads that request through the fenced authority and
+matches the native payment journal before committing allocation-to-operation and
+hold correlation. A repeated authorization cannot reassign either identifier.
+The allocation's agreement digest prevents re-signing a fresh request or fresh
+authority against the same deposit.
+
+## Finding and settlement checks
+
+`chio.experimental.native-funded-submission.v1` binds the original allocation,
+agreement, authority UUID, request digest, operation, hold, authorization and
+retained native outcome. `Native::evidence` reads the qualified outcome store,
+checks the operation/outcome link and raw return digest, and exports the actual
+W0 output. It does not infer completion from the example's invocation counter.
+Input and output bytes are retained under SHA256 content addresses. A canonical
+`chio.finding.v1` artifact commits the standard media-type/base64 reveal envelope.
+The provider signs the Finding and exact submission. Strict raw-first decoding
+rejects duplicate keys, noncanonical encodings, unknown fields and typed drift.
+
+The prepayment Finding uses **asserted** evidence and guarantee classes. A native
+completed payment receipt does not yet exist, and this profile does not claim
+receipt/checkpoint, bond, status-liveness, lineage or runtime-assurance facets.
+The separate experimental W0 decision requires original native output binding,
+retrievable custody and an independently implemented Python checker over the
+exact original input. It is not a general `chio-finding-verifier` report or a
+promotion to the Finding's `verified` evidence class. Unsupported or unavailable
+authority/evidence issues no decision. An authenticated incorrect result receives
+a signed rejection. The negative fixture signs a wrong provider submission; it
+does not edit the native outcome or rerun the tool.
+
+The receiver policy pins a separate Ed25519 verifier key. The decision binds the
+observed original claim transaction/block, submission commitment, Finding ID,
+checker implementation and native identities. Only a claim observed in its
+resolution window can produce that decision. The owned chain signer verifies
+the Ed25519 decision before producing the contract's EIP-712 authorization.
+All these actors and keys belong to one local fixture, not separate companies.
+
+Claim, decision, payout and refund actions retain exact signed transaction bytes before broadcast.
+Rust checks the intent and ABI call; the existing ethers reconciler independently
+decodes the transaction, signer, nonce, fees and calldata. Retrying uses the same
+bytes and hash. Missing inclusion, occupied nonces or changed prior inclusion
+remain uncertain. Rust then checks the actual receipt, two descendant blocks,
+separate current-head read, immutable terms, commitment/decision and exact escrow
+and ERC20 events. Previously observed inclusion cannot silently move to a new
+block. Source files for the Python checker and Node transport are pinned.
+The public summary independently enumerates mined blocks and receipts and
+compares transaction hashes with the retained intents. A separate negative
+control sends duplicate idempotent claim/decision transactions: enumeration
+catches both even though their replay receipts emit no events.
+
+The lifecycle advances private chain time to exercise deadlines without waiting
+in real time. Admission retains its wall-clock freshness checks. Lifecycle reads
+retain the 30-second receiver observation limit and validate the current private
+chain snapshot. These are bounded private-chain observations, not public finality.
+
+## Recovery and remaining work
+
+| Process loss | Recovery |
+| --- | --- |
+| After funding journal commit, before native admission | The same signed request executes once |
+| After native hold creation, before funding binding | Original operation and reversed hold remain inspectable; native payment is not authorized; no tool replay |
+| After native hold binding, before rail acknowledgement | Recover the original authorization, preserve pending release and open budget hold; no tool replay |
+| After W0 executes, before native outcome recording | Native execution remains `OutcomeUnknownAfterDispatch`; no replay |
+
+Before the funding journal binds a native operation, observer failure is a definite
+refusal. A journal commit error remains uncertain. Native recovery queries the
+rail using the original operation before cancelling an unacknowledged payment.
+Only an authoritative `NoAuthorization` permits cancellation; a committed held
+authorization is recovered into the same native journal. Unavailable, panicking
+or incompatible queries preserve uncertainty. An outstanding release resumes its
+existing durable intent after an interruption. Other rails must provide the same
+strong negative-query contract to support this recovery path.
+
+The adapter refuses capture, release and refund until their contract successors
+are independently observed. It never reports local bookkeeping as token payment.
+Startup reconciliation errors are retained in the report and block new work;
+reads of the original binding remain available. The journal admits at most 63
+allocations and retains their identities indefinitely, leaving one native
+retention slot for recovery administration. This is a bounded experiment, not
+the later sustained-capacity trial.
+
+Payout acknowledgement completes the original native capture and operation.
+Refund acknowledgement is a **release** of the funded allocation. If native
+execution already recorded a positive cost, its original capture intent remains
+`Finalizing` / `Settling`; the report independently shows the verified refund.
+This slice does not fabricate contractual zero-charge authority, reverse consumed
+native work budget, erase execution uncertainty or refund an earned payout.
+An unknown native outcome stays `OutcomeUnknownAfterDispatch`, with its original
+open budget exposure, after financial refund. An undispatched authorization can
+complete its already-authorized release and reverse the original budget hold.
+
+Recovery first observes current escrow state. An unbroadcast submission or
+unrecorded decision that missed its deadline can time out and refund while the
+original signed artifacts and prepared transactions remain retained. A recorded
+acceptance remains payable after deadlines. Public `expire()` followed by a
+separate refund transaction is also supported. No database edits are needed.
+
+## Contractual capture resolution
+
+`experimental-funded-resolution STATE MODE FAULT` supports `reject`, `absent`,
+`unavailable` and `preexpired`. `FAULT` is `none`, `after-resolution-retained`,
+`after-resolution-accepted` or `after-resolution-completed`. Every crash case
+kills a real worker, reopens its original authority and repeats the exact request.
+
+Before funding, buyer and provider separately sign the original native capture
+waiver terms. Their digest enters the exact capability-bearing request; the
+funding agreement commits that entire request. Terms pin the contract context,
+capability, request ID, separate observer policy and a bounded validity window.
+A fresh observation verifies the exact successful refund. The pinned observer
+then signs its binding to the original native journal, raw outcome, agreement,
+allocation and refund transaction. A legacy agreement cannot acquire this
+waiver after execution.
+
+The resolution owner deliberately skips ordinary capture recovery. Any recovery
+claim from the current serving owner, even expired, prevents initial waiver
+acceptance because lease expiry cannot establish that an in-flight payment call
+has stopped. Exclusive owner handoff precedes acceptance. SQLite appends accepted
+and completed successor records with global commit coverage. Schema v36 accepts
+only its exact supported predecessor. No original journal or budget event is
+rewritten; exact replay appends no new successor or global commit.
+
+The effective payment becomes `Resolved`, with original action `capture` and
+recorded cost 100 intact. Ordinary finalization completes the known operation.
+Its signed financial receipt reports `cost_charged: 0`, `settlement_status:
+failed`, positive `cost_breakdown.payment.recorded_units` and explicit
+`contractual_resolution` authority. A contractual waiver does not replenish
+consumed native budget. The ordinary lifecycle command still leaves positive
+capture pending until this explicit resolution is accepted. Unknown execution
+is ineligible and retains its original uncertainty and budget exposure.
+
+## Earned child after native parent loss
+
+`experimental-funded-child STATE FAULT` supports `none`, `pay-after-prepare`,
+`pay-after-broadcast` and `pay-after-observation`. The parent and child receive
+separate 100-unit allocations, native stores, keys, capabilities and requests.
+The intermediary signs a dependency binding both original agreements, requests,
+authority UUIDs and the shared input digest. The parent tool invokes the child's
+kernel on a scoped thread; it joins the child before returning. This is explicit
+separately funded orchestration, not native capability attenuation or host isolation.
+
+The child runs W0 once, produces its native Finding, passes the pinned Python
+checker and reaches observed `Payable` while still unpaid. Actual SIGKILL then
+kills the parent process after its tool invocation but before native outcome
+recording. The parent remains `OutcomeUnknownAfterDispatch` with one invocation;
+its allocation refunds without replay. Parent action signing and all new verifier
+decisions are disabled in the owned fixture, with attempted-signing negative
+controls. A child-only collector consumes retained child artifacts and beneficiary
+authority, pays once and completes the original child capture. Its three payment
+crash boundaries reuse the original signed transaction bytes.
+
+The final token balances are buyer 1,000, intermediary 900, child 100 and escrow
+zero, with total supply 2,000. The intermediary absorbs the 100-unit child cost.
+The parent invocation counter measures orchestration; the actual W0 checker ran
+in the child. One owned host and chain contain all roles. The witness does not
+establish independent operators, independent custody or public-chain finality.
+
+Remaining Task 4 work includes registered general work artifact and Finding-facet
+integration, broader disclosure and manifest attacks, independent operators and
+sustained capacity. Experimental agreement/submission/decision schemas remain
+example-local. See the [execution report](../../docs/market/open-agent-work/execution/21-native-resolution-earned-child.md)
+for selected qualification and security-sync provenance.
+
+## Registered wire and Finding requirements
+
+The [registered profile](../../spec/schemas/chio-work/README.md) defines exact closed
+agreement v2, submission v1, dependency v1 and decision v2 shapes. The agreement
+commits a pre-provisioned governance-signed Finding context and ordered facet
+requirements. The current profile requires artifact integrity and guarantee
+consistency; additional requirements cannot be weakened by a later verifier.
+
+The actual Finding evidence verifier derives all thirteen facets. This profile
+supplies no external receipt, checkpoint, bond, status or runtime evidence.
+Unavailable or unsupported required facets do not produce a financial decision;
+existing timeout/refund handles the allocation. Positive work acceptance still
+requires custody retrieval and the independent pinned Python W0 checker. Decision
+verification re-derives the exact assessment at its original evaluation time, so
+retained accepted claims survive later context expiry without creating fresh
+admission authority.
+
+The raw wire check is intentionally a parser, not a signature or authority check:
+
+```sh
+target/debug/chio-federated-work experimental-funded-wire-check examples/federated-work/fixtures/registered-work/decision.json
+python examples/federated-work/funded_wire.py --vectors examples/federated-work/fixtures/registered-work/manifest.json
+CARGO_TARGET_DIR=target cargo test --locked --manifest-path examples/federated-work/Cargo.toml shared_malformed_vectors
+CHIO_WORK_PYTHON="$(command -v python)" python3 scripts/tests/check-registered-work-schemas.py
+```
+
+Use the existing Python environment installed with the hashed buyer requirements.
+The [execution report](../../docs/market/open-agent-work/execution/23-registered-work-finding-acceptance.md)
+records the schema, trust, funding and qualification boundaries. These artifacts
+create no market purchase, reimbursement, verified-fix, collateral or challenge
+rights. Full Finding backing and independent operators remain separate work.

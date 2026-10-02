@@ -37,6 +37,7 @@ TARGETS=(
     capability_receipt
     manifest_roundtrip
     federation_trust_establishment
+    bilateral_dsse_verify
     finding_worker_protocol
     response_authority_protocol
     response_lifecycle

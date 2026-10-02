@@ -1,0 +1,65 @@
+FF
+======================================================================
+FAIL: test_https_verifier_payout_and_refund (__main__.PeerVerifier.test_https_verifier_payout_and_refund) (mode='pay')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/test_peer_verifier.py", line 19, in test_https_verifier_payout_and_refund
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+peer transport qualification failed: Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/peer_transport.py", line 264, in <module>
+    print(json.dumps(run(*sys.argv[1:])))
+                     ^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/peer_transport.py", line 205, in run
+    send("wrong-ca", endpoint=root / "wrong-endpoint.json", error_contains="UnknownIssuer")
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/peer_transport.py", line 74, in send
+    assert error_contains.encode() in result.stderr, result.stderr
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: b'invalid peer certificate: BadSignature\n'
+
+
+
+======================================================================
+FAIL: test_https_verifier_payout_and_refund (__main__.PeerVerifier.test_https_verifier_payout_and_refund) (mode='reject')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/test_peer_verifier.py", line 19, in test_https_verifier_payout_and_refund
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+peer transport qualification failed: Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/peer_transport.py", line 264, in <module>
+    print(json.dumps(run(*sys.argv[1:])))
+                     ^^^^^^^^^^^^^^^^^^
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/peer_transport.py", line 205, in run
+    send("wrong-ca", endpoint=root / "wrong-endpoint.json", error_contains="UnknownIssuer")
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/peer_transport.py", line 74, in send
+    assert error_contains.encode() in result.stderr, result.stderr
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: b'invalid peer certificate: BadSignature\n'
+
+
+
+----------------------------------------------------------------------
+Ran 1 test in 55.698s
+
+FAILED (failures=2)

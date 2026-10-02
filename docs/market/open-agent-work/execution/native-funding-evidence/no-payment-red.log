@@ -1,0 +1,29 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-edge)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-a2a-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-adapter)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 5m 03s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-b067e73033312bae)
+
+running 1 test
+test funded_work::tests::native::admission_without_a_payment_participant_remains_inspectable ... Error: "native funding payment journal missing"
+FAILED
+
+failures:
+
+failures:
+    funded_work::tests::native::admission_without_a_payment_participant_remains_inspectable
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 26 filtered out; finished in 3.29s
+
+error: test failed, to rerun pass `--bin chio-federated-work`

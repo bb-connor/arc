@@ -1,0 +1,329 @@
+{
+  "schema": "chio.experimental.work-claim-execution.v1",
+  "captured_utc": "2026-09-14T07:48:26.463572+00:00",
+  "base_commit": "56db3b0751142d2b1c74a104c96a03c1de0dff23",
+  "branch": "research/funded-work-baseline",
+  "worktree": "/home/connor/backbay/arc-funded-work",
+  "environment": {
+    "node": "24.16.0",
+    "python": "3.13.13",
+    "solc": "0.8.30",
+    "ethers": "6.16.0",
+    "ganache": "7.9.2",
+    "host": "Linux/aarch64",
+    "optimizer_runs": 200,
+    "compile_evm": "paris",
+    "runtime_evm": "shanghai",
+    "chain_id": 31337,
+    "native_accelerators": "unavailable; supported JavaScript fallback used"
+  },
+  "runs": [
+    {
+      "command": "python3 -B -m unittest discover -s examples/funded-work-model -p 'test_claim_model.py' -v",
+      "exit_code": 1,
+      "result": "expected red: claim model absent",
+      "source_scope": "development",
+      "log": "claim-evidence/model-red.log",
+      "sha256": "ad75bf1246a422bd1d8038404fe67d7f9df1876481a464d0733f73640b92f615"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s examples/funded-work-model -p 'test_claim_explorer.py' -v",
+      "exit_code": 1,
+      "result": "expected red: explorer absent",
+      "source_scope": "development",
+      "log": "claim-evidence/explorer-red.log",
+      "sha256": "73ee3705a4d022399353524f4dfaa230d0d00bc010739065347788cfc47487e2"
+    },
+    {
+      "command": "python3 -B -m unittest discover -s examples/funded-work-model -p 'test_*.py' -v",
+      "exit_code": 0,
+      "result": "18 passed",
+      "source_scope": "final model source",
+      "log": "claim-evidence/model-complete.log",
+      "sha256": "e20021573d5d02369718f2a93f4388dd870a093c7b07287820f300a7bb5e1535"
+    },
+    {
+      "command": "python3 -B examples/funded-work-model/claim_explorer.py --output /tmp/chio-claim-execution-XslvRh/final-traces.json\ncmp examples/funded-work-model/claim-traces.json /tmp/chio-claim-execution-XslvRh/final-traces.json",
+      "exit_code": 0,
+      "result": "normal exploration and retained corpus match",
+      "source_scope": "final model source",
+      "log": "claim-evidence/trace-freshness.log",
+      "sha256": "46d86b398118e733f22ec4b0579e9f4ff24d44741b9759873d48e0f18a5b5494"
+    },
+    {
+      "command": "python3 -B examples/funded-work-model/claim_explorer.py --broken-expiry --output /tmp/chio-claim-execution-XslvRh/model-counterexample.json",
+      "exit_code": 1,
+      "result": "expected negative: accepted claim refunded",
+      "source_scope": "final model with test-driver mutation",
+      "log": "claim-evidence/model-counterexample.log",
+      "sha256": "1c790cbff0a3d80c170f48b936a8b78796b49601ba786753ed46428d9b3475ec"
+    },
+    {
+      "command": "node --test contracts/scripts/work-claim-escrow.test.mjs",
+      "exit_code": 1,
+      "result": "expected red: experimental artifact absent",
+      "source_scope": "development: 16 checks before later regression additions",
+      "log": "claim-evidence/contract-security-red.log",
+      "sha256": "77df3ba2e5a573257a479d60b014da3865a26358f2519d564f38d7561ee3e5ce"
+    },
+    {
+      "command": "node --test contracts/scripts/work-claim-escrow.test.mjs",
+      "exit_code": 1,
+      "result": "compiler stack limit; subsequently fixed",
+      "source_scope": "development: combined hash and signature decoder",
+      "log": "claim-evidence/contract-green.log",
+      "sha256": "aa88fce76261f3e32502e683c31fa2d7e9da623eca496a047e3fcbe4a5605587"
+    },
+    {
+      "command": "node --test --test-name-pattern='squat' contracts/scripts/work-claim-escrow.test.mjs",
+      "exit_code": 1,
+      "result": "unrelated payer occupies public digest and denies valid buyer funding",
+      "source_scope": "development: before payer-scoped uniqueness",
+      "log": "claim-evidence/squatting-red.log",
+      "sha256": "a977e4dfe79eaa1d2018fcd0e4208d9d0cc885651f7c7b1bc096fbc395a253a4"
+    },
+    {
+      "command": "node --test --test-name-pattern='squat' contracts/scripts/work-claim-escrow.test.mjs",
+      "exit_code": 0,
+      "result": "payer-scoped uniqueness regression passes",
+      "source_scope": "final contract; before added ABI-vector test",
+      "log": "claim-evidence/squatting-green.log",
+      "sha256": "0fe08df8dcd8963cee7ddfacc25a8898aa1ae32784d2f58b8ac2fb1b30c17921"
+    },
+    {
+      "command": "node --test contracts/scripts/work-claim-escrow.test.mjs contracts/scripts/work-claim-model.test.mjs contracts/scripts/funded-work-fit.test.mjs",
+      "exit_code": 0,
+      "result": "143 passed, 0 skipped",
+      "source_scope": "final contract and tests",
+      "log": "claim-evidence/contract-final.log",
+      "sha256": "9052b5871c3f3d0ea43c13343db0aecd9d723f7e1996e296f22cb1575452c60a"
+    },
+    {
+      "command": "CHIO_CLAIM_MUTATION=expire-payable node --test --test-name-pattern='accepted claim survives' contracts/scripts/work-claim-escrow.test.mjs",
+      "exit_code": 1,
+      "result": "expected negative: modified expiry guard permits forbidden refund",
+      "source_scope": "final source modified only in compiler input by test driver",
+      "log": "claim-evidence/contract-expiry-mutation.log",
+      "sha256": "0fef520e4ff24890b5d0665b733fc88b68c32a8b9320650705c59ff8802adfc4"
+    },
+    {
+      "command": "node contracts/scripts/work-claim-demo.mjs --output /tmp/chio-claim-execution-XslvRh/child-claim-demo.json",
+      "exit_code": 1,
+      "result": "expected red: financial reproduction entrypoint absent",
+      "source_scope": "development",
+      "log": "claim-evidence/demo-red.log",
+      "sha256": "7ec7ff65bd7a681ea7ee653847070a7e3e38e1ab32210fe907e28ce3b3c97f21"
+    },
+    {
+      "command": "node contracts/scripts/work-claim-demo.mjs --output /tmp/chio-claim-execution-XslvRh/child-claim-demo.json",
+      "exit_code": 0,
+      "result": "parent refunded 100; unpaid accepted child subsequently paid 60",
+      "source_scope": "final contract and demonstration",
+      "log": "claim-evidence/demo-green.log",
+      "sha256": "23649cafd5922920d2608dff94e672785d10fad4abb387824ef97e087c4d681c"
+    }
+  ],
+  "source_hashes": [
+    {
+      "path": "contracts/package.json",
+      "sha256": "64efeb00225f14767812ce75d78d52002fbc6faa999a4ee43887a31d8357a773"
+    },
+    {
+      "path": "contracts/pnpm-lock.yaml",
+      "sha256": "07cee51275b05dc9c4fea16f42e256bc5707c75a17794425c0c5c64695e23ce8"
+    },
+    {
+      "path": "contracts/scripts/fixtures/WorkClaimTestToken.sol",
+      "sha256": "eadb8d1455095e2d238e0c751139429f489d7febb0841d7b1073ec854c3444dd"
+    },
+    {
+      "path": "contracts/scripts/fixtures/work-claim-vectors.json",
+      "sha256": "43e40c4b99c9f15d5e0afe67a8aac9276fd7843251a52b65f9cc42aa3ffcbd80"
+    },
+    {
+      "path": "contracts/scripts/funded-work-fit.test.mjs",
+      "sha256": "83864ed61cea1136ec5a5b919d675f5394638329fef3caa99173949687dfb593"
+    },
+    {
+      "path": "contracts/scripts/work-claim-demo.mjs",
+      "sha256": "a12a80fb15290f54aa909138e2510a2b71ceabbcb35545852ce656a20865e8e7"
+    },
+    {
+      "path": "contracts/scripts/work-claim-escrow.test.mjs",
+      "sha256": "66ca63196e940331b4525be1badbab9bdd67b2c2e91e89440400c27c991ab8e9"
+    },
+    {
+      "path": "contracts/scripts/work-claim-fixture.mjs",
+      "sha256": "4088fb60f197de82327ab3444be93665672bc80088d26c375492db066fc9e7ab"
+    },
+    {
+      "path": "contracts/scripts/work-claim-model.test.mjs",
+      "sha256": "fb970b03925ebd5de4ce46cf552b9d01751ce9d9b8a8361d716d15fb09934068"
+    },
+    {
+      "path": "contracts/src/ChioBondVault.sol",
+      "sha256": "c425add7c32c8617cbcaeba99ca4dffb3dee74cc16c6e539a77cffd9a0b38cd7"
+    },
+    {
+      "path": "contracts/src/ChioEscrow.sol",
+      "sha256": "0ee3d055c3696e0e4847b413838ee9d3e064c64018964d02c03b242dbe089e7f"
+    },
+    {
+      "path": "contracts/src/ChioIdentityRegistry.sol",
+      "sha256": "34feea40aeff3ffc36eec325dbb65aad0fbbe6ac4fe294efa50f47a8e746f1b7"
+    },
+    {
+      "path": "contracts/src/ChioPriceResolver.sol",
+      "sha256": "84fc5f6d020fda58faf09cdae27082703b617ba7afc473651efec1ea00d91146"
+    },
+    {
+      "path": "contracts/src/ChioRootRegistry.sol",
+      "sha256": "0a4d9e48cf4e902bcc641b8be4f44eddf0a2fada0b857abcfb875885ac7c112b"
+    },
+    {
+      "path": "contracts/src/experimental/ChioWorkClaimEscrow.sol",
+      "sha256": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9"
+    },
+    {
+      "path": "contracts/src/interfaces/IAggregatorV3.sol",
+      "sha256": "c9549e5a36ef15792f83547703d429fa0a3c88ef14b2b1b0a01916bc717ebefa"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioBondVault.sol",
+      "sha256": "62d2b34a235a8e9543e7dc49869075beec79894636054d40f0cca98c8b45bccf"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioEscrow.sol",
+      "sha256": "edccfaecb712daba527a68ecbb4092ae7adf91fdc7e0a9b13f1117430b69f9c9"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioIdentityRegistry.sol",
+      "sha256": "dddea33a1506a26546ebbe52d258b227270dba284cc5138b4334740f479840be"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioPriceResolver.sol",
+      "sha256": "412e5fcce50330e28ed4ead8479b3236b8b8765501fb5307c55171bf020d74de"
+    },
+    {
+      "path": "contracts/src/interfaces/IChioRootRegistry.sol",
+      "sha256": "1e8ddedfbf56ef3ca9c9c06e837db431078687f5c9c0b00bf8c55ce8ea7a5d01"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20.sol",
+      "sha256": "acd7d465fcd0264e92b038a0671f1b90e003325d2c48c211de23fcc09a7f3ec3"
+    },
+    {
+      "path": "contracts/src/interfaces/IERC20Permit.sol",
+      "sha256": "4751af7647654a4891bde119b9ba4662e3e09ef5fe2729fb13d6ea266f7cfb4e"
+    },
+    {
+      "path": "contracts/src/lib/ChioMerkle.sol",
+      "sha256": "4cf0734a1cbd8981a1e64ee3905a878bac2cb2c323168025b6464be65b701c17"
+    },
+    {
+      "path": "contracts/src/mocks/ChioCreate2Factory.sol",
+      "sha256": "e6e0010de71cb2e476ca09bbb1bec35bfacd4cf040c2549a694558a2ee4cb52b"
+    },
+    {
+      "path": "contracts/src/mocks/FeeOnTransferERC20.sol",
+      "sha256": "2b4a08527ce6b41979afe9b8f66c5cf35e6726ca2082374fe308cb74676dc6e8"
+    },
+    {
+      "path": "contracts/src/mocks/Mock1271Admin.sol",
+      "sha256": "f9f5adfc23ad42219a7c8a7a384fb24f6f7518e20e9943eb475a75ce852be3ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockAggregatorV3.sol",
+      "sha256": "b22a0f951b8ab103a3804bd281ab25e02b46bd197f825fe2ce279146e92d74ca"
+    },
+    {
+      "path": "contracts/src/mocks/MockERC20.sol",
+      "sha256": "8a780f5a771b541061aeceb752652d446c52848d9a681835a2e496e5e4821a1d"
+    },
+    {
+      "path": "contracts/src/mocks/NoReturnERC20.sol",
+      "sha256": "3d2e72701c4fadc58ae398fa4c748d9602512bcb17fdaaa49231e9813efb7d20"
+    },
+    {
+      "path": "contracts/src/mocks/ReentrantBondToken.sol",
+      "sha256": "e8c3e32e3fd7280141853c3215db37db9372d10059fd8f7402c451ce82ee6ca9"
+    },
+    {
+      "path": "examples/funded-work-model/claim-traces.json",
+      "sha256": "0b8984fe29ed929450b72d8fa3ac35bbc4938888a5378f6e015bf7d02daf1cdc"
+    },
+    {
+      "path": "examples/funded-work-model/claim_explorer.py",
+      "sha256": "cc64fb7f46deaff56557804f384e1f91c39dcbf8fc3ed34aae60697c3764040b"
+    },
+    {
+      "path": "examples/funded-work-model/claim_model.py",
+      "sha256": "bad13e96d8918aca808a4a6511aa3faa797644accd19408992ccc786c1f9a9ae"
+    },
+    {
+      "path": "examples/funded-work-model/funding_model.py",
+      "sha256": "3fad21a8060d24ee5ac700f640673e9ee1a26caaee50b85c852a058394bae71b"
+    },
+    {
+      "path": "examples/funded-work-model/test_claim_explorer.py",
+      "sha256": "84b2ec0c798b7ac1d89f15b9d0df1be6467d62c90ba3b5748982efbf32303be2"
+    },
+    {
+      "path": "examples/funded-work-model/test_claim_model.py",
+      "sha256": "19414ee1e55023ad879c1159f1e51973f2b8aacbad5ece32b1d0a75c19170664"
+    },
+    {
+      "path": "examples/funded-work-model/test_funding_model.py",
+      "sha256": "e5103c224aaa50cb4f8211faaff4e83f71581590e4e828b1c12f356c42be3768"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "claim-evidence/child-claim-demo.json",
+      "sha256": "b0ebdd95794096b1f052afeecb08eeb00e8c42f9a2bdcb1e43ed634a3d78a1c8"
+    },
+    {
+      "path": "claim-evidence/model-counterexample.json",
+      "sha256": "d1ab4b0f8c9fe2d597c4451c51ef3d9a0942c14c937138c3cbcdcc2437279b67"
+    },
+    {
+      "path": "claim-evidence/security-pr.json",
+      "sha256": "a6514c8b2bb38e27d5ade3a19e74530f068b6a58f67523406b2ece8431187131"
+    },
+    {
+      "path": "claim-evidence/security-gate.json",
+      "sha256": "420e7f3fa2c6145b7a2139ebef789f90a887f061f3107db82dc2fb064c652d5b"
+    }
+  ],
+  "model": {
+    "states": 5508,
+    "transitions": 132192,
+    "trace_representatives": 118,
+    "limits": "Two pre-funded obligations of 3 and 2 units; nine times and finite actor/commitment/decision alphabet; funding and transfer failures tested separately."
+  },
+  "original_checkout_preservation": {
+    "files_checked": 3688,
+    "changed_files": [],
+    "head_unchanged": true,
+    "short_status_unchanged": true
+  },
+  "tasks": {
+    "claim_model": "implemented and locally verified",
+    "experimental_contract": "implemented and locally verified",
+    "native_integration": "gated on qualified Security M4; not started",
+    "native_funded_work": "not started"
+  },
+  "limitations": [
+    "Independent security review and remote CI are not supplied.",
+    "The existing escrow source and all dependency locks remain unchanged.",
+    "The contract-only verifier certification is synthetic and does not establish useful work or retained custody.",
+    "Model journal uncertainty is not qualified native incident recovery.",
+    "Private development-chain state is not external finality or reorg qualification.",
+    "All roles use one administrator and host; there are no independent company or real-funds claims.",
+    "The standalone demo has an unsubmitted parent; it does not kill a native parent process."
+  ],
+  "implementation_commits": {
+    "model": "cbcb59596303a0631fa86ba06525b20a3773058e",
+    "contract": "640002afb7ce3ce8bb5ede6370877b80a9942e64"
+  }
+}

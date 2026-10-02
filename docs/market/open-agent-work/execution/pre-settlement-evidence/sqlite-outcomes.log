@@ -1,0 +1,30 @@
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 1m 15s
+     Running unittests src/lib.rs (target/debug/deps/chio_store_sqlite-5a6ec1936384c61e)
+
+running 23 tests
+test tool_outcome_store::execution_evidence::tests::current_schema_rejects_missing_or_weakened_execution_guards_without_repair ... ok
+test tool_outcome_store::execution_evidence::tests::exact_v3_migration_preserves_release_schema_and_creates_empty_execution_projection ... ok
+test tool_outcome_store::execution_evidence::tests::execution_load_rejects_oversized_blob_before_decoding ... ok
+test tool_outcome_store::execution_evidence::tests::execution_schema_prevents_replacement_mutation_deletion_and_wrong_owner ... ok
+test tool_outcome_store::execution_evidence::tests::unstamped_execution_namespace_and_future_schema_are_not_adopted ... ok
+test tool_outcome_store::execution_evidence::tests::v3_migration_rejects_partial_weakened_and_future_execution_namespaces_atomically ... ok
+test tool_outcome_store::execution_evidence::tests::v3_predecessor_check_accepts_existing_release_rows_without_rewriting_them ... ok
+test tool_outcome_store::security_release::tests::a_damaged_release_source_identity_is_not_restamped_on_failure ... ok
+test tool_outcome_store::security_release::tests::alternate_case_version_metadata_cannot_hide_a_future_source_revision ... ok
+test tool_outcome_store::security_release::tests::exact_unstamped_legacy_source_is_stamped_only_after_successful_migration ... ok
+test tool_outcome_store::security_release::tests::exact_v1_and_unversioned_predecessors_migrate_without_invented_releases ... ok
+test tool_outcome_store::security_release::tests::exact_v2_migration_creates_no_release_acknowledgements ... ok
+test tool_outcome_store::security_release::tests::rejected_unstamped_predecessor_rolls_back_identity_and_schema ... ok
+test tool_outcome_store::security_release::tests::v2_migration_refuses_an_unqualified_release_namespace ... ok
+test tool_outcome_store::security_release::tests::v2_migration_refuses_missing_immutable_guards_without_repair ... ok
+test tool_outcome_store::security_release::tests::version_metadata_with_cleared_identity_cannot_be_adopted_as_legacy ... ok
+test tool_outcome_store::tests::compaction_clears_a_terminal_blob_and_reports_compacted_reads ... ok
+test tool_outcome_store::tests::compaction_is_refused_while_an_owning_operation_is_live ... ok
+test tool_outcome_store::tests::compaction_respects_the_retention_cutoff ... ok
+test tool_outcome_store::tests::outcome_journal_survives_owner_rotation_and_detects_tampering ... ok
+test tool_outcome_store::tests::post_return_evaluation_is_fenced_staged_and_finalized_by_cas ... ok
+test tool_outcome_store::tests::reinserting_verified_bytes_rehydrates_a_compacted_blob ... ok
+test tool_outcome_store::tests::tool_return_atomically_persists_blob_and_advances_operation ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 1650 filtered out; finished in 14.20s

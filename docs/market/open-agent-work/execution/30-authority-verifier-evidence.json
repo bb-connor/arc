@@ -1,0 +1,1058 @@
+{
+  "schema": "chio.local.authority-verifier-qualification.v1",
+  "qualifiedAtUTC": "2026-09-15T14:01:51.506772+00:00",
+  "baseCommit": "919bd0546f5fccc70cf70f0543027fafe18f96de",
+  "branch": "feat/funded-native-admission",
+  "sourceObjects": [
+    {
+      "path": "crates",
+      "gitObject": "874362eedd6c5386f3d3d18c073b6bfcfc9d59b8"
+    },
+    {
+      "path": "contracts",
+      "gitObject": "58f7afe7d555427c21262458479acc471cd66c3d"
+    },
+    {
+      "path": "examples/federated-work",
+      "gitObject": "3fad2e4acaa2e2d4189838ee12a3ada79b1b1bd0"
+    },
+    {
+      "path": "Cargo.toml",
+      "gitObject": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23"
+    },
+    {
+      "path": "Cargo.lock",
+      "gitObject": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "gitObject": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "examples/federated-work/Cargo.lock",
+      "sha256": "17f8e0c6c009b26f8cee6a19f214319263fd9e2609ccdb792e734fa940b27953"
+    },
+    {
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "f5d2b63a4c785a9820706933da1aee14047734e559ceb99311d6530185c0bfa0"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/protocol.py",
+      "sha256": "5891d6d04e4f329f24078df332269e319a8e5f3cac031af5e0af93ef82523907"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/review.py",
+      "sha256": "3293712bc70c426462ceae97551b9efd3936fdab722960577a7b7b2afce74ef9"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract.py",
+      "sha256": "440a808d2e3ad548e9d5c8257156ba75aab77dd7524968042c2f0a5ca5d7726d"
+    },
+    {
+      "path": "examples/federated-work/src/buyer.rs",
+      "sha256": "3dac26a1280bcc9713987994a12b26e85d73430bb42d27aeac832d65762bc45b"
+    },
+    {
+      "path": "examples/federated-work/src/common.rs",
+      "sha256": "590f2d34781e6a8f6bb3da59dc175fb9875b1c2ee4059b1257e2e01b8ef2e356"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/agreement.rs",
+      "sha256": "ad1e55b918e8f5f90db5857142cd12bc7a3eabc348709b2ef6afe47bf1984c30"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/allocation.rs",
+      "sha256": "e6e9f2dbed89f6c5de4c7f354c3461e9a29d58fc0c6aa079f1cde604bb7ffb39"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/authority_enrollment.rs",
+      "sha256": "d4e4364e4fc8e92f851442f54c3dd94547072dae44cf89f7a33220e93d8b5da6"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/authority_process.rs",
+      "sha256": "1580f23b20161bd144b8f315d02e7173f48150c1de2af5e5c04543817b7cc15b"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/capture_resolution.rs",
+      "sha256": "68e1372be771508c8fd6b0d13ec010080db37b3f63897187479ebd2b760be30a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_files.rs",
+      "sha256": "b4876f124fe3782d4374a56beef8801553c9d18e2fc7d66ffb29e7a9fc6200a9"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_handoff.rs",
+      "sha256": "9f76664ff01a7fd1767761eda80e759fa5083eef36c12390a82f431df38bd97d"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_operator.rs",
+      "sha256": "b24eaddf80424d62a63787d4c6472075c6b254188f3ab6d7bbe78b0940fd11e1"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_process.rs",
+      "sha256": "1e4bb85c43aee3ee5442064652c077bc79980d84c076b8d8a9e2c4e0c487f2e1"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/child.rs",
+      "sha256": "f85b01d68a5d3724e87743a87147bca6f3c638220bd6c37e0240c82464eb0642"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/child_process.rs",
+      "sha256": "06875545d4b8519fd07b4fc04f6bf0cceedabae04d87071a153b630a511e71f0"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/evidence.rs",
+      "sha256": "3039b423481be3e2394bc4d2401d1c9f0a7ecdf1461aa52df1a997e55e358bd2"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/execution_evidence.rs",
+      "sha256": "f238b568591e24c93d7ff588b7b70280324b8b42c1b57f36e3dfa2b1b6349157"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/finding_acceptance.rs",
+      "sha256": "43e21d6313cd27e62f466b1b272e2511b0e60bd458923118c220cf0d8112860e"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/finding_acceptance_tests.rs",
+      "sha256": "32ef061e2d65789a756f0b3669779fad0f4499b03a6aef6c6f3fa00a3a109d27"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/finding_context.rs",
+      "sha256": "8c1adef2ee55d9a4439b509c1a550b315ecf4d623fb21cf8b6d0b6278ef20890"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/journal.rs",
+      "sha256": "037877646af76cf7c41291534a05558cf0ea816e2e0bf3a9e401dbe4b8c8c94a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/lifecycle.rs",
+      "sha256": "97f24af7b1f78b542fd391f2a84f8f495b56e166ddfed38e1b4df73291289604"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/lifecycle_process.rs",
+      "sha256": "2dfc740e46f286f0d0e4b750bb05056e2450802f18595517aac4b5918330eb04"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/local_chain.rs",
+      "sha256": "afb1407f9cf92edcc5352ccb793449af5f40a4581f1ed8bed6086e1068196117"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/native.rs",
+      "sha256": "99b9c22846fcc877850c2debabbc54f8432e89be2cb9945fc332179c3091327a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/observer.rs",
+      "sha256": "47100e75935bdd03419d85f9a8f9f0d1c5167f21ce19f48d77eafa131dda5030"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/process.rs",
+      "sha256": "263d107426dfd908f8c58a00f42094b13ec88467e7fa2a894e048c5e3736c77c"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/rail.rs",
+      "sha256": "0a2771d7b49eb493b8447a8c371a2de7100ccb6ab3acca52ef708c7b2a5ef9ac"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/resolution_process.rs",
+      "sha256": "c8a499c421d2769c1cb2c14e073525f4ba930584b8aa9d502de728aa63dad060"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/settlement.rs",
+      "sha256": "ff8833b3b002c561638f86da1b46133589f654dec730d1d4ed17784009a838a8"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/settlement_observer.rs",
+      "sha256": "165faaeb8da786709017a9bbce9211ea27a5686a4b4fcde43cfc6f409786e718"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/smoke.rs",
+      "sha256": "74b8b0f0485b1f99582170fe28f6e3b18d188426a34554f14c1bcbd67a398883"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/authority_enrollment.rs",
+      "sha256": "d8e91e48cc61a3b7293c1c283c284b7b0bc3c9b28fbebafce69cad7190daf5bf"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/checkpoint_handoff.rs",
+      "sha256": "3413a9ad2c16fe6e0439a03b3675b3cefd30a414f7b7c7edd031015d309f22e6"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/evidence.rs",
+      "sha256": "6bf6eb31a8ecc2f36e0968f79134bdd3af63ca767e1e7d6aea73f647aee6936e"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/execution.rs",
+      "sha256": "3f91add447b8057568e9b1a1713be85641e8cbdb1e1f921e6ca6e3ca8ccebe27"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/execution_authority.rs",
+      "sha256": "4eeb89ae989944a4efee2d6605073f7009261bf65823b243b1d7888ab2606678"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/native.rs",
+      "sha256": "368c27e89a83053a00ee44210ae89d42e2f5e5d876f4a626ca3f407cfeb88b04"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/observer.rs",
+      "sha256": "7d1fd66e82eda4075f88730c36eb668068c9ad8459c75fe41ee48ee5c69de11a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/resolution.rs",
+      "sha256": "99c6dda7ec2b2e259014bd3fc1fa7bf67064ec929f8c27ca5a29d6d16a024704"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/settlement.rs",
+      "sha256": "a553b357ee419ae399bd92ee4dae37cdcb454b2aef27d289af1803982ee7dbaa"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/successors.rs",
+      "sha256": "2758c323456382d24eba8401fba1571b6bd1d0c84e7dade92acaee81d4af781d"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/verifier_handoff.rs",
+      "sha256": "37bd98d549bdd3e3c9c52ca5f3c336b566f58236aa333f0a1fac73723916cff0"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/wire.rs",
+      "sha256": "4e457cce1292e9a67dd461c98e0e324aa5ed43e78b8c83519fd344b3d62a9beb"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests.rs",
+      "sha256": "5a8ba0f64d90f5d375195ae455dd372f9b4ba2a661ab732961b75ccc64e36041"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tool.rs",
+      "sha256": "33aa2723a3b99a3c83a1472b6f515260b5ab9df3f303c0da1a6b81f442457d27"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verification.rs",
+      "sha256": "6d2712e4fcfb65b4a920fd3350469221b8decffc0c2b15d5027cea10c80c1b3a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verifier_files.rs",
+      "sha256": "a82b252f7e726f26f8859e48dba9bd02cf7bf64a7941c571da4c4847b11c294d"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verifier_handoff.rs",
+      "sha256": "751acef1e459a39f2444d098187bf130873508e5e1faff1e5e7e9f2ed54e2111"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verifier_operator.rs",
+      "sha256": "a608c0474bdbf8525f727af8d3ebe7370bed2ddd3646f0aa7948cdf5f764dbe3"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/waiver_terms.rs",
+      "sha256": "a6e994fb3a27124e0af612813713ad7712981117b0e8c10a40459b4884cdc4e4"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/wire.rs",
+      "sha256": "5c1fe88cb4f053f2b883991c2f3a6f75e64bdc1d7bf46f4feac21e63ab58d6e4"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work.rs",
+      "sha256": "9f7cbf0f7f34e3626dd95e2af09f93eb9df1078c5e6c0a01385ec26df0948e4c"
+    },
+    {
+      "path": "examples/federated-work/src/https.rs",
+      "sha256": "6ccb234476276088901924dc569c805f4b5179bcefb8be7ad92a314dc3443a77"
+    },
+    {
+      "path": "examples/federated-work/src/incident.rs",
+      "sha256": "5358dd4f9a8a3fce50bac1d3b3f3c8e23b84a11d62cad599d7849b8ec7fa0570"
+    },
+    {
+      "path": "examples/federated-work/src/main.rs",
+      "sha256": "25d05faf07819ef93e125b9bd9b4ce7da997439c5565e43b4ed17ec8c5c1fe2f"
+    },
+    {
+      "path": "examples/federated-work/src/market.rs",
+      "sha256": "5be0fe0c4cd8df0beb0dce78f8525c321da26ab69b87ce68fccbad918c525cb4"
+    },
+    {
+      "path": "examples/federated-work/src/payment.rs",
+      "sha256": "6713c0b6ab60e4100c47ceab648bb44bc887323db64c3826b515c74ba8ae849b"
+    },
+    {
+      "path": "examples/federated-work/src/provider.rs",
+      "sha256": "503783952a78bb34ac9e87dcd3a0b0db232ca860bb2d6052681f61a1b4a7a664"
+    },
+    {
+      "path": "examples/federated-work/src/resolution.rs",
+      "sha256": "0125087098912adf16a4441cea90c0da9c1bba50cadd54556b3ed7672c295fd1"
+    },
+    {
+      "path": "examples/federated-work/src/review.rs",
+      "sha256": "bc491412dd649ba4fbd49c5409c39740acd30bbfa6618ef81c40188235828919"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/enrollment.rs",
+      "sha256": "2fca8cc82a68384d9cd124b11f47b4d084230f17b10951826955faf612fcf962"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/permit.rs",
+      "sha256": "6822c1ca9c5e6c1ed7ba8affa1baedd118fb202477812832a2b8f461538c915a"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/tests.rs",
+      "sha256": "2bb542986f663b4b3f850e0aba4e615f4d07f3fc9f8055c6efc8c02ebe55eaa1"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/worker.rs",
+      "sha256": "7065d912d110d0574cfc34ebc5307ba939c086390bdd53b5979602724a21d853"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract.rs",
+      "sha256": "19779a9a283adabed128e8a5c0db823d5d4f375e0a528124f98867b56bafd081"
+    },
+    {
+      "path": "examples/federated-work/src/tests.rs",
+      "sha256": "5981e6786f93ad863a459acbbd65a31893f61694bf3d2f384cb9f9dc78e868a2"
+    },
+    {
+      "path": "examples/federated-work/src/work_buyer.rs",
+      "sha256": "d3e8ece74e1ce8aa7f55d39ada853c0874612fcbf67d0e605866f5f88357e210"
+    },
+    {
+      "path": "examples/federated-work/test_authority_verifier.py",
+      "sha256": "f13d2f868e49dbbb373384fccec9b5b45323379e5eb1993a083375fec257371a"
+    },
+    {
+      "path": "examples/funded-work/checker-profile.json",
+      "sha256": "dbb11df4e9402024bd330cb39dc7fc484f062e278ca593986636d86d3101ad78"
+    },
+    {
+      "path": "examples/funded-work/native_checker.py",
+      "sha256": "79660d72b794de5b1288fe36363edb88893ef89664198b87300b2dcec1a4fbb0"
+    },
+    {
+      "path": "examples/funded-work/reference_checker.py",
+      "sha256": "ee9ede7d02655b0b926fc75dc5e4180aa7790ca1cbf22f63a53997da9bf6e1fd"
+    }
+  ],
+  "binary": {
+    "path": "target/debug/chio-federated-work",
+    "sha256": "11f4591ef5bdcbe0c1d2150ed65631480d03cfae0b809746453f3c4b35bbea6b"
+  },
+  "environment": {
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "node": "v24.16.0",
+    "buyerPython": "/tmp/chio-python31-locked-venv/bin/python",
+    "buyerPythonSha256": "c86f21d0da9290ece2d7d49a3f7ed52aed59cb029abdf0ea25c79634f6cbe960",
+    "buyerPythonVersion": "Python 3.12.3",
+    "cargoBuildJobs": 3,
+    "cargoIncremental": false,
+    "cargoProfileDebug": 0,
+    "cargoNetOffline": true,
+    "rustTestThreads": 1,
+    "chainId": 31337,
+    "funding": "owned private Ganache chain, mock token, two descendant confirmations"
+  },
+  "results": {
+    "rustTests": 82,
+    "regularRustTests": 76,
+    "explicitlySelectedIgnoredRustTests": 6,
+    "newRustAuthorityVerifierTests": 10,
+    "pythonPublicTests": 28,
+    "pythonWireTests": 6,
+    "operatorPayoutRefundScenarios": 2,
+    "separateVerifierPayoutRefundScenarios": 2,
+    "malformedOrConflictingVerifierCliRequestsRejected": 12,
+    "corruptedOrMissingVerifierCustodyCopiesRejected": 12,
+    "malformedOperatorCliRequestsRejected": 10,
+    "ownedProcessScenarios": 20,
+    "sigkillEvents": 15,
+    "fullWorkspaceTests": false,
+    "newFuzzCampaign": false,
+    "independentAdministration": false,
+    "remoteCI": false,
+    "publicActivation": false,
+    "realFunds": false
+  },
+  "checks": [
+    {
+      "path": "authority-verifier-evidence/build.log",
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked"
+      ],
+      "startedAt": "2026-09-15T13:51:44.084661+00:00",
+      "completedAt": "2026-09-15T13:52:06.510528+00:00",
+      "elapsedSeconds": 22.426,
+      "exitCode": 0,
+      "sha256": "3f5c511bdd477f12416494a0f6cca359e2edc208216d947147372fb49bf13899",
+      "rawSha256": "3f5c511bdd477f12416494a0f6cca359e2edc208216d947147372fb49bf13899",
+      "bytes": 171,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/rust-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T13:52:27.305268+00:00",
+      "completedAt": "2026-09-15T13:56:11.011197+00:00",
+      "elapsedSeconds": 223.706,
+      "exitCode": 0,
+      "sha256": "f74717bd18e977fa63180e7775f3b040bfda6104b76911935865010141f4bd0c",
+      "rawSha256": "653a0a09c033b548d8b3bce0bdc4d00fbc84e5302f36b1cf0966d0dd824c0f80",
+      "bytes": 9569,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/ignored-rust.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T13:56:34.101464+00:00",
+      "completedAt": "2026-09-15T13:59:37.681564+00:00",
+      "elapsedSeconds": 183.58,
+      "exitCode": 0,
+      "sha256": "350a9a257b41feb4b0dbd6021c165f907a65028229c689f191a97902723c8dfd",
+      "rawSha256": "b59dbf70c84a11a0ffc6e681fd549b917f1ba6b4deafd20493f4c7e975300c46",
+      "bytes": 6341,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/clippy.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T13:59:57.917625+00:00",
+      "completedAt": "2026-09-15T14:00:06.928488+00:00",
+      "elapsedSeconds": 9.011,
+      "exitCode": 0,
+      "sha256": "143c11427d4ddca219581f35b71c8a29af21af0a6987bfb85165e8f2aa7bc24b",
+      "rawSha256": "143c11427d4ddca219581f35b71c8a29af21af0a6987bfb85165e8f2aa7bc24b",
+      "bytes": 170,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/handoff-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/test_checkpoint_handoff.py"
+      ],
+      "startedAt": "2026-09-15T13:54:11.226341+00:00",
+      "completedAt": "2026-09-15T13:55:02.723929+00:00",
+      "elapsedSeconds": 51.498,
+      "exitCode": 0,
+      "sha256": "52b15105009e53c8aee06e5d28842c20edf5728d29a716f85bba60d587ee9ecc",
+      "rawSha256": "52b15105009e53c8aee06e5d28842c20edf5728d29a716f85bba60d587ee9ecc",
+      "bytes": 99,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/authority-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/test_authority_verifier.py"
+      ],
+      "startedAt": "2026-09-15T13:58:04.314847+00:00",
+      "completedAt": "2026-09-15T13:59:07.103695+00:00",
+      "elapsedSeconds": 62.789,
+      "exitCode": 0,
+      "sha256": "35dc3002589cbfd5fb50443e3af0fedb1e8f2afccd8d0defbce8afbbde42869d",
+      "rawSha256": "35dc3002589cbfd5fb50443e3af0fedb1e8f2afccd8d0defbce8afbbde42869d",
+      "bytes": 99,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/python-public.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "examples/federated-work/test_execution_evidence.py"
+      ],
+      "startedAt": "2026-09-15T13:52:48.552044+00:00",
+      "completedAt": "2026-09-15T13:52:53.757552+00:00",
+      "elapsedSeconds": 5.205,
+      "exitCode": 0,
+      "sha256": "d54fdd199e0d209f1a11c08d6f074486c7240ad0810821712e37a3dd6e58771e",
+      "rawSha256": "d54fdd199e0d209f1a11c08d6f074486c7240ad0810821712e37a3dd6e58771e",
+      "bytes": 127,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/python-wire.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "examples/federated-work/test_funded_wire.py"
+      ],
+      "startedAt": "2026-09-15T13:52:48.643390+00:00",
+      "completedAt": "2026-09-15T13:52:48.804513+00:00",
+      "elapsedSeconds": 0.161,
+      "exitCode": 0,
+      "sha256": "c48d7092b4a6d7831074841a1ffe819ca85fdb38d1dc240b0b415e7654d09bf5",
+      "rawSha256": "c48d7092b4a6d7831074841a1ffe819ca85fdb38d1dc240b0b415e7654d09bf5",
+      "bytes": 104,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_resolution.py"
+      ],
+      "startedAt": "2026-09-15T13:54:11.302256+00:00",
+      "completedAt": "2026-09-15T13:57:38.083924+00:00",
+      "elapsedSeconds": 206.782,
+      "exitCode": 0,
+      "sha256": "8e529558cbfb0214851ed5b4a546f044543f0ffff2b266eca105ce411e3bf610",
+      "rawSha256": "8e529558cbfb0214851ed5b4a546f044543f0ffff2b266eca105ce411e3bf610",
+      "bytes": 418,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/child-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_child.py"
+      ],
+      "startedAt": "2026-09-15T13:55:52.307843+00:00",
+      "completedAt": "2026-09-15T13:58:40.459339+00:00",
+      "elapsedSeconds": 168.151,
+      "exitCode": 0,
+      "sha256": "b1f03f6bdf47bab73b6d5db4a6f56e73e56466f4200f1b78afa37ba93f8120b6",
+      "rawSha256": "b1f03f6bdf47bab73b6d5db4a6f56e73e56466f4200f1b78afa37ba93f8120b6",
+      "bytes": 233,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/execution-recovery.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_execution_evidence_and_custody"
+      ],
+      "startedAt": "2026-09-15T13:59:14.994455+00:00",
+      "completedAt": "2026-09-15T14:01:12.961945+00:00",
+      "elapsedSeconds": 117.967,
+      "exitCode": 0,
+      "sha256": "08156c5661ff379e4b2a37fe3113b15ef33650882875a81362ce1f7c929bb934",
+      "rawSha256": "08156c5661ff379e4b2a37fe3113b15ef33650882875a81362ce1f7c929bb934",
+      "bytes": 235,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/standalone-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T13:53:54.641981+00:00",
+      "completedAt": "2026-09-15T13:53:55.028102+00:00",
+      "elapsedSeconds": 0.386,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/workspace-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T13:53:54.566660+00:00",
+      "completedAt": "2026-09-15T13:54:18.077923+00:00",
+      "elapsedSeconds": 23.511,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/hygiene.log",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "startedAt": "2026-09-15T13:53:54.753694+00:00",
+      "completedAt": "2026-09-15T13:53:56.068487+00:00",
+      "elapsedSeconds": 1.315,
+      "exitCode": 0,
+      "sha256": "07566a537c84ce63a1085719c7e65e63e90f27a91fbe703f641bcc510582a560",
+      "rawSha256": "07566a537c84ce63a1085719c7e65e63e90f27a91fbe703f641bcc510582a560",
+      "bytes": 43432,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/preservation.log",
+      "command": [
+        "python3",
+        "/tmp/chio-presettlement/check-preservation.py"
+      ],
+      "startedAt": "2026-09-15T13:53:44.106182+00:00",
+      "completedAt": "2026-09-15T13:53:44.430446+00:00",
+      "elapsedSeconds": 0.324,
+      "exitCode": 0,
+      "sha256": "de879f98827b8c2c1ecc3df10c31e8cab9090f34a45cc0cf6ca2ea6003c40b8a",
+      "rawSha256": "de879f98827b8c2c1ecc3df10c31e8cab9090f34a45cc0cf6ca2ea6003c40b8a",
+      "bytes": 332,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "authority-verifier-evidence/diff-check.log",
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T14:01:50.673870+00:00",
+      "completedAt": "2026-09-15T14:01:50.703020+00:00",
+      "elapsedSeconds": 0.029,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    }
+  ],
+  "scenarioReports": [
+    "handoff-pay.json",
+    "handoff-reject.json",
+    "authority-pay.json",
+    "authority-reject.json",
+    "earned-child-none.json",
+    "earned-child-pay-after-prepare.json",
+    "earned-child-pay-after-broadcast.json",
+    "earned-child-pay-after-observation.json",
+    "resolution-reject-none.json",
+    "resolution-absent-none.json",
+    "resolution-unavailable-none.json",
+    "resolution-preexpired-none.json",
+    "resolution-reject-after-resolution-retained.json",
+    "resolution-reject-after-resolution-accepted.json",
+    "resolution-reject-after-resolution-completed.json",
+    "pay-before-execution-evidence.json",
+    "pay-after-execution-evidence.json",
+    "pay-after-execution-checkpoint.json",
+    "pay-after-execution-custody.json",
+    "reject-after-execution-custody.json"
+  ],
+  "artifacts": [
+    {
+      "path": "authority-verifier-evidence/authority-pay.json",
+      "sha256": "a55fcd62ac217880c5a5479f86ac1e62e1be6c1e5a549514f32193e8715c1770",
+      "bytes": 7056
+    },
+    {
+      "path": "authority-verifier-evidence/authority-pins-pay.json",
+      "sha256": "ead7cb9bad04c53a8f8e1c8241c307f1495695b99f34499a36cf4673428ce384",
+      "bytes": 468
+    },
+    {
+      "path": "authority-verifier-evidence/authority-pins-reject.json",
+      "sha256": "f0343b99a2cc70f92d081754e8dae05b9888ed0687476ebc2d953fb70aedb4f2",
+      "bytes": 468
+    },
+    {
+      "path": "authority-verifier-evidence/authority-process.log",
+      "sha256": "35dc3002589cbfd5fb50443e3af0fedb1e8f2afccd8d0defbce8afbbde42869d",
+      "bytes": 99
+    },
+    {
+      "path": "authority-verifier-evidence/authority-python-pay.json",
+      "sha256": "a1c4113e34c834dbd504dda3e75b5161492f66cc2a4493d10e1d704361e397ef",
+      "bytes": 1058
+    },
+    {
+      "path": "authority-verifier-evidence/authority-python-reject.json",
+      "sha256": "26d847fdcf3309dbd6b7e0367e0241aa60ef8ba6fa589620ee959ce5d18da517",
+      "bytes": 1059
+    },
+    {
+      "path": "authority-verifier-evidence/authority-reject.json",
+      "sha256": "d9f361f2e696c2f7f8e62b37bbc52d8f6308c2e118b4d27512e6235da79b75ef",
+      "bytes": 7181
+    },
+    {
+      "path": "authority-verifier-evidence/authority-witness-pay.json",
+      "sha256": "fee3590e57e285a6be9666b8d21c8087c83c899ecd95b46fcc9d19654d4df466",
+      "bytes": 15415
+    },
+    {
+      "path": "authority-verifier-evidence/authority-witness-reject.json",
+      "sha256": "e67011f8d5238146fdfaee4d99262539e9299fbdcaa8420db16b87e33d27f23e",
+      "bytes": 15149
+    },
+    {
+      "path": "authority-verifier-evidence/build.log",
+      "sha256": "3f5c511bdd477f12416494a0f6cca359e2edc208216d947147372fb49bf13899",
+      "bytes": 171
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-enrollment-pay.json",
+      "sha256": "aceb52d6743baad69ef5a453b38c22e12452701aaa27d8ea2e561f4a32031f65",
+      "bytes": 5745
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-enrollment-reject.json",
+      "sha256": "47127ebeca5c01b574cc6136363bd71aa73283e165682f5e0219d6bd52c56921",
+      "bytes": 5745
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-pins-pay.json",
+      "sha256": "10b7fd77f3b14da793cf1e3f465aa473acd66d01e767e86297fc2152b1c4f6bd",
+      "bytes": 371
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-pins-reject.json",
+      "sha256": "40e87098fe9e872d6ab9a6f0aad542a7cbb58b8e740a9fa422150c702b743dbd",
+      "bytes": 371
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-python-pay.json",
+      "sha256": "9c8d903417ffe75aef30f54ac87698f28e7faeb948bc62547bba0f8534575f2b",
+      "bytes": 1058
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-python-reject.json",
+      "sha256": "598e8a467a2755963108da9a262b1b9184648862350a700454a2954d7ab58c80",
+      "bytes": 1059
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-request-pay.json",
+      "sha256": "a9acfce702d5cd29a24e3bf95608dd897a717fac046d837263471f1baea8be87",
+      "bytes": 3329
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-request-reject.json",
+      "sha256": "46332a3b7b3d53f2aba54f55e4c6d46cd8115a9981a72a3310704c23c586b60c",
+      "bytes": 3329
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-response-pay.json",
+      "sha256": "c551ce23d4b5d24632f047a257e033ca2937ca2d474e2453773bd61abaef68f5",
+      "bytes": 5596
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-response-reject.json",
+      "sha256": "781b87026a32f98a536a9b0a70697de99246ed6693769fb5a9a6f99d151b83f9",
+      "bytes": 5596
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-witness-pay.json",
+      "sha256": "dd5269031d8359ac6b1407de8590bcb84d9ee0fcc930b41db302fb2a3c3fac3f",
+      "bytes": 16243
+    },
+    {
+      "path": "authority-verifier-evidence/checkpoint-witness-reject.json",
+      "sha256": "cc06e5d0f8298187549fe4b54942023267c2b1d1fde28a975c6c419cf6084052",
+      "bytes": 15977
+    },
+    {
+      "path": "authority-verifier-evidence/child-process.log",
+      "sha256": "b1f03f6bdf47bab73b6d5db4a6f56e73e56466f4200f1b78afa37ba93f8120b6",
+      "bytes": 233
+    },
+    {
+      "path": "authority-verifier-evidence/clippy.log",
+      "sha256": "143c11427d4ddca219581f35b71c8a29af21af0a6987bfb85165e8f2aa7bc24b",
+      "bytes": 170
+    },
+    {
+      "path": "authority-verifier-evidence/context-pay.json",
+      "sha256": "9d6e42ae9dbd4b05f6769c712d67b7ebea8fd69bca4f5c1455440f439f80b34e",
+      "bytes": 5613
+    },
+    {
+      "path": "authority-verifier-evidence/context-reject.json",
+      "sha256": "b0e861b93a785b410f2dc0f44e42fd6f280cf8d898d871b14856f21596e18816",
+      "bytes": 5613
+    },
+    {
+      "path": "authority-verifier-evidence/decision-pay.json",
+      "sha256": "729dcf7d5b55d7cb3ca18d7a55f551a0a63a8708894d30b90cd30b13be08a489",
+      "bytes": 3440
+    },
+    {
+      "path": "authority-verifier-evidence/decision-reject.json",
+      "sha256": "4df6340c3d373808a42bab7f3bbc5ee7ba9229fe3ee39f9cc94af1207034b9e7",
+      "bytes": 3441
+    },
+    {
+      "path": "authority-verifier-evidence/development-freshness-green.log",
+      "sha256": "19c28c12b00f2bdc06083c8b47d42f1a7db7f3e0efd945204129aa5e132057d4",
+      "bytes": 1099
+    },
+    {
+      "path": "authority-verifier-evidence/development-freshness-red.log",
+      "sha256": "6fdfc179b97deaa367186e0d8bb88db0ff32ae2e1ba4fef19cf68133eb7f261c",
+      "bytes": 1756
+    },
+    {
+      "path": "authority-verifier-evidence/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "authority-verifier-evidence/earned-child-none.json",
+      "sha256": "6d078f5ccd39577cf7e62a9b97175eaa466f290ca6461511aa907a021ef98dc5",
+      "bytes": 9076
+    },
+    {
+      "path": "authority-verifier-evidence/earned-child-pay-after-broadcast.json",
+      "sha256": "4a39eda319be55d4ffa6ce7bd9fe2c16a3e0ccc51bd6115406a689ef1be0a67d",
+      "bytes": 9073
+    },
+    {
+      "path": "authority-verifier-evidence/earned-child-pay-after-observation.json",
+      "sha256": "765e160fe0429ac1d4b58804e113ba8a2c244071fb8a6e47b27059a6f7c874f0",
+      "bytes": 9073
+    },
+    {
+      "path": "authority-verifier-evidence/earned-child-pay-after-prepare.json",
+      "sha256": "ffc446188bcd8b4925212fae8ebe7d6d470df6ef2921fee32dcaa2f19460eefe",
+      "bytes": 9073
+    },
+    {
+      "path": "authority-verifier-evidence/execution-assessment.json",
+      "sha256": "044cb16f62d624c3ada07a1396a81702252ecc23bc0a636a2adebc070677fa62",
+      "bytes": 1998
+    },
+    {
+      "path": "authority-verifier-evidence/execution-pins-pay.json",
+      "sha256": "02de80436984f1dbd550be9cdb555d90a8480b2429ad55ccacdfddb74f63b042",
+      "bytes": 371
+    },
+    {
+      "path": "authority-verifier-evidence/execution-pins-reject.json",
+      "sha256": "908ea11425717eabb7c76057ebb3277c4d5670fab97f029c426c209f24353e24",
+      "bytes": 371
+    },
+    {
+      "path": "authority-verifier-evidence/execution-pins.json",
+      "sha256": "495b68ce97e9c950c1bda07adb56e0a0e8c813125427bee3fa501c455a1d9626",
+      "bytes": 371
+    },
+    {
+      "path": "authority-verifier-evidence/execution-recovery.log",
+      "sha256": "08156c5661ff379e4b2a37fe3113b15ef33650882875a81362ce1f7c929bb934",
+      "bytes": 235
+    },
+    {
+      "path": "authority-verifier-evidence/execution-witness.json",
+      "sha256": "b861264dd641b581cbab78a20922de143db30588db3365c63aed6da884ab25fe",
+      "bytes": 16243
+    },
+    {
+      "path": "authority-verifier-evidence/handoff-pay.json",
+      "sha256": "29f3e4654a4bbb196927efad006d41f33ff5bac29066611c59486de9306d55d6",
+      "bytes": 5771
+    },
+    {
+      "path": "authority-verifier-evidence/handoff-process.log",
+      "sha256": "52b15105009e53c8aee06e5d28842c20edf5728d29a716f85bba60d587ee9ecc",
+      "bytes": 99
+    },
+    {
+      "path": "authority-verifier-evidence/handoff-reject.json",
+      "sha256": "6580e1e0bbacac2df26ce061eb72f39d2adc31fba7b7509a8079ec2a68f67c89",
+      "bytes": 5896
+    },
+    {
+      "path": "authority-verifier-evidence/hygiene.log",
+      "sha256": "07566a537c84ce63a1085719c7e65e63e90f27a91fbe703f641bcc510582a560",
+      "bytes": 43432
+    },
+    {
+      "path": "authority-verifier-evidence/ignored-rust.log",
+      "sha256": "350a9a257b41feb4b0dbd6021c165f907a65028229c689f191a97902723c8dfd",
+      "bytes": 6341
+    },
+    {
+      "path": "authority-verifier-evidence/pay-after-execution-checkpoint.json",
+      "sha256": "a574a605b1d10140558b124f8e5eb7d0adc08156810625050ece18ee32798506",
+      "bytes": 8236
+    },
+    {
+      "path": "authority-verifier-evidence/pay-after-execution-custody.json",
+      "sha256": "16050d31df38ab80c4e8b03bc47d3ccb319a66a2722157ccbded5cc20d70b1e4",
+      "bytes": 8295
+    },
+    {
+      "path": "authority-verifier-evidence/pay-after-execution-evidence.json",
+      "sha256": "6d4b4a185870792dac748a7d2d408b883c11ee838011596ed42d1937ad3684b3",
+      "bytes": 8172
+    },
+    {
+      "path": "authority-verifier-evidence/pay-before-execution-evidence.json",
+      "sha256": "c31b9d60878d4b31714d12c50c77ae609246b731c01548627021e78e052f1267",
+      "bytes": 8111
+    },
+    {
+      "path": "authority-verifier-evidence/preservation.log",
+      "sha256": "de879f98827b8c2c1ecc3df10c31e8cab9090f34a45cc0cf6ca2ea6003c40b8a",
+      "bytes": 332
+    },
+    {
+      "path": "authority-verifier-evidence/python-public.log",
+      "sha256": "d54fdd199e0d209f1a11c08d6f074486c7240ad0810821712e37a3dd6e58771e",
+      "bytes": 127
+    },
+    {
+      "path": "authority-verifier-evidence/python-wire.log",
+      "sha256": "c48d7092b4a6d7831074841a1ffe819ca85fdb38d1dc240b0b415e7654d09bf5",
+      "bytes": 104
+    },
+    {
+      "path": "authority-verifier-evidence/reject-after-execution-custody.json",
+      "sha256": "6084a73212ab22174770d911b3dd5f67ab62cec648fc2d424d57c9d2897adecc",
+      "bytes": 8423
+    },
+    {
+      "path": "authority-verifier-evidence/required-execution-metered-unavailable.json",
+      "sha256": "19c7c372ecb4f3c436b702fd5ac6346d5089e138633e812534e01bfa316def1d",
+      "bytes": 5047
+    },
+    {
+      "path": "authority-verifier-evidence/required-execution-settled-unavailable.json",
+      "sha256": "1c00d661e537be26268070ad8dc75bc4d670a2a46b4c9b7530a8dc9cac49c3d7",
+      "bytes": 5041
+    },
+    {
+      "path": "authority-verifier-evidence/required-lineage-unsupported.json",
+      "sha256": "a2aba88b8feb12c3502d4072d7925ad0f139b43722db262e6eabd21a90a4d369",
+      "bytes": 4827
+    },
+    {
+      "path": "authority-verifier-evidence/required-receipt-unavailable.json",
+      "sha256": "bc2a5efc1d04625b210e0b572abf1036a02a2b8e5577614bb866e92f70bd8cf6",
+      "bytes": 4839
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-absent-none.json",
+      "sha256": "c61b167027b1010b911b718bcabdf43a8aee030c8bcf92a4596575233df4fce1",
+      "bytes": 5191
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-preexpired-none.json",
+      "sha256": "9531967ebeb5aa44f4274e91fd0cba8f2a27176f0d663a2c18fe111414fc7bd1",
+      "bytes": 5191
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-process.log",
+      "sha256": "8e529558cbfb0214851ed5b4a546f044543f0ffff2b266eca105ce411e3bf610",
+      "bytes": 418
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-reject-after-resolution-accepted.json",
+      "sha256": "dd3c3f8a196e2f3017d7334b496c06e28f724297d8bcb02550de923a7d82bce2",
+      "bytes": 5506
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-reject-after-resolution-completed.json",
+      "sha256": "5a472e77d856b947eecd435844f950fb17caf5fd2d5afeb29a51678709a62b5c",
+      "bytes": 5506
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-reject-after-resolution-retained.json",
+      "sha256": "e09db547125b4e155663e8fb9b6b6d12e55e9137fc4df45a9b262125d7971ef6",
+      "bytes": 5506
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-reject-none.json",
+      "sha256": "8b1ae6ed4a9f8d48df1409f7b314fb5d39601255db954344b26751d2b029ab3f",
+      "bytes": 5509
+    },
+    {
+      "path": "authority-verifier-evidence/resolution-unavailable-none.json",
+      "sha256": "d80fdbb4f156a97b688a71bbe70aaab0d5da1fa6066bf2dd68544b0a793648ca",
+      "bytes": 5350
+    },
+    {
+      "path": "authority-verifier-evidence/review.md",
+      "sha256": "8cb50bd5d85c2d9f0a58941d0282b2f13f3b868da27e0ad1cb8adc905a41a629",
+      "bytes": 5494
+    },
+    {
+      "path": "authority-verifier-evidence/rust-tests.log",
+      "sha256": "f74717bd18e977fa63180e7775f3b040bfda6104b76911935865010141f4bd0c",
+      "bytes": 9569
+    },
+    {
+      "path": "authority-verifier-evidence/standalone-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "authority-verifier-evidence/verifier-enrollment-pay.json",
+      "sha256": "579b0e2fe4f0809c3845be0f62b0929b4c8e4e876a6b513ff969233b71a2b065",
+      "bytes": 8392
+    },
+    {
+      "path": "authority-verifier-evidence/verifier-enrollment-reject.json",
+      "sha256": "4880b419aa29d3dedba061fd82b5f11defe366746b79e6765903a14dc3c363a8",
+      "bytes": 8392
+    },
+    {
+      "path": "authority-verifier-evidence/verifier-request-pay.json",
+      "sha256": "bb0aadb3dc6426bd2683e7164d76a13911e5bc34048d2dee1460cdd2d5183b8b",
+      "bytes": 10539
+    },
+    {
+      "path": "authority-verifier-evidence/verifier-request-reject.json",
+      "sha256": "9e3cbf8f7787eb9ef75f7926cdfb47e40f8dcb1562e5765f2a2ae1b70577b6d1",
+      "bytes": 10273
+    },
+    {
+      "path": "authority-verifier-evidence/workspace-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "boundaries": [
+    "One allocation and one receipt per enrolled checkpoint log and verifier custody slot",
+    "Keys generated in originating role directories; same-host administrator and no OS role isolation",
+    "Fixture coordinator reads buyer and provider seeds for bilateral consent; context construction reads governance and status seeds together",
+    "Provider funding and operator custody journals have no external rollback anchor",
+    "Historical response replay does not refresh standing or authorize payment",
+    "No external revocation feed; bounded local authority standing",
+    "Python verifies execution authority and externally pinned allocation; it does not verify chain funding",
+    "Same native receipt-store checkpoint signer rule; unchanged kernel and workspace dependencies"
+  ]
+}

@@ -1,0 +1,124 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ one real deposit cannot fund a second escrow or change its beneficiary (3911.866664ms)
+✔ beneficiary claims a signed release without another buyer action and cannot be paid twice (3890.262239ms)
+✔ a pre-expiry operator certificate does not preserve a claim past refund time (3223.445089ms)
+ℹ {"case":"timely-certificate-loses-to-expiry","certifiedAt":1789344000,"deadline":1789344100,"refundedAt":1789344101,"paid":"0","refunded":"100"}
+✔ administrative pause blocks release while an expired refund remains possible (3034.539963ms)
+✔ changing the registered operator key does not migrate an existing escrow pin (2462.378918ms)
+✔ a separately funded child stays paid when its unpaid parent expires (5697.056704ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ accepted claim survives deadlines, funding pause and future verifier rotation (5699.39087ms)
+✔ only a timely provider commitment opens the verifier decision window (3295.801603ms)
+▶ verifier outage and absent submission reach refund only strictly after timeout
+  ✔ false (2994.649248ms)
+  ✔ true (2994.094725ms)
+✔ verifier outage and absent submission reach refund only strictly after timeout (5989.928859ms)
+✔ rejected work refunds without creating a payment right (3156.889124ms)
+✔ still-unpaid earned child withdraws after the parent is refunded (6609.695622ms)
+ℹ {"case":"unpaid-earned-child-survives-parent-refund","parentRefunded":"100","childPaidAfterParentRefund":"60","intermediaryLoss":"60"}
+✔ funding binds every term and cannot allocate the same agreement twice (2538.989455ms)
+✔ another payer cannot squat a publicly known agreement digest (4337.647239ms)
+✔ fixed allocation and authorization vectors are accepted by the deployed bytecode (3279.076847ms)
+✔ invalid amounts, roles, deadlines and administrative callers cannot create backing (1280.887844ms)
+✔ maximum supported integer deposits and refunds without rounding (2426.312665ms)
+✔ a release signature cannot substitute its domain, claim, decision, asset or beneficiary (3877.989107ms)
+✔ future verifier rotation does not replace a funded agreements decision key (2877.646959ms)
+✔ competing mined withdrawals produce one payment and no refund (3195.891281ms)
+✔ failed, taxed or malformed token transfers cannot consume a payable claim (7422.521064ms)
+✔ inexact deposits and failed refunds roll back allocation and terminal state (4725.896312ms)
+✔ token callbacks cannot reenter the financial transition (4325.142627ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ accepted W0 recovers every action after before_broadcast (16729.005085ms)
+✔ accepted W0 recovers every action after after_broadcast (14495.519226ms)
+✔ accepted W0 recovers every action after after_observation (13996.858632ms)
+✔ accepted W0 recovers every action after after_recorded (14769.018194ms)
+✔ rejected W0 recovers every action after before_broadcast (13559.031427ms)
+✔ rejected W0 recovers every action after after_broadcast (13403.980037ms)
+✔ rejected W0 recovers every action after after_observation (13721.519366ms)
+✔ rejected W0 recovers every action after after_recorded (14451.28212ms)
+✔ missing-custody W0 recovers every action after before_broadcast (9343.826767ms)
+✔ missing-custody W0 recovers every action after after_broadcast (9267.949319ms)
+✔ missing-custody W0 recovers every action after after_observation (9285.250968ms)
+✔ missing-custody W0 recovers every action after after_recorded (9460.600114ms)
+✔ child W0 recovers every action after before_broadcast (19864.944639ms)
+✔ child W0 recovers every action after after_broadcast (20053.682305ms)
+✔ child W0 recovers every action after after_observation (20516.014077ms)
+✔ child W0 recovers every action after after_recorded (20958.871272ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ raw recovery validates signature, operation, complete transaction and local rail pins (5057.347561ms)
+✔ unavailable or mismatched rail observations cannot certify inclusion (3813.292621ms)
+✔ a reorg preserves uncertainty and a revert never becomes paid (3406.890429ms)
+✔ an unresolved earlier nonce prevents dispatch of a future transaction (2984.85136ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ actual W0 payout recovers after SIGKILL before_broadcast (8634.528185ms)
+✔ actual W0 payout recovers after SIGKILL after_broadcast (6810.713964ms)
+✔ actual W0 payout recovers after SIGKILL after_observation (6565.226843ms)
+✔ actual W0 payout recovers after SIGKILL after_recorded (6401.346042ms)
+✔ an earned child recovers payout after parent refund and rail-worker loss (9430.010303ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-work/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ real W0 accepted has exact retained authority and balances (6134.546764ms)
+✔ real W0 rejected has exact retained authority and balances (4359.125779ms)
+✔ real W0 missing-custody has exact retained authority and balances (3737.478371ms)
+✔ real W0 child has exact retained authority and balances (8504.989518ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 53
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 245861.060595

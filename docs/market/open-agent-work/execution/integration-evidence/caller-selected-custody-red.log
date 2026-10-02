@@ -1,0 +1,23 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+    Finished `test` profile [unoptimized] target(s) in 1m 11s
+     Running unittests src/lib.rs (target/debug/deps/chio_kernel-ece71a10790b9ed1)
+
+running 5 tests
+test kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_approval_authority ... ok
+test kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_dpop_authority ... ok
+test kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_preserves_genuinely_unselected_and_legacy_custody_absence ... ok
+test kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody ... FAILED
+test kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_selected_runtime_custody ... ok
+
+failures:
+
+---- kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody stdout ----
+Error: "published caller snapshot without selected DPoP custody"
+
+
+failures:
+    kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 1440 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p chio-kernel --lib`

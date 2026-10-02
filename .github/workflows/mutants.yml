@@ -3,7 +3,7 @@
 # Two jobs:
 #   mutants-pr      - path-scoped pull-request job; runs
 #                     `cargo mutants --in-diff`
-#                     against the PR base ref, six crates in parallel,
+#                     against the PR base ref, eight crates in parallel,
 #                     posts a Markdown summary for same-repository PRs,
 #                     and consults scripts/mutants-gate.sh for advisory-vs-blocking
 #                     posture (driven by releases.toml cycle_end_tag).
@@ -20,7 +20,8 @@
 # Cutover rule:
 #   The lane flips after two consecutive nightly runs report >= 80 caught
 #   ratio on every trust-boundary crate: chio-policy, chio-credentials,
-#   chio-attest-verify, chio-kernel-core, chio-guards, and chio-anchor.
+#   chio-attest-verify, chio-kernel-core, chio-guards, chio-anchor,
+#   chio-federation, and chio-runtime-core.
 #
 # continue-on-error policy:
 #   - mutants-pr: NOT set, so the gate script's exit code propagates.
@@ -58,6 +59,10 @@ on:
       - "crates/trust/chio-credentials/src/**"
       - "crates/economy/chio-anchor/mutants.toml"
       - "crates/economy/chio-anchor/src/**"
+      - "crates/trust/chio-federation/mutants.toml"
+      - "crates/trust/chio-federation/src/**"
+      - "crates/kernel/chio-runtime-core/mutants.toml"
+      - "crates/kernel/chio-runtime-core/src/**"
       - "releases.toml"
       - "scripts/check-fuzz-budget.sh"
       - "scripts/check-mutants-rationale.sh"
@@ -107,6 +112,8 @@ jobs:
           - chio-credentials
           - chio-attest-verify
           - chio-anchor
+          - chio-federation
+          - chio-runtime-core
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
@@ -134,6 +141,8 @@ jobs:
             chio-credentials) crate_path="crates/trust/chio-credentials" ;;
             chio-attest-verify) crate_path="crates/trust/chio-attest-verify" ;;
             chio-anchor) crate_path="crates/economy/chio-anchor" ;;
+            chio-federation) crate_path="crates/trust/chio-federation" ;;
+            chio-runtime-core) crate_path="crates/kernel/chio-runtime-core" ;;
             *)
               echo "unknown mutation package: ${MATRIX_PACKAGE}" >&2
               exit 1
@@ -344,6 +353,8 @@ jobs:
           - chio-credentials
           - chio-attest-verify
           - chio-anchor
+          - chio-federation
+          - chio-runtime-core
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:

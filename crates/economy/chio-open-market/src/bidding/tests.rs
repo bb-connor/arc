@@ -19,6 +19,118 @@ fn invalid_request_helper_preserves_variant_message() {
 }
 
 #[test]
+fn received_acceptance_verifies_without_buyer_private_key_and_rejects_substitution() {
+    let provider = Keypair::generate();
+    let buyer = Keypair::generate();
+    let reserve_authority = Keypair::generate();
+    let listing = listing_entry(
+        &provider,
+        &provider,
+        GenericListingStatus::Active,
+        100,
+        110,
+        600,
+    );
+    let request = signed_bid_request(&buyer, "agent-alpha", 200, 300, 120);
+    let ask = bid(
+        &request,
+        BidMintContext {
+            listing: &listing,
+            issuer_keypair: &provider,
+            agent_subject: buyer.public_key(),
+            token_id: "purchase-1".to_string(),
+            now: 120,
+            grant_constraints: Vec::new(),
+            dpop_required: None,
+        },
+    )
+    .test_unwrap();
+    let reservation = reservation_for(&ask, "held-1", &reserve_authority);
+    let accepted = accept(&ask, &reservation, &buyer, 130).test_unwrap();
+    let verify = |value: &SignedAcceptedBid| {
+        verify_acceptance(
+            value,
+            &ask,
+            &reservation,
+            &provider.public_key(),
+            &buyer.public_key(),
+        )
+    };
+    assert!(verify(&accepted).is_ok());
+
+    // Every changed body is signed by the actual buyer. Signature checking
+    // alone therefore cannot reject these changed agreements.
+    let mut variants = Vec::new();
+    for field in [
+        "schema",
+        "listingId",
+        "agentId",
+        "bidDigest",
+        "askDigest",
+        "bidReceiptId",
+        "tokenId",
+    ] {
+        let mut value = serde_json::to_value(&accepted.body).test_unwrap();
+        value[field] = serde_json::json!("different");
+        variants.push(serde_json::from_value::<AcceptedBid>(value).test_unwrap());
+    }
+    let mut changed = accepted.body.clone();
+    changed.quoted_price.units += 1;
+    variants.push(changed);
+    let mut changed = accepted.body.clone();
+    changed.quoted_price.currency = "EUR".to_string();
+    variants.push(changed);
+    let mut changed = accepted.body.clone();
+    changed.token_subject = provider.public_key();
+    variants.push(changed);
+    let mut changed = accepted.body.clone();
+    changed.token_expires_at += 1;
+    variants.push(changed);
+    let mut changed = accepted.body.clone();
+    changed.accepted_at = ask.body.issued_at - 1;
+    variants.push(changed);
+    let mut changed = accepted.body.clone();
+    changed.accepted_at = ask.body.expires_at;
+    variants.push(changed);
+    for variant in variants {
+        let signed = SignedAcceptedBid::sign(variant, &buyer).test_unwrap();
+        assert!(signed.verify_signature().test_unwrap());
+        assert!(verify(&signed).is_err());
+    }
+    let other = Keypair::generate();
+    assert!(verify_acceptance(
+        &accepted,
+        &ask,
+        &reservation,
+        &other.public_key(),
+        &buyer.public_key()
+    )
+    .is_err());
+    assert!(verify_acceptance(
+        &accepted,
+        &ask,
+        &reservation,
+        &provider.public_key(),
+        &other.public_key()
+    )
+    .is_err());
+    let forged = SignedAcceptedBid::sign(accepted.body.clone(), &other).test_unwrap();
+    assert!(verify(&forged).is_err());
+    let mut damaged = accepted.clone();
+    damaged.body.accepted_at += 1;
+    assert!(verify(&damaged).is_err());
+    let other_reservation = reservation_for(&ask, "held-2", &reserve_authority);
+    assert!(verify_acceptance(
+        &accepted,
+        &ask,
+        &other_reservation,
+        &provider.public_key(),
+        &buyer.public_key()
+    )
+    .is_err());
+}
+
+#[test]
 fn bid_request_rejects_padded_required_fields() {
     let mut request = bid_request(" agent-alpha", 200, 300, 120);
     let error = request

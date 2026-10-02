@@ -1,0 +1,186 @@
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+warning: function `setup_with_requirements` is never used
+  --> src/funded_work/smoke.rs:56:15
+   |
+56 | pub(super) fn setup_with_requirements(
+   |               ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-federated-work` (bin "chio-federated-work" test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 21.36s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-ec8305597a8f01bf)
+
+running 62 tests
+test funded_work::finding_acceptance::tests::asserted_w0_has_exact_derived_facets_and_no_backing_upgrade ... ok
+test funded_work::finding_acceptance::tests::changed_claim_and_optional_failed_facet_deny ... ok
+test funded_work::finding_acceptance::tests::changed_trust_profile_and_standing_fail_closed ... ok
+test funded_work::finding_acceptance::tests::context_admission_checks_independent_role_pins_and_time ... ok
+test funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing ... ok
+test funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle ... ok
+test funded_work::finding_acceptance::tests::invented_evidence_digest_cannot_be_authorized_by_resigning ... ok
+test funded_work::finding_acceptance::tests::invented_optional_verified_facet_cannot_be_authorized_by_resigning ... ok
+test funded_work::finding_acceptance::tests::missing_required_and_unsupported_facets_deny ... ok
+test funded_work::finding_acceptance::tests::raw_ingress_and_relabelled_assessment_deny ... ok
+test funded_work::finding_acceptance::tests::retained_assessment_uses_historical_authority_window ... ok
+test funded_work::finding_acceptance::tests::trust_time_and_authentication_cannot_be_refreshed_by_evaluator ... ok
+test funded_work::tests::allocation_matches_the_independent_contract_vector ... ok
+test funded_work::tests::allocation_rejects_lossy_or_ambiguous_money ... ok
+test funded_work::tests::evidence::authenticated_wrong_result_is_rejected_without_replacing_execution ... ok
+test funded_work::tests::evidence::custody_capacity_preserves_exact_retrieval_and_retries ... ok
+test funded_work::tests::evidence::custody_loss_and_noncanonical_or_forged_finding_cannot_decide ... ok
+test funded_work::tests::evidence::finding_requires_the_original_retained_native_outcome ... ok
+test funded_work::tests::evidence::private_chain_pays_the_original_native_operation ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+FAILED
+test funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+FAILED
+test funded_work::tests::execution_authority::accepted_execution_decision_replays_after_finding_expiry ... FAILED
+test funded_work::tests::execution_authority::invalid_execution_standing_cannot_mint_either_financial_decision ... FAILED
+test funded_work::tests::native::admission_without_a_payment_participant_remains_inspectable ... ok
+test funded_work::tests::native::changed_request_and_unavailable_observer_cannot_reserve ... ok
+test funded_work::tests::native::concurrent_retries_cannot_duplicate_native_dispatch_or_hold ... ok
+test funded_work::tests::native::fresh_native_authority_cannot_inherit_funded_agreement ... ok
+test funded_work::tests::native::invalid_observations_deny_before_any_native_operation_hold_or_dispatch ... ok
+test funded_work::tests::native::observation_lost_during_authorization_keeps_original_native_identity ... ok
+test funded_work::tests::native::original_capability_expiry_and_scope_deny_before_reservation ... ok
+test funded_work::tests::native::resigning_another_request_cannot_reuse_the_original_deposit ... ok
+test funded_work::tests::native::restart_and_replay_preserve_one_operation_and_original_hold ... ok
+test funded_work::tests::native::retention_capacity_denies_before_an_additional_native_reservation ... ok
+test funded_work::tests::native::signed_agreement_rejects_identity_and_signature_substitution ... ok
+test funded_work::tests::native::verified_funding_creates_one_native_operation_and_hold ... ok
+test funded_work::tests::observer::receiver_verifies_exact_funded_state_and_confirmed_ancestry ... ok
+test funded_work::tests::observer::stale_chain_time_cannot_be_refreshed_by_a_new_receiver_timestamp ... ok
+test funded_work::tests::resolution::refund_substitution_cannot_authorize_a_native_waiver ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+FAILED
+test funded_work::tests::settlement::payout_rejects_altered_observations_and_adapter_identities ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+FAILED
+test funded_work::tests::successors::altered_original_waiver_authority_denies_before_reservation ... ok
+test funded_work::tests::successors::legacy_funding_cannot_acquire_a_waiver_after_execution ... ok
+test funded_work::tests::successors::substituted_dependency_denies_before_opening_the_child_kernel ... ok
+test funded_work::tests::wire::canonical_signed_artifact_decoding_rejects_raw_ambiguity ... ok
+test funded_work::tests::wire::original_agreement_commits_finding_context_and_required_facets ... ok
+test funded_work::tests::wire::registered_artifact_vectors_cover_current_signed_shapes ... ok
+test funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+FAILED
+test funded_work::tests::wire::shared_malformed_vectors_match_the_registered_rust_parser ... ok
+test funded_work::tests::wire::signed_decision_cannot_override_missing_or_changed_finding_authority ... ok
+test funded_work::tests::wire::signed_requirement_or_context_substitution_cannot_admit_work ... ok
+test funded_work::tests::wire::unavailable_or_unsupported_finding_facets_cannot_mint_financial_decisions ... ok
+test https::tests::advertised_origin_cannot_change_scheme_or_route ... ok
+test https::tests::public_enrollment_rejects_keys_and_malformed_certificates ... ok
+test subcontract::tests::disclosure_reconstructs_authentication_without_nested_private_data ... ok
+test subcontract::tests::even_valid_promisor_signatures_cannot_widen_the_exact_procurement ... ok
+test subcontract::tests::four_keys_and_exact_disclosure_are_required ... ok
+test subcontract::tests::parent_signature_cannot_replace_specialist_evidence ... ok
+test tests::authentication_review_observes_inheritance_and_explicit_anonymous_alternatives ... ok
+test tests::authentication_review_rejects_ambiguous_or_unsupported_security_semantics ... ok
+test tests::buyer_rejects_widened_offers_even_when_provider_resigns_them ... ok
+test tests::release_vectors_require_exact_joint_authority_and_completed_receipt ... ok
+test work_buyer::tests::conflicting_verified_terminals_cannot_change_the_first_accounting_choice ... ok
+
+failures:
+
+---- funded_work::tests::evidence::private_chain_pays_the_original_native_operation stdout ----
+Error: Conflict("checkpoint 1 kernel key 469b3c54b6782ec6b22c0ac422ae75a53f4914ede84d7acadbabb107e30caa3d does not match receipt signer key 91282ea8ff235c0cbdd27944039e6b721268526b378cabc0a39b18740a73ec75 for claim receipt log range 1..=1")
+
+---- funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment stdout ----
+Error: Conflict("checkpoint 1 kernel key 910a331eff5af58960f6bff6e8c3654219db4282eddf5c68c128218b2fde98d4 does not match receipt signer key 51c072660e8dd99081b8bce1f3d9afbbc35aa8b81ba74594bb3e942778903639 for claim receipt log range 1..=1")
+
+---- funded_work::tests::execution_authority::accepted_execution_decision_replays_after_finding_expiry stdout ----
+Error: Conflict("checkpoint 1 kernel key 77922daec1a06a1ce3567caf83a66b86ce8577fbdb538a75daa328597446c77f does not match receipt signer key 4319f9721666ee5f93cc4c2ca74475043e1856c93b6d53c65e410cfaa671c824 for claim receipt log range 1..=1")
+
+---- funded_work::tests::execution_authority::invalid_execution_standing_cannot_mint_either_financial_decision stdout ----
+Error: Conflict("checkpoint 1 kernel key 1abf6d0f2d540ad7110b70d4cded631514f7168da276a19dab22fb7ef524caf1 does not match receipt signer key 00f517c7904d8e5311344f7d3b51e7391bbc3b39a01d10a0fa8d00fe62971144 for claim receipt log range 1..=1")
+
+---- funded_work::tests::resolution::refund_substitution_cannot_authorize_a_native_waiver stdout ----
+Error: Conflict("checkpoint 1 kernel key 0fce441d93fc6ff896a22be423d270c777ed5ff5ae24c1cc3cbf52b5a56dcf56 does not match receipt signer key ce9c8af195b4ac6038d403052a7a068f537017ab88349f3a7ee1920e7bba7414 for claim receipt log range 1..=1")
+
+---- funded_work::tests::settlement::payout_rejects_altered_observations_and_adapter_identities stdout ----
+Error: Conflict("checkpoint 1 kernel key 8fe6ef97d6d15ecb25e001f1d2d77a9ef74dde22f098936ee24c3eeabc512868 does not match receipt signer key aef4f46176f11ac46a189c080d6f38110d75750a171fadb439992206eff74df7 for claim receipt log range 1..=1")
+
+---- funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment stdout ----
+
+thread 'funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment' (2257718) panicked at src/funded_work/tests/wire.rs:407:9:
+conflict: checkpoint 1 kernel key 3c8aa09f2ee8f60e784bbd5c8ef155da95db2f3b1720a001bde2079ca2fa16a0 does not match receipt signer key 7b5afa1f06b0cf8eff5fc81ea7e34116ad77d785959a82bb55f37e1766c2945d for claim receipt log range 1..=1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    funded_work::tests::evidence::private_chain_pays_the_original_native_operation
+    funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment
+    funded_work::tests::execution_authority::accepted_execution_decision_replays_after_finding_expiry
+    funded_work::tests::execution_authority::invalid_execution_standing_cannot_mint_either_financial_decision
+    funded_work::tests::resolution::refund_substitution_cannot_authorize_a_native_waiver
+    funded_work::tests::settlement::payout_rejects_altered_observations_and_adapter_identities
+    funded_work::tests::wire::required_facet_failure_times_out_without_a_chain_decision_or_payment
+
+test result: FAILED. 55 passed; 7 failed; 0 ignored; 0 measured; 0 filtered out; finished in 228.36s
+
+error: test failed, to rerun pass `--bin chio-federated-work`

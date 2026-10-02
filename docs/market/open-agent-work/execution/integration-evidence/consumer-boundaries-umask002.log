@@ -1,0 +1,856 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling smallvec v1.15.1
+   Compiling hashbrown v0.17.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling icu_normalizer v2.1.1
+   Compiling idna_adapter v1.2.1
+   Compiling indexmap v2.14.1
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling parking_lot_core v0.9.12
+   Compiling serde_json v1.0.149
+   Compiling parking_lot v0.12.5
+   Compiling tokio v1.50.0
+   Compiling ed25519-dalek v2.2.0
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling alloy-rlp v0.3.13
+   Compiling ruint v1.20.0
+   Compiling k256 v0.13.4
+   Compiling alloy-primitives v1.5.7
+   Compiling tokio-util v0.7.18
+   Compiling postcard v1.1.3
+   Compiling itertools v0.14.0
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper v1.8.1
+   Compiling tower v0.5.3
+   Compiling hyper-util v0.1.20
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling tower-http v0.6.8
+   Compiling hyper-rustls v0.27.7
+   Compiling frost-core v3.0.0
+   Compiling reqwest v0.13.2
+   Compiling frost-rerandomized v3.0.0
+   Compiling frost-ed25519 v3.0.0
+   Compiling rustix v1.1.4
+   Compiling alloy-json-abi v1.5.7
+   Compiling alloy-sol-macro-input v1.5.7
+   Compiling tokio-stream v0.1.18
+   Compiling x509-cert v0.2.5
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling alloy-sol-macro v1.5.7
+   Compiling toml_edit v0.25.9+spec-1.1.0
+   Compiling alloy-sol-types v1.5.7
+   Compiling serde_with v3.18.0
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling proc-macro-crate v3.5.0
+   Compiling num_enum_derive v0.7.6
+   Compiling alloy-eip2124 v0.2.0
+   Compiling num_enum v0.7.6
+   Compiling alloy-eip7928 v0.3.3
+   Compiling alloy-eip2930 v0.2.3
+   Compiling alloy-eip7702 v0.6.3
+   Compiling alloy-serde v1.8.3
+   Compiling nybbles v0.4.8
+   Compiling alloy-trie v0.9.5
+   Compiling alloy-eips v1.8.3
+   Compiling referencing v0.46.0
+   Compiling alloy-consensus v1.8.3
+   Compiling jsonschema v0.46.0
+   Compiling rusqlite v0.39.0
+   Compiling serde_json_canonicalizer v0.3.2
+   Compiling alloy-json-rpc v1.8.3
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling tempfile v3.27.0
+   Compiling alloy-consensus-any v1.8.3
+   Compiling alloy-network-primitives v1.8.3
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling lru v0.18.2
+   Compiling alloy-rpc-types-eth v1.8.3
+   Compiling num-bigint-dig v0.8.6
+   Compiling alloy-transport v1.8.3
+   Compiling olpc-cjson v0.1.4
+   Compiling rsa v0.9.10
+   Compiling alloy-transport-http v1.8.3
+   Compiling alloy-rpc-types-any v1.8.3
+   Compiling oci-spec v0.9.0
+   Compiling oauth2 v5.0.0
+   Compiling alloy-signer v1.8.3
+   Compiling jsonwebtoken v10.4.0
+   Compiling tough v0.22.0
+   Compiling toml_edit v0.22.27
+   Compiling oci-client v0.17.0
+   Compiling dashmap v6.1.0
+   Compiling sigstore_protobuf_specs v0.5.1
+   Compiling openidconnect v4.0.1
+   Compiling alloy-network v1.8.3
+   Compiling alloy-rpc-client v1.8.3
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling alloy-chains v0.2.33
+   Compiling alloy-core v1.5.7
+   Compiling webbrowser v1.2.2
+   Compiling alloy-provider v1.8.3
+   Compiling sigstore v0.14.0
+   Compiling webauthn-rs-core v0.5.2
+   Compiling alloy v1.8.3
+   Compiling toml v0.8.23
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling alloy-dyn-abi v1.5.7
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling tracing-subscriber v0.3.23
+   Compiling jsonwebtoken v9.3.1
+   Compiling alloy-contract v1.8.3
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling ureq v2.12.1
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards/redactors/default)
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-log-redact)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow-preflight)
+   Compiling wasmtime-internal-core v46.0.3
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling sigstore-types v0.6.6
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling cranelift-srcgen v0.133.3
+   Compiling cranelift-assembler-x64-meta v0.133.3
+   Compiling sigstore-crypto v0.6.6
+   Compiling cranelift-bitset v0.133.3
+   Compiling cms v0.2.3
+   Compiling semver v1.0.27
+   Compiling crmf v0.2.0
+   Compiling hashbrown v0.15.5
+   Compiling crossbeam-deque v0.8.6
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling curve25519-dalek v5.0.0-rc.0
+   Compiling pulley-macros v46.0.3
+   Compiling target-lexicon v0.13.5
+   Compiling leb128fmt v0.1.0
+   Compiling r2d2 v0.8.10
+   Compiling cmpv2 v0.2.0
+   Compiling wasmparser v0.251.0
+   Compiling cranelift-entity v0.133.3
+   Compiling gimli v0.33.0
+   Compiling bumpalo v3.20.2
+   Compiling wasmtime-internal-versioned-export-macros v46.0.3
+   Compiling cranelift-isle v0.133.3
+   Compiling cranelift-bforest v0.133.3
+   Compiling x509-tsp v0.1.0
+   Compiling pulley-interpreter v46.0.3
+   Compiling n0-future v0.3.2
+   Compiling r2d2_sqlite v0.33.0
+   Compiling sigstore-merkle v0.6.6
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling prefix-trie v0.8.4
+   Compiling cranelift-codegen-shared v0.133.3
+   Compiling object v0.39.1
+   Compiling cranelift-codegen-meta v0.133.3
+   Compiling hickory-proto v0.26.1
+   Compiling sigstore-rekor v0.6.6
+   Compiling ed25519-dalek v3.0.0-rc.0
+   Compiling sigstore-tsa v0.6.6
+   Compiling hashlink v0.10.0
+   Compiling cranelift-assembler-x64 v0.133.3
+   Compiling fastbloom v0.17.0
+   Compiling h2 v0.4.16
+   Compiling futures-intrusive v0.5.0
+   Compiling cpp_demangle v0.4.5
+   Compiling sqlx-core v0.8.6
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-trace-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-trace-validate)
+   Compiling hickory-net v0.26.1
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-http-session v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-session)
+   Compiling noq-proto v1.0.1
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling moka v0.12.15
+   Compiling cranelift-codegen v0.133.3
+   Compiling iroh-base v1.0.1
+   Compiling sigstore-bundle v0.6.6
+   Compiling wasm-encoder v0.251.0
+   Compiling sigstore-trust-root v0.6.3
+   Compiling zstd-sys v2.0.16+zstd.1.5.7
+   Compiling netlink-sys v0.8.8
+   Compiling md-5 v0.10.6
+   Compiling arbitrary v1.4.2
+   Compiling wasmtime-internal-component-util v46.0.3
+   Compiling hickory-resolver v0.26.1
+   Compiling axum v0.8.8
+   Compiling sqlx-postgres v0.8.6
+   Compiling cranelift-control v0.133.3
+   Compiling chio-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-guards)
+   Compiling sigstore-verify v0.6.3 (/home/connor/backbay/arc-funded-integration/third_party/sigstore-verify-chio)
+   Compiling chio-conformance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-conformance)
+   Compiling noq v1.0.1
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling sqlx-macros-core v0.8.6
+   Compiling wasmprinter v0.251.0
+   Compiling regalloc2 v0.15.1
+   Compiling ignore v0.4.32
+   Compiling rustc-demangle v0.1.27
+   Compiling wasmtime-environ v46.0.3
+   Compiling tokio-websockets v0.13.3
+   Compiling netdev v0.45.0
+   Compiling iroh-dns v1.0.1
+   Compiling nono v0.53.0
+   Compiling sqlx-macros v0.8.6
+   Compiling netlink-proto v0.12.0
+   Compiling serde_yaml_ng v0.10.0
+   Compiling n0-watcher v1.0.0
+   Compiling chio-finding-market-port v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-port)
+   Compiling zstd-safe v7.2.4
+   Compiling id-arena v2.3.0
+   Compiling iroh-relay v1.0.1
+   Compiling nono-chio v0.53.0-chio.2 (/home/connor/backbay/arc-funded-integration/third_party/nono-chio)
+   Compiling netwatch v0.19.1
+   Compiling chio-finding-market-migrations v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-migrations)
+   Compiling sqlx v0.8.6
+   Compiling chio-http-serve v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-http-serve)
+   Compiling wasm-encoder v0.258.0
+   Compiling backon v1.6.0
+   Compiling winnow v1.0.1
+   Compiling unicode-width v0.2.2
+   Compiling wasmtime-internal-unwinder v46.0.3
+   Compiling wast v258.0.0
+   Compiling wit-parser v0.251.0
+   Compiling toml_parser v1.1.1+spec-1.1.0
+   Compiling chio-cage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-cage)
+   Compiling iroh v1.0.1
+   Compiling chio-finding-market-store-postgres v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-store-postgres)
+   Compiling wasmtime-internal-fiber v46.0.3
+   Compiling wasmtime-internal-jit-debug v46.0.3
+   Compiling chio-decoy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-decoy)
+   Compiling chio-metering v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-metering)
+   Compiling chio-reputation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-reputation)
+   Compiling chio-flow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-flow)
+   Compiling inplace-vec-builder v0.1.1
+   Compiling dirs-sys-next v0.1.2
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling toml_writer v1.1.1+spec-1.1.0
+   Compiling fixedbitset v0.4.2
+   Compiling wasmtime-internal-cranelift v46.0.3
+   Compiling wasmtime-internal-component-macro v46.0.3
+   Compiling wasmtime-internal-cache v46.0.3
+   Compiling range-collections v0.4.6
+   Compiling petgraph v0.6.5
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling irpc v0.17.0
+   Compiling directories-next v2.0.0
+   Compiling chio-security-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-kernel)
+   Compiling chio-credentials v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-credentials)
+   Compiling chio-data-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards)
+   Compiling chio-finding-worker v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-worker)
+   Compiling chio-policy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-policy)
+   Compiling zstd v0.13.3
+   Compiling chio-mcp-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-adapter)
+   Compiling wasmtime-internal-wit-bindgen v46.0.3
+   Compiling wat v1.258.0
+   Compiling rayon-core v1.13.0
+   Compiling cranelift-native v0.133.3
+   Compiling cranelift-frontend v0.133.3
+   Compiling chio-finding-hosted-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-external-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-external-guards)
+   Compiling chio-trust-market-context v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-trust-market-context)
+   Compiling chio-enterprise-export v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-enterprise-export)
+   Compiling chio-finding-challenge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-challenge)
+   Compiling chio-http-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-core)
+   Compiling chio-siem v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-siem)
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling wasmtime v46.0.3
+   Compiling iroh-io v0.6.2
+   Compiling chio-signing-remote v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-signing-remote)
+   Compiling chio-keyring v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-keyring)
+   Compiling chio-spec-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-spec-validate)
+   Compiling chio-quarantine v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-quarantine)
+   Compiling chio-secure-ipc v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-secure-ipc)
+   Compiling debugid v0.8.0
+   Compiling inotify-sys v0.1.5
+   Compiling wasmparser v0.221.3
+   Compiling bitflags v1.3.2
+   Compiling inotify v0.9.6
+   Compiling bao-tree v0.16.0
+   Compiling futures-concurrency v7.7.1
+   Compiling chio-control-plane v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-control-plane)
+   Compiling fxprof-processed-profile v0.8.1
+   Compiling chio-openapi v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-openapi)
+   Compiling rayon v1.11.0
+   Compiling wasm-compose v0.251.0
+   Compiling iroh-util v0.6.0
+   Compiling iroh-tickets v1.0.0
+   Compiling addr2line v0.26.1
+   Compiling chio-pheromone-runtime v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone-runtime)
+   Compiling wasmtime-internal-jit-icache-coherence v46.0.3
+   Compiling nested_enum_utils v0.2.3
+   Compiling reflink-copy v0.1.30
+   Compiling memfd v0.6.5
+   Compiling mio v0.8.11
+   Compiling filetime v0.2.27
+   Compiling encoding_rs v0.8.35
+   Compiling rusty-fork v0.3.1
+   Compiling notify v6.1.1
+   Compiling iroh-blobs v0.103.0
+   Compiling chio-pheromone-relay v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone-relay)
+   Compiling iroh-gossip v0.101.0
+   Compiling chio-config v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-config)
+   Compiling pollster v0.4.0
+   Compiling proptest v1.10.0
+   Compiling chio-wasm-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-wasm-guards)
+   Compiling chio-federation-transport-iroh v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-transport-iroh)
+   Compiling chio-anchor v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-anchor)
+   Compiling chio-api-protect v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-api-protect)
+   Compiling chio-mcp-remote v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-remote)
+   Compiling chio-openapi-mcp-bridge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-openapi-mcp-bridge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-edge)
+   Compiling chio-acp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-acp-edge)
+   Compiling chio-a2a-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-adapter)
+   Compiling chio-kernel-browser v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-browser)
+   Compiling chio-tee-frame v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-tee-frame)
+   Compiling chio-adversarial-suite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-adversarial-suite)
+    Finished `test` profile [unoptimized] target(s) in 17m 27s
+     Running tests/consumer_boundary.rs (target/debug/deps/consumer_boundary-6f6a2b947afbffc8)
+a2a_aggregate_capture_survives_consumer_restart: test
+a2a_threshold_proposal_approval_and_restart_preserve_one_capture: test
+acp_aggregate_capture_survives_consumer_restart: test
+acp_threshold_proposal_approval_and_restart_preserve_one_capture: test
+mcp_aggregate_capture_survives_consumer_restart: test
+mcp_threshold_proposal_approval_and_restart_preserve_one_capture: test
+native_aggregate_capture_survives_consumer_restart: test
+native_threshold_proposal_approval_and_restart_preserve_one_capture: test
+
+8 tests, 0 benchmarks
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 17m 00s
+     Running tests/consumer_boundary.rs (target/debug/deps/consumer_boundary-6f6a2b947afbffc8)
+
+running 8 tests
+test a2a_aggregate_capture_survives_consumer_restart ... ok
+test a2a_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+test acp_aggregate_capture_survives_consumer_restart ... ok
+test acp_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+test mcp_aggregate_capture_survives_consumer_restart ... ok
+test mcp_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+test native_aggregate_capture_survives_consumer_restart ... ok
+test native_threshold_proposal_approval_and_restart_preserve_one_capture ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.80s
+
+durable consumer boundaries passed (8 exact tests)
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+    Finished `test` profile [unoptimized] target(s) in 9m 50s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acquisition: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 3m 04s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.08s
+
+MCP malformed profile before acquisition passed (1 exact tests)
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 2m 34s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 10.96s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.04s
+
+MCP profile recovery without upgrade passed (1 exact tests)
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 8.19s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+runtime::source_receipt_tests::mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 10.27s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_edge-c2b074a1abe4c704)
+
+running 1 test
+test runtime::source_receipt_tests::mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 112 filtered out; finished in 0.04s
+
+MCP bound target authority passed (1 exact tests)
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling smallvec v1.15.1
+   Compiling alloy-primitives v1.5.7
+   Compiling oci-spec v0.9.0
+   Compiling icu_normalizer v2.1.1
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling tokio v1.50.0
+   Compiling referencing v0.46.0
+   Compiling alloy-json-abi v1.5.7
+   Compiling tokio-util v0.7.18
+   Compiling hyper v1.8.1
+   Compiling tower v0.5.3
+   Compiling hyper-util v0.1.20
+   Compiling tower-http v0.6.8
+   Compiling tokio-rustls v0.26.4
+   Compiling num-bigint-dig v0.8.6
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling rsa v0.9.10
+   Compiling alloy-sol-types v1.5.7
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling jsonschema v0.46.0
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling oauth2 v5.0.0
+   Compiling rusqlite v0.39.0
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling serde_with v3.18.0
+   Compiling tough v0.22.0
+   Compiling openidconnect v4.0.1
+   Compiling oci-client v0.17.0
+   Compiling alloy-core v1.5.7
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling webbrowser v1.2.2
+   Compiling webauthn-rs-core v0.5.2
+   Compiling sigstore v0.14.0
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling alloy v1.8.3
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling tracing-subscriber v0.3.23
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling ureq v2.12.1
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling dashmap v6.1.0
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-log-redact)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling sigstore-rekor v0.6.6
+   Compiling sigstore-tsa v0.6.6
+   Compiling tokio-stream v0.1.18
+   Compiling futures-intrusive v0.5.0
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling sqlx-core v0.8.6
+   Compiling sigstore-bundle v0.6.6
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling sqlx-postgres v0.8.6
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling sigstore-verify v0.6.3 (/home/connor/backbay/arc-funded-integration/third_party/sigstore-verify-chio)
+   Compiling scheduled-thread-pool v0.2.7
+   Compiling regress v0.11.1
+   Compiling nono v0.53.0
+   Compiling r2d2 v0.8.10
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling chio-finding-market-port v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-port)
+   Compiling axum v0.8.8
+   Compiling nono-chio v0.53.0-chio.2 (/home/connor/backbay/arc-funded-integration/third_party/nono-chio)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-finding-market-migrations v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-migrations)
+   Compiling r2d2_sqlite v0.33.0
+   Compiling sqlx v0.8.6
+   Compiling chio-cage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-cage)
+   Compiling chio-finding-market-store-postgres v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-store-postgres)
+   Compiling chio-decoy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-decoy)
+   Compiling chio-metering v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-metering)
+   Compiling chio-reputation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-reputation)
+   Compiling chio-flow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-flow)
+   Compiling chio-credentials v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-credentials)
+   Compiling chio-finding-worker v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-worker)
+   Compiling chio-http-serve v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-http-serve)
+   Compiling chio-signing-remote v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-signing-remote)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-http-session v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-session)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-guards)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-trace-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-trace-validate)
+   Compiling chio-mcp-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-adapter)
+   Compiling chio-policy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-policy)
+   Compiling chio-data-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards)
+   Compiling chio-external-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-external-guards)
+   Compiling chio-enterprise-export v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-enterprise-export)
+   Compiling chio-trust-market-context v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-trust-market-context)
+   Compiling chio-finding-challenge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-challenge)
+   Compiling chio-security-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-kernel)
+   Compiling chio-finding-hosted-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-siem v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-siem)
+   Compiling chio-keyring v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-keyring)
+   Compiling chio-spec-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-spec-validate)
+   Compiling chio-quarantine v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-quarantine)
+   Compiling chio-conformance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-conformance)
+   Compiling chio-control-plane v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-control-plane)
+   Compiling chio-mcp-remote v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-remote)
+    Finished `test` profile [unoptimized] target(s) in 3m 55s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 7m 25s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+
+running 1 test
+test tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 1.72s
+
+remote MCP early profile rejection passed (1 exact tests)
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 1.78s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized] target(s) in 1.46s
+     Running unittests src/lib.rs (target/debug/deps/chio_mcp_remote-ce856780fb500dc0)
+
+running 1 test
+test tests::restored_authorization_matches_the_handshake_without_upgrading_legacy_sessions ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 59 filtered out; finished in 0.01s
+
+remote MCP retained authorization passed (1 exact tests)
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling postcard v1.1.3
+   Compiling tokio-util v0.7.18
+   Compiling frost-core v3.0.0
+   Compiling h2 v0.4.16
+   Compiling alloy-primitives v1.5.7
+   Compiling frost-rerandomized v3.0.0
+   Compiling tower v0.5.3
+   Compiling frost-ed25519 v3.0.0
+   Compiling tower-http v0.6.8
+   Compiling hyper v1.8.1
+   Compiling tokio-rustls v0.26.4
+   Compiling tempfile v3.27.0
+   Compiling referencing v0.46.0
+   Compiling hyper-util v0.1.20
+   Compiling rusqlite v0.39.0
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling jsonschema v0.46.0
+   Compiling alloy-sol-macro-expander v1.5.7
+   Compiling oci-spec v0.9.0
+   Compiling alloy-sol-macro v1.5.7
+   Compiling alloy-json-abi v1.5.7
+   Compiling serde_with v3.18.0
+   Compiling oauth2 v5.0.0
+   Compiling jsonwebtoken v10.4.0
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling tough v0.22.0
+   Compiling openidconnect v4.0.1
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling oci-client v0.17.0
+   Compiling alloy-sol-types v1.5.7
+   Compiling sigstore v0.14.0
+   Compiling alloy-core v1.5.7
+   Compiling webauthn-rs-proto v0.5.2
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling webauthn-rs-core v0.5.2
+   Compiling alloy v1.8.3
+   Compiling tracing-subscriber v0.3.23
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling ureq v2.12.1
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-log-redact)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling nix v0.31.2
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling sigstore-crypto v0.6.6
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling sigstore-merkle v0.6.6
+   Compiling sigstore-rekor v0.6.6
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling sigstore-tsa v0.6.6
+   Compiling r2d2_sqlite v0.33.0
+   Compiling wasmparser v0.251.0
+   Compiling gimli v0.33.0
+   Compiling tokio-stream v0.1.18
+   Compiling sqlx-core v0.8.6
+   Compiling sigstore-bundle v0.6.6
+   Compiling sigstore-trust-root v0.6.3
+   Compiling axum v0.8.8
+   Compiling sqlx-postgres v0.8.6
+   Compiling sigstore-verify v0.6.3 (/home/connor/backbay/arc-funded-integration/third_party/sigstore-verify-chio)
+   Compiling clap_builder v4.6.0
+   Compiling nono v0.53.0
+   Compiling wasm-encoder v0.251.0
+   Compiling chio-finding-market-port v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-port)
+   Compiling wasmprinter v0.251.0
+   Compiling clap v4.6.0
+   Compiling nono-chio v0.53.0-chio.2 (/home/connor/backbay/arc-funded-integration/third_party/nono-chio)
+   Compiling chio-finding-market-migrations v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-migrations)
+   Compiling chio-http-serve v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-http-serve)
+   Compiling sqlx v0.8.6
+   Compiling regalloc2 v0.15.1
+   Compiling chio-reputation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-reputation)
+   Compiling wasmtime-environ v46.0.3
+   Compiling cranelift-codegen v0.133.3
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-commerce-order)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-http-session v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-session)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-agent-web-interop)
+   Compiling chio-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-guards)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-enterprise-export v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-enterprise-export)
+   Compiling chio-trust-market-context v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-trust-market-context)
+   Compiling chio-trace-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-trace-validate)
+   Compiling chio-cage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-cage)
+   Compiling chio-finding-market-store-postgres v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-market-store-postgres)
+   Compiling chio-decoy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-decoy)
+   Compiling chio-metering v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-metering)
+   Compiling chio-flow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-flow)
+   Compiling chio-security-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-kernel)
+   Compiling chio-data-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-data-guards)
+   Compiling chio-finding-worker v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-worker)
+   Compiling chio-policy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-policy)
+   Compiling chio-mcp-adapter v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-adapter)
+   Compiling chio-external-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-external-guards)
+   Compiling chio-finding-challenge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-finding-challenge)
+   Compiling chio-finding-hosted-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-finding-hosted-edge)
+   Compiling chio-siem v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-siem)
+   Compiling chio-credentials v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-credentials)
+   Compiling chio-conformance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-conformance)
+   Compiling zstd-sys v2.0.16+zstd.1.5.7
+   Compiling chio-signing-remote v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-signing-remote)
+   Compiling chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-proof-parity)
+   Compiling chio-quarantine v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-quarantine)
+   Compiling chio-keyring v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-keyring)
+   Compiling chio-spec-validate v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/tooling/chio-spec-validate)
+   Compiling zstd-safe v7.2.4
+   Compiling zstd v0.13.3
+   Compiling signal-hook v0.3.18
+   Compiling wasmtime-internal-unwinder v46.0.3
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-core)
+   Compiling chio-control-plane v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-control-plane)
+   Compiling cranelift-native v0.133.3
+   Compiling cranelift-frontend v0.133.3
+   Compiling chio-tee-frame v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-tee-frame)
+   Compiling base64 v0.13.1
+   Compiling jwt v0.16.0
+   Compiling chio-tee v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-tee)
+   Compiling wasmtime-internal-cranelift v46.0.3
+   Compiling rayon v1.11.0
+   Compiling wasm-compose v0.251.0
+   Compiling wasmtime-internal-cache v46.0.3
+   Compiling wasmtime-internal-fiber v46.0.3
+   Compiling wit-parser v0.251.0
+   Compiling chio-http-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-http-core)
+   Compiling addr2line v0.26.1
+   Compiling reqwest v0.12.28
+   Compiling wasmtime v46.0.3
+   Compiling oci-distribution v0.11.0
+   Compiling chio-openapi v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-openapi)
+   Compiling chio-replay-corpus v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-replay-corpus)
+   Compiling wasmparser v0.221.3
+   Compiling chio-config v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-config)
+   Compiling chio-attest-loopback v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-loopback)
+   Compiling chio-pheromone-runtime v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone-runtime)
+   Compiling chio-mcp-remote v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-remote)
+   Compiling xattr v1.6.1
+   Compiling num_cpus v1.17.0
+   Compiling deadpool-runtime v0.1.4
+   Compiling deadpool v0.12.3
+   Compiling chio-wasm-guards v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-wasm-guards)
+   Compiling chio-hosted-mcp v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-hosted-mcp)
+   Compiling tar v0.4.45
+   Compiling chio-active-response-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-active-response-authority)
+   Compiling chio-api-protect v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-api-protect)
+   Compiling chio-pheromone-relay v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone-relay)
+   Compiling chio-runtime-harness v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime-harness)
+   Compiling chio-arena v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-arena)
+   Compiling chio-guard-registry v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/guards/chio-guard-registry)
+   Compiling chio-proof-room v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-proof-room)
+   Compiling chio-runtime v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-runtime)
+   Compiling chio-attest-buyer v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer)
+   Compiling chio-acp-proxy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-acp-proxy)
+   Compiling assert-json-diff v2.0.2
+   Compiling console v0.16.3
+   Compiling similar v2.7.0
+   Compiling insta v1.47.2
+   Compiling wiremock v0.6.5
+   Compiling chio-cli v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 7m 12s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 2.62s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+
+running 1 test
+test mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 34.90s
+
+remote MCP ready-session restart passed (1 exact tests)
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 58.73s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening: test
+
+1 test, 0 benchmarks
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on artifact directory
+    Finished `test` profile [unoptimized] target(s) in 1m 39s
+     Running tests/mcp_serve_http.rs (target/debug/deps/mcp_serve_http-9e149b1eec78f843)
+
+running 1 test
+test mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 34.28s
+
+remote MCP restart policy tightening passed (1 exact tests)
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-cli v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/products/chio-cli)
+    Finished `test` profile [unoptimized] target(s) in 1m 06s
+     Running tests/mcp_startup_security.rs (target/debug/deps/mcp_startup_security-1dbbef0f5623b02e)
+mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading: test
+
+1 test, 0 benchmarks
+    Finished `test` profile [unoptimized] target(s) in 1.30s
+     Running tests/mcp_startup_security.rs (target/debug/deps/mcp_startup_security-1dbbef0f5623b02e)
+
+running 1 test
+test mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading ... FAILED
+
+failures:
+
+---- mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading stdout ----
+
+thread 'mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading' (1408330) panicked at crates/products/chio-cli/tests/mcp_startup_security.rs:81:13:
+error [CHIO-CLI-IO]: i/o error: private directory ancestry must not be group or world writable unless sticky
+context: {"source":"private directory ancestry must not be group or world writable unless sticky"}
+suggested fix: Check file paths, permissions, and parent directories before retrying.
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+error: test failed, to rerun pass `-p chio-cli --test mcp_startup_security`

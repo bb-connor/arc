@@ -1,0 +1,20 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 1m 09s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-33efb2859b86a795)
+
+running 11 tests
+test https::tests::public_enrollment_rejects_keys_and_malformed_certificates ... ok
+test https::tests::advertised_origin_cannot_change_scheme_or_route ... ok
+test tests::authentication_review_observes_inheritance_and_explicit_anonymous_alternatives ... ok
+test tests::authentication_review_rejects_ambiguous_or_unsupported_security_semantics ... ok
+test subcontract::tests::four_keys_and_exact_disclosure_are_required ... ok
+test subcontract::tests::disclosure_reconstructs_authentication_without_nested_private_data ... ok
+test subcontract::tests::even_valid_promisor_signatures_cannot_widen_the_exact_procurement ... ok
+test tests::buyer_rejects_widened_offers_even_when_provider_resigns_them ... ok
+test work_buyer::tests::conflicting_verified_terminals_cannot_change_the_first_accounting_choice ... ok
+test subcontract::tests::parent_signature_cannot_replace_specialist_evidence ... ok
+test tests::release_vectors_require_exact_joint_authority_and_completed_receipt ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+

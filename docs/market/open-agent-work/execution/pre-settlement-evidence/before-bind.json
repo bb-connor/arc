@@ -1,0 +1,69 @@
+{
+  "after": {
+    "executionBundleSha256": null,
+    "executionCheckpointSha256": null,
+    "executionProjectionSha256": null,
+    "executionReceiptCount": 0,
+    "holdCount": 1,
+    "holdDisposition": "reversed",
+    "holdId": "admission-budget:3b8107eea607f2ce551cb2547c9ade49641b5f96bdedb8e7a495c536fbabba7a:0",
+    "operationCount": 1,
+    "operationId": "3b8107eea607f2ce551cb2547c9ade49641b5f96bdedb8e7a495c536fbabba7a"
+  },
+  "before": {
+    "executionBundleSha256": null,
+    "executionCheckpointSha256": null,
+    "executionProjectionSha256": null,
+    "executionReceiptCount": 0,
+    "holdCount": 1,
+    "holdDisposition": "open",
+    "holdId": "admission-budget:3b8107eea607f2ce551cb2547c9ade49641b5f96bdedb8e7a495c536fbabba7a:0",
+    "operationCount": 1,
+    "operationId": "3b8107eea607f2ce551cb2547c9ade49641b5f96bdedb8e7a495c536fbabba7a"
+  },
+  "chain": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "100",
+    "events": {
+      "ClaimSubmitted": 0,
+      "DecisionRecorded": 0,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x2ea6ac588db99d2d0b1f0656bcc84925946b9768fe8c142837640863042eecfa",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Funded",
+    "transactions": {
+      "pay": [],
+      "record": [],
+      "refund": [],
+      "submit": []
+    }
+  },
+  "checkpoint": "before-bind",
+  "killedSignal": 9,
+  "replay": {
+    "allocationId": "0x91e43ab32242b099fc46c4353874025835f48a2e990f50a290d7b4b71ab748d3",
+    "authorityUuid": "01a0a347-e417-7be0-aeb9-bd2fc98f6abc",
+    "authorizationId": null,
+    "executions": 0,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "not_authorized",
+    "holdId": "admission-budget:3b8107eea607f2ce551cb2547c9ade49641b5f96bdedb8e7a495c536fbabba7a:0",
+    "nativeAuthorizationId": null,
+    "nativePaymentAction": null,
+    "nativePaymentState": "Closed",
+    "nativeState": "CompensatedBeforeDispatch",
+    "operationId": "3b8107eea607f2ce551cb2547c9ade49641b5f96bdedb8e7a495c536fbabba7a",
+    "paymentState": "not_authorized",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  }
+}

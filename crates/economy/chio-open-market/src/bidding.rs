@@ -462,6 +462,58 @@ pub fn accept(
     acceptor_keypair: &Keypair,
     accepted_at: u64,
 ) -> Result<SignedAcceptedBid, BiddingError> {
+    let accepted = accepted_body(
+        ask,
+        reservation,
+        &acceptor_keypair.public_key(),
+        accepted_at,
+    )?;
+    let signed = SignedAcceptedBid::sign(accepted, acceptor_keypair)
+        .map_err(|error| invalid_request(error.to_string()))?;
+    match signed.verify_signature() {
+        Ok(true) => Ok(signed),
+        _ => Err(invalid_request(
+            "signed accepted bid signature is not verifiable",
+        )),
+    }
+}
+
+/// Verify a received acceptance under locally selected buyer and provider keys.
+///
+/// Checks the same offer, time window, token and reservation bindings used by
+/// [`accept`], without the buyer's private key. The reservation witness must
+/// already have been verified under the caller's selected reservation authority.
+/// This proves a historical signed agreement, not current funds availability,
+/// tool authorization, delivery, consumption, or settlement. Those require the
+/// receiving runtime's live state and execution checks.
+pub fn verify_acceptance(
+    accepted: &SignedAcceptedBid,
+    ask: &SignedAskResponse,
+    reservation: &VerifiedReservationReceipt,
+    expected_provider: &PublicKey,
+    expected_buyer: &PublicKey,
+) -> Result<(), BiddingError> {
+    if &ask.signer_key != expected_provider || &accepted.signer_key != expected_buyer {
+        return Err(BiddingError::AuthorityMismatch);
+    }
+    if !matches!(accepted.verify_signature(), Ok(true)) {
+        return Err(invalid_request("accepted bid signature is not verifiable"));
+    }
+    let expected = accepted_body(ask, reservation, expected_buyer, accepted.body.accepted_at)?;
+    if accepted.body != expected {
+        return Err(invalid_request(
+            "accepted bid does not bind the exact offer and reservation",
+        ));
+    }
+    Ok(())
+}
+
+fn accepted_body(
+    ask: &SignedAskResponse,
+    reservation: &VerifiedReservationReceipt,
+    acceptor: &PublicKey,
+    accepted_at: u64,
+) -> Result<AcceptedBid, BiddingError> {
     if ask.body.schema != ASK_RESPONSE_SCHEMA {
         return Err(invalid_request(format!(
             "unsupported ask response schema: {}",
@@ -493,7 +545,7 @@ pub fn accept(
     if accepted_at >= ask.body.expires_at {
         return Err(BiddingError::PricingExpired);
     }
-    if acceptor_keypair.public_key() != ask.body.token_offer.subject {
+    if acceptor != &ask.body.token_offer.subject {
         return Err(BiddingError::AuthorityMismatch);
     }
     let ask_digest = canonical_digest(&ask.body)?;
@@ -506,7 +558,7 @@ pub fn accept(
     {
         return Err(BiddingError::ReservationReceiptInvalid);
     }
-    let accepted = AcceptedBid {
+    Ok(AcceptedBid {
         schema: ACCEPTED_BID_SCHEMA.to_string(),
         listing_id: ask.body.listing_id.clone(),
         agent_id: ask.body.agent_id.clone(),
@@ -518,15 +570,7 @@ pub fn accept(
         token_id: ask.body.token_offer.id.clone(),
         token_subject: ask.body.token_offer.subject.clone(),
         token_expires_at: ask.body.token_offer.expires_at,
-    };
-    let signed = SignedAcceptedBid::sign(accepted, acceptor_keypair)
-        .map_err(|error| invalid_request(error.to_string()))?;
-    match signed.verify_signature() {
-        Ok(true) => Ok(signed),
-        _ => Err(invalid_request(
-            "signed accepted bid signature is not verifiable",
-        )),
-    }
+    })
 }
 
 fn token_offer_total_liability(ask: &AskResponse) -> Result<MonetaryAmount, BiddingError> {

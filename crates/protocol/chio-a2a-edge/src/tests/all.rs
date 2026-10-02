@@ -122,6 +122,7 @@ mod tests {
             assert_eq!(kernel.receipt_log().receipts().len(), receipts);
         }
     }
+    include!("v1.rs");
     use super::*;
     use chio_test_support::prelude::*;
     use std::sync::atomic::{AtomicUsize, Ordering};

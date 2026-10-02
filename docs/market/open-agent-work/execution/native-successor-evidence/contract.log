@@ -1,0 +1,49 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ accepted claim survives deadlines, funding pause and future verifier rotation (5891.246745ms)
+✔ only a timely provider commitment opens the verifier decision window (3430.597258ms)
+▶ verifier outage and absent submission reach refund only strictly after timeout
+  ✔ false (2625.954906ms)
+  ✔ true (2675.756793ms)
+✔ verifier outage and absent submission reach refund only strictly after timeout (5302.620703ms)
+✔ rejected work refunds without creating a payment right (3390.505058ms)
+✔ still-unpaid earned child withdraws after the parent is refunded (7091.800737ms)
+ℹ {"case":"unpaid-earned-child-survives-parent-refund","parentRefunded":"100","childPaidAfterParentRefund":"60","intermediaryLoss":"60"}
+✔ funding binds every term and cannot allocate the same agreement twice (2442.153833ms)
+✔ another payer cannot squat a publicly known agreement digest (4247.567228ms)
+✔ fixed allocation and authorization vectors are accepted by the deployed bytecode (3465.369108ms)
+✔ invalid amounts, roles, deadlines and administrative callers cannot create backing (1299.424845ms)
+✔ maximum supported integer deposits and refunds without rounding (2438.945017ms)
+✔ a release signature cannot substitute its domain, claim, decision, asset or beneficiary (3735.469488ms)
+✔ future verifier rotation does not replace a funded agreements decision key (2820.80363ms)
+✔ competing mined withdrawals produce one payment and no refund (3019.937297ms)
+✔ failed, taxed or malformed token transfers cannot consume a payable claim (7094.020823ms)
+✔ inexact deposits and failed refunds roll back allocation and terminal state (4356.539606ms)
+✔ token callbacks cannot reenter the financial transition (4057.012681ms)
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+✔ block inventory catches duplicate idempotent claim and decision transactions without events (5244.972979ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75604.65389

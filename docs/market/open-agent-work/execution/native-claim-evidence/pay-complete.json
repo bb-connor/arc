@@ -1,0 +1,100 @@
+{
+  "chain": {
+    "beneficiaryBalance": "100",
+    "escrowBalance": "0",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 1,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0xd3f4205c94426eaed211e57786b2f362fa1629f27d3521bad917b80b05b31f73",
+    "paid": "100",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Paid",
+    "transactions": {
+      "pay": [
+        {
+          "hash": "0x31721f2d25aa8187b0431d2f0cd036a9d58910af7c12778908445dd487b47604",
+          "nonce": 1,
+          "status": 1
+        }
+      ],
+      "record": [
+        {
+          "hash": "0x6ca41fee8f24f00881f42d83eac613d6d8456ae5d13c4740f374d5506503b62c",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [],
+      "submit": [
+        {
+          "hash": "0x6ff23d812024a99d157060a0ed53e1def11b0f70b966c3ab422e14c53f7f77b2",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "first": {
+    "allocationId": "0x71361c0375390cdfa27df1394013f1914216c4ae2e7611113166482baad71576",
+    "authorityUuid": "01a0a229-e44d-7152-982e-06e372c318e3",
+    "authorizationId": "funded-71361c0375390cdfa27df1394013f1914216c4ae2e7611113166482baad71576",
+    "executions": 1,
+    "externalFundsTransferred": false,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:99a6c01404fae8ae8c70f1e4216de26b6aab0d27dacdabb30f9f3f5ab8ccdec5:0",
+    "nativeAuthorizationId": "funded-71361c0375390cdfa27df1394013f1914216c4ae2e7611113166482baad71576",
+    "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settling",
+    "nativeState": "Finalizing",
+    "operationId": "99a6c01404fae8ae8c70f1e4216de26b6aab0d27dacdabb30f9f3f5ab8ccdec5",
+    "paymentState": "pending",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": null,
+    "startupReconciliationError": null
+  },
+  "replay": {
+    "allocationId": "0x71361c0375390cdfa27df1394013f1914216c4ae2e7611113166482baad71576",
+    "authorityUuid": "01a0a229-e44d-7152-982e-06e372c318e3",
+    "authorizationId": "funded-71361c0375390cdfa27df1394013f1914216c4ae2e7611113166482baad71576",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:99a6c01404fae8ae8c70f1e4216de26b6aab0d27dacdabb30f9f3f5ab8ccdec5:0",
+    "nativeAuthorizationId": "funded-71361c0375390cdfa27df1394013f1914216c4ae2e7611113166482baad71576",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "99a6c01404fae8ae8c70f1e4216de26b6aab0d27dacdabb30f9f3f5ab8ccdec5",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-w0",
+    "settlementObservationError": null,
+    "settlementTransaction": "0x31721f2d25aa8187b0431d2f0cd036a9d58910af7c12778908445dd487b47604",
+    "startupReconciliationError": null
+  },
+  "verification": {
+    "accepted": true,
+    "commitment": "0x6940f251b1ba13ddfcc195cffebaa8079956af3d30e16c9944122f4f66f0ede0",
+    "decision": "verified",
+    "decisionSha256": "67993ff4b0384d38bd65c827cbc3e0e848c3e25cd1a32b7e4eb0efb2d140f1fc",
+    "financial": "payout",
+    "findingAssurance": "asserted-native-artifact-with-experimental-w0-checks",
+    "findingId": "4b641ec6f078b646786e7f27f2b28d308d2ede37e78be537dfe273161bc2ccb8",
+    "observationSha256": "8a01a671077b4d8f3bcd137654c837c3ba67a0d4e9999731e592ced589af4b80",
+    "transactionHash": "0x31721f2d25aa8187b0431d2f0cd036a9d58910af7c12778908445dd487b47604"
+  },
+  "retainedTransactions": {
+    "submit": "0x6ff23d812024a99d157060a0ed53e1def11b0f70b966c3ab422e14c53f7f77b2",
+    "record": "0x6ca41fee8f24f00881f42d83eac613d6d8456ae5d13c4740f374d5506503b62c",
+    "pay": "0x31721f2d25aa8187b0431d2f0cd036a9d58910af7c12778908445dd487b47604"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "baseCommit": "946e9f1cc7a16edc12a44d87960ed87c49348faa",
+  "scope": "Registered artifacts, original Finding policy, immutable assessment derivation, wire parsing and financial preparation",
+  "reviews": [
+    {
+      "scope": "Integrated Rust and authority review",
+      "verdict": "No open actionable findings after source fixes",
+      "fixed": [
+        "Recompute the complete assessment at its original evaluation time to reject invented optional backing and evidence digests.",
+        "Reject whitespace-only reasons consistently in Rust, registered schemas and Python."
+      ]
+    },
+    {
+      "scope": "Schema and independent parser parity",
+      "verdict": "126 schema cases and 57 shared raw cases agree",
+      "fixed": [
+        "Enforce Ed25519 shape explicitly for algorithm-aware Rust keys and signatures.",
+        "Check nested Finding signature shape and UTF-8 byte bounds."
+      ]
+    },
+    {
+      "scope": "Node signer follow-up",
+      "verdict": "Recursive facet-array encoding fix reviewed, no new issue",
+      "fixed": [
+        "Extend bounded canonical decision encoding to ordered arrays; all four Rust artifact vectors match byte for byte."
+      ]
+    }
+  ],
+  "boundary": "Read-only source review plus separately recorded targeted tests; no hosted review or release qualification."
+}

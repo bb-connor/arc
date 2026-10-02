@@ -1,0 +1,9 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+    Finished `test` profile [unoptimized] target(s) in 13.63s
+     Running tests/durable_admission_sqlite.rs (target/debug/deps/durable_admission_sqlite-e5c253aea567000a)
+
+running 2 tests
+test contractual_resolution::capture_waiver_requires_original_terms_and_keeps_positive_budget ... ok
+test contractual_resolution::delayed_elicitation_terminalization_refreshes_authority_time ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 7.11s

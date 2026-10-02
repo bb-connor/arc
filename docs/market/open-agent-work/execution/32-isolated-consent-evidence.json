@@ -1,0 +1,1371 @@
+{
+  "schema": "chio.local.isolated-consent-qualification.v1",
+  "qualifiedAtUTC": "2026-09-15T16:30:41.017687+00:00",
+  "baseCommit": "ff0de59644d924b71da76091e582e07f0dea1032",
+  "branch": "feat/funded-native-admission",
+  "sourceObjects": [
+    {
+      "path": "crates",
+      "gitObject": "874362eedd6c5386f3d3d18c073b6bfcfc9d59b8"
+    },
+    {
+      "path": "contracts",
+      "gitObject": "58f7afe7d555427c21262458479acc471cd66c3d"
+    },
+    {
+      "path": "examples/federated-work",
+      "gitObject": "6a9135c55a060c5412f33f582770fee48c936ea1"
+    },
+    {
+      "path": "Cargo.toml",
+      "gitObject": "f622b684573a9e01d2807f6eb95a8f74bfdb6b23"
+    },
+    {
+      "path": "Cargo.lock",
+      "gitObject": "3beee23ddc1b00265130dc87b135da0b1cc2a0a3"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "gitObject": "b1dd491cdce6f8b98cfe02f6807980c0dfe48784"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "examples/federated-work/Cargo.lock",
+      "sha256": "17f8e0c6c009b26f8cee6a19f214319263fd9e2609ccdb792e734fa940b27953"
+    },
+    {
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "f5d2b63a4c785a9820706933da1aee14047734e559ceb99311d6530185c0bfa0"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/protocol.py",
+      "sha256": "5891d6d04e4f329f24078df332269e319a8e5f3cac031af5e0af93ef82523907"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/review.py",
+      "sha256": "3293712bc70c426462ceae97551b9efd3936fdab722960577a7b7b2afce74ef9"
+    },
+    {
+      "path": "examples/federated-work/python_buyer/subcontract.py",
+      "sha256": "440a808d2e3ad548e9d5c8257156ba75aab77dd7524968042c2f0a5ca5d7726d"
+    },
+    {
+      "path": "examples/federated-work/src/buyer.rs",
+      "sha256": "3dac26a1280bcc9713987994a12b26e85d73430bb42d27aeac832d65762bc45b"
+    },
+    {
+      "path": "examples/federated-work/src/common.rs",
+      "sha256": "590f2d34781e6a8f6bb3da59dc175fb9875b1c2ee4059b1257e2e01b8ef2e356"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/agreement.rs",
+      "sha256": "a210b474a9cc6cdeecce210f6f77f9f48b24e359cb1885372a4596f96059920f"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/allocation.rs",
+      "sha256": "e6e9f2dbed89f6c5de4c7f354c3461e9a29d58fc0c6aa079f1cde604bb7ffb39"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/authority_enrollment.rs",
+      "sha256": "204598f6d3d0172af5fd6e5d290d51e1cf957baf00aefe93799092a1333435b8"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/authority_process.rs",
+      "sha256": "1580f23b20161bd144b8f315d02e7173f48150c1de2af5e5c04543817b7cc15b"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/capture_resolution.rs",
+      "sha256": "68e1372be771508c8fd6b0d13ec010080db37b3f63897187479ebd2b760be30a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_files.rs",
+      "sha256": "b4876f124fe3782d4374a56beef8801553c9d18e2fc7d66ffb29e7a9fc6200a9"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_handoff.rs",
+      "sha256": "9f76664ff01a7fd1767761eda80e759fa5083eef36c12390a82f431df38bd97d"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_operator.rs",
+      "sha256": "b24eaddf80424d62a63787d4c6472075c6b254188f3ab6d7bbe78b0940fd11e1"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/checkpoint_process.rs",
+      "sha256": "1e4bb85c43aee3ee5442064652c077bc79980d84c076b8d8a9e2c4e0c487f2e1"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/child.rs",
+      "sha256": "f85b01d68a5d3724e87743a87147bca6f3c638220bd6c37e0240c82464eb0642"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/child_process.rs",
+      "sha256": "06875545d4b8519fd07b4fc04f6bf0cceedabae04d87071a153b630a511e71f0"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/evidence.rs",
+      "sha256": "3039b423481be3e2394bc4d2401d1c9f0a7ecdf1461aa52df1a997e55e358bd2"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/execution_evidence.rs",
+      "sha256": "f238b568591e24c93d7ff588b7b70280324b8b42c1b57f36e3dfa2b1b6349157"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/finding_acceptance.rs",
+      "sha256": "6f67b85f70093c14d0bba6838d2b025a4b5f5073e7f8dc27ccb4f91c55502713"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/finding_acceptance_tests.rs",
+      "sha256": "32ef061e2d65789a756f0b3669779fad0f4499b03a6aef6c6f3fa00a3a109d27"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/finding_context.rs",
+      "sha256": "430f1f8ba3814e9d1f030b0c10339c1ea755e9515080f448aaad59c17c33055e"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/isolated_process.rs",
+      "sha256": "c206c55723530bf6a5265b117d9a25bc936c2b04a1ba923e65628b7c858e5f58"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/isolated_roles.rs",
+      "sha256": "2f88418298a322ff83a97fd743a6037aaff070e98c1342f2e5d71f1a8a526158"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/journal.rs",
+      "sha256": "037877646af76cf7c41291534a05558cf0ea816e2e0bf3a9e401dbe4b8c8c94a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/lifecycle.rs",
+      "sha256": "97f24af7b1f78b542fd391f2a84f8f495b56e166ddfed38e1b4df73291289604"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/lifecycle_process.rs",
+      "sha256": "2dfc740e46f286f0d0e4b750bb05056e2450802f18595517aac4b5918330eb04"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/local_chain.rs",
+      "sha256": "afb1407f9cf92edcc5352ccb793449af5f40a4581f1ed8bed6086e1068196117"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/native.rs",
+      "sha256": "f2becfed10e4fab1ff321de2880d47eff6251044858c843c8fde3c38f875dc1f"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/observer.rs",
+      "sha256": "47100e75935bdd03419d85f9a8f9f0d1c5167f21ce19f48d77eafa131dda5030"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/process.rs",
+      "sha256": "263d107426dfd908f8c58a00f42094b13ec88467e7fa2a894e048c5e3736c77c"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/provider_files.rs",
+      "sha256": "b814ba1682a21c5db8076e2fc09dd11d96301f05da1bc0111d93d790ccf7edde"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/rail.rs",
+      "sha256": "0a2771d7b49eb493b8447a8c371a2de7100ccb6ab3acca52ef708c7b2a5ef9ac"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/resolution_process.rs",
+      "sha256": "c8a499c421d2769c1cb2c14e073525f4ba930584b8aa9d502de728aa63dad060"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/settlement.rs",
+      "sha256": "ff8833b3b002c561638f86da1b46133589f654dec730d1d4ed17784009a838a8"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/settlement_observer.rs",
+      "sha256": "165faaeb8da786709017a9bbce9211ea27a5686a4b4fcde43cfc6f409786e718"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/smoke.rs",
+      "sha256": "74b8b0f0485b1f99582170fe28f6e3b18d188426a34554f14c1bcbd67a398883"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/authority_enrollment.rs",
+      "sha256": "c85d0069944b909a6b9fbee300423fd7599fc1bd731e2f073b7ffa39c39ba8e2"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/checkpoint_handoff.rs",
+      "sha256": "3413a9ad2c16fe6e0439a03b3675b3cefd30a414f7b7c7edd031015d309f22e6"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/evidence.rs",
+      "sha256": "6bf6eb31a8ecc2f36e0968f79134bdd3af63ca767e1e7d6aea73f647aee6936e"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/execution.rs",
+      "sha256": "3f91add447b8057568e9b1a1713be85641e8cbdb1e1f921e6ca6e3ca8ccebe27"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/execution_authority.rs",
+      "sha256": "4eeb89ae989944a4efee2d6605073f7009261bf65823b243b1d7888ab2606678"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/native.rs",
+      "sha256": "368c27e89a83053a00ee44210ae89d42e2f5e5d876f4a626ca3f407cfeb88b04"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/observer.rs",
+      "sha256": "7d1fd66e82eda4075f88730c36eb668068c9ad8459c75fe41ee48ee5c69de11a"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/resolution.rs",
+      "sha256": "99c6dda7ec2b2e259014bd3fc1fa7bf67064ec929f8c27ca5a29d6d16a024704"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/settlement.rs",
+      "sha256": "a553b357ee419ae399bd92ee4dae37cdcb454b2aef27d289af1803982ee7dbaa"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/successors.rs",
+      "sha256": "2758c323456382d24eba8401fba1571b6bd1d0c84e7dade92acaee81d4af781d"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/verifier_handoff.rs",
+      "sha256": "37bd98d549bdd3e3c9c52ca5f3c336b566f58236aa333f0a1fac73723916cff0"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/wire.rs",
+      "sha256": "4e457cce1292e9a67dd461c98e0e324aa5ed43e78b8c83519fd344b3d62a9beb"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests/work_consent.rs",
+      "sha256": "77503f44a8e09c9a37c20c042baf26bafa170507bec8b4e9f2bef05421a0d508"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tests.rs",
+      "sha256": "d8de0a686a67e438c1101cc6deb8cfc9d78f147404ed6bffb79902917880bd80"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/tool.rs",
+      "sha256": "33aa2723a3b99a3c83a1472b6f515260b5ab9df3f303c0da1a6b81f442457d27"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verification.rs",
+      "sha256": "4748598b274f94a2c66569c368b52524ffc2b72d654efd538e437db1a1aac597"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verifier_files.rs",
+      "sha256": "a82b252f7e726f26f8859e48dba9bd02cf7bf64a7941c571da4c4847b11c294d"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verifier_handoff.rs",
+      "sha256": "751acef1e459a39f2444d098187bf130873508e5e1faff1e5e7e9f2ed54e2111"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/verifier_operator.rs",
+      "sha256": "a608c0474bdbf8525f727af8d3ebe7370bed2ddd3646f0aa7948cdf5f764dbe3"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/waiver_terms.rs",
+      "sha256": "a6e994fb3a27124e0af612813713ad7712981117b0e8c10a40459b4884cdc4e4"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/wire.rs",
+      "sha256": "f18383654e961b5662b0fb85e7bc793278d7bb9e091d8195238e8d2c3872a318"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work/work_consent.rs",
+      "sha256": "d4228de651a57070008229171ea0dee040337c81de088c93c34e7c4cc16334ea"
+    },
+    {
+      "path": "examples/federated-work/src/funded_work.rs",
+      "sha256": "5efba2cc65629f032ea20d8f810fe54f36f852cd2059ea9bd73bb823c3ae1daf"
+    },
+    {
+      "path": "examples/federated-work/src/https.rs",
+      "sha256": "6ccb234476276088901924dc569c805f4b5179bcefb8be7ad92a314dc3443a77"
+    },
+    {
+      "path": "examples/federated-work/src/incident.rs",
+      "sha256": "5358dd4f9a8a3fce50bac1d3b3f3c8e23b84a11d62cad599d7849b8ec7fa0570"
+    },
+    {
+      "path": "examples/federated-work/src/main.rs",
+      "sha256": "8ef41129e2d243815a7722aa23f58176169647497880ff06dcbda4ac27d9485c"
+    },
+    {
+      "path": "examples/federated-work/src/market.rs",
+      "sha256": "5be0fe0c4cd8df0beb0dce78f8525c321da26ab69b87ce68fccbad918c525cb4"
+    },
+    {
+      "path": "examples/federated-work/src/payment.rs",
+      "sha256": "6713c0b6ab60e4100c47ceab648bb44bc887323db64c3826b515c74ba8ae849b"
+    },
+    {
+      "path": "examples/federated-work/src/provider.rs",
+      "sha256": "503783952a78bb34ac9e87dcd3a0b0db232ca860bb2d6052681f61a1b4a7a664"
+    },
+    {
+      "path": "examples/federated-work/src/resolution.rs",
+      "sha256": "0125087098912adf16a4441cea90c0da9c1bba50cadd54556b3ed7672c295fd1"
+    },
+    {
+      "path": "examples/federated-work/src/review.rs",
+      "sha256": "bc491412dd649ba4fbd49c5409c39740acd30bbfa6618ef81c40188235828919"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/enrollment.rs",
+      "sha256": "2fca8cc82a68384d9cd124b11f47b4d084230f17b10951826955faf612fcf962"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/permit.rs",
+      "sha256": "6822c1ca9c5e6c1ed7ba8affa1baedd118fb202477812832a2b8f461538c915a"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/tests.rs",
+      "sha256": "2bb542986f663b4b3f850e0aba4e615f4d07f3fc9f8055c6efc8c02ebe55eaa1"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract/worker.rs",
+      "sha256": "7065d912d110d0574cfc34ebc5307ba939c086390bdd53b5979602724a21d853"
+    },
+    {
+      "path": "examples/federated-work/src/subcontract.rs",
+      "sha256": "19779a9a283adabed128e8a5c0db823d5d4f375e0a528124f98867b56bafd081"
+    },
+    {
+      "path": "examples/federated-work/src/tests.rs",
+      "sha256": "5981e6786f93ad863a459acbbd65a31893f61694bf3d2f384cb9f9dc78e868a2"
+    },
+    {
+      "path": "examples/federated-work/src/work_buyer.rs",
+      "sha256": "d3e8ece74e1ce8aa7f55d39ada853c0874612fcbf67d0e605866f5f88357e210"
+    },
+    {
+      "path": "examples/federated-work/test_authority_verifier.py",
+      "sha256": "f13d2f868e49dbbb373384fccec9b5b45323379e5eb1993a083375fec257371a"
+    },
+    {
+      "path": "examples/federated-work/test_isolated_consent.py",
+      "sha256": "bf8ae7ef1dde67716ebb061bf9d58f9809fef1c691fc39ec1e2b8ea8b9e93284"
+    },
+    {
+      "path": "examples/funded-work/checker-profile.json",
+      "sha256": "dbb11df4e9402024bd330cb39dc7fc484f062e278ca593986636d86d3101ad78"
+    },
+    {
+      "path": "examples/funded-work/native_checker.py",
+      "sha256": "79660d72b794de5b1288fe36363edb88893ef89664198b87300b2dcec1a4fbb0"
+    },
+    {
+      "path": "examples/funded-work/reference_checker.py",
+      "sha256": "ee9ede7d02655b0b926fc75dc5e4180aa7790ca1cbf22f63a53997da9bf6e1fd"
+    }
+  ],
+  "binary": {
+    "path": "target/debug/chio-federated-work",
+    "sha256": "c38c341bf09efe5e62ab825ca06a8d7ff2f83255dd658e2568bba115af1658a0"
+  },
+  "environment": {
+    "bubblewrap": "bubblewrap 0.9.0",
+    "bubblewrapSha256": "ae27935781511400c65ebcc0b4669775d602f46251b8707c947a1ac1b160c1c8",
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "node": "v24.16.0",
+    "buyerPython": "/tmp/chio-python31-locked-venv/bin/python",
+    "buyerPythonSha256": "c86f21d0da9290ece2d7d49a3f7ed52aed59cb029abdf0ea25c79634f6cbe960",
+    "buyerPythonVersion": "Python 3.12.3",
+    "cargoBuildJobs": 3,
+    "cargoIncremental": false,
+    "cargoProfileDebug": 0,
+    "cargoNetOffline": true,
+    "rustTestThreads": 1,
+    "chainId": 31337,
+    "funding": "owned private Ganache chain, mock token, two descendant confirmations"
+  },
+  "results": {
+    "rustTests": 87,
+    "regularRustTests": 81,
+    "explicitlySelectedIgnoredRustTests": 6,
+    "newRustConsentAndContextTests": 5,
+    "pythonPublicTests": 28,
+    "pythonWireTests": 6,
+    "operatorPayoutRefundScenarios": 2,
+    "separateVerifierPayoutRefundScenarios": 2,
+    "malformedOrConflictingVerifierCliRequestsRejected": 12,
+    "corruptedOrMissingVerifierCustodyCopiesRejected": 12,
+    "malformedOperatorCliRequestsRejected": 10,
+    "ownedProcessScenarios": 22,
+    "isolatedPayoutRefundScenarios": 2,
+    "roleNamespaceProbes": 10,
+    "roleCustodyDomains": 5,
+    "roleKeys": 6,
+    "sigkillEvents": 15,
+    "fullWorkspaceTests": false,
+    "newFuzzCampaign": false,
+    "independentAdministration": false,
+    "remoteCI": false,
+    "publicActivation": false,
+    "realFunds": false
+  },
+  "checks": [
+    {
+      "path": "isolated-consent-evidence/build.log",
+      "command": [
+        "cargo",
+        "build",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked"
+      ],
+      "startedAt": "2026-09-15T16:18:46.300367+00:00",
+      "completedAt": "2026-09-15T16:19:10.157554+00:00",
+      "elapsedSeconds": 23.857,
+      "exitCode": 0,
+      "sha256": "9cc418272ebc6dbf19f172140df2e83d17b5b1b823410e7df517c45412081104",
+      "rawSha256": "9cc418272ebc6dbf19f172140df2e83d17b5b1b823410e7df517c45412081104",
+      "bytes": 171,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/rust-tests.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T16:19:50.347815+00:00",
+      "completedAt": "2026-09-15T16:23:42.631194+00:00",
+      "elapsedSeconds": 232.283,
+      "exitCode": 0,
+      "sha256": "b36f54940c872cb38d0a8e335bab6a4d14c1eed90de6b2a96eecd25ef675de80",
+      "rawSha256": "08347241a553e32ffcd86de7b818335c0b8ff2a10b03744d10a85f83be70b348",
+      "bytes": 10139,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/ignored-rust.log",
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--locked",
+        "--",
+        "--ignored",
+        "--test-threads=1"
+      ],
+      "startedAt": "2026-09-15T16:24:46.618877+00:00",
+      "completedAt": "2026-09-15T16:27:39.958469+00:00",
+      "elapsedSeconds": 173.34,
+      "exitCode": 0,
+      "sha256": "183a2a981199de659f159ef436aaba9c5b77e988c8ef00593eb79dddc41207d9",
+      "rawSha256": "59901077555d9a30e273d1477fd7456b8ecb36ca68c568fb74a84a09186e6629",
+      "bytes": 6341,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/clippy.log",
+      "command": [
+        "cargo",
+        "clippy",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "startedAt": "2026-09-15T16:24:11.472812+00:00",
+      "completedAt": "2026-09-15T16:24:19.244626+00:00",
+      "elapsedSeconds": 7.772,
+      "exitCode": 0,
+      "sha256": "558501925d18be0b03e349ce7ed9106b2226964ca4c28acf260802f9f87b60a1",
+      "rawSha256": "558501925d18be0b03e349ce7ed9106b2226964ca4c28acf260802f9f87b60a1",
+      "bytes": 170,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/handoff-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/test_checkpoint_handoff.py"
+      ],
+      "startedAt": "2026-09-15T16:23:42.551634+00:00",
+      "completedAt": "2026-09-15T16:24:32.289522+00:00",
+      "elapsedSeconds": 49.738,
+      "exitCode": 0,
+      "sha256": "628009fc744f2ac90f8c398dac3539eca57ebe722ab8e311a5eb64349d6c57b2",
+      "rawSha256": "628009fc744f2ac90f8c398dac3539eca57ebe722ab8e311a5eb64349d6c57b2",
+      "bytes": 99,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/authority-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/test_authority_verifier.py"
+      ],
+      "startedAt": "2026-09-15T16:19:50.521790+00:00",
+      "completedAt": "2026-09-15T16:20:54.271721+00:00",
+      "elapsedSeconds": 63.75,
+      "exitCode": 0,
+      "sha256": "d9226b704a694cdc6c97a244edf58e8b7b6b4c67c3bdb72e5fe43525e552beed",
+      "rawSha256": "d9226b704a694cdc6c97a244edf58e8b7b6b4c67c3bdb72e5fe43525e552beed",
+      "bytes": 99,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/test_isolated_consent.py"
+      ],
+      "startedAt": "2026-09-15T16:19:50.436094+00:00",
+      "completedAt": "2026-09-15T16:20:59.745904+00:00",
+      "elapsedSeconds": 69.31,
+      "exitCode": 0,
+      "sha256": "24d9109cf68c271dfd37f919748e4ab3e8d8aaf38a5d0b71e3c4aba6704df84c",
+      "rawSha256": "24d9109cf68c271dfd37f919748e4ab3e8d8aaf38a5d0b71e3c4aba6704df84c",
+      "bytes": 99,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/python-public.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "examples/federated-work/test_execution_evidence.py"
+      ],
+      "startedAt": "2026-09-15T16:19:19.284490+00:00",
+      "completedAt": "2026-09-15T16:19:24.459392+00:00",
+      "elapsedSeconds": 5.175,
+      "exitCode": 0,
+      "sha256": "09154859f4f59a2384963581a86059c8940b972bb70b3408de56a200083d156c",
+      "rawSha256": "09154859f4f59a2384963581a86059c8940b972bb70b3408de56a200083d156c",
+      "bytes": 127,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/python-wire.log",
+      "command": [
+        "/tmp/chio-python31-locked-venv/bin/python",
+        "-B",
+        "examples/federated-work/test_funded_wire.py"
+      ],
+      "startedAt": "2026-09-15T16:19:19.377906+00:00",
+      "completedAt": "2026-09-15T16:19:19.525420+00:00",
+      "elapsedSeconds": 0.148,
+      "exitCode": 0,
+      "sha256": "157a98b66d422569e68b74b61a228086ab2f2972218c5d9c3bd87f6a2820902a",
+      "rawSha256": "157a98b66d422569e68b74b61a228086ab2f2972218c5d9c3bd87f6a2820902a",
+      "bytes": 104,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_resolution.py"
+      ],
+      "startedAt": "2026-09-15T16:23:42.639426+00:00",
+      "completedAt": "2026-09-15T16:26:56.446540+00:00",
+      "elapsedSeconds": 193.807,
+      "exitCode": 0,
+      "sha256": "b9d3f8490c944c353dfc2d1f0bd11eee7adac47f99030518ad3674a7f260d92e",
+      "rawSha256": "b9d3f8490c944c353dfc2d1f0bd11eee7adac47f99030518ad3674a7f260d92e",
+      "bytes": 418,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/child-process.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_child.py"
+      ],
+      "startedAt": "2026-09-15T16:25:44.327810+00:00",
+      "completedAt": "2026-09-15T16:28:19.073549+00:00",
+      "elapsedSeconds": 154.746,
+      "exitCode": 0,
+      "sha256": "32db9c8779a084a81406c7624a74046b4f5bd399691a0472370cd273f0ea3acf",
+      "rawSha256": "32db9c8779a084a81406c7624a74046b4f5bd399691a0472370cd273f0ea3acf",
+      "bytes": 233,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/execution-recovery.log",
+      "command": [
+        "python3",
+        "-B",
+        "examples/federated-work/funded_lifecycle.py",
+        "FundedLifecycle.test_sigkill_around_execution_evidence_and_custody"
+      ],
+      "startedAt": "2026-09-15T16:27:46.345842+00:00",
+      "completedAt": "2026-09-15T16:29:48.540498+00:00",
+      "elapsedSeconds": 122.195,
+      "exitCode": 0,
+      "sha256": "6ef7509688b725d4b97cc663816aec4d4c79a1ec7b207ee0da52b497a444e458",
+      "rawSha256": "6ef7509688b725d4b97cc663816aec4d4c79a1ec7b207ee0da52b497a444e458",
+      "bytes": 235,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/standalone-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "examples/federated-work/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T16:18:47.510044+00:00",
+      "completedAt": "2026-09-15T16:18:47.953686+00:00",
+      "elapsedSeconds": 0.444,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/workspace-fmt.log",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T16:18:47.609803+00:00",
+      "completedAt": "2026-09-15T16:19:10.519135+00:00",
+      "elapsedSeconds": 22.909,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/hygiene.log",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "startedAt": "2026-09-15T16:18:47.557228+00:00",
+      "completedAt": "2026-09-15T16:18:51.510531+00:00",
+      "elapsedSeconds": 3.953,
+      "exitCode": 0,
+      "sha256": "6d957a3e886b4b48ca6c61b29e5a2d042fbe788d3fd097982add432098d9ee98",
+      "rawSha256": "6d957a3e886b4b48ca6c61b29e5a2d042fbe788d3fd097982add432098d9ee98",
+      "bytes": 43432,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/preservation.log",
+      "command": [
+        "python3",
+        "/tmp/chio-presettlement/check-preservation.py"
+      ],
+      "startedAt": "2026-09-15T16:20:14.554328+00:00",
+      "completedAt": "2026-09-15T16:20:20.600317+00:00",
+      "elapsedSeconds": 6.046,
+      "exitCode": 0,
+      "sha256": "8fe346916819c996fff0707d0ff3cb0a85a8412a6cb3c09cdea9a7b484497c99",
+      "rawSha256": "8fe346916819c996fff0707d0ff3cb0a85a8412a6cb3c09cdea9a7b484497c99",
+      "bytes": 332,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    },
+    {
+      "path": "isolated-consent-evidence/diff-check.log",
+      "command": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "startedAt": "2026-09-15T16:30:40.474913+00:00",
+      "completedAt": "2026-09-15T16:30:40.498436+00:00",
+      "elapsedSeconds": 0.024,
+      "exitCode": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "normalization": "Trailing whitespace removed; one final newline for nonempty logs"
+    }
+  ],
+  "scenarioReports": [
+    "handoff-pay.json",
+    "handoff-reject.json",
+    "authority-pay.json",
+    "authority-reject.json",
+    "isolated-pay.json",
+    "isolated-reject.json",
+    "earned-child-none.json",
+    "earned-child-pay-after-prepare.json",
+    "earned-child-pay-after-broadcast.json",
+    "earned-child-pay-after-observation.json",
+    "resolution-reject-none.json",
+    "resolution-absent-none.json",
+    "resolution-unavailable-none.json",
+    "resolution-preexpired-none.json",
+    "resolution-reject-after-resolution-retained.json",
+    "resolution-reject-after-resolution-accepted.json",
+    "resolution-reject-after-resolution-completed.json",
+    "pay-before-execution-evidence.json",
+    "pay-after-execution-evidence.json",
+    "pay-after-execution-checkpoint.json",
+    "pay-after-execution-custody.json",
+    "reject-after-execution-custody.json"
+  ],
+  "artifacts": [
+    {
+      "path": "isolated-consent-evidence/authority-pay.json",
+      "sha256": "8071649eec71d4ec5759072a54f50d3545f1361c0a19d80a1bf346ee9c5f8efd",
+      "bytes": 7056
+    },
+    {
+      "path": "isolated-consent-evidence/authority-pins-pay.json",
+      "sha256": "92758e451bc24fdb39daef781445922c873a756c5e3f5c160a2b1fa1c1118a87",
+      "bytes": 468
+    },
+    {
+      "path": "isolated-consent-evidence/authority-pins-reject.json",
+      "sha256": "b5de60b4ae1f44011bc3a965f1860f5ea78f965d7f4bf322d13cc8c159b516e7",
+      "bytes": 468
+    },
+    {
+      "path": "isolated-consent-evidence/authority-process.log",
+      "sha256": "d9226b704a694cdc6c97a244edf58e8b7b6b4c67c3bdb72e5fe43525e552beed",
+      "bytes": 99
+    },
+    {
+      "path": "isolated-consent-evidence/authority-python-pay.json",
+      "sha256": "91f10c97f12b1a4ca9797ae8785f00e73db0d624837148f70122a43543da569a",
+      "bytes": 1058
+    },
+    {
+      "path": "isolated-consent-evidence/authority-python-reject.json",
+      "sha256": "36e2f122ee375f15a67b742175f38809f11de569f6cb4c230d2807170e7e1997",
+      "bytes": 1059
+    },
+    {
+      "path": "isolated-consent-evidence/authority-reject.json",
+      "sha256": "019fc3817d7e6b2daa0756ec428c70090dd54f3b7f26becd4b7be994bae133a6",
+      "bytes": 7181
+    },
+    {
+      "path": "isolated-consent-evidence/authority-witness-pay.json",
+      "sha256": "b9555d093788ca142c576bc0e9d8b407d5409be5ab1da03c712bc7231f407cec",
+      "bytes": 15415
+    },
+    {
+      "path": "isolated-consent-evidence/authority-witness-reject.json",
+      "sha256": "64c968677e6e34393d4a5d6000f7e66a15cd0d67ad1dba643d000135d15b8bba",
+      "bytes": 15149
+    },
+    {
+      "path": "isolated-consent-evidence/build.log",
+      "sha256": "9cc418272ebc6dbf19f172140df2e83d17b5b1b823410e7df517c45412081104",
+      "bytes": 171
+    },
+    {
+      "path": "isolated-consent-evidence/child-process.log",
+      "sha256": "32db9c8779a084a81406c7624a74046b4f5bd399691a0472370cd273f0ea3acf",
+      "bytes": 233
+    },
+    {
+      "path": "isolated-consent-evidence/clippy.log",
+      "sha256": "558501925d18be0b03e349ce7ed9106b2226964ca4c28acf260802f9f87b60a1",
+      "bytes": 170
+    },
+    {
+      "path": "isolated-consent-evidence/context-pay.json",
+      "sha256": "a2140428f274d8fe45ea74783ce2f0ccf2dc5fd4e2fa0608496dff1659ebb43f",
+      "bytes": 5613
+    },
+    {
+      "path": "isolated-consent-evidence/context-reject.json",
+      "sha256": "602ec34204f7a677efd17aa518e4d357be9893ed7d4e5ca51bd1da21e9750858",
+      "bytes": 5613
+    },
+    {
+      "path": "isolated-consent-evidence/decision-pay.json",
+      "sha256": "bc3e67434d49e0e18a7eaca8e5390dee062ac7f97ccbc7937c16a146b0cfb8ef",
+      "bytes": 3440
+    },
+    {
+      "path": "isolated-consent-evidence/decision-reject.json",
+      "sha256": "b86fdfb1474dc23a56cd61bb9363e3fc4c3079408ccb619c8e72c1620c9e06b6",
+      "bytes": 3441
+    },
+    {
+      "path": "isolated-consent-evidence/development-custody-red.log",
+      "sha256": "7c08a2730b7d964776d90d03501acd9bb6efee310ba6997b4b694be4c294615c",
+      "bytes": 1068
+    },
+    {
+      "path": "isolated-consent-evidence/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "isolated-consent-evidence/earned-child-none.json",
+      "sha256": "98cd59c3e3a2ce741249f8d9944c20871355996e3a9616487d9eed66475fb922",
+      "bytes": 9076
+    },
+    {
+      "path": "isolated-consent-evidence/earned-child-pay-after-broadcast.json",
+      "sha256": "b55af49fb9ac9b14613cba40d6a981a7fb3192669cb7c4609a4c78d8e0ce2bd0",
+      "bytes": 9073
+    },
+    {
+      "path": "isolated-consent-evidence/earned-child-pay-after-observation.json",
+      "sha256": "91ec46d65c43c418ca3887454418174c6fdca5bb4e1515bd702c491ea3195e65",
+      "bytes": 9073
+    },
+    {
+      "path": "isolated-consent-evidence/earned-child-pay-after-prepare.json",
+      "sha256": "b3ed1902dacbbf3ce77e5da12a1fc71c00a31b8b4b768adfa949d1437a9edbbd",
+      "bytes": 9073
+    },
+    {
+      "path": "isolated-consent-evidence/enrollment-pay.json",
+      "sha256": "f2a8df4847d46fe7436fb43d8dc809c5668ae3f3615858f9756c6d5dbdf4bd56",
+      "bytes": 5745
+    },
+    {
+      "path": "isolated-consent-evidence/enrollment-reject.json",
+      "sha256": "e7d234ec6f0ab46891616275161874946445c7f5bcd6f3d5029e2685aec21da3",
+      "bytes": 5745
+    },
+    {
+      "path": "isolated-consent-evidence/execution-assessment.json",
+      "sha256": "6838b59f6267bd21c00381672459acc79233439eeb5ddf50d93d6eb765c9113a",
+      "bytes": 1998
+    },
+    {
+      "path": "isolated-consent-evidence/execution-pins-pay.json",
+      "sha256": "76153fa4cd505fc791b0bafad501383065a258baad52f803ac4892c7c737c3dd",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/execution-pins-reject.json",
+      "sha256": "e9f0486458efd908f37ca2352593c67e6c62dedd47bbef6fcb31d881fd5125d4",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/execution-pins.json",
+      "sha256": "7673500a7a1c290446feee6260662ddecf612b7a436f50889e7d1dad5895018b",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/execution-recovery.log",
+      "sha256": "6ef7509688b725d4b97cc663816aec4d4c79a1ec7b207ee0da52b497a444e458",
+      "bytes": 235
+    },
+    {
+      "path": "isolated-consent-evidence/execution-witness.json",
+      "sha256": "dd24fb10966d119682927598d2efe9114757ee88c3bfb80c48ac9f23c82e2080",
+      "bytes": 16243
+    },
+    {
+      "path": "isolated-consent-evidence/handoff-pay.json",
+      "sha256": "fcdf56ccf8d2488e94a4d7997f7131460c2791336ba3b83a53c8af55149d7921",
+      "bytes": 5771
+    },
+    {
+      "path": "isolated-consent-evidence/handoff-process.log",
+      "sha256": "628009fc744f2ac90f8c398dac3539eca57ebe722ab8e311a5eb64349d6c57b2",
+      "bytes": 99
+    },
+    {
+      "path": "isolated-consent-evidence/handoff-reject.json",
+      "sha256": "93f54e5a07360651eb4981012910f83b6482b70e618fe76e31ade9c73d029c14",
+      "bytes": 5896
+    },
+    {
+      "path": "isolated-consent-evidence/hygiene.log",
+      "sha256": "6d957a3e886b4b48ca6c61b29e5a2d042fbe788d3fd097982add432098d9ee98",
+      "bytes": 43432
+    },
+    {
+      "path": "isolated-consent-evidence/ignored-rust.log",
+      "sha256": "183a2a981199de659f159ef436aaba9c5b77e988c8ef00593eb79dddc41207d9",
+      "bytes": 6341
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-acceptance.json",
+      "sha256": "796bf74025dfae32489077b74ecf48d6b963cf1015aa5b80efef54eba6b73fa6",
+      "bytes": 2023
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-authorities.json",
+      "sha256": "95ca3bd427916cf50d810a39d8c5a907463f2c36fa4454fdb065c331f6719f03",
+      "bytes": 468
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-candidate.json",
+      "sha256": "8b10121606f72f738c76abee3bf4b88f077ff3b1964ddeff36227887593bb350",
+      "bytes": 268
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-checkpoint-enrollment.json",
+      "sha256": "591cdb9f5e1d9ab154ae8a1b9ee68ac3e2a0d21e6feadc39c3be68d8296e7bd8",
+      "bytes": 5744
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-checkpoint-request.json",
+      "sha256": "0dfec2f065bb0f9c49ee9e73527d2b2fa761d2dfee72544993a170e14772161a",
+      "bytes": 3217
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-checkpoint-response.json",
+      "sha256": "9187ee6c4025225cde26610dc18335a57825b7ec4e540447aecdb6a501da598b",
+      "bytes": 5484
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-context.json",
+      "sha256": "855da85a65641036dce67797c81e70895845c959ef6d60371a916f18df0ee2f8",
+      "bytes": 5613
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-decision.json",
+      "sha256": "0ff0e19b90e2c00a6601369603943276eb35a170bd374acdb3dc7fdd0b082c36",
+      "bytes": 3440
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-domain.json",
+      "sha256": "fd5074230de239e4974fc0f85a341050ff97000c9faf9d366f81a82eb83b41c7",
+      "bytes": 437
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-draft.json",
+      "sha256": "1c8b38a08e16573c2dc61f4fd34c73d2b862f7691e198a7ee71bde11f826655e",
+      "bytes": 5108
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-input.json",
+      "sha256": "d2ee2736b7f30cec559fcc2bcb45653c19e9906562b663aaad9864d1be88e40e",
+      "bytes": 770
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-intent.json",
+      "sha256": "d5c7151327cfb0ee28377898c6ddc1d080d1b160a9ce6ee299bca84beb7d535f",
+      "bytes": 531
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-output.json",
+      "sha256": "8b10121606f72f738c76abee3bf4b88f077ff3b1964ddeff36227887593bb350",
+      "bytes": 268
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-pins.json",
+      "sha256": "e9091938c4be218ff31529405159c66187a14515afa8b88f805712632fc64800",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-probe-buyer.json",
+      "sha256": "d2d21f52c55d3cec2d00f3ec3a870c82d063e6f27048bf3c98f55fc7474e3671",
+      "bytes": 237
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-probe-governance.json",
+      "sha256": "34abdb677296a60ead3cad41871d9dc45bd62fcef842d03b5d9bca38e59f6f9f",
+      "bytes": 232
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-probe-operator.json",
+      "sha256": "f3f9d3de5f5e8843e946ee8081e6dca8ac1346bd0b793a2842506c2897bc764e",
+      "bytes": 234
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-probe-provider.json",
+      "sha256": "0f57bd6a89ffe8e7d5d4afaa7105829416ff50cda726d2770cf7fdfb7cc3242f",
+      "bytes": 234
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-probe-verifier.json",
+      "sha256": "10aca34668056c2e63a9f8a5b0688b094b109b9f9de76cc3e24e3cf30ac5e41c",
+      "bytes": 234
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-proposal.json",
+      "sha256": "45f834574043005636b69cfe18a10f1ed04afd1a0d4226bce6823348a8919103",
+      "bytes": 9021
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-tampered-acceptance.json",
+      "sha256": "6d4114e40243ecc16d31790d36d124616ce6ea56f56938830a8b7132cde0f068",
+      "bytes": 2023
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-verifier-enrollment.json",
+      "sha256": "a7cac44f675e6fe413dfa7822c895aff36f37395336990ced7b88c5cfebdb692",
+      "bytes": 8383
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-verifier-request.json",
+      "sha256": "a93e6059b52ee8d3f265f95db19abc7e7a15450d483df6aaaf72cc074e7ccac8",
+      "bytes": 10521
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay-witness.json",
+      "sha256": "9352140c630d6bcb125dbafa58cc8851aff6c1acd14545db956aa7b1fe2d9365",
+      "bytes": 15388
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-pay.json",
+      "sha256": "7b02fa2b9b65ab1ca802b8e2d5438a43afbf176f5a3e39ebcf060d65b86433ff",
+      "bytes": 4266
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-process.log",
+      "sha256": "24d9109cf68c271dfd37f919748e4ab3e8d8aaf38a5d0b71e3c4aba6704df84c",
+      "bytes": 99
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-python-pay.json",
+      "sha256": "ddb40dbf4a4c670bbc6a7af61ed6042948a88ee4cbca4150035b64d90c7e102f",
+      "bytes": 1058
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-python-reject.json",
+      "sha256": "a859717b589ceebcf45e7c8c44b3da00e60ee6b62c1c1861de86018dc789e312",
+      "bytes": 1059
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-acceptance.json",
+      "sha256": "ce2240ebdb0ad84b3b7485e9e3f90a31bff10c59ef936eb72c598e81324d84f8",
+      "bytes": 2023
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-authorities.json",
+      "sha256": "bf9d51a366dbf88cd103b708be7dc784382798d3e8a082b2181839c37052e903",
+      "bytes": 468
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-candidate.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "bytes": 2
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-checkpoint-enrollment.json",
+      "sha256": "5b0628acfe36e1599d2a7639afad58755272407326d54936ca5c47398461c352",
+      "bytes": 5744
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-checkpoint-request.json",
+      "sha256": "5c34bfc592e6b76f191c33d5f0422dbae2c3734eb886e6a3a9b5072ae573c3d0",
+      "bytes": 3217
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-checkpoint-response.json",
+      "sha256": "b22fb1a4ef762442879635b44c1905236861308891e400a577aadd67e1c8c814",
+      "bytes": 5484
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-context.json",
+      "sha256": "334771cec70ba2b7b0fef0b8041aff91b1ccb7ea1e4d90dbba70df39b740c81e",
+      "bytes": 5613
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-decision.json",
+      "sha256": "1dd2f3859209bcc457b460e870e482a4f76083a20cf4eded1129e7778b4f7dd6",
+      "bytes": 3441
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-domain.json",
+      "sha256": "e71f248750174f4f98de92e421fdcfed2dafce6ec77b45bfc3f11c907e96ce00",
+      "bytes": 437
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-draft.json",
+      "sha256": "3525d1bc0cce1cd9b0480bd540ac4f521903e6e6a9b705ee065e1ef37581ada1",
+      "bytes": 5108
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-input.json",
+      "sha256": "d2ee2736b7f30cec559fcc2bcb45653c19e9906562b663aaad9864d1be88e40e",
+      "bytes": 770
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-intent.json",
+      "sha256": "b1cb7dec6eac58089548e55af9e69da0062383d0a9a94d327f676e51f0efd732",
+      "bytes": 531
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-output.json",
+      "sha256": "8b10121606f72f738c76abee3bf4b88f077ff3b1964ddeff36227887593bb350",
+      "bytes": 268
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-pins.json",
+      "sha256": "80344dfb30e8f0be7caa828cb442ff7840c96c11d8189d82dde407c47eb3e468",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-probe-buyer.json",
+      "sha256": "7a1f96b682549ae090600bb5a0c52f95c278bd124a72229937ae20d4a4b18f58",
+      "bytes": 237
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-probe-governance.json",
+      "sha256": "8c05ea84eba4f1643705b1b4f338ec1ce5f555cdb5e8647a89650944a0770e77",
+      "bytes": 232
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-probe-operator.json",
+      "sha256": "7b3bbfa261c5e5139efb80e81a76eb3f408ceb50d2239223d71d13f89112f75b",
+      "bytes": 234
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-probe-provider.json",
+      "sha256": "d78c81d0e96460960fbe47793a7ddadd6527d9e9b2d02b2a4bf868c2a62be8e9",
+      "bytes": 234
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-probe-verifier.json",
+      "sha256": "b369d9448bb8a05b678b46b21611343724e34f6947bc03885eee0744ba879dea",
+      "bytes": 234
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-proposal.json",
+      "sha256": "586e26c259082340ed6a897f1065cc90a32b8ac9000b06c231a4eded9377dfd3",
+      "bytes": 9021
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-tampered-acceptance.json",
+      "sha256": "38c796324e33c11c404da078d067da81b32413205f8797a5cdb0c670bbe935f2",
+      "bytes": 2023
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-verifier-enrollment.json",
+      "sha256": "0441b3d4771d50a0f65fecbc51e2ef13a03afc330d8095549cbfa74d80d30540",
+      "bytes": 8383
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-verifier-request.json",
+      "sha256": "10a58ab682b5af7073b53656970758a132490572472b578726241927bb2964b9",
+      "bytes": 10255
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject-witness.json",
+      "sha256": "db527c0f2b60c8439e0d562b97eef75e55d6e254537260102c2e19f2875c81f6",
+      "bytes": 15122
+    },
+    {
+      "path": "isolated-consent-evidence/isolated-reject.json",
+      "sha256": "f6929906284b9ce0baba96742e110ea95a659d526d2b72b29beacc9fa959edb1",
+      "bytes": 4390
+    },
+    {
+      "path": "isolated-consent-evidence/pay-after-execution-checkpoint.json",
+      "sha256": "085f2fe0903358b54e711cf5f8bb83dc9cf41ce292ff12f9b86d32a2b314988d",
+      "bytes": 8236
+    },
+    {
+      "path": "isolated-consent-evidence/pay-after-execution-custody.json",
+      "sha256": "f66a394a195ef09233350d83ebdb9c68502027e12fa099c77460a38c3c76a348",
+      "bytes": 8295
+    },
+    {
+      "path": "isolated-consent-evidence/pay-after-execution-evidence.json",
+      "sha256": "a38d8146ff35250b8488bb60a4c2ae6226c9e309b8889df9e9e50ed7c2a6c703",
+      "bytes": 8172
+    },
+    {
+      "path": "isolated-consent-evidence/pay-before-execution-evidence.json",
+      "sha256": "d702d22c490b9660584bc897e0d967a6aadfb1f23754b19e8273dec47d53d809",
+      "bytes": 8111
+    },
+    {
+      "path": "isolated-consent-evidence/pins-pay.json",
+      "sha256": "5c5fe31ef32636ad292b02d461bc99e7067e69e6e2b8f3c458ecbaea1308ab10",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/pins-reject.json",
+      "sha256": "70eea569f23816da021094364bd35da36984759e382d6b880114cf8282867482",
+      "bytes": 371
+    },
+    {
+      "path": "isolated-consent-evidence/preservation.log",
+      "sha256": "8fe346916819c996fff0707d0ff3cb0a85a8412a6cb3c09cdea9a7b484497c99",
+      "bytes": 332
+    },
+    {
+      "path": "isolated-consent-evidence/python-pay.json",
+      "sha256": "ffdaeffe70f9c3013922349ac0d18a53ae2dbfca39455a505e42645c3ff6deb1",
+      "bytes": 1058
+    },
+    {
+      "path": "isolated-consent-evidence/python-public.log",
+      "sha256": "09154859f4f59a2384963581a86059c8940b972bb70b3408de56a200083d156c",
+      "bytes": 127
+    },
+    {
+      "path": "isolated-consent-evidence/python-reject.json",
+      "sha256": "f3e320745589ee2b9c2d99e8584bd39ef3e442aa3b71feb9fb8b09d4570b3e11",
+      "bytes": 1059
+    },
+    {
+      "path": "isolated-consent-evidence/python-wire.log",
+      "sha256": "157a98b66d422569e68b74b61a228086ab2f2972218c5d9c3bd87f6a2820902a",
+      "bytes": 104
+    },
+    {
+      "path": "isolated-consent-evidence/reject-after-execution-custody.json",
+      "sha256": "d237cba0dc7e2b305993914c71d2cb656a37e850556a3084dffbada88cfb6def",
+      "bytes": 8423
+    },
+    {
+      "path": "isolated-consent-evidence/request-pay.json",
+      "sha256": "d8bad5fc71366cfed948ec20b2a93de27777a8ce78b71cedd95cb8b19fe0e009",
+      "bytes": 3329
+    },
+    {
+      "path": "isolated-consent-evidence/request-reject.json",
+      "sha256": "53f7014f4534fd92f054fe0547295c5a1053b23b0d79449e8565eea0171da1c7",
+      "bytes": 3329
+    },
+    {
+      "path": "isolated-consent-evidence/required-execution-metered-unavailable.json",
+      "sha256": "89b209b08eb85da689b2ffaa661363b7c1115ed7a3b07bfb0377ceca8ce8e3ba",
+      "bytes": 5047
+    },
+    {
+      "path": "isolated-consent-evidence/required-execution-settled-unavailable.json",
+      "sha256": "bc79817fe7dc218084d45ca1f5291d548f034e57d044b9dfcfa434e9aff59b37",
+      "bytes": 5041
+    },
+    {
+      "path": "isolated-consent-evidence/required-lineage-unsupported.json",
+      "sha256": "e7b890e6722d52b0f82e1ff93027b1761726a34a4609011e3d491078c9092740",
+      "bytes": 4827
+    },
+    {
+      "path": "isolated-consent-evidence/required-receipt-unavailable.json",
+      "sha256": "e2f1b72f1f5762e09a3556bef6bc6207b459ea80d8b09edcee4b0e780a561d65",
+      "bytes": 4839
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-absent-none.json",
+      "sha256": "8e75bc604344dc923238498fa53d967789f53472ae72513ae86702d9a1581d5b",
+      "bytes": 5191
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-preexpired-none.json",
+      "sha256": "5a8614c28ffa6cf8496a3b7c15c1da5466fc0a2f493c1f1385226201b9d952ef",
+      "bytes": 5191
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-process.log",
+      "sha256": "b9d3f8490c944c353dfc2d1f0bd11eee7adac47f99030518ad3674a7f260d92e",
+      "bytes": 418
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-reject-after-resolution-accepted.json",
+      "sha256": "f83b3bf4ea5e8d200189381307192c6c9c1902d6c4c0754e5faf8f9781d09ea5",
+      "bytes": 5506
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-reject-after-resolution-completed.json",
+      "sha256": "789eba6c723d62ac3d437e6e6853ccdd64050b32c764a33dcf632bd4bc350e84",
+      "bytes": 5506
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-reject-after-resolution-retained.json",
+      "sha256": "ff29e3b67cd5c0b61d3ce72d83e55b63e1835b3a13709bd3098965d407735daf",
+      "bytes": 5506
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-reject-none.json",
+      "sha256": "702a8261f4fe4d252d0895e5bad4056214c2684868b08ea07ad97850334c8e00",
+      "bytes": 5509
+    },
+    {
+      "path": "isolated-consent-evidence/resolution-unavailable-none.json",
+      "sha256": "40ed1ab1553b88c1e7b466f690c04c0beae145fe14a48ea50a539d17545d2dea",
+      "bytes": 5350
+    },
+    {
+      "path": "isolated-consent-evidence/response-pay.json",
+      "sha256": "58b2581eed8ec098b59458b0a0bb3f0d483062e980a4e90cc12385a975a1bc5c",
+      "bytes": 5596
+    },
+    {
+      "path": "isolated-consent-evidence/response-reject.json",
+      "sha256": "0935f657fd3b3bb93feefae16ebf48430738b7199d90f1a68073a4c8341f5a08",
+      "bytes": 5596
+    },
+    {
+      "path": "isolated-consent-evidence/review.md",
+      "sha256": "f3c6bdb952aaf50f4a4088cd12250c60e0c848037e7799a909758ef71fea6a1c",
+      "bytes": 4978
+    },
+    {
+      "path": "isolated-consent-evidence/rust-tests.log",
+      "sha256": "b36f54940c872cb38d0a8e335bab6a4d14c1eed90de6b2a96eecd25ef675de80",
+      "bytes": 10139
+    },
+    {
+      "path": "isolated-consent-evidence/standalone-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "isolated-consent-evidence/verifier-enrollment-pay.json",
+      "sha256": "6bedac6775764830a1d6572b7fb29968422c8e529bb672fc80568380c7a4d61c",
+      "bytes": 8392
+    },
+    {
+      "path": "isolated-consent-evidence/verifier-enrollment-reject.json",
+      "sha256": "caa9fd8cb96678d6062b612f4186c13577eff361d65db468f9ce8f20714d5cf9",
+      "bytes": 8392
+    },
+    {
+      "path": "isolated-consent-evidence/verifier-request-pay.json",
+      "sha256": "aba8eb781acbe700f60bc10eee68f15f917f9a45ce6e4afcde16945b0ed2ff99",
+      "bytes": 10539
+    },
+    {
+      "path": "isolated-consent-evidence/verifier-request-reject.json",
+      "sha256": "c6a65b588b64f87257a51ee7e11d2aa1a3aac960dc7428f3f3967491a79d4511",
+      "bytes": 10273
+    },
+    {
+      "path": "isolated-consent-evidence/witness-pay.json",
+      "sha256": "b5b1bd5c6e1687a19a58f25fa747c06b14586172f09fa0052d7f1184ffb6b2d6",
+      "bytes": 16243
+    },
+    {
+      "path": "isolated-consent-evidence/witness-reject.json",
+      "sha256": "29ce095bfcc58303ac78433195e98163bd71dd4beb55283bb91a747872b8110d",
+      "bytes": 15977
+    },
+    {
+      "path": "isolated-consent-evidence/workspace-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ],
+  "boundaries": [
+    "One allocation and one receipt per enrolled checkpoint log and verifier custody slot",
+    "Five isolated role domains with six keys; same trusted host administrator",
+    "Public proposal and acceptance exchange; coordinator does not read role seeds or private requests",
+    "Checkpoint and status keys remain in one operator domain",
+    "Owned mock-chain adapter still controls transaction signing; no independently administered observers",
+    "Python verifies the existing execution witness, not the new consent envelope",
+    "Provider funding and operator custody journals have no external rollback anchor",
+    "Local consent files do not detect whole-state rollback or copied keys",
+    "Namespaces trust the host kernel and administrator",
+    "Historical response replay does not refresh standing or authorize payment",
+    "No external revocation feed; bounded local authority standing",
+    "Python verifies execution authority and externally pinned allocation; it does not verify chain funding",
+    "Same native receipt-store checkpoint signer rule; unchanged kernel and workspace dependencies"
+  ]
+}

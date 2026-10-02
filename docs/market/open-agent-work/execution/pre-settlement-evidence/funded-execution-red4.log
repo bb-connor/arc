@@ -1,0 +1,83 @@
+warning: associated function `qualify` is never used
+  --> /home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:31:19
+   |
+29 | impl QualifiedExecutionEvidenceV1 {
+   | --------------------------------- associated function in this implementation
+30 |     #[allow(clippy::too_many_arguments)]
+31 |     pub(crate) fn qualify(
+   |                   ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-kernel` (lib) generated 1 warning
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 1m 01s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-ec8305597a8f01bf)
+
+running 7 tests
+test funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement ... FAILED
+test funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys ... FAILED
+test funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing ... FAILED
+test funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle ... FAILED
+test funded_work::tests::evidence::authenticated_wrong_result_is_rejected_without_replacing_execution ... ok
+test funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment ... bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-funded-integration/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+FAILED
+test funded_work::tests::successors::legacy_funding_cannot_acquire_a_waiver_after_execution ... ok
+
+failures:
+
+---- funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement stdout ----
+
+thread 'funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement' (2211609) panicked at src/funded_work/finding_acceptance_tests.rs:229:5:
+assertion `left == right` failed
+  left: "chio.experimental.funded-finding-context.v1"
+ right: "chio.experimental.funded-finding-context.v2"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys stdout ----
+
+thread 'funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys' (2211612) panicked at src/funded_work/finding_acceptance_tests.rs:456:5:
+assertion failed: fixture_execution_context(&verifier.public_key(), &kernel.public_key(),
+        kernel.public_key(), &status, 100, 1000).is_err()
+
+---- funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing stdout ----
+
+thread 'funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing' (2211613) panicked at src/funded_work/finding_acceptance_tests.rs:438:5:
+assertion failed: evaluate_with_evidence(&canonical_json_bytes(&legacy_finding)?, &legacy,
+        &digest(&legacy)?, &[], 110, Some(&evidence)).is_err()
+
+---- funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle stdout ----
+
+thread 'funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle' (2211633) panicked at src/funded_work/finding_acceptance_tests.rs:379:5:
+assertion `left == right` failed
+  left: Rejected
+ right: Accepted
+
+---- funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment stdout ----
+
+thread 'funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment' (2211809) panicked at src/funded_work/tests/execution.rs:21:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+
+failures:
+    funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement
+    funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys
+    funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing
+    funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle
+    funded_work::tests::execution::native_execution_receipt_is_available_before_claim_or_payment
+
+test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 53 filtered out; finished in 23.82s
+
+error: test failed, to rerun pass `--bin chio-federated-work`

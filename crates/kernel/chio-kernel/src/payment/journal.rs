@@ -11,6 +11,8 @@ pub enum PaymentJournalState {
     Authorized,
     Settling,
     Settled,
+    Resolving,
+    Resolved,
     Closed,
     ReconcileFailed,
 }
@@ -87,6 +89,10 @@ pub enum PaymentReleaseAuthorityKind {
     PreDispatchNoEffect,
     TransportNotAccepted,
     ContractualZeroCharge,
+    /// A new jointly authorized payment decision after a historical unknown.
+    /// This is not evidence that execution had no effect.
+    MutuallyAgreedUnknown,
+    ContractualCaptureWaiver,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -272,6 +278,27 @@ impl PaymentJournalRecord {
                     }
                 }
             }
+            PaymentJournalState::Resolving | PaymentJournalState::Resolved => {
+                self.require_authorization_id("capture waiver")?;
+                if self.rail_mode != PaymentRailMode::ReversibleHold
+                    || self.settle_action != Some(PaymentSettleAction::Capture)
+                    || self
+                        .settle_amount_units
+                        .is_none_or(|n| n == 0 || n > self.amount_units)
+                    || self.transaction_id.is_some()
+                        != (self.state == PaymentJournalState::Resolved)
+                    || self.release_authority.as_ref().is_none_or(|a| {
+                        a.kind != PaymentReleaseAuthorityKind::ContractualCaptureWaiver
+                    })
+                {
+                    return Err(PaymentJournalError(
+                        "invalid capture waiver successor".into(),
+                    ));
+                }
+                if let Some(authority) = &self.release_authority {
+                    authority.validate_for(&self.operation_id)?;
+                }
+            }
             PaymentJournalState::ReconcileFailed => self.validate_reconcile_shape()?,
         }
         Ok(())
@@ -329,6 +356,11 @@ impl PaymentJournalRecord {
                 PaymentJournalState::Settling
             }
             PaymentJournalTransition::BeginRelease { authority } => {
+                if authority.kind == PaymentReleaseAuthorityKind::ContractualCaptureWaiver {
+                    return Err(PaymentJournalError(
+                        "capture waiver requires qualified successor storage".into(),
+                    ));
+                }
                 if self.state != PaymentJournalState::Authorized {
                     return Err(PaymentJournalError(
                         "release intent requires an authorized journal".to_owned(),

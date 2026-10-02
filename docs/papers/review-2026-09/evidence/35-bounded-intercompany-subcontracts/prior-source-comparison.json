@@ -1,0 +1,25 @@
+{
+  "changedExistingSources": [
+    "docs/papers/evidence-crosses/paper.pdf",
+    "docs/papers/evidence-crosses/sections/01-rule.tex",
+    "docs/papers/review-2026-09/README.md",
+    "examples/federated-work/README.md",
+    "examples/federated-work/python_buyer/client.py",
+    "examples/federated-work/python_buyer/protocol.py",
+    "examples/federated-work/python_buyer/review.py",
+    "examples/federated-work/python_buyer/test_enrollment.py",
+    "examples/federated-work/src/buyer.rs",
+    "examples/federated-work/src/common.rs",
+    "examples/federated-work/src/https.rs",
+    "examples/federated-work/src/main.rs",
+    "examples/federated-work/src/market.rs",
+    "examples/federated-work/src/provider.rs",
+    "examples/federated-work/src/review.rs",
+    "examples/federated-work/src/tests.rs"
+  ],
+  "manifest": "docs/papers/review-2026-09/evidence/34-mutually-agreed-unknown-release/manifest.json",
+  "manifestSha256": "17576bf1d9fb8830dd0e53d404f59a92e14adc71b9896b884350c953a6d475dc",
+  "nativeKernelAndStoreSourcesChanged": false,
+  "priorArtifactsVerified": 234,
+  "priorSources": 1506
+}

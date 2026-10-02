@@ -1,0 +1,26 @@
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+    Finished `test` profile [unoptimized] target(s) in 13.54s
+     Running tests/durable_admission_sqlite.rs (target/debug/deps/durable_admission_sqlite-e5c253aea567000a)
+
+running 18 tests
+test checked_output::checked_output_contract_rejects_final_payment_before_authorization ... ok
+test checked_output::checked_output_denial_recovers_before_and_after_release_without_becoming_a_capture ... ok
+test delivery_marked_grant_cannot_fall_through_to_an_unmarked_sibling ... ok
+test federation_context::sqlite_retained_federation_context_survives_owner_restart_without_redispatch ... ok
+test malformed_delivery_digests_are_rejected_before_dispatch ... ok
+test output_digest_admission_rejects_malformed_commitments ... ok
+test output_digest_delivery_contract_enforces_every_lane ... ok
+test security_release::payment_capture_precedes_checkpoint_and_is_not_repeated ... ok
+test security_release::security_refusal_cannot_repeat_or_reverse_captured_payment ... ok
+test security_release::security_refusal_cannot_repeat_zero_charge_release ... ok
+test security_release::zero_charge_release_precedes_checkpoint_and_is_not_repeated ... ok
+test sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome ... ok
+test sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly ... ok
+test sqlite_restart_completes_a_committed_capture_without_request_replay ... ok
+test sqlite_restart_completes_a_committed_release_without_request_replay ... ok
+test sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds ... ok
+test stream_delivery_cannot_satisfy_a_committed_output_digest ... ok
+test unknown_release::mutual_release_recovers_without_rewriting_unknown_work ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 62.18s
+

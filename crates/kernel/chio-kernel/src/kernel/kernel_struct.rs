@@ -548,6 +548,7 @@ pub struct ChioKernel {
     pub(super) clock_fence: Arc<Mutex<chio_security_types::clock::ClockFence>>,
     pub(super) config: KernelConfig,
     pub(super) durable_admission_mode: crate::admission_operation::DurableAdmissionMode,
+    pub(super) require_durable_request_retention: bool,
     pub(super) durable_admission_runtime: Option<DurableAdmissionRuntime>,
     #[cfg(feature = "admission-test-support")]
     pub(super) durable_finalization_cutpoint_hook: Option<super::DurableFinalizationCutpointHook>,

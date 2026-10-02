@@ -4,9 +4,9 @@
 use super::*;
 use crate::admission_operation::{
     immutable_tool_request_hash_with_profile, qualify_recovery_claim_for_test,
-    AdmissionExecutionNonceReservationV1, AdmissionOperationBindingInputV1, AdmissionOperationKind,
-    AdmissionParticipantRequirements, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
-    UntrustedAdmissionRecoveryClaim,
+    AdmissionAuthorityProfileV1, AdmissionExecutionNonceReservationV1,
+    AdmissionOperationBindingInputV1, AdmissionOperationKind, AdmissionParticipantRequirements,
+    AdmissionRequestBindingV1, AuthenticatedRequestNamespace, UntrustedAdmissionRecoveryClaim,
 };
 use crate::execution_nonce::ExecutionNonceConfig;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
@@ -49,6 +49,39 @@ fn advance(
 }
 
 pub(super) fn fixture() -> TestResult<Fixture> {
+    let (kernel, admission, request, now) = caller_admission_with_profile(None, false)?;
+    let nonce = request.execution_nonce.clone().ok_or("caller nonce")?;
+    let frozen = kernel.freeze_durable_tool_return_context(
+        &admission,
+        DurableToolReturnContextInput {
+            request: &request,
+            matched_grant_index: 0,
+            extra_receipt_metadata: None,
+            pre_invocation_guard_evidence: &[],
+            verified_payee_binding: None,
+            verified_purchase: None,
+            verified_recovery: None,
+            trusted_now_unix_ms: now,
+            security_invocation_context: None,
+            security_release_required: false,
+        },
+    )?;
+    let frame = kernel
+        .frame_caller_return_context(&admission, &request, &frozen, now)?
+        .ok_or("caller model frame")?;
+    Ok(Fixture {
+        request,
+        kernel,
+        admission,
+        frame,
+        nonce,
+    })
+}
+
+pub(super) fn caller_admission_with_profile(
+    profile: Option<&AdmissionAuthorityProfileV1>,
+    dpop_required: bool,
+) -> TestResult<(ChioKernel, DurableToolAdmission, ToolCallRequest, u64)> {
     let key = chio_core::Keypair::generate();
     let kernel = ChioKernel::new_with_clock(
         KernelConfig {
@@ -83,7 +116,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
                 max_invocations: Some(1),
                 max_cost_per_invocation: None,
                 max_total_cost: None,
-                dpop_required: None,
+                dpop_required: dpop_required.then_some(true),
             }],
             ..ChioScope::default()
         },
@@ -106,7 +139,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
         &matching,
         &[],
         None,
-        &crate::admission_operation::AdmissionAuthorityProfileV1::unconfigured_for_test()?,
+        profile.unwrap_or(&AdmissionAuthorityProfileV1::unconfigured_for_test()?),
     )?;
     let binding = AdmissionOperationBindingV1::new(AdmissionOperationBindingInputV1 {
         kind: AdmissionOperationKind::ToolDispatch,
@@ -144,6 +177,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
     })?;
     let now = current_unix_timestamp_ms();
     let mut operation = AdmissionOperationV1::prepare(binding, 1)?;
+    original.validate_binding(operation.binding())?;
     let nonce = AdmissionExecutionNonceReservationV1::mint_for_operation(
         &operation,
         &original,
@@ -199,29 +233,5 @@ pub(super) fn fixture() -> TestResult<Fixture> {
         issued_nonce: Some(nonce.clone()),
         nonce_preflight: None,
     };
-    let frozen = kernel.freeze_durable_tool_return_context(
-        &admission,
-        DurableToolReturnContextInput {
-            request: &request,
-            matched_grant_index: 0,
-            extra_receipt_metadata: None,
-            pre_invocation_guard_evidence: &[],
-            verified_payee_binding: None,
-            verified_purchase: None,
-            verified_recovery: None,
-            trusted_now_unix_ms: now,
-            security_invocation_context: None,
-            security_release_required: false,
-        },
-    )?;
-    let frame = kernel
-        .frame_caller_return_context(&admission, &request, &frozen, now)?
-        .ok_or("caller model frame")?;
-    Ok(Fixture {
-        request,
-        kernel,
-        admission,
-        frame,
-        nonce: nonce.signed_nonce().clone(),
-    })
+    Ok((kernel, admission, request, now))
 }

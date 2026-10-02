@@ -96,6 +96,8 @@ The primary live release documents. Auditors and operators start here.
 - [Agent Economy](reference/AGENT_ECONOMY.md) - technical design for governed transaction controls and payment interop
 - [Agent Reputation](reference/AGENT_REPUTATION.md) - local scoring, issuance gating, and reputation surfaces
 - [Cognition Market](market/README.md) - agents trading verified findings under kernel-governed delivery; qualified bounded single-operator market plus a hosted profile, with cross-organization escrow kept conditional
+- [Open agent work program](market/open-agent-work/README.md) - research and implementation plans for funded work across independent companies, bounded subcontracting, useful verification and a matched independent-operator trial
+- [Chio: A Peer-to-Peer Economy of Verifiable Work](papers/verifiable-work/README.md) - approved whitepaper title, thesis and manuscript/evidence status
 - [Competitive Landscape](reference/COMPETITIVE_LANDSCAPE.md) - agent protocols, payment rails, and identity standards in the surrounding space
 
 ## Protocol and architecture

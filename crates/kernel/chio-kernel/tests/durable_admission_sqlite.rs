@@ -32,10 +32,20 @@ use chio_kernel::{
 };
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
+#[path = "durable_admission_sqlite/checked_output.rs"]
+mod checked_output;
+#[path = "durable_admission_sqlite/execution_evidence.rs"]
+mod execution_evidence;
 #[path = "durable_admission_sqlite/federation_context.rs"]
 mod federation_context;
+#[path = "durable_admission_sqlite/payment_acknowledgement.rs"]
+mod payment_acknowledgement;
+#[path = "durable_admission_sqlite/request_retention.rs"]
+mod request_retention;
 #[path = "durable_admission_sqlite/security_release.rs"]
 mod security_release;
+#[path = "durable_admission_sqlite/unknown_release.rs"]
+mod unknown_release;
 
 fn secure_directory(path: &std::path::Path) -> std::io::Result<()> {
     #[cfg(unix)]
@@ -1954,3 +1964,6 @@ fn stream_delivery_cannot_satisfy_a_committed_output_digest() -> Result<(), Box<
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
+
+#[path = "durable_admission_sqlite/contractual_resolution.rs"]
+mod contractual_resolution;

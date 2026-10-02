@@ -1,0 +1,51 @@
+name: Paper Artifact Check
+
+on:
+  pull_request:
+    paths:
+      - "docs/papers/programmable-sovereignty/**"
+      - "crates/trust/chio-federation/**"
+      - "crates/kernel/chio-runtime-core/**"
+      - "crates/kernel/chio-kernel/benches/**"
+      - "formal/lean4/**"
+      - "formal/diff-tests/**"
+      - "scripts/generate-programmable-sovereignty-artifact.py"
+      - "scripts/check-programmable-sovereignty-artifact.sh"
+      - ".github/workflows/paper-artifact-check.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/papers/programmable-sovereignty/**"
+      - "crates/trust/chio-federation/**"
+      - "crates/kernel/chio-runtime-core/**"
+      - "crates/kernel/chio-kernel/benches/**"
+      - "formal/lean4/**"
+      - "formal/diff-tests/**"
+      - "scripts/generate-programmable-sovereignty-artifact.py"
+      - "scripts/check-programmable-sovereignty-artifact.sh"
+      - ".github/workflows/paper-artifact-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paper-artifact-check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  artifact-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # The check compares benchmark inputs against the pinned source
+          # commit and the producer commits recorded in the result files.
+          fetch-depth: 0
+      - name: Install pdftotext
+        uses: ./.github/actions/apt-install
+        with:
+          packages: poppler-utils
+      - name: Check the programmable-sovereignty artifact
+        run: python3 scripts/generate-programmable-sovereignty-artifact.py --check

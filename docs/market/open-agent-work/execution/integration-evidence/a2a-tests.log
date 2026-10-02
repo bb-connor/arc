@@ -1,0 +1,254 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling zeroize v1.9.0
+   Compiling getrandom v0.2.17
+   Compiling parking_lot_core v0.9.12
+   Compiling generic-array v0.14.7
+   Compiling rand_core v0.6.4
+   Compiling der v0.7.10
+   Compiling parking_lot v0.12.5
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.10.7
+   Compiling block-padding v0.3.3
+   Compiling inout v0.1.4
+   Compiling sha2 v0.10.9
+   Compiling cipher v0.4.4
+   Compiling hmac v0.12.1
+   Compiling salsa20 v0.10.2
+   Compiling pbkdf2 v0.12.2
+   Compiling spki v0.7.3
+   Compiling scrypt v0.11.0
+   Compiling cbc v0.1.2
+   Compiling aes v0.8.4
+   Compiling signature v2.2.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/security/chio-security-types)
+   Compiling pkcs5 v0.7.1
+   Compiling pkcs8 v0.10.2
+   Compiling ring v0.17.14
+   Compiling ed25519 v2.2.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling rustls-pki-types v1.14.0
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling mio v1.1.1
+   Compiling socket2 v0.6.3
+   Compiling aws-lc-rs v1.16.2
+   Compiling tokio v1.50.0
+   Compiling rustls-webpki v0.103.13
+   Compiling rs_merkle v1.5.0
+   Compiling rustls v0.23.37
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling sha3 v0.10.8
+   Compiling frost-core v3.0.0
+   Compiling alloy-primitives v1.5.7
+   Compiling getrandom v0.4.2
+   Compiling rand_chacha v0.3.1
+   Compiling frost-rerandomized v3.0.0
+   Compiling hyper v1.8.1
+   Compiling frost-ed25519 v3.0.0
+   Compiling rand v0.8.6
+   Compiling ff v0.13.1
+   Compiling rustls-native-certs v0.8.3
+   Compiling tower v0.5.3
+   Compiling hyper-util v0.1.20
+   Compiling group v0.13.0
+   Compiling tokio-rustls v0.26.4
+   Compiling tokio-util v0.7.18
+   Compiling sec1 v0.7.3
+   Compiling hkdf v0.12.4
+   Compiling crypto-bigint v0.5.5
+   Compiling tower-http v0.6.8
+   Compiling hyper-rustls v0.27.7
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling reqwest v0.13.2
+   Compiling elliptic-curve v0.13.8
+   Compiling rfc6979 v0.4.0
+   Compiling getrandom v0.3.4
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling cpufeatures v0.3.0
+   Compiling sha2 v0.11.0
+   Compiling alloy-json-abi v1.5.7
+   Compiling num-bigint-dig v0.8.6
+   Compiling openssl-sys v0.9.114
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling pkcs1 v0.7.5
+   Compiling universal-hash v0.5.1
+   Compiling tempfile v3.27.0
+   Compiling poly1305 v0.8.0
+   Compiling tls_codec v0.4.2
+   Compiling openssl v0.10.78
+   Compiling oauth2 v5.0.0
+   Compiling rsa v0.9.10
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling ahash v0.8.12
+   Compiling alloy-sol-types v1.5.7
+   Compiling p384 v0.13.1
+   Compiling p256 v0.13.2
+   Compiling uuid v1.22.0
+   Compiling jsonwebtoken v10.4.0
+   Compiling sha1 v0.10.6
+   Compiling aead v0.5.2
+   Compiling tough v0.22.0
+   Compiling oci-client v0.17.0
+   Compiling referencing v0.46.0
+   Compiling openidconnect v4.0.1
+   Compiling crypto_secretbox v0.1.1
+   Compiling x509-cert v0.2.5
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling alloy-core v1.5.7
+   Compiling webauthn-attestation-ca v0.5.2
+   Compiling x509-parser v0.16.0
+   Compiling scrypt v0.12.0
+   Compiling rusqlite v0.39.0
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling webauthn-rs-core v0.5.2
+   Compiling jsonschema v0.46.0
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling sigstore v0.14.0
+   Compiling alloy v1.8.3
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-egress-contract)
+   Compiling webpki-roots v1.0.6
+   Compiling webpki-roots v0.26.11
+   Compiling jsonwebtoken v9.3.1
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3-bindings)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling webauthn-rs v0.5.2
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-sqlite-file-identity)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling dashmap v6.1.0
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling ureq v2.12.1
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-edge-metrics)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-cross-protocol)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-a2a-edge)
+    Finished `test` profile [unoptimized] target(s) in 2m 23s
+     Running unittests src/lib.rs (target/debug/deps/chio_a2a_edge-65a81884f62a9739)
+
+running 102 tests
+test metrics::tests::registry_constant_matches_spec ... ok
+test metrics::tests::render_exposes_writer_liveness_gauges ... ok
+test metrics::tests::render_includes_pending_approval_outcome_label ... ok
+test nonce_preflight_tests::strict_nonce_retries_require_and_accept_stable_request_ids ... ok
+test tests::a2a_execution_boundary_rejects_removed_or_mismatched_flow_sidecar ... ok
+test tests::a2a_execution_request_preserves_complete_authorization_context ... ok
+test tests::a2a_projection_preserves_complete_approval_set_and_opaque_extension ... ok
+test tests::a2a_unnegotiated_extensions_deny_before_dispatch_or_receipt_mutation ... ok
+test tests::agent_card_custom_config ... ok
+test tests::agent_card_default_config_fields_stay_stable ... ok
+test tests::agent_card_has_correct_name ... ok
+test tests::agent_card_has_correct_version ... ok
+test tests::agent_card_has_interface ... ok
+test tests::agent_card_includes_all_skills ... ok
+test tests::agent_card_json_serializes ... ok
+test tests::ambiguous_unqualified_skill_id_returns_guidance ... ok
+test tests::approval_required_tool_is_not_auto_published ... ok
+test tests::authoritative_send_supports_openai_target_binding ... ok
+test tests::authoritative_send_uses_protocol_aware_target_binding ... ok
+test tests::bridge_fidelity_serializes_correctly ... ok
+test tests::cancellation_tool_is_adapted_with_truthful_caveats ... ok
+test tests::compatibility_send_rejects_multiple_data_parts ... ok
+test tests::complete_task_preserves_cancelled_deferred_task ... ok
+test tests::default_config_has_reasonable_values ... ok
+test tests::duplicate_skills_across_manifests_receive_qualified_ids ... ok
+test tests::edge_rejects_blank_agent_card_endpoint_before_publication ... ok
+test tests::edge_rejects_blank_agent_card_name_before_publication ... ok
+test tests::edge_rejects_blank_agent_card_protocol_binding_before_publication ... ok
+test tests::edge_rejects_blank_agent_card_version_before_publication ... ok
+test tests::edge_rejects_manifest_with_unsupported_schema_version ... ok
+test tests::edge_rejects_padded_agent_card_endpoint_before_publication ... ok
+test tests::edge_rejects_padded_agent_card_protocol_binding_before_publication ... ok
+test tests::error_display_invalid_request ... ok
+test tests::error_display_kernel ... ok
+test tests::error_display_tool_not_found ... ok
+test tests::execution_context_rejects_control_character_agent_id ... ok
+test tests::execution_context_rejects_oversized_threshold_approval_set ... ok
+test tests::extract_data_from_parts ... ok
+test tests::extract_prefers_data_over_text ... ok
+test tests::extract_rejects_array_data_part_arguments ... ok
+test tests::extract_rejects_scalar_data_part_arguments ... ok
+test tests::extract_text_from_parts ... ok
+test tests::hidden_tool_is_not_auto_published ... ok
+test tests::invalid_target_protocol_metadata_fails_closed ... ok
+test tests::jsonrpc_compatibility_send_rejects_non_object_params_before_passthrough ... ok
+test tests::jsonrpc_invalid_version_preserves_scalar_request_id ... ok
+test tests::jsonrpc_missing_skill_id_with_multiple_skills_errors ... ok
+test tests::jsonrpc_passthrough_marks_compatibility_path ... ok
+test tests::jsonrpc_rejects_non_scalar_request_ids_before_method_dispatch ... ok
+test tests::jsonrpc_rejects_padded_target_skill_id_before_lookup ... ok
+test tests::jsonrpc_send_message_param_parser_infers_single_skill_and_labels_stream_errors ... ok
+test tests::jsonrpc_send_message_param_parser_requires_skill_id_for_multiple_skills ... ok
+test tests::jsonrpc_send_message_rejects_empty_parts ... ok
+test tests::jsonrpc_send_message_single_skill ... ok
+test tests::jsonrpc_send_message_with_skill_id ... ok
+test tests::jsonrpc_send_rejects_non_object_params_before_skill_resolution ... ok
+test tests::jsonrpc_send_with_streaming_tool_collates_output_into_final_message ... ok
+test tests::jsonrpc_single_skill_rejects_empty_target_skill_id_before_lookup ... ok
+test tests::jsonrpc_single_skill_rejects_malformed_chio_metadata ... ok
+test tests::jsonrpc_single_skill_rejects_non_string_target_skill_id ... ok
+test tests::jsonrpc_stream_capacity_ignores_retained_terminal_deferred_tasks ... ok
+test tests::jsonrpc_stream_creates_deferred_task_and_task_get_resolves_result ... ok
+test tests::jsonrpc_stream_notification_creates_task_without_response ... ok
+test tests::jsonrpc_stream_rejects_deferred_task_map_over_cap ... ok
+test tests::jsonrpc_stream_rejects_padded_execution_agent_id_before_task_retention ... ok
+test tests::jsonrpc_task_cancel_marks_stream_task_cancelled ... ok
+test tests::jsonrpc_task_get_rejects_empty_task_id_before_lookup ... ok
+test tests::jsonrpc_task_get_rejects_non_object_params_before_lookup ... ok
+test tests::jsonrpc_task_get_retains_completed_deferred_task_result ... ok
+test tests::jsonrpc_task_get_runtime_admission_denies_before_deferred_dispatch ... ok
+test tests::jsonrpc_task_id_params_reject_control_characters_before_lookup ... ok
+test tests::jsonrpc_task_id_params_reject_surrounding_whitespace_before_lookup ... ok
+test tests::jsonrpc_unknown_method_returns_error ... ok
+test tests::pending_approval_is_not_reported_as_completed ... ok
+test tests::pre_kernel_bridge_error_does_not_record_receipt_write_error_outcome ... ok
+test tests::read_only_tool_has_lossless_fidelity ... ok
+test tests::registry_admitted_flow_survives_a2a_execution_projection_canonically ... ok
+test tests::result_content_array_to_text_parts ... ok
+test tests::result_object_to_data_parts ... ok
+test tests::result_text_to_parts ... ok
+test tests::send_message_completes_successfully ... ok
+test tests::send_message_kernel_error_records_receipt_write_error_outcome ... ok
+test tests::send_message_kernel_failure_still_returns_receipt_metadata ... ok
+test tests::send_message_rejects_blank_execution_agent_id_before_dispatch ... ok
+test tests::send_message_rejects_singular_approval_token_without_stable_request_id ... ok
+test tests::send_message_rejects_supplemental_authorization_without_stable_request_id ... ok
+test tests::send_message_returns_task_id ... ok
+test tests::send_message_server_failure_returns_failed_task ... ok
+test tests::send_message_unknown_skill_errors ... ok
+test tests::send_message_with_kernel_denial_still_returns_receipt_metadata ... ok
+test tests::send_message_with_kernel_emits_signed_receipt_metadata ... ok
+test tests::send_message_with_request_id_accepts_request_bound_artifacts ... ok
+test tests::side_effect_tool_has_adapted_fidelity_with_permission_caveat ... ok
+test tests::skill_ids_returns_all ... ok
+test tests::skill_returns_none_for_unknown ... ok
+test tests::streaming_tool_is_adapted_with_truthful_caveats ... ok
+test tests::task_status_serializes_correctly ... ok
+test tests::v1_card_does_not_advertise_sse_for_a_polling_lifecycle ... ok
+test tests::v1_output_negotiation_is_retained_when_polling ... ok
+test tests::v1_rejects_unsupported_or_ambiguous_semantics_before_task_retention ... ok
+test tests::v1_restart_never_rebinds_an_old_task_identifier ... ok
+test tests::v1_task_get_and_cancel_keep_the_original_owner_boundary ... ok
+
+test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s
+

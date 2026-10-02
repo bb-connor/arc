@@ -1,0 +1,170 @@
+{
+  "externalFundsTransferred": false,
+  "independentOperators": false,
+  "passed": 10,
+  "scenarios": [
+    {
+      "buyerCharged": 100,
+      "delegateCharged": 100,
+      "distinctKeys": 4,
+      "externalFundsTransferred": false,
+      "independentOperators": false,
+      "organizations": 3,
+      "passed": true,
+      "privateCanaryDisclosed": false,
+      "specialistReviews": 1,
+      "spendingDenials": 13
+    },
+    {
+      "buyerSpent": 0,
+      "child": {
+        "jobs": 1,
+        "payments": {
+          "captured": 1
+        },
+        "reviews": 1
+      },
+      "concurrentChildRecoveries": 4,
+      "concurrentParentRecoveries": 4,
+      "delegateSpent": 100,
+      "parent": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 0
+      },
+      "parentReplayed": false,
+      "scenario": "parent-after-child"
+    },
+    {
+      "buyerSpent": 0,
+      "child": {
+        "jobs": 1,
+        "payments": {
+          "captured": 1
+        },
+        "reviews": 1
+      },
+      "concurrentChildRecoveries": 4,
+      "concurrentParentRecoveries": 4,
+      "delegateSpent": 100,
+      "parent": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 1
+      },
+      "parentReplayed": false,
+      "scenario": "invalid-child-proof"
+    },
+    {
+      "buyerSpent": 0,
+      "child": {
+        "jobs": 1,
+        "payments": {
+          "captured": 1
+        },
+        "reviews": 1
+      },
+      "concurrentChildRecoveries": 4,
+      "concurrentParentRecoveries": 4,
+      "delegateSpent": 100,
+      "parent": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 1
+      },
+      "parentReplayed": false,
+      "scenario": "child-after-capture"
+    },
+    {
+      "buyerSpent": 0,
+      "child": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 1
+      },
+      "concurrentChildRecoveries": 4,
+      "concurrentParentRecoveries": 4,
+      "delegateSpent": 0,
+      "parent": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 1
+      },
+      "parentReplayed": false,
+      "scenario": "child-after-review"
+    },
+    {
+      "buyerSpent": 0,
+      "child": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 0
+      },
+      "concurrentChildRecoveries": 4,
+      "concurrentParentRecoveries": 4,
+      "delegateSpent": 0,
+      "parent": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 1
+      },
+      "parentReplayed": false,
+      "scenario": "child-before-review"
+    },
+    {
+      "buyerSpent": 0,
+      "child": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 1
+      },
+      "concurrentChildRecoveries": 4,
+      "concurrentParentRecoveries": 4,
+      "delegateSpent": 0,
+      "parent": {
+        "jobs": 1,
+        "payments": {
+          "released": 1
+        },
+        "reviews": 0
+      },
+      "parentReplayed": false,
+      "scenario": "both-after-child-write"
+    },
+    {
+      "extraProcurementDenied": true,
+      "legitimateSpecialistJobs": 1,
+      "parentKeyOverwritten": false,
+      "parentKeyReadable": false,
+      "scenario": "hostile-worker"
+    },
+    {
+      "childStateCreated": false,
+      "denials": 4,
+      "scenario": "disclosure",
+      "specialistCalls": 0
+    },
+    {
+      "childStateCreated": false,
+      "denials": 1,
+      "scenario": "no-specialist",
+      "specialistCalls": 0
+    }
+  ]
+}

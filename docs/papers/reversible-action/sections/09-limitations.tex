@@ -92,17 +92,19 @@ The remaining limits are:
   \item \textbf{Bounded paper model.} The model encodes the TTL-
     bounded amendment chain composition theorem and four supporting
     bridges; it does not verify the whole deployment instance. The
-    proof manifest entries map the formal names to substrate-level
-    obligations; the deployment instance discharges those obligations
-    by code citation rather than by mechanized refinement.
+    model is paper-local: it is checked by hand against the substrate's
+    syntactic treaty model and is not in the substrate's proof manifest
+    or theorem inventory. The deployment instance discharges the
+    substrate-level obligations by code citation rather than by
+    mechanized refinement.
   \item \textbf{rfl-gate on the headline theorem.} The headline
     composition theorem \thm{ttl_bounded_amendment_chain_preserves_baseline}
-    is plausibly non-\emph{rfl}: the discharge requires structural
-    induction over the chain and a case split on the TTL window at
-    each step. Mechanized confirmation is required. If, on closer
-    inspection, the theorem discharges to \emph{rfl}, the construction
-    collapses to the definitional bridges and no headline result
-    remains.
+    does not discharge to \emph{rfl}: the paper-local mechanization
+    proves it pointwise per amendment by a case split on the TTL window,
+    composing the two refinement witnesses on the explicit finite
+    admission domain in the in-window arm. The result is finite-domain:
+    it holds on the domain the witnesses were checked against and says
+    nothing about admission views outside it.
   \item \textbf{Operator-key custody at scale.} The bilateral
     admission on the destructive subclass requires an operator-polity
     key whose custody, rotation, revocation, and compromise recovery

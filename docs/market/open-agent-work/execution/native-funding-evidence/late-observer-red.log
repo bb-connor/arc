@@ -1,0 +1,16 @@
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-funded-integration/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 16.14s
+     Running unittests src/main.rs (target/debug/deps/chio_federated_work-b067e73033312bae)
+
+running 1 test
+test funded_work::tests::native::observation_lost_during_authorization_keeps_original_native_identity ... Error: ReceiptPersistence(Conflict("tool receipt `28efa2d35faa0ac843e043ba6aa83e270eca20325b1a94a8a1a4f40959effcc8` has invalid financial metadata: missing field `grant_index`"))
+FAILED
+
+failures:
+
+failures:
+    funded_work::tests::native::observation_lost_during_authorization_keeps_original_native_identity
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 25 filtered out; finished in 3.62s
+
+error: test failed, to rerun pass `--bin chio-federated-work`

@@ -1,0 +1,7 @@
+test_native_refund_resolution_preserves_positive_work_history (__main__.FundedResolution.test_native_refund_resolution_preserves_positive_work_history) ... ok
+test_resolution_recovers_original_authority_after_worker_loss (__main__.FundedResolution.test_resolution_recovers_original_authority_after_worker_loss) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 216.413s
+
+OK

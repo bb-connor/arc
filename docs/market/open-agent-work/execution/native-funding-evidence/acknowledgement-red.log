@@ -1,0 +1,32 @@
+test_killed_workers_preserve_original_funding_operation_and_hold (__main__.FundedNativeSmoke.test_killed_workers_preserve_original_funding_operation_and_hold) ...
+  test_killed_workers_preserve_original_funding_operation_and_hold (__main__.FundedNativeSmoke.test_killed_workers_preserve_original_funding_operation_and_hold) (point='after-hold') ... FAIL
+  test_killed_workers_preserve_original_funding_operation_and_hold (__main__.FundedNativeSmoke.test_killed_workers_preserve_original_funding_operation_and_hold) (point='after-tool') ... FAIL
+
+======================================================================
+FAIL: test_killed_workers_preserve_original_funding_operation_and_hold (__main__.FundedNativeSmoke.test_killed_workers_preserve_original_funding_operation_and_hold) (point='after-hold')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/funded_smoke.py", line 30, in test_killed_workers_preserve_original_funding_operation_and_hold
+    self.assertEqual(result["replay"]["nativePaymentState"], "Settling")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Closed' != 'Settling'
+- Closed
++ Settling
+
+
+======================================================================
+FAIL: test_killed_workers_preserve_original_funding_operation_and_hold (__main__.FundedNativeSmoke.test_killed_workers_preserve_original_funding_operation_and_hold) (point='after-tool')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-integration/examples/federated-work/funded_smoke.py", line 30, in test_killed_workers_preserve_original_funding_operation_and_hold
+    self.assertEqual(result["replay"]["nativePaymentState"], "Settling")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Authorized' != 'Settling'
+- Authorized
++ Settling
+
+
+----------------------------------------------------------------------
+Ran 1 test in 53.538s
+
+FAILED (failures=2)

@@ -1,0 +1,31 @@
+{
+  "captured_utc": "2026-09-14T07:37:20.199188+00:00",
+  "head": "8738bdfd7be8c43a0543ca0ce468541529c47add",
+  "short_status": [
+    " M docs/security/consumer-support.md",
+    " M docs/security/launch-execution-plan.md",
+    " M docs/security/launch-plan.md",
+    " M docs/security/launch-status.md",
+    " M docs/security/m4-consumer-migration.md",
+    " M docs/security/m4-consumer-qualification.md",
+    "?? docs/security/m4-local-acceptance.md"
+  ],
+  "documents": [
+    {
+      "path": "docs/security/m4-local-acceptance.md",
+      "sha256": "9872ccfcd0573fb00af29e517008aeca261fd23d22391df55e26a897b5b11468"
+    },
+    {
+      "path": "docs/security/launch-status.md",
+      "sha256": "a65ab51561b5e92f408c0af56fe07cf084e4ab9535f0feb17ee2b4674048dd0d"
+    },
+    {
+      "path": "docs/security/m4-consumer-qualification.md",
+      "sha256": "9b01703aef54fb5db1f4f77f1bb3afff60754fbf4e84f940a2b01d765c4b3146"
+    }
+  ],
+  "m4_acceptance_opening": [
+    "Status: final qualification in progress on 2026-09-14 UTC. The completed rows below\nare local evidence, not a completed milestone, hosted CI result or release\nauthorization. Required running rows must finish successfully before closeout.\nThe complete workspace test command, normal build and strict all-target Clippy\npassed on the earlier `740f359ccc` source, followed by the explicit C++/Drogon\ngates, formatting, file hygiene and proof-coverage freshness. That serial driver\nexited zero. Final review then reproduced two additional defects: the receipt\nschemas and some SDK validators omitted the native `chio_internal` origin, and\nthe retained operation's independent 17-attachment limit rejected a valid\n18-attachment outcome append. These repairs change production source. Earlier\ngreen results are not final qualification for the repaired candidate; current\nM4/M3, composed flow, workspace and affected consumer gates must be refreshed.\nThe native caller restart/expiry test and two MCP ready-session restart tests\nfailed during qualification. Their corrections passed focused regressions; the\ncomplete final gates remain required. Hosted checks additionally exposed stale\ndependent proof fixtures; their repair passed local and hosted proof gates without\nweakening verification.\nM4 cannot close on this candidate's current evidence.",
+    "## Final review repairs awaiting composed qualification"
+  ]
+}

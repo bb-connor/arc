@@ -11,6 +11,9 @@ use payment::DurablePaymentSettlementInput;
 #[path = "terminal/evaluation_contract.rs"]
 mod evaluation_contract;
 
+#[path = "terminal/payment_receipt.rs"]
+mod payment_receipt;
+
 pub(crate) struct DurableToolReturn {
     raw: RawInvocationOutcomeV1,
     outcome: ToolOutcomeRecordV1,
@@ -71,6 +74,7 @@ struct KernelOutputMaterialization<'a> {
 }
 
 struct DurableEvaluatedOutput {
+    output_guard_rejected: bool,
     output: ToolCallOutput,
     incomplete_reason: Option<String>,
     post_invocation_metadata: Option<serde_json::Value>,
@@ -98,11 +102,11 @@ struct CompletedDurableReceiptExpectation<'a> {
     post_invocation_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
 }
 
-const DELIVERY_MISMATCH_REDACTION_DOMAIN: &[u8] = b"chio.delivery-mismatch.redacted.v1\0";
-
-#[path = "terminal/receipt_content.rs"]
-mod receipt_content;
-use receipt_content::receipt_visible_delivery_content;
+#[path = "terminal/output_verdict.rs"]
+mod output_verdict;
+#[cfg(test)]
+use output_verdict::{receipt_visible_delivery_content, DELIVERY_MISMATCH_REDACTION_DOMAIN};
+use output_verdict::{retained_checked_output_denial, visible_terminal_content};
 
 fn record_terminal_finding_denial(
     metadata: Option<serde_json::Value>,
@@ -155,7 +159,8 @@ impl ChioKernel {
         context.validate_binding(admission, request)?;
         let matched_grant_index = context.matched_grant_index;
         let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
-        self.validate_guarded_output(request, matched_grant_index, output, false)?;
+        // Retain the authenticated return before output evaluation. Recording it
+        // does not authorize output release or payment capture.
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
@@ -374,6 +379,13 @@ impl ChioKernel {
         matched_grant_index: usize,
         plan: &DurablePostReturnPlan,
     ) -> Result<DurableEvaluatedOutput, KernelError> {
+        let raw_guard_rejected = self.check_guarded_output(
+            request,
+            matched_grant_index,
+            &invocation_output_to_server_output(raw.output()),
+            false,
+            true,
+        )?;
         let materialized = self.apply_stream_limit_snapshot(
             invocation_output_to_server_output(raw.output()),
             Duration::from_millis(raw.elapsed_millis()),
@@ -411,7 +423,8 @@ impl ChioKernel {
                     .to_owned(),
             ));
         }
-        self.validate_guarded_output(request, matched_grant_index, &handling.output, true)?;
+        let released_guard_rejected =
+            self.check_guarded_output(request, matched_grant_index, &handling.output, true, true)?;
         let (output, transformed_incomplete_reason) =
             Self::terminal_tool_call_output(handling.output);
         let incomplete_reason = materialized_incomplete_reason.or(transformed_incomplete_reason);
@@ -429,6 +442,7 @@ impl ChioKernel {
             ));
         }
         Ok(DurableEvaluatedOutput {
+            output_guard_rejected: raw_guard_rejected || released_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata: handling.extra_metadata,
@@ -474,6 +488,7 @@ impl ChioKernel {
             recovery_status,
         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
+            output_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata,
@@ -512,6 +527,18 @@ impl ChioKernel {
             &receipt_content.canonical_content,
             purchase.as_ref(),
         );
+        if output_guard_rejected && receipt.decision == Some(Decision::Allow) {
+            return Err(KernelError::GuardDenied(
+                "completed output no longer passes the agreed check".to_owned(),
+            ));
+        }
+        if retained_checked_output_denial(&tool_return.outcome, &receipt_content.content_hash)? {
+            delivery_evaluation.denial = Some(delivery_contract::output_guard_delivery_denial());
+        } else if output_guard_rejected {
+            return Err(KernelError::GuardDenied(
+                "replayed output check conflicts with its retained terminal".to_owned(),
+            ));
+        }
         if let Some(reason) = self.revalidate_replayed_purchase_delivery(
             receipt.decision.as_ref(),
             &mut delivery_evaluation,
@@ -520,9 +547,9 @@ impl ChioKernel {
         ) {
             warn!(request_id = %request.request_id, reason = %redacted!(&reason), "finding purchase replay output withheld");
         }
-        let receipt_visible_content = receipt_visible_delivery_content(
+        let receipt_visible_content = visible_terminal_content(
             &receipt_content,
-            delivery_evaluation.digest_mismatched,
+            &delivery_evaluation,
             expected_output_digest.as_deref(),
         );
         let expected_decision = match &delivery_evaluation.denial {
@@ -836,95 +863,7 @@ impl ChioKernel {
                 )
             })?;
         let expected_outcome_id = Some(tool_return.outcome.outcome_id());
-        let financial = receipt
-            .metadata
-            .as_ref()
-            .and_then(serde_json::Value::as_object)
-            .and_then(|metadata| metadata.get("financial"))
-            .cloned()
-            .map(serde_json::from_value::<FinancialReceiptMetadata>)
-            .transpose()
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "projected receipt financial metadata is invalid".to_owned(),
-                )
-            })?;
-        if operation.binding().participant_requirements().payment {
-            let journal = runtime
-                .store
-                .load_payment_journal(operation.binding().operation_id().as_str(), &runtime.fence)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed payment journal disappeared".to_owned(),
-                    )
-                })?;
-            let expected_cost = match (journal.rail_mode, journal.settle_action) {
-                (crate::payment::PaymentRailMode::PrepaidFinal, _) => journal.amount_units,
-                (
-                    crate::payment::PaymentRailMode::ReversibleHold,
-                    Some(crate::payment::PaymentSettleAction::Capture),
-                ) => journal.settle_amount_units.ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed capture journal omitted its amount".to_owned(),
-                    )
-                })?,
-                (
-                    crate::payment::PaymentRailMode::ReversibleHold,
-                    Some(crate::payment::PaymentSettleAction::Release),
-                ) => 0,
-                _ => {
-                    return Err(KernelError::DurableAdmission(
-                        "completed payment journal omitted its settlement action".to_owned(),
-                    ));
-                }
-            };
-            let financial = financial.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "completed payment receipt omitted financial metadata".to_owned(),
-                )
-            })?;
-            let payment_reference = journal
-                .transaction_id
-                .as_ref()
-                .or(journal.authorization_id.as_ref());
-            let grant = request
-                .capability
-                .scope
-                .grants
-                .get(usize::try_from(journal.grant_index).map_err(|_| {
-                    KernelError::DurableAdmission(
-                        "payment grant index exceeds address space".into(),
-                    )
-                })?)
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission("payment journal names a missing grant".into())
-                })?;
-            let expected_ceiling = grant.max_total_cost.as_ref().map(|amount| amount.units);
-            if journal.state != crate::payment::PaymentJournalState::Settled
-                || financial.grant_index != journal.grant_index
-                || financial.cost_charged != expected_cost
-                || financial.currency != journal.currency
-                || financial.payment_reference.as_ref() != payment_reference
-                || financial.settlement_status != SettlementStatus::Settled
-                || financial.delegation_depth
-                    != u32::try_from(request.capability.delegation_chain.len()).unwrap_or(u32::MAX)
-                || financial.root_budget_holder != request.capability.issuer.to_hex()
-                || financial.budget_total != expected_ceiling
-                || financial.budget_remaining.is_some() != financial.budget_total.is_some()
-                || financial.budget_remaining > financial.budget_total
-                || financial.attempted_cost.is_some()
-            {
-                return Err(KernelError::DurableAdmission(
-                    "projected receipt financial metadata conflicts with the payment journal"
-                        .to_owned(),
-                ));
-            }
-        } else if financial.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "nonpayment admission projected financial metadata".to_owned(),
-            ));
-        }
+        payment_receipt::verify_replayed_financial(runtime, operation, request, receipt)?;
         let signing_nonce = receipt
             .metadata
             .as_ref()
@@ -1069,6 +1008,7 @@ impl ChioKernel {
             recovery_status,
         } = self.durable_evaluation_contract(admission, request, &tool_return.raw)?;
         let DurableEvaluatedOutput {
+            output_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata,
@@ -1134,6 +1074,11 @@ impl ChioKernel {
         stored_outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
+        if output_guard_rejected
+            || retained_checked_output_denial(&stored_outcome, resolved_output_digest.as_str())?
+        {
+            delivery_evaluation.denial = Some(delivery_contract::output_guard_delivery_denial());
+        }
         let existing_evaluation = runtime
             .outcome_store
             .lookup_post_return_evaluation(admission.operation.binding().operation_id())
@@ -1235,9 +1180,9 @@ impl ChioKernel {
         } else {
             AdmissionOperationState::Completed
         };
-        let receipt_visible_content = receipt_visible_delivery_content(
+        let receipt_visible_content = visible_terminal_content(
             &receipt_content,
-            delivery_evaluation.digest_mismatched,
+            &delivery_evaluation,
             expected_output_digest.as_deref(),
         );
         let receipt_visible_digest = AdmissionDigest::try_new(
@@ -1529,14 +1474,14 @@ impl ChioKernel {
             Ok(serde_json::json!({
                 "financial": FinancialReceiptMetadata {
                     grant_index: payment.journal.grant_index,
-                    cost_charged: payment.amount_units,
+                    cost_charged: if payment.journal.state == crate::payment::PaymentJournalState::Resolved { 0 } else { payment.amount_units },
                     currency: payment.journal.currency.clone(),
                     budget_remaining: financial_budget_remaining(budget_total, payment.reconcile.committed_cost_units_after)?,
                     budget_total,
                     delegation_depth: crate::receipt_support::checked_receipt_count(request.capability.delegation_chain.len(), "delegation depth")?,
                     root_budget_holder: request.capability.issuer.to_hex(),
                     payment_reference,
-                    settlement_status: SettlementStatus::Settled,
+                    settlement_status: if payment.journal.state == crate::payment::PaymentJournalState::Resolved { SettlementStatus::Failed } else { SettlementStatus::Settled },
                     cost_breakdown: Some(serde_json::json!({
                         "payment": {
                             "rail": payment.journal.rail,
@@ -1544,7 +1489,8 @@ impl ChioKernel {
                             "authorization_id": payment.journal.authorization_id,
                             "transaction_id": payment.journal.transaction_id,
                             "preauthorized_units": payment.journal.amount_units,
-                            "recorded_units": payment.amount_units
+                            "recorded_units": payment.amount_units,
+                            "contractual_resolution": if payment.journal.state == crate::payment::PaymentJournalState::Resolved { payment.journal.release_authority.as_ref() } else { None }
                         }
                     })),
                     oracle_evidence: None,

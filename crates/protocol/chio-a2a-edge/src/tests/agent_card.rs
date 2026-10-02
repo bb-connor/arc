@@ -170,7 +170,7 @@ fn agent_card_custom_config() {
     let card = edge.agent_card();
     assert_eq!(card.name, "My Agent");
     assert_eq!(card.description, "Custom agent");
-    assert!(card.capabilities.streaming);
+    assert!(!card.capabilities.streaming);
     assert_eq!(card.supported_interfaces[0].url, "https://myagent.com");
     assert_eq!(card.supported_interfaces[0].protocol_binding, "HTTP+JSON");
 }

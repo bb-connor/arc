@@ -19,6 +19,8 @@ mod participants;
 
 #[path = "tests/custody.rs"]
 mod custody;
+#[path = "tests/selected_custody.rs"]
+mod selected_custody;
 
 #[test]
 fn caller_observation_metadata_cannot_be_injected_before_dispatch() -> TestResult {

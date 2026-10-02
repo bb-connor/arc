@@ -1,0 +1,14 @@
+test_shadow_protocol_module_is_not_used_as_the_pinned_library (test_protocol.ProtocolTests.test_shadow_protocol_module_is_not_used_as_the_pinned_library) ... FAIL
+
+======================================================================
+FAIL: test_shadow_protocol_module_is_not_used_as_the_pinned_library (test_protocol.ProtocolTests.test_shadow_protocol_module_is_not_used_as_the_pinned_library)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/connor/backbay/arc-funded-work/examples/funded-work/test_protocol.py", line 58, in test_shadow_protocol_module_is_not_used_as_the_pinned_library
+    self.assertNotEqual(result.returncode,0,'the pinned parser was imported from another directory')
+AssertionError: 0 == 0 : the pinned parser was imported from another directory
+
+----------------------------------------------------------------------
+Ran 1 test in 0.070s
+
+FAILED (failures=1)

@@ -124,6 +124,14 @@ pub(super) fn load_verified_projection(
     )? {
         expected_latest_digest = digest;
     }
+    if let Some(digest) = execution_evidence::verify_projection(
+        connection,
+        &operation,
+        &outcome,
+        evaluation.as_ref(),
+    )? {
+        expected_latest_digest = digest;
+    }
     let latest: Option<String> = connection
         .query_row(
             r#"

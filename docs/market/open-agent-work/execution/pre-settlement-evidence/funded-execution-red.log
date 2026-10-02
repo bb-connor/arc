@@ -1,0 +1,71 @@
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-revocation-oracle)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-finding)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-governance)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-pheromone)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-appraisal)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-open-market)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-underwriting)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-fincred)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-did)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/observability/chio-lineage)
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-verify)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel-core)
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-credit)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-swarm-authority)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-disclosure-lineage)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-market)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-web3)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/core/chio-core)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-manifest)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-link)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/economy/chio-settle)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/platform/chio-workflow)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel)
+error[E0433]: failed to resolve: could not find `action` in `receipt`
+   --> /home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:103:54
+    |
+103 |             || receipt.action != chio_core::receipt::action::ToolCallAction::from_parameters(request.arguments)
+    |                                                      ^^^^^^ could not find `action` in `receipt`
+    |
+help: consider importing one of these structs
+    |
+  2 + use crate::ToolCallAction;
+    |
+  2 + use chio_appraisal::receipt::decision::ToolCallAction;
+    |
+  2 + use chio_core::receipt::decision::ToolCallAction;
+    |
+  2 + use chio_core_types::receipt::decision::ToolCallAction;
+    |
+    = and 3 other candidates
+help: if you import `ToolCallAction`, refer to it directly
+    |
+103 -             || receipt.action != chio_core::receipt::action::ToolCallAction::from_parameters(request.arguments)
+103 +             || receipt.action != ToolCallAction::from_parameters(request.arguments)
+    |
+
+error[E0282]: type annotations needed
+   --> /home/connor/backbay/arc-funded-integration/crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:104:27
+    |
+104 |                 .map_err(|e| ToolOutcomeError::Canonical(e.to_string()))?
+    |                           ^                              - type must be known at this point
+    |
+help: consider giving this closure parameter an explicit type
+    |
+104 |                 .map_err(|e: /* Type */| ToolOutcomeError::Canonical(e.to_string()))?
+    |                            ++++++++++++
+
+Some errors have detailed explanations: E0282, E0433.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-kernel` (lib) due to 2 previous errors
