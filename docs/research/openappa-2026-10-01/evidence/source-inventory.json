@@ -1,0 +1,501 @@
+{
+  "scope": "Selected reviewed files; a map of the full repository does not imply every line was audited. Development source is described by relative paths and file hashes; it is not public-release evidence.",
+  "files": [
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "README.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "1b54033e7dbbe2db211c438d79641cab441b08c99e2bf9710ba6564578d37734",
+      "lines": 136,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "LICENSE.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "4d699db022022acf51f959343e444444c98f0e3adc89e954489092981e1fd55a",
+      "lines": 7,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "Cargo.toml",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "7d91ddfcf6466d7f31cdbf64e7ebd5226eaef45b20386481788ca7e47f9aa337",
+      "lines": 90,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d9199b2f085a40f7b1fc5916f1505ca4a9630f012cd195bdcd9df99e75136cdd",
+      "lines": 110,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/label.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "1d19f17afbf25bf82421a9da4557037700fb7f7610ffbdd1eaadffcb59059b23",
+      "lines": 1583,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/plan.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "dd9e881c884f91ed7c1e42621b40d91724ae600874f41704d89eb6932957f76b",
+      "lines": 4540,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/projection.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "307dec0fd6b554ae6527fce700d08b108d8fdc53c7d2962cfee4041330f07272",
+      "lines": 1792,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/shape.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "fab856b42a8034e0e5fcab0025d201416bf9db9a0685218631e1fa28d1705d97",
+      "lines": 1177,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/basis.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "8edb3792597f4b081db13298da148a5d9f6944ec19cc8f6922ba2e84d9156cf2",
+      "lines": 209,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/contract.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "dab2ba9cbfe14c38b4a436dfcff99240eb7ea692dd51b19921cd533e16bf3e1a",
+      "lines": 865,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-engine/src/engine.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "8d44dd606244bf91198787f68638a4a7aa44e137af1d10d188c49821f5d384b3",
+      "lines": 15778,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-policy/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "a129f5be66ed1d8130d85547d90ec2f3259a5fc33322e579861c12a948281989",
+      "lines": 16,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-eventlog/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "563926a5d58661e9b004b65c44e3e4fb757786ceff7108e2d1bb000f1f2bc1b8",
+      "lines": 2303,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-eventlog/src/receipts.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "e3bd5f8babb54ba653632b0aa1055af03b8dd485772b50a373c80009b7c45e2e",
+      "lines": 819,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-eventlog/src/files.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "15c4c9cf8ba834c54f9af972ecda98ed119edbe6bf328081b3b7e51f51e7c2d6",
+      "lines": 1480,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/main.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "697dd209d343f1e32877fd5eec1c9d09ceccf963092377a4e89de58ab54ddf17",
+      "lines": 798,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/api/session.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "877ca575e46548bd36ada9e35c13be526f22a23544c301aed899e263bd3123c0",
+      "lines": 7564,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/engine.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "e33d7c09d025e3379c36d2175a1356a5ea8d6588865384ce763f9bd4b58c6be3",
+      "lines": 4792,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/replay.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "c08efe12fcf2294aae0e5edb413e63414b11f53cebf483af3222bebb66e3493c",
+      "lines": 985,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/model/jev.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "aab29dc25872b993bcf887dabc2db9daca491ac9fdd74abb07eed21c36b26411",
+      "lines": 1744,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/telemetry.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "19a4d1040a39fb387747982fd36038123f3e2ac312a525acaa2793b931c1f39b",
+      "lines": 253,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/telemetry/exporter.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "cf91efdd42fc3a86106ddc54e40ed50f575eb1990415687a601636e452697c2f",
+      "lines": 125,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/protected_launch.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "426e00e13ab37f1148fa5cb002452c21e6d2d1f3f2f79130814e5c14d3143c3f",
+      "lines": 255,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/src/yell/report.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "cecb5a555df0e972327e5fe415f95cf40a7bd5eb5c4588c7ac3a5c36e822e1cf",
+      "lines": 584,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/FILE-MEDIATION.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d7954870d52e6cdb31da0c93f88ce18d01d208252a370f0156cd0cda10a9226f",
+      "lines": 420,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/tests/crash_recovery.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d21fc7f0d793ecc69e041f5aea67e68d68e84012d405d584780ccc30efdc92fc",
+      "lines": 415,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime/tests/claude_code_subagent.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "88ac36b89fb1478c85478d4defdd766faea18749b102c5dc4995db782ea34b79",
+      "lines": 851,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-runtime-api/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d6b82a5cbb1a300abd01d075de4a6c01c12f6a2618e9042245b442865423f855",
+      "lines": 661,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-builtin/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "1b5ef56d2f8aacd73c7cdad18f06771f784dc23272ec0cfe05008ff1b35cab23",
+      "lines": 432,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "appa-package/src/lib.rs",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "7a7cff08dc9131af836e8e9439cdfe1f0f73b4102f7e4aacb1b062c4b27246f9",
+      "lines": 35,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "marketplace/plugins/claude-code/default.appa.toml",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "fefe67b89fb9aeca577aa1b692714033bc8efb7501a8e3388d0c9c1a3c626fb0",
+      "lines": 434,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "marketplace/batteries/claude-code/appa.toml",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "29cb8f0ff2b1874d39e05eedb9504bd99c2086cd0f4141ab8be368b8a7e46b02",
+      "lines": 1694,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/how-it-works.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "b324ded172870093bd9a5da1dc34db9583f4efefa4464310be5d40b330466b6e",
+      "lines": 189,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/contracts.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "9f56014bd8803c98caba90cdb9f47aad744e2704390a5605cb42ac53dde149de",
+      "lines": 1402,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/add-to-agent.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "312b47766432cae45f5814e22847a29bf8d38380a1231799ac9aafbd894172f9",
+      "lines": 143,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/batteries.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "9f2ea29e42245cf60099edd52df0a2ee9a5d787e1c24344f59b0202e76ecf16e",
+      "lines": 235,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/coding-agents.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "b00f55a7dff1c52dcd97801fe553faf86e9f96553094fad0fa75066ed644c31f",
+      "lines": 216,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/validation.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "bdf91e49bf22b37cb2f387ded20898469b1cfe6ab0beae3e38db7c5a9792f196",
+      "lines": 128,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/evaluation.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "03363bc26329481ad91e128629c011f4d4c8be354bbf65278abe8b4aa816a650",
+      "lines": 171,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/self-improving-policies.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "366f558e98de0617bf3cd03eb423a22f815a55c5bd88e7b98be3ef70035fc5e3",
+      "lines": 36,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "website/content/docs/observability.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d170724b6680fcdb88ab8d708bda4237ea812f105d40bfeffdcd5514806514d2",
+      "lines": 207,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "bench/README.md",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "bf1bb7d4feb72444ca9030a6cff26a530cbe577518c047328c47af6a8eeb85a2",
+      "lines": 141,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "bench/agentthreatbench/results/full-sonnet-5/summary.json",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d699db3b9d8fd032b1452536f4b2e71c4354fd929dad19a2af6f0e798bcc8b31",
+      "lines": 1573,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "bench/corp/results/20260911-162255/summary.json",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "795886939188bb4fa0c10b38e4af9793a67752d8f7b7cda5fa50bad35b97cfdf",
+      "lines": 2360,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "bench/corp/results/20260911-164615/summary.json",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "4021d83006404fcf7c6766b6084d0fd3996b5195a17dec8ebe94cd41c06d6d15",
+      "lines": 1189,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "OpenAPPA public pinned source",
+      "path": "bench/taubench/results/parallel-2026-09-16/summary.json",
+      "revision": "a96f87d1fec900caf890f14342a089a32b3bfaff",
+      "sha256": "d425f5aea81b2f88ed4924266bca26b4f4ba1d5c9c1d44a34f0c1bcdba5998db",
+      "lines": 7356,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "Chio public pinned source",
+      "path": "crates/guards/chio-guards/src/data_flow.rs",
+      "revision": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "sha256": "3281c7b43fa4a2671884e61eb3b7c03b2995df559bfa60bd739f3a2a535cd753",
+      "lines": 341,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "Chio public pinned source",
+      "path": "crates/kernel/chio-kernel/src/admission_operation/capture.rs",
+      "revision": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "sha256": "af22be0617656ba7afc844cb8201d8136f2dc7724164613d5c1eddbef3d3fe36",
+      "lines": 872,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "Chio public pinned source",
+      "path": "crates/kernel/chio-kernel/src/admission_operation/projection/outcome_unknown.rs",
+      "revision": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "sha256": "ad093d7a6d2dfc572f90f4c3ef76055a40c7ffc652ecd6b6a36bdeb3a1a7d11f",
+      "lines": 58,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "Chio public pinned source",
+      "path": "crates/products/chio-cli/src/cli/replay.rs",
+      "revision": "5b8bec41d32f3838b880576fe6123c983ecebf8d",
+      "sha256": "aba46e5713f5b4bc30f83b2c9e06ac83a100283fe2999b7e62895ebe2092cff7",
+      "lines": 811,
+      "public_source_verified": true
+    },
+    {
+      "source_class": "Chio local development snapshot",
+      "path": "crates/security/chio-security-types/src/flow.rs",
+      "revision": null,
+      "sha256": "724c50b89a36c0bcf0cb554ae56c494ac408b2fbcba17dcd181b50bd1e580304",
+      "lines": 1118,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio local development snapshot",
+      "path": "crates/security/chio-security-types/src/declassification.rs",
+      "revision": null,
+      "sha256": "8b30ac70802e7864976e5b12be9ffee3073f71fef13fefc0cfc0697212c8a392",
+      "lines": 325,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio local development snapshot",
+      "path": "crates/security/chio-flow/src/engine.rs",
+      "revision": null,
+      "sha256": "8b04a11bc644e2b5fd522d8ad0c24ff422494a4ebde75d94f9385d80c36953b7",
+      "lines": 1310,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio local development snapshot",
+      "path": "crates/security/chio-flow/src/lattice.rs",
+      "revision": null,
+      "sha256": "239d84fc48a654fb3e5f8679fa6ff873f7d0bfdf55e4c72138955a4291b35701",
+      "lines": 271,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio local development snapshot",
+      "path": "crates/security/chio-flow/src/declassification.rs",
+      "revision": null,
+      "sha256": "0e121749b4bc7f6811cea537840bfdbe1cd7fac5183384cffa2ff3f89503b5bc",
+      "lines": 843,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio local development snapshot",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/labels.rs",
+      "revision": null,
+      "sha256": "0e2ad588eed3c3bac9d9442eb55da2770f0e789c16814242ae6bb0448340ea09",
+      "lines": 133,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio documentation working tree",
+      "path": "src/app/docs/security/information-flow/page.tsx",
+      "revision": null,
+      "sha256": "67ec79becc6baccd5719876bccfec61054bf380e45cc56bfd2ddba6809ba5d07",
+      "lines": 105,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio documentation working tree",
+      "path": "src/app/docs/security/declassification/page.tsx",
+      "revision": null,
+      "sha256": "57f4ea0f30dfbcffdb12b12a3a0be019c7d45542c0bdfbfd36ef20cac067b69c",
+      "lines": 101,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio documentation working tree",
+      "path": "src/app/docs/security/confinement/page.tsx",
+      "revision": null,
+      "sha256": "1d3578e823d0e84b420ae4340587fc2a8820ab26af5146e421b02c434e2898c5",
+      "lines": 103,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio documentation working tree",
+      "path": "src/app/docs/security/execution/page.tsx",
+      "revision": null,
+      "sha256": "46ed505c457516fd971aa3528dd0976f559ad62fea40951ccf6208febf72dc46",
+      "lines": 106,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio documentation working tree",
+      "path": "src/app/docs/processes/page.tsx",
+      "revision": null,
+      "sha256": "3466a83d373abbc95d21fa3ffa96538bed46faef351792c72d4ee74b327faf63",
+      "lines": 321,
+      "public_source_verified": false
+    },
+    {
+      "source_class": "Chio local development qualification ledger",
+      "path": "docs/security/process-security-qualification.md",
+      "revision": null,
+      "sha256": "e2dde154ebdce2071fadd0059ed9a249c0439e707a1d6f19df2aca872f780fe7",
+      "lines": 1077,
+      "public_source_verified": false
+    }
+  ]
+}

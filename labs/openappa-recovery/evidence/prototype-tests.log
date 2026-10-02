@@ -1,0 +1,52 @@
+   Compiling chio-recovery-lab v0.1.0 (/Users/connor/Medica/backbay/standalone/arc/.worktrees/openappa-recovery-lab-20261001/labs/openappa-recovery)
+    Finished `test` profile [unoptimized] target(s) in 0.96s
+     Running unittests src/lib.rs (/private/tmp/chio-openappa-research-20261001/chio-target/debug/deps/chio_recovery_lab-774d67ef683cc3d2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/private/tmp/chio-openappa-research-20261001/chio-target/debug/deps/chio_recovery_lab-a3e2a0967686213c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/consumption.rs (/private/tmp/chio-openappa-research-20261001/chio-target/debug/deps/consumption-7b9a75ddaa199bcf)
+
+running 6 tests
+test a_fresh_offer_cannot_rebind_an_old_signed_grant ... ok
+test a_valid_signature_from_an_untrusted_key_cannot_approve_the_offer ... ok
+test an_unavailable_consumption_port_cannot_release_the_prepared_flow ... ok
+test released_failed_and_unknown_outcomes_do_not_make_a_grant_reusable ... ok
+test the_consumption_clock_cannot_extend_a_previously_valid_grant ... ok
+test the_real_engine_consumes_the_grant_once ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/recovery.rs (/private/tmp/chio-openappa-research-20261001/chio-target/debug/deps/recovery-3fca3d4710182e69)
+
+running 14 tests
+test a_private_disclosure_offers_one_exact_approval ... ok
+test a_public_request_needs_no_disclosure_exception ... ok
+test a_valid_grant_prepares_only_the_exact_crossing_without_clearing_taint ... ok
+test an_unrelated_operation_cannot_borrow_another_operations_host_state ... ok
+test changed_payload_destination_capability_and_tool_cannot_reuse_the_offer ... ok
+test changes_in_flow_policy_authority_and_budget_basis_make_the_offer_stale ... ok
+test denied_input_observation_is_restrictive_and_grants_no_egress ... ok
+test frozen_denied_operations_require_a_continuation_without_reusing_the_offer ... ok
+test noncanonical_bytes_are_rejected_before_an_offer_is_created ... ok
+test passage_of_time_allows_fresh_checks_but_not_offer_or_grant_expiry ... ok
+test pending_operations_wait_without_issuing_a_new_approval_offer ... ok
+test revocation_and_exhausted_budget_are_refusals_without_approval_offers ... ok
+test top_and_missing_clearance_never_get_a_disclosure_approval_offer ... ok
+test unknown_and_complete_operations_do_not_receive_a_new_dispatch_offer ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests chio_recovery_lab
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

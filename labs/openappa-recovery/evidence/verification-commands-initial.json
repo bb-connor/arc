@@ -1,0 +1,30 @@
+[
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "labs/openappa-recovery/Cargo.toml"
+    ],
+    "exit_code": 0,
+    "log": "prototype-tests.log"
+  },
+  {
+    "command": [
+      "cargo",
+      "+1.94.1",
+      "clippy",
+      "--locked",
+      "--manifest-path",
+      "labs/openappa-recovery/Cargo.toml",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "log": "prototype-clippy.log"
+  }
+]

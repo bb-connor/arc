@@ -1,0 +1,41 @@
+Scope: one frozen process envelope, one native nonce operation, one crash, expiry/cancellation and exact attachment.
+Assumptions: atomic durable steps, authentic native issuance/effect evidence, complete closure, current serving ownership.
+Authority vectors use four symbolic obligation classes and four context bindings, not real signatures or label arithmetic.
+Excluded: complete native participant composition, SQL, cryptography, provider correctness, timing and fairness.
+THIRD BASELINE PASS Nonce: 133 reachable states, 252 transitions; useful restart reachable.
+THIRD MUTATION REJECTED FinalizeWithoutCustody: process finalized without durable exact request custody
+  1. finalize process reservation once
+THIRD MUTATION REJECTED PreflightBeforeIntent: native preflight preceded durable admission intent
+  1. retain exact reviewed envelope
+  2. finalize process reservation once
+  3. begin original native nonce preflight
+THIRD MUTATION REJECTED RenewMissingNonce: missing process acknowledgement minted another native nonce
+  1. retain exact reviewed envelope
+  2. finalize process reservation once
+  3. retain immutable admission intent
+  4. begin original native nonce preflight
+  5. native issuance commits before process acknowledgement
+  6. crash and reopen; discard only volatile reply
+  7. mint replacement after missing process nonce
+THIRD MUTATION REJECTED RewriteProcessEnvelope: native attachment rewrote the frozen process envelope
+  1. retain exact reviewed envelope
+  2. finalize process reservation once
+  3. retain immutable admission intent
+  4. begin original native nonce preflight
+  5. native issuance commits before process acknowledgement
+  6. retain the exact original issuance in process journal
+  7. attach original nonce and capture original operation
+THIRD MUTATION REJECTED RequireLiveInitiator: expired initiator blocked authorized historical settlement
+  1. retain exact reviewed envelope
+  2. finalize process reservation once
+  3. retain immutable admission intent
+  4. begin original native nonce preflight
+  5. native issuance commits before process acknowledgement
+  6. retain the exact original issuance in process journal
+  7. attach original nonce and capture original operation
+  8. initiating authority expires
+  9. original captured owner applies its one effect
+THIRD CONTRACT PASS Coverage: 3844 bounded cases.
+THIRD MUTATION REJECTED AnyOwnerSuffices: partial owner or power coverage authorized the complete release
+THIRD MUTATION REJECTED IgnoreApprovalContext: approval from another action target challenge or source satisfied coverage
+THIRD MUTATION REJECTED CountSignatureAliases: two aliases of one principal satisfied a two-principal obligation
