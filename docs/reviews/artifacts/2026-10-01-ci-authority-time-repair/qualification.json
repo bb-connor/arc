@@ -51,7 +51,7 @@
       "note": "The first CLI command passed 11 complete targets; complete reruns of its three failed targets passed. 340 integration tests across the 14 targets are qualified cumulatively."
     },
     "native_protocols": {
-      "status": "compiled locally; enforcing host execution pending",
+      "status": "passed hosted: qualified host, all five native targets and evidence upload; broader workflow still in progress at capture",
       "compile": "cli-native-targets-compile",
       "targets": [
         "mcp_auth_server",
@@ -59,7 +59,177 @@
         "mcp_serve_http",
         "conformance_cli",
         "process_host_native"
-      ]
+      ],
+      "hosted_run": 36983882538,
+      "hosted_url": "https://github.com/bb-connor/arc/actions/runs/36983882538",
+      "source_commit": "66d1ab85075abb84b328fff1f84091161b474d05",
+      "prior_attempts": [
+        {
+          "run_id": 36973805077,
+          "job_id": 110733198874,
+          "source_commit": "5920a896c7cb76448a6941bd1015596667c8bc39",
+          "job": "MCP process host and enforced native recovery",
+          "conclusion": "failure",
+          "log": "hosted-native-job-110733198874-failed.log",
+          "log_sha256": "e6f0e4a3304efbaa75a482a1d057d1de2b436c88a01b7c1de306e99baff4a87c",
+          "bytes": 417129,
+          "cause": "One standalone rustfmt line-wrap mismatch after tests and Clippy passed. Native fixture and targets skipped; evidence upload had no files.",
+          "native_execution": "not executed"
+        },
+        {
+          "run_id": 36976096104,
+          "job_id": 110740146007,
+          "source_commit": "d2c8432dd3c0874440c7fe7f8faf37252f38a690",
+          "job": "MCP process host and enforced native recovery",
+          "conclusion": "failure",
+          "log": "hosted-native-job-110740146007-failed.log",
+          "log_sha256": "14dadfc9b9b484aa95d0e7d7ce4d124a46a15bd52ea25580d9c2a685e45ae80a",
+          "bytes": 433732,
+          "cause": "Privileged native isolation probe passed; terminal evidence check failed because rg was not installed. Independent fixture and native integration targets did not execute.",
+          "native_execution": "privileged discovery passed one test; five integration targets skipped",
+          "probe_artifact": {
+            "run_id": 36976096104,
+            "source_commit": "d2c8432dd3c0874440c7fe7f8faf37252f38a690",
+            "artifact_id": 11214037151,
+            "archive": "hosted-native-probe-artifact-11214037151.zip",
+            "sha256": "5be2a4220fcda950e555b1e2fd1f3b5f3ed994e93dacea8d12be6bee360243ba",
+            "members": [
+              {
+                "path": "native-discovery.log",
+                "bytes": 196,
+                "sha256": "0ab8b329055beca580d58d1a6da0f0c1ed670adcd760439bcccad73c26ed14f7"
+              }
+            ],
+            "scope": "Privileged isolation probe passed. No independent consumer fixture was produced and native integration targets did not execute."
+          }
+        },
+        {
+          "run_id": 36978666220,
+          "job_id": 110747998821,
+          "source_commit": "22de2642a034933de986f99fbe17f3cff4d8d1ee",
+          "job": "MCP process host and enforced native recovery",
+          "conclusion": "cancelled",
+          "native_protocol_step": "failure",
+          "native_recovery_step": "success",
+          "cancellation_reason": "Stop later optimized consumer campaign after both required native steps were terminal; retrieve protocol failure diagnostics.",
+          "log": "hosted-native-job-110747998821-cancelled.log",
+          "log_sha256": "cdfed366dd6d5829ef3dd03b35a83d9b62af19e28871faa51674f3d887974dd0",
+          "bytes": 509962,
+          "target_outcomes": {
+            "conformance_cli": {
+              "passed": 4,
+              "failed": 0
+            },
+            "mcp_auth_server": {
+              "passed": 1,
+              "failed": 4
+            },
+            "mcp_serve": {
+              "passed": 14,
+              "failed": 7
+            },
+            "mcp_serve_http": {
+              "passed": 38,
+              "failed": 5,
+              "ignored": 1
+            },
+            "process_host_native": {
+              "passed": 3,
+              "failed": 0
+            }
+          },
+          "causes": [
+            "Five tests assert private pre-redaction text rather than current stable public errors.",
+            "Delayed/threaded Python fixtures issue clock_nanosleep or clone syscalls forbidden by their selected native profile."
+          ],
+          "artifact": {
+            "run_id": 36978666220,
+            "source_commit": "22de2642a034933de986f99fbe17f3cff4d8d1ee",
+            "artifact_id": 11215826363,
+            "archive": "hosted-native-fixture-artifact-11215826363.zip",
+            "sha256": "20161c4ed071a75cc37ef1cb277180a70184d125fb8d766217c2e9a3c89c17e8",
+            "members": [
+              {
+                "path": "native-discovery.log",
+                "bytes": 196,
+                "sha256": "438d9e94b9259b0e60db87ebe436c20997d093d1fbdab84ec5bdd4cc0c5607b4"
+              },
+              {
+                "path": "enforced-native-fixture/fixture.json",
+                "bytes": 1877,
+                "sha256": "648f6de5bde0610ffeca8f1c6302dfb78f7c48f45ae02b699e245183d8a2629b"
+              }
+            ],
+            "scope": "Privileged isolation probe and independent fixture preparation passed. Native process recovery passed; native protocol step failed. Broader workflow cancelled after these terminal outcomes to retrieve failure diagnostics."
+          }
+        }
+      ],
+      "hosted_acceptance": {
+        "run_id": 36983882538,
+        "source_commit": "66d1ab85075abb84b328fff1f84091161b474d05",
+        "url": "https://github.com/bb-connor/arc/actions/runs/36983882538",
+        "job_id": 110764373932,
+        "captured_at": "20261002T090201121198Z",
+        "selected_native_steps": [
+          {
+            "completedAt": "2026-10-02T08:51:29Z",
+            "conclusion": "success",
+            "name": "Qualify enforcing host and prepare native consumer fixture",
+            "number": 12,
+            "startedAt": "2026-10-02T08:49:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-02T08:55:32Z",
+            "conclusion": "success",
+            "name": "Native protocol targets under enforced authority",
+            "number": 13,
+            "startedAt": "2026-10-02T08:51:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-02T09:00:28Z",
+            "conclusion": "success",
+            "name": "Native MCP and worker recovery under enforced authority",
+            "number": 14,
+            "startedAt": "2026-10-02T08:55:32Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-02T09:00:29Z",
+            "conclusion": "success",
+            "name": "Preserve native host qualification evidence",
+            "number": 15,
+            "startedAt": "2026-10-02T09:00:28Z",
+            "status": "completed"
+          }
+        ],
+        "overall_run_status_at_capture": "in_progress",
+        "overall_run_conclusion_at_capture": "",
+        "host_job_status_at_capture": "in_progress",
+        "host_job_conclusion_at_capture": "",
+        "snapshot": "hosted-native-acceptance-36983882538-20261002T090201121198Z-steps.json",
+        "snapshot_sha256": "eaec8d684201e986745696e77c218b326ff09584651951fa38d60953e8ee2fa8",
+        "artifact": {
+          "id": 11217712907,
+          "name": "native-consumer-host-qualification",
+          "archive": "hosted-native-acceptance-36983882538-20261002T090201121198Z.zip",
+          "sha256": "5d8c8e227b7f520b922b1b55fcc30b05c786daeb07a5580cea9f64cdd8d4da7e",
+          "members": [
+            {
+              "path": "native-discovery.log",
+              "bytes": 196,
+              "sha256": "b4f4dac02ca0e7723e358a8a7874295d458ec523f21658dbdb092cc4d3b566e1"
+            },
+            {
+              "path": "enforced-native-fixture/fixture.json",
+              "bytes": 1877,
+              "sha256": "8bbf5eb5cbacb2e28f8934aa371d7c5fd2a413ffcddf70a7cd9c19ffb941493f"
+            }
+          ]
+        },
+        "scope": "Terminal acceptance for the five native integration targets and host prerequisite probe; broader workflow status remains separate."
+      }
     },
     "clippy": {
       "status": "passed locally",
@@ -75,8 +245,8 @@
       "supersedes": "all-owner-clippy-final"
     },
     "structural_ci": {
-      "status": "passed locally",
-      "run": "structural-99-corrected",
+      "status": "passed locally on published source; all 99 gates with zero failures",
+      "run": "structural-99-published-final",
       "gate_count": 99,
       "failed_gates": 0,
       "first_complete_run": "structural-99-final: 99 gates, four failures; retained unchanged",
@@ -84,7 +254,28 @@
         "Bind all three MSRV cache consumers",
         "Review and update exact workspace lock digest after internal test dependency",
         "Require behind-anchor rejection and retire one weak assertion identity"
-      ]
+      ],
+      "follow_up": "Complete post-publication sweeps include the native portability and protocol fixture corrections. The first had one missing response-model review classification; its explicit repair and negative control passed, followed by the clean full 99-gate rerun.",
+      "post_publication_failure": "structural-99-native-fixture-final",
+      "classification_repair": {
+        "green": "response-model-review-slice-green",
+        "negative": "response-model-review-slice-negative",
+        "scope": "Classify only chio-response-model as core-protocol; adjacent unknown crates still have no classification."
+      },
+      "source_commit": "48dc9ebee24b1786cf3f349ca686086cdedee05b",
+      "log_sha256": "056fc6cab7c8c57d133b70cec46074253853fdc5c4cd4288da1edc4653323256",
+      "post_publication_failure_details": {
+        "label": "structural-99-native-fixture-final",
+        "command": [
+          "bash",
+          "/tmp/chio-structural-step-ci-repair.sh"
+        ],
+        "exit_code": 1,
+        "elapsed_seconds": 976.08,
+        "log_sha256": "e82791e97e78d025ce189efa022566e9aa9e95034c018ffe62a913d2a5532343",
+        "gate_count": 99,
+        "failed_gates": 1
+      }
     },
     "independent_review": {
       "status": "complete; three Important findings fixed; no remaining Critical or Important source findings in reviewed batch",
@@ -96,16 +287,44 @@
       "native_ci_hostile_mutations": 70
     },
     "publication": {
-      "status": "Local qualification complete; authorized commit and push in progress; no merge or activation.",
+      "status": "All implementation commits pushed and local/remote source SHA verified; this reporting-only follow-up records terminal local and hosted native evidence. No merge or activation.",
       "existing_local_review_commit": "8c6ef0a98fef8faafdea0e2b0d7370cdaac0e7f1",
-      "review_commit_scope": "Documentation only; preserve and include in the already authorized security branch push."
+      "review_commit_scope": "Documentation only; preserve and include in the already authorized security branch push.",
+      "implementation_commit": "5920a896c7cb76448a6941bd1015596667c8bc39",
+      "remote_commit_verified": "48dc9ebee24b1786cf3f349ca686086cdedee05b",
+      "tracked_worktree_clean_at_source_push": true,
+      "preserved_untracked": "output/",
+      "format_only_commit": "d2c8432dd3c0874440c7fe7f8faf37252f38a690",
+      "native_probe_portability_commit": "22de2642a034933de986f99fbe17f3cff4d8d1ee",
+      "native_protocol_fixture_commit": "66d1ab85075abb84b328fff1f84091161b474d05",
+      "review_slice_commit": "48dc9ebee24b1786cf3f349ca686086cdedee05b",
+      "native_candidate_difference": {
+        "source_commit": "66d1ab85075abb84b328fff1f84091161b474d05",
+        "current_commit": "48dc9ebee24b1786cf3f349ca686086cdedee05b",
+        "paths": [
+          "scripts/check-review-slices.py"
+        ],
+        "verified_scope": "Only the explicit response-model review-slice entry differs. Native source, fixture action and hosted workflow are unchanged."
+      }
     },
     "process_journal_authority": {
       "status": "passed locally",
       "red": "process-journal-unversioned-red",
       "green": "process-journal-owner-green",
       "passed": 19,
-      "review": "Same independent reviewer found no Critical or Important issues in the added preflight repair. Concurrent first initialization assessed from source. Byte-preservation evidence covers the supplied rollback-mode fixtures."
+      "review": "Same independent reviewer found no Critical or Important issues in the added preflight repair. Concurrent first initialization assessed from source. Byte-preservation evidence covers the supplied rollback-mode fixtures.",
+      "hosted": {
+        "source_commit": "66d1ab85075abb84b328fff1f84091161b474d05",
+        "run_id": 36983882538,
+        "job_id": 110764373675,
+        "log": "hosted-workers-job-110764373675.log",
+        "target": "processes",
+        "passed": 19,
+        "controls": [
+          "unversioned_journals_cannot_gain_dispatch_authority",
+          "first_dispatch_attempt_preserves_request_identity_and_exact_replay"
+        ]
+      }
     },
     "economic_snapshot_rollback": {
       "status": "passed locally",
@@ -123,12 +342,95 @@
         "hygiene-publication-corrected",
         "diff-publication-final"
       ]
+    },
+    "hosted_workers": {
+      "run_id": 36983882538,
+      "job_id": 110764373675,
+      "source_commit": "66d1ab85075abb84b328fff1f84091161b474d05",
+      "job": "Authenticated Python and JavaScript workers",
+      "conclusion": "success",
+      "log": "hosted-workers-job-110764373675.log",
+      "log_sha256": "a783213a7f6156034880c14daf3402476a9aa7827fc3e0e0b67055e0c2520c0a",
+      "bytes": 140793,
+      "prior_passes": [
+        {
+          "run_id": 36973805077,
+          "job_id": 110733198647,
+          "source_commit": "5920a896c7cb76448a6941bd1015596667c8bc39",
+          "job": "Authenticated Python and JavaScript workers",
+          "conclusion": "success",
+          "log": "hosted-workers-job-110733198647.log",
+          "log_sha256": "54700d6454afeaf30f5454077ec31a34bddb5a320f84e6d4f2774fcafaa25941",
+          "bytes": 241702
+        },
+        {
+          "run_id": 36976096104,
+          "job_id": 110740145842,
+          "source_commit": "d2c8432dd3c0874440c7fe7f8faf37252f38a690",
+          "job": "Authenticated Python and JavaScript workers",
+          "conclusion": "success",
+          "log": "hosted-workers-job-110740145842.log",
+          "log_sha256": "1ca2d8145abb3d29529a4b3c18798f439c419147199d5829afabf2d425655e17",
+          "bytes": 140089
+        },
+        {
+          "run_id": 36978666220,
+          "job_id": 110747999140,
+          "source_commit": "22de2642a034933de986f99fbe17f3cff4d8d1ee",
+          "job": "Authenticated Python and JavaScript workers",
+          "conclusion": "success",
+          "log": "hosted-workers-job-110747999140.log",
+          "log_sha256": "d72149764346f489dd0d2a9fdb1fd8d2ea3cc2c0d7120808842dbc7a58a7eaa0",
+          "bytes": 138992
+        }
+      ]
+    },
+    "standalone_host_formatting": {
+      "status": "passed locally after reproducing the hosted failure",
+      "red": "hosted-standalone-format-red",
+      "green": [
+        "hosted-standalone-format-green",
+        "hosted-receipt-format-green",
+        "hosted-response-format-green",
+        "hosted-cargo-format-green"
+      ],
+      "source_change": "One line-wrap correction; no Rust tokens changed."
+    },
+    "native_probe_portability": {
+      "status": "passed local controls and the fourth hosted native qualification, including independent fixture preparation",
+      "red": "native-probe-portability-red",
+      "green": [
+        "native-probe-portability-green",
+        "native-probe-contract-green",
+        "native-probe-ci-inventory-green",
+        "native-probe-fixture-green"
+      ],
+      "change": "Use base-runner grep for the unchanged one-passed, zero-failed terminal requirement; test success and zero/failed rejection with rg absent. Reviewed action digest updated; no enforcement bypass."
+    },
+    "native_fixture_protocol_recovery": {
+      "status": "passed local controls and hosted native targets on 66d1ab85075abb84b328fff1f84091161b474d05",
+      "hosted_red_run": 36978666220,
+      "syscall_red": "native-python-fixture-syscalls-red",
+      "syscall_green": [
+        "native-python-fixture-syscalls-green",
+        "native-python-packaged-syscalls-green"
+      ],
+      "fixture_tests": "native-stdio-fixtures-final",
+      "scope": "Test fixture event loop uses allowed poll timing and no thread creation. Production enforcement and profile vocabulary are unchanged. Linux x86_64 hosted execution now qualifies all five native targets; the preexisting TTL-race ignore remains outside acceptance.",
+      "control_script": "native-fixture-syscall-check.py",
+      "control_script_sha256": "af9794600fad3d3fdc318ba2507b8e3c7acc7c2a8386b2cf5321cd76a44ab949",
+      "clippy": "native-protocol-fixture-clippy",
+      "hygiene": "native-protocol-fixture-hygiene",
+      "format": "native-protocol-fixture-format",
+      "preserved_preexisting_ignore": "mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry: existing TTL race ignore; no new skip introduced",
+      "original_default_python_control_script": "native-fixture-syscall-check-original.py",
+      "original_default_python_control_sha256": "9e25a65fbf1ca616cf6c4b6822bc580d0b5204e73bd1e062bd8c7e7c5571921f"
     }
   },
   "source_manifest": [
     {
       "path": ".github/actions/enforced-native-fixture/action.yml",
-      "sha256": "1e763f374b2f69ce83ecad4fe8918f2f117acc7d3aabeb1e36a43691c8dfe018"
+      "sha256": "8c25ad460fe8a5dbfd157fa62f75a4f14d2df2332f2fcaa08ffe814594722608"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -1079,6 +1381,10 @@
       "sha256": "7e9731d026ed1d94de4753c27815c087da99b50e7b1c45d9dd01981b50963f84"
     },
     {
+      "path": "crates/products/chio-cli/src/cli/process_host/native_broker/preparation.rs",
+      "sha256": "512dc7e24aa27efaec1214a9dccb629daff71a859f99e40a9ba9b69c17b367ae"
+    },
+    {
       "path": "crates/products/chio-cli/tests/enforced_discovery.rs",
       "sha256": "22dcf88c6c69ff789175c336c014dbca518cc940e98fd66364fb52acec15b18d"
     },
@@ -1088,11 +1394,11 @@
     },
     {
       "path": "crates/products/chio-cli/tests/mcp_auth_server.rs",
-      "sha256": "4330dac681977add6e727f7eeabef6809d4fea92ef1e484b5e6c364db10abb70"
+      "sha256": "31d87b7eed476d3c438aa0048d7e62352aa37c7fb251a43c863db24663a3a36f"
     },
     {
       "path": "crates/products/chio-cli/tests/mcp_serve.rs",
-      "sha256": "4c84fb190bfe4633060d904fa5ebfc98c029e8caec5bf45f75cd7d8621096be7"
+      "sha256": "c0bcaca11cfac10d07f6ae4722ab093c9aec701a8ed9b055db3d8084fd0ef635"
     },
     {
       "path": "crates/products/chio-cli/tests/mcp_serve/test_directory.rs",
@@ -1103,8 +1409,12 @@
       "sha256": "35d3450c9e0a5aeccae75c3efffce6e6dc4f84fd6df72c7bd8cc3a93b76632f7"
     },
     {
+      "path": "crates/products/chio-cli/tests/mcp_serve_http/malformed_initialize.rs",
+      "sha256": "0e868bc8c102dfeccf144082989f72d0f2f84c5ca7b679fd2f9865faf00163ae"
+    },
+    {
       "path": "crates/products/chio-cli/tests/mcp_serve_http/mock_server_script.rs",
-      "sha256": "1fd1b7fcd6ec08eb9b61c7750d7e150d8f566fd4782c18cb0811b2c154b1bd60"
+      "sha256": "bfd51dc94da59c1cc96d29ba8f98997c9cfe30b135eadf3f7bedde0f9ed1018b"
     },
     {
       "path": "crates/products/chio-cli/tests/mcp_serve_http/security.rs",
@@ -1165,6 +1475,10 @@
     {
       "path": "crates/products/chio-cli/tests/support/mcp_security.rs",
       "sha256": "a03eb365b2a7c3fbc7d3a824824f5b988b9aa2f157f065be30626d3dcd4d3c12"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/support/native_mcp_stdio.py",
+      "sha256": "cb0b60b600a91ba178ca25e86ba6bede4cc21c449f03a9ad40bebb190dc6ff7d"
     },
     {
       "path": "crates/products/chio-cli/tests/support/private_fixture.rs",
@@ -1360,7 +1674,11 @@
     },
     {
       "path": "scripts/check-native-protocol-ci.py",
-      "sha256": "9730a5cf15ac30e2e4d78203582f4b4c83b8c3a78f7c229810a341bfa8a6344d"
+      "sha256": "50e918c0848febabcb7adc536a75a17361b8416cc06c960185c16dc2e50318b4"
+    },
+    {
+      "path": "scripts/check-review-slices.py",
+      "sha256": "e65250ab4e53999ab1d38bd64194fb85591faaea6eab000e834d2e57ca6e9fa4"
     },
     {
       "path": "scripts/check-rust-file-hygiene.py",
@@ -1404,7 +1722,7 @@
     },
     {
       "path": "scripts/tests/check-native-protocol-ci.test.py",
-      "sha256": "7b62c6a7d33a4dc30ef8f071a218b437117ed1b9cd48a0b9473e185a134d7cbe"
+      "sha256": "8aebefde004561e30427bb8ff3cba991cf2698293ac5c5f040613a9f96761145"
     },
     {
       "path": "scripts/tests/check-proof-room-copy-scope.test.py",
@@ -1429,6 +1747,10 @@
     {
       "path": "scripts/tests/msrv-cache-target.test.py",
       "sha256": "845d35e1757cce7bc448ac80e37dde2a800f74d32c5ffcb879b34856fa6b83c6"
+    },
+    {
+      "path": "scripts/tests/prepare-enforced-native-fixture.test.py",
+      "sha256": "d599b072d5ba313114e3a5a0da4c2305c467cdb2d7ec3fdb5c38962aaeb8f379"
     },
     {
       "path": "third_party/provenance/clawdstrike-enterprise-hardening.toml",
@@ -3157,6 +3479,83 @@
       ]
     },
     {
+      "label": "hosted-cargo-format-green",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "chio-cli",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.36,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "hosted-receipt-format-green",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/products/chio-cli/src/cli/receipt_verify.rs"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.05,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "hosted-response-format-green",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/products/chio-cli/src/cli/process_response_verify.rs",
+        "crates/products/chio-cli/tests/process_response_verify.rs"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.06,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "hosted-standalone-format-green",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/products/chio-cli/src/cli/process_host.rs"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.25,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "hosted-standalone-format-red",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/products/chio-cli/src/cli/process_host.rs"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.27,
+      "log_sha256": "8c2147463cf2bdf15c5617af134313ca66facd1410b41178031591bfe5d45d3f",
+      "disposition": "expected failing regression control",
+      "test_results": []
+    },
+    {
       "label": "hygiene-publication-corrected",
       "command": [
         "python3",
@@ -3286,6 +3685,263 @@
       "elapsed_seconds": 0.21,
       "log_sha256": "4734f3f3ece09c33949a1691f984e86fbe37edcb10bba70acf1d3ce622ea5976",
       "disposition": "expected failing regression control",
+      "test_results": []
+    },
+    {
+      "label": "native-probe-ci-inventory-green",
+      "command": [
+        "python3",
+        "scripts/tests/check-process-ci-inventory.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.09,
+      "log_sha256": "d13bd68c0e7f20c9f33aabe0fee5395e45fd956ca0cde3cc23a962e7e527a58a",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-probe-contract-green",
+      "command": [
+        "python3",
+        "scripts/check-native-protocol-ci.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.13,
+      "log_sha256": "06d3dc89861a14cdfb0b9460d4ecb52334bd9f130ab20f3b3ecffab33af37293",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-probe-fixture-green",
+      "command": [
+        "python3",
+        "scripts/tests/prepare-enforced-native-fixture.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08,
+      "log_sha256": "6f283ee6225d2cef4c0127d95456a6f954c45141c92b97dd89016cb1c630e8f4",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-probe-portability-green",
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.23,
+      "log_sha256": "4193fe43a430b264dfce2a0ca5febb94011ba6e24bd574d77fbbbca5e86ea3d4",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-probe-portability-red",
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py",
+        "NativeProtocolCiTests.test_terminal_evidence_check_works_without_ripgrep"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.18,
+      "log_sha256": "019b9833402cebd5666798205a44f4cd3a78b0409bb79c73209fd669d4488af5",
+      "disposition": "expected failing regression control",
+      "test_results": []
+    },
+    {
+      "label": "native-protocol-fixture-ci-contract",
+      "command": [
+        "python3",
+        "scripts/check-native-protocol-ci.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.15,
+      "log_sha256": "06d3dc89861a14cdfb0b9460d4ecb52334bd9f130ab20f3b3ecffab33af37293",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-protocol-fixture-ci-mutations",
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.26,
+      "log_sha256": "4307c9d8fa4b5ca277afe1045ce248164b575f61557682c033277a13323348a1",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-protocol-fixture-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--features",
+        "real-linux-enforcement",
+        "--test",
+        "mcp_auth_server",
+        "--test",
+        "mcp_serve",
+        "--test",
+        "mcp_serve_http",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 180.51,
+      "log_sha256": "7844e8fd9d55e1d871fbcea0cf8720e39bb3018f709ffe6c1c65fb7e876b5552",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-protocol-fixture-format",
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "chio-cli",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.38,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-protocol-fixture-hygiene",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.35,
+      "log_sha256": "83f377dd6c4c44cb865a5622b11344c8d13a4c429706b8e17c60b8b726062964",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-python-fixture-syscalls-green",
+      "command": [
+        "python3",
+        "/tmp/chio-native-fixture-syscall-check.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.85,
+      "log_sha256": "24e3bcc37d15fc9f308650ee545e2656bafb8b7634180f18f836166bea953733",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-python-fixture-syscalls-red",
+      "command": [
+        "python3",
+        "/tmp/chio-native-fixture-syscall-check.py"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.91,
+      "log_sha256": "ce6da551a387c525bffb8929f15ddbe398d5d9c395f8dec29db79ec7afc27619",
+      "disposition": "expected failing regression control",
+      "test_results": []
+    },
+    {
+      "label": "native-python-packaged-syscalls-green",
+      "command": [
+        "env",
+        "CHIO_FIXTURE_PYTHON=$EVIDENCE_ROOT/native-python-select-runtime/python",
+        "python3",
+        "/tmp/chio-native-fixture-syscall-check.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.39,
+      "log_sha256": "24e3bcc37d15fc9f308650ee545e2656bafb8b7634180f18f836166bea953733",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-python-select-runtime",
+      "command": [
+        "python3",
+        "scripts/prepare-native-python-runtime.py",
+        "--python",
+        "/usr/bin/python3",
+        "--output",
+        "$EVIDENCE_ROOT/native-python-select-runtime",
+        "--module",
+        "sqlite3",
+        "--module",
+        "argparse",
+        "--module",
+        "json",
+        "--module",
+        "hashlib",
+        "--module",
+        "uuid",
+        "--module",
+        "runpy",
+        "--module",
+        "zipfile",
+        "--module",
+        "datetime",
+        "--module",
+        "math",
+        "--module",
+        "signal",
+        "--module",
+        "select"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.41,
+      "log_sha256": "6326c79a1f8970bddfd91e46b70903c4b1756e373a092215709c7f8816a5ce29",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-python-syscall-trace",
+      "command": [
+        "strace",
+        "-qq",
+        "-f",
+        "-e",
+        "trace=clock_nanosleep,nanosleep,clone,clone3",
+        "/usr/bin/python3",
+        "-c",
+        "import threading, time; time.sleep(0.01); worker = threading.Thread(target=lambda: None); worker.start(); worker.join()"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.07,
+      "log_sha256": "f0f72c15848d119ea808e37e4100ebffd076064ed86101df8549f0056952e843",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-stdio-fixtures-final",
+      "command": [
+        "python3",
+        "scripts/tests/prepare-enforced-native-fixture.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.27,
+      "log_sha256": "262b4fbb1c0f883373692fbad0e9771a7fa2060b933a492ec4e71410801e3bba",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "native-stdio-fixtures-green",
+      "command": [
+        "python3",
+        "scripts/tests/prepare-enforced-native-fixture.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.22,
+      "log_sha256": "1adf8f8b7dba1db680974abd6b2522ad1a7d33463bdc8ee28f03ff52dd04f06b",
+      "disposition": "passed",
       "test_results": []
     },
     {
@@ -3490,6 +4146,31 @@
       "exit_code": 0,
       "elapsed_seconds": 12.35,
       "log_sha256": "300d88f88e8e5e176032d6c07f4c77e283e596d993c491bad10b093c86763057",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "response-model-review-slice-green",
+      "command": [
+        "python3",
+        "scripts/check-review-slices.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.37,
+      "log_sha256": "69a36ca58b507528cd896659be98035eb89dd34d1119dcf9b752a6fa0f9e9343",
+      "disposition": "passed",
+      "test_results": []
+    },
+    {
+      "label": "response-model-review-slice-negative",
+      "command": [
+        "python3",
+        "-c",
+        "import runpy; ns=runpy.run_path(\"scripts/check-review-slices.py\"); classify=ns[\"classify\"]; assert classify(\"crates/core/chio-response-model/src/state.rs\").name == \"core-protocol\"; assert classify(\"crates/core/chio-response-model-shadow/src/lib.rs\") is None; assert classify(\"crates/core/chio-unreviewed/src/lib.rs\") is None; print(\"Response model is classified explicitly; adjacent unreviewed crates remain rejected\")"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08,
+      "log_sha256": "cecd7622dab2576690c96ad95f5ec27dfbcc9bc7e3b3ccd6d8a4c4e016b5b4e3",
       "disposition": "passed",
       "test_results": []
     },
@@ -3707,6 +4388,68 @@
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.09s",
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.05s",
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.28s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.03s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.09s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.04s"
+      ]
+    },
+    {
+      "label": "structural-99-native-fixture-final",
+      "command": [
+        "bash",
+        "/tmp/chio-structural-step-ci-repair.sh"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 976.08,
+      "log_sha256": "e82791e97e78d025ce189efa022566e9aa9e95034c018ffe62a913d2a5532343",
+      "disposition": "failed; retained intermediate or unresolved result, see acceptance boundaries",
+      "test_results": [
+        "test result: ok. 151 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.70s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 253 filtered out; finished in 0.06s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.36s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.28s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.03s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.10s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.05s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.28s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.03s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.09s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.04s"
+      ]
+    },
+    {
+      "label": "structural-99-published-final",
+      "command": [
+        "bash",
+        "/tmp/chio-structural-step-ci-repair.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 976.82,
+      "log_sha256": "056fc6cab7c8c57d133b70cec46074253853fdc5c4cd4288da1edc4653323256",
+      "disposition": "passed",
+      "test_results": [
+        "test result: ok. 151 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.71s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 253 filtered out; finished in 0.06s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.97s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.28s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.03s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.09s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.04s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.27s",
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.03s",
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.09s",
         "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 0.04s"

@@ -65,7 +65,7 @@
 - [x] Use the retained failing test names to trace fixture producers to production rejections.
 - [x] Correct fixture custody, journal version, process environment and launch contracts without production bypasses.
 - [x] Run the complete affected non-native integration targets and compile all five native targets with real enforcement enabled.
-- [ ] Execute the native integration targets on the qualified Linux x86_64 host; distinguish genuine host prerequisite failures from source failures.
+- [x] Execute the native integration targets on the qualified Linux x86_64 host; distinguish genuine host prerequisite failures from source failures.
 
 ### Task 5: CLI proof and report regressions
 
@@ -83,5 +83,5 @@
 
 - [x] Run formatting, changed-owner verification and the required structural boundary once on final source; schedule Cargo graphs serially.
 - [x] Obtain one fresh independent review and repair Important/Critical findings with regression evidence.
-- [ ] Commit conventional changes and push the existing security branch; verify local and remote SHA.
-- [ ] Report each task's actual completion state and propose the next reconciled reader/decode-contract batch. Do not claim hosted, merge, milestone or release completion from local results.
+- [x] Commit conventional changes and push the existing security branch; verify local and remote SHA.
+- [x] Report each task's actual completion state and propose the next reconciled reader/decode-contract batch. Do not claim hosted, merge, milestone or release completion from local results.

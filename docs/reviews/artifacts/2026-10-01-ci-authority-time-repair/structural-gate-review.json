@@ -51,8 +51,12 @@
       "review": "Preserve exact captured Rust source bytes. Only this immutable path/digest is excluded from release copy; any changed bytes fail closed. Reviews, plans, adjacent JSON and release documents remain scanned."
     },
     "native_fixture_action": {
-      "normalized_yaml_sha256": "2ff37d6fa410ea42145d9bb572062b66537d0b6a53b0b9a04089a9486aac2963",
-      "review": "Reviewed the static musl helper build, exact privileged one-test enforcement probe and complete Python runtime preparation. The action previously passed no read grants to authority preparation, which requires a nonempty explicit list. It now packages the bounded runtime first, forwards every path as its own argument, validates those grants against authority and independent anchor paths, and retains the validated grant file. The musl helper has warning/debuginfo flags scoped separately from host-only lld flags; discovery inherits each lane flags and target directory. No platform or enforcement bypass is added."
+      "normalized_yaml_sha256": "7f2085f2912ce7f87bbb861d5a33b6f7f89c7f2e6f38568e4ef7a301e4a3e4e7",
+      "review": "Reviewed the static musl helper build, exact privileged one-test enforcement probe and complete Python runtime preparation. The action previously passed no read grants to authority preparation, which requires a nonempty explicit list. It now packages the bounded runtime first, forwards every path as its own argument, validates those grants against authority and independent anchor paths, and retains the validated grant file. The musl helper has warning/debuginfo flags scoped separately from host-only lld flags; discovery inherits each lane flags and target directory. No platform or enforcement bypass is added.",
+      "pre_portability_normalized_yaml_sha256": "2ff37d6fa410ea42145d9bb572062b66537d0b6a53b0b9a04089a9486aac2963",
+      "portability_follow_up": "Hosted privileged discovery passed on d2c8432dd3, then rg was missing. Replace only the terminal matcher with base-runner grep -Fq; preserve one-passed/zero-failed evidence requirement. A PATH without rg reproduces the failure and now accepts real success text while rejecting zero/failed results.",
+      "pre_timer_fixture_normalized_yaml_sha256": "a86df81b318660730af5bcea69433271a0040dee5d1390fcc292375e7ff6019a",
+      "timer_fixture_follow_up": "Add explicit select module to the existing bounded Python runtime closure for poll-based single-threaded test fixtures. Native syscall profiles and enforcement remain unchanged; no new skips. Packaged fixtures passed controls that kill clock_nanosleep, clone and clone3. The original hosted protocol failures and subsequent local controls are retained."
     }
   },
   "terminal_checks": [
@@ -632,10 +636,122 @@
       "exit_code": 0,
       "elapsed_seconds": 0.12,
       "log_sha256": "06d3dc89861a14cdfb0b9460d4ecb52334bd9f130ab20f3b3ecffab33af37293"
+    },
+    {
+      "label": "native-probe-portability-red",
+      "metadata": "native-probe-portability-red.json",
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py",
+        "NativeProtocolCiTests.test_terminal_evidence_check_works_without_ripgrep"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 0.18,
+      "log_sha256": "019b9833402cebd5666798205a44f4cd3a78b0409bb79c73209fd669d4488af5"
+    },
+    {
+      "label": "native-probe-portability-green",
+      "metadata": "native-probe-portability-green.json",
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.23,
+      "log_sha256": "4193fe43a430b264dfce2a0ca5febb94011ba6e24bd574d77fbbbca5e86ea3d4"
+    },
+    {
+      "label": "native-probe-contract-green",
+      "metadata": "native-probe-contract-green.json",
+      "command": [
+        "python3",
+        "scripts/check-native-protocol-ci.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.13,
+      "log_sha256": "06d3dc89861a14cdfb0b9460d4ecb52334bd9f130ab20f3b3ecffab33af37293"
+    },
+    {
+      "label": "native-probe-ci-inventory-green",
+      "metadata": "native-probe-ci-inventory-green.json",
+      "command": [
+        "python3",
+        "scripts/tests/check-process-ci-inventory.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.09,
+      "log_sha256": "d13bd68c0e7f20c9f33aabe0fee5395e45fd956ca0cde3cc23a962e7e527a58a"
+    },
+    {
+      "label": "native-probe-fixture-green",
+      "metadata": "native-probe-fixture-green.json",
+      "command": [
+        "python3",
+        "scripts/tests/prepare-enforced-native-fixture.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08,
+      "log_sha256": "6f283ee6225d2cef4c0127d95456a6f954c45141c92b97dd89016cb1c630e8f4"
+    },
+    {
+      "label": "native-protocol-fixture-ci-contract",
+      "metadata": "native-protocol-fixture-ci-contract.json",
+      "command": [
+        "python3",
+        "scripts/check-native-protocol-ci.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.15,
+      "log_sha256": "06d3dc89861a14cdfb0b9460d4ecb52334bd9f130ab20f3b3ecffab33af37293"
+    },
+    {
+      "label": "native-protocol-fixture-ci-mutations",
+      "metadata": "native-protocol-fixture-ci-mutations.json",
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.26,
+      "log_sha256": "4307c9d8fa4b5ca277afe1045ce248164b575f61557682c033277a13323348a1"
+    },
+    {
+      "label": "native-stdio-fixtures-final",
+      "metadata": "native-stdio-fixtures-final.json",
+      "command": [
+        "python3",
+        "scripts/tests/prepare-enforced-native-fixture.test.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.27,
+      "log_sha256": "262b4fbb1c0f883373692fbad0e9771a7fa2060b933a492ec4e71410801e3bba"
+    },
+    {
+      "label": "response-model-review-slice-green",
+      "metadata": "response-model-review-slice-green.json",
+      "command": [
+        "python3",
+        "scripts/check-review-slices.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.37,
+      "log_sha256": "69a36ca58b507528cd896659be98035eb89dd34d1119dcf9b752a6fa0f9e9343"
+    },
+    {
+      "label": "response-model-review-slice-negative",
+      "metadata": "response-model-review-slice-negative.json",
+      "command": [
+        "python3",
+        "-c",
+        "import runpy; ns=runpy.run_path(\"scripts/check-review-slices.py\"); classify=ns[\"classify\"]; assert classify(\"crates/core/chio-response-model/src/state.rs\").name == \"core-protocol\"; assert classify(\"crates/core/chio-response-model-shadow/src/lib.rs\") is None; assert classify(\"crates/core/chio-unreviewed/src/lib.rs\") is None; print(\"Response model is classified explicitly; adjacent unreviewed crates remain rejected\")"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.08,
+      "log_sha256": "cecd7622dab2576690c96ad95f5ec27dfbcc9bc7e3b3ccd6d8a4c4e016b5b4e3"
     }
   ],
   "pending_checks": [],
-  "ci_mutation_scope": "The complete final CI-contract mutation suite passed in structural-99-corrected, including the lifecycle aggregate binding and soft-fail refusal cases.",
+  "ci_mutation_scope": "The complete CI-contract mutation suite passed in structural-99-published-final, including lifecycle aggregate binding and soft-fail refusal cases.",
   "reader_ownership": {
     "moved_production_readers": 4,
     "state": [
@@ -664,10 +780,10 @@
       "mcp_serve_http",
       "conformance_cli"
     ],
-    "portable_test_groups": 10,
+    "portable_test_groups": 11,
     "rejected_workflow_and_action_mutations": 70,
     "shell_plumbing": "Captured actual action argv using file names with spaces and literal shell substitution syntax; all explicit read grants remain separate literal arguments.",
-    "native_host_boundary": "Local Linux aarch64 refuses native fixture preparation as required. The real CPython runtime package was built and validated locally, but the privileged x86_64 discovery probe and native consumers require the hosted Linux x86_64 lane.",
+    "native_host_boundary": "The five native integration targets and privileged discovery probe passed on the qualified Linux x86_64 host at 66d1ab85075abb84b328fff1f84091161b474d05. Exact-source terminal step and artifact evidence is in qualification.json; the broader consumer workflow remained in progress at capture. Local Linux aarch64 evidence alone does not establish this acceptance.",
     "actionlint_boundary": "Installed actionlint v1.7.7 passes process-workers.yml. It rejects only the existing artifact-metadata permission in ci.yml, also present at HEAD; this combined lint result is retained as failed, not counted as passing."
   },
   "structural_sweep_source": {
@@ -676,7 +792,7 @@
     "script": "/tmp/chio-structural-step-ci-repair.sh",
     "script_sha256": "b20c9ec1f8b7057b36265b6d195abafcf58602f8f91725dda30d876118ceb279",
     "gate_count": 99,
-    "state": "Passed all 99 gates with zero failures in structural-99-corrected."
+    "state": "Passed all 99 gates with zero failures in structural-99-published-final on 48dc9ebee24b1786cf3f349ca686086cdedee05b."
   },
   "independent_review_repairs": [
     {
@@ -718,14 +834,16 @@
     "exit_code": 0
   },
   "final_integrated_sweep": {
-    "label": "structural-99-corrected",
+    "label": "structural-99-published-final",
     "command": [
       "bash",
       "/tmp/chio-structural-step-ci-repair.sh"
     ],
     "exit_code": 0,
-    "elapsed_seconds": 979.63,
-    "log_sha256": "1c3d627280ce7a9810f11d2be6a6b8c9b804c785a713b07b69bf692344cb0b78",
+    "elapsed_seconds": 976.82,
+    "log_sha256": "056fc6cab7c8c57d133b70cec46074253853fdc5c4cd4288da1edc4653323256",
+    "gate_count": 99,
+    "failed_gates": 0,
     "gates": [
       {
         "exit_code": 0,
@@ -1124,6 +1242,40 @@
         "command": "bash ./scripts/tests/check-release-overflow.test.sh"
       }
     ],
-    "supersedes": "structural-99-final completed 99 gates with four failed outcomes, retained unchanged."
-  }
+    "source_commit": "48dc9ebee24b1786cf3f349ca686086cdedee05b",
+    "supersedes": "The post-publication sweep completed 99 gates with one review-classification failure; retained unchanged."
+  },
+  "prior_integrated_sweeps": [
+    {
+      "label": "structural-99-corrected",
+      "command": [
+        "bash",
+        "/tmp/chio-structural-step-ci-repair.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 979.63,
+      "log_sha256": "1c3d627280ce7a9810f11d2be6a6b8c9b804c785a713b07b69bf692344cb0b78",
+      "supersedes": "structural-99-final completed 99 gates with four failed outcomes, retained unchanged."
+    },
+    {
+      "label": "structural-99-native-fixture-final",
+      "command": [
+        "bash",
+        "/tmp/chio-structural-step-ci-repair.sh"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 976.08,
+      "log_sha256": "e82791e97e78d025ce189efa022566e9aa9e95034c018ffe62a913d2a5532343",
+      "gate_count": 99,
+      "failed_gates": 1,
+      "failed_commands": [
+        {
+          "exit_code": 1,
+          "command": "python3 scripts/check-review-slices.py"
+        }
+      ],
+      "cause": "Newly committed response-model files were missing an explicit core-protocol review classification."
+    }
+  ],
+  "post_publication_follow_up": "After native action portability and protocol fixture corrections, the complete sweep found one missing review classification. An explicit response-model entry and positive/negative controls repaired it. The final full rerun passed all 99 gates; source changes since the hosted native candidate affect only the review classifier."
 }
