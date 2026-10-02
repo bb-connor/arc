@@ -1,16 +1,16 @@
 use super::*;
 
 pub(crate) fn write_mock_server_script(dir: &Path) -> PathBuf {
-    let script = r##"
+    let script = concat!(
+        include_str!("../support/native_mcp_stdio.py"),
+        r##"
 import json
 import os
 import sys
-import threading
 import time
 
 CLIENT_CAPABILITIES = {}
 STARTUP_MARKER_PATH = sys.argv[2] if len(sys.argv) == 3 and sys.argv[1] == "--startup-marker" else None
-WRITE_LOCK = threading.Lock()
 
 if STARTUP_MARKER_PATH:
     with open(STARTUP_MARKER_PATH, "a", encoding="utf-8") as handle:
@@ -118,11 +118,10 @@ RESOURCES = [
 ]
 
 def respond(payload):
-    with WRITE_LOCK:
-        sys.stdout.write(json.dumps(payload) + "\n")
-        sys.stdout.flush()
+    sys.stdout.write(json.dumps(payload) + "\n")
+    sys.stdout.flush()
 
-for line in sys.stdin:
+for line in native_io:
     if not line.strip():
         continue
 
@@ -220,7 +219,7 @@ for line in sys.stdin:
             continue
 
         if tool_name == "slow_echo":
-            time.sleep(1.0)
+            native_io.sleep(1.0)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -232,7 +231,7 @@ for line in sys.stdin:
             continue
 
         if tool_name == "slow_cancelable_echo":
-            time.sleep(3.0)
+            native_io.sleep(3.0)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -272,8 +271,7 @@ for line in sys.stdin:
             count = max(1, int(arguments.get("count", 1)))
             delay_ms = max(10, int(arguments.get("delayMs", 150)))
 
-            def emit_late_notifications():
-                time.sleep(delay_ms / 1000.0)
+            def emit_late_notifications(count=count):
                 for index in range(count):
                     if index % 2 == 0:
                         respond({
@@ -287,7 +285,7 @@ for line in sys.stdin:
                             "params": {"uri": f"fixture://docs/{index}"}
                         })
 
-            threading.Thread(target=emit_late_notifications, daemon=True).start()
+            native_io.schedule(delay_ms / 1000.0, emit_late_notifications)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -335,7 +333,7 @@ for line in sys.stdin:
             })
 
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("id") != sample_request_id or sample_response.get("method"):
                     continue
                 if sample_response.get("error"):
@@ -378,7 +376,8 @@ for line in sys.stdin:
         "id": message.get("id"),
         "error": {"code": -32601, "message": f"unknown method: {method}"}
     })
-"##;
+"##
+    );
 
     let path = dir.join("mock_http_mcp_server.py");
     fs::write(&path, script).expect("write mock server script");

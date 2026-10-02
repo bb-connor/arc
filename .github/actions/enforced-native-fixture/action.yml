@@ -38,7 +38,7 @@ runs:
           --python /usr/bin/python3 --output "$RUNNER_TEMP/native-python-runtime" \
           --module sqlite3 --module argparse --module json --module hashlib \
           --module uuid --module runpy --module zipfile --module datetime \
-          --module math --module signal > "$RUNNER_TEMP/native-python-runtime.json"
+          --module math --module signal --module select > "$RUNNER_TEMP/native-python-runtime.json"
         runtime_read_grants=()
         while IFS= read -r runtime_read_path; do
           runtime_read_grants+=(--read-path "$runtime_read_path")

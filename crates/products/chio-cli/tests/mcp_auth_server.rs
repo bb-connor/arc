@@ -13,6 +13,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+use chio_test_support::ctx::TestUnwrap;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{HeaderName, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, LOCATION};
@@ -902,10 +903,13 @@ fn mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_asserti
         .send()
         .expect("send stale authorize request");
     assert_eq!(stale.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(stale
-        .text()
-        .expect("stale authorize body")
-        .contains("identityAssertion is stale"));
+    assert_eq!(
+        stale.json::<Value>().test_unwrap("stale authorize body"),
+        json!({
+            "error": "invalid_request",
+            "error_description": "urn:chio:error:transport:invalid-request-shape"
+        })
+    );
 
     let mismatch = client
         .get(format!("{base_url}/oauth/authorize"))
@@ -924,10 +928,15 @@ fn mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_asserti
         .send()
         .expect("send mismatched authorize request");
     assert_eq!(mismatch.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(mismatch
-        .text()
-        .expect("mismatched authorize body")
-        .contains("identityAssertion.verifierId must match client_id"));
+    assert_eq!(
+        mismatch
+            .json::<Value>()
+            .test_unwrap("mismatched authorize body"),
+        json!({
+            "error": "invalid_request",
+            "error_description": "urn:chio:error:transport:invalid-request-shape"
+        })
+    );
 }
 
 #[test]
@@ -1048,10 +1057,10 @@ fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token
         }),
     );
     assert_eq!(replay_response.status(), reqwest::StatusCode::UNAUTHORIZED);
-    assert!(replay_response
-        .text()
-        .expect("replay body")
-        .contains("already used"));
+    assert_eq!(
+        replay_response.text().test_unwrap("replay body"),
+        "urn:chio:error:transport:dpop-verification-failed"
+    );
 }
 
 #[test]
@@ -1188,10 +1197,12 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
         missing_attestation.status(),
         reqwest::StatusCode::UNAUTHORIZED
     );
-    assert!(missing_attestation
-        .text()
-        .expect("missing attestation body")
-        .contains("missing runtime attestation binding header"));
+    assert_eq!(
+        missing_attestation
+            .text()
+            .test_unwrap("missing attestation body"),
+        "urn:chio:error:transport:dpop-verification-failed"
+    );
 }
 
 #[test]
@@ -1251,12 +1262,15 @@ fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpo
         .send()
         .expect("send attestation-only authorize request");
     assert_eq!(attestation_only.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(attestation_only
-        .text()
-        .expect("attestation-only body")
-        .contains(
-            "require either chio_sender_dpop_public_key or chio_sender_mtls_thumbprint_sha256"
-        ));
+    assert_eq!(
+        attestation_only
+            .json::<Value>()
+            .test_unwrap("attestation-only body"),
+        json!({
+            "error": "invalid_request",
+            "error_description": "urn:chio:error:transport:invalid-request-shape"
+        })
+    );
 
     let sender_keypair = Keypair::generate();
     let sender_key_hex = sender_keypair.public_key().to_hex();
@@ -1289,8 +1303,13 @@ fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpo
         .send()
         .expect("send mismatched attestation authorize request");
     assert_eq!(mismatch.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(mismatch
-        .text()
-        .expect("mismatched attestation body")
-        .contains("must match chio_transaction_context.runtimeAssuranceEvidenceSha256"));
+    assert_eq!(
+        mismatch
+            .json::<Value>()
+            .test_unwrap("mismatched attestation body"),
+        json!({
+            "error": "invalid_request",
+            "error_description": "urn:chio:error:transport:invalid-request-shape"
+        })
+    );
 }

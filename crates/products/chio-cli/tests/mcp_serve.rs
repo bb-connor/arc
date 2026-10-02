@@ -21,11 +21,12 @@ mod test_directory;
 use test_directory::unique_test_dir;
 
 fn write_mock_server_script(dir: &Path) -> PathBuf {
-    let script = r##"
+    let script = concat!(
+        include_str!("support/native_mcp_stdio.py"),
+        r##"
 import json
 import os
 import sys
-import threading
 import time
 
 TOOLS = [
@@ -293,7 +294,7 @@ PROMPTS = [
 
 CLIENT_CAPABILITIES = {}
 
-for raw in sys.stdin:
+for raw in native_io:
     line = raw.strip()
     if not line:
         continue
@@ -367,7 +368,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("id") != sample_request_id or sample_response.get("method"):
                     continue
                 if sample_response.get("error"):
@@ -435,7 +436,7 @@ for raw in sys.stdin:
             sample_task_id = None
             status_notifications = 0
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -459,7 +460,7 @@ for raw in sys.stdin:
             if sample_task_id is None:
                 continue
 
-            time.sleep(0.15)
+            native_io.sleep(0.15)
 
             task_get_request_id = f"task-get-{message['id']}"
             respond({
@@ -471,7 +472,7 @@ for raw in sys.stdin:
 
             task_status = "unknown"
             while True:
-                task_get_response = json.loads(sys.stdin.readline())
+                task_get_response = json.loads(native_io.readline())
                 if task_get_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -503,7 +504,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                task_result_response = json.loads(sys.stdin.readline())
+                task_result_response = json.loads(native_io.readline())
                 if task_result_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -578,7 +579,7 @@ for raw in sys.stdin:
             sample_task_id = None
             status_notifications = 0
             while True:
-                sample_response = json.loads(sys.stdin.readline())
+                sample_response = json.loads(native_io.readline())
                 if sample_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -626,7 +627,7 @@ for raw in sys.stdin:
 
             task_status = "unknown"
             while True:
-                task_get_response = json.loads(sys.stdin.readline())
+                task_get_response = json.loads(native_io.readline())
                 if task_get_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -658,7 +659,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                task_result_response = json.loads(sys.stdin.readline())
+                task_result_response = json.loads(native_io.readline())
                 if task_result_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -727,7 +728,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                elicitation_response = json.loads(sys.stdin.readline())
+                elicitation_response = json.loads(native_io.readline())
                 if elicitation_response.get("id") != elicitation_request_id or elicitation_response.get("method"):
                     continue
                 if elicitation_response.get("error"):
@@ -797,7 +798,7 @@ for raw in sys.stdin:
             elicitation_task_id = None
             status_notifications = 0
             while True:
-                elicitation_response = json.loads(sys.stdin.readline())
+                elicitation_response = json.loads(native_io.readline())
                 if elicitation_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -821,7 +822,7 @@ for raw in sys.stdin:
             if elicitation_task_id is None:
                 continue
 
-            time.sleep(0.15)
+            native_io.sleep(0.15)
 
             task_get_request_id = f"elicit-task-get-{message['id']}"
             respond({
@@ -833,7 +834,7 @@ for raw in sys.stdin:
 
             task_status = "unknown"
             while True:
-                task_get_response = json.loads(sys.stdin.readline())
+                task_get_response = json.loads(native_io.readline())
                 if task_get_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -865,7 +866,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                task_result_response = json.loads(sys.stdin.readline())
+                task_result_response = json.loads(native_io.readline())
                 if task_result_response.get("method") == "notifications/tasks/status":
                     status_notifications += 1
                     continue
@@ -927,7 +928,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                elicitation_response = json.loads(sys.stdin.readline())
+                elicitation_response = json.loads(native_io.readline())
                 if elicitation_response.get("id") != elicitation_request_id or elicitation_response.get("method"):
                     continue
                 if elicitation_response.get("error"):
@@ -944,8 +945,7 @@ for raw in sys.stdin:
                 action = elicitation_response["result"]["action"]
 
                 if action == "accept":
-                    def emit_completion_notification():
-                        time.sleep(0.10)
+                    def emit_completion_notification(elicitation_id=elicitation_id):
                         respond({
                             "jsonrpc": "2.0",
                             "method": "notifications/elicitation/complete",
@@ -954,7 +954,7 @@ for raw in sys.stdin:
                             }
                         })
 
-                    threading.Thread(target=emit_completion_notification, daemon=True).start()
+                    native_io.schedule(0.10, emit_completion_notification)
 
                 respond({
                     "jsonrpc": "2.0",
@@ -992,7 +992,7 @@ for raw in sys.stdin:
             })
 
             while True:
-                roots_response = json.loads(sys.stdin.readline())
+                roots_response = json.loads(native_io.readline())
                 if roots_response.get("id") != roots_request_id or roots_response.get("method"):
                     continue
                 if roots_response.get("error"):
@@ -1063,7 +1063,6 @@ for raw in sys.stdin:
 
         if tool_name == "notify_resources_background":
             def emit_notifications():
-                time.sleep(0.10)
                 respond({
                     "jsonrpc": "2.0",
                     "method": "notifications/resources/updated",
@@ -1083,7 +1082,7 @@ for raw in sys.stdin:
                     "method": "notifications/resources/list_changed"
                 })
 
-            threading.Thread(target=emit_notifications, daemon=True).start()
+            native_io.schedule(0.10, emit_notifications)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -1096,7 +1095,6 @@ for raw in sys.stdin:
 
         if tool_name == "notify_catalog_changes_background":
             def emit_catalog_notifications():
-                time.sleep(0.10)
                 respond({
                     "jsonrpc": "2.0",
                     "method": "notifications/tools/list_changed"
@@ -1106,7 +1104,7 @@ for raw in sys.stdin:
                     "method": "notifications/prompts/list_changed"
                 })
 
-            threading.Thread(target=emit_catalog_notifications, daemon=True).start()
+            native_io.schedule(0.10, emit_catalog_notifications)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -1122,7 +1120,7 @@ for raw in sys.stdin:
             sys.exit(0)
 
         if tool_name == "slow_echo":
-            time.sleep(0.25)
+            native_io.sleep(0.25)
             respond({
                 "jsonrpc": "2.0",
                 "id": message["id"],
@@ -1281,7 +1279,8 @@ for raw in sys.stdin:
         "id": message.get("id"),
         "error": {"code": -32601, "message": f"unknown method: {method}"}
     })
-"##;
+"##
+    );
 
     let path = dir.join("mock_mcp_server.py");
     fs::write(&path, script).expect("write mock MCP server");
