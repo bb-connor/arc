@@ -40,7 +40,8 @@ impl PreparationConfig {
         if !self.issuer_seed_file.is_absolute()
             || !(1..=300).contains(&self.lifetime_seconds)
             || !(1..=131_072).contains(&self.maximum_body_bytes)
-            || self.response_limit_bytes > chio_secret_broker::daemon::MAX_DAEMON_COMBINED_RESPONSE_BYTES
+            || self.response_limit_bytes
+                > chio_secret_broker::daemon::MAX_DAEMON_COMBINED_RESPONSE_BYTES
             || self.destination.method != "POST"
         {
             return Err(error(
