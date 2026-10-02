@@ -31,7 +31,7 @@
 - [x] Reproduce aggregate epoch mismatch and clock-fault mutation gaps with owner tests.
 - [x] Remove kernel global timestamp helpers and thread kernel authority time into finding-pool, active-response, child-receipt and release paths.
 - [x] Connect remaining SQLite and process-host clock consumers to injected owners, retaining default constructor convenience and durable high-water semantics.
-- [ ] Run affected owner tests and integration controls for failure, expiry and recovery.
+- [x] Run affected owner tests and integration controls for failure, expiry and recovery.
 
 ### Task 2: AC3 actual clock boundary enforcement
 
@@ -64,6 +64,6 @@
 
 **Files:** execution report and compact evidence artifact under `docs/reviews/`.
 
-- [ ] Run changed-owner warnings-denied Clippy, formatting and affected source gates.
-- [ ] Obtain one independent final review, resolve findings with meaningful regressions and verify any fix pass.
+- [x] Run changed-owner warnings-denied Clippy, formatting and affected source gates.
+- [x] Obtain one independent final review, resolve findings with meaningful regressions and verify any fix pass.
 - [ ] Publish all authorized security changes, verify remote SHA, record per-task completion and the next remaining queue. Keep local and hosted acceptance distinct.

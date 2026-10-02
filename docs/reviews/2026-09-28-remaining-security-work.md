@@ -3,7 +3,7 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the October 2 CI and authority-time repair batch. Each batch has its own
+Updated through the October 2 clock, decoding-contract and consumer repair batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
 
@@ -17,13 +17,25 @@ CLI/proof/report failures and the CI fixture/source contracts. Its final
 qualification and publication boundaries govern those claims; the historical
 review lists below are not a fresh list of still-reproducible defects.
 
-The next implementation batch is PB3/PR3 clock-fault recovery, PR5 certificate
-collection, NC2 repeated response headers and TR2 unseen threat-intelligence
-results. Acceptance criteria are in the current execution record. Follow with
-AC2/AC3 explicit clock ownership and SF1/CA2 producer-specific decode contracts.
-Full required hosted CI, branch decomposition, remaining compliance/product
-findings and the parent assurance gates remain open. No broad reader census or
-new baseline count substitutes for those contracts.
+The [operational recovery record](2026-10-02-operational-regression-recovery-execution.md)
+records PB3/PR3 clock-fault recovery, PR5 certificate collection, NC2 repeated
+response headers and TR2 unseen threat-intelligence handling. The
+[clock and contract record](2026-10-02-clock-contract-consumer-closure-execution.md)
+records the AC2/AC3 owner migration, SF1/CA2 checked source contracts and broader
+consumer workflow repair. Each record owns its local and hosted acceptance state.
+
+The [next implementation plan](../superpowers/plans/2026-10-02-identity-authority-release-closure.md)
+covers the remaining identity and authority findings: AP1 caller-controlled public subject keys and sender binding; KG1
+signed, pinned authority replication over authenticated transport; RL1 a single
+real release signer identity with executable verification documentation. Current
+source still derives sidecar private key material from public labels and imports
+peer authority snapshots without a signature contract. Do not infer closure from
+successful clock or decoder gates.
+
+AC4 protected run/step writes, CA3 extractor-aware signed ingress, remaining TCB
+reader semantics, proof-result sealing and error provenance remain separate
+engineering work. Full required hosted CI, branch decomposition, remaining
+compliance/product findings and the parent assurance gates also remain open.
 
 ## Current inventory
 
@@ -31,7 +43,7 @@ new baseline count substitutes for those contracts.
 | --- | --- | --- |
 | Decoder classification | 45 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers, all 28 remaining protocol readers, all 35 pinned trust readers, all 33 guard/security readers, all 31 pinned platform readers, all 22 pinned economy readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 154 occurrences at 149 inventory keys | The kernel/SQLite review migrated 22 production reads; the four-owner review migrated 15 more and classified 36 fixture occurrences. Native admission, kernel, broker and caller executor clocks share their configured authority owners. Four protocol adapters and policy evaluation now use the shared clock; A2A deferred tasks use fenced deadlines. The five remote production readers now use shared clocks. ACP-Client receipt/compliance now migrate the three remaining production readers to the shared fenced owner; the three fixtures stay classified. Other owners remain. |
+| Ambient clocks | 436 remaining observations and 38 pinned native compositions, including fixtures | The expanded gate covers complete TCB/boundary crates, aliases, function references, adapter selection and SQL clock literals. The immutable base scan found 471 observations, 317 invisible to the old gate. These counts measure source observations, not production vulnerabilities or completed migrations. The October 2 clock record bounds the owner changes and tests. |
 | Negative assertions | Baseline contains 1,256 assertions at 1,174 sites | This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |
@@ -330,8 +342,8 @@ this grouping. The kernel/SQLite execution record contains the local checks for 
 
 The [pass 9 execution review](2026-10-01-execution-review.md) reviewed every batch above at `a2630c20a1`, in twelve slice reviews linked
 from it. It found 128 issues: 5 High (one, TR1, since closed), 41 Medium, 67 Low, 15 Note. The decoder figure in
-the inventory table is a count of a lexical pattern: the gate passes after an inventory-only edit
-(CA2) and cannot see axum `Json<T>` ingress (CA3). The reader census demonstrated no pre-existing
+the inventory table is a count of a lexical pattern: the review demonstrated inventory-only promotion (CA2) and missing axum `Json<T>`
+ingress (CA3). The October 2 checked-contract repair addresses CA2; CA3 remains open. The reader census demonstrated no pre-existing
 defect after September 28 (CA value tally).
 
 Before another batch, in order:
