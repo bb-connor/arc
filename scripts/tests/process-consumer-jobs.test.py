@@ -135,6 +135,7 @@ class ProcessConsumerJobsTests(unittest.TestCase):
             {
                 "artifact-ids": "${{ needs['consumer-binaries'].outputs.artifact_id }}",
                 "path": "${{ runner.temp }}/prepared-native-binaries",
+                "merge-multiple": True,
             },
         )
         with tempfile.TemporaryDirectory(prefix="consumer binaries ") as temporary:
@@ -172,7 +173,14 @@ class ProcessConsumerJobsTests(unittest.TestCase):
             digest = hashlib.sha256(archive.read_bytes()).hexdigest()
             self.assertEqual((producer / "output").read_text(), f"sha256={digest}\n")
             download_dir = consumer / "prepared-native-binaries"
-            download_dir.mkdir()
+            # download-artifact d3f86a1 uses a flat directory only for a
+            # named download or merge-multiple, even for a single artifact ID.
+            if not (
+                download["with"].get("name")
+                or download["with"].get("merge-multiple", False)
+            ):
+                download_dir /= "native-consumer-binaries-fixture"
+            download_dir.mkdir(parents=True)
             received = download_dir / archive.name
             received.write_bytes(archive.read_bytes())
             exports = consumer / "environment"

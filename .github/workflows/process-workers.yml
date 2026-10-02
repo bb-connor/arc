@@ -293,6 +293,7 @@ jobs:
         with:
           artifact-ids: ${{ needs['consumer-binaries'].outputs.artifact_id }}
           path: ${{ runner.temp }}/prepared-native-binaries
+          merge-multiple: true
       - name: Verify and install prepared native binaries
         env:
           EXPECTED_SHA256: ${{ needs['consumer-binaries'].outputs.archive_sha256 }}
