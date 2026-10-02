@@ -24,7 +24,8 @@ for event in ("push", "pull_request"):
         assert f"crates/security/{owner}/**" in triggers[event]["paths"], (
             f"{owner} changes must trigger native consumer qualification"
         )
-steps = workflow["jobs"]["host"]["steps"]
+host_steps = workflow["jobs"]["host-tests"]["steps"]
+steps = host_steps + workflow["jobs"]["installed-consumers"]["steps"]
 commands = [
     shlex.split(line) for step in steps for line in step.get("run", "").splitlines()
 ]
@@ -92,15 +93,16 @@ assert "prepare-native-python-runtime.py" in runtime
 assert "CHIO_CAGE_RUNTIME_FILES_FILE" in runtime
 for broad in ("/usr", "/opt/hostedtoolcache", "$GITHUB_WORKSPACE"):
     assert f'--read-path "{broad}"' not in runtime
-for job in ("host", "optimized-comparison"):
+for job in ("consumer-binaries", "optimized-comparison"):
     job_steps = workflow["jobs"][job]["steps"]
     assert any(
         step.get("uses") == "./.github/actions/prepared-native-broker"
         for step in job_steps
     )
+for job in ("host-tests", "installed-consumers", "optimized-comparison"):
     assert any(
         step.get("uses") == "./.github/actions/enforced-native-fixture"
-        for step in job_steps
+        for step in workflow["jobs"][job]["steps"]
     )
 broker = yaml.safe_load(
     (ROOT / ".github/actions/prepared-native-broker/action.yml").read_text()

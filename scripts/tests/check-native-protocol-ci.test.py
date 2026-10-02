@@ -27,7 +27,7 @@ LIVE = (
 CONSUMERS = (
     (0, "check", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
-    (1, "host", CHECKER.PROTOCOL_NAME),
+    (1, "host-tests", CHECKER.PROTOCOL_NAME),
 )
 
 
@@ -106,14 +106,14 @@ class NativeProtocolCiTests(unittest.TestCase):
         ):
             with self.subTest(removed=text):
                 changed = copy.deepcopy(LIVE)
-                _, step = CHECKER.named_step(changed[1]["jobs"]["host"], CHECKER.PROTOCOL_NAME)
+                _, step = CHECKER.named_step(changed[1]["jobs"]["host-tests"], CHECKER.PROTOCOL_NAME)
                 self.assertIn(text, step["run"])
                 step["run"] = step["run"].replace(text, " ", 1)
                 self.rejected(changed, "target set must execute every required target")
 
     def test_static_report_cannot_clear_runtime_before_protocol_targets(self):
         changed = copy.deepcopy(LIVE)
-        job = changed[1]["jobs"]["host"]
+        job = changed[1]["jobs"]["host-tests"]
         protocol_index, _ = CHECKER.named_step(job, CHECKER.PROTOCOL_NAME)
         report_index, _ = CHECKER.named_step(
             job, "Native MCP and worker recovery under enforced authority"
@@ -205,7 +205,7 @@ class NativeProtocolCiTests(unittest.TestCase):
     def test_contract_and_negative_checks_remain_enrolled(self):
         for document, job_id, name in (
             (0, "check", "Workspace structural gates"),
-            (1, "host", "Default kernel and worker dependency boundary"),
+            (1, "host-tests", "Default kernel and worker dependency boundary"),
         ):
             for script in (
                 "scripts/check-native-protocol-ci.py",
