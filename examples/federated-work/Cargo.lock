@@ -1473,12 +1473,16 @@ dependencies = [
  "chio-a2a-edge",
  "chio-core-types",
  "chio-egress-contract",
+ "chio-federation",
  "chio-finding",
  "chio-finding-verifier",
  "chio-kernel",
  "chio-manifest",
  "chio-open-market",
+ "chio-runtime-core",
  "chio-store-sqlite",
+ "chio-swarm-authority",
+ "chio-workflow",
  "rusqlite",
  "rustls",
  "rustls-pemfile",
@@ -1615,6 +1619,7 @@ dependencies = [
  "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-weights",
+ "chio-workflow",
  "chrono",
  "dashmap",
  "futures",
@@ -1800,6 +1805,35 @@ dependencies = [
  "chrono",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "chio-runtime-core"
+version = "0.1.0"
+dependencies = [
+ "chio-attest-buyer-core",
+ "chio-core-types",
+ "chio-federation",
+ "chio-kernel",
+ "chio-runtime-proof-parity",
+ "chio-security-types",
+ "chio-sqlite-file-identity",
+ "chio-swarm-authority",
+ "chio-weights",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-runtime-proof-parity"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1999,6 +2033,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-workflow-preflight",
+ "rusqlite",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

@@ -23,6 +23,8 @@ fn run() -> Result<serde_json::Value> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         #[cfg(unix)]
+        ["experimental-evolving-work",state] => funded_work::evolving::run(Path::new(state)),
+        #[cfg(unix)]
         ["experimental-peer-lifecycle",root,mode] => funded_work::authority_process::run_peer(Path::new(root),mode),
         #[cfg(unix)]
         ["experimental-verifier-call",state,id,socket,origin,output] => funded_work::peer_verifier::export(Path::new(state),id,Path::new(socket),origin,Path::new(output)),

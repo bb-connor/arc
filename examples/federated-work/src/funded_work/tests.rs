@@ -4,7 +4,7 @@ mod evidence;
 mod execution;
 mod execution_authority;
 mod native;
-mod observer;
+pub(super) mod observer;
 mod resolution;
 mod settlement;
 mod successors;

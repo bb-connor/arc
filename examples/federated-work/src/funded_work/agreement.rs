@@ -10,6 +10,8 @@ pub const AGREEMENT_SCHEMA: &str =
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Policy {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<super::composition::Config>,
     pub authority_uuid: String,
     pub implementation_sha256: String,
     pub buyer_key: PublicKey,

@@ -34,6 +34,23 @@ class QualificationTests(unittest.TestCase):
                              recovered_receipt={'signature':'fixture'},
                              sibling_receipt={'signature':'fixture'})
         self.write(str(EVIDENCE/'qualified-native-recovery.json'), json.dumps(self.recovery))
+        self.evolving = dict(schema='chio.experimental.evolving-funded-run.v1', parentKilledSignal=9,
+            discoveredAfterScout=True, originalScoutPreserved=True, graphNodeCounts=[3,4],
+            rejections=dict(receiver=True, allocation=True, continuation=True, treaty=True),
+            earned=dict(state='Payable', paid='0'),
+            retired=dict(parentActionsDisabled=True, verifierSigningDisabled=True), original={},
+            final={'balances': dict(buyer='900', intermediary='1000', child='100', escrow='0', supply='2000')})
+        for role in ('scout','parent','child'):
+            identity = {k: role+'-'+k for k in ('operationId','allocationId','holdId','authorizationId','authorityUuid')}
+            identity['runtimeClaimHistory'] = [{'reference': {'operationId': identity['operationId']},
+                'intent': {'resources': [{'kind': 'treaty_continuation'}, {'kind': 'swarm_continuation'}]}}]
+            self.evolving['original'][role] = copy.deepcopy(identity)
+            self.evolving[role] = dict(identity, nativeState='Completed', executions=1,
+                                      paymentState='refunded' if role=='parent' else 'paid')
+        self.evolving['parent']['nativeState'] = 'OutcomeUnknownAfterDispatch'
+        self.evolving['collection'] = dict(transactionHash='payment', replay=copy.deepcopy(self.evolving['child']))
+        self.evolving['collectionReplay'] = copy.deepcopy(self.evolving['collection'])
+        self.write(str(EVIDENCE/'qualified-evolving-funded-work.json'), json.dumps(self.evolving))
 
     def write(self, name, contents):
         data = contents.encode()
@@ -89,6 +106,22 @@ class QualificationTests(unittest.TestCase):
                 self.assertTrue(verify_qualification(self.root, self.record))
         del self.record['outputs'][path]
         self.assertTrue(verify_qualification(self.root, self.record))
+
+    def test_exit_zero_cannot_substitute_a_broken_evolving_trajectory(self):
+        path = str(EVIDENCE/'qualified-evolving-funded-work.json')
+        for mutation in ('signal', 'balance', 'identity', 'claim', 'repeat', 'earned', 'rejection', 'collector'):
+            body = copy.deepcopy(self.evolving)
+            if mutation == 'signal': body['parentKilledSignal'] = 0
+            if mutation == 'balance': body['final']['balances']['child'] = '200'
+            if mutation == 'identity': body['child']['allocationId'] = 'replacement'
+            if mutation == 'claim': body['child']['runtimeClaimHistory'] = []
+            if mutation == 'repeat': body['child']['executions'] = 2
+            if mutation == 'earned': body['earned']['state'] = 'Submitted'
+            if mutation == 'rejection': body['rejections']['treaty'] = False
+            if mutation == 'collector': body['collectionReplay']['transactionHash'] = 'new-payment'
+            self.write(path, json.dumps(body))
+            with self.subTest(mutation=mutation):
+                self.assertTrue(verify_qualification(self.root, self.record))
 
 
 if __name__ == '__main__':

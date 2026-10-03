@@ -42,6 +42,10 @@ pub struct Native {
 pub fn implementation_digest() -> String {
     chio_core_types::sha256_hex(
         &[
+            include_bytes!("composition.rs").as_slice(),
+            include_bytes!("composition/treaty.rs").as_slice(),
+            include_bytes!("evolving.rs").as_slice(),
+            include_bytes!("evolving/graph.rs").as_slice(),
             include_bytes!("allocation.rs").as_slice(),
             include_bytes!("observer.rs").as_slice(),
             include_bytes!("agreement.rs").as_slice(),
@@ -126,6 +130,24 @@ impl Native {
         required_finding_facets: Vec<chio_finding::FindingFacetKind>,
         execution: bool,
     ) -> Result<()> {
+        Self::provision_composed(
+            state,
+            buyer,
+            domain,
+            required_finding_facets,
+            execution,
+            None,
+        )
+    }
+
+    pub(super) fn provision_composed(
+        state: &Path,
+        buyer: PublicKey,
+        domain: Domain,
+        required_finding_facets: Vec<chio_finding::FindingFacetKind>,
+        execution: bool,
+        composition: Option<super::composition::Provision>,
+    ) -> Result<()> {
         super::wire::requirements(&required_finding_facets)?;
         domain.validate()?;
         match fs::symlink_metadata(state) {
@@ -167,7 +189,13 @@ impl Native {
         } else {
             super::finding_acceptance::fixture_context(&verifier, &provider, now, expires)?
         };
+        let composition = composition
+            .map(|input| {
+                super::composition::provision(state, &authority, &common::key(state)?, input)
+            })
+            .transpose()?;
         let policy = Policy {
+            composition,
             authority_uuid: authority.mutation_fence().store_uuid,
             implementation_sha256: implementation_digest(),
             buyer_key: buyer,
@@ -275,6 +303,9 @@ impl Native {
             authority.mutation_fence(),
         )?;
         kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+        if let Some(composition) = &policy.composition {
+            kernel = super::composition::install(kernel, state, composition)?;
+        }
         let recovery_error = if recover {
             kernel
                 .reconcile_durable_admission_startup()
@@ -429,13 +460,13 @@ impl Native {
             || request.capability.budget_share_bps.is_some()
             || request.dpop_proof.is_some()
             || request.execution_nonce.is_some()
-            || request.governed_intent.is_some()
+            || (self.policy.composition.is_none() && request.governed_intent.is_some())
             || request.approval_token.is_some()
             || !request.approval_tokens.is_empty()
             || request.threshold_approval_proposal.is_some()
             || request.supplemental_authorization.is_some()
             || request.model_metadata.is_some()
-            || request.federated_origin_kernel_id.is_some()
+            || (self.policy.composition.is_none() && request.federated_origin_kernel_id.is_some())
             || request.declassification_grant.is_some()
             || !super::waiver_terms::supported_arguments(&request.arguments)
             || request.arguments["input"]
@@ -444,18 +475,33 @@ impl Native {
         {
             return Err("unsupported native funding request profile".into());
         }
+        let metadata = self
+            .policy
+            .composition
+            .as_ref()
+            .map(|config| super::composition::validate(&self.state, config, request))
+            .transpose()?;
         let observed = self.source.observe(&allocation)?;
         let verified =
             observer::verify(&self.policy.domain, &terms, &observed, time, common::now()?)?;
         self.journal.stage(&verified, agreement, request)?;
         (self.checkpoint)("after-stage")?;
-        let evaluation = self.kernel.evaluate_tool_call_blocking(request);
+        let evaluation = self
+            .kernel
+            .evaluate_tool_call_blocking_with_metadata(request, metadata);
         // The rail deliberately cannot settle without an observed contract
         // successor. A retained operation and hold remain inspectable on error.
         match self.report(request) {
             Ok(mut report) => {
-                if let Err(error) = evaluation {
-                    report["nativeEvaluationError"] = serde_json::Value::String(error.to_string());
+                match evaluation {
+                    Err(error) => {
+                        report["nativeEvaluationError"] =
+                            serde_json::Value::String(error.to_string())
+                    }
+                    Ok(response) if response.verdict == chio_kernel::Verdict::Deny => {
+                        report["nativeDenial"] = serde_json::json!({"reason":response.reason, "metadata":response.receipt.metadata});
+                    }
+                    Ok(_) => (),
                 }
                 Ok(report)
             }
@@ -616,11 +662,27 @@ impl Native {
             _ if correlated => "pending",
             _ => "not_authorized",
         };
+        let runtime_claims = if self.policy.composition.is_some() {
+            Some(
+                self.authority
+                    .admission_operation_store()
+                    .load_runtime_participant_history(
+                        operation.binding().operation_id(),
+                        &self.authority.mutation_fence(),
+                        super::now_ms()?,
+                    )?
+                    .ok_or("original runtime participant history unavailable")?
+                    .1,
+            )
+        } else {
+            None
+        };
         Ok(
             serde_json::json!({"allocationId": entry.allocation, "operationId": id,
             "holdId": hold, "authorizationId": authorization,
             "nativeAuthorizationId": native_authorization, "startupReconciliationError": self.recovery_error,
             "requestId": request.request_id, "authorityUuid": self.policy.authority_uuid,
+            "runtimeClaimHistory": runtime_claims,
             "nativeState": format!("{:?}", operation.state()), "nativePaymentState": payment.as_ref().map(|p| format!("{:?}", p.state)),
             "nativePaymentAction": payment.as_ref().and_then(|p| p.settle_action),
             "fundingCorrelation": if correlated { "bound" } else { "not_authorized" },

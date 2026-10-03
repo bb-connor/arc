@@ -153,6 +153,7 @@ pub fn enroll(
     let authority =
         SqliteAuthorityStore::open_serving(state.join("authority.sqlite"), state.join("locks"))?;
     let policy = Policy {
+        composition: None,
         authority_uuid: authority.mutation_fence().store_uuid,
         implementation_sha256: super::native::implementation_digest(),
         buyer_key: pins.buyer.clone(),

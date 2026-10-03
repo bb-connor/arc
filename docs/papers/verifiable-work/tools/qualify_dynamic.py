@@ -26,6 +26,8 @@ def main():
             raise SystemExit('\n'.join(errors))
         print('PASS: current native source and terminal evidence agree')
         return
+    if not os.environ.get('CHIO_FUNDED_PYTHON'):
+        raise SystemExit('Set CHIO_FUNDED_PYTHON to the Python participant environment with its hash-locked dependencies')
     previous = [*directory.glob('qualified-*')]
     if path.exists():
         previous.append(path)
@@ -37,7 +39,9 @@ def main():
     before = native_sources(ROOT)
     env = os.environ.copy()
     env.setdefault('CARGO_TARGET_DIR', '/tmp/chio-paper-target')
-    env.setdefault('CARGO_BUILD_JOBS', '4')
+    env.setdefault('CARGO_BUILD_JOBS', '2')
+    env['CHIO_FUNDED_BINARY'] = str(Path(env['CARGO_TARGET_DIR'])/'debug/chio-federated-work')
+    env['CHIO_FUNDED_EVIDENCE_DIR'] = str(directory)
     env['CHIO_CHECKOUT_ROOT'] = str(ROOT)
     env['CHIO_DYNAMIC_RECOVERY_EVIDENCE'] = str(directory/'qualified-native-recovery.json')
     commands = {}
@@ -53,6 +57,8 @@ def main():
         print(f'{name}: exit {result.returncode}', flush=True)
         if result.returncode:
             break
+    for output in directory.glob('earned-child-*.json'):
+        output.rename(directory/('qualified-'+output.name))
     after = native_sources(ROOT)
     outputs = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                for p in sorted(directory.glob('qualified-*')) if p.is_file()}

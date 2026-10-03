@@ -57,6 +57,10 @@ struct Fixture {
 }
 
 fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
+    fixture_with_federation(false)
+}
+
+fn fixture_with_federation(federated: bool) -> Result<Fixture, Box<dyn std::error::Error>> {
     let mut grant = make_grant("durable-server", "mutate");
     grant.max_cost_per_invocation = Some(MonetaryAmount {
         units: 10,
@@ -66,9 +70,26 @@ fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
         units: 100,
         currency: "USD".into(),
     });
-    let (mut kernel, request, store, invocations) =
+    let (mut kernel, mut request, store, invocations) =
         durable_admission_fixture_with_grants("execution-signing-request", vec![grant]);
     kernel.require_durable_request_retention();
+    if federated {
+        kernel.set_receipt_store(Box::new(AdmissionReceiptProjectionStore::default()))?;
+        let origin = Keypair::generate();
+        kernel.set_federation_local_kernel_id("kernel.org-b");
+        let trust = KernelTrustExchange::new("kernel.org-b", kernel.config.keypair.clone())
+            .with_trusted_peer("kernel.org-a", origin.public_key());
+        let peer = handshake_and_pin(&trust, "kernel.org-a", &origin, current_unix_timestamp());
+        kernel = kernel.with_federation_peers(vec![peer]);
+        kernel.set_runtime_admission_hook(Arc::new(TreatyDsseAdmissionHook::new(
+            origin,
+            kernel.config.keypair.clone(),
+        )));
+        kernel.set_federation_cosigner(Arc::new(CountingRejectingCosigner {
+            calls: Arc::new(AtomicU64::new(0)),
+        }));
+        request.federated_origin_kernel_id = Some("kernel.org-a".into());
+    }
     let captures = Arc::new(AtomicUsize::new(0));
     kernel.set_payment_adapter(Box::new(PendingPayment(captures.clone())));
     let result = kernel.evaluate_tool_call_blocking(&request);
@@ -94,6 +115,62 @@ fn fixture() -> Result<Fixture, Box<dyn std::error::Error>> {
         invocations,
         captures,
     })
+}
+
+#[test]
+fn federated_execution_export_uses_original_admission_without_remote_completion() -> TestResult {
+    let f = fixture_with_federation(true)?;
+    let before = f.operations.payment_journal();
+    let receipt = f.kernel.export_durable_execution_evidence(&f.request)?;
+    assert!(receipt.verify_signature()?);
+    assert!(f.kernel.dual_signed_receipt(&receipt.id).is_none());
+    assert!(f.kernel.federation_dsse_envelope(&receipt.id).is_none());
+    f.kernel
+        .set_federation_local_kernel_id("substituted-local-owner");
+    assert!(f
+        .kernel
+        .export_durable_execution_evidence(&f.request)
+        .is_err());
+    f.kernel.set_federation_local_kernel_id("kernel.org-b");
+    let replay = f.kernel.export_durable_execution_evidence(&f.request)?;
+    assert_eq!(
+        canonical_json_bytes(&receipt)?,
+        canonical_json_bytes(&replay)?
+    );
+    assert_eq!(f.operations.payment_journal(), before);
+    assert_eq!(f.invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(f.captures.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn federated_execution_export_rejects_missing_or_substituted_frozen_context() -> TestResult {
+    for missing in [true, false] {
+        let f = fixture_with_federation(true)?;
+        let before = f.operations.payment_journal();
+        {
+            let mut state = f.outcomes.state.lock().map_err(|_| "state lock")?;
+            let mut wire = state
+                .raw_outcome
+                .as_ref()
+                .ok_or("raw outcome")?
+                .to_persisted();
+            wire.federation_context_json = if missing { None } else { Some("{}".into()) };
+            state.raw_outcome = Some(RawInvocationOutcomeV1::from_persisted(wire)?);
+        }
+        assert!(f
+            .kernel
+            .export_durable_execution_evidence(&f.request)
+            .is_err());
+        assert!(f
+            .outcomes
+            .lookup_execution_evidence(f.operation.binding().operation_id())?
+            .is_none());
+        assert_eq!(f.operations.payment_journal(), before);
+        assert_eq!(f.invocations.load(Ordering::SeqCst), 1);
+        assert_eq!(f.captures.load(Ordering::SeqCst), 1);
+    }
+    Ok(())
 }
 
 impl TestAdmissionOperationStore {
@@ -187,7 +264,7 @@ struct SigningProbe {
     mode: Mode,
     calls: AtomicUsize,
     reentries: AtomicUsize,
-    advanced_clock: Mutex<Option<crate::FixedRuntimeScope>>,
+    advanced_clock: Mutex<Option<chio_test_support::clock::ClockScope>>,
     mutation_store: Arc<TestAdmissionOperationStore>,
 }
 
@@ -241,11 +318,9 @@ impl SigningBackend for SigningProbe {
                 *self
                     .advanced_clock
                     .lock()
-                    .map_err(|_| chio_core::Error::InvalidSignature("clock lock".into()))? =
-                    Some(crate::scope_fixed_runtime_for_current_thread(
-                        current_unix_timestamp() + 61,
-                        [],
-                    ));
+                    .map_err(|_| chio_core::Error::InvalidSignature("clock lock".into()))? = Some(
+                    chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61),
+                );
                 self.inner.sign_bytes_for_identity(key, message)
             }
             Mode::SourceChange => {

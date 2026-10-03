@@ -210,7 +210,19 @@ pub(crate) fn execution_metadata(
         .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
         Some(serde_json::json!({"receipt_context": {"request_id": request.request_id}})),
     );
-    if raw.receipt_metadata_snapshot() != expected_metadata.as_ref() {
+    let mut source_metadata = raw.receipt_metadata_snapshot().cloned();
+    if raw.federation_context_json().is_some() {
+        // These annotations belong to the retained admission/return context.
+        // The projection does not copy them or attest bilateral completion.
+        // Its request and raw-outcome digests retain their exact source binding;
+        // the exporting kernel revalidates the frozen treaty separately.
+        if let Some(object) = source_metadata.as_mut().and_then(Value::as_object_mut) {
+            for key in ["chio_runtime", "governed_transaction", "route"] {
+                object.remove(key);
+            }
+        }
+    }
+    if source_metadata.as_ref() != expected_metadata.as_ref() {
         return Err(ToolOutcomeError::Binding("execution.unsupported_metadata"));
     }
     let ResolvedToolOutcomeV1::Resolved {
@@ -374,8 +386,7 @@ pub(crate) fn validate_execution_provenance(
         || raw.caller_delivery_evidence().is_some()
         || raw.requires_security_release()?
         || raw.security_invocation_context().is_some()
-        || raw.federation_context_json().is_some()
-        || request.federated_origin_kernel_id.is_some()
+        || (raw.federation_context_json().is_some() != request.federated_origin_kernel_id.is_some())
         || request.declassification_grant.is_some()
         || request.execution_nonce.is_some()
         || operation.execution_nonce_id().is_some()

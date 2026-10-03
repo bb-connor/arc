@@ -13,7 +13,8 @@ use chio_core::receipt::signing::ReceiptSigningHandle;
 impl ChioKernel {
     /// Return one immutable receipt for the original retained native execution.
     /// This creates neither dispatch nor settlement authority. Unsupported
-    /// provenance and missing original signing identity fail closed.
+    /// provenance and missing original signing identity fail closed. A federated
+    /// projection attests local execution, not remote delivery or co-signing.
     pub fn export_durable_execution_evidence(
         &self,
         request: &ToolCallRequest,
@@ -88,6 +89,22 @@ impl ChioKernel {
             .map_err(durable_outcome_store_error)?
             .ok_or_else(|| execution_error("original resolved output is unavailable"))?;
         validate_execution_provenance(&operation, &raw).map_err(tool_outcome_error)?;
+        if let Some(context) = raw.federation_context_json() {
+            outcome
+                .validate_canonical_blob(
+                    &operation,
+                    &raw.canonical_blob().map_err(tool_outcome_error)?,
+                )
+                .map_err(tool_outcome_error)?;
+            // Reuse the historical admission decoder at its original time. This
+            // neither installs a peer from a request nor asks for new consent.
+            self.restore_frozen_federation_return_context(
+                context.to_owned(),
+                &operation,
+                request,
+                outcome.recorded_at_unix_ms(),
+            )?;
+        }
         let journal = runtime
             .store
             .load_payment_journal(id.as_str(), &runtime.fence)

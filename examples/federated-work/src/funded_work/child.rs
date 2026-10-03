@@ -140,6 +140,7 @@ pub(super) fn executor(
         &request,
         &parent.body.provider_key,
     )?;
+    let parent_state = state.join("parent");
     let state = state.join("child");
     Ok(Arc::new(move |input| {
         if request.arguments["input"].as_str() != Some(input) {
@@ -151,8 +152,17 @@ pub(super) fn executor(
         std::thread::scope(|scope| {
             scope
                 .spawn(|| {
-                    let native = Native::open(&state, source.clone())?;
-                    native.execute(&child, &request)?;
+                    let mut native = Native::open(&state, source.clone())?;
+                    if native.policy.composition.is_some() {
+                        super::composition::connect_local_cosigner(
+                            &mut native,
+                            &common::key(&parent_state)?,
+                        )?;
+                    }
+                    let report = native.execute(&child, &request)?;
+                    if report["executions"] != 1 {
+                        return Err(format!("child stopped before execution: {report}").into());
+                    }
                     let checkpoint: super::Checkpoint = Arc::new(|_| Ok(()));
                     let earned = super::lifecycle::progress(
                         &state,

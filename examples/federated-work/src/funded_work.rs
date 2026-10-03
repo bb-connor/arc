@@ -86,3 +86,7 @@ pub mod peer_client;
 
 #[cfg(unix)]
 mod peer_process;
+
+mod composition;
+#[cfg(unix)]
+pub mod evolving;

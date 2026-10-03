@@ -8,6 +8,10 @@ license = "Apache-2.0"
 [workspace]
 
 [dependencies]
+chio-workflow = { path = "../../crates/platform/chio-workflow" }
+chio-runtime-core = { path = "../../crates/kernel/chio-runtime-core" }
+chio-swarm-authority = { path = "../../crates/kernel/chio-swarm-authority" }
+chio-federation = { path = "../../crates/trust/chio-federation" }
 alloy-primitives = { version = "1.5.7", default-features = false, features = ["std"] }
 alloy-sol-types = { version = "1.5.7", default-features = false, features = ["std"] }
 chio-core-types = { path = "../../crates/core/chio-core-types" }

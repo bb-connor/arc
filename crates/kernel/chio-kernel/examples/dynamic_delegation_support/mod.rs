@@ -102,6 +102,21 @@ pub fn open_with_clock(
     bad: bool,
     clock: Option<Arc<dyn Clock>>,
 ) -> Result<(ChioKernel, Arc<AtomicUsize>)> {
+    open_with_layout(
+        root,
+        receiver,
+        bad,
+        clock,
+        delegated_work::DelegatedWorkLayout::Arguments,
+    )
+}
+pub fn open_with_layout(
+    root: &Path,
+    receiver: u8,
+    bad: bool,
+    clock: Option<Arc<dyn Clock>>,
+    layout: delegated_work::DelegatedWorkLayout,
+) -> Result<(ChioKernel, Arc<AtomicUsize>)> {
     let dir = root.join(format!("receiver-{receiver}"));
     std::fs::create_dir_all(dir.join("locks"))?;
     #[cfg(unix)]
@@ -142,7 +157,11 @@ pub fn open_with_clock(
         Arc::new(authority.tool_outcome_store()),
         authority.mutation_fence(),
     )?;
-    delegated_work::install_delegated_work(&mut kernel, vec![key(1).public_key()])?;
+    delegated_work::install_delegated_work_with_layout(
+        &mut kernel,
+        vec![key(1).public_key()],
+        layout,
+    )?;
     let calls = Arc::new(AtomicUsize::new(0));
     kernel.register_tool_server(Box::new(Tool {
         calls: calls.clone(),

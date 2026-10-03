@@ -36,7 +36,7 @@ pub fn parent_worker(state: &Path) -> Result<Value> {
             Ok(())
         }),
     )?;
-    let native = Native::open_configured(
+    let mut native = Native::open_configured(
         &state.join("parent"),
         parent_source,
         Arc::new(|point| {
@@ -48,6 +48,12 @@ pub fn parent_worker(state: &Path) -> Result<Value> {
         }),
         Some(subcontract),
     )?;
+    if native.policy.composition.is_some() {
+        super::composition::connect_local_cosigner(
+            &mut native,
+            &common::key(&state.join("buyer"))?,
+        )?;
+    }
     native.execute(
         &super::evidence::read(state.join("parent/original-agreement.json"))?,
         &super::evidence::read(state.join("parent/original-request.json"))?,

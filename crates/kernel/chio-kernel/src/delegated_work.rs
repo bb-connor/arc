@@ -22,6 +22,25 @@ pub fn install_delegated_work(
     kernel: &mut ChioKernel,
     accepted_allocators: Vec<PublicKey>,
 ) -> Result<(), KernelError> {
+    install_delegated_work_with_layout(kernel, accepted_allocators, DelegatedWorkLayout::Arguments)
+}
+
+/// The receiver chooses the permit location when installing the guard. Requests
+/// cannot switch layouts or fall back to an unguarded input format.
+#[derive(Clone, Copy, Debug)]
+pub enum DelegatedWorkLayout {
+    /// Existing `{slot_id, payload, allocation}` tool argument envelope.
+    Arguments,
+    /// `{slot_id, allocation}` in `governed_intent.context.chioDelegation`.
+    /// The input commitment covers the complete, unchanged tool arguments.
+    GovernedContext,
+}
+
+pub fn install_delegated_work_with_layout(
+    kernel: &mut ChioKernel,
+    accepted_allocators: Vec<PublicKey>,
+    layout: DelegatedWorkLayout,
+) -> Result<(), KernelError> {
     if !kernel.has_durable_admission_store() {
         return Err(denied(
             "durable native admission must be configured before installation",
@@ -32,6 +51,7 @@ pub fn install_delegated_work(
         accepted_allocators,
         receiver: kernel.public_key(),
         clock: kernel.authority_clock(),
+        layout,
     }));
     Ok(())
 }
@@ -40,6 +60,7 @@ struct DelegatedWorkGuard {
     accepted_allocators: Vec<PublicKey>,
     receiver: PublicKey,
     clock: Arc<dyn crate::Clock>,
+    layout: DelegatedWorkLayout,
 }
 
 #[derive(Deserialize)]
@@ -50,6 +71,13 @@ struct Arguments {
     allocation: Signed<DispatchPermit>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ContextPermit {
+    slot_id: String,
+    allocation: Signed<DispatchPermit>,
+}
+
 fn denied(message: impl std::fmt::Display) -> KernelError {
     KernelError::GuardDenied(format!("delegated work: {message}"))
 }
@@ -57,7 +85,26 @@ fn denied(message: impl std::fmt::Display) -> KernelError {
 impl DelegatedWorkGuard {
     fn admit(&self, ctx: &GuardContext<'_>) -> Result<Admission, KernelError> {
         let request = ctx.request;
-        let args: Arguments = serde_json::from_value(request.arguments.clone()).map_err(denied)?;
+        let args: Arguments = match self.layout {
+            DelegatedWorkLayout::Arguments => {
+                serde_json::from_value(request.arguments.clone()).map_err(denied)?
+            }
+            DelegatedWorkLayout::GovernedContext => {
+                let value = request
+                    .governed_intent
+                    .as_ref()
+                    .and_then(|intent| intent.context.as_ref())
+                    .and_then(|context| context.get("chioDelegation"))
+                    .ok_or_else(|| denied("governed delegation permit absent"))?;
+                let permit: ContextPermit =
+                    serde_json::from_value(value.clone()).map_err(denied)?;
+                Arguments {
+                    slot_id: permit.slot_id,
+                    allocation: permit.allocation,
+                    payload: request.arguments.clone(),
+                }
+            }
+        };
         let [grant] = ctx.scope.grants.as_slice() else {
             return Err(denied("one exact invocation grant required"));
         };

@@ -75,6 +75,18 @@ impl FundingRail {
             .ok_or("no verified funding for native request")?;
         let terms = entry.agreement.validate(&self.policy, &entry.request)?;
         let original = retained.request_for_revalidation();
+        let governed_matches = match (&request.governed, &original.governed_intent) {
+            (None, None) => self.policy.composition.is_none(),
+            (Some(payment), Some(intent)) if self.policy.composition.is_some() => {
+                payment.intent_id == intent.id
+                    && payment.intent_hash == intent.binding_hash()?
+                    && payment.purpose == intent.purpose
+                    && payment.server_id == intent.server_id
+                    && payment.tool_name == intent.tool_name
+                    && payment.approval_token_id.is_none()
+            }
+            _ => false,
+        };
         if digest(original)? != digest(&entry.request)?
             || binding.coordinator_authority_id().as_str() != self.policy.authority_uuid
             || binding.policy_hash().as_str() != digest(&self.policy)?
@@ -82,7 +94,7 @@ impl FundingRail {
             || request.currency != CURRENCY
             || request.payer != self.policy.buyer_key.to_hex()
             || request.payee != SERVER
-            || request.governed.is_some()
+            || !governed_matches
             || request.commerce.is_some()
         {
             return Err("payment request does not match original funded native operation".into());

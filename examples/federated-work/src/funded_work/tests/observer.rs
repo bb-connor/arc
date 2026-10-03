@@ -3,7 +3,7 @@ use crate::funded_work::observer::*;
 use alloy_primitives::{keccak256, B256, U256};
 use alloy_sol_types::SolValue;
 
-pub(super) fn fixture() -> Result<(Domain, Terms, Observation, u64)> {
+pub(crate) fn fixture() -> Result<(Domain, Terms, Observation, u64)> {
     let now = crate::common::now()?;
     let vector: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../../contracts/scripts/fixtures/work-claim-vectors.json"

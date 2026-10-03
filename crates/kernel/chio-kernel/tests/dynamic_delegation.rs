@@ -272,3 +272,63 @@ fn unknown_original_keeps_its_allocation_while_a_sibling_completes() -> Result {
     }
     Ok(())
 }
+
+#[test]
+fn governed_delegation_preserves_tool_arguments_and_denies_binding_substitution() -> Result {
+    use chio_core::capability::governance::GovernedTransactionIntent;
+    for mutation in 0..5 {
+        let dir = tempfile::tempdir()?;
+        let store = DelegationStore::open(dir.path().join("allocation.db"))?;
+        store.create_root(slot("leaf", 2, 60, 2)?)?;
+        let (kernel, calls) = open_with_layout(
+            dir.path(),
+            3,
+            false,
+            None,
+            delegated_work::DelegatedWorkLayout::GovernedContext,
+        )?;
+        let mut call = request(&kernel, "leaf", 2, "context-bound", 20)?;
+        // The actual tool still receives its original argument shape. The permit
+        // binds all of it, including fields the tool itself does not inspect.
+        let payload = call.arguments.clone();
+        call.arguments = json!({"slot_id":"leaf", "payload":payload});
+        choose(&store, &call, 2, 3, 0, 20)?;
+        seal(&store, &mut call, 20)?;
+        let allocation = call.arguments["allocation"].clone();
+        call.arguments = call.arguments["payload"].clone();
+        call.governed_intent = Some(GovernedTransactionIntent {
+            id: "composed".into(),
+            server_id: call.server_id.clone(),
+            tool_name: call.tool_name.clone(),
+            purpose: "delegated work".into(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: None,
+            autonomy: None,
+            context: Some(json!({"chioDelegation":{"slot_id":"leaf", "allocation":allocation}})),
+            body: Default::default(),
+        });
+        match mutation {
+            1 => call.arguments["payload"] = json!(["substituted"]),
+            2 => call.governed_intent = None,
+            3 => call.request_id = "replacement".into(),
+            4 => call.arguments["unused"] = json!(true),
+            _ => (),
+        }
+        let response = kernel.evaluate_tool_call_blocking(&call)?;
+        assert_eq!(
+            response.verdict,
+            if mutation == 0 {
+                Verdict::Allow
+            } else {
+                Verdict::Deny
+            },
+            "mutation {mutation}: {:?}",
+            response.reason
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), usize::from(mutation == 0));
+    }
+    Ok(())
+}

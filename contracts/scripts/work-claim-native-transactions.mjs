@@ -28,6 +28,7 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
   const owners = { submit: beneficiary, record: verifier, pay: beneficiary, refund: payer };
   const included = new Map();
   let verifierKey;
+  const verifierKeys = new Map();
   let allowed = new Set(Object.keys(owners));
   const policyFor = action => ({ owner: owners[action].address.toLowerCase(), domain: scope });
   function retainedPolicy(prepared) {
@@ -40,10 +41,17 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
       assert.ok(actions.every(action => allowed.has(action)), 'authority cannot widen after retirement');
       allowed = new Set(actions);
     },
-    pin(key) {
+    pin(key, allocationId) {
       assert.match(key, /^[0-9a-f]{64}$/);
       assert.ok(!verifierKey || verifierKey === key, 'verifier pin is immutable');
-      verifierKey = key;
+      if (allocationId !== undefined) {
+        assert.match(allocationId, /^0x[0-9a-f]{64}$/);
+        assert.ok(!verifierKeys.has(allocationId) || verifierKeys.get(allocationId) === key, 'verifier pin is immutable');
+        verifierKeys.set(allocationId, key);
+      } else {
+        assert.ok([...verifierKeys.values()].every(value => value === key), 'verifier pin is immutable');
+        verifierKey = key;
+      }
     },
     async prepare(request) {
       assert.deepEqual(Object.keys(request).sort(), ['action', 'allocationId', 'commitment', 'decision', 'terms']);
@@ -56,14 +64,15 @@ export function transactions({ rpc, provider, escrow, domain, payer, beneficiary
       let callData;
       if (action === 'submit') callData = escrowInterface.encodeFunctionData('submitClaim', [allocationId, commitment]);
       if (action === 'record') {
-        assert.ok(verifierKey && decision);
+        const selectedVerifier = verifierKeys.get(allocationId) ?? verifierKey;
+        assert.ok(selectedVerifier && decision);
         const body = decision.body;
         assert.equal(body.schema, 'chio.experimental.native-funded-decision.v2');
         assert.equal(body.binding.allocationId, allocationId);
         assert.equal('0x' + body.binding.agreementSha256, terms.agreementDigest);
         assert.equal(body.commitment, commitment);
         assert.equal(work.commitment, commitment, 'decision requires observed original claim');
-        const key = createPublicKey({ key: Buffer.from('302a300506032b6570032100' + verifierKey, 'hex'), format: 'der', type: 'spki' });
+        const key = createPublicKey({ key: Buffer.from('302a300506032b6570032100' + selectedVerifier, 'hex'), format: 'der', type: 'spki' });
         assert.match(decision.signature, /^[0-9a-f]{128}$/);
         assert.ok(verify(null, Buffer.from(canonical(body)), key, Buffer.from(decision.signature, 'hex')), 'native verifier signature invalid');
         const decisionDigest = ethers.sha256(ethers.toUtf8Bytes(canonical(body)));

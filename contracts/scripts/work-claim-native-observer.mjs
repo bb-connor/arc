@@ -127,7 +127,7 @@ async function run(request) {
     assert.deepEqual(Object.keys(request).sort(), request.allocation ? ['allocation', 'key', 'method'] : ['key', 'method']);
     const route = request.allocation ? routes.get(request.allocation) : lifecycle;
     assert.ok(route, 'unknown verifier allocation');
-    route.pin(request.key); return {};
+    route.pin(request.key, request.allocation); return {};
   }
   if (request.method === 'prepare') {
     assert.deepEqual(Object.keys(request).sort(), ['method', 'request']);

@@ -36,6 +36,57 @@ pub(super) fn fixture() -> Result<Fixture> {
     ])
 }
 
+#[test]
+fn composed_receiver_cannot_drop_policy_or_recreate_missing_runtime_custody() -> Result<()> {
+    use crate::funded_work::composition::Provision;
+    let (domain, _, observation, _) = super::observer::fixture()?;
+    let directory = tempfile::tempdir()?;
+    let buyer = Keypair::generate();
+    let planner = Keypair::generate();
+    let now = crate::funded_work::now_ms()?;
+    Native::provision_composed(
+        directory.path(),
+        buyer.public_key(),
+        domain,
+        vec![
+            chio_finding::FindingFacetKind::ArtifactIntegrity,
+            chio_finding::FindingFacetKind::GuaranteeConsistency,
+        ],
+        false,
+        Some(Provision {
+            allocator: planner.public_key(),
+            witness: planner.public_key(),
+            program_id: crate::common::digest(&planner.public_key())?,
+            buyer,
+            issued: now,
+            until: now + 600_000,
+        }),
+    )?;
+    let source = Arc::new(Source(Mutex::new(observation), AtomicBool::new(false)));
+    drop(Native::open(directory.path(), source.clone())?);
+    let policy = directory.path().join("funding-policy.json");
+    let original = std::fs::read(&policy)?;
+    let mut changed: serde_json::Value = serde_json::from_slice(&original)?;
+    changed
+        .as_object_mut()
+        .ok_or("policy object")?
+        .remove("composition");
+    std::fs::write(&policy, chio_core_types::canonical_json_bytes(&changed)?)?;
+    assert!(Native::open(directory.path(), source.clone()).is_err());
+    std::fs::write(&policy, original)?;
+    let runtime = directory.path().join("runtime.sqlite");
+    let offline = directory.path().join("runtime.offline");
+    std::fs::rename(&runtime, &offline)?;
+    assert!(Native::open(directory.path(), source.clone()).is_err());
+    assert!(
+        !runtime.exists(),
+        "missing custody must not be replaced by empty state"
+    );
+    std::fs::rename(&offline, &runtime)?;
+    drop(Native::open(directory.path(), source)?);
+    Ok(())
+}
+
 pub(super) fn fixture_with_requirements(
     requirements: Vec<chio_finding::FindingFacetKind>,
 ) -> Result<Fixture> {

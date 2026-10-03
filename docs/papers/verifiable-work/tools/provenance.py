@@ -12,6 +12,7 @@ HISTORICAL_SOURCE = '71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3'
 EVIDENCE = Path('docs/research/dynamic-delegation/evidence')
 TOOLS = 'docs/papers/verifiable-work/tools/'
 COMMANDS = {
+    'environment': ['python3', '-B', TOOLS+'qualify_environment.py'],
     'workflow-tests': ['cargo', 'test', '--locked', '-p', 'chio-workflow'],
     'native-tests': ['cargo', 'test', '--locked', '-p', 'chio-kernel', '--features',
                      'admission-test-support', '--test', 'dynamic_delegation'],
@@ -34,6 +35,42 @@ COMMANDS = {
                'crates/kernel/chio-kernel/tests/dynamic_delegation.rs',
                'crates/kernel/chio-kernel/examples/dynamic_delegation.rs'],
     'example': ['cargo', 'run', '--locked', '-p', 'chio-kernel', '--example', 'dynamic_delegation'],
+    'execution-export-tests': ['cargo', 'test', '--locked', '-p', 'chio-kernel', '--features',
+                               'admission-test-support', '--lib', 'execution_evidence'],
+    'durable-regression': ['cargo', 'test', '--locked', '-p', 'chio-kernel', '--features',
+                           'admission-test-support', '--test', 'durable_admission_sqlite'],
+    'funded-tests': ['cargo', 'test', '--locked', '--manifest-path', 'examples/federated-work/Cargo.toml'],
+    'funded-clippy': ['cargo', 'clippy', '--locked', '--manifest-path', 'examples/federated-work/Cargo.toml',
+                      '--all-targets', '--', '-D', 'warnings'],
+    'funded-format': ['rustfmt', '--edition', '2021', '--config', 'skip_children=true', '--check',
+                      'crates/kernel/chio-kernel/examples/dynamic_delegation_support/mod.rs',
+                      'crates/kernel/chio-kernel/src/delegated_work.rs',
+                      'crates/kernel/chio-kernel/src/kernel/admission_coordinator/execution_evidence.rs',
+                      'crates/kernel/chio-kernel/src/kernel/tests/durable_admission/execution_evidence.rs',
+                      'crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs',
+                      'crates/kernel/chio-kernel/tests/durable_admission_sqlite/federation_context.rs',
+                      'crates/kernel/chio-kernel/tests/dynamic_delegation.rs',
+                      'examples/federated-work/src/funded_work.rs',
+                      'examples/federated-work/src/funded_work/agreement.rs',
+                      'examples/federated-work/src/funded_work/authority_enrollment.rs',
+                      'examples/federated-work/src/funded_work/child.rs',
+                      'examples/federated-work/src/funded_work/child_process.rs',
+                      'examples/federated-work/src/funded_work/composition.rs',
+                      'examples/federated-work/src/funded_work/composition/treaty.rs',
+                      'examples/federated-work/src/funded_work/evolving.rs',
+                      'examples/federated-work/src/funded_work/evolving/graph.rs',
+                      'examples/federated-work/src/funded_work/evolving/tests.rs',
+                      'examples/federated-work/src/funded_work/native.rs',
+                      'examples/federated-work/src/funded_work/rail.rs',
+                      'examples/federated-work/src/funded_work/tests.rs',
+                      'examples/federated-work/src/funded_work/tests/native.rs',
+                      'examples/federated-work/src/funded_work/tests/observer.rs',
+                      'examples/federated-work/src/main.rs',
+                     ],
+    'funded-build': ['cargo', 'build', '--locked', '--manifest-path', 'examples/federated-work/Cargo.toml'],
+    'rail-pins': ['node', '--test', 'contracts/scripts/work-claim-native-wire.test.mjs'],
+    'evolving-funded': ['python3', '-B', 'examples/federated-work/test_evolving_work.py'],
+    'funded-child-regression': ['python3', '-B', 'examples/federated-work/funded_child.py'],
     'artifact-tests': ['python3', '-B', '-m', 'unittest', 'discover', '-s', TOOLS.rstrip('/'), '-p', 'test_*.py'],
 }
 
@@ -82,7 +119,9 @@ def native_sources(root):
     # Retain the broad repository context, including indirect test fixtures.
     # Only this change's publication/evidence files are qualified separately.
     excluded = ('docs/papers/verifiable-work/', 'docs/research/dynamic-delegation/',
-                'docs/research/swarm-evolution/',
+                'docs/research/swarm-evolution/', 'docs/research/evolving-funded-work/',
+                'docs/superpowers/plans/2026-10-02-evolving-funded-work.md',
+                'docs/superpowers/specs/2026-10-02-evolving-funded-work-design.md',
                 'docs/superpowers/plans/2026-10-02-dynamic-delegation.md',
                 'docs/superpowers/specs/2026-10-02-dynamic-delegation-design.md',
                 'docs/superpowers/plans/2026-10-02-sovereign-swarm-evolution.md',
@@ -141,6 +180,14 @@ def verify_qualification(root, record):
                     errors.append('missing native recovery receipt: '+name)
         except (OSError, ValueError, TypeError, AttributeError):
             errors.append('invalid native recovery trajectory')
+    required = str(EVIDENCE/'qualified-evolving-funded-work.json')
+    if required not in outputs:
+        errors.append('missing fresh evolving funded trajectory')
+    else:
+        try:
+            errors.extend(verify_evolving(json.loads((root/required).read_text())))
+        except (OSError, ValueError, TypeError, AttributeError, KeyError):
+            errors.append('invalid evolving funded trajectory')
     for name, digest in outputs.items():
         file = (root/name).resolve()
         if (not safe_path(name) or not file.is_relative_to(root.resolve())
@@ -149,4 +196,50 @@ def verify_qualification(root, record):
             errors.append('outside dynamic evidence root: '+name)
         elif not file.is_file() or hashlib.sha256(file.read_bytes()).hexdigest() != digest:
             errors.append('dynamic evidence mismatch: '+name)
+    return errors
+
+
+def verify_evolving(r):
+    errors = []
+    expected = dict(schema='chio.experimental.evolving-funded-run.v1', parentKilledSignal=9,
+                    discoveredAfterScout=True, originalScoutPreserved=True, graphNodeCounts=[3,4])
+    if any(type(r.get(k)) is not type(v) or r.get(k) != v for k,v in expected.items()):
+        errors.append('evolving trajectory does not establish growth and parent loss')
+    if (r['earned']['state'] != 'Payable' or r['earned']['paid'] != '0'
+            or r['retired'] != dict(parentActionsDisabled=True, verifierSigningDisabled=True)
+            or r['parent']['nativeState'] != 'OutcomeUnknownAfterDispatch'):
+        errors.append('evolving trajectory lost original uncertainty or earned independence')
+    if r['final']['balances'] != dict(buyer='900', intermediary='1000', child='100', escrow='0', supply='2000'):
+        errors.append('evolving funded accounting mismatch')
+    if set(r['rejections']) != {'receiver','allocation','continuation','treaty'} or any(v is not True for v in r['rejections'].values()):
+        errors.append('evolving authority substitution was not rejected')
+    roles = ('scout','parent','child')
+    for field in ('operationId','allocationId','holdId','authorityUuid'):
+        if len({r[role][field] for role in roles}) != 3:
+            errors.append('evolving resource owners are not distinct: '+field)
+    if any(r[role]['nativeState'] != 'Completed' for role in ('scout','child')):
+        errors.append('evolving local execution did not finish')
+    collection, replay = r['collection'], r['collectionReplay']
+    if collection['replay'] != r['child']:
+        errors.append('evolving collector differs from child report')
+    def stable(value):
+        value = json.loads(json.dumps(value))
+        value['replay'].pop('startupReconciliationError', None)
+        return value
+    if stable(collection) != stable(replay):
+        errors.append('evolving collection replay changed execution or payment')
+    for role in roles:
+        current = r[role]
+        if type(current['executions']) is not int or current['executions'] != 1:
+            errors.append('evolving duplicate or absent effect: '+role)
+        if current['paymentState'] != ('refunded' if role == 'parent' else 'paid'):
+            errors.append('evolving settlement mismatch: '+role)
+        for field in ('operationId','allocationId','holdId','authorizationId','authorityUuid','runtimeClaimHistory'):
+            if not current.get(field) or current[field] != r['original'][role][field]:
+                errors.append('evolving original identity changed: '+role+'/'+field)
+        history = current['runtimeClaimHistory']
+        if len(history) != 1 or history[0]['reference']['operationId'] != current['operationId']:
+            errors.append('evolving physical claim mismatch: '+role)
+        elif {v['kind'] for v in history[0]['intent']['resources']} != {'treaty_continuation','swarm_continuation'} or len(history[0]['intent']['resources']) != 2:
+            errors.append('evolving physical resources missing or duplicated: '+role)
     return errors

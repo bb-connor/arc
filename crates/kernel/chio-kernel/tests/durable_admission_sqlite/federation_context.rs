@@ -137,7 +137,7 @@ fn sqlite_retained_federation_context_survives_owner_restart_without_redispatch(
         assert!(
             denied
                 .to_string()
-                .contains("execution.unsupported_provenance"),
+                .contains("original payment identity is unavailable"),
             "{denied}"
         );
         assert!(outcomes.lookup_execution_evidence(&operation_id)?.is_none());
