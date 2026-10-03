@@ -1,0 +1,71 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
+error[E0599]: no method named `seal_dispatch` found for struct `Arc<chio_workflow::delegation::DelegationStore>` in the current scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:403:24
+    |
+403 |     let permit = store.seal_dispatch(&b, 1000, &key(1))?;
+    |                        ^^^^^^^^^^^^^
+    |
+help: there is a method `claim_dispatch` with a similar name, but with different arguments
+   --> crates/platform/chio-workflow/src/delegation/store.rs:197:5
+    |
+197 |     pub fn claim_dispatch(&self, binding: &DispatchBinding, now: u64) -> Result<Admission> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `seal_dispatch` found for struct `Arc<chio_workflow::delegation::DelegationStore>` in the current scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:404:30
+    |
+404 |     assert_eq!(permit, store.seal_dispatch(&b, 1001, &key(1))?);
+    |                              ^^^^^^^^^^^^^
+    |
+help: there is a method `claim_dispatch` with a similar name, but with different arguments
+   --> crates/platform/chio-workflow/src/delegation/store.rs:197:5
+    |
+197 |     pub fn claim_dispatch(&self, binding: &DispatchBinding, now: u64) -> Result<Admission> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0425]: cannot find function `verify_dispatch_permit` in this scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:409:5
+    |
+409 |     verify_dispatch_permit(&permit, &b, 1002, &[key(1).public_key()])?;
+    |     ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `verify_dispatch_permit` in this scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:410:13
+    |
+410 |     assert!(verify_dispatch_permit(&permit, &b, 1002, &[]).is_err());
+    |             ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `verify_dispatch_permit` in this scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:413:13
+    |
+413 |     assert!(verify_dispatch_permit(&altered, &b, 1002, &[key(1).public_key()]).is_err());
+    |             ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `verify_dispatch_permit` in this scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:415:13
+    |
+415 |     assert!(verify_dispatch_permit(&permit, &other, 1002, &[key(1).public_key()]).is_err());
+    |             ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `verify_dispatch_permit` in this scope
+   --> crates/platform/chio-workflow/tests/delegation.rs:416:13
+    |
+416 |     assert!(verify_dispatch_permit(&permit, &b, 1900, &[key(1).public_key()]).is_err());
+    |             ^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+Some errors have detailed explanations: E0425, E0599.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `chio-workflow` (test "delegation") due to 7 previous errors

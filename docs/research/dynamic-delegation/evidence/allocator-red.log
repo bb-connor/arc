@@ -1,0 +1,59 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
+error[E0432]: unresolved import `chio_workflow::delegation`
+ --> crates/platform/chio-workflow/tests/delegation.rs:3:20
+  |
+3 | use chio_workflow::delegation::*;
+  |                    ^^^^^^^^^^ could not find `delegation` in `chio_workflow`
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-workflow/tests/delegation.rs:77:16
+   |
+77 |     let path = dir.path().join("allocation.db");
+   |                ^^^ cannot infer type
+
+error[E0282]: type annotations needed
+  --> crates/platform/chio-workflow/tests/delegation.rs:97:22
+   |
+97 |     assert!(matches!(store.subdivide(&Signed::sign(body.clone(), &key(4))?, 1000), Err(DelegationError::Authority)));
+   |                      ^^^^^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> crates/platform/chio-workflow/tests/delegation.rs:116:26
+    |
+116 | ...   assert!(matches!(store.subdivide(&Signed::sign(Subdivision { parent_id: "root".into(), child }, &key(1))?, 1000), Err(Delegat...
+    |                        ^^^^^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> crates/platform/chio-workflow/tests/delegation.rs:146:42
+    |
+146 |     let reopened = DelegationStore::open(dir.path().join("allocation.db"))?;
+    |                                          ^^^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> crates/platform/chio-workflow/tests/delegation.rs:160:39
+    |
+160 |     let other = DelegationStore::open(dir.path().join("allocation.db"))?;
+    |                                       ^^^ cannot infer type
+
+error[E0282]: type annotations needed
+   --> crates/platform/chio-workflow/tests/delegation.rs:209:22
+    |
+209 |     assert!(matches!(store.subdivide(&request, 2000), Err(DelegationError::Expired)));
+    |                      ^^^^^ cannot infer type
+
+Some errors have detailed explanations: E0282, E0432.
+For more information about an error, try `rustc --explain E0282`.
+error: could not compile `chio-workflow` (test "delegation") due to 7 previous errors

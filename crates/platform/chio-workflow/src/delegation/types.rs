@@ -162,10 +162,14 @@ pub struct Subdivision {
     pub child: WorkSlot,
 }
 
+/// Receiver-signed v1 offer with accepted-output pricing: a result rejected by
+/// the bound predicate earns zero charge in the qualified native payment profile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkOffer {
     pub slot_id: String,
+    /// Includes holder, bounds and acceptance terms, not just a reusable name.
+    pub contract_hash: String,
     pub receiver: PublicKey,
     pub effect: Effect,
     pub arguments_hash: String,
@@ -196,6 +200,20 @@ impl sealed::Body for WorkOffer {
 }
 impl sealed::Body for Selection {
     const DOMAIN: &'static str = "chio.work-selection.v1";
+}
+
+/// Portable evidence from an explicitly trusted resource allocator. It does
+/// not assert that funds were escrowed or grant authority at a receiver.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DispatchPermit {
+    pub root_id: String,
+    pub slot: WorkSlot,
+    pub selection: Signed<Selection>,
+    pub issued_at: u64,
+}
+impl sealed::Body for DispatchPermit {
+    const DOMAIN: &'static str = "chio.work-dispatch-permit.v1";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -247,6 +265,88 @@ pub struct DispatchBinding {
 pub struct Admission {
     pub slot: WorkSlot,
     pub selection: Signed<Selection>,
+}
+
+/// Check locally, without the issuer database. Issuer keys are trusted operator
+/// configuration; never accept a key merely because it arrived in a permit.
+pub fn verify_dispatch_permit(
+    permit: &Signed<DispatchPermit>,
+    binding: &DispatchBinding,
+    now: u64,
+    accepted_issuers: &[PublicKey],
+) -> Result<Admission> {
+    permit.verify()?;
+    if !accepted_issuers.contains(&permit.signer) {
+        return Err(Error::Authority);
+    }
+    let body = &permit.body;
+    body.slot.validate()?;
+    identifier(&body.root_id)?;
+    if body.issued_at == 0 || body.issued_at > now {
+        return invalid("permit issuance time");
+    }
+    let selection = &body.selection;
+    selection.verify()?;
+    selection.body.offer.verify()?;
+    let offer = &selection.body.offer.body;
+    if selection.signer != body.slot.holder
+        || selection.body.offer.signer != offer.receiver
+        || !body
+            .slot
+            .contract
+            .readers
+            .contains(&offer.receiver.to_hex())
+    {
+        return Err(Error::Authority);
+    }
+    if offer.slot_id != body.slot.id || binding.slot_id != body.slot.id {
+        return Err(Error::Conflict);
+    }
+    if offer.contract_hash != binding_digest(&body.slot)? {
+        return Err(Error::Conflict);
+    }
+    if offer.expires_at > body.slot.contract.expires_at
+        || offer.price_units > body.slot.contract.max_units
+        || !body.slot.contract.effects.contains(&offer.effect)
+    {
+        return Err(Error::Bounds);
+    }
+    validate_dispatch(&body.slot, selection, binding, now)?;
+    Ok(Admission {
+        slot: body.slot.clone(),
+        selection: selection.clone(),
+    })
+}
+
+pub(crate) fn validate_dispatch(
+    slot: &WorkSlot,
+    selection: &Signed<Selection>,
+    binding: &DispatchBinding,
+    now: u64,
+) -> Result<()> {
+    let offer = &selection.body.offer.body;
+    live(slot.contract.expires_at, now)?;
+    live(offer.expires_at, now)?;
+    if binding.subject != slot.holder || binding.receiver != offer.receiver {
+        return Err(Error::Authority);
+    }
+    if binding.request_id != selection.body.request_id
+        || binding.capability_hash != selection.body.capability_hash
+        || binding.arguments_hash != offer.arguments_hash
+        || binding.effect != offer.effect
+    {
+        return Err(Error::Conflict);
+    }
+    if binding.currency != slot.contract.currency || binding.max_units > offer.price_units {
+        return Err(Error::Bounds);
+    }
+    Ok(())
+}
+
+/// Excludes the evidence envelope to avoid a circular commitment. The slot and
+/// exact payload are signed; capability and request identity are also bound.
+pub fn work_input_digest(slot_id: &str, payload: &Value) -> Result<String> {
+    binding_digest(&(slot_id, payload))
 }
 
 /// Domain-separated digest of an exact native capability or request payload.

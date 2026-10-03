@@ -1,5 +1,5 @@
 use super::{types::*, DelegationError as Error, Result};
-use chio_core::crypto::PublicKey;
+use chio_core::crypto::{Keypair, PublicKey};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use std::{
     path::Path,
@@ -37,7 +37,10 @@ impl DelegationStore {
                 selection TEXT, revision INTEGER NOT NULL, dispatched INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS work_slots_parent_v1 ON work_slots_v1(parent);
-            CREATE INDEX IF NOT EXISTS work_slots_root_v1 ON work_slots_v1(root);",
+            CREATE INDEX IF NOT EXISTS work_slots_root_v1 ON work_slots_v1(root);
+            CREATE TABLE IF NOT EXISTS work_dispatch_permits_v1 (
+                slot_id TEXT PRIMARY KEY REFERENCES work_slots_v1(id), body TEXT NOT NULL
+            );",
         )?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -146,6 +149,9 @@ impl DelegationStore {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = required(&tx, &offer.slot_id)?;
+        if offer.contract_hash != binding_digest(&row.slot)? {
+            return Err(Error::Conflict);
+        }
         if request.signer != row.slot.holder
             || selection.offer.signer != offer.receiver
             || !qualified.contains(&offer.receiver)
@@ -199,22 +205,7 @@ impl DelegationStore {
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = required(&tx, &binding.slot_id)?;
         let selection = row.selection.ok_or(Error::Conflict)?;
-        let offer = &selection.body.offer.body;
-        live(row.slot.contract.expires_at, now)?;
-        live(offer.expires_at, now)?;
-        if binding.subject != row.slot.holder || binding.receiver != offer.receiver {
-            return Err(Error::Authority);
-        }
-        if binding.request_id != selection.body.request_id
-            || binding.capability_hash != selection.body.capability_hash
-            || binding.arguments_hash != offer.arguments_hash
-            || binding.effect != offer.effect
-        {
-            return Err(Error::Conflict);
-        }
-        if binding.currency != row.slot.contract.currency || binding.max_units > offer.price_units {
-            return Err(Error::Bounds);
-        }
+        validate_dispatch(&row.slot, &selection, binding, now)?;
         tx.execute(
             "UPDATE work_slots_v1 SET dispatched=1 WHERE id=?1",
             [&row.slot.id],
@@ -224,6 +215,52 @@ impl DelegationStore {
             slot: row.slot,
             selection,
         })
+    }
+}
+
+impl DelegationStore {
+    /// Commit before returning portable evidence. The signing key belongs to
+    /// allocator configuration, not a holder request. Sealing forbids replacement
+    /// even before receiver execution. Retries return the original signed bytes.
+    pub fn seal_dispatch(
+        &self,
+        binding: &DispatchBinding,
+        now: u64,
+        issuer: &Keypair,
+    ) -> Result<Signed<DispatchPermit>> {
+        let admission = self.claim_dispatch(binding, now)?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing: Option<String> = tx
+            .query_row(
+                "SELECT body FROM work_dispatch_permits_v1 WHERE slot_id=?1",
+                [&binding.slot_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        let permit = if let Some(body) = existing {
+            serde_json::from_str::<Signed<DispatchPermit>>(&body)
+                .map_err(|e| Error::Invalid(e.to_string()))?
+        } else {
+            let row = required(&tx, &binding.slot_id)?;
+            let permit = Signed::sign(
+                DispatchPermit {
+                    root_id: row.root,
+                    slot: admission.slot,
+                    selection: admission.selection,
+                    issued_at: now,
+                },
+                issuer,
+            )?;
+            tx.execute(
+                "INSERT INTO work_dispatch_permits_v1(slot_id,body) VALUES(?1,?2)",
+                params![binding.slot_id, encode(&permit)?],
+            )?;
+            permit
+        };
+        verify_dispatch_permit(&permit, binding, now, &[issuer.public_key()])?;
+        tx.commit()?;
+        Ok(permit)
     }
 }
 

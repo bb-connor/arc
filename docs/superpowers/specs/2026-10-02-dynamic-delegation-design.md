@@ -46,7 +46,7 @@ is immutable. A separate leaf can perform final assembly/checking.
 
 Holders sign subdivision and selection requests. Provider offers are signed by
 the receiving kernel's key and bind the exact slot, arguments digest, effect,
-price and validity interval. A locally configured, explicit receiver allowlist
+price, complete slot digest and validity interval. A locally configured, explicit receiver allowlist
 qualifies providers; discovery alone grants no authority. Initial enrollment
 and application adapters are trusted setup costs, never counted as zero.
 Adding a provider to a discovery response requires no change to contract code;
@@ -56,7 +56,7 @@ Provider selection binds the offer to an ordinary receiver-issued capability
 digest and request ID. The native capability still supplies authority. The
 offer and allocation are evidence, never an alternate CA root. A holder cannot
 select a provider for another holder's slot. Signed bodies use domain-separated
-RFC 8785 canonical JSON and strict Ed25519 verification.
+RFC 8785 canonical JSON and strict native signature verification.
 
 ## Durable state and transitions
 
@@ -70,8 +70,12 @@ consensus and multi-region availability are outside this profile.
   Atomic allocation rejects sibling overcommit and integer overflow. A selected
   slot cannot be subdivided; a container cannot be selected for execution.
 - Select: authenticated holder binds a qualified signed offer and exact native
-  request/capability. Before dispatch the holder may select a replacement.
-- Dispatch: the guard atomically records the selected binding before execution.
+  request/capability. Before sealing the holder may select a replacement.
+- Seal: the owner allocator atomically locks the selected binding before exporting
+  signed evidence. A persisted permit binds the root, immutable slot, selection
+  and issuance time. Retrying returns the original permit.
+- Dispatch: the receiver verifies that portable permit against locally configured
+  allocator keys, without accessing the allocator database.
   A different request, capability, provider, arguments or offer is rejected.
   Revalidation of the same binding is idempotent. An uncertain operation retains
   its reservation and cannot be replaced or subdivided.
@@ -80,12 +84,16 @@ consensus and multi-region availability are outside this profile.
   manufacture proof of general usefulness.
 
 There is deliberately no reset, timeout refund, untrusted absence report or
-release of dispatched allocations. Existing native durable admission owns
+release of sealed allocations. Existing native durable admission owns
 operation replay and recovery. The allocator conservatively retains capacity
 even when a later native check prevents dispatch. This is a liveness cost.
 
 SQLite immediate transactions serialize sibling allocation and selection versus
-dispatch. Separate connections/processes use the same owner database. Every
+sealing. Selecting a provider authorizes sealing that exact execution; any courier
+may carry that authorized request. A replacement wins only if it commits before
+sealing. The allocator retains all capacity from sealing onward, even when no
+receiver executes. The gap between locking the selection and persisting its
+permit can strand capacity but cannot change the selected identity. Separate connections/processes use the same owner database. Every
 mutation validates the trusted clock argument and current expiry. Public methods
 accept explicit time for deterministic use; the native adapter obtains wall time.
 Store corruption and lock failure fail closed.
@@ -102,16 +110,20 @@ satisfy this JSON-return profile.
 
 ## Native integration
 
-Add an opt-in `DelegatedWorkGuard` to `chio-kernel`, using the shared allocator.
-Requests carry `{slot_id, payload}`. Offer hashes bind the complete arguments.
+Add an opt-in installation API in `chio-kernel`, requiring native durable
+admission. Requests carry `{slot_id, payload, allocation}`. Offer hashes bind
+slot and exact payload; excluding the enclosing permit avoids circular hashing.
+The permit separately commits the exact capability and request ID. Receivers
+activate accepted allocator keys locally, separately from capability CA roots.
 The guard pins its receiving key, checks the selected native capability digest,
 subject, request ID, exact server/tool, expiry and bounded monetary grants. It
 requires one exact invoke grant, max_invocations=1 and both cost limits no larger
 than the offer price, in the slot currency. Native capability verification,
 durable operation capture, payment and receipt signing remain in their existing
 owners. Require durable request retention in the example/integration setup.
-Output checks run after transforms. Pricing remains native; this guard does not
-opt into zero-charge rejection or claim paid settlement from an allocation.
+Output checks run after transforms. Pricing remains native. The receiver-signed offer binds accepted-output pricing:
+this installed profile opts into the existing reversible-hold zero-charge
+rejection contract. An allocation alone is not evidence of paid settlement.
 
 The receiving host/tool confinement and declared reader/effect completeness are
 explicit assumptions. The guard controls this kernel invocation and result;
@@ -159,3 +171,19 @@ local checking, resource conservation or safe substitution.
 Global constraints: fail closed; no unsafe Rust; no new external dependencies;
 reuse workspace rusqlite; signed payloads use RFC 8785; no em dashes; no
 unqualified breakthrough claim; retain all meaningful failed evidence.
+
+## Execution refinements
+
+The initial shared-database guard was superseded before successful native
+qualification by portable sealed evidence. This realizes the intended separation
+of allocation coordination from receiver-local execution. Receivers need no live
+allocator connection after sealing; they still need their own durable native
+authority and the selected payment rail. This is not removal of coordination
+from resource allocation or instant offline revocation.
+
+The wire profile caps numbers at 2^53-1, depth at 32, effects at 64, readers at
+256, children per slot at 64 and slots per root at 4096. Qualified providers must
+also belong to the explicit reader set. New enrollment/disclosure authority is
+not inferred from discovery. Dynamic selection in the example uses a previously
+qualified pool; policy-class enrollment and arbitrary information-flow tracking
+remain separate integration work.

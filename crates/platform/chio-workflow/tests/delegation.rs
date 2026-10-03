@@ -60,6 +60,7 @@ fn selection(id: &str, receiver: u8, revision: u64) -> Result<Signed<Selection>>
             offer: Signed::sign(
                 WorkOffer {
                     slot_id: id.into(),
+                    contract_hash: binding_digest(&slot(id, 2, 60, 2))?,
                     receiver: key(receiver).public_key(),
                     effect: Effect {
                         server: "research".into(),
@@ -391,5 +392,49 @@ fn predicates_validate_and_check_the_actual_json_result() -> Result {
     }
     .validate()
     .is_err());
+    Ok(())
+}
+
+#[test]
+fn sealed_allocation_is_portable_and_cannot_be_reassigned() -> Result {
+    let (dir, store) = setup()?;
+    child(&store, "leaf", 60)?;
+    store.select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])?;
+    let b = binding("leaf", 3);
+    let permit = store.seal_dispatch(&b, 1000, &key(1))?;
+    assert_eq!(permit, store.seal_dispatch(&b, 1001, &key(1))?);
+    assert!(store
+        .select(&selection("leaf", 4, 1)?, 1001, &[key(4).public_key()])
+        .is_err());
+    drop(store);
+    drop(dir);
+    // The issuing service and its database are gone; verification is local.
+    verify_dispatch_permit(&permit, &b, 1002, &[key(1).public_key()])?;
+    assert!(verify_dispatch_permit(&permit, &b, 1002, &[]).is_err());
+    let mut altered = permit.clone();
+    altered.body.slot.contract.acceptance.clauses.clear();
+    assert!(verify_dispatch_permit(&altered, &b, 1002, &[key(1).public_key()]).is_err());
+    let mut other = b.clone();
+    other.receiver = key(4).public_key();
+    assert!(verify_dispatch_permit(&permit, &other, 1002, &[key(1).public_key()]).is_err());
+    assert!(verify_dispatch_permit(&permit, &b, 1900, &[key(1).public_key()]).is_err());
+    Ok(())
+}
+
+#[test]
+fn provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id() -> Result {
+    let dir = tempfile::tempdir()?;
+    let store = DelegationStore::open(dir.path().join("other.db"))?;
+    let mut substituted = slot("leaf", 2, 60, 2);
+    substituted.contract.acceptance = Acceptance {
+        clauses: vec![Clause::Equals {
+            pointer: "/status".into(),
+            value: json!("different-terms"),
+        }],
+    };
+    store.create_root(substituted)?;
+    assert!(store
+        .select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])
+        .is_err());
     Ok(())
 }

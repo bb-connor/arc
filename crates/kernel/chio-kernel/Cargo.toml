@@ -71,6 +71,7 @@ loom = { workspace = true }
 # `cfg(not(loom))` keeps normal builds byte-identical while letting the loom
 # lane compile.
 [target.'cfg(not(loom))'.dependencies]
+chio-workflow = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-bounded = { workspace = true }
 chio-supervisor = { workspace = true }

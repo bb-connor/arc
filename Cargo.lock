@@ -4212,6 +4212,7 @@ dependencies = [
  "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-weights",
+ "chio-workflow",
  "chrono",
  "criterion",
  "dashmap 6.1.0",

@@ -1,0 +1,35 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
+    Finished `test` profile [unoptimized] target(s) in 2.81s
+     Running tests/delegation.rs (/tmp/chio-paper-target/debug/deps/delegation-f9bf153f43632ef0)
+
+running 1 test
+test provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id ... FAILED
+
+failures:
+
+---- provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id stdout ----
+
+thread 'provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id' (1820201) panicked at crates/platform/chio-workflow/tests/delegation.rs:430:5:
+assertion failed: store.select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()]).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p chio-workflow --test delegation`

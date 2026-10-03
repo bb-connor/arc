@@ -4,7 +4,7 @@
 
 **Goal:** Make runtime-selected and recursively delegated work use one durable, receiver-checked allocation contract, then update the paper to reflect the actual result.
 
-**Architecture:** A holder-authenticated SQLite allocation tree lives in chio-workflow. An opt-in chio-kernel guard binds each leaf to its original receiver-issued invocation and checks its exact output. Existing kernel authority, recovery, receipts and payments retain their roles.
+**Architecture:** A holder-authenticated SQLite allocation tree lives in chio-workflow. The allocator seals portable evidence; an opt-in chio-kernel guard verifies it locally, binds each leaf to its original receiver-issued invocation and checks its exact output. Existing kernel authority, recovery, receipts and payments retain their roles.
 
 **Tech Stack:** Rust, existing chio-core crypto/canonical JSON, serde, rusqlite, native kernel guards, LaTeX and Python artifact tooling.
 
@@ -30,25 +30,25 @@
 
 **Files:** Create `crates/platform/chio-workflow/src/delegation/{mod,types,store}.rs`, `crates/platform/chio-workflow/tests/delegation.rs`; modify `src/lib.rs` and `Cargo.toml`.
 
-**Interfaces:** `DelegationStore::open(path)`, `create_root(Slot)`, `subdivide(SignedSubdivision, now)`, `select(SignedSelection, now, qualified_receivers)`, `claim_dispatch(DispatchBinding, now)`, `slot(id)`; `Acceptance::validate/check`; signed offer/subdivision/selection constructors. Exact structs follow the spec; errors use one typed enum. Store operations return immutable slot/binding records, never capabilities.
+**Interfaces:** `DelegationStore::open(path)`, `create_root(Slot)`, `subdivide(SignedSubdivision, now)`, `select(SignedSelection, now, qualified_receivers)`, `claim_dispatch(DispatchBinding, now)`, `seal_dispatch(DispatchBinding, now, issuer)`, `verify_dispatch_permit`, `slot(id)`; `Acceptance::validate/check`; signed offer/subdivision/selection constructors. Exact structs follow the spec; errors use one typed enum. Store operations return immutable slot/binding records, never capabilities.
 
-- [ ] Write tests for dynamic nested allocation, sibling overspend, wrong signer, malformed predicates, integer overflow, changed replay and expiry. Run and retain the missing implementation failure.
-- [ ] Implement bounded serializable types, signatures and canonical digests; SQLite immediate transactions, immutable slots and exact dispatch binding.
-- [ ] Add two-connection race, reopen, replacement-before-dispatch and no replacement after dispatch tests. Observe failures before corrections where applicable.
-- [ ] Run `cargo test --locked -p chio-workflow`, focused clippy and formatting. Expected: all applicable tests pass; initial failures retained.
-- [ ] Commit `feat: add durable dynamic work delegation`.
+- [x] Write tests for dynamic nested allocation, sibling overspend, wrong signer, malformed predicates, integer overflow, changed replay and expiry. Run and retain the missing implementation failure.
+- [x] Implement bounded serializable types, signatures and canonical digests; SQLite immediate transactions, immutable slots and exact dispatch binding.
+- [x] Add two-connection race, reopen, replacement-before-dispatch and no replacement after dispatch tests. Observe failures before corrections where applicable.
+- [x] Run `cargo test --locked -p chio-workflow`, focused clippy and formatting. Expected: all applicable tests pass; initial failures retained.
+- [x] Commit `feat: add durable dynamic work delegation`.
 
 ## Task 2: Native receiver binding and runnable dynamic workflow
 
 **Files:** Create `crates/kernel/chio-kernel/src/delegated_work.rs`, `crates/kernel/chio-kernel/tests/dynamic_delegation.rs`, `crates/kernel/chio-kernel/examples/dynamic_delegation.rs`; modify kernel lib/Cargo metadata and lockfile for existing workspace dependencies only.
 
-**Interfaces:** `DelegatedWorkGuard::new(Arc<DelegationStore>, PublicKey)` consumes Task 1 bindings. `Guard::evaluate/revalidate_before_dispatch/validate_output_before_release` enforce native request and result checks. A shared example fixture may live under the integration test directory if it is only demonstration code.
+**Interfaces:** `install_delegated_work(&mut ChioKernel, Vec<PublicKey>)` activates accepted allocator keys and requires durable admission. A private guard consumes portable Task 1 permits. `Guard::evaluate/revalidate_before_dispatch/validate_output_before_release` enforce native request and result checks. A shared example fixture may live under the integration test directory if it is only demonstration code.
 
-- [ ] Write failing native tests for selected-provider dispatch, holder/capability/request tampering, output rejection, receiver substitution and attempted retry through a new identity.
-- [ ] Implement opt-in guard with fresh time checks and native monetary ceiling matching. Keep allocation evidence distinct from capability authority and settlement.
-- [ ] Exercise provider discovery after root creation, recursive holder delegation, pre-dispatch replacement, persisted unknown allocation and useful sibling completion; assert native receipts and dispatch counts.
-- [ ] Run native integration tests and the runnable example; test the changed crate boundary with focused clippy/formatting. Expected: authorized output delivered, altered calls/outputs denied, retained binding after reopen.
-- [ ] Commit `feat: enforce delegated work at native dispatch`.
+- [x] Write failing native tests for selected-provider dispatch, holder/capability/request tampering, output rejection, receiver substitution and attempted retry through a new identity.
+- [x] Implement opt-in guard with fresh time checks and native monetary ceiling matching. Keep allocation evidence distinct from capability authority and settlement.
+- [x] Exercise provider discovery after root creation, recursive holder delegation, pre-dispatch replacement, persisted unknown allocation and useful sibling completion; assert native receipts and dispatch counts.
+- [x] Run native integration tests and the runnable example; test the changed crate boundary with focused clippy/formatting. Expected: authorized output delivered, altered calls/outputs denied, retained binding after reopen.
+- [x] Commit `feat: enforce delegated work at native dispatch`.
 
 ## Task 3: Protocol argument, evidence and manuscript
 
