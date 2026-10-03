@@ -1,0 +1,2283 @@
+{
+  "schema": "chio.local-qualification.v1",
+  "scope": [
+    "KG2",
+    "KG3",
+    "AP2",
+    "AP3"
+  ],
+  "status": "local-source-accepted",
+  "source_base": "a617c0b02f182afac6acab2df89a2cd9270e4923",
+  "source_commit": "11485c4ef6747768454a42781f4faaf7bb0b7bb4",
+  "checkout": "/tmp/arc-security-launch",
+  "branch": "packet/3-retention-accounting",
+  "archive": "/home/connor/chio-security-evidence/2026-10-02-lifecycle-approval-authority",
+  "rust_environment": {
+    "CARGO_TARGET_DIR": "/home/connor/chio-security-target-6d-final",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "CHIO_CHECKOUT_ROOT": "/tmp/arc-security-launch"
+  },
+  "summary": {
+    "rust_passed": 2236,
+    "python_passed": 511,
+    "python_skipped": 4,
+    "rust_ignored": 0
+  },
+  "source_sha256": {
+    "Cargo.lock": "f08b01208531c697266a07192aecb03b202afc55b1e884083bfe2a2dd371010d",
+    "crates/guards/chio-policy/src/compiler.rs": "554cdd0d929780d65281e86d85bef5fa7e681ee74276bc39f0d4e622cb190222",
+    "crates/guards/chio-policy/src/compiler/tests.rs": "9e9b46717899cea384439e8b2a488a943c6f7d24eb72d834103fe86dbd9cb244",
+    "crates/guards/chio-policy/src/models.rs": "45b2167710981c11a40ddd308a34c3708e68679029d24a6b872acf384cf7e1bb",
+    "crates/guards/chio-policy/src/models/extensions.rs": "b2a31d16b532003f472b6ff112ced327b358ab12096a4921ec5b6f294760113d",
+    "crates/guards/chio-policy/src/models/rules.rs": "dd16d4575d790b92d565884e5dd2b3a0a1ccd4762ce8940caf1cd0acd1657516",
+    "crates/guards/chio-policy/tests/chio_extension.rs": "aa426cc4526170ad571a4285e9f3d6ca96423602a730c1ee3f99948c5ced1aba",
+    "crates/guards/chio-policy/tests/compile_policy.rs": "f73db3c76fc3d40d7d2e6dca371ade8474f49783a1b371e56175463480cf50b6",
+    "crates/guards/chio-policy/tests/human_in_loop.rs": "7a071457ee4dcbd12f631fecd859e076a1f8e8a27f6bf98cdecd5999b323ee1f",
+    "crates/kernel/chio-kernel/src/approval.rs": "dfe9ecc599ba7c78897db1826ce5cd3f92de803152b77310fe8ddecc52409cf6",
+    "crates/kernel/chio-kernel/src/approval/tool_context.rs": "c6b193ed63ee028de23efd704734b00c41915984b579ffa97391483a5007eb43",
+    "crates/kernel/chio-kernel/src/authority.rs": "40638dac30acff407984106898017911b6af595ffd6a0cf5acf6cf318d008240",
+    "crates/kernel/chio-kernel/src/authority/lifecycle.rs": "35b1d9a383408de8c9e24e42878445ffc3fe8eac7b83d536579217f11801dfe9",
+    "crates/kernel/chio-kernel/src/authority/replication.rs": "7bbc2f2c215d0c0660552e52c169df21f15c2def6c07645adce3b3022eadd035",
+    "crates/kernel/chio-kernel/src/kernel/construction.rs": "ecc7b25c735340d04d2311f9a85a9d2c996b5b04e6679c9a66f49ab240bf4fbd",
+    "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "61ce811c7024896919b2ac74d5cab83d9dfd8ad71270ec4ef843b4e15fe0e1a7",
+    "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "45814b69288a648fb8079e7467f9799e174e8cc4a62a0b98e339b5f29b20c0fa",
+    "crates/kernel/chio-kernel/src/kernel/governed_validation.rs": "7d07065ab4fb3f177aa239df2cf0010b692d0f0ed4fba4e9360cfea7fee3bf9f",
+    "crates/kernel/chio-kernel/src/kernel/governed_validation/tool_approval.rs": "0a243c3aa7cc8db10999aa794dcd534175c42bb7192416d7397e5652a8e5d7a5",
+    "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs": "46ce872bcae7106a8fea913c063cd6bca2b076b8345399c284617e532646a7af",
+    "crates/kernel/chio-kernel/src/kernel/session_ops.rs": "aeef6e9bd024b75ce4e1c655ca8ec500ab620358053ecafac1888cc150780123",
+    "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs": "c3d0a3a09133bcd850b8d51bea6818809591814288ef52bb9fb828274c54d222",
+    "crates/kernel/chio-kernel/src/kernel/session_ops/threshold_binding.rs": "8474a25645ad5466acf2db3b40710ae52f525aeccaf8fbfb80801dcb2e6e0a5b",
+    "crates/kernel/chio-kernel/src/kernel/session_ops/threshold_continuation.rs": "108c7bfe7056f1ebe86762484766cdf4d197e38f6f2f6648bb6490e4b82e9647",
+    "crates/kernel/chio-kernel/src/kernel/tests.rs": "c29f42af5c7cdbc9bb28122a27aae7cfb8c57c008fbcff5734aa747beea38f91",
+    "crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs": "8cc56ed5a94c8fc807206248f693a19f66655c92a095c34c456187a17ee50dba",
+    "crates/kernel/chio-kernel/src/kernel/tests/budget_governed_assurance.rs": "c2176f73d9259067b085f30f424da1e049e0e8de5ce7bd508507305da2164ac7",
+    "crates/kernel/chio-kernel/src/kernel/tests/budget_governed_call_chain.rs": "6dd1323156fabc4cf840fda00f0055c2510901e693c42fbeafbd76b7c3413ad8",
+    "crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs": "438f635416bf2cd2416ae98ea97c73186d507b561835ee792c76645345e58cdd",
+    "crates/kernel/chio-kernel/src/kernel/tests/dispatch_credentials.rs": "dcd7b408315f6a13996223032db6526f8ccef9e081e79ca099872b0a5dc08c71",
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/cumulative_budget.rs": "cf29f12954208f40ec1c3c815d5349b0f1d715db5e53c2c5db7e51643d502d9f",
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/dispatch_commit_failure.rs": "febadd33212144c0e556c7d58c616a4e12ab15f9a100ea67d1447e7b44a52fa0",
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/dispatch_commit_failure/mustprepay.rs": "61df6a785e063ebd1bfa08834a60ad527233979dcff67c3489ece4f58f7694f1",
+    "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/governed_acquisition.rs": "15d68b9e4ae82838566f96eb65c7798e46ed1eadc2998401fbd2650609217858",
+    "crates/kernel/chio-kernel/src/kernel/tests/payment_ambiguity.rs": "7123bed02e09cf6ba9e12dfbc07dcd3bdbd03648b73a2305641604c6a5e6a172",
+    "crates/kernel/chio-kernel/src/kernel/tests/security_dispatch/credentials.rs": "c728f37435bf22bd086a5eb720100a18ee3156a315851b89026a71f5eb10bb7e",
+    "crates/kernel/chio-kernel/src/kernel/tests/sim_payment.rs": "d20bb465613b94542727c461a3f399044099b1b251594007c90f74cdd7cfb6e8",
+    "crates/kernel/chio-kernel/src/kernel/tests/support_tool_approval.rs": "0acd512e6643a8566e05dfdb8b44d0b0893913a388de11ec1cd47bf7754bf7b8",
+    "crates/kernel/chio-kernel/src/kernel/tests/threshold_crypto_floor.rs": "d6d96093c18d4290d3bc2094b0ac5af2e3d4c59b20eda71d7b81c85d2dda4120",
+    "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance.rs": "9317f027a2277725b5436ef69c8628393c62171b5c3a138701e93ee76f673305",
+    "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/scope_binding.rs": "7eeef29003ee94f188c1cc64d096b0242f32ca39d210f5c0eb45d4bb47f1b3d1",
+    "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_continuation.rs": "de6ca61caf60e762da422f935fc53a39fc5d5b688b8f4fb43177cf56a100239c",
+    "crates/kernel/chio-kernel/src/kernel/validation.rs": "3ef33c554d96c8179889caac71c7836200b85b7ec18db94957256e6ad538c15b",
+    "crates/kernel/chio-kernel/src/kernel/validation/issuer_trust.rs": "a4d814a62182a1762b7a66b0c0c9daf20068978e0dcb23e8b89a36d79a8a93f3",
+    "crates/kernel/chio-kernel/src/kernel/validation/portable.rs": "ce4c31150f73cf8b4a7dc4766ce173adb3844d95505e6d9f3a2db539aa8c8918",
+    "crates/kernel/chio-kernel/src/session/threshold_continuation.rs": "2e46aca28aed2beb1b45ba0a764e4d5a1d12e4bc19922a1cc253c5f3a83c8152",
+    "crates/platform/chio-control-plane/src/issuance/authority.rs": "9cdb0ceb06c0f4ede59faa31e8b87843428eb8970c94b2321bb0f76ad913108b",
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs": "3945e165dda3df37c1ae5ca266e848fedeab783d14bcfa0db0a2f2ed0046ef01",
+    "crates/platform/chio-control-plane/src/keyring_runtime/capability.rs": "7f9c3723b9d39a170dfbb1eb8d225fa63d70898f5589fa390c1b32e59d669bb1",
+    "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs": "43423310b9b49023e0628b674c377ebb2682f2e05ed4d2a55f9c185311968275",
+    "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials.rs": "a1f9d51a5c226e991d1fe8c3dd65d884876a44b21f82d3b600f9344929846c8a",
+    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": "298cc0f16de2ca79088a8f9f5863ca8e8bf83e709abec5457588c93092a4e581",
+    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_lifecycle.rs": "97f3de31edc3d663fe7d56723df4817a048a9a72be910f95f736a84c26e9cee7",
+    "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_replication.rs": "e1498e18f1991e16047e4dd8cffa25d56054dba43d27edf4e29bff7c358981c0",
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs": "2bef787f7d76e48775b50958b1257055864fbd7c3cc8e0db9da69332de78d6e8",
+    "crates/platform/chio-control-plane/src/trust_control/report_validation.rs": "78579e0f735f0bffe8bb3c8b42ce0b0549ceb20634e82c71aed37542fd487c2c",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs": "38cb47185d2bc9a59a3066b6a5850964f2993afd8092fd0679c66ad9a18e10e0",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority/lifecycle.rs": "8023d9223b9c351550091171aaaa408a256a4cfffa91055c12d650b212fda687",
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/budget.rs": "e9a3823a2d6186f26d5e73f27a71e9ed8af556b6ece26c82e1f62fea7922afbf",
+    "crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs": "ae65da1d22c66f9b8e96dd6ad7ac250a4551357305e618920b84d99234d38a23",
+    "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": "a2e6dad36accae1e33d2587060ff239c7098134a214e279a32598679882ba913",
+    "crates/platform/chio-store-sqlite/src/approval_store.rs": "94b59d8424b840c4f26c7ff7b6c4b837b68c234eefb21dd3a2a01e9470b57db6",
+    "crates/platform/chio-store-sqlite/src/approval_store/decision_tests.rs": "fdbf6e881b834e18e482247ccb67a0f9afc12b3f3230cb7908e03e8915601359",
+    "crates/platform/chio-store-sqlite/src/authority.rs": "b4030aa6e87f3da89a5bce9c0056414a39ab84065b1837aeb3c0998f87f02202",
+    "crates/platform/chio-store-sqlite/src/authority/custody.rs": "046075299824414918f741602cd36b51e91346ffa49ff654ce570b47c747a84d",
+    "crates/platform/chio-store-sqlite/src/authority/custody/filesystem.rs": "9a1ae9e89e7d9029edd5906e1cbdb6a8ab7c3415575b0c6f98f0cb8bbeb27fa3",
+    "crates/platform/chio-store-sqlite/src/authority/custody/path.rs": "2e9987ecd09f055b9abe2211028f78baa5a43b361e6cbd7d2e2bd5d0ce398e49",
+    "crates/platform/chio-store-sqlite/src/authority/lifecycle.rs": "044dd83b65aa7a0d753593bc1306c4a6368312fb3b76a3c2289c90370c98f4ee",
+    "crates/platform/chio-store-sqlite/src/authority/replication.rs": "99eebe562c8d93905872ad1686abaaa4757e7a09422746b61e4eee73d306c6d5",
+    "crates/platform/chio-store-sqlite/src/authority/replication/persistence.rs": "56a4efb9bb2c9fceacc2002383fb5bc5133b120b04b7d3c5710d3235f649227c",
+    "crates/platform/chio-store-sqlite/src/authority/replication/tests.rs": "f1dff674c405ed864b728d8eaa719bc16f6397f5d4165cd187a721fa9a5158c3",
+    "crates/platform/chio-store-sqlite/src/authority/transaction_tests.rs": "894dcd488370f5b903c916db918aa1cf110a7a9fbcff418610362073c8cb0718",
+    "crates/platform/chio-store-sqlite/tests/authority_custody.rs": "128ba0000db50a02734d4fd786fc2b69e561dd6c5be0a184ecdcfba4edbe47fb",
+    "crates/platform/chio-store-sqlite/tests/authority_lifecycle.rs": "e753cd644308f2a859c2911235b469da36528f987bde8f5e00008b2a641e0b5f",
+    "crates/platform/chio-store-sqlite/tests/authority_lifecycle/portable.rs": "b02af37e030b6797876c5f7b0df9356d416d182d47018cc7fc4dcef13f493600",
+    "crates/products/chio-api-protect/README.md": "5037723598b6ba07ad747059217147b0e89ae41181be18de7c7e64196d19298a",
+    "crates/products/chio-api-protect/src/lib.rs": "4edbe271b90c3646c8d950c4afc18049c0a3c8f75b9a432ba3b7648d74064a35",
+    "crates/products/chio-api-protect/src/proxy.rs": "55a3c1eee11f9e54989ea1b993c83f31e5108023be22404abc2e14ef04e8bceb",
+    "crates/products/chio-api-protect/src/proxy/approval.rs": "8024fa96c438682792529bcd2af80d99c8115d4c0143049d396a1e35dfb34b20",
+    "crates/products/chio-api-protect/src/proxy/approval_authority.rs": "b336aaadad8c7b1e08e505375f52e677ca4bbe16f0051edfa6644637ccf10e70",
+    "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs": "157e42a7fae90b6e29b4c204673de6ab0d6d1200c43e8eeb111ee69e9d15a8e3",
+    "crates/products/chio-api-protect/src/proxy/config.rs": "801283aecbce21057de8dac4a5e0c210e05e6cada7b9acb590450399de13eeb7",
+    "crates/products/chio-api-protect/src/proxy/mediated.rs": "5ad6f2dd51349946d2ae97399c11965f3a5f75eb925a675ba547b0edd8014a23",
+    "crates/products/chio-api-protect/src/proxy/mediated/tests.rs": "64b54c051b01126a39b29924967e22000e3a061b21c076c3f444993481163f19",
+    "crates/products/chio-api-protect/src/proxy/mediated/tests/approvals.rs": "eba50edb68be93b7527f61e8fc6bc03e425dc04a74a049e68decbe06847ab016",
+    "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs": "fdf59807a720ea5ed83fa4f8a2ac70509f8b5a3a577fdc4db39bcf70b39dab2a",
+    "crates/products/chio-api-protect/src/proxy/nonce_tests.rs": "ac6039b01a4e1e77d69d439f5d787f73f5a4c0a9fbec7c75d2d211ac6f5c4d27",
+    "crates/products/chio-api-protect/src/proxy/state.rs": "079fc43e1f913bce10e5cd4a870a9600dab16f7647a6fd68f8fdfefcc302684d",
+    "crates/products/chio-api-protect/src/proxy/tests.rs": "2cadbdc90e4ffbfb28f7cf7a7575c04ed0ca3d330d5e69d5b675848c573c3922",
+    "crates/products/chio-api-protect/src/proxy/tests/control_containment.rs": "c742d13741bb0ed5909c4817e762ea8c7e5054738387ba497e826ff3e661b57e",
+    "crates/products/chio-cli/src/cli/chio/types/authority.rs": "55aaff4ba35365c5954a3d7fde8cdd7f12db8dbd3204aa2059ebbae62a6c08f1",
+    "crates/products/chio-cli/src/cli/dispatch/api_mcp.rs": "7f37688d25533173f0516252d0a99a31ab3f58c3100f0c143eeb362ec799579f",
+    "crates/products/chio-cli/src/cli/dispatch/federation.rs": "e35198021985db898983995ecfbfb81e3f1063a79ddf531873ab9d3d92478644",
+    "crates/products/chio-cli/src/cli/dispatch/federation/replication.rs": "e8602606290fd67cf4fdac213a378dbd7a554e9946add7bd849bf812a609db0c",
+    "crates/products/chio-cli/src/cli/mcp/governed_sim.rs": "450591e976047527eb8240674379cae454321162c0f12b06bdc72d6f505bf8f9",
+    "crates/products/chio-cli/src/cli/mcp/payment_config.rs": "141980c264247c92b3552d24636ab67b0a5e1d7a1b98b291c7ad17385b369fc3",
+    "crates/products/chio-cli/src/cli/process_host/keyring.rs": "7b18c53ad0003cfa4e35247a50b8253887e55e2fdb870c19db9182914ef28e13",
+    "crates/products/chio-cli/src/cli/process_host/keyring/live_tests.rs": "d795528cd055c5e99fb198afcb439dbccd07058e3ab6b4ae121bfe3fac557e36",
+    "crates/products/chio-cli/src/cli/runtime.rs": "c28f8096e0f0559e5b0ba002d143673d7348a9dff46ac0ddc10f858ea902c762",
+    "crates/products/chio-cli/src/cli/session/tests/pending_approval.rs": "6b7a68844d8e59f1cb679ee773cffa5c60c6a37871fc89a9fb1dee448114cdba",
+    "crates/products/chio-cli/src/cli/types/runtime.rs": "2c8ee014d9ae04cdd48a3a3bb48f0b407ba80c9264e59c4fc288055b5697d47a",
+    "crates/protocol/chio-mcp-remote/README.md": "f98792c1cf948f0833df17c9d2b9560dfd2f80698e254c89f893c273134c6848",
+    "crates/protocol/chio-mcp-remote/src/lib.rs": "34a6cb1ae75db27bb083665ce36c4c633c6c10231088ca02982ab2b2646eb37e",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs": "00333f2e75fec46c16aded3955c1405478eb88fe9c8d1caed3dec7b7f406470b",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": "4a7be93fe9773d52af3733f7c59a47224b9583641b7fa34d93e56d93217254d7",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/records.rs": "4c0aa7977c3b69a52ea7b1824af13e67d23c33325bd31f45ef74bbb538995251",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/redemption.rs": "8fb5ff269b9961d4c73b350b76d1d702bdfe5d7674ac8d1f36450726d5ee56a9",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/validation.rs": "a499e47e8d8b535343f587a1824447e2bea645b053c69c7e6287e72d7002fdac",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/mod.rs": "6f30484f45d2732c3672c536f25321fba12947c57af264106109ceb2b2ed1961",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals.rs": "b2cdc60899c0a1a26cb0f85790da88b43ea18346ff5d05a340f249fdcd4fd1a0",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals/fixture.rs": "d43816fdbdd18a5451cc832664ec22dae598014e5f9817e794389f4f4f9ad775",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals/native.rs": "3951f222aba5988d75b1704ad1985e43f3585f3917b526a8e64988f7fdb6b87d",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals/redemption.rs": "1d7d8fc4beef14725d524f198f080d9a1d6d19cedd4165f6b980de893a51af54",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs": "0003f98de7c3a87653b91bc96d7171a3c952359ec771dcdb1369474677edb019",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": "ab70e451923a152fce974189a7557cca8b73a39b063b8943d9eefd51b953a64c",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs": "50d4ef3e66ccb41b92c0d510a54143699a2a872951f165c6aca1674d3f450050",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs": "f86e9decbbeeeaf33601b011aaf88a9222aed2d478daca7a4bbec8f83a23d146",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/session.rs": "185c2bca3dd0d6e0ef5506c27c0e389f5646feb80441e19c8ad10f969cd4b47f",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": "623271d6a4037cc7a5f40af458d870fd5c952848e6a70b22a04aaa4766a4147c",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs": "24261b5128fa06e953bfeff5e79df44cb610236f44c8d680d40b11681ed2acad",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs": "3cb1466aeb18662778e51f63d3b6a7e30bfc5741bd74163ee1e8db1b9f9c15e6",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_recovery.rs": "4123150199fcb4004715900ebf97bfdad57a111108d94819ad3bc782fe896c61",
+    "crates/security/chio-keyring/src/state.rs": "00315be97346af5cdce15cdde6ef209a726df495025f69681180a16037ffb92c",
+    "crates/security/chio-keyring/tests/state.rs": "22b8d609e1aef2fe52bf393773d2c2b30a251039e55cb0704b6fb6f836107fa7",
+    "crates/tooling/chio-test-support/Cargo.toml": "b0bd0e32fa74d8b8d4a9856a749eb8424ae280b5a8d252151f89e0ebe046d5ad",
+    "crates/tooling/chio-test-support/src/lib.rs": "ce786f44add5f9cbc0238182f7f7365e1a1a3fba1830c9290361e4fb58a4ff8e",
+    "docs/security/authority-sqlite-custody.md": "e26f373ea9362b6b73d413121d15ce1249adc759932c79ac7bdf46fb51450b13",
+    "docs/security/issuer-lifecycle.md": "86087488b41cfbfc7617eec2da9a328e7f84b46c789a45ace6e01015783130ea",
+    "docs/security/kernel-signing-authority.md": "0a229ccb435680ff23ed16e6e97fb9411cd0ba4bebc304893a8d4b4c31148394",
+    "docs/security/threshold-approval-collection.md": "79b0ed3a71e36adfd3afe4d8d1aa92a06dcfd67b906b428b275aa443bca069fb",
+    "docs/security/trust-boundary-inventory.json": "46c127e07625ba9f196ff1fa96062fc932c5af30f6e9559bd6c6b61dc979636c",
+    "examples/policies/canonical-hushspec.yaml": "54b2d32b8ba6ab50cd25f2ef7fa8b535d967976365dd1e8aff53768d72cfbf03",
+    "integrations/required-agents/qualification/APPROVALS.md": "73c7cd33ad8b7037062ffd4e3ae202055a4cf9be93b04fc8da8eeff7bdb245b3",
+    "integrations/required-agents/qualification/README.md": "cdc8f8208791a3d819d5e52d83529f5c4345f569729025ff1443de49a7e2afb3",
+    "integrations/required-agents/qualification/operator_approval.py": "7e2a4cfc7318e688b7365c22043260c96a4baad61fb4d92b8c39eb80fbded2c2",
+    "integrations/required-agents/qualification/shared_kernel.py": "f79983caa726f8813c88aed06a467ef7885a7e5e7669e3233cd01bab6df92aed",
+    "integrations/required-agents/qualification/test_operator_http.py": "a201234816ec8afaefaad0485331a9cf91086d61cd8331dde9c0e529756422a6",
+    "integrations/required-agents/qualification/test_shared_approval_availability.py": "f157ea5f319797f7f9bb267d273b0a578a0e4ca965ce331ef8898daee08c87c2",
+    "sdks/python/chio-hermes/README.md": "d92dd47ed8d46a734b0e40afc7796f6966b3d8c0ab5a339789d21e1f9a41ce88",
+    "sdks/python/chio-hermes/src/chio_hermes/approval_inputs.py": "eebe55ad64e490e40907836d439a3cd90397c0c30dad7eb34108f43a551e21e2",
+    "sdks/python/chio-hermes/src/chio_hermes/cli.py": "5239beef116c17025032f7b44e4c00b81446d264ef4987fc0670b5a72ef7ebfe",
+    "sdks/python/chio-hermes/src/chio_hermes/commands.py": "e85c59c95e2cec2897f5618cf7412c40c3f357aa3554fc6c6a7ffeca3b04a3f8",
+    "sdks/python/chio-hermes/src/chio_hermes/handlers.py": "67ef6ab77ef47a20c82038d065f2b9926568c56e8399f8846550dd33ae5f70ae",
+    "sdks/python/chio-hermes/src/chio_hermes/runtime.py": "4454dab321b0b2a4c0b915d084110e828f7252e603df0a4c09d0bde2073574db",
+    "sdks/python/chio-hermes/tests/conftest.py": "0d867c96617105e94b2ea999f2e3e41e42fc830a45dfe49e40747bb788d4150c",
+    "sdks/python/chio-hermes/tests/test_approval_inputs.py": "76b0cc892f8abec1d7d248d3e333000387ebe4d17bd5e40e0c1306d1d4c6b7ce",
+    "sdks/python/chio-hermes/tests/test_cli.py": "d4acb0a6129516e6b745be06480eb1d001f890f9a78bec337945f883b843de9f",
+    "sdks/python/chio-hermes/tests/test_commands.py": "78f4e2f9e685b3299b4843a7fe6b08a05c2426d530d9652eb5ef7d1711592a03",
+    "sdks/python/chio-hermes/tests/test_hitl_approval.py": "f7323e28f0c55896416723eced42350bf55be69fc8ea1039bf52e638ce61786f",
+    "sdks/python/chio-hermes/tests/test_security_fixes.py": "29f79c0867d017fc384dd3d2142b8cdf847850a0ba6b72598264853b3912eb2d",
+    "sdks/python/chio-sdk-python/README.md": "9a89e32589b0708109e8aeecfae7fc439ead77d07387cfdc427aed4347fd4db1",
+    "sdks/python/chio-sdk-python/src/chio_sdk/approval_contract.py": "1933060cc0cb7055468ca19e731f3de731285d4c79fb1889aac89a07c477f616",
+    "sdks/python/chio-sdk-python/src/chio_sdk/client.py": "06a53633c7a2a88f8ae10abb501c77a4f79cc25bfb6e95efbd956edf52384125",
+    "sdks/python/chio-sdk-python/src/chio_sdk/models_approvals.py": "e25ebae192548fbcb51c3d1294b08d848e8d6474e3b61a290665cf21880b1fc4",
+    "sdks/python/chio-sdk-python/src/chio_sdk/testing.py": "ee6aa3f6d6492cd73770f144ef8852abde9c50447541024143ce03d699ada2be",
+    "sdks/python/chio-sdk-python/tests/test_approvals.py": "7568df3fc9ee2ce23bf99a9389f2cb2b7e6bf906fac85241f8afe43387d216cb",
+    "spec/wire-schemas-unpinned.md": "31fd226fcf2657a6d6360495dbbcc2c73b5a1b9dd6682b372a937c8308128cfd",
+    "spec/wire-schemas.lock": "adba65bcb4a30ae98fd3325e52dba124336901e36ec1d370db89899f76607652"
+  },
+  "accepted_runs": [
+    {
+      "label": "kernel-unit-final-2",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-96afd4f1dc9860df",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.39,
+      "log_sha256": "2e5be8c24e15287553d24e2c705ceab8686d05a49bc60fc28c29f3b5db071419",
+      "tests": {
+        "passed": 1504,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "api-unit-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_api_protect-23225b0d1a843530",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 24.64,
+      "log_sha256": "3e748843eb57ed6d458847ace1ea33dc45018c6dd863d209c18731be5817a4b4",
+      "tests": {
+        "passed": 234,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "mcp-unit-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_remote-0485a0b24b760e5a",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 52.85,
+      "log_sha256": "7b17a470ef36adcb6bceff56d6e013288bd26d9715e707bae2f032d40aacc6eb",
+      "tests": {
+        "passed": 118,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "policy-unit-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_policy-2b054f949224b5f7",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.03,
+      "log_sha256": "9bae6189ea88f334cdb79b70cbf04c9a2b29448a2fdef1f729aa98a0f1bb29f9",
+      "tests": {
+        "passed": 194,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "policy-hitl-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/human_in_loop-7defeb7b948e34f5",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.02,
+      "log_sha256": "51440b385ff04813c33d96e447c8cf15309cbdd0660c4018781f6b52fd22a7b7",
+      "tests": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "policy-compile-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/compile_policy-741d8e4b35aea8bd",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.15,
+      "log_sha256": "f39dc06d5d7c115e49271e5e50ba9824005fb6a222f182e1c63a1c560e11e8c0",
+      "tests": {
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "policy-extension-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_extension-8fa813db50decb8e",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.02,
+      "log_sha256": "1f8245a22aacfcaee00f567723825a4e3525602835d8a3731e85d72ff91f89a6",
+      "tests": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "store-authority-approval-final-2",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-1f3427720e045366",
+        "authority::",
+        "approval_store::",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.04,
+      "log_sha256": "8a9ca734f60df8c2f2570ffa152ea89ae1d5f3620b23fe3752876b62544f88f7",
+      "tests": {
+        "passed": 41,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "authority-custody-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/authority_custody-3e289e6c65fbea99",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.2,
+      "log_sha256": "26c167c2998b020bc9ec518bab9d2b1ecbb43f526782f6cc73ea3fa8b6a0dd8c",
+      "tests": {
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "authority-lifecycle-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/authority_lifecycle-e15eb3a3166b5b4e",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.95,
+      "log_sha256": "75b2987b2a22704f7135410c3b531ae96c9ba61938dabf62291fd0789b3d75e1",
+      "tests": {
+        "passed": 14,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "keyring-unit-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_keyring-c7b96bebb023e703",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.14,
+      "log_sha256": "dd84866158b2b8e6ccdcff41507ee3f7d5d55e1b0987a1a4884a6e1b3210fe8b",
+      "tests": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "keyring-state-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/state-a41c611ebe711a2c",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.05,
+      "log_sha256": "732840d3e780a2c474833fd2b296027ddfd5ea5b6ab462515264170b543dc336",
+      "tests": {
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "cli-consumers-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio-9f69865705d43c7e",
+        "kg2_",
+        "session_cli::tests::pending_approval",
+        "mcp_cli::payment_config",
+        "process_host::keyring",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.49,
+      "log_sha256": "8a6f63d8934b9f93705ee7e8c5c55511db56e551067e4026d31e80ce905cc29c",
+      "tests": {
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "control-authority-final-2",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-8ad2fbd3500646c1",
+        "authority_replication::",
+        "authority_lifecycle::",
+        "remote_authority::",
+        "service_runtime::tests::budget::",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.26,
+      "log_sha256": "4732c992901f6876e8df6ad79dad3da59b9165952fd710bcfb6d850a96f449b9",
+      "tests": {
+        "passed": 46,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "control-native-credentials-final",
+      "status": "passed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-0dd21ef61deaeac3",
+        "combined_credentials::",
+        "native_caller_composes_local_egress_declassification_and_complete_credentials",
+        "native_caller_original_delivery_survives_restart_and_authority_expiry",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 340.82,
+      "log_sha256": "0dc837b5dcf4eee725ad7543bae0df958a30703ddf323c8abb14975ec30b69e1",
+      "tests": {
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "owner-clippy-final-2",
+      "status": "passed",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-test-support",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 65.67,
+      "log_sha256": "5b31a4e29c94c751ab11a877f22577fdc42f90a752f4e967f6ac5427e248a902"
+    },
+    {
+      "label": "format-final-2",
+      "status": "passed",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 25.54,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "source-hygiene-publication",
+      "status": "passed",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.54,
+      "log_sha256": "cf73a2bb4f0f891f831c5deb2697daf2ac20e9ae599c1501487fe29eb3deafc3"
+    },
+    {
+      "label": "source-clocks-publication",
+      "status": "passed",
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 26.59,
+      "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993"
+    },
+    {
+      "label": "source-negative-publication",
+      "status": "passed",
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.32,
+      "log_sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+    },
+    {
+      "label": "source-trust-publication",
+      "status": "passed",
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 59.19,
+      "log_sha256": "9f549e9c54094cd6e9e23d987a99ed3d0dc9e717d56fb28b074e66a69cbddbf4"
+    },
+    {
+      "label": "http-egress-review",
+      "status": "passed",
+      "command": [
+        "bash",
+        "scripts/check-http-egress-contract.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.51,
+      "log_sha256": "504ee28d9b04c91b14acb80bdd3e59d814c75bac254c2a2a9b1b6958b2037c8a"
+    },
+    {
+      "label": "domain-separation-review",
+      "status": "passed",
+      "command": [
+        "python3",
+        "scripts/check-domain-separation.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.39,
+      "log_sha256": "cd40b28dcd8ef10ae487ba086ffe75be6a6122ec61d4d3b112da5abdcc672cae"
+    },
+    {
+      "label": "schema-registry-final",
+      "status": "passed",
+      "command": [
+        "bash",
+        "scripts/check-chio-schema-registry.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.19,
+      "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "label": "wire-schemas-final",
+      "status": "passed",
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 10.01,
+      "log_sha256": "63bbfb9e6a73ca08df3f882d08d05905c7b0f9af3689e49ea85b1f7a016bfb2c"
+    },
+    {
+      "label": "ap23/sdk-mock-green-attempt",
+      "status": "passed",
+      "cwd": "/tmp/arc-security-launch",
+      "command": "uv run --isolated --with httpx --with 'pydantic>=2.5,<3' --with pytest --with pytest-asyncio --with respx python -m pytest -q sdks/python/chio-sdk-python/tests",
+      "environment_overrides": {
+        "PYTHONPATH": "sdks/python/chio-sdk-python/src"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 1.96,
+      "elapsed_source": "pytest summary; process wall duration not captured",
+      "log": "/home/connor/chio-security-evidence/2026-10-02-lifecycle-approval-authority/ap23/sdk-mock-green-attempt.log",
+      "log_sha256": "b277075568fba2ced7c6f9e863ff390765719f2784a138315cdbb6bdcb190a58",
+      "recorded_after_execution": true
+    },
+    {
+      "label": "ap23/hermes-final-tests-2",
+      "status": "passed",
+      "cwd": "/tmp/arc-security-launch",
+      "command": "uv run --isolated --with httpx --with 'pydantic>=2.5,<3' --with pyyaml --with certifi --with pytest --with pytest-asyncio --with respx python -m pytest -q -rs sdks/python/chio-hermes/tests",
+      "environment_overrides": {
+        "PYTHONPATH": "sdks/python/chio-hermes:sdks/python/chio-hermes/src:sdks/python/chio-sdk-python/src:sdks/python/chio-code-agent/src:sdks/python/chio-adapter-base/src"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 4.99,
+      "elapsed_source": "pytest summary; process wall duration not captured",
+      "log": "/home/connor/chio-security-evidence/2026-10-02-lifecycle-approval-authority/ap23/hermes-final-tests-2.log",
+      "log_sha256": "a0cc3a3199d4f4933188cb163ebf94495c24cb4285859f5fef96cf69ac1dc06a",
+      "recorded_after_execution": true
+    },
+    {
+      "label": "mcp-approvals/operator-and-shared-green",
+      "status": "passed",
+      "command": "python3 -m unittest test_shared_kernel test_shared_approval_availability test_operator_http",
+      "cwd": "/tmp/arc-security-launch/integrations/required-agents/qualification",
+      "exit_status": 0,
+      "tests": 24,
+      "duration_seconds": 10.811,
+      "log": "/home/connor/chio-security-evidence/2026-10-02-lifecycle-approval-authority/mcp-approvals/operator-and-shared-green.log",
+      "log_sha256": "b14b77824693bf009a97995db23949047e93c011ba3a598b13bd4f2a7f2d9874",
+      "execution": "Previously completed result; metadata captured without rerun. No Docker or external runtime execution."
+    }
+  ],
+  "retained_attempts": [
+    {
+      "label": "affected-owner-tests-1",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--test",
+        "chio_extension",
+        "--test",
+        "compile_policy",
+        "--test",
+        "human_in_loop"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 194.86,
+      "log_sha256": "199a6f241cf96abae27344a9dd817a7ca4d533911238103c14cce44b882aafc1"
+    },
+    {
+      "label": "affected-owner-tests-2",
+      "status": "cancelled",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--test",
+        "chio_extension",
+        "--test",
+        "compile_policy",
+        "--test",
+        "human_in_loop"
+      ],
+      "exit_code": -2,
+      "elapsed_seconds": 955.38,
+      "log_sha256": "86b7513581ae27fb130e4431fcae12bd0d806acad27bbc3a63514d3a7aee1456"
+    },
+    {
+      "label": "authority-first-check-2",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "authority_custody",
+        "--test",
+        "authority_lifecycle",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 88.91,
+      "log_sha256": "5116854d41192bfda3b01db747967735c671c29ff5452bd45fab4655e33976c9"
+    },
+    {
+      "label": "authority-first-check-3",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "authority_custody",
+        "--test",
+        "authority_lifecycle",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 10.66,
+      "log_sha256": "4e679c75b9a92e82fe021408667db69bad75e047bb31517c1f28a903724579b4"
+    },
+    {
+      "label": "authority-first-check",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "authority_custody",
+        "--test",
+        "authority_lifecycle",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 28.32,
+      "log_sha256": "c77572f76da7ca643c6b30afb989029cfdfc696d7b439687df597a73a3ad4779"
+    },
+    {
+      "label": "authority-store-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-store-sqlite",
+        "--test",
+        "authority_custody",
+        "--test",
+        "authority_lifecycle",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 11.61,
+      "log_sha256": "a2dc7d49c9beaac19cff50da4ba290414b9fa7abccdee7ea18a216e6759d2d96"
+    },
+    {
+      "label": "boundaries-first-check-2",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "--lib",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 172.32,
+      "log_sha256": "5125d4631242f94e8ea2ae851baf4b766e67a5f6ac814aef4a1950511d94a5cb"
+    },
+    {
+      "label": "boundaries-first-check",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "--lib",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 28.41,
+      "log_sha256": "81eb63989a87455114f191950c70640de6d7ed772e23778363b8332ee94ac73c"
+    },
+    {
+      "label": "boundaries-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "--lib",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 174.19,
+      "log_sha256": "d94d71672ac2eb4d4bd5c5ec1e515af1ad77c2936dc184d7d12d8124dd23d57e"
+    },
+    {
+      "label": "control-authority-final",
+      "status": "failed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-0dd21ef61deaeac3",
+        "authority_replication::",
+        "authority_lifecycle::",
+        "remote_authority::",
+        "service_runtime::tests::budget::",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 3.68,
+      "log_sha256": "098555e82df4a02fa7fc3870d60e7275ee54991d87eb797a15cfe84197e1cc8f"
+    },
+    {
+      "label": "decode-scan-1",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py",
+        "--scan"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 58.56,
+      "log_sha256": "13084af511cbc23cb840ebe90faba039aafcb021067aa9198f5786ec2e453b08"
+    },
+    {
+      "label": "final-owner-build-2",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-run",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--test",
+        "human_in_loop",
+        "--test",
+        "compile_policy",
+        "--test",
+        "chio_extension"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 301.2,
+      "log_sha256": "7495d0d7689f6aef100ebfa310e1373c10171fb3e4078ff72387fd41ced4bb0a"
+    },
+    {
+      "label": "final-owner-build",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-run",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--test",
+        "human_in_loop",
+        "--test",
+        "compile_policy",
+        "--test",
+        "chio_extension"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 279.89,
+      "log_sha256": "809259cf16bce26ac71370e758ed3f86273a711dd2442d9708114c79e6ce3975"
+    },
+    {
+      "label": "format-apply-residual",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 25.42,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "format-final",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 25.67,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "independent-review-consumer-red-2",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "kg2_",
+        "ap23_",
+        "kernel::tests::",
+        "pending_approval",
+        "governed_mustprepay_via_cli_sim",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 74.66,
+      "log_sha256": "5951a7021c7cd548c4186d4d35f94ddc96dcbdc0a6bb013b13c8ce5e5c76da2d"
+    },
+    {
+      "label": "independent-review-consumer-red-3",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "kg2_",
+        "ap23_",
+        "kernel::tests::",
+        "pending_approval",
+        "governed_mustprepay_via_cli_sim",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 77.33,
+      "log_sha256": "effb1c0b5b9cd393fa5fa85d3cfab5e33c0c2f2c4697cf83ae44c6827c619028"
+    },
+    {
+      "label": "independent-review-consumer-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "kg2_",
+        "ap23_",
+        "kernel::tests::",
+        "pending_approval",
+        "governed_mustprepay_via_cli_sim",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 257.47,
+      "log_sha256": "e52b249464f552f4415a841531590713a751d0a24f9f87dbdd60de4ce3284039"
+    },
+    {
+      "label": "integrated-authority-approval-check-1",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 150.05,
+      "log_sha256": "b26d84daff4622e28d2c91c07ac3fa48fee484b1d6721378742d58d9bbd0210d"
+    },
+    {
+      "label": "integrated-authority-approval-check-2",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 127.86,
+      "log_sha256": "46896b44e86c465229e1615dd94771db2e659c4ceb5211c56752798fe1803849"
+    },
+    {
+      "label": "integrated-authority-approval-check-3",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 110.76,
+      "log_sha256": "826b6c3211d9d292bd025eb4e15f7c827952e176659c0c9f3dc1e91791b93dde"
+    },
+    {
+      "label": "integrated-authority-approval-check-4",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "ap23_",
+        "kg2_",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 65.53,
+      "log_sha256": "4e784da73cdb0552f4db7c7bffb63394f7d59c01cd7c6aa24f93501f65b0d811"
+    },
+    {
+      "label": "kernel-unit-final",
+      "status": "failed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-43a1b4c89eb327f8",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 14.67,
+      "log_sha256": "49c996cad2f1a6caa721a23d80da381f7539e5d8ef7ee46881b250a07f3bfd0b"
+    },
+    {
+      "label": "keyring-lifecycle-first-check",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-keyring",
+        "--test",
+        "state",
+        "kg2_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.71,
+      "log_sha256": "de1b017d6e2edfea51fcbdb0400c86d65d02e4471a84fa37e1384a527675416b"
+    },
+    {
+      "label": "keyring-lifecycle-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-keyring",
+        "--test",
+        "state",
+        "kg2_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 8.25,
+      "log_sha256": "e09e282f8dd33cb8fb007dc12943b3cced079b9e6c3cf7164989cb61c6246725"
+    },
+    {
+      "label": "mcp-approval-red-2",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-mcp-remote",
+        "--lib",
+        "ap23_mcp_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 170.58,
+      "log_sha256": "cf2ed94874cfbc5df05f12d3098ae5e4e70162811414710faebad435a881582c"
+    },
+    {
+      "label": "mcp-approval-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-mcp-remote",
+        "--lib",
+        "ap23_mcp_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 36.69,
+      "log_sha256": "1b0e6850dfec1a35b20d9d04ba0f20a8ab86d5de1c29acf28134435dea80ddb0"
+    },
+    {
+      "label": "owner-clippy-final",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "-p",
+        "chio-test-support",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 185.08,
+      "log_sha256": "0303e97def8b344875f5f130838d50a003db99982d96ca5c33ef17a7726d8e2e"
+    },
+    {
+      "label": "pre-continuation-kernel-diagnostic",
+      "status": "failed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-43a1b4c89eb327f8",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 13.46,
+      "log_sha256": "8674223f4d4157e96869a96d236f18562bee33ccb9c393d467980c91c00a4b15"
+    },
+    {
+      "label": "remote-cache-red-2",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "kg2_remote_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 196.53,
+      "log_sha256": "8736c994a990d34b538aa1ec7a77e1baba0102e481339872b669ec809d179698"
+    },
+    {
+      "label": "remote-cache-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "kg2_remote_stale_cache",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 28.54,
+      "log_sha256": "81eb63989a87455114f191950c70640de6d7ed772e23778363b8332ee94ac73c"
+    },
+    {
+      "label": "residual-owner-build",
+      "status": "historical-pass",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 212.82,
+      "log_sha256": "85df536ac2da9fbdedc7b89896ac9b044b059f331b5bff53a582ef4046f3e522"
+    },
+    {
+      "label": "review-fixes-session-scope-red-2",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "kg2_",
+        "ap23_",
+        "kernel::tests::",
+        "pending_approval",
+        "governed_mustprepay_via_cli_sim",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 161.82,
+      "log_sha256": "846b5c1676318ae9fe95519bea5fc1e2354986c7af4b2e057759f521d07ea0b7"
+    },
+    {
+      "label": "review-fixes-session-scope-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--",
+        "kg2_",
+        "ap23_",
+        "kernel::tests::",
+        "pending_approval",
+        "governed_mustprepay_via_cli_sim",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 230.25,
+      "log_sha256": "86a3c6965a4e4a6b86352417b7f1832c4628bb2983d858a36b800a380c3d63c4"
+    },
+    {
+      "label": "same-tenant-session-red",
+      "status": "failed",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--no-fail-fast",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-policy",
+        "-p",
+        "chio-api-protect",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-mcp-remote",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-cli",
+        "--lib",
+        "--bin",
+        "chio",
+        "--test",
+        "authority_lifecycle",
+        "--test",
+        "authority_custody",
+        "--test",
+        "state",
+        "--test",
+        "human_in_loop",
+        "--test",
+        "compile_policy",
+        "--test",
+        "chio_extension",
+        "--",
+        "ap23_session_",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 74.89,
+      "log_sha256": "c151b467bdcbcfed5f07dd436de3d4047a2f61eab8f8a4a6191a32703de5a7d7"
+    },
+    {
+      "label": "source-clock-review",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 26.41,
+      "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993"
+    },
+    {
+      "label": "source-clocks-2",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 26.64,
+      "log_sha256": "dcdcda4fceade4e86094da1792f0186a5ee49ac232000ec9ddb0c7628f019917"
+    },
+    {
+      "label": "source-clocks-final",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 27.61,
+      "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993"
+    },
+    {
+      "label": "source-clocks-post-session",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 27.59,
+      "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993"
+    },
+    {
+      "label": "source-hygiene-2",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.77,
+      "log_sha256": "68eefab5c4e780e42e89797f27eb56d42210a0d6e145005925625931dd2dc8c2"
+    },
+    {
+      "label": "source-hygiene-final",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.09,
+      "log_sha256": "cf73a2bb4f0f891f831c5deb2697daf2ac20e9ae599c1501487fe29eb3deafc3"
+    },
+    {
+      "label": "source-hygiene-post-session",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.5,
+      "log_sha256": "cf73a2bb4f0f891f831c5deb2697daf2ac20e9ae599c1501487fe29eb3deafc3"
+    },
+    {
+      "label": "source-hygiene-review",
+      "status": "failed",
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 4.28,
+      "log_sha256": "11f117f143a4f42ec7b0acb936348af86e6cfc663f1be7c58c67dbe9ad9744f6"
+    },
+    {
+      "label": "source-negative-assertions-2",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.3,
+      "log_sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+    },
+    {
+      "label": "source-negative-final",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.43,
+      "log_sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+    },
+    {
+      "label": "source-negative-post-session",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.43,
+      "log_sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+    },
+    {
+      "label": "source-negative-review",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-negative-assertions.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.22,
+      "log_sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+    },
+    {
+      "label": "source-trust-boundaries-2",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 59.06,
+      "log_sha256": "9f549e9c54094cd6e9e23d987a99ed3d0dc9e717d56fb28b074e66a69cbddbf4"
+    },
+    {
+      "label": "source-trust-final",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 61.22,
+      "log_sha256": "9f549e9c54094cd6e9e23d987a99ed3d0dc9e717d56fb28b074e66a69cbddbf4"
+    },
+    {
+      "label": "source-trust-post-session",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 60.74,
+      "log_sha256": "9f549e9c54094cd6e9e23d987a99ed3d0dc9e717d56fb28b074e66a69cbddbf4"
+    },
+    {
+      "label": "source-trust-review",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 59.0,
+      "log_sha256": "9f549e9c54094cd6e9e23d987a99ed3d0dc9e717d56fb28b074e66a69cbddbf4"
+    },
+    {
+      "label": "store-authority-approval-final",
+      "status": "failed",
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-f511f28d5edce27b",
+        "authority::",
+        "approval_store::",
+        "--test-threads=4"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 14.68,
+      "log_sha256": "e095b575a9d712952d40f977692c330333050a1050b6bfe5c6b794608cc51667"
+    },
+    {
+      "label": "wire-schemas-review",
+      "status": "failed",
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 9.62,
+      "log_sha256": "6e3af060502bcf3721be7ce591a8badeeaf385ccba876f86779dc202b79d175e"
+    },
+    {
+      "label": "wire-schemas-update",
+      "status": "historical-pass",
+      "command": [
+        "python3",
+        "scripts/check-wire-schemas.py",
+        "--update"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 40.79,
+      "log_sha256": "5d87d46a878cd8fb4c80a2ba54bf558c1a87326b0756be75c65297dcf69c3d17"
+    }
+  ],
+  "test_binary_records": [
+    [
+      {
+        "label": "kernel-unit-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-43a1b4c89eb327f8",
+        "binary_sha256": "e87e053b1b42ec2b93ea5c2248053b5f55fd97a9aa8d729fe8709c3885b9cf3e",
+        "filters": [],
+        "exit_code": 101
+      },
+      {
+        "label": "api-unit-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_api_protect-23225b0d1a843530",
+        "binary_sha256": "baee9f610dacd9fec7c7dc5fbe474368fd6406f3c10dadedaf211a44811656e2",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "mcp-unit-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_remote-0485a0b24b760e5a",
+        "binary_sha256": "455d2395a8b1b9367f425ba433c5d99c14e531006b60602aee799fdce0189995",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "policy-unit-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_policy-2b054f949224b5f7",
+        "binary_sha256": "908e6a822eba84e6f05185c64ae57b2b5430a9b49cf477657a6bfcf05442666c",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "policy-hitl-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/human_in_loop-7defeb7b948e34f5",
+        "binary_sha256": "6bb28f6963288afa3230a09efd07e13b426b44a6c51bfe3fd100903c17619ea1",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "policy-compile-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/compile_policy-741d8e4b35aea8bd",
+        "binary_sha256": "0e1244152c1edeb090371b5043842a537c2b4d9f2ecad31e2dc533d1773da2dd",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "policy-extension-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_extension-8fa813db50decb8e",
+        "binary_sha256": "3ea4e1087cd5e9ee99efa7291170e7363af4b56b51da2032843da533c7f179ee",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "store-authority-approval-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-f511f28d5edce27b",
+        "binary_sha256": "35667d64db6af7b59273825e00317d97a8bfbc31baa404e51d7c0cb8408ab0c8",
+        "filters": [
+          "authority::",
+          "approval_store::"
+        ],
+        "exit_code": 101
+      },
+      {
+        "label": "authority-custody-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/authority_custody-3e289e6c65fbea99",
+        "binary_sha256": "80b31117b06a29ac515baddf9c3372acfdb319e398b8484be0f0e172fb532a2b",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "authority-lifecycle-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/authority_lifecycle-e15eb3a3166b5b4e",
+        "binary_sha256": "e0af92ea3752e96b78fd1ab0fe05556f9c0a582e41bcd7d7ae12c8c29ca69253",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "keyring-unit-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_keyring-c7b96bebb023e703",
+        "binary_sha256": "ad083febfb2b3215d16dec7f73e2474e1aa03a24dbc52b3d60949a581f280f6e",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "keyring-state-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/state-a41c611ebe711a2c",
+        "binary_sha256": "29b1c834619c254be264ecffd1e0221e50a75f9c423dc4e57063c1160cb7d7f9",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "cli-consumers-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio-9f69865705d43c7e",
+        "binary_sha256": "d99acd4d08a4d52d3387c40d04505818374969e4b63fc05921b94da0eb929bcb",
+        "filters": [
+          "kg2_",
+          "session_cli::tests::pending_approval",
+          "mcp_cli::payment_config",
+          "process_host::keyring"
+        ],
+        "exit_code": 0
+      },
+      {
+        "label": "control-authority-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-0dd21ef61deaeac3",
+        "binary_sha256": "e2990df28818458ea7884da907b7d80a55c51d2282544b569f85f5980a4f7dbf",
+        "filters": [
+          "authority_replication::",
+          "authority_lifecycle::",
+          "remote_authority::",
+          "service_runtime::tests::budget::"
+        ],
+        "exit_code": 101
+      },
+      {
+        "label": "control-native-credentials-final",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-0dd21ef61deaeac3",
+        "binary_sha256": "e2990df28818458ea7884da907b7d80a55c51d2282544b569f85f5980a4f7dbf",
+        "filters": [
+          "combined_credentials::",
+          "native_caller_composes_local_egress_declassification_and_complete_credentials",
+          "native_caller_original_delivery_survives_restart_and_authority_expiry"
+        ],
+        "exit_code": 0
+      }
+    ],
+    [
+      {
+        "label": "kernel-unit-final-2",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-96afd4f1dc9860df",
+        "binary_sha256": "a26f3896f4f81c0f190fc438e80d12fa900f06d9bc28cf60a50e32f49cf290b8",
+        "filters": [],
+        "exit_code": 0
+      },
+      {
+        "label": "store-authority-approval-final-2",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-1f3427720e045366",
+        "binary_sha256": "c3937d76d2d80938a78bd3a581a4e5368b56e21a06c4f0fe99e17b6f11945f03",
+        "filters": [
+          "authority::",
+          "approval_store::"
+        ],
+        "exit_code": 0
+      },
+      {
+        "label": "control-authority-final-2",
+        "binary": "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-8ad2fbd3500646c1",
+        "binary_sha256": "4aed6b728d1bacb4fc4aada87c8dd7d83f83ea85dd20778063fcb96bcbb0a8af",
+        "filters": [
+          "authority_replication::",
+          "authority_lifecycle::",
+          "remote_authority::",
+          "service_runtime::tests::budget::"
+        ],
+        "exit_code": 0
+      }
+    ]
+  ],
+  "evidence_reuse": {
+    "original_source_hashes": {
+      "Cargo.lock": "f08b01208531c697266a07192aecb03b202afc55b1e884083bfe2a2dd371010d",
+      "crates/guards/chio-policy/src/compiler.rs": "554cdd0d929780d65281e86d85bef5fa7e681ee74276bc39f0d4e622cb190222",
+      "crates/guards/chio-policy/src/compiler/tests.rs": "9e9b46717899cea384439e8b2a488a943c6f7d24eb72d834103fe86dbd9cb244",
+      "crates/guards/chio-policy/src/models.rs": "45b2167710981c11a40ddd308a34c3708e68679029d24a6b872acf384cf7e1bb",
+      "crates/guards/chio-policy/src/models/extensions.rs": "b2a31d16b532003f472b6ff112ced327b358ab12096a4921ec5b6f294760113d",
+      "crates/guards/chio-policy/src/models/rules.rs": "dd16d4575d790b92d565884e5dd2b3a0a1ccd4762ce8940caf1cd0acd1657516",
+      "crates/guards/chio-policy/tests/chio_extension.rs": "aa426cc4526170ad571a4285e9f3d6ca96423602a730c1ee3f99948c5ced1aba",
+      "crates/guards/chio-policy/tests/compile_policy.rs": "f73db3c76fc3d40d7d2e6dca371ade8474f49783a1b371e56175463480cf50b6",
+      "crates/guards/chio-policy/tests/human_in_loop.rs": "7a071457ee4dcbd12f631fecd859e076a1f8e8a27f6bf98cdecd5999b323ee1f",
+      "crates/kernel/chio-kernel/src/approval.rs": "dfe9ecc599ba7c78897db1826ce5cd3f92de803152b77310fe8ddecc52409cf6",
+      "crates/kernel/chio-kernel/src/approval/tool_context.rs": "c6b193ed63ee028de23efd704734b00c41915984b579ffa97391483a5007eb43",
+      "crates/kernel/chio-kernel/src/authority.rs": "40638dac30acff407984106898017911b6af595ffd6a0cf5acf6cf318d008240",
+      "crates/kernel/chio-kernel/src/authority/lifecycle.rs": "35b1d9a383408de8c9e24e42878445ffc3fe8eac7b83d536579217f11801dfe9",
+      "crates/kernel/chio-kernel/src/authority/replication.rs": "7bbc2f2c215d0c0660552e52c169df21f15c2def6c07645adce3b3022eadd035",
+      "crates/kernel/chio-kernel/src/kernel/construction.rs": "ecc7b25c735340d04d2311f9a85a9d2c996b5b04e6679c9a66f49ab240bf4fbd",
+      "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs": "61ce811c7024896919b2ac74d5cab83d9dfd8ad71270ec4ef843b4e15fe0e1a7",
+      "crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs": "45814b69288a648fb8079e7467f9799e174e8cc4a62a0b98e339b5f29b20c0fa",
+      "crates/kernel/chio-kernel/src/kernel/governed_validation.rs": "7d07065ab4fb3f177aa239df2cf0010b692d0f0ed4fba4e9360cfea7fee3bf9f",
+      "crates/kernel/chio-kernel/src/kernel/governed_validation/tool_approval.rs": "0a243c3aa7cc8db10999aa794dcd534175c42bb7192416d7397e5652a8e5d7a5",
+      "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs": "46ce872bcae7106a8fea913c063cd6bca2b076b8345399c284617e532646a7af",
+      "crates/kernel/chio-kernel/src/kernel/session_ops.rs": "aeef6e9bd024b75ce4e1c655ca8ec500ab620358053ecafac1888cc150780123",
+      "crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs": "c3d0a3a09133bcd850b8d51bea6818809591814288ef52bb9fb828274c54d222",
+      "crates/kernel/chio-kernel/src/kernel/session_ops/threshold_binding.rs": "8474a25645ad5466acf2db3b40710ae52f525aeccaf8fbfb80801dcb2e6e0a5b",
+      "crates/kernel/chio-kernel/src/kernel/session_ops/threshold_continuation.rs": "108c7bfe7056f1ebe86762484766cdf4d197e38f6f2f6648bb6490e4b82e9647",
+      "crates/kernel/chio-kernel/src/kernel/tests.rs": "c29f42af5c7cdbc9bb28122a27aae7cfb8c57c008fbcff5734aa747beea38f91",
+      "crates/kernel/chio-kernel/src/kernel/tests/approval_flow.rs": "8cc56ed5a94c8fc807206248f693a19f66655c92a095c34c456187a17ee50dba",
+      "crates/kernel/chio-kernel/src/kernel/tests/budget_governed_assurance.rs": "c2176f73d9259067b085f30f424da1e049e0e8de5ce7bd508507305da2164ac7",
+      "crates/kernel/chio-kernel/src/kernel/tests/budget_governed_call_chain.rs": "6dd1323156fabc4cf840fda00f0055c2510901e693c42fbeafbd76b7c3413ad8",
+      "crates/kernel/chio-kernel/src/kernel/tests/capability_validation.rs": "438f635416bf2cd2416ae98ea97c73186d507b561835ee792c76645345e58cdd",
+      "crates/kernel/chio-kernel/src/kernel/tests/dispatch_credentials.rs": "dcd7b408315f6a13996223032db6526f8ccef9e081e79ca099872b0a5dc08c71",
+      "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/cumulative_budget.rs": "cf29f12954208f40ec1c3c815d5349b0f1d715db5e53c2c5db7e51643d502d9f",
+      "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/dispatch_commit_failure.rs": "febadd33212144c0e556c7d58c616a4e12ab15f9a100ea67d1447e7b44a52fa0",
+      "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/dispatch_commit_failure/mustprepay.rs": "61df6a785e063ebd1bfa08834a60ad527233979dcff67c3489ece4f58f7694f1",
+      "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/governed_acquisition.rs": "a81cbdc25db4484ff7846844d10bb78a998eacb5b3bad30ec8e637c74fdefd94",
+      "crates/kernel/chio-kernel/src/kernel/tests/payment_ambiguity.rs": "7123bed02e09cf6ba9e12dfbc07dcd3bdbd03648b73a2305641604c6a5e6a172",
+      "crates/kernel/chio-kernel/src/kernel/tests/security_dispatch/credentials.rs": "c728f37435bf22bd086a5eb720100a18ee3156a315851b89026a71f5eb10bb7e",
+      "crates/kernel/chio-kernel/src/kernel/tests/sim_payment.rs": "d20bb465613b94542727c461a3f399044099b1b251594007c90f74cdd7cfb6e8",
+      "crates/kernel/chio-kernel/src/kernel/tests/support_tool_approval.rs": "0acd512e6643a8566e05dfdb8b44d0b0893913a388de11ec1cd47bf7754bf7b8",
+      "crates/kernel/chio-kernel/src/kernel/tests/threshold_crypto_floor.rs": "d6d96093c18d4290d3bc2094b0ac5af2e3d4c59b20eda71d7b81c85d2dda4120",
+      "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance.rs": "9317f027a2277725b5436ef69c8628393c62171b5c3a138701e93ee76f673305",
+      "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/scope_binding.rs": "7eeef29003ee94f188c1cc64d096b0242f32ca39d210f5c0eb45d4bb47f1b3d1",
+      "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance/session_continuation.rs": "de6ca61caf60e762da422f935fc53a39fc5d5b688b8f4fb43177cf56a100239c",
+      "crates/kernel/chio-kernel/src/kernel/validation.rs": "3ef33c554d96c8179889caac71c7836200b85b7ec18db94957256e6ad538c15b",
+      "crates/kernel/chio-kernel/src/kernel/validation/issuer_trust.rs": "a4d814a62182a1762b7a66b0c0c9daf20068978e0dcb23e8b89a36d79a8a93f3",
+      "crates/kernel/chio-kernel/src/kernel/validation/portable.rs": "ce4c31150f73cf8b4a7dc4766ce173adb3844d95505e6d9f3a2db539aa8c8918",
+      "crates/kernel/chio-kernel/src/session/threshold_continuation.rs": "2e46aca28aed2beb1b45ba0a764e4d5a1d12e4bc19922a1cc253c5f3a83c8152",
+      "crates/platform/chio-control-plane/src/issuance/authority.rs": "9cdb0ceb06c0f4ede59faa31e8b87843428eb8970c94b2321bb0f76ad913108b",
+      "crates/platform/chio-control-plane/src/keyring_runtime.rs": "3945e165dda3df37c1ae5ca266e848fedeab783d14bcfa0db0a2f2ed0046ef01",
+      "crates/platform/chio-control-plane/src/keyring_runtime/capability.rs": "7f9c3723b9d39a170dfbb1eb8d225fa63d70898f5589fa390c1b32e59d669bb1",
+      "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs": "43423310b9b49023e0628b674c377ebb2682f2e05ed4d2a55f9c185311968275",
+      "crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/capture/combined_credentials.rs": "a1f9d51a5c226e991d1fe8c3dd65d884876a44b21f82d3b600f9344929846c8a",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": "298cc0f16de2ca79088a8f9f5863ca8e8bf83e709abec5457588c93092a4e581",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_lifecycle.rs": "97f3de31edc3d663fe7d56723df4817a048a9a72be910f95f736a84c26e9cee7",
+      "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/authority_replication.rs": "e1498e18f1991e16047e4dd8cffa25d56054dba43d27edf4e29bff7c358981c0",
+      "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs": "2bef787f7d76e48775b50958b1257055864fbd7c3cc8e0db9da69332de78d6e8",
+      "crates/platform/chio-control-plane/src/trust_control/report_validation.rs": "78579e0f735f0bffe8bb3c8b42ce0b0549ceb20634e82c71aed37542fd487c2c",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs": "38cb47185d2bc9a59a3066b6a5850964f2993afd8092fd0679c66ad9a18e10e0",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority/lifecycle.rs": "8023d9223b9c351550091171aaaa408a256a4cfffa91055c12d650b212fda687",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/budget.rs": "91900541867d8a534eca7a6cdb3e5b5e52d58a1cda9833a953bb3b7dd22a52c4",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs": "ae65da1d22c66f9b8e96dd6ad7ac250a4551357305e618920b84d99234d38a23",
+      "crates/platform/chio-control-plane/src/trust_control/service_types/state.rs": "a2e6dad36accae1e33d2587060ff239c7098134a214e279a32598679882ba913",
+      "crates/platform/chio-store-sqlite/src/approval_store.rs": "94b59d8424b840c4f26c7ff7b6c4b837b68c234eefb21dd3a2a01e9470b57db6",
+      "crates/platform/chio-store-sqlite/src/approval_store/decision_tests.rs": "fdbf6e881b834e18e482247ccb67a0f9afc12b3f3230cb7908e03e8915601359",
+      "crates/platform/chio-store-sqlite/src/authority.rs": "b4030aa6e87f3da89a5bce9c0056414a39ab84065b1837aeb3c0998f87f02202",
+      "crates/platform/chio-store-sqlite/src/authority/custody.rs": "046075299824414918f741602cd36b51e91346ffa49ff654ce570b47c747a84d",
+      "crates/platform/chio-store-sqlite/src/authority/custody/filesystem.rs": "9a1ae9e89e7d9029edd5906e1cbdb6a8ab7c3415575b0c6f98f0cb8bbeb27fa3",
+      "crates/platform/chio-store-sqlite/src/authority/custody/path.rs": "2e9987ecd09f055b9abe2211028f78baa5a43b361e6cbd7d2e2bd5d0ce398e49",
+      "crates/platform/chio-store-sqlite/src/authority/lifecycle.rs": "044dd83b65aa7a0d753593bc1306c4a6368312fb3b76a3c2289c90370c98f4ee",
+      "crates/platform/chio-store-sqlite/src/authority/replication.rs": "99eebe562c8d93905872ad1686abaaa4757e7a09422746b61e4eee73d306c6d5",
+      "crates/platform/chio-store-sqlite/src/authority/replication/persistence.rs": "56a4efb9bb2c9fceacc2002383fb5bc5133b120b04b7d3c5710d3235f649227c",
+      "crates/platform/chio-store-sqlite/src/authority/replication/tests.rs": "b95bb8dee09a8f9d1f34b7ade092d043174eda2ca84f971055f36a8e0ce0ba79",
+      "crates/platform/chio-store-sqlite/src/authority/transaction_tests.rs": "8876eec80a90a472989b40e7d144640f30d5a523bbefa14b71df4d92e2734f92",
+      "crates/platform/chio-store-sqlite/tests/authority_custody.rs": "128ba0000db50a02734d4fd786fc2b69e561dd6c5be0a184ecdcfba4edbe47fb",
+      "crates/platform/chio-store-sqlite/tests/authority_lifecycle.rs": "e753cd644308f2a859c2911235b469da36528f987bde8f5e00008b2a641e0b5f",
+      "crates/platform/chio-store-sqlite/tests/authority_lifecycle/portable.rs": "b02af37e030b6797876c5f7b0df9356d416d182d47018cc7fc4dcef13f493600",
+      "crates/products/chio-api-protect/README.md": "5037723598b6ba07ad747059217147b0e89ae41181be18de7c7e64196d19298a",
+      "crates/products/chio-api-protect/src/lib.rs": "4edbe271b90c3646c8d950c4afc18049c0a3c8f75b9a432ba3b7648d74064a35",
+      "crates/products/chio-api-protect/src/proxy.rs": "55a3c1eee11f9e54989ea1b993c83f31e5108023be22404abc2e14ef04e8bceb",
+      "crates/products/chio-api-protect/src/proxy/approval.rs": "8024fa96c438682792529bcd2af80d99c8115d4c0143049d396a1e35dfb34b20",
+      "crates/products/chio-api-protect/src/proxy/approval_authority.rs": "b336aaadad8c7b1e08e505375f52e677ca4bbe16f0051edfa6644637ccf10e70",
+      "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs": "157e42a7fae90b6e29b4c204673de6ab0d6d1200c43e8eeb111ee69e9d15a8e3",
+      "crates/products/chio-api-protect/src/proxy/config.rs": "801283aecbce21057de8dac4a5e0c210e05e6cada7b9acb590450399de13eeb7",
+      "crates/products/chio-api-protect/src/proxy/mediated.rs": "5ad6f2dd51349946d2ae97399c11965f3a5f75eb925a675ba547b0edd8014a23",
+      "crates/products/chio-api-protect/src/proxy/mediated/tests.rs": "64b54c051b01126a39b29924967e22000e3a061b21c076c3f444993481163f19",
+      "crates/products/chio-api-protect/src/proxy/mediated/tests/approvals.rs": "eba50edb68be93b7527f61e8fc6bc03e425dc04a74a049e68decbe06847ab016",
+      "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs": "fdf59807a720ea5ed83fa4f8a2ac70509f8b5a3a577fdc4db39bcf70b39dab2a",
+      "crates/products/chio-api-protect/src/proxy/nonce_tests.rs": "ac6039b01a4e1e77d69d439f5d787f73f5a4c0a9fbec7c75d2d211ac6f5c4d27",
+      "crates/products/chio-api-protect/src/proxy/state.rs": "079fc43e1f913bce10e5cd4a870a9600dab16f7647a6fd68f8fdfefcc302684d",
+      "crates/products/chio-api-protect/src/proxy/tests.rs": "2cadbdc90e4ffbfb28f7cf7a7575c04ed0ca3d330d5e69d5b675848c573c3922",
+      "crates/products/chio-api-protect/src/proxy/tests/control_containment.rs": "c742d13741bb0ed5909c4817e762ea8c7e5054738387ba497e826ff3e661b57e",
+      "crates/products/chio-cli/src/cli/chio/types/authority.rs": "55aaff4ba35365c5954a3d7fde8cdd7f12db8dbd3204aa2059ebbae62a6c08f1",
+      "crates/products/chio-cli/src/cli/dispatch/api_mcp.rs": "7f37688d25533173f0516252d0a99a31ab3f58c3100f0c143eeb362ec799579f",
+      "crates/products/chio-cli/src/cli/dispatch/federation.rs": "e35198021985db898983995ecfbfb81e3f1063a79ddf531873ab9d3d92478644",
+      "crates/products/chio-cli/src/cli/dispatch/federation/replication.rs": "e8602606290fd67cf4fdac213a378dbd7a554e9946add7bd849bf812a609db0c",
+      "crates/products/chio-cli/src/cli/mcp/governed_sim.rs": "450591e976047527eb8240674379cae454321162c0f12b06bdc72d6f505bf8f9",
+      "crates/products/chio-cli/src/cli/mcp/payment_config.rs": "141980c264247c92b3552d24636ab67b0a5e1d7a1b98b291c7ad17385b369fc3",
+      "crates/products/chio-cli/src/cli/process_host/keyring.rs": "7b18c53ad0003cfa4e35247a50b8253887e55e2fdb870c19db9182914ef28e13",
+      "crates/products/chio-cli/src/cli/process_host/keyring/live_tests.rs": "d795528cd055c5e99fb198afcb439dbccd07058e3ab6b4ae121bfe3fac557e36",
+      "crates/products/chio-cli/src/cli/runtime.rs": "c28f8096e0f0559e5b0ba002d143673d7348a9dff46ac0ddc10f858ea902c762",
+      "crates/products/chio-cli/src/cli/session/tests/pending_approval.rs": "6b7a68844d8e59f1cb679ee773cffa5c60c6a37871fc89a9fb1dee448114cdba",
+      "crates/products/chio-cli/src/cli/types/runtime.rs": "2c8ee014d9ae04cdd48a3a3bb48f0b407ba80c9264e59c4fc288055b5697d47a",
+      "crates/protocol/chio-mcp-remote/README.md": "f98792c1cf948f0833df17c9d2b9560dfd2f80698e254c89f893c273134c6848",
+      "crates/protocol/chio-mcp-remote/src/lib.rs": "34a6cb1ae75db27bb083665ce36c4c633c6c10231088ca02982ab2b2646eb37e",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs": "00333f2e75fec46c16aded3955c1405478eb88fe9c8d1caed3dec7b7f406470b",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": "4a7be93fe9773d52af3733f7c59a47224b9583641b7fa34d93e56d93217254d7",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/records.rs": "4c0aa7977c3b69a52ea7b1824af13e67d23c33325bd31f45ef74bbb538995251",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/redemption.rs": "8fb5ff269b9961d4c73b350b76d1d702bdfe5d7674ac8d1f36450726d5ee56a9",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/validation.rs": "a499e47e8d8b535343f587a1824447e2bea645b053c69c7e6287e72d7002fdac",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/mod.rs": "6f30484f45d2732c3672c536f25321fba12947c57af264106109ceb2b2ed1961",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals.rs": "b2cdc60899c0a1a26cb0f85790da88b43ea18346ff5d05a340f249fdcd4fd1a0",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals/fixture.rs": "d43816fdbdd18a5451cc832664ec22dae598014e5f9817e794389f4f4f9ad775",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals/native.rs": "3951f222aba5988d75b1704ad1985e43f3585f3917b526a8e64988f7fdb6b87d",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/operator_approvals/redemption.rs": "1d7d8fc4beef14725d524f198f080d9a1d6d19cedd4165f6b980de893a51af54",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs": "0003f98de7c3a87653b91bc96d7171a3c952359ec771dcdb1369474677edb019",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": "ab70e451923a152fce974189a7557cca8b73a39b063b8943d9eefd51b953a64c",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs": "50d4ef3e66ccb41b92c0d510a54143699a2a872951f165c6aca1674d3f450050",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs": "f86e9decbbeeeaf33601b011aaf88a9222aed2d478daca7a4bbec8f83a23d146",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/session.rs": "185c2bca3dd0d6e0ef5506c27c0e389f5646feb80441e19c8ad10f969cd4b47f",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs": "623271d6a4037cc7a5f40af458d870fd5c952848e6a70b22a04aaa4766a4147c",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs": "24261b5128fa06e953bfeff5e79df44cb610236f44c8d680d40b11681ed2acad",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs": "3cb1466aeb18662778e51f63d3b6a7e30bfc5741bd74163ee1e8db1b9f9c15e6",
+      "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/session_recovery.rs": "4123150199fcb4004715900ebf97bfdad57a111108d94819ad3bc782fe896c61",
+      "crates/security/chio-keyring/src/state.rs": "00315be97346af5cdce15cdde6ef209a726df495025f69681180a16037ffb92c",
+      "crates/security/chio-keyring/tests/state.rs": "22b8d609e1aef2fe52bf393773d2c2b30a251039e55cb0704b6fb6f836107fa7",
+      "crates/tooling/chio-test-support/Cargo.toml": "b0bd0e32fa74d8b8d4a9856a749eb8424ae280b5a8d252151f89e0ebe046d5ad",
+      "crates/tooling/chio-test-support/src/lib.rs": "ce786f44add5f9cbc0238182f7f7365e1a1a3fba1830c9290361e4fb58a4ff8e",
+      "docs/security/authority-sqlite-custody.md": "e26f373ea9362b6b73d413121d15ce1249adc759932c79ac7bdf46fb51450b13",
+      "docs/security/issuer-lifecycle.md": "86087488b41cfbfc7617eec2da9a328e7f84b46c789a45ace6e01015783130ea",
+      "docs/security/kernel-signing-authority.md": "494f87e5014c2af2a04a44e743b112a3cd6d5f3c51e375c0af8312bb4ed19b42",
+      "docs/security/threshold-approval-collection.md": "66c1e522576a7c088c35d36cc7f5c77682dffb6f8a2ad33f49e3ca7da7a774c9",
+      "docs/security/trust-boundary-inventory.json": "46c127e07625ba9f196ff1fa96062fc932c5af30f6e9559bd6c6b61dc979636c",
+      "examples/policies/canonical-hushspec.yaml": "54b2d32b8ba6ab50cd25f2ef7fa8b535d967976365dd1e8aff53768d72cfbf03",
+      "integrations/required-agents/qualification/APPROVALS.md": "73c7cd33ad8b7037062ffd4e3ae202055a4cf9be93b04fc8da8eeff7bdb245b3",
+      "integrations/required-agents/qualification/README.md": "cdc8f8208791a3d819d5e52d83529f5c4345f569729025ff1443de49a7e2afb3",
+      "integrations/required-agents/qualification/operator_approval.py": "7e2a4cfc7318e688b7365c22043260c96a4baad61fb4d92b8c39eb80fbded2c2",
+      "integrations/required-agents/qualification/shared_kernel.py": "f79983caa726f8813c88aed06a467ef7885a7e5e7669e3233cd01bab6df92aed",
+      "integrations/required-agents/qualification/test_operator_http.py": "a201234816ec8afaefaad0485331a9cf91086d61cd8331dde9c0e529756422a6",
+      "integrations/required-agents/qualification/test_shared_approval_availability.py": "f157ea5f319797f7f9bb267d273b0a578a0e4ca965ce331ef8898daee08c87c2",
+      "sdks/python/chio-hermes/README.md": "d92dd47ed8d46a734b0e40afc7796f6966b3d8c0ab5a339789d21e1f9a41ce88",
+      "sdks/python/chio-hermes/src/chio_hermes/approval_inputs.py": "eebe55ad64e490e40907836d439a3cd90397c0c30dad7eb34108f43a551e21e2",
+      "sdks/python/chio-hermes/src/chio_hermes/cli.py": "5239beef116c17025032f7b44e4c00b81446d264ef4987fc0670b5a72ef7ebfe",
+      "sdks/python/chio-hermes/src/chio_hermes/commands.py": "e85c59c95e2cec2897f5618cf7412c40c3f357aa3554fc6c6a7ffeca3b04a3f8",
+      "sdks/python/chio-hermes/src/chio_hermes/handlers.py": "67ef6ab77ef47a20c82038d065f2b9926568c56e8399f8846550dd33ae5f70ae",
+      "sdks/python/chio-hermes/src/chio_hermes/runtime.py": "4454dab321b0b2a4c0b915d084110e828f7252e603df0a4c09d0bde2073574db",
+      "sdks/python/chio-hermes/tests/conftest.py": "0d867c96617105e94b2ea999f2e3e41e42fc830a45dfe49e40747bb788d4150c",
+      "sdks/python/chio-hermes/tests/test_approval_inputs.py": "76b0cc892f8abec1d7d248d3e333000387ebe4d17bd5e40e0c1306d1d4c6b7ce",
+      "sdks/python/chio-hermes/tests/test_cli.py": "d4acb0a6129516e6b745be06480eb1d001f890f9a78bec337945f883b843de9f",
+      "sdks/python/chio-hermes/tests/test_commands.py": "78f4e2f9e685b3299b4843a7fe6b08a05c2426d530d9652eb5ef7d1711592a03",
+      "sdks/python/chio-hermes/tests/test_hitl_approval.py": "f7323e28f0c55896416723eced42350bf55be69fc8ea1039bf52e638ce61786f",
+      "sdks/python/chio-hermes/tests/test_security_fixes.py": "29f79c0867d017fc384dd3d2142b8cdf847850a0ba6b72598264853b3912eb2d",
+      "sdks/python/chio-sdk-python/README.md": "9a89e32589b0708109e8aeecfae7fc439ead77d07387cfdc427aed4347fd4db1",
+      "sdks/python/chio-sdk-python/src/chio_sdk/approval_contract.py": "1933060cc0cb7055468ca19e731f3de731285d4c79fb1889aac89a07c477f616",
+      "sdks/python/chio-sdk-python/src/chio_sdk/client.py": "06a53633c7a2a88f8ae10abb501c77a4f79cc25bfb6e95efbd956edf52384125",
+      "sdks/python/chio-sdk-python/src/chio_sdk/models_approvals.py": "e25ebae192548fbcb51c3d1294b08d848e8d6474e3b61a290665cf21880b1fc4",
+      "sdks/python/chio-sdk-python/src/chio_sdk/testing.py": "ee6aa3f6d6492cd73770f144ef8852abde9c50447541024143ce03d699ada2be",
+      "sdks/python/chio-sdk-python/tests/test_approvals.py": "7568df3fc9ee2ce23bf99a9389f2cb2b7e6bf906fac85241f8afe43387d216cb",
+      "spec/wire-schemas-unpinned.md": "31fd226fcf2657a6d6360495dbbcc2c73b5a1b9dd6682b372a937c8308128cfd",
+      "spec/wire-schemas.lock": "adba65bcb4a30ae98fd3325e52dba124336901e36ec1d370db89899f76607652"
+    },
+    "subsequent_test_only_changes": [
+      "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/governed_acquisition.rs",
+      "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/budget.rs",
+      "crates/platform/chio-store-sqlite/src/authority/replication/tests.rs",
+      "crates/platform/chio-store-sqlite/src/authority/transaction_tests.rs"
+    ],
+    "rule": "Unaffected green consumer binaries remain evidence for unchanged production and selected test paths; changed test owners were rebuilt and rerun. Contract documentation changes are not executable inputs."
+  },
+  "cancelled_campaign": {
+    "status": "cancelled-after-observed-failures",
+    "cargo_pid": 1749996,
+    "terminated_descendant_pids": [
+      1757051
+    ],
+    "reason": "Stop broad native campaign to repair confirmed CLI/native approval regressions and three review gaps; focused consumer qualification will follow. Incomplete targets are not passes."
+  },
+  "independent_review": "independent-review.md",
+  "unavailable_or_not_run": [
+    "Full workspace and full control-plane campaign; the earlier broad campaign was cancelled after observed failures and its unexecuted targets are not passes.",
+    "Four live-sidecar Hermes cases skipped without CHIO_INTEGRATION=1.",
+    "Legacy Docker approval workflow and Hermes execution resume unavailable under the new authority contract.",
+    "Hosted exact-head CI, release, deployment, operator activation and physical process-crash qualification.",
+    "Non-Linux private SQLite custody, HSM or encrypted custody, whole-database rollback defense and automatic checkpoint handover."
+  ],
+  "python_lint_limit": "Changed new SDK contract/model/tests and Hermes surfaces passed Ruff. Ten pre-existing SDK client/testing findings were reproduced at the source base; no suppression added.",
+  "auxiliary_retained_logs": [
+    {
+      "path": "ap23/hermes-approval-red.log",
+      "sha256": "ea1e01e31637719069331f89184e9f8e3359d4620e040b54837889f1d58241ef"
+    },
+    {
+      "path": "ap23/hermes-final-tests-2.log",
+      "sha256": "a0cc3a3199d4f4933188cb163ebf94495c24cb4285859f5fef96cf69ac1dc06a"
+    },
+    {
+      "path": "ap23/hermes-final-tests.log",
+      "sha256": "3e30cc040615d1ecaba3c8f2495beeb6bee19043217ca742496ff5e87202318e"
+    },
+    {
+      "path": "ap23/hermes-green-attempt.log",
+      "sha256": "4e3b2b9a39c4a02f1fad792846ccd4c8a90154a88d11342c7f35f1b40a19ba6b"
+    },
+    {
+      "path": "ap23/hermes-route-red.log",
+      "sha256": "93cf6232eb9b8875b0c1a05d8f924604af4254e6d4764a6859478b863699c34b"
+    },
+    {
+      "path": "ap23/hermes-ruff-final.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "ap23/mock-approval-red.log",
+      "sha256": "3ec6ebf0f2baed920e8e31d65fdb2389f940a92747a3d3b45d8a104e798e2dcf"
+    },
+    {
+      "path": "ap23/python-changed-surface-ruff.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "ap23/python-ruff-attempt.log",
+      "sha256": "a1aa5be62e878f895e603fe358803198db13c35847ef7b5c46eb437bcf6f06d9"
+    },
+    {
+      "path": "ap23/sdk-client-ruff-base.log",
+      "sha256": "72b89793caecc2e8222df95ae92f4e7845b66ca9cb3fd3a771446735922b70ca"
+    },
+    {
+      "path": "ap23/sdk-control-green.log",
+      "sha256": "a70d4eb37c7df7fe4b5283c2875fb1daefd00e5acd078d060987876dc058734b"
+    },
+    {
+      "path": "ap23/sdk-control-red.log",
+      "sha256": "23369e7a9e4ef2b4d392301fac9c859cf1890bfaf1274b71fe0ee335f113653e"
+    },
+    {
+      "path": "ap23/sdk-green.log",
+      "sha256": "6227871cf31a887b65e83c86e081a997535ca71ed246132a51319b93a85a3a8f"
+    },
+    {
+      "path": "ap23/sdk-mock-green-attempt.log",
+      "sha256": "b277075568fba2ced7c6f9e863ff390765719f2784a138315cdbb6bdcb190a58"
+    },
+    {
+      "path": "ap23/sdk-red.log",
+      "sha256": "4f3aeb6721c708ba3f4b511c64bc45a9e87f69fc8cc214dd5e9b7e7bfba9aed2"
+    },
+    {
+      "path": "ap23/sdk-suite.log",
+      "sha256": "f4191a6bbaf26388bc6dcccd81dc32a7d86bc9a284332cc95951ae5298b830f5"
+    },
+    {
+      "path": "ap23/sdk-testing-ruff-base.log",
+      "sha256": "c4fad85c6085c12a4ae892909ee25c66b6f67c90a44e94c738bfcdd6bc549335"
+    },
+    {
+      "path": "mcp-approvals/operator-and-shared-green.log",
+      "sha256": "b14b77824693bf009a97995db23949047e93c011ba3a598b13bd4f2a7f2d9874"
+    },
+    {
+      "path": "mcp-approvals/operator-green.log",
+      "sha256": "98765d48b830faa3316cfafb4f515ae9979eaa83a9725403da90dced7e06ce62"
+    },
+    {
+      "path": "mcp-approvals/operator-red.log",
+      "sha256": "c9d5cc27fb17a0770790478ff18fafe436ecfa1da62a60692e72b24fc37119e5"
+    },
+    {
+      "path": "mcp-approvals/shared-workflow-green.log",
+      "sha256": "77d39d232626e3e59e6a916819491f0ba13a87739af70ac3ae4468c1f8dea0c8"
+    },
+    {
+      "path": "mcp-approvals/shared-workflow-red-2.log",
+      "sha256": "23fc172356fb7506e05d466fba6127b485dba4a6331a6ed1cf33bab3fc182c5e"
+    },
+    {
+      "path": "mcp-approvals/shared-workflow-red.log",
+      "sha256": "7f4f5bb8b7c5d23126e6461511f84c57dcec21224d753934999e6ed6b972aaa9"
+    }
+  ],
+  "python_contract_record": "python-evidence.md"
+}

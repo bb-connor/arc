@@ -30,11 +30,19 @@ replication, and RL1 exact release workflow/tag identities with executable cosig
 controls. These have local source acceptance, with publication recorded separately
 from hosted and deployed acceptance.
 
-The [next implementation plan](../superpowers/plans/2026-10-02-issuer-lifecycle-approval-authority.md)
-covers KG2 issuer retirement/revocation and receipt-signer separation, KG3 private
-authority database custody, AP2 execution-bound approval redemption, and AP3
-explicit approver identity and enforceable policy. The signed KG1 chain currently
-represents additions only; it does not close lifecycle retirement or recovery.
+The [issuer and approval execution record](2026-10-02-issuer-lifecycle-approval-authority-execution.md)
+locally accepts KG2 signed lifecycle/retirement/revocation/recovery and separate
+receipt authority, KG3 private Linux SQLite custody, AP2 exact single-use approval
+redemption, and AP3 explicit approver identity and enforced policy. It records
+2,236 Rust passes, 511 Python passes, four live Hermes skips, all four independent
+review corrections, retained failures and the final source commit. Platform,
+operator, unavailable legacy workflow and hosted boundaries remain explicit.
+
+**Next substantial batch: AC4 plus CA3.** Fence protected run and step writes
+with the current lease token inside the committing transaction, with stale-owner,
+takeover, restart and zero-write controls. Extend the ingress census to framework
+extractors, shared readers and non-JSON decoders, then migrate exposed signed and
+authoritative consumers with duplicate/original-byte route controls.
 
 AC4 protected run/step writes, CA3 extractor-aware signed ingress, remaining TCB
 reader semantics, proof-result sealing and error provenance remain separate
@@ -47,7 +55,7 @@ compliance/product findings and the parent assurance gates also remain open.
 | --- | --- | --- |
 | Decoder classification | 45 `raw-input-baseline` files; core types, runtime core, broker, control plane, kernel, SQLite, selected native/remote/A2A protocol owners, 28 API-protect/CLI/proof-room files, 26 further CLI readers, the remaining 29 CLI readers, all 28 remaining protocol readers, all 35 pinned trust readers, all 33 guard/security readers, all 31 pinned platform readers, all 22 pinned economy readers and the removed manifest-v1 converter disposed | Lexical inventory awaiting semantic disposition, not a vulnerability count. |
 | Arithmetic | 85 pending of 638 original entries; 553 classified, including 133 repaired | Historical source anchors include fixtures and code already moved or repaired. All 264 previously pending kernel/SQLite entries and 37 scoped runtime/broker entries have dispositions. |
-| Ambient clocks | 436 remaining observations and 38 pinned native compositions, including fixtures | The expanded gate covers complete TCB/boundary crates, aliases, function references, adapter selection and SQL clock literals. The immutable base scan found 471 observations, 317 invisible to the old gate. These counts measure source observations, not production vulnerabilities or completed migrations. The October 2 clock record bounds the owner changes and tests. |
+| Ambient clocks | 426 remaining observations and 38 pinned native compositions, including fixtures | The expanded gate covers complete TCB/boundary crates, aliases, function references, adapter selection and SQL clock literals. The immutable base scan found 471 observations, 317 invisible to the old gate. These counts measure source observations, not production vulnerabilities or completed migrations. The October 2 clock record bounds the owner changes and tests. |
 | Negative assertions | Baseline contains 1,254 assertions at 1,172 sites | The identity batch strengthened rejection checks and removed two obsolete entries without extending the deadline. This is the committed ratchet, not proof that every assertion is security-relevant or currently defective. |
 | Tenant runtime matrix | 85 of 85 SQLite tables mapped to exercised families | Signed authorization consumption now has production commit/replay/reopen and substitution evidence. Shared family witnesses do not establish query-by-query mutation coverage. |
 | Schema/domain duplication | Wire lock records 163 identifiers declared in multiple files; domain gate has 32 shape exceptions and zero duplicate byte domains | Six duplicated byte domains and 37 schema duplicates retired with 43 canonical identity pins. Remaining schema consolidation and domain-shape repairs stay queued. |

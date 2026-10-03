@@ -4,8 +4,11 @@
 source repairs in the [identity and authority execution record](2026-10-02-identity-authority-release-closure-execution.md).
 The historical findings and counts below remain the October 1 snapshot. This
 follow-up does not establish deployed migration, hosted keyless signing, release
-publication or closure of the other findings. KG2/KG3 and AP2/AP3 are the
-[next proposed batch](../superpowers/plans/2026-10-02-issuer-lifecycle-approval-authority.md).
+publication or closure of the other findings. KG2/KG3 and AP2/AP3 now have
+bounded local source acceptance in the
+[issuer and approval execution record](2026-10-02-issuer-lifecycle-approval-authority-execution.md).
+Linux custody, explicit provisioning and unavailable legacy workflows are stated
+there. AC4 lease-fenced run/step writes and CA3 framework ingress are next.
 
 A compliance-documentation review of `main` (`f5566d9a76`) on September 30 and October 1 checked
 every compliance, security and supply-chain claim in the repository against the code, the CI

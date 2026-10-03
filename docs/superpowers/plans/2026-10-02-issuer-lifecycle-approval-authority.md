@@ -1,7 +1,11 @@
 # Issuer lifecycle, key custody and execution-bound approvals
 
-**Status:** Proposed next batch after AP1/KG1/RL1. No checklist item below is
-completed by this plan. Refresh the source and review findings before execution.
+**Status:** Complete for the bounded local source batch from
+`a617c0b02f182afac6acab2df89a2cd9270e4923`. The
+[execution record](../../reviews/2026-10-02-issuer-lifecycle-approval-authority-execution.md)
+contains the source commit, independent review, terminal evidence and explicit
+operational limits. The approved design is
+[issuer lifecycle and approval authority](../specs/2026-10-02-issuer-lifecycle-approval-authority-design.md).
 
 **Goal:** Close KG2/KG3 and AP2/AP3 from the
 [compliance and product-truth review](../../reviews/2026-10-01-compliance-product-truth-review.md)
@@ -28,17 +32,17 @@ and approval authority, then enforce the lifetime and exact use of each grant.
 Owners: `chio-kernel` authority/validation, `chio-store-sqlite` authority store,
 `chio-keyring` state/store, and control-plane construction and replication.
 
-- [ ] Reproduce admission by a retired or expired issuer and admission under the
+- [x] Reproduce admission by a retired or expired issuer and admission under the
   kernel receipt key when a distinct capability authority is configured.
-- [ ] Specify active, verify-only, retired and revoked states, with precise
+- [x] Specify active, verify-only, retired and revoked states, with precise
   issuance and verification deadlines. Define authenticated rotation, retirement,
   revocation and recovery transitions, including migration from KG1 checkpoints.
-- [ ] Atomically publish lifecycle state and replay commitments; reject unsigned,
+- [x] Atomically publish lifecycle state and replay commitments; reject unsigned,
   stale, conflicting and unauthorized changes across incremental and full import.
-- [ ] Apply `verify_until` and revocation at keyring and kernel verification time.
+- [x] Apply `verify_until` and revocation at keyring and kernel verification time.
   Receipt signing must not implicitly grant capability or approval authority.
   Preserve deliberately configured local authority behavior with explicit tests.
-- [ ] Exercise issue A, rotate B, retire/revoke A and deny through `build_kernel`;
+- [x] Exercise issue A, rotate B, retire/revoke A and deny through `build_kernel`;
   check exact deadline boundaries, clock faults, restart, retained historical
   receipts, rollback, competing updates and custody mismatch. Document recovery
   and bounded-chain recheckpointing without claiming automatic safe handover.
@@ -48,13 +52,13 @@ Owners: `chio-kernel` authority/validation, `chio-store-sqlite` authority store,
 Owner: `chio-store-sqlite` authority database creation/opening, using existing
 file-identity and private-file helpers where their contracts fit.
 
-- [ ] Reproduce default-umask exposure in an isolated subprocess.
-- [ ] Establish private directory/database modes before writing a seed and
+- [x] Reproduce default-umask exposure in an isolated subprocess.
+- [x] Establish private directory/database modes before writing a seed and
   validate existing stores. Include WAL/SHM sidecars, symlinks, file replacement,
   SQLite URI paths and platform-specific behavior in the design.
-- [ ] Reject unsafe pre-existing custody rather than silently broadening access.
+- [x] Reject unsafe pre-existing custody rather than silently broadening access.
   Provide a bounded offline migration procedure for legitimate deployments.
-- [ ] Verify creation under umask 022, unsafe permissions and parent paths,
+- [x] Verify creation under umask 022, unsafe permissions and parent paths,
   reopen/rotation/replication, and zero seed-bearing writes on refusal. Do not
   describe filesystem permissions as encryption or external key custody.
 
@@ -63,15 +67,15 @@ file-identity and private-file helpers where their contracts fit.
 Owners: kernel governed validation, API-protect mediated/approval routes,
 `chio-http-core` approval store and SDK approval contracts.
 
-- [ ] Reproduce approval for arguments A being substituted or unbound, and the
+- [x] Reproduce approval for arguments A being substituted or unbound, and the
   mismatch between SDK parameter hashing and kernel intent binding.
-- [ ] Build `BoundToolInvocation` server-side from the admitted capability,
+- [x] Build `BoundToolInvocation` server-side from the admitted capability,
   route, arguments and request identity. Require that binding whenever approval
   is required, including non-HTTP kernel callers.
-- [ ] Connect approval persistence and redemption to admission with single-use,
+- [x] Connect approval persistence and redemption to admission with single-use,
   expiry, tenant and current-policy checks. Preserve safe pending/recovery
   semantics across restart; distinguish denial from an advisory workflow.
-- [ ] Exercise real submit/approve/evaluate paths: A succeeds once, B and an
+- [x] Exercise real submit/approve/evaluate paths: A succeeds once, B and an
   unbound intent deny, and wrong capability, route, request, tenant, policy,
   expired/revoked approval and concurrent redemption deny without tool dispatch.
 
@@ -79,25 +83,25 @@ Owners: kernel governed validation, API-protect mediated/approval routes,
 
 Owners: the same approval consumers, policy loading and approval receipt types.
 
-- [ ] Require an explicitly configured approver roster and authenticated signer
+- [x] Require an explicitly configured approver roster and authenticated signer
   identity. Do not substitute the sidecar key for an invalid requester or infer
   approval authority from membership in a capability issuer set.
-- [ ] Preserve approver attribution and exact approved intent in signed evidence.
+- [x] Preserve approver attribution and exact approved intent in signed evidence.
   Decide and implement the supported dual-approval contract, including distinct
   principals and current-policy revalidation, or reject it at policy load.
-- [ ] Reject unsupported approval policy fields (`approve_when`, timeout behavior
+- [x] Reject unsupported approval policy fields (`approve_when`, timeout behavior
   and currency thresholds) rather than accepting ineffective configuration.
   Update public examples and SDK behavior to the supported contract.
-- [ ] Test an unlisted signer, duplicate approver, changed roster, signer retirement,
+- [x] Test an unlisted signer, duplicate approver, changed roster, signer retirement,
   invalid requester and unsupported policy fields through their actual consumers.
 
 ## Acceptance and handoff
 
-- [ ] Run affected owner tests, production composition controls, warnings-denied
+- [x] Run affected owner tests, production composition controls, warnings-denied
   lint and source gates. Do not substitute serialization tests for admission.
-- [ ] Resolve one independent review and record commands, source hashes and
+- [x] Resolve one independent review and record commands, source hashes and
   terminal logs; commit/push authorized security work and verify the remote SHA.
-- [ ] Reconcile KG2/KG3/AP2/AP3 individually with their roadmap owners and keep
+- [x] Reconcile KG2/KG3/AP2/AP3 individually with their roadmap owners and keep
   incomplete parts explicit. AC4 protected run/step writes, CA3 framework ingress,
   remaining TCB readers, guard integration, evidence/retention and full hosted
   release qualification remain subsequent queue items.

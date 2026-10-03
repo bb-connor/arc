@@ -653,17 +653,18 @@ launch blockers and report any proposed scope change before taking it.
 The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. At that review these defects were not on an implementation plan.
 The October 2 [identity and authority batch](../reviews/2026-10-02-identity-authority-release-closure-execution.md)
 locally qualifies AP1, KG1 and RL1 source repairs. It does not establish deployed
-migration, release publication or milestone-wide acceptance. Remaining findings by milestone:
+migration, release publication or milestone-wide acceptance. The October 2
+[issuer and approval batch](../reviews/2026-10-02-issuer-lifecycle-approval-authority-execution.md)
+also locally accepts AP2/AP3 (M4) and KG2/KG3 (M6), with Linux custody and explicit
+operator provisioning limits. Its source acceptance does not close M4 or M6.
+Remaining findings by milestone:
 
-- **M4.** AP2 (API-protect approvals gate nothing; unbound intents accepted), AP3 (approver identity not
-  recorded; any trusted key approves), AP4 (API protect allows unmatched routes and side-effect-free
+- **M4.** AP4 (API protect allows unmatched routes and side-effect-free
   methods by default), AP5 (capabilities are bearer tokens; `jkt` binding fails open), AP6
   (certificate binding satisfied by caller-set headers), AP10 (submitted records verify as decisions),
   KG4 (capability constraints silently unenforced), KG5 and KG6 (wildcard default grant; policy
   hashes that do not identify policy), KG12 (two kernel paths with no guards or sanitizer).
-- **M6.** KG2 (rotation never
-  retires keys; kernel key is an unrotatable issuer), KG3 (authority database with the plaintext seed
-  created world-readable), KG7 and KG8 (attestation never verified), KG14 (no KMS or HSM signer),
+- **M6.** KG7 and KG8 (attestation never verified), KG14 (no KMS or HSM signer),
   AP7 (no TLS on any listener), AP8 (session revocation reports success on failure), AP12.
 - **M7.** EV1 (raw tool arguments in receipts, SIEM events and pages; prerequisite for any personal
   data or PHI pilot), KG10 (library-only guards documented as running), KG11 (indirect injection and
