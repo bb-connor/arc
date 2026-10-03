@@ -1,77 +1,55 @@
 \section{Relation to existing mechanisms}
-Miller's robust composition addresses cooperation among potentially malicious
-distributed components using object capabilities~\cite{miller}. Secure Linking
-uses certified properties and proof-carrying authentication to govern component
-linking~\cite{securelink}. Multiparty session types derive local checks from
-global interaction types and establish communication properties within their
-calculus~\cite{sessiontypes}. These works precede the general ambition of
-composing independently controlled components. S1 contributes a concrete
-extension rule for Chio's existing signed authority and native continuation
-custody. It does not introduce secure composition in general or establish the
-session-type progress guarantees for arbitrary agent programs.
+\label{sec:related}
+Chio builds on established mechanisms for secure cooperation. Object
+capabilities support robust composition among mutually suspicious
+components~\cite{miller}; Secure Linking connects certified component properties
+with proof-carrying authentication~\cite{securelink}. Proof-carrying code makes
+supplied evidence checkable against a consumer's policy~\cite{pcc}.
+Chio applies receiver-owned checking to a work commitment whose allocation,
+invocation, execution history and payment are enforced by different custodians.
 
-Contract Net already organizes distributed work through announcements, bids
-and awards~\cite{contractnet}. Agent Contracts unifies task specifications,
-resource constraints and success conditions, including delegated budget
-conservation~\cite{agentcontracts}. Chio does not introduce contracting or
-hierarchical budget discipline. D1 connects such bounds to a sealed, portable
-selection and an exact native invocation; F1 connects accepted work to an
-obligation backed by a declared settlement authority.
+Contract Net organizes distributed work through announcements, bids and
+awards~\cite{contractnet}. Agent Contracts combines task specifications,
+resource bounds and success conditions, including delegated budget
+conservation~\cite{agentcontracts}. The additional boundary developed here is
+sealing that choice to an exact receiver-issued invocation and preserving it
+when the surrounding signed work graph grows.
 
-Proof-carrying code makes supplied evidence checkable against a consumer's
-safety policy~\cite{pcc}. Interface Automata models component assumptions,
-guarantees, compatibility and refinement~\cite{interfaceautomata}. These are
-important antecedents to locally checked composition. D1's permit carries
-authenticated allocation evidence, not a proof of arbitrary program behavior.
-Its subset rules do not establish semantic refinement between parent and child
-tasks. A successful predicate check certifies only that predicate.
+Interface Automata and multiparty session types establish compatibility and
+communication properties within their respective models~\cite{interfaceautomata,sessiontypes}.
+The preservation result in Section~\ref{sec:preservation} concerns authority,
+capacity, execution identity and earned obligations. Correct task decomposition
+and progress of an arbitrary agent program require further properties of its
+tasks and interaction model.
 
-AgentBound places deterministic governance before execution and binds decisions
-to verifiable receipts~\cite{agentbound}. That overlaps substantially with local
-authorization and audit. A receipt about permitted behavior does not by itself
-reserve funds at a separate authority or decide application-specific output
-acceptance. Chio's work contract explicitly joins those duties, while retaining
-their distinct assumptions.
+AgentBound's deterministic governance and verifiable decision receipts overlap
+with pre-execution policy enforcement~\cite{agentbound}. A2A supplies task,
+message, artifact and discovery interfaces~\cite{a2a}; AP2 specifies signed
+commercial and payment mandates~\cite{ap2}. OAuth token exchange permits
+deployment-specific trust and token semantics~\cite{oauth}. These mechanisms can
+carry rich application contracts. Chio's contribution is the defined binding
+and enforcement path across the owners of the resources, rather than an
+expressiveness restriction on their message formats.
 
-A2A supplies tasks, messages, artifacts and discovery~\cite{a2a}; AP2 specifies
-signed commercial and payment mandates and their verification~\cite{ap2}.
-AP2 v0.2 leaves shopping-agent mandate delegation outside its scope and permits
-extensible authorization models. That is a scope choice, not evidence that its
-carriers cannot express this work contract. Likewise, OAuth token exchange
-leaves significant trust and token semantics to deployment profiles~\cite{oauth}.
-A receiver-issued credential and ordinary signed application fields can enforce
-receiver-owned authorization. Interoperability requires a defined profile and
-conformance tests, not a claim that other formats lack expressive power.
-
-ERC-8183 is a particularly close construction: it specifies escrowed agent jobs,
+ERC-8183 is the closest economic construction: it defines escrowed agent jobs,
 providers, evaluator-approved completion and expiry refunds~\cite{erc8183}.
-The economic pattern is already present. The pinned upstream implementation
-additionally supports partial claims and relayable EIP-712 authorization; the
-specification and implementation differ in details. Section 6 tests their
-overlap with Chio directly. No new economic primitive follows from separating
-acceptance and withdrawal or from independently funding child jobs.
-ERC-8004 provides discovery, reputation and validation interfaces while leaving
-payments to other protocols~\cite{erc8004}. A registry entry is evidence a
-receiver may consider, not a capability to use its resources. Both standards
-are drafts at the pinned snapshots.
+Section~\ref{sec:evaluation} and Appendix~\ref{app:evidence} compare the pinned
+implementations directly. ERC-8004 supplies discovery, reputation and validation
+interfaces~\cite{erc8004}; such evidence can inform local policy while admission
+remains the receiver's decision. Neither an agent registry nor a settlement
+ledger must serve as a universal authority over tool access.
 
-Sagas explain how sequences of transactions use application-defined
-compensation~\cite{sagas}. A refund is such a financial action; it need not erase
-an already delivered effect. Our explicit unknown state prevents recovery from
-inventing a successful execution or a no-effect history. Durable workflows and
-transactional outboxes remain appropriate competing implementation techniques.
+Sagas use application-defined compensation for sequences of
+transactions~\cite{sagas}. Durable workflows and transactional outboxes likewise
+provide established techniques for retaining work and messages. Chio's recovery
+rule makes the authority of each retained fact explicit: a compensating refund
+resolves money, while an uncertain tool effect retains its original status.
+Contingent payments and fair exchange offer stronger cryptographic constructions
+for particular verification and exchange problems~\cite{zkcsp,fairswap}.
+The funded profile here uses an agreed verifier and settlement domain.
 
-Contingent service payments and fair exchange have established constructions
-for linking payment to verification~\cite{zkcsp,fairswap}. F1 is weaker in an
-important respect: it relies on a selected verifier, rather than supplying a
-cryptographic proof of arbitrary useful work or complete fair exchange.
-Replacing that verifier with a proof system would require a restricted task
-language, cost measurements and a new analysis of availability and disclosure.
-The current implementation does not establish that extension.
-
-The relevant comparison is thus a composition of competent implementations of
-these mechanisms. A missing field in a base specification is not an obstacle
-to that composition. Chio offers a particular contract and enforcement path;
-whether that common contract materially lowers the cost of changing partners
-remains the experiment that would distinguish protocol value from a large
-bespoke integration.
+The architectural result is a common native boundary for these concerns.
+Changing a program's plan preserves the authenticated commitments already
+admitted by its resource owners. This gives planners a defined operation for
+composing work, and implementers a concrete set of bindings and lifecycle rules
+against which to test another receiver.

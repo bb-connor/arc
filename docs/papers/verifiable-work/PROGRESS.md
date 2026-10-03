@@ -1,5 +1,54 @@
 # Publication execution record
 
+2026-10-03 manuscript revision: the user redirected the next chunk from an
+outside trial to making the paper itself complete and compelling, then specified
+writing from the completed contribution. This is a bounded revision of the
+existing manuscript, authorized by that direction. Preserve the locked title,
+existing protocol and evidence; strengthen the claim, explanation and structure.
+
+Revision plan: (1) state the kernel contract and programmable sovereignty first;
+(2) organize delegation, admission, graph evolution, recovery and payment around
+one commitment and one running example; (3) present the composed preservation
+argument with explicit premises; (4) consolidate measured results and prior-art
+comparisons, with exact profile details in an appendix and development history
+in the companion; (5) obtain a fresh technical/editorial review, repair findings,
+render, visually inspect and freeze the final artifact. No new experiment,
+independent-operator result, formal refinement or economic advantage is inferred
+from this change in voice. Native source and its qualified evidence remain the
+implementation boundary; manuscript validation is the relevant changed boundary.
+
+2026-10-03 editorial acceptance: all five revision steps are complete. The main
+text now presents the completed protocol through programmable sovereignty, one
+work commitment, one running example and one preservation proposition. The
+abstract and conclusion state the contribution directly. Profile definitions and
+qualification detail are retained in two technical appendices. Fresh automated
+review closed one Important and three Minor findings; its follow-up accepted
+the reviewed scope with no remaining findings. `EDITORIAL-REVIEW.md` records
+the repairs and review boundaries.
+
+The final PDF is 17 pages (12 main text, two references, three appendices),
+332736 bytes, SHA-256
+`ebbd609b563014ee15866a93f485792c7474ce275e8a67888250f311f085b5dd`.
+Visual checks cover the abstract, protocol figure, conclusion and evidence
+appendix. The LaTeX log has no warnings or overfull/underfull boxes. All 28 claim
+records have their required fields, unique IDs and existing evidence paths;
+all 28 local Markdown links checked in the edited documents resolve.
+
+`make render`, `python3 -B tools/check.py --freeze` and `make build` pass. The
+last build reproduces the frozen PDF bytes and validates all 655 artifact files,
+current native inventory, historical source pins, bibliography and derived
+results. The inventory comparison contains only 15 changed paper files and
+three new paper files; no native input, proof program, tool or retained evidence
+output changed. `git diff --check` passes. No native tests were rerun for this
+editorial revision.
+
+The publication check exits one for exactly the four retained open gates
+(independent operation, useful-work economics, integration advantage and
+foundational critique) and the two false readiness flags. This verifies their
+unchanged status; the completed manuscript revision supplies no new experiment
+or outside review. The paper remains on its isolated branch, with no merge,
+push or external publication performed.
+
 2026-10-03 composed execution revision: the user reiterated execution using
 existing delegation, swarm authority and treaties. The active plan is
 `docs/superpowers/plans/2026-10-02-evolving-funded-work.md`. The composed

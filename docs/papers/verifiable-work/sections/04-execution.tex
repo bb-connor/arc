@@ -1,167 +1,101 @@
-\section{Execution, recovery and payment}
-\subsection{The native delegation boundary}
-D1's receiver consumes a slot ID, payload and signed dispatch permit. The
-installed guard requires a locally accepted allocator and checks the allocator,
-holder and receiver signatures. It compares the exact receiver key, capability
-subject, server/tool, input digest, request ID and capability digest with the
-sealed selection. The capability must be issued by this receiving kernel and
-contain one exact invoke grant, one invocation, and per-call and total monetary
-ceilings no larger than the offer. The offer and slot must be live. Ordinary
-native capability validation, revocation and policy checks still apply.
+\section{Evolution, execution and recovery}
+\label{sec:execution}
+A commitment gives a running program a stable object to preserve. The program
+can discover further work, but extending its plan must not enlarge an earlier
+permission, reassign a sealed invocation or reset a consumed execution right.
 
-The installation API requires durable native admission and enables original
-request retention. The receiver selects either the original argument envelope
-or a governed-context layout; the caller cannot select a weaker interpretation.
-In the composed layout the permit commits to every original tool argument,
-including existing financial terms, without rewriting the tool payload. The guard revalidates before dispatch and checks the exact
-JSON value after output transformations. A signed offer in D1 agrees to
-accepted-output pricing: a qualifying predicate rejection withholds output and
-uses the native reversible-hold path to produce a zero-charge denial. The
-executed invocation remains consumed. This rule depends on the qualified
-payment profile; a portable permit does not implement settlement by itself.
+\subsection{Grow the plan without replacing its history}
+Let $G_i$ be the current signed swarm graph. An extension supplies the expected
+digest of $G_i$ and a signed candidate $G_{i+1}$. The store first runs ordinary
+live-authority verification on both, then checks that the candidate retains
+the earlier graph envelope, tasks, edges, routes, witnesses, allocations and
+revocation epoch. New tasks must fit within the original depth, fan-out and
+pool bounds.
 
-Sealing uses two durable steps: first freeze the exact selection, then persist
-the signed permit before returning it. A crash between them can strand
-capacity. Retrying returns the original stored permit once available, and
-cannot replace its provider or request. Native custody, rather than a permit
-cache, determines whether that request has already executed. Timeouts do not
-authorize a replacement. Independent siblings can proceed from their own
-allocations while the original operation is unresolved.
+Each task has at most one allocation and one single-use continuation. An old
+continuation retains its identity and all fields except the graph digest and
+signature that bind it to the successor. A new task receives a new continuation.
+Signing a new graph therefore does not issue another attempt for an old task.
 
-In the native fault experiment, the receiver process is killed after
-\texttt{ToolReturnRecorded}. A second receiver cannot replace the original
-allocation, but completes an already allocated sibling. Reopening the first
-receiver recovers its recorded output without a fresh tool call. This cut has
-recoverable evidence; it does not establish recovery from every possible cut.
-An effect lacking authoritative completion evidence remains unknown. Ordinary
-external effects acquire no exactly-once guarantee from the permit.
+The installer atomically compares the expected head, archives the exact parent
+bundle and installs the successor. Two contenders using the same old head
+cannot both commit. A receiver resolves the graph version named in the original
+request, so old work remains interpretable after growth. Native custody owns
+the continuation by its stable identity across those versions. Fresh work still
+passes current capability, expiry, revocation and treaty checks.
 
-\subsection{Extending a running swarm}
-S1 adds one operation to the existing swarm lifecycle. Given the expected
-digest of the installed bundle and a signed candidate, the runtime store
-checks both bundles with the ordinary live-authority verifier at store-owned
-time. It then checks retention: the original graph envelope, nodes, edges,
-joins, routes, witness chains, allocations and revocation epoch remain intact.
-The candidate must add nodes within the original depth, fan-out and pool limits.
-Each task has at most one allocation and continuation. Existing continuations
-retain every field except the new graph digest and its signature. A new task
-receives a new continuation; an old task cannot receive a new attempt identity.
+In the running example, the survey's result creates the specialist task.
+The program seals the specialist's invocation, binds and funds its agreement,
+then installs the checked graph extension. The survey retains its original
+execution evidence. The intermediary can still execute its previously sealed
+request under the earlier graph.
 
-In one immediate SQLite transaction, the installer compares the expected head,
-archives the exact parent bundle and installs the successor. Competing proposals
-against one parent cannot both commit. The archive binds the graph index to the
-signed graph digest and full bundle digest. Admission uses the graph digest
-already carried by the request, so an unfinished operation can still present
-its original evidence after growth. Every fresh invocation also passes the
-ordinary current capability, revocation and treaty gates.
+\subsection{Admit one invocation}
+The receiver checks local authority and the complete evidence binding before
+dispatch. It also verifies observed backing for the funded agreement.
+One native operation acquires the treaty and swarm continuation resources and
+binds the original financial allocation to its budget hold. The kernel records
+admission durably before invoking the tool.
 
-The native kernel owns the single-use continuation resource by its stable ID.
-A changed graph digest therefore cannot turn a consumed continuation into fresh
-authority. Replaying a completed request resolves its original operation and
-receipt. Revalidating an original physical claim reads its original graph and
-treaty evidence. The installer does not need a joint transaction with every
-running operation: additive growth leaves their allocations and identities
-intact. Non-additive retirement would require a different authority boundary.
+For delegated work, the guard checks the exact output after transformations
+against the slot's predicate. Funded acceptance adds the agreement's verification
+procedure. The native execution statement binds the retained original request
+and output so that verification cannot silently consume another invocation's
+result.
 
-\subsection{One admission across three resource owners}
-The composed adapter resides in the experimental funded receiver. Its protected
-policy pins the allocator, swarm witness, treaty peer and runtime profile.
-Opening the receiver installs the same delegation guard and runtime admission
-hook before recovery. Removing that configuration changes the pinned policy;
-losing its runtime database cannot silently provision empty custody.
+A federated execution statement is exported from the original frozen admission
+provenance: treaty, participants, request and recorded admission time are checked
+against the retained outcome. Export supplies evidence of receiver-local
+execution. Final bilateral receipt delivery is a separate operation that may
+still require a remote co-signer.
 
-The D1 slot ID equals the native request ID and S1 task ID. The S1 allocation ID
-is the D1 allocation digest; both agree on amount and currency. The sealed
-permit and native swarm witness bind the same capability. The signed route must
-target this receiver. The existing F1 agreement signs the entire final request,
-including the governed D1, swarm and treaty references. Its escrow allocation ID
-therefore commits transitively to those references. These are different hash
-domains joined by checked bindings, not interchangeable identifiers. The
-agreement is downstream of the request, so no circular hash is required.
+\subsection{Recover the fact that was established}
+A timeout describes a missing response. It does not establish whether the
+receiver dispatched, whether the tool had an effect, or whether a verifier
+recorded acceptance. Recovery therefore consults the resource owner's durable
+history.
 
-Before dispatch, the receiver checks treaty and capability authority separately
-from observed escrow backing. One existing native operation acquires both the
-treaty and swarm continuation resources. Its payment adapter compares the
-governed payment context with the original retained intent, then binds the
-original funding allocation to the operation and budget hold. A new graph
-member receives neither a capability nor funds merely by appearing in a graph.
+Before sealing, revision checks permit another provider choice. After sealing,
+the original allocation and request remain bound even if a crash strands their
+permit. After native dispatch, recorded output can be recovered without another
+tool call. Where authoritative completion evidence is absent, the native state
+remains \textsf{OutcomeUnknownAfterDispatch}. Independent sibling work can
+continue from its own allocations.
 
-A receiver-local pre-settlement statement authenticates the retained execution
-and output before a funded decision. For a federated invocation, export
-revalidates the original frozen treaty, participants and admission time against
-the content-addressed native outcome. It does not ask for a new remote
-co-signature, imply delivery to the remote party, or settle payment. The agreed
-checker and escrow decision establish the earned claim. Final bilateral
-receipt delivery remains a separate operation.
+The same rule governs settlement transactions. The reference implementation
+persists the exact signed transaction before broadcast. A restart reobserves
+or rebroadcasts those bytes; it does not choose a new nonce or substitute a
+different allocation. This preserves particular durable transitions. Arbitrary
+external tool effects still depend on the tool's own effect and recovery model.
 
-The commit order is seal, bind the funded agreement, deposit backing, install
-checked growth, admit and dispatch, then record acceptance. No distributed
-transaction spans those owners. A crash between steps may strand unused
-capacity or funds until the existing refund rules apply. It cannot silently
-replace the original receiver, request or allocation.
-
-\subsection{The funded state machine}
-F1's financial state machine has seven states after funding:
+\subsection{Earn, then collect}
+The funded lifecycle is
 \[
-\textsf{Funded}\to\textsf{Submitted}\to
-\begin{cases}
-\textsf{Payable}\to\textsf{Paid},\\
-\textsf{Rejected}\to\textsf{Refunded}.
-\end{cases}
+ \textsf{Funded}\to\textsf{Submitted}\to
+ \begin{cases}
+  \textsf{Payable}\to\textsf{Paid},\\
+  \textsf{Rejected}\to\textsf{Refunded}.
+ \end{cases}
 \]
-A funded or submitted job without a decision can become
-$\textsf{TimedOut}$ and then $\textsf{Refunded}$. There is no edge from
-$\textsf{Payable}$ to timeout or refund.
+Undecided work can time out and refund under its agreed deadlines. An earned
+claim has no transition from \textsf{Payable} to timeout or refund.
 
-Let $t_s<t_c<t_r<t_f$ denote submission, challenge, resolution and refund
-boundaries. The beneficiary submits by $t_s$. A first verifier decision is
-recorded only when $t_c<t\leq t_r$. Without a decision, refund is allowed only
-when $t>t_f$. The interval before decision is a timing boundary, not a claim
-that F1 implements a public challenge court. The exact verifier decision may
-be carried by any courier. Its first valid recording determines acceptance;
-an identical replay changes nothing, and a conflicting replay fails.
+The selected verifier's decision binds the allocation, agreement, submission,
+beneficiary, asset and amount through typed signed data~\cite{eip712}. The
+escrow authenticates that decision. A claim is \emph{earned} when an accepting
+decision is recorded under the selected settlement observation rule.
+An output or an unrecorded signature alone does not reach that state.
+An identical decision replay changes nothing; a conflicting replay fails.
 
-A claim is \emph{earned} here when an accepting decision has been recorded in
-the settlement state under the selected finality rule. Merely producing an
-output or obtaining an off-chain signature does not earn this right. After
-that transition, the beneficiary may withdraw without a new payer signature.
-The reference contract imposes no later expiry on an earned withdrawal.
-Administrative pause and verifier-registry changes govern new funding and do
-not revise an existing claim. The recipient still needs transaction inclusion,
-fees and a functioning asset contract.
+Once the claim is earned, its beneficiary can withdraw without a new payer
+authorization. Parent completion, failure and refund concern a different
+allocation. In the running example, the specialist's right to its reserved
+100 survives the intermediary's loss; the intermediary bears that subcontract
+cost. Its own refund does not establish that its unknown native invocation had
+no effect.
 
-Local execution proceeds under its own durable operation identity. The kernel
-commits admission before dispatch, retains observed output and produces signed
-evidence. The funded integration carries the original allocation, operation,
-hold and authorization identifiers through verification and recovery. Recovery
-reopens that history; it must not mint a fresh admission simply because a
-response was lost. A return whose occurrence cannot be established remains an
-unknown terminal. A later financial resolution has its own authority and does
-not rewrite the original observation.
-
-For actual rail transactions, the research implementation records the exact
-signed transaction before broadcast. After a crash it reobserves or rebroadcasts
-those same bytes. A changed nonce, transaction or funding context is not an
-ordinary retry. This approach handles particular durable cutpoints; it is not
-an exactly-once guarantee for arbitrary tool effects.
-
-\subsection{Successful exchange and failed intermediary}
-In a successful exchange, the buyer and provider sign the terms, the buyer
-funds $f_1$, and the provider admits one bound operation. The result and custody
-record identify the exact submitted bytes. The verifier reruns the selected
-check, records acceptance, and the provider withdraws 100. An offline reader
-can verify the signed evidence without possessing either party's private keys;
-current spendability still requires settlement state.
-
-For the failed intermediary, the specialist's 60-unit child claim becomes
-$\textsf{Payable}$ but remains uncollected. The parent produces no eligible
-submission and its 100 returns to the buyer after timeout. The specialist then
-withdraws the original 60. The provider bears the loss because it funded the
-child. This is neither a transfer of the buyer's risk to an unpaid specialist
-nor a claim that failed computation is free.
-
-If instead the verifier never records a child decision, the child may time out
-and refund its payer despite the specialist having performed work. F1 protects
-recorded earned claims; it cannot guarantee timely adjudication against its own
-failed verifier. That distinction is the decisive difference between financial
-safety and an unconditional promise to pay for every useful result.
+The owners commit in order: seal, bind the funded agreement, deposit backing,
+install graph growth, admit and dispatch, then record acceptance. There is no
+distributed transaction across those steps. A failure can leave capacity or
+funds committed until their existing lifecycle resolves them. Preserving that
+obligation is what prevents recovery from manufacturing a second promise.

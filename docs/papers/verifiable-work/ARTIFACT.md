@@ -2,12 +2,29 @@
 
 This artifact accompanies *Chio: A Peer-to-Peer Economy of Verifiable Work*.
 The title was approved on 2026-09-14. The manuscript was first completed as a
-research draft on 2026-10-02. Publication readiness is evaluated separately in
-`PUBLICATION.json`; the high-bar gates are not waived by a successful PDF build.
+research draft on 2026-10-02 and restructured around programmable sovereignty
+and preserved work commitments on 2026-10-03. Publication readiness is evaluated
+separately in `PUBLICATION.json`.
+
+## Reading the paper
+
+The main text develops one execution contract: plans may evolve while issued
+commitments retain their bounds and identity. Sections 1-2 introduce the agentic
+kernel and receiver-owned authority; Sections 3-5 specify the commitment,
+lifecycle and preservation argument. Sections 6-9 present the composed execution,
+comparisons, deployment conditions and conclusion.
+
+Appendix A maps the argument to the concrete D1, S1 and F1 profiles, including
+their encodings and acceptance rules. Appendix B records source qualification,
+model coverage and matched alternatives. This companion supplies the exact
+source paths and reproduction commands. The
+[editorial review](EDITORIAL-REVIEW.md) records the final manuscript review and
+repairs. This revision changes no native source, proof program, comparison tool
+or experimental output; the existing qualifications keep their original scope.
 
 ## Sources and profiles
 
-The current manuscript adds D1, the dynamic delegation profile in
+The dynamic delegation profile D1 is implemented in
 `crates/platform/chio-workflow/src/delegation/` and
 `crates/kernel/chio-kernel/src/delegated_work.rs`. Its
 [protocol](../../research/dynamic-delegation/PROTOCOL.md) defines allocation,

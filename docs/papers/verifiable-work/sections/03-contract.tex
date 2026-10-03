@@ -1,100 +1,114 @@
-\section{The work contract}
-Write a D1 slot as
+\section{From authority to a work commitment}
+\label{sec:contract}
+The work commitment is the unit of composition. It develops through an ordered
+set of decisions: allocate capacity, choose an offer, seal the invocation, back
+its payment, and admit it at the receiver. The implementation uses existing
+signed records for these decisions. Their authenticated bindings make them
+refer to one piece of work.
+
+\subsection{Delegate bounded capacity}
+A work slot contains
 \[
- S=(i,h,E,A,b,c,t,d,Q),\qquad s=H(\operatorname{canon}(S)).
+ S=(i,h,E,A,b,c,t,d,Q),
 \]
-$i$ identifies the slot, $h$ its holder, $E$ its exact server/tool pairs, $A$
-its permitted reader keys, $b$ its ceiling in currency $c$, $t$ its expiry,
-$d$ its remaining depth and $Q$ its acceptance predicate. The owner creates a
-root through a trusted configuration API. Each allocator has a persistent
-namespace $N$. The allocation digest $a=H(\operatorname{canon}(N,S_{\rm root},S))$
-binds both the full root and the target slot within that namespace, under a
-versioned domain. A holder signs a subdivision naming the parent, its allocation
-digest and the complete child. The allocator admits it only when that digest
-matches its protected state and
-\begin{align*}
- E_{\rm child}&\subseteq E_{\rm parent}, &
- A_{\rm child}&\subseteq A_{\rm parent},\\
- t_{\rm child}&\leq t_{\rm parent}, &
- d_{\rm child}&<d_{\rm parent},\\
- c_{\rm child}&=c_{\rm parent}, &
- \sum_{j\in\operatorname{children}(S)} b_j&\leq b_S.
-\end{align*}
-The child must still be live. Its holder and selected receiver must be in its
-reader set. Immediate SQLite transactions couple insertion with the parent's
-allocation counter. A slot with children cannot execute; a selected slot
-cannot acquire children. Unused internal capacity remains available for
-additional children. There is no reclaim operation in D1.
+where $i$ is its identity, $h$ its holder, $E$ its permitted server/tool pairs,
+$A$ its permitted readers, $b$ its ceiling in currency $c$, $t$ its expiry,
+$d$ its remaining delegation depth, and $Q$ its acceptance predicate.
+The owner creates a root through a trusted configuration API. A holder signs
+a subdivision naming its parent allocation and the complete child slot.
 
-Children perform different subtasks and may have different predicates. A
-successful child therefore does not establish that its parent task succeeded.
-A separate leaf may assemble results and check the final predicate within its
-own allocation. D1 supplies capacity-preserving subdivision, not automatic
-semantic decomposition of an owner's goal.
+The allocator admits a child only when its effects and readers are subsets of
+the parent's, its expiry is no later, its depth is smaller, and its currency is
+unchanged. All child ceilings together must fit within the parent's ceiling:
+\[
+ \sum_{j\in\operatorname{children}(S)} b_j\leq b_S.
+\]
+An atomic transaction couples the new child with the parent's allocation
+counter. A slot that has children cannot execute; a selected slot cannot acquire
+children. Unused internal capacity remains available for further subdivision.
+This prevents the same capacity from authorizing both a container and its leaves.
 
-\subsection{Offer, selection and commitment}
-A receiver signs an offer binding the allocation digest $a$, complete slot digest
-$s$, its own key,
-the exact effect and input digest, a price ceiling and an expiry. Binding the
-complete slot is essential: signing only its name would allow the offer to be
-transplanted into different acceptance terms. Binding $a$ additionally prevents
-replay between honest owners using equal local slot names and terms. The holder
-signs a selection
-containing that offer, the original native request ID, the receiver-issued
-capability digest and the expected selection revision. Compare-and-swap
-revisions permit replacement and reject stale selections.
+An allocation digest binds the allocator's persistent namespace, the complete
+root and the complete slot. Equal local names at different honest allocators
+therefore identify different allocations. A child can specify a different
+predicate because it performs a different task. The parent's result still
+requires its own check.
 
-Sealing freezes the selected binding before the allocator exports a signed
-\emph{dispatch permit}. The permit contains the root ID, allocation digest, immutable slot,
-signed selection and issuance time. An accepted allocator signature attests
-that the slot was allocated and sealed; the receiver does not independently
-reconstruct the owner's entire allocation tree. It checks this evidence
-against its configured allocator keys, while its native capability supplies
-the actual authority to execute.
+\subsection{Select, then seal}
+A provider signs an offer over the allocation and slot digests, its receiving
+key, the exact effect and input, a price ceiling and an expiry. The holder
+selects that offer together with the original request ID and the digest of the
+receiver-issued capability. Revision checks serialize replacements while the
+selection remains open.
 
-Every signed body has its own versioned domain and uses RFC 8785 canonical
-JSON~\cite{jcs}. The input digest covers the slot ID and exact payload. It
-excludes the enclosing permit to avoid circular hashing; the permit has its
-own signature. Unknown wrapper fields reject. Wire numbers are limited to
-$2^{53}-1$, depth to 32, children per slot to 64 and slots per root to 4,096.
-The acceptance language is a conjunction of 1--16 exact JSON-pointer
-equalities or inclusive integer ranges. These limits define the implemented
-profile, rather than a general language for proving useful computation.
+Sealing freezes the selection. The allocator persists a signed dispatch permit
+before returning it. That permit carries the immutable slot and signed
+selection, allowing the receiver to authenticate the commitment without a live
+connection to the allocator. It relies on the allocator's protected state for
+exclusive allocation and on the receiver's own custody for execution.
 
-\begin{figure}[t]
+The receiver compares the permit with the actual subject, receiver, capability,
+tool, input and request. Its native grant authorizes one exact invocation with
+monetary ceilings no greater than the offer. The receiver also checks validity
+and current local authorization. A caller cannot substitute a different
+provider or input while retaining the original consent.
+
+\begin{figure}[ht]
 \centering
-\begin{tikzpicture}[font=\small,box/.style={draw=ink,rounded corners=2pt,align=center,minimum width=3cm,minimum height=0.9cm},>=Latex]
-\node[box] (a) {Owner allocator\\root and subdivision};
-\node[box,right=0.8cm of a] (p) {Sealed permit\\exact selection};
-\node[box,right=0.8cm of p] (r) {Receiver kernel\\local capability};
-\draw[->,thick] (a) -- (p);
-\draw[->,thick] (p) -- (r);
-\node[box,below=0.8cm of r] (e) {Durable invocation\\checked output};
-\draw[->,thick] (r) -- (e);
-\node[align=left,below=0.8cm of a.south west,anchor=north west] {Choice can change before sealing.\\Committed identity survives failure.};
+\begin{tikzpicture}[
+ font=\small,>=Latex,
+ box/.style={draw=ink,rounded corners=2pt,align=center,
+             text width=2.8cm,minimum height=1.15cm}]
+\node[box] (a) {Allocator\\Bound and seal\\selected work};
+\node[box,right=0.65cm of a] (r) {Receiver kernel\\Admit and record\\original execution};
+\node[box,right=0.65cm of r,text width=2.1cm] (v) {Verifier\\Check agreed\\acceptance};
+\node[box,right=0.65cm of v] (s) {Escrow\\Record claim\\and settle};
+\draw[->,thick] (a) -- (r);
+\draw[->,thick] (r) -- (v);
+\draw[->,thick] (v) -- (s);
+\draw[->,thick] (s.south) -- ++(0,-0.65) -| (r.south);
+\path (r.south) -- (s.south)
+ node[midway,below=0.68cm,font=\scriptsize]
+ {backing observation before dispatch};
 \end{tikzpicture}
-\caption{D1 separates coordinated allocation from locally checked execution.
-After sealing, the receiver needs its own custody and payment services but no
-live allocator connection. The permit grants no native capability.}
+\caption{The exact work binding connects allocation, native execution and
+settlement. The receiver checks local authority and backing before dispatch.
+Its execution evidence feeds the agreed verifier; escrow enforces the recorded
+decision.}
 \label{fig:work}
 \end{figure}
 
-\subsection{An allocation ceiling and a funded obligation}
-F1 binds an agreement digest, payer, beneficiary, verifier, asset, amount and
-deadlines to an actual reserved allocation. The allocation identifier includes
-the chain and contract address. A new payer agreement cannot be funded twice
-under the same payer and digest. The receiver relies on a qualified observation
-of that reserve, not a signed balance supplied by the payer.
+\subsection{Back the obligation}
+Funded work adds an agreement that binds the complete final request, payer,
+beneficiary, verifier, asset, amount, settlement domain and deadlines. A
+qualified observation must establish that the agreement's allocation holds the
+required funds. The escrow identifier includes its chain and contract domain;
+a new agreement cannot reuse another allocation's reserve.
 
-Acceptance in F1 is a separate EIP-712 decision~\cite{eip712} binding the
-allocation, agreement, submission, decision digest, acceptance bit, beneficiary,
-asset and amount. The escrow authenticates the pinned verifier; it does not
-execute the application checker. A missing output or custody record yields no
-decision. An available result that fails the predicate yields rejection.
+Each subcontract has its own backing. In the running example, the
+intermediary pays for the specialist from funds it already controls. Its
+expected payment from the buyer remains locked under a different agreement.
+This choice assigns the cost of a failed parent to the participant that hired
+the child, while preserving the child's separately earned claim.
 
-A child agreement is separately funded. In the 100/60 example, the intermediary
-must already control the child's 60; the buyer's reserved 100 cannot be pledged
-again. D1's 100-unit allocation tree, by comparison, divides one owner's
-authority ceiling. It does not promise both a 100-unit parent refund and
-additional child payments from the same 100. Credit, conditional netting and
-cross-profile deployment require their own backing and integration rules.
+\subsection{Bind the handoffs}
+The composed receiver checks that the delegated slot, native request and swarm
+task have the same identity. The swarm allocation names the delegated
+allocation digest and agrees on amount and currency. The sealed permit and
+swarm witness bind the same native capability, and the signed route targets
+this receiver.
+
+The funded agreement then authenticates the complete request, including its
+delegation, graph and treaty references. Its financial allocation is a distinct
+identifier linked through that agreement. The hash chain has no cycle: the
+request contains the admission references; the agreement commits to the
+request; the escrow commits to the agreement.
+
+Native signed bodies use canonical JSON and versioned domains~\cite{jcs}.
+Settlement decisions use the domain-bound EIP-712 encoding described in
+Section~\ref{sec:execution}.
+Admission checks these relationships as well as each individual signature.
+Individually valid objects that refer to different work do not compose.
+The protected receiver profile installs the same checks before fresh work and
+recovery, so stripping request context or local configuration cannot select
+a weaker admission path.

@@ -1,0 +1,92 @@
+\section{Artifact and comparison details}
+\label{app:evidence}
+The companion \texttt{ARTIFACT.md} gives executable commands, source pins,
+dependency locks and the mapping from protocol objects to implementation.
+The claim register records assumptions and counterexamples for each claim.
+Current native evidence and historical experiments retain separate source
+inventories. The PDF build verifies the derived results and frozen artifacts.
+
+\subsection{Current native qualification}
+The current campaign records 21 terminal commands, 36,556 unchanged source
+inputs and 48 hashed outputs. Rust pass counts by boundary are 54 workflow,
+10 native delegation labels, five existing native composition, 453
+swarm/runtime, 11 execution-export, 25 durable SQLite and 91 default standalone
+cases. The delegation count includes its subprocess worker.
+One pre-existing workflow doctest is ignored. The default standalone run
+ignores six opt-in chain cases; a separate run passes all six against the
+identical source inventory, exercising 97 standalone cases in total.
+
+The campaign includes three Node wire/pin tests, 13 artifact tests, the evolving
+funded execution, four existing earned-child crash subcases, four strict
+Clippy commands, three format commands, the delegation example and the funded
+binary build. This qualifies the affected local boundaries, not the full
+workspace or a production deployment.
+
+The suite outputs identify the tested bindings and recovery cuts. Intended
+negative controls and initial development failures remain distinct from the
+terminal passing results.
+
+\subsection{Retained financial model and implementation checks}
+\begin{table}[ht]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l r X@{}}
+\toprule
+Experiment & Result & Scope\\
+\midrule
+Finite claim graph & \ModelStates\ states & Two prefunded edges and nine timestamps\\
+Transition checks & \ModelTransitions & Selected role, deadline and financial transitions\\
+Contract suite & \ContractTests\ passing & Private-chain bytecode; \TraceCount\ representative traces\\
+SQL comparator & \MatchedSteps\ matched steps & Same representative traces; trusted sequential store\\
+Upstream ERC-8183 & \UpstreamTests\ passing & Unmodified suite at the pinned source\\
+Paired escrow cases & \PairedTests\ passing & Same asset, fees, capital and evaluator trust\\
+Lean specification & \ProofCount\ results & Abstract conservation and earned-state lemmas\\
+\bottomrule
+\end{tabularx}
+\caption{Historical results retain their original source identities. Their
+counts are not attributed to the changed native implementation.}
+\label{tab:evidence}
+\end{table}
+
+The finite graph begins with a three-unit parent and a two-unit child.
+It explores submissions, decisions, payment, refund, expiry and execution
+uncertainty within that alphabet. The Solidity runner replays \TraceCount\
+representative financial traces, rather than all \ModelTransitions\
+transitions. It compares state, commitments, decisions and actual balances.
+A deliberately weakened model permits an earned claim to refund; the explorer
+finds the counterexample. An in-memory mutation of the escrow produces the
+corresponding intended test failure.
+
+The Lean specification proves conservation over finite account traces,
+paid-plus-refunded bounds, persistence of earned states, and noninterference
+between distinct allocation entries. The native binding and graph-growth
+arguments are not mechanized refinements of the Rust code. These different
+forms of evidence support their stated boundaries rather than a proof of the
+implementation as a whole.
+
+\subsection{Matched alternatives}
+The ordinary SQL comparator implements the same monetary transitions without
+Chio kernel code. It matches \MatchedSteps\ non-time steps over the
+\TraceCount\ representative traces, with additional tests for child collection,
+allocation exclusivity and unknown execution. A conditional-backing experiment
+also compares a structural bound with an independent exhaustive oracle over
+4,095 finite profiles. A conventional allocator obtains the same capital
+saving from selecting among exclusive alternatives before dispatch.
+
+Upstream ERC-8183 is pinned to commit \texttt{142e669c1f}. Its
+\UpstreamTests\ unchanged tests and \PairedTests\ added comparison tests use
+equal mock assets, zero fees, capital and evaluator trust. Both implementations
+pay a separately funded child after parent refund, reject two 60-unit jobs
+funded from 100, and deny spending an unsettled parent reserve.
+The upstream implementation also pays an approved 60-unit partial claim from a
+100-unit job and refunds the remaining 40 after rejection.
+
+The lifecycle differences are concrete. Chio records acceptance before later
+withdrawal, applies a resolution cutoff, and preserves earned withdrawal through
+its funding pause or allowlist changes. The pinned upstream completion pays
+immediately; after its expiry grace period, completion can still win if refund
+has not executed. Its refunds are blocked while paused. These observations
+concern the pinned implementations, whose specifications and extension
+mechanisms admit other choices. No performance or security ranking is inferred.
+
+The historical security-integration record binds its native runs to their
+earlier v2/v3 source inventories. Current composed qualification remains separate.

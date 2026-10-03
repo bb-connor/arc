@@ -1,0 +1,86 @@
+\section{Reference profiles and encodings}
+\label{app:profiles}
+The artifact names three existing profiles: D1 for dynamic delegation, S1 for
+additive swarm evolution and F1 for funded work. The composed receiver joins
+their original records; it does not replace them with another wire format.
+
+\subsection{Delegation records}
+A D1 allocation digest binds the persistent allocator namespace, immutable root
+slot and target slot. Each holder-signed subdivision binds the parent's
+allocation digest. The receiver's offer binds the allocation, complete slot,
+receiver, effect, input, price ceiling and expiry. The holder's selection
+includes the complete signed offer, capability digest, request ID and expected
+selection revision. The allocator-signed permit carries the frozen slot and
+selection. Signed domains are versioned; the qualified records use v2.
+
+The original receiver envelope contains a slot ID, payload and permit.
+Its input digest binds the slot ID and exact payload. In the composed layout,
+the permit is carried in the governed request context and the payload is the
+entire original tool-argument object. The receiver selects the installed layout;
+the caller cannot downgrade it. The enclosing permit has its own signature and
+is excluded from the input digest to avoid a hash cycle.
+
+Canonical numbers are bounded by $2^{53}-1$, delegation depth by 32, children per
+slot by 64, slots per root by 4,096 and envelopes by 64\,KiB. Acceptance is a
+conjunction of 1--16 JSON-pointer equalities or inclusive integer ranges.
+The one-invocation native capability is issued by the receiving kernel and
+names the exact subject, server and tool. Per-call and total monetary ceilings
+must be no greater than the signed offer, in the same currency.
+
+The D1 offer specifies accepted-output pricing. The installed guard rechecks
+the binding before dispatch and validates the exact JSON value after output
+transformations. A qualifying predicate rejection withholds output and uses
+the qualified reversible-hold path for a zero-charge denial. The executed
+invocation remains consumed. Native capability validity and revocation remain
+independent requirements.
+
+Sealing freezes the selection, then persists its signed permit before returning
+it. A crash between those durable steps can strand capacity. When a stored
+permit is available, a retry returns its original issuance time and signature.
+There is no post-seal replacement or automatic reclaim operation.
+
+\subsection{Swarm and receiver records}
+S1 retains the graph envelope, existing nodes, edges, joins, routes, witness
+chains, allocations, pool and revocation epoch. Existing continuations retain
+every field except the new graph digest and signature. New tokens and
+allocations name new tasks; each task has at most one of each.
+
+The SQLite installer verifies both bundles at store-owned time and commits the
+head transition and parent archive together. Historical lookup checks the
+graph ID, signed graph digest, full bundle digest and strict encoding.
+Other stores need equivalent protected serialization and historical binding
+to implement the same profile.
+
+The composed receiver pins its allocator, witness, treaty peer, program and
+runtime profile in protected deployment policy. Each open installs the runtime
+hook and delegation guard before reconciliation. The existing runtime database
+must remain present; losing it cannot provision an empty continuation domain.
+The funded journal's policy hash prevents removal of the composed configuration.
+
+Bilateral admission uses the existing signed treaty, permission antecedents,
+invocation and continuation records. Such antecedents establish permission;
+completed-work evidence comes from the retained native outcome. Execution export
+revalidates that outcome and its frozen federation provenance under the
+original participant identities and admission time. It grants no new dispatch,
+settlement or remote-completion authority.
+
+\subsection{Funding and deadlines}
+F1's native agreement authenticates the full final request, original receiver
+authority, checker context and settlement terms. The current workload uses
+100 mock units per native agreement. The artifact-only F1 agreement is a
+different concrete schema; the companion maps both explicitly.
+
+Let $t_s<t_c<t_r<t_f$ be submission, challenge, resolution and refund boundaries.
+Submission is allowed by $t_s$, first verifier decision recording when
+$t_c<t\leq t_r$, and undecided refund when $t>t_f$. The interval before decision
+is a timing boundary; the profile has no public challenge court.
+An available failed check yields rejection; missing required output or custody
+yields no eligible decision.
+
+Acceptance is a domain-bound EIP-712 decision over the allocation, agreement,
+submission, decision digest, acceptance bit, beneficiary, asset and amount.
+The reference escrow has no later expiry for an earned withdrawal. Its
+administrative pause and verifier-registry updates govern new funding, without
+rewriting an existing claim. This fixed-price profile has no partial-settlement
+entrypoint. Fees, disclosure loss and opportunity costs fall outside its
+reserved-unit bound unless separately provisioned.

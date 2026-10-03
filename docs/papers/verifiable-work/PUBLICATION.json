@@ -8,15 +8,15 @@
       "id": "manuscript",
       "status": "passed",
       "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers.",
-      "evidence": "../../research/evolving-funded-work/REVIEW.md",
-      "result": "Complete manuscript covering one composed D1/S1/treaty/F1 execution. Fresh automated review closed both Important findings and the minor wording/platform findings. Independent scientific and economic claims remain open."
+      "evidence": "EDITORIAL-REVIEW.md",
+      "result": "Completed protocol manuscript centered on programmable sovereignty and preservation of issued commitments. Fresh automated technical/editorial review closed one Important and three Minor findings, with no remaining findings in its reviewed scope. Independent foundational critique remains a separate gate."
     },
     {
       "id": "artifact",
       "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": "artifact-manifest.json",
-      "result": "Rebuilt PDF, 21 current-source terminal checks plus six opt-in chain regressions, historical F1 source pin, bibliography and artifact hashes agree. Original failed runs and default-suite skips are retained."
+      "result": "The revised PDF, bibliography, exact source references and artifact hashes agree. The editorial revision changes no qualified native source or experimental output; the 21 current-source terminal checks, six opt-in chain regressions and historical F1 source pin retain their original scope. Original failed runs and default-suite skips are retained."
     },
     {
       "id": "funded-security-integration",

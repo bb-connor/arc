@@ -1,67 +1,86 @@
-\section{Principals, resources and assumptions}
-The \emph{owner} configures an allocator and creates a root contract. A
-\emph{holder} may subdivide its allocation and select an offer. A
-\emph{receiver} offers a tool operation and issues the native capability under
-which it will run. A courier transports signed records. An organization can
-occupy several roles; distinct keys alone do not establish independent
-administration. Holders and receivers in the dynamic profile are previously
-qualified keys explicitly permitted by the owner. Discovery selects among them;
-it does not enroll an unknown party or authorize a new disclosure.
+\section{Programmable sovereignty}
+\label{sec:sovereignty}
+A kernel for agentic operating systems must give an untrusted planner useful
+freedom while preserving the owner's control over effects. In Chio, the kernel
+is the trusted mediator for tool access and its durable records. Host isolation
+and tool confinement supply the surrounding enforcement boundary.
 
-Agents and couriers may be malicious. Messages may be delayed, duplicated,
-reordered or lost. Processes may crash between durable steps. The honest
-owner's allocator serializes allocation and preserves its state. Each receiving
-key has one protected native custody and budget domain. Cloning those keys and
-databases into independently spendable forks violates the assumptions.
-Signatures authenticate statements; they do not prevent a trusted issuer that
-has been compromised from making contradictory statements.
+An \emph{owner} creates a bounded work allocation and qualifies the principals
+that may use it. A \emph{holder} can subdivide its allocation and select a
+provider. A \emph{receiver} issues the capability for its tool and decides
+whether to admit the invocation. A \emph{payer} backs a payment obligation in a
+chosen settlement domain, and a \emph{verifier} applies the agreed acceptance
+procedure. These are roles, not a requirement for six organizations. Couriers
+carry signed evidence without acquiring the authority of its signers.
 
-We distinguish three experimental profiles. \textbf{D1} implements dynamic
-allocation and locally checked dispatch permits. It assumes honest allocator
-enforcement, collision-resistant hashes, unforgeable signatures, accurate
-validity checks, and the receiver's capability, durable admission and payment
-enforcement. Its effect and reader sets are declarations whose completeness
-depends on the qualified host and tool confinement. Set inclusion alone does
-not prove information-flow security or prevent an arbitrary tool from using an
-undeclared channel. The local implementation uses a durable integer payment
-fixture; its budget allocations are ceilings, not proof of deposited assets.
+\subsection{Authority stays with the resource owner}
+A work agreement expresses what parties intend to exchange. Admission decides
+whether a particular invocation may use a particular receiver's resources.
+The receiver loads trusted issuers, policy, treaty records and replay state from
+its own protected stores. Request metadata cannot install those authorities.
 
-\textbf{S1} implements additive evolution of Chio's existing swarm authority.
-It uses signed task graphs, attenuation witnesses, routes, revocation epochs,
-allocations and single-use continuations. Each graph has one protected current
-head, and one protected authority controls the declared pool across that graph's
-versions. The installer serializes successors; receivers resolve the exact
-version named by a request and preserve native continuation custody. Reusing a
-pool in independently provisioned graphs or stores is outside this allocation
-discipline. The evaluated graph growth is additive: it preserves permissions,
-expiry, declared capacity and prior artifacts instead of reclaiming or
-transferring them. Ordinary capability and treaty checks apply at dispatch.
+A bilateral treaty supplies the conditions under which the parties cooperate.
+The receiver checks the configured participants and their signatures over the
+same canonical statement, its permitted action, validity and continuation, and
+the references binding it to this invocation. These checks join the receiver's
+ordinary capability, revocation and guard checks. A valid work permit, treaty
+or funded allocation satisfies its own part of admission; none substitutes
+for the other required decisions.
 
-\textbf{F1} implements funded, fixed-price work claims. A payer $B$ reserves
-funds for provider $P$ in settlement domain $R$. A selected verifier $V$ applies
-the agreed predicate to bound inputs and outputs. F1 additionally assumes that
-the rail enforces exclusive allocations and atomic transfers, the asset
-transfers the agreed units, and the finality observation is sound. Collection
-requires available evidence, eligible verifier decisions and transaction
-inclusion. The verifier remains a trusted decision authority even if others
-can rerun its checker. The composed profile joins D1, S1 and F1 in one
-nondestructive review trajectory, with explicit bindings between their existing
-records. Each receiver has separate authority and custody, under one local
-administrator. Its treaty co-signers run in process, and its rail uses a private
-development chain and valueless tokens. Independently operated participants
-remain the target of the published receiver trial.
+The distinction also governs change. An owner can refuse a fresh invocation
+under its current policy. Replaying an admitted operation resolves its existing
+history. A claim already earned in escrow follows the immutable terms under
+which the payer funded it. Sovereignty determines which commitments an owner
+enters; the commitment's lifecycle determines how it is discharged.
 
-Three kinds of state answer different questions. Allocation state records
-which capacity is committed. Native custody records what was admitted and
-observed during execution. Settlement state records what is reserved, payable
-and transferred. An unknown tool effect remains unknown after a financial
-refund. A sealed allocation remains committed after a network timeout. A
-historical receipt cannot authorize a new invocation.
+\subsection{Three kinds of protected state}
+\begin{table}[ht]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
+\toprule
+State & Authoritative fact & Preservation rule\\
+\midrule
+Allocation and plan & Which bounded work has been committed & Subdivision conserves capacity; growth retains old tasks and allocations\\
+Native custody & Which invocation was admitted and what execution established & Replay resolves the original operation and consumed continuation\\
+Settlement & Which funds are reserved, earned, paid or refunded & Each transfer follows its own allocation and recorded decision\\
+\bottomrule
+\end{tabularx}
+\caption{The records are linked by authenticated bindings. A transition in one
+domain cannot stand in for evidence owned by another.}
+\label{tab:owners}
+\end{table}
 
-The bounds concern operations admitted under these profiles. They exclude
-off-protocol spending, opportunity cost, loss of disclosed data and fees unless
-those costs are explicitly reserved. D1 supports finite trees with bounded
-wire objects; S1 grows finite signed graphs; F1 evaluates distinct funded edges.
-These profiles do not prove that
-an arbitrary task decomposes correctly, that every participant remains
-available or that the work is economically useful.
+A sealed allowance is not a deposit. An authenticated execution statement is
+not a payment decision. A financial refund is not proof that a tool had no
+effect. Keeping these facts distinct is what allows the domains to compose:
+each contributes a decision it is actually authorized to make.
+
+\subsection{Trust and failure model}
+Agents and couriers may be malicious. Messages may be duplicated, reordered,
+delayed or lost, and processes may crash between durable steps. Safety assumes
+unforgeable signatures, collision-resistant canonical digests, valid clock
+checks, and honest enforcement by the selected resource custodians. Each
+delegation root has one protected allocator; each declared swarm pool has one
+protected graph lineage. Their custodians serialize allocation and head
+changes. Each receiving key has one protected execution and budget domain.
+The rail serializes financial transitions and couples them to actual asset
+transfers.
+
+These are local trust requirements. Cloning a signing key and its database into
+independently spendable forks, or provisioning two graph lineages against the
+same declared pool, violates them. Tools must be confined well enough
+for their declared effects and readers to describe the protected operation.
+The acceptance authority and settlement observation must also be trustworthy.
+
+The implemented discovery step selects among previously enrolled principals.
+A new result can create work and select its receiver; it cannot authorize a new
+reader or install a new trust root. This paper's Rust profiles instantiate
+delegation, additive graph evolution and funded claims, identified in the
+artifact as D1, S1 and F1. Appendix~\ref{app:profiles} fixes their concrete
+encodings and limits.
+
+\emph{Verifiable work} means work bound to an agreed check and authenticated
+evidence. The kernel's receipt attests its own mediated execution; the selected
+verifier decides the agreed acceptance predicate. Their signatures make those
+statements attributable and checkable. The value of the work depends on what
+the predicate measures.

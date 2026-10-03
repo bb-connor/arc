@@ -1,166 +1,124 @@
-\section{What composes}
-The arguments concern transitions under the assumptions of Section 2.
-They do not prove the complete Rust implementation or semantic correctness of
-a task decomposition.
+\section{The preservation property}
+\label{sec:preservation}
+The protocol has a single composition criterion: every allowed change must
+preserve the bounds and identity of existing commitments. Three invariants
+make this criterion precise.
 
-\subsection{Delegation invariants}
-\begin{proposition}[Declared attenuation and bounded capacity]
-In D1, every descendant's declared effects and readers are subsets of its
-ancestors', its expiry is no later, and the sum of executable leaf ceilings is
-at most the root ceiling.
-\end{proposition}
-\begin{proof}
-Subset inclusion and the expiry order are transitive. Strictly decreasing
-depth bounds the lineage. Let $U_v$ be the unallocated remainder of an internal
-slot. Initially the root is one leaf of ceiling $B$. Subdivision moves $b$
-units from a leaf or internal remainder into a child of ceiling $b$, atomically
-and with a nonnegative remainder. Therefore
-\[
- \sum_{\text{leaves }v} b_v+\sum_{\text{internal }v}U_v=B.
-\]
-Selection and sealing change no ceiling. Containers cannot execute, so only
-leaf capacity can authorize invocations. Native enforcement of the bound
-one-invocation capability in one protected receiver custody domain bounds
-admitted charges by those ceilings. This last step assumes native enforcement;
-the arithmetic alone does not prove it.
-\end{proof}
-
-\begin{proposition}[Stable sealed identity]
-After a D1 selection is sealed, an accepted permit cannot change its receiver,
-capability, input, effect or request identity without violating an authenticated
-binding or the trusted allocator's transition rules.
-\end{proposition}
-\begin{proof}
-Selection revisions serialize replacements before sealing. The allocator
-freezes the selection before exporting a permit and offers no later transition
-that replaces it. Each receiver compares its invocation with that signed
-selection and the complete slot digest. Substitution either fails a comparison
-or requires a new trusted statement. Replaying identical evidence reaches
-native custody under the original identity; it supplies no fresh capability.
-\end{proof}
-
-This result permits changing collaborators before commitment while preserving
-uncertain obligations afterward. It trades reclaim and automatic failover for
-a simple safety rule. A future reclaim protocol would need authoritative
-closure or fencing of the original operation. Expiry or an agent's claim of
-absence is insufficient. These D1 arguments are not mechanized; the retained
-Lean results below concern the separate funded state machine.
-
-\subsection{Commitments across graph versions}
-Let $G_0,\ldots,G_n$ be the installed S1 lineage and $A_i$ its set of uniquely
-identified allocations, with ceiling $b(a)$ for allocation $a$. Let $B$ be the
-fixed declared pool. Every checked extension requires
-\[
- A_i\subseteq A_{i+1},\qquad b_{i+1}(a)=b_i(a)\ (a\in A_i),
- \qquad\sum_{a\in A_{i+1}} b(a)\leq B.
-\]
-
-\begin{proposition}[Bounded commitments under additive growth]
-Within one protected S1 lineage, the ceilings of all allocations ever installed
-sum to at most $B$. Graph extension preserves an old task's authority artifacts
-and cannot refresh its consumed native continuation.
-\end{proposition}
-\begin{proof}
-An atomic compare-and-swap admits at most one successor from each installed
-head. Retention makes the allocation sets monotone, so
-$\bigcup_{i=0}^{n}A_i=A_n$. The live verifier bounds the sum in $A_n$ by $B$;
-checked integer arithmetic prevents overflow. The extension check retains
-every old continuation ID and its allocation and forbids a second continuation
-for that task or allocation. Native custody uses this retained ID across graph
-versions. Re-signing its new graph digest cannot create a second native
-resource. Exact historical resolution supplies the original artifacts to old
-requests and physical-claim revalidation. Ordinary expiry, revocation and
-local admission still govern whether unstarted work may execute.
-\end{proof}
-
-This argument covers interleaving extension with old and new dispatch because
-growth neither removes an allocation nor resets its execution identity. It
-requires a single protected head for the pool and a single native custody domain
-for each task. A copied database or a second independently provisioned graph
-does not inherit the exclusivity of the first. The result bounds declared
-commitments; it supplies neither financial backing nor a proof of task meaning.
-The native trajectory demonstrates conditional progress for a new worker and
-an original unstarted worker, without asserting termination of an arbitrary
-swarm. The S1 argument, like D1's, is not a mechanized Rust refinement.
-
-\subsection{Funded obligations}
-
-For each funding source $u$, let $D_u$ be its fixed deposited endowment,
-$A_u$ its unallocated balance, $L_u$ its locked allocations, $P_u$ its paid
-outflow and $R_u$ its refunded outflow. Returned cash remains recorded as an
-outflow in this accounting interval; a later deposit opens a new interval.
-The conservation invariant is
+\subsection{Capacity is allocated once}
+Let $B_D$ be a delegation root's ceiling, $b_v$ the ceiling of a leaf and $U_v$
+the unused remainder of an internal slot. Subdivision preserves
 \begin{equation}
- D_u=A_u+L_u+P_u+R_u,\qquad A_u,L_u,P_u,R_u\geq0. \label{eq:conservation}
+ \sum_{\mathrm{leaves}\ v}b_v+\sum_{\mathrm{internal}\ v}U_v=B_D,
+ \qquad b_v,U_v\geq0. \label{eq:delegation}
 \end{equation}
+It moves capacity from a parent remainder into a child, without changing the
+sum. Internal slots cannot execute; selection and sealing change no ceiling.
+Declared effect and reader inclusion, decreasing expiry and decreasing depth
+extend transitively along the allocation tree. With the bound one-invocation
+capabilities and native charge enforcement, admitted leaf charges fit those
+ceilings.
 
-\begin{proposition}[Bounded funded exposure]
-If reservation moves $q\leq A_u$ from available to locked funds, and payment
-or refund moves an allocation's locked amount once to its corresponding
-outflow, every reachable state satisfies (\ref{eq:conservation}). Total paid
-and refunded outflow is at most the original deposit.
+For a swarm lineage, let $A_i$ be the set of uniquely identified allocations
+in $G_i$, with fixed ceiling $b(a)$ and original declared pool $B_G$.
+Every checked extension satisfies
+\begin{equation}
+ A_i\subseteq A_{i+1},\quad
+ b_{i+1}(a)=b_i(a)\ (a\in A_i),\quad
+ \sum_{a\in A_{i+1}}b(a)\leq B_G. \label{eq:growth}
+\end{equation}
+A single protected lineage per declared pool, with a serialized head,
+establishes the domain of this bound. Because earlier allocations are
+retained, $\bigcup_{i=0}^n A_i=A_n$: the latest bound also covers every allocation
+ever installed. These are capacity bounds; deposited assets have a separate
+accounting invariant.
+
+\subsection{Funds follow their own allocation}
+For each accounted endowment $u$, fix deposited funds $D_u$ with no further
+deposits into that accounting cohort. Let $A_u$ be its available balance,
+$L_u$ its locked funds, and $P_u,R_u$ its paid and refunded outflows. Then
+\begin{equation}
+ D_u=A_u+L_u+P_u+R_u,\qquad A_u,L_u,P_u,R_u\geq0.
+ \label{eq:conservation}
+\end{equation}
+Reservation moves funds from $A_u$ to $L_u$; payment or refund moves an
+allocation's locked funds once to the corresponding outflow. Each transition
+preserves the sum and nonnegativity. Returned cash remains an outflow in this
+cohort. A later deposit is accounted as another endowment; it neither resets
+these accounts nor releases their still-locked allocations.
+
+An earned allocation remains in $\{\textsf{Payable},\textsf{Paid}\}$.
+A transition on another allocation leaves it unchanged. Thus a parent refund
+cannot consume an earned child's reserve. Eventual withdrawal also requires
+the beneficiary's key, available evidence, transaction inclusion and a
+functioning asset.
+
+\subsection{Compose through the original invocation}
+\begin{proposition}[Preservation under evolving work]
+Assume the protected allocation, graph, receiver-custody and settlement domains
+of Section~\ref{sec:sovereignty}, the authenticated bindings of
+Section~\ref{sec:contract}, and the transitions of Section~\ref{sec:execution}.
+Begin with validly provisioned roots, verified initial graphs and funded
+accounts. Within those declared domains, every finite interleaving of valid
+subdivision, sealing, graph growth, native execution, recovery and settlement
+preserves the following properties:
+\begin{enumerate}
+ \item Declared delegation and swarm capacity remain within their original
+       bounds; paid plus refunded funds never exceed deposited backing.
+ \item A sealed invocation retains its selected receiver, capability, input,
+       effect and request. Graph growth and replay grant it no additional
+       native invocation right.
+ \item A recorded earned child claim retains its original terms and remains
+       payable or paid through any parent failure, completion or refund.
+\end{enumerate}
 \end{proposition}
+
 \begin{proof}
-The initial state is $(D_u,0,0,0)$. Reservation subtracts and adds the same
-quantity within the sum. Payment and refund do the same across a different
-pair of accounts. Their guards preserve nonnegativity. Other transitions do
-not change money. Induction over the transition sequence proves the equality
-and bound. This argument requires the implementation to identify allocations
-uniquely and couple each state transition with its actual transfer.
+Initially, a new root has all its capacity in one leaf, a verified graph fits
+its declared pool, and a fresh funded endowment has
+$(A_u,L_u,P_u,R_u)=(D_u,0,0,0)$. No execution right has been consumed or payment
+earned. The properties hold in this initialized state.
+
+Induct over the interleaving. A subdivision changes only the parent's remainder
+and its new child, preserving (\ref{eq:delegation}). A selection changes no
+capacity. Sealing freezes the selected binding before evidence escapes.
+
+A graph extension preserves every earlier allocation and checks
+(\ref{eq:growth}) before committing its new head. The old continuation keeps its
+resource identity. Exact historical lookup preserves the artifacts used by
+an old request; a new graph signature cannot cause native custody to acquire
+that resource as a second invocation.
+
+Admission compares the request with the sealed permit, native capability,
+graph task, route and treaty. The funded agreement authenticates that same
+request. A substituted object either fails the binding or requires a different
+authorized commitment. Native recovery resolves the original operation, hold
+and continuation claim. Refusal, expiry and revocation can prevent fresh work;
+they do not create a replacement invocation from the old commitment.
+
+Financial transitions preserve (\ref{eq:conservation}). Their allocation
+identity confines each transition to its own reserved funds. A parent
+transition cannot change the child; a child transition after acceptance stays
+inside $\{\textsf{Payable},\textsf{Paid}\}$.
+
+These cases cover the allowed transitions. They remain valid when interleaved
+because additive growth retains the resources on which old execution depends,
+and each scarce resource is serialized by its own custodian.
 \end{proof}
 
-\begin{proposition}[Earned child independence]
-Suppose each work edge has a distinct allocation with its own immutable terms,
-an earned claim can only remain payable or become paid, and a transition on
-one edge cannot modify another's allocation. Then any sequence of parent
-failure, refund or completion transitions leaves an earned unpaid child
-collectible under its original terms.
-\end{proposition}
-\begin{proof}
-A transition concerning another edge leaves the child unchanged. A transition
-on the child preserves the set $\{\textsf{Payable},\textsf{Paid}\}$. Induction
-therefore excludes child refund after acceptance. Distinct funding prevents a
-parent transfer from consuming the child's reserve. Eventual collection further
-requires availability, an exercisable beneficiary key and transaction inclusion.
-\end{proof}
+The result explains why the construction needs no atomic transaction spanning
+all owners. An incomplete handoff can strand a commitment, but cannot use
+absence of a later record as permission to replace it. Safety is obtained by
+retaining the earlier fact and resolving it under its original authority.
 
-\begin{proposition}[Preservation across the composed boundary]
-Assume the D1 and S1 invariants above, receiver-owned native custody, exact
-D1/S1/F1 request bindings, and the F1 allocation rules. Adding a task cannot
-change an earlier sealed invocation or its funded terms. Once a child is earned,
-parent failure cannot create a fresh child invocation or remove that child's
-recorded right to collect.
-\end{proposition}
-\begin{proof}
-The D1 permit fixes the invocation; S1 extension retains its task, allocation
-and continuation identity. The funded agreement authenticates that exact
-request and fixes its independent escrow terms. Native replay retains the
-original operation rather than reacquiring its continuation. Parent transitions
-address a different allocation, so earned child independence applies. The
-argument composes conditional invariants; it adds no global atomicity or
-availability assumption and is not a mechanized implementation refinement.
-\end{proof}
+This is a conditional protocol argument. The accompanying Lean development
+checks abstract financial conservation and earned-state lemmas; native tests
+exercise concrete admission and recovery boundaries. Their relationship to the
+Rust and Solidity implementations is tested rather than established by a
+machine-checked refinement proof.
 
-A small Lean specification checks conservation over arbitrary finite account
-traces, the paid-plus-refunded bound, persistence of the earned states, and
-noninterference of distinct map entries. A finite Python explorer checks
-concrete timing and role guards; selected traces are replayed against Solidity.
-These are complementary checks. There is no machine-checked refinement from the
-Rust kernel or Solidity contract to the Lean specification, and the arithmetic
-proof does not authenticate a signer or prove that a token is honest.
-
-The capital cost follows directly. If $E_{\rm open}$ contains the distinct
-unsettled obligations, their reserve is $\sum_{e\in E_{\rm open}}q_e$. A chain of
-promised future receipts cannot reduce this amount under F1. The example locks
-160 units while the two obligations coexist, although the buyer's task costs
-100. Short milestones may reduce capital duration; they do not eliminate
-capital needs. Capital efficiency must be measured alongside success rate.
-
-A payer-only signature cannot supply the missing exclusivity. Consider two
-receivers that see individually valid promises against the same deposit and
-have no common state or other non-equivocation mechanism. Each receiver's view
-is indistinguishable from a run in which it is the only payee. If both accept
-on that evidence alone, the two promises can exceed the deposit. The argument
-identifies a missing shared fact; a conventional trusted ledger, a qualified
-rollback-resistant authority or a settlement chain can supply it. It is not an
-impossibility result about OAuth, A2A, capabilities or ordinary escrow.
+Exclusive allocation is a necessary premise. Two receivers can each see a valid
+promise against one deposit while neither sees the other promise. Signatures
+alone cannot distinguish that execution from two individually affordable
+exchanges. A protected allocator, trusted ledger or settlement chain must
+supply the shared allocation fact. Chio makes that custodian explicit at each
+handoff.

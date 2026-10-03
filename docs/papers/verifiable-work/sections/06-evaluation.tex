@@ -1,231 +1,100 @@
-\section{Evidence and comparison}
-We distinguish current D1, S1 and composed funded qualification from retained
-F1 experiments and September process evidence. Each has a source inventory; historical tests are
-checked against their preserved source tree rather than attributed to modified
-native code. All reported executions use author-controlled infrastructure.
-Fixture balances and development-chain tokens have no economic value.
+\section{Implementation and evidence}
+\label{sec:evaluation}
+The Rust implementation connects the work contract to Chio's existing
+delegation allocator, swarm-authority verifier, bilateral treaty admission,
+native continuation custody, receipt exporter and funded settlement adapter.
+The composed profile adds explicit binding checks at their handoffs. It uses
+the existing capability and escrow mechanisms.
 
-\subsection{Dynamic delegation in the native kernel}
-The Rust allocator implements root creation, signed subdivision, revisioned
-selection, sealing and portable verification. The native guard is an opt-in
-public installation API. Sixteen allocator tests cover recursive holders,
-concurrent sibling overcommit, selection/dispatch races, reopen, malformed
-predicates, expiry, integer bounds, authority substitution and offer reuse
-against changed terms, cross-owner namespace replay and persistent allocator
-identity. The full workflow crate run also exercises its existing
-tests; the artifact does not count those as new delegation experiments.
+The evaluation has two source epochs: current native qualification for the
+composed execution, and retained funded-model and comparison experiments at
+their recorded revisions. The artifact binds each to its source inventory,
+commands and outputs. All observed executions use author-controlled
+infrastructure; the composed run uses separate receiver keys and stores on
+one host, in-process treaty co-signers, a private development chain and mock
+tokens.
 
-Nine substantive native tests cover dynamic provider choice, exact request and
-capability binding, offline-allocator execution, receiver substitution, output
-rejection before and after transforms, the configured receiver clock, required
-durable custody, governed-context payload preservation, and actual
-process-kill recovery with useful sibling progress. The native runner reports
-ten test labels because one is the subprocess worker. Recovery retains the
-original request and produces zero new tool dispatches after the selected cut.
-Rejected output yields a signed zero-charge denial in the qualified fixture.
+\subsection{A program that grows after its first result}
+The executable begins with a declared envelope of 300 units and a graph
+containing a planning root, a survey task and an unstarted intermediary task.
+The survey inventories an OpenAPI document's authentication declarations and
+identifies an operation without required authentication. That actual result
+triggers selection of an enrolled specialist. Only then are its task,
+capability, sealed selection, funded agreement and 100-unit deposit created.
+The checked graph grows from three nodes to four.
 
-The runnable example constructs a tree after startup, delegates through a
-second holder, replaces one selected provider before sealing, and executes
-through the replacement's kernel. Reopening its independent native store
-returns the same receipt without another call. A sibling then completes, and
-fixture balances conserve their initial 1,000 units. Receivers hold separate
-keys and stores under one administrator; no remote network interoperability,
-independent operator or LLM planning result follows from this example.
-
-A semantic negative test exposed an offer that authenticated only a slot name:
-the offer could be reused with different acceptance terms. Binding the full
-slot digest closes that case; the failing and passing outputs are retained.
-Fresh review also exposed signed mutations crossing honest allocator namespaces;
-binding the allocator, root and slot closes subdivision and selection replay.
-A further native regression found that a guard bypassed the configured clock;
-the guard now uses the kernel's fenced authority clock.
-Compiler and fixture-configuration failures are retained separately and are
-not presented as protocol counterexamples. The qualification also reruns the
-existing three-owner native regression, checks Rust lints and formatting, runs
-the example and tests artifact provenance. These are bounded engineering
-checks, not a statistical estimate of production reliability.
-
-\subsection{Evolution through existing swarm and treaty authority}
-Five new verifier tests exercise checked growth, individually valid re-signed
-rewrites, caller-owned time and trust, duplicate attempts and budget bounds.
-Four store tests cover exact history after reopen, rollback after a rejected
-extension, simultaneous proposals through separate SQLite connections, and
-corrupted historical data. The race produces exactly one successor.
-
-Three native trajectories exercise the effect boundary. First, an original
-worker executes, the graph grows, and the added worker executes. After reopen,
-replay returns the exact original receipt and physical claim; a fresh request
-for its consumed continuation is denied even though its ordinary capability
-still has invocation headroom. Second, an original unstarted worker executes
-under its historical graph after extension. Third, a combined bilateral-treaty
-and swarm operation retains its three physical resources across extension and
-restart. The test explicitly revalidates the original claim, rejects a request
-with treaty context removed, and replays without another effect.
-
-The qualification runs the complete swarm-authority and runtime-core crate
-suites, their all-target lints and formatting, alongside D1's checks. These are
-tests of one implementation under author-controlled stores. They establish no
-new consensus mechanism, automatic receiver migration or independently operated
-network. The companion preserves the initial compiler and fixture failures
-separately from terminal passing evidence.
-
-\subsection{One evolving funded execution}
-The composed trajectory begins with a 300-unit declared envelope, a scout and
-an unstarted intermediary. The scout's actual review finds an operation without
-required authentication. The program then allocates an enrolled specialist,
-seals its exact request, deposits its own 100-unit backing, and adds its task.
-The graph grows from three nodes to four, counting the planning root. Enrollment
-precedes discovery; the specialist's task, capability, agreement and funding do
-not. All three executed leaves retain separate native custody and allocations.
-
-The intermediary invokes the specialist. The existing Python W0 checker accepts
-the retained child result and the escrow records \textsf{Payable}. The parent
-process is then killed with SIGKILL before its return is captured. Its execution
-remains \textsf{OutcomeUnknownAfterDispatch}; an observed refund resolves its
-funding without rewriting that uncertainty. Parent and verifier rail signing
-are disabled, and a child collector withdraws the original claim. Repeated
-collection performs no second work invocation or payment.
-
-The acceptance test checks one execution per receiver, unchanged operation,
-allocation, hold, authorization and physical claim identities, and two native
-continuation resources per operation. The scout's original execution evidence
-is unchanged after growth and reopen. The final token balances are buyer 900,
-intermediary 1,000, child 100 and escrow zero, from total supply 2,000. The scout
-and child are paid 100 each; the parent's 100 is refunded. These are observed
-mock-token balances, not the declared swarm pool.
-
-Controls exercise sealed-allocation conflict, re-signed continuation refresh,
-missing treaty and receiver substitution. Additional receiver tests sign the
-actual adversarial request and agreement, including a valid signed swarm route
-to the wrong receiver, and require rejection before funding observation or
-native work. Export regressions preserve the distinction between local execution
-and remote completion. The qualified campaign also runs the existing funded
-child crash/rebroadcast cases. Compiler, missing-dependency and integration
-failures remain in the companion record; only terminal passing campaigns are
-qualified. This result establishes the composed local execution, with no claim
-of independent administration or commercial usefulness.
-
-\subsection{Retained funded evidence}
+The intermediary invokes the specialist. A separately implemented Python
+checker accepts the bound result, and escrow records the specialist's claim
+as \textsf{Payable}. Before the intermediary's own return is captured, its
+process is killed with SIGKILL. Its funding later refunds while its native
+effect remains unknown. Parent and verifier rail signing are disabled.
+The specialist's collector withdraws the original earned claim, then repeats
+collection without another invocation or transfer.
 
 \begin{table}[ht]
 \centering\small
-\begin{tabularx}{\linewidth}{@{}l r X@{}}
+\begin{tabularx}{\linewidth}{@{}l X l@{}}
 \toprule
-Experiment & Result & Boundary\\
+Work & Retained native outcome & Financial result\\
 \midrule
-Finite claim graph & \ModelStates\ states & Two prefunded edges, fixed symbolic actors and nine timestamps\\
-Transition checks & \ModelTransitions & Conservation, terminal consistency, denial stability and uncertainty\\
-Contract suite & \ContractTests\ passing & Compiled bytecode on a private development chain; includes \TraceCount\ representative traces\\
-Ordinary SQL comparator & \MatchedSteps\ matched steps & The same \TraceCount\ traces; sequential trusted database\\
-Upstream ERC-8183 & \UpstreamTests\ passing & Unmodified upstream suite at the pinned commit\\
-Paired escrow cases & \PairedTests\ passing & Same token, zero fees, capital and evaluator trust; local Cancun EVM\\
-Lean specification & \ProofCount\ named results & Abstract transitions; no implementation refinement\\
+Survey & Completed; original evidence unchanged & Paid 100\\
+Intermediary & Outcome unknown after dispatch & Refunded 100\\
+Specialist & Completed; original claim retained & Paid 100\\
 \bottomrule
 \end{tabularx}
-\caption{Retained F1 evidence at its recorded sources. The build checks the
-results and hashes; these counts are separate from current D1/S1 and composed
-funded qualification.}
-\label{tab:evidence}
+\caption{One composed execution after graph growth, intermediary SIGKILL and
+recovery. Native observations and financial resolution retain distinct meanings.}
+\label{tab:trajectory}
 \end{table}
 
-\subsection{Transitions and negative controls}
-The finite graph starts with a three-unit parent and a two-unit child. It
-explores alternative submissions, conflicting and unauthorized decisions,
-payment, refund, expiry and execution uncertainty over the selected timestamps.
-Every reachable transition is checked against the invariants. Exploration is
-exhaustive only within this bounded alphabet and starting configuration.
-Funding and failed-transfer boundaries have separate unit tests.
+Each receiver records one tool invocation and one native claim episode
+containing its treaty and swarm continuation resources. Operation, allocation,
+hold, authorization and physical claim identities remain unchanged through
+reopen and collection. Starting from 2,000 total mock units, final balances are
+buyer 900, intermediary 1,000, specialist 100 and escrow zero. Survey proceeds
+accrue to the intermediary, which separately funds the specialist.
 
-The \TraceCount\ shortest representative financial traces cover selected
-state-transition classes. The Solidity runner compares contract states,
-commitments, decisions and actual token balances with the model after each
-step. It does not replay all \ModelTransitions\ graph transitions against
-bytecode. Additional contract tests exercise failed and asymmetric transfers,
-unauthorized calls, duplicate funding, replay, verifier changes and delayed
-withdrawal. No confidence interval for deployed failure rates can be derived
-from this deterministic regression suite.
+The first collection report retains an unavailable remote co-signer diagnostic.
+A later open has no unfinished local operation to reconcile. Both reports
+retain the same execution and payment identities. The observed result is
+local completion and payment; final bilateral receipt delivery remains a
+separate boundary.
 
-Two negative controls test whether the harness can detect the property it
-claims to enforce. A deliberately weakened model allows a payable job to
-expire; the explorer finds the sequence submission, acceptance, refund. A
-corresponding in-memory mutation of the compiled escrow is rejected by the
-earned-withdrawal regression. Neither negative control changes the source
-contract. Separately, the older escrow characterization exhibits a timely
-certificate losing payment eligibility at expiry. That historical contract has
-different semantics; the paper does not describe it as an attempted equivalent
-implementation of the new rule.
+\subsection{Adversarial and recovery checks}
+The rejection cases use authenticated adversarial inputs. A validly re-signed
+graph that changes an issued continuation is rejected. A sealed allocation
+cannot select another invocation. Missing treaty evidence, a foreign
+capability and a signed route to another receiver fail before funding
+observation or native work. A deliberate removal of the receiver-route check
+makes its regression fail for reaching funding observation.
 
-\subsection{An ordinary transactional alternative}
-We implement the monetary state machine using ordinary SQL transactions and
-conditional updates, without Chio kernel code. It receives the same role
-identities, deadlines and predicate outcomes as the model. It checks every
-observable snapshot and source balance along the same representative traces.
-The result is \MatchedSteps\ matched steps and no mismatch. Additional tests
-preserve an uncollected child's payment after parent refund, deny reuse of its
-funds, and keep unknown execution distinct from verifier rejection.
+Native tests also recover recorded tool output after process loss, allow
+independent sibling progress, preserve original unfinished work through graph
+extension, and reject a fresh request using a consumed continuation. Concurrent
+graph extensions yield one committed successor. These cases exercise the
+specific boundaries used in the preservation argument.
 
-This is evidence that the tested monetary safety is available through standard
-mechanisms. The comparator trusts the database operator; replacing it with the
-same external escrow gives an ordinary application access to the same scarce
-backing. We have not benchmarked that application's full integration effort or
-implemented every native admission feature in it. Accordingly, the comparison
-supports neither a Chio speedup nor an impossibility claim against alternatives.
-Both implementations were written within this project, so it is also not an
-independently authored replication.
+Current qualification completes 21 commands on an unchanged source inventory,
+including the composed execution and four existing earned-child crash and
+transaction-recovery cases. Six opt-in chain regressions are run explicitly
+in addition to the default standalone suite. Appendix~\ref{app:evidence}
+gives counts and source boundaries; the companion retains the command output
+and the initial failed runs.
 
-A later conditional-backing experiment gives a stronger conventional allocator
-the same knowledge of earned, unknown, fenced-absent and exclusively selectable
-future claims. The proposed structural bound and an independent exhaustive
-oracle match in all 4,095 finite profiles. Selection before dispatch saves
-capacity relative to reserving every alternative, but the conventional
-construction obtains exactly the same saving. The companion retains this
-rejected exclusive-capital hypothesis. D1 consequently claims a reusable
-implementation boundary, not a uniquely available conservation rule.
+\subsection{What the comparisons establish}
+The financial state machine is also implemented using ordinary SQL transactions.
+It matches every compared state and balance along the retained representative
+traces. A competent conventional implementation therefore has the same tested
+monetary conservation and earned-child behavior.
 
-\subsection{Comparison with upstream ERC-8183}
-We also test the existing agent-commerce implementation at upstream commit
-\texttt{142e669c1f}. Its \UpstreamTests\ unchanged tests pass. We add
-\PairedTests\ comparison tests, using the same mock token, zero fees, a
-100-unit buyer and a separately capitalized 60-unit intermediary. Each escrow
-uses its native authorization and deadline rules; distinct trusted evaluator
-addresses make decisions. The artifact retains compiled-bytecode traces,
-compiler and dependency pins, and reproduction after relocation.
+The pinned upstream ERC-8183 implementation also pays a separately funded child
+after parent refund and rejects overcommitment of the available reserve.
+It additionally supports partial settlement, beyond this paper's fixed-price
+profile. Chio's explicit \textsf{Payable} state preserves recorded acceptance
+until a later withdrawal. These are lifecycle choices within expressive
+settlement systems, not evidence of an exclusive economic primitive.
 
-Both implementations pay the child after parent refund, reject funding two
-60-unit jobs from 100, and deny spending the unsettled parent reserve. The
-upstream implementation also supports a stronger milestone case: it pays an
-approved 60-unit claim from one 100-unit job, then refunds the remaining 40 when
-the job is rejected. Chio's fixed-price allocation has no partial-settlement
-entrypoint. These results reject an exclusive claim to either funded agent
-jobs or surviving child payments.
-
-The observed differences concern state-machine policy. Chio separates recorded
-acceptance from withdrawal, rejects new acceptance after its resolution cutoff,
-and preserves earned withdrawal through a funding pause or allowlist change.
-Upstream completion pays immediately; after its expiry grace period, completion
-can still win if refund has not executed. Upstream refunds are blocked while
-paused. These are properties of the pinned implementations, not expressiveness
-limits of ERC-8183, whose evaluators and hooks admit extensions. No gas,
-performance or security superiority follows from the comparison.
-
-\subsection{Execution, verification and security integration}
-The existing funded prototype binds actual Rust-produced output to a separately
-implemented Python check, signed custody, a claim and payment. Its workload
-inventories supported OpenAPI authentication declarations. It checks the listed
-properties, not the security of a running API. September evidence records
-payment, rejection, missing custody, an earned child after parent refund,
-transaction recovery and native execution witnesses. Its later process
-experiments isolate role keys and pass public evidence between separate roles.
-
-We reconciled funded source \texttt{7755d3762b} with security source
-\texttt{491f585e90} in integration commit \texttt{71e5cbc3bf}. Their changes
-overlap in durable admission, recovery and evidence handling; compatibility
-cannot be inferred from their independent tests. \IntegrationSummary
-The companion retains the exact integration record and each remaining gate.
-
-The deterministic workload deliberately makes acceptance easy to inspect. It
-does not demonstrate an asymmetry between expensive production and cheap
-verification: a buyer can often compute this inventory itself. There is no
-held-out repair corpus, economic-margin result, live-agent advantage or
-independently operated company trial in the reported evaluation. Those omissions
-bound the broader economy claim rather than the tested escrow behavior.
+The composed experiment establishes the implemented connection between evolving
+authority, native execution and an earned obligation. The authentication
+inventory is deliberately easy to check: it measures protocol behavior rather
+than an economic advantage in outsourcing that work.

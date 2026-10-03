@@ -2,51 +2,50 @@
 
 [Read the paper](paper.pdf) · [Source](paper.tex) · [Artifact and reproduction](ARTIFACT.md) · [Claim register](CLAIMS.json) · [Publication gates](PUBLICATION.json)
 
-Title approved and locked on 2026-09-14. Full research manuscript and reproducible
-artifact extended on 2026-10-03. **The requested breakthrough/publication bar
-remains open:** independently operated useful work and a measured advantage over
-the strongest practical alternative have not been established.
+Chio is a kernel for composing agentic work under the authority of its resource
+owners. Its central rule is simple: **plans may evolve while issued commitments
+retain their bounds and identity.**
 
-The paper now centers on evolving programs with preserved commitments. A running
-swarm can add work through its existing signed authority while retaining prior
-allocations, exact historical artifacts and native continuation custody.
-Native tests preserve new and unfinished work, original receipts and bilateral
-treaty conditions across growth and restart.
+An agent can delegate bounded capacity, select a collaborator and grow a running
+work graph. Each receiver admits the resulting invocation under its own
+capabilities and treaty conditions. Durable custody preserves the original
+execution, and funded claims preserve earned obligations after parent failure.
+This is programmable sovereignty at the execution boundary: owners control what
+may enter their domains, while agents compose work within those bounds.
 
-Dynamic delegation supplies the complementary operation: a holder subdivides bounded work,
-selects a receiver and seals the exact contract and invocation into portable
-evidence. The receiver checks it locally using its own capability and durable
-custody. The new experimental Rust profile demonstrates recursive allocation,
-provider replacement before sealing, offline-allocator execution, checked output
-and real process-kill recovery while a sibling completes.
+The paper gives the protocol, its conditional preservation argument and a Rust
+implementation. One running example connects the design to an executable result:
+an API survey triggers a specialist task, the intermediary is killed after the
+specialist earns payment, and the original claim is collected while earlier
+execution evidence remains unchanged.
 
-The composed execution now joins these boundaries to funded work: a scout
-result triggers a new specialist allocation, graph growth and receiver-owned
-bilateral admission. Actual parent SIGKILL leaves the child's original earned
-claim collectible and earlier execution evidence intact. The
-[evolving-work result](../../research/evolving-funded-work/RESULTS.md) records
-the implementation, replay diagnostics and original physical claim identities.
-This makes programmable sovereignty concrete at admission while keeping
-allocation ceilings and actual backing distinct.
-The paper preserves the ordinary-escrow, ERC-8183 and conditional-capital parity
-results; it makes no claim that conventional implementations lack these rules.
+The manuscript presents the kernel contract, trust model, commitment lifecycle,
+preservation property and evidence as one argument. Appendix A fixes the concrete
+profiles and encodings; Appendix B retains the exact qualification and comparison
+boundaries. The [editorial review](EDITORIAL-REVIEW.md) records the technical
+review and repairs behind this revision.
+
+The title was approved on 2026-09-14. The manuscript and artifact were revised on
+2026-10-03. The composed result uses one administrator and a private chain. The
+[claim register](CLAIMS.json) and [publication record](PUBLICATION.json) preserve
+the separate evidence requirements for independent operation, useful-work
+economics, integration advantage and external foundational critique.
 
 ## Contents
 
-- `paper.pdf`, `paper.tex`, `sections/`, `bib.bib`: complete main manuscript.
+- `paper.pdf`, `paper.tex`, `sections/`, `bib.bib`: manuscript and technical appendices.
 - `ARTIFACT.md`: concrete profile mapping, source boundaries and exact reproduction commands.
 - `CLAIMS.json`: supported claims, assumptions, limitations and unestablished hypotheses.
 - `sources.json`: versioned primary references and content hashes.
 - `formal/WorkClaims.lean`: checked abstract conservation and earned-state lemmas.
 - `tools/compare.py`: ordinary transactional escrow replayed against the same finite trace corpus.
-- `evidence/`: fresh logs, model traces, negative controls and integration/comparison records.
+- `evidence/`: source-bound logs, model traces, negative controls and integration/comparison records.
 - `PUBLICATION.json`: fail-closed high-bar readiness gates.
 - `EXTERNAL-TRIAL.md`, `trial/`: independent operator handoff, frozen analysis rules and data templates; no completed trial is implied.
 - `PROGRESS.md`: execution decisions and remaining work.
-- `REVIEW.md`: fresh review, reproduced checks, documentation fixes and its limits.
+- `EDITORIAL-REVIEW.md`, `REVIEW.md`: current manuscript review and retained earlier review records.
 - [Dynamic delegation](../../research/dynamic-delegation/README.md): protocol,
-  results, current source qualification and review of this revision. The older
-  paper-local review concerns the earlier funded manuscript.
+  results, current native source qualification and implementation review.
 - [Swarm evolution](../../research/swarm-evolution/README.md): reuse map,
   additive composition argument, native trajectories and combined review.
 - [Evolving funded work](../../research/evolving-funded-work/RESULTS.md): the
