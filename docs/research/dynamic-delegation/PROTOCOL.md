@@ -33,17 +33,32 @@ coordination remains necessary at each shared resource allocator and rail.
 | Record | Content committed | Authority |
 | --- | --- | --- |
 | WorkSlot | ID, holder, exact effect/reader sets, currency, ceiling, expiry, depth, acceptance clauses | Trusted owner creation or authenticated parent subdivision |
-| Subdivision | Parent ID and complete child slot | Signature by current parent holder |
-| WorkOffer | Slot ID and full slot digest, receiver, effect, exact input digest, price ceiling and expiry | Receiver signature; discovery alone is insufficient |
+| Subdivision | Parent ID, parent allocation digest and complete child slot | Signature by current parent holder |
+| WorkOffer | Allocation digest, slot ID and full slot digest, receiver, effect, exact input digest, price ceiling and expiry | Receiver signature; discovery alone is insufficient |
 | Selection | Complete signed offer, exact native capability digest, request ID and expected selection revision | Current slot holder signature |
-| DispatchPermit | Root ID, immutable slot, signed selection, issuance time | Explicitly accepted allocator key, after durable commitment |
+| DispatchPermit | Root ID, allocation digest, immutable slot, signed selection, issuance time | Explicitly accepted allocator key, after durable commitment |
 
 Every signed body uses a distinct versioned domain and RFC 8785 canonical JSON.
 Signatures include the signer's identity. A provider signs the complete slot
 digest: two allocations with the same name but different acceptance terms cannot
-share an offer. The receiver-signed v1 offer prices this checked-output contract:
+share an offer. The receiver-signed v2 offer prices this checked-output contract:
 a result rejected by the agreed predicate earns zero charge. The installed
 native profile explicitly opts into the existing reversible-hold contract.
+
+Local names are not global consent. A persistent random allocator namespace,
+the complete immutable root slot and the complete target slot form the
+allocation digest. Subdivision binds the parent's digest; the offer and
+allocator permit bind the selected slot's digest. A selection signs the entire
+offer. Each mutation checks its digest inside the same protected transaction
+that changes allocation state. Equal names and terms at two honest allocators
+therefore do not share holder or receiver consent. The namespace is an identity,
+not a new signing authority; cloning its protected state still violates the
+single-custodian assumption.
+
+The prepublication signed domains are now v2. Earlier v1 mutations and permits
+require fresh signatures. Opening an issued store whose namespace is missing
+fails; it cannot silently mint a replacement namespace. No migration of live
+v1 commitments is claimed.
 
 ## Allocation rule
 
@@ -98,7 +113,8 @@ wrapper fields reject. The receiver checks:
 2. The allocator, holder and receiver signatures and full contract digest agree.
 3. Slot, subject, receiver, server/tool, payload, native capability and original
    request match the committed selection.
-4. Offer and slot are live. Native capability validity/revocation also pass.
+4. Offer and slot are live under the kernel's configured fenced authority clock.
+   Native capability validity/revocation also pass.
 5. The native grant is one exact invoke grant, with one invocation and monetary
    ceilings no larger than the signed offer, in the same currency.
 6. Native durable admission and original request retention protect execution.
@@ -176,6 +192,9 @@ advantage, a new foundational theorem or an autonomous economy.
 - Monotone declarations do not establish complete data provenance, worker
   isolation, arbitrary error/log/payment-channel mediation or semantic goal
   refinement. Those remain explicit recovery/host integration requirements.
+- Completion and recovery recheck contract expiry. Work can remain stranded
+  after expiry; the demonstrated recovery cut completes while the contract is
+  live. A future earned-output policy must define that lifetime explicitly.
 - No automatic post-seal replacement or reclaim. No liveness guarantee under
   network partition, unavailable rails, withheld outputs or dishonest verifiers.
 - The executable example uses one administrator, local tool implementations and

@@ -1,0 +1,6 @@
+pdflatex -interaction=nonstopmode -halt-on-error paper.tex > build-first.log
+bibtex paper > build-bib.log
+pdflatex -interaction=nonstopmode -halt-on-error paper.tex > build-second.log
+pdflatex -interaction=nonstopmode -halt-on-error paper.tex > build-final.log
+python3 tools/check.py
+PASS: manuscript, bibliography, derived results, PDF and artifact hashes agree.

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+from provenance import HISTORICAL_SOURCE, EVIDENCE, verify_revision_files, verify_qualification
 
 PAPER = Path(__file__).resolve().parents[1]
 ROOT = PAPER.parents[2]
@@ -112,13 +113,20 @@ def main():
     if hashlib.sha256(raw_source_manifest).hexdigest() != integration['source_manifest_uncompressed_sha256']:
         errors.append('native source inventory hash mismatch')
     source_files = json.loads(raw_source_manifest)['sourceFiles']
-    # Paper additions do not change the native build. Check all other retained
-    # source inputs, including inherited code, locks and fixtures.
+    # The historical experiment's build inputs belong to its retained epoch.
+    # Manuscript/tooling inputs are checked by the current artifact inventory.
     source_files = {k:v for k,v in source_files.items()
                     if not k.startswith('docs/papers/verifiable-work/')}
-    errors.extend(verify_files(ROOT, source_files))
+    # Historical native observations remain checked against the preserved tree.
+    # New native code is qualified separately below; no old inventory is rewritten.
+    errors.extend(verify_revision_files(ROOT, HISTORICAL_SOURCE, source_files))
+    qualification = ROOT/EVIDENCE/'qualification.json'
+    if not qualification.is_file():
+        errors.append('missing current dynamic native qualification')
+    else:
+        errors.extend(verify_qualification(ROOT, json.loads(qualification.read_text())))
     trial = json.loads((PAPER/'trial/manifest.template.json').read_text())
-    errors.extend(verify_files(ROOT, trial['profile_inputs']))
+    errors.extend(verify_revision_files(ROOT, HISTORICAL_SOURCE, trial['profile_inputs']))
     for check in integration['checks']:
         record = json.loads((PAPER/'evidence'/check['record']).read_text())
         if record['exitCode'] != 0 or not (PAPER/'evidence'/check['log']).is_file():
@@ -155,6 +163,16 @@ def main():
     manifest=PAPER/'artifact-manifest.json'
     if args.freeze:
         candidates=[*PAPER.rglob('*'),* (ROOT/'examples/funded-work-model').glob('*.py'),
+                    *(ROOT/'docs/research/dynamic-delegation').rglob('*'),
+                    *(ROOT/'docs/research/swarm-evolution').rglob('*'),
+                    ROOT/'docs/superpowers/specs/2026-10-02-dynamic-delegation-design.md',
+                    ROOT/'docs/superpowers/plans/2026-10-02-dynamic-delegation.md',
+                    ROOT/'docs/superpowers/specs/2026-10-02-sovereign-swarm-evolution-design.md',
+                    ROOT/'docs/superpowers/plans/2026-10-02-sovereign-swarm-evolution.md',
+                    ROOT/'docs/research/kernel-continuation/CAPITAL.md',
+                    ROOT/'docs/research/kernel-continuation/capital.py',
+                    ROOT/'docs/research/kernel-continuation/test_capital.py',
+                    ROOT/'docs/research/kernel-continuation/results/capital.json',
                     ROOT/'examples/funded-work-model/claim-traces.json',
                     * (ROOT/'contracts/src').rglob('*.sol'),
                     * (ROOT/'contracts/scripts').glob('work-claim-*.mjs'),

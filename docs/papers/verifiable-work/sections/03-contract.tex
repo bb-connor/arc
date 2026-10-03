@@ -1,81 +1,100 @@
 \section{The work contract}
-For exposition, write an agreement as
+Write a D1 slot as
 \[
- A=(B,P,I,C,D,F,T,L),\qquad a=H(\operatorname{canon}(A)).
+ S=(i,h,E,A,b,c,t,d,Q),\qquad s=H(\operatorname{canon}(S)).
 \]
-$I$ commits the input, $C$ identifies the checker and acceptance policy, $D$
-defines permitted disclosure, $F$ identifies the funding domain and terms, $T$
-sets the deadlines, and $L$ names any parent agreement. Both parties sign the
-same canonical agreement. This tuple is a description of the common contract,
-not a replacement wire encoding. The artifact companion maps it to the
-versioned implementation objects.
+$i$ identifies the slot, $h$ its holder, $E$ its exact server/tool pairs, $A$
+its permitted reader keys, $b$ its ceiling in currency $c$, $t$ its expiry,
+$d$ its remaining depth and $Q$ its acceptance predicate. The owner creates a
+root through a trusted configuration API. Each allocator has a persistent
+namespace $N$. The allocation digest $a=H(\operatorname{canon}(N,S_{\rm root},S))$
+binds both the full root and the target slot within that namespace, under a
+versioned domain. A holder signs a subdivision naming the parent, its allocation
+digest and the complete child. The allocator admits it only when that digest
+matches its protected state and
+\begin{align*}
+ E_{\rm child}&\subseteq E_{\rm parent}, &
+ A_{\rm child}&\subseteq A_{\rm parent},\\
+ t_{\rm child}&\leq t_{\rm parent}, &
+ d_{\rm child}&<d_{\rm parent},\\
+ c_{\rm child}&=c_{\rm parent}, &
+ \sum_{j\in\operatorname{children}(S)} b_j&\leq b_S.
+\end{align*}
+The child must still be live. Its holder and selected receiver must be in its
+reader set. Immediate SQLite transactions couple insertion with the parent's
+allocation counter. A slot with children cannot execute; a selected slot
+cannot acquire children. Unused internal capacity remains available for
+additional children. There is no reclaim operation in D1.
 
-An agreement has three bindings. \emph{Authority binding} connects it to the
-receiver's own admitted operation and bounded local grant. \emph{Result binding}
-connects the exact input, output and acceptance procedure. \emph{Funding binding}
-connects the agreement and result commitment to one allocation, beneficiary,
-asset and amount in one settlement domain. These bindings prevent a valid
-statement about one relationship from being reused as a statement about another.
-They do not establish useful work independently of the acceptance procedure.
+Children perform different subtasks and may have different predicates. A
+successful child therefore does not establish that its parent task succeeded.
+A separate leaf may assemble results and check the final predicate within its
+own allocation. D1 supplies capacity-preserving subdivision, not automatic
+semantic decomposition of an owner's goal.
 
-\subsection{Funding is an allocation}
-The payer deposits $q>0$ units into an allocation $f$. The reference contract
-derives its allocation identifier from the chain, contract address and complete
-terms. The agreement digest, payer, beneficiary, verifier, asset, amount and
-four deadlines are immutable. A new payer agreement cannot be funded twice
-under the same payer and digest. The receiver checks the selected contract code
-and observation source before relying on an allocation.
+\subsection{Offer, selection and commitment}
+A receiver signs an offer binding the allocation digest $a$, complete slot digest
+$s$, its own key,
+the exact effect and input digest, a price ceiling and an expiry. Binding the
+complete slot is essential: signing only its name would allow the offer to be
+transplanted into different acceptance terms. Binding $a$ additionally prevents
+replay between honest owners using equal local slot names and terms. The holder
+signs a selection
+containing that offer, the original native request ID, the receiver-issued
+capability digest and the expected selection revision. Compare-and-swap
+revisions permit replacement and reject stale selections.
 
-A provider does not start merely because a payer supplies a signed balance. It
-requires an acceptable observation of the actual reserved allocation and a
-local admission decision bound to it. The binding does not atomically fuse a
-remote blockchain with a local database. Fresh observation, the deadline
-margin, retained operation identity and conservative recovery are necessary.
-If the chain reorganizes after an observation, the profile's finality assumption
-has failed or the observation was premature. A local receipt cannot repair that.
+Sealing freezes the selected binding before the allocator exports a signed
+\emph{dispatch permit}. The permit contains the root ID, allocation digest, immutable slot,
+signed selection and issuance time. An accepted allocator signature attests
+that the slot was allocated and sealed; the receiver does not independently
+reconstruct the owner's entire allocation tree. It checks this evidence
+against its configured allocator keys, while its native capability supplies
+the actual authority to execute.
 
-\subsection{Acceptance is an explicit decision}
-A submission commits the result and its evidence. A verifier checks the exact
-agreement, allocation, input, output, checker and custody record before issuing
-a decision. Missing evidence produces no decision. An available result that
-fails the predicate produces rejection. These outcomes must remain distinct:
-a verifier outage is not proof that the provider delivered bad work.
-
-Off-chain artifacts use canonical JSON and Ed25519 signatures~\cite{jcs}.
-The reference escrow accepts a separate EIP-712 decision~\cite{eip712}, binding
-the allocation, agreement, submission commitment, decision digest, acceptance
-bit, beneficiary, asset and amount. Its domain includes chain ID and contract
-address. The contract verifies the pinned signer's decision, not the
-application predicate. The publication artifact specifies which digests cover
-bodies and which cover complete signed envelopes; those encodings cannot be
-interchanged.
-
-\subsection{A child is a separate obligation}
-A parent link records provenance. It is not collateral and grants no authority.
-Before hiring a specialist, the intermediary must commit funds it already
-controls to a different allocation. In the opening example, the buyer deposits
-100 and the intermediary deposits 60. The buyer's reserved 100 is not available
-for the intermediary to pledge again. If the intermediary cannot finance the
-60, this profile cannot admit the subcontract. Credit or conditional netting
-would require a different contract and a different failure argument.
+Every signed body has its own versioned domain and uses RFC 8785 canonical
+JSON~\cite{jcs}. The input digest covers the slot ID and exact payload. It
+excludes the enclosing permit to avoid circular hashing; the permit has its
+own signature. Unknown wrapper fields reject. Wire numbers are limited to
+$2^{53}-1$, depth to 32, children per slot to 64 and slots per root to 4,096.
+The acceptance language is a conjunction of 1--16 exact JSON-pointer
+equalities or inclusive integer ranges. These limits define the implemented
+profile, rather than a general language for proving useful computation.
 
 \begin{figure}[t]
 \centering
-\begin{tikzpicture}[font=\small,box/.style={draw=ink,rounded corners=2pt,align=center,minimum width=2.8cm,minimum height=0.9cm},>=Latex]
-\node[box] (b) {Buyer $B$\\local authority};
-\node[box,right=2.5cm of b] (p) {Provider $P$\\local authority};
-\node[box,right=2.5cm of p] (s) {Specialist $S$\\local authority};
-\draw[->,thick] (b) -- node[above]{agreement} (p);
-\draw[->,thick] (p) -- node[above]{subcontract} (s);
-\node[box,below=1.1cm of b] (f1) {Allocation $f_1$\\100 from $B$};
-\node[box,below=1.1cm of s] (f2) {Allocation $f_2$\\60 from $P$};
-\draw[->] (b) -- (f1);
-\draw[->] (p.south) -- node[left]{deposit} (f2.north west);
-\draw[->,dashed] (f2) -- node[right]{earned claim} (s);
-\node[align=center,below=0.22cm of f1.south east,anchor=north west] {Parent refund leaves $f_2$ intact.\\Evidence crosses; each receiver admits locally.};
+\begin{tikzpicture}[font=\small,box/.style={draw=ink,rounded corners=2pt,align=center,minimum width=3cm,minimum height=0.9cm},>=Latex]
+\node[box] (a) {Owner allocator\\root and subdivision};
+\node[box,right=0.8cm of a] (p) {Sealed permit\\exact selection};
+\node[box,right=0.8cm of p] (r) {Receiver kernel\\local capability};
+\draw[->,thick] (a) -- (p);
+\draw[->,thick] (p) -- (r);
+\node[box,below=0.8cm of r] (e) {Durable invocation\\checked output};
+\draw[->,thick] (r) -- (e);
+\node[align=left,below=0.8cm of a.south west,anchor=north west] {Choice can change before sealing.\\Committed identity survives failure.};
 \end{tikzpicture}
-\caption{Work dependencies and funding dependencies differ. Each obligation has
-its own backing; the figure depicts neither a shared application operator nor
-an absence of shared settlement and verification dependencies.}
+\caption{D1 separates coordinated allocation from locally checked execution.
+After sealing, the receiver needs its own custody and payment services but no
+live allocator connection. The permit grants no native capability.}
 \label{fig:work}
 \end{figure}
+
+\subsection{An allocation ceiling and a funded obligation}
+F1 binds an agreement digest, payer, beneficiary, verifier, asset, amount and
+deadlines to an actual reserved allocation. The allocation identifier includes
+the chain and contract address. A new payer agreement cannot be funded twice
+under the same payer and digest. The receiver relies on a qualified observation
+of that reserve, not a signed balance supplied by the payer.
+
+Acceptance in F1 is a separate EIP-712 decision~\cite{eip712} binding the
+allocation, agreement, submission, decision digest, acceptance bit, beneficiary,
+asset and amount. The escrow authenticates the pinned verifier; it does not
+execute the application checker. A missing output or custody record yields no
+decision. An available result that fails the predicate yields rejection.
+
+A child agreement is separately funded. In the 100/60 example, the intermediary
+must already control the child's 60; the buyer's reserved 100 cannot be pledged
+again. D1's 100-unit allocation tree, by comparison, divides one owner's
+authority ceiling. It does not promise both a 100-unit parent refund and
+additional child payments from the same 100. Credit, conditional netting and
+cross-profile deployment require their own backing and integration rules.

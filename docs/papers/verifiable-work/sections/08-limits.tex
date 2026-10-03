@@ -1,4 +1,25 @@
 \section{Where the argument stops}
+D1 has a trusted owner allocator and one protected custody domain per receiver
+key. It cannot prevent those trusted components from equivocating after state
+fork or rollback. Its offline permits require prior qualification and do not
+provide instantaneous global revocation. Sealing may strand unused capacity;
+expired, withheld or unresolved work has no automatic reclaim path. Output
+validation and recovery recheck contract expiry, so completion after that
+deadline may remain stranded. The
+implemented predicates and finite trees intentionally restrict expressiveness.
+Declared reader/effect attenuation still depends on complete host mediation.
+The profile does not track arbitrary information flow through tools, logs,
+errors and payment channels.
+
+S1 conservatively retains every allocation and prior permission. Its storage
+and verification costs grow with the retained graph and history; no scalability
+or hostile-load result is reported. Policy changes, revocation-epoch replacement,
+task retirement, budget reclaim and receiver migration require explicit
+lifecycle rules beyond additive extension. The D1 and S1 trajectories do not
+yet bind their distinct allocation representations to F1's escrow in a single
+evaluated execution. Doing so requires one explicit owner for each scarce
+resource and preservation of its identity at every handoff.
+
 The two enduring dependencies in F1 are the acceptance authority and the
 settlement domain. Parties may choose them without choosing a shared task
 scheduler, but cannot dispense with their assumptions. An escrow administrator

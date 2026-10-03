@@ -126,6 +126,58 @@
       "bytes": 24470,
       "status": "retrieved",
       "overlap": "Closest agent commerce or validation standard; credit existing mechanism."
+    },
+    {
+      "id": "pcc",
+      "url": "https://homes.cs.washington.edu/~mernst/teaching/6.893/readings/necula-popl97.pdf",
+      "version": "POPL 1997",
+      "bytes": 1170920,
+      "sha256": "53dc6821c9e6ec014ee4fd3dc03c919c1987fdb0f62f14f0feac3321792b572c",
+      "overlap": "Safety conditions checked locally from supplied proofs; permit signatures here are not program proofs.",
+      "status": "retrieved",
+      "reading_scope": "Abstract and introductory framing; no line-by-line proof replication.",
+      "retrieved_at": "2026-10-03T00:42:46.563867+00:00"
+    },
+    {
+      "id": "interfaceautomata",
+      "url": "https://web.cs.wpi.edu/~heineman/html/teaching_/CS562/p109-de_alfaro.pdf",
+      "version": "ESEC/FSE 2001",
+      "bytes": 260613,
+      "sha256": "e1f5f47ff8923286324860aad22915224918300b97fbd77b54572c1219758e52",
+      "overlap": "Compatibility and refinement under interface assumptions; no semantic goal-refinement result claimed here.",
+      "status": "retrieved",
+      "reading_scope": "Abstract and introductory framing; no line-by-line proof replication.",
+      "retrieved_at": "2026-10-03T00:42:46.802164+00:00"
+    },
+    {
+      "id": "miller",
+      "url": "https://worrydream.com/refs/Miller_2006_-_Robust_Composition.pdf",
+      "version": "2006 dissertation",
+      "overlap": "Object-capability foundations for robust composition of distributed, potentially malicious components.",
+      "bytes": 1882311,
+      "sha256": "ec1850bb8dc0627202d8d19dbcea6a79efb8db7bb2b98c8876f1548cd319f3d3",
+      "status": "retrieved",
+      "retrieved_at": "2026-10-03T02:16:20.499796+00:00"
+    },
+    {
+      "id": "securelink",
+      "url": "https://www.cs.princeton.edu/techreports/2002/663.pdf",
+      "version": "TR-663-02, September 2002",
+      "overlap": "Component linking using certified properties and proof-carrying authentication.",
+      "bytes": 730616,
+      "sha256": "845b8391076426b73a09566bd5afa479b482f6cde4086e0b5aea7412e8535574",
+      "status": "retrieved",
+      "retrieved_at": "2026-10-03T02:16:20.378491+00:00"
+    },
+    {
+      "id": "sessiontypes",
+      "url": "https://mrg.cs.ox.ac.uk/publications/multiparty-asynchronous-session-types/",
+      "version": "POPL 2008 author publication record",
+      "overlap": "Local projection of global interaction types, with communication properties under formal assumptions.",
+      "bytes": 4837,
+      "sha256": "68037ab6c477687b5f3294d39b783141e60b9c2ce59b87642bc1989c3d5e8672",
+      "status": "retrieved",
+      "retrieved_at": "2026-10-03T02:16:21.605533+00:00"
     }
   ]
 }

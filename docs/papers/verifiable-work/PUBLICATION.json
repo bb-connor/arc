@@ -8,15 +8,15 @@
       "id": "manuscript",
       "status": "passed",
       "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers.",
-      "evidence": "REVIEW.md",
-      "result": "Complete bounded manuscript; fresh review found no Critical/Important defect. Both minor traceability findings were closed. External scientific validation remains separate."
+      "evidence": "../../research/swarm-evolution/REVIEW.md",
+      "result": "Complete D1/S1/F1 manuscript; fresh automated review finding repaired with red/green regressions. Broader independent scientific claims remain explicitly open."
     },
     {
       "id": "artifact",
       "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": "artifact-manifest.json",
-      "result": "Fresh byte-identical scratch PDF rebuild; retained command logs, exact source inventories, numerical results, references and artifact hashes checked. Final check rerun after documentation fixes."
+      "result": "Rebuilt PDF, exact current D1/S1 qualification (11 terminal commands), historical F1 source pin, bibliography and artifact hashes agree."
     },
     {
       "id": "funded-security-integration",

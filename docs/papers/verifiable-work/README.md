@@ -7,11 +7,23 @@ artifact prepared on 2026-10-02. **The requested breakthrough/publication bar
 remains open:** independently operated useful work and a measured advantage over
 the strongest practical alternative have not been established.
 
-The paper connects receiver-local authority, checkable acceptance and exclusively
-funded work obligations. It explains both a successful exchange and a child
-payment surviving parent failure, with explicit verifier, settlement and
-availability assumptions. It credits existing escrow and agent-commerce work,
-including ERC-8183, and retains the matching ordinary-escrow result.
+The paper now centers on evolving programs with preserved commitments. A running
+swarm can add work through its existing signed authority while retaining prior
+allocations, exact historical artifacts and native continuation custody.
+Native tests preserve new and unfinished work, original receipts and bilateral
+treaty conditions across growth and restart.
+
+Dynamic delegation supplies the complementary operation: a holder subdivides bounded work,
+selects a receiver and seals the exact contract and invocation into portable
+evidence. The receiver checks it locally using its own capability and durable
+custody. The new experimental Rust profile demonstrates recursive allocation,
+provider replacement before sealing, offline-allocator execution, checked output
+and real process-kill recovery while a sibling completes.
+
+The separately qualified funded profile explains collectible child payments
+after parent failure. Allocation ceilings and actual backing remain distinct.
+The paper preserves the ordinary-escrow, ERC-8183 and conditional-capital parity
+results; it makes no claim that conventional implementations lack these rules.
 
 ## Contents
 
@@ -26,6 +38,11 @@ including ERC-8183, and retains the matching ordinary-escrow result.
 - `EXTERNAL-TRIAL.md`, `trial/`: independent operator handoff, frozen analysis rules and data templates; no completed trial is implied.
 - `PROGRESS.md`: execution decisions and remaining work.
 - `REVIEW.md`: fresh review, reproduced checks, documentation fixes and its limits.
+- [Dynamic delegation](../../research/dynamic-delegation/README.md): protocol,
+  results, current source qualification and review of this revision. The older
+  paper-local review concerns the earlier funded manuscript.
+- [Swarm evolution](../../research/swarm-evolution/README.md): reuse map,
+  additive composition argument, native trajectories and combined review.
 
 ```sh
 make build

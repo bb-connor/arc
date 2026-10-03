@@ -1,0 +1,105 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-swarm-authority v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-swarm-authority)
+    Finished `test` profile [unoptimized] target(s) in 4.34s
+     Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_swarm_authority-865511633593fe94)
+
+running 6 tests
+test finding_pool::tests::allocation_identifiers_reject_whitespace_only_values ... ok
+test finding_pool::tests::allocation_amount_parser_rejects_values_above_u64 ... ok
+test finding_pool::tests::allocation_amount_covers_the_full_u64_domain_without_json_rounding ... ok
+test finding_pool::tests::signed_allocation_rejects_malformed_pool_accounting ... ok
+test finding_pool::tests::allocation_rejects_a_different_qualified_ledger_domain ... ok
+test finding_pool::tests::pool_projection_rejects_unbounded_inputs_before_materializing ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/swarm_authority_stage0.rs (/tmp/chio-paper-target/debug/deps/swarm_authority_stage0-f3c20f599502b299)
+
+running 66 tests
+test swarm_authority_rejects_oversubscribed_budget_fanout ... ok
+test swarm_authority_reserves_budget_fanout ... ok
+test evolution::extension_uses_local_time_and_trusted_keys ... ok
+test evolution::extension_rejects_no_growth_and_budget_overflow ... ok
+test swarm_authority_releases_budget_on_fanin ... ok
+test evolution::extension_adds_live_work_with_original_authority ... ok
+test swarm_authority_mints_signed_join_receipt ... ok
+test live_admission::fanout_admission_does_not_claim_future_join_or_terminal_results ... ok
+test swarm_authority_stage0_accepts_any_success_join_subset ... ok
+test swarm_authority_mints_signed_continuation_token ... ok
+test swarm_authority_stage0_accepts_quorum_join_subset ... ok
+test swarm_authority_stage0_accepts_multi_hop_with_feature_gate ... ok
+test swarm_authority_stage0_accepts_reordered_join_parent_task_receipts ... ok
+test swarm_authority_stage0_rejects_budget_allocations_exceeding_pool ... ok
+test swarm_authority_stage0_rejects_child_without_continuation_ref ... ok
+test swarm_authority_stage0_rejects_continuation_witness_chain_binding_mismatch ... ok
+test swarm_authority_stage0_rejects_continuation_budget_ref_mismatch ... ok
+test live_admission::admission_checks_supplied_results_instead_of_ignoring_them ... ok
+test swarm_authority_stage0_rejects_empty_route_plan_egress_constraints ... ok
+test swarm_authority_stage0_rejects_continuation_route_ref_mismatch ... ok
+test live_admission::admission_still_requires_selected_join_and_all_authority ... ok
+test swarm_authority_stage0_rejects_edge_depth_bypass ... ok
+test swarm_authority_stage0_rejects_continuation_parent_not_declared_on_child ... ok
+test swarm_authority_stage0_rejects_disconnected_witness_hops ... ok
+test swarm_authority_stage0_rejects_future_continuation ... ok
+test swarm_authority_stage0_rejects_future_task_graph ... ok
+test evolution::extension_cannot_reset_or_reallocate_an_existing_task ... ok
+test swarm_authority_stage0_rejects_future_revocation_epoch ... ok
+test swarm_authority_stage0_rejects_graph_cycle ... ok
+test swarm_authority_stage0_rejects_join_parent_set_mismatch ... ok
+test swarm_authority_stage0_rejects_join_next_task_that_is_parent ... ok
+test swarm_authority_stage0_rejects_join_parent_task_receipt_mapping_mismatch ... ok
+test swarm_authority_stage0_rejects_released_budget_allocation ... ok
+test swarm_authority_stage0_rejects_join_continuation_parent_receipt_mismatch ... ok
+test swarm_authority_stage0_rejects_rejected_route_plan ... ok
+test swarm_authority_stage0_rejects_join_receipt_parent_count_mismatch ... ok
+test swarm_authority_stage0_rejects_non_root_task_without_parent ... ok
+test swarm_authority_stage0_rejects_root_only_bundle_without_trusted_witness_keys ... ok
+test swarm_authority_stage0_rejects_root_only_bundle_without_signed_swarm_evidence ... ok
+test swarm_authority_stage0_rejects_replayed_continuation_nonce ... ok
+test swarm_authority_stage0_rejects_revocation_epoch_list_root_mismatch ... ok
+test swarm_authority_stage0_rejects_revocation_epoch_root_mismatch ... ok
+test swarm_authority_stage0_rejects_multi_hop_without_feature_gate ... ok
+test swarm_authority_stage0_rejects_route_plan_selected_route_bridge_mismatch ... ok
+test swarm_authority_stage0_rejects_revoked_task ... ok
+test swarm_authority_stage0_rejects_route_plan_protocol_target_bridge_mismatch ... ok
+test swarm_authority_stage0_rejects_revoked_authority_subject ... ok
+test swarm_authority_stage0_rejects_single_parent_join ... ok
+test swarm_authority_stage0_rejects_tampered_continuation_signature ... ok
+test swarm_authority_stage0_rejects_unsigned_continuation_token_json ... ok
+test swarm_authority_stage0_rejects_stale_route_plan ... ok
+test swarm_authority_stage0_rejects_tampered_route_plan_signature ... ok
+test swarm_authority_stage0_rejects_stale_continuation ... ok
+test swarm_authority_stage0_rejects_tampered_join_receipt_signature ... ok
+test swarm_authority_stage0_rejects_unpinned_witness_issuer ... ok
+test swarm_authority_stage0_rejects_terminal_budget_rollup_mismatch ... ok
+test swarm_authority_stage0_rejects_task_graph_tampering_after_continuations_are_resealed ... ok
+test swarm_authority_stage0_rejects_unmet_quorum_join_subset ... ok
+test swarm_authority_stage0_rejects_witness_child_scope_mismatch ... ok
+test swarm_authority_stage0_rejects_tampered_witness_signature ... ok
+test swarm_authority_stage0_verifies_valid_bundle ... ok
+test swarm_authority_stage0_rejects_unsupported_route_plan_egress_constraint ... ok
+test swarm_authority_stage0_rejects_unsupported_join_predicate ... ok
+test swarm_authority_stage0_rejects_unsigned_revocation_epoch_list_reseal ... ok
+test evolution::extension_rejects_individually_valid_rewrites ... ok
+test swarm_authority_stage0_rejects_generated_recursive_scope_widening ... ok
+
+test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s
+
+   Doc-tests chio_swarm_authority
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

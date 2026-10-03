@@ -1,7 +1,89 @@
 \section{What composes}
-The following argument abstracts cryptography, finality and transaction
-execution into the assumptions of Section 2. It concerns admitted obligations,
-not the correctness of the entire implementation.
+The arguments concern transitions under the assumptions of Section 2.
+They do not prove the complete Rust implementation or semantic correctness of
+a task decomposition.
+
+\subsection{Delegation invariants}
+\begin{proposition}[Declared attenuation and bounded capacity]
+In D1, every descendant's declared effects and readers are subsets of its
+ancestors', its expiry is no later, and the sum of executable leaf ceilings is
+at most the root ceiling.
+\end{proposition}
+\begin{proof}
+Subset inclusion and the expiry order are transitive. Strictly decreasing
+depth bounds the lineage. Let $U_v$ be the unallocated remainder of an internal
+slot. Initially the root is one leaf of ceiling $B$. Subdivision moves $b$
+units from a leaf or internal remainder into a child of ceiling $b$, atomically
+and with a nonnegative remainder. Therefore
+\[
+ \sum_{\text{leaves }v} b_v+\sum_{\text{internal }v}U_v=B.
+\]
+Selection and sealing change no ceiling. Containers cannot execute, so only
+leaf capacity can authorize invocations. Native enforcement of the bound
+one-invocation capability in one protected receiver custody domain bounds
+admitted charges by those ceilings. This last step assumes native enforcement;
+the arithmetic alone does not prove it.
+\end{proof}
+
+\begin{proposition}[Stable sealed identity]
+After a D1 selection is sealed, an accepted permit cannot change its receiver,
+capability, input, effect or request identity without violating an authenticated
+binding or the trusted allocator's transition rules.
+\end{proposition}
+\begin{proof}
+Selection revisions serialize replacements before sealing. The allocator
+freezes the selection before exporting a permit and offers no later transition
+that replaces it. Each receiver compares its invocation with that signed
+selection and the complete slot digest. Substitution either fails a comparison
+or requires a new trusted statement. Replaying identical evidence reaches
+native custody under the original identity; it supplies no fresh capability.
+\end{proof}
+
+This result permits changing collaborators before commitment while preserving
+uncertain obligations afterward. It trades reclaim and automatic failover for
+a simple safety rule. A future reclaim protocol would need authoritative
+closure or fencing of the original operation. Expiry or an agent's claim of
+absence is insufficient. These D1 arguments are not mechanized; the retained
+Lean results below concern the separate funded state machine.
+
+\subsection{Commitments across graph versions}
+Let $G_0,\ldots,G_n$ be the installed S1 lineage and $A_i$ its set of uniquely
+identified allocations, with ceiling $b(a)$ for allocation $a$. Let $B$ be the
+fixed declared pool. Every checked extension requires
+\[
+ A_i\subseteq A_{i+1},\qquad b_{i+1}(a)=b_i(a)\ (a\in A_i),
+ \qquad\sum_{a\in A_{i+1}} b(a)\leq B.
+\]
+
+\begin{proposition}[Bounded commitments under additive growth]
+Within one protected S1 lineage, the ceilings of all allocations ever installed
+sum to at most $B$. Graph extension preserves an old task's authority artifacts
+and cannot refresh its consumed native continuation.
+\end{proposition}
+\begin{proof}
+An atomic compare-and-swap admits at most one successor from each installed
+head. Retention makes the allocation sets monotone, so
+$\bigcup_{i=0}^{n}A_i=A_n$. The live verifier bounds the sum in $A_n$ by $B$;
+checked integer arithmetic prevents overflow. The extension check retains
+every old continuation ID and its allocation and forbids a second continuation
+for that task or allocation. Native custody uses this retained ID across graph
+versions. Re-signing its new graph digest cannot create a second native
+resource. Exact historical resolution supplies the original artifacts to old
+requests and physical-claim revalidation. Ordinary expiry, revocation and
+local admission still govern whether unstarted work may execute.
+\end{proof}
+
+This argument covers interleaving extension with old and new dispatch because
+growth neither removes an allocation nor resets its execution identity. It
+requires a single protected head for the pool and a single native custody domain
+for each task. A copied database or a second independently provisioned graph
+does not inherit the exclusivity of the first. The result bounds declared
+commitments; it supplies neither financial backing nor a proof of task meaning.
+The native trajectory demonstrates conditional progress for a new worker and
+an original unstarted worker, without asserting termination of an arbitrary
+swarm. The S1 argument, like D1's, is not a mechanized Rust refinement.
+
+\subsection{Funded obligations}
 
 For each funding source $u$, let $D_u$ be its fixed deposited endowment,
 $A_u$ its unallocated balance, $L_u$ its locked allocations, $P_u$ its paid

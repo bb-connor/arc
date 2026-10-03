@@ -1,47 +1,64 @@
-\section{Parties, authority and assumptions}
-A work edge connects a payer $B$ and a provider $P$. A selected verifier $V$
-decides the agreed acceptance predicate, a custody service retains the relevant
-bytes, and a settlement domain $R$ allocates and transfers funds. One
-organization may supply several services, but each role and key is explicit.
-Distinct keys alone do not establish independent administration. A provider on
-one edge can be the payer on another.
+\section{Principals, resources and assumptions}
+The \emph{owner} configures an allocator and creates a root contract. A
+\emph{holder} may subdivide its allocation and select an offer. A
+\emph{receiver} offers a tool operation and issues the native capability under
+which it will run. A courier transports signed records. An organization can
+occupy several roles; distinct keys alone do not establish independent
+administration. Holders and receivers in the dynamic profile are previously
+qualified keys explicitly permitted by the owner. Discovery selects among them;
+it does not enroll an unknown party or authorize a new disclosure.
 
-An agent chooses requests and may be malicious. The honest organization's
-kernel mediates its resource access using locally activated trust roots,
-bounded capabilities and current policy. The remote operator may control its
-agents, signing keys, storage, messages and task implementation. The network
-may delay, duplicate, reorder or lose messages. Processes may fail between
-any two durable steps. Cryptographic authenticity cannot make a dishonest
-operator's account of its own execution true.
+Agents and couriers may be malicious. Messages may be delayed, duplicated,
+reordered or lost. Processes may crash between durable steps. The honest
+owner's allocator serializes allocation and preserves its state. Each receiving
+key has one protected native custody and budget domain. Cloning those keys and
+databases into independently spendable forks violates the assumptions.
+Signatures authenticate statements; they do not prevent a trusted issuer that
+has been compromised from making contradictory statements.
 
-The initial profile, F1, makes five assumptions. First, the honest party's local
-enforcement and protected state work as specified. Second, signatures are
-unforgeable and the selected hashes resist collisions. Third, the settlement
-domain enforces exclusive allocations, atomic transitions and the chosen
-finality rule; its token transfers exactly the agreed units. Fourth, the pinned
-verifier applies the agreed predicate to the bound inputs and makes an
-eligible decision available within its window. Fifth, the parties can obtain
-the evidence and submit transactions needed to exercise a claim. Safety and
-liveness depend on different subsets of these assumptions.
+We distinguish three experimental profiles. \textbf{D1} implements dynamic
+allocation and locally checked dispatch permits. It assumes honest allocator
+enforcement, collision-resistant hashes, unforgeable signatures, accurate
+validity checks, and the receiver's capability, durable admission and payment
+enforcement. Its effect and reader sets are declarations whose completeness
+depends on the qualified host and tool confinement. Set inclusion alone does
+not prove information-flow security or prevent an arbitrary tool from using an
+undeclared channel. The local implementation uses a durable integer payment
+fixture; its budget allocations are ceilings, not proof of deposited assets.
 
-The verifier is a trusted decision authority, even when its checker is publicly
-reproducible. Other readers can detect a wrong decision by rerunning the check;
-F1 does not make the settlement contract execute that check. A compromised
-verifier can approve bad work or withhold a decision. A compromised settlement
-domain can violate backing. These are central trust dependencies, not details
-of transport security.
+\textbf{S1} implements additive evolution of Chio's existing swarm authority.
+It uses signed task graphs, attenuation witnesses, routes, revocation epochs,
+allocations and single-use continuations. Each graph has one protected current
+head, and one protected authority controls the declared pool across that graph's
+versions. The installer serializes successors; receivers resolve the exact
+version named by a request and preserve native continuation custody. Reusing a
+pool in independently provisioned graphs or stores is outside this allocation
+discipline. The evaluated graph growth is additive: it preserves permissions,
+expiry, declared capacity and prior artifacts instead of reclaiming or
+transferring them. Ordinary capability and treaty checks apply at dispatch.
 
-Three ledgers describe different facts. The receiver's authorization ledger
-answers whether an operation was admitted. The evidence record answers what
-was observed and checked. The settlement ledger answers which funds are
-reserved, payable or transferred. No record substitutes for the other two.
-In particular, a tool whose effect is unknown after a crash remains unknown
-even if the parties later release a payment hold.
+\textbf{F1} implements funded, fixed-price work claims. A payer $B$ reserves
+funds for provider $P$ in settlement domain $R$. A selected verifier $V$ applies
+the agreed predicate to bound inputs and outputs. F1 additionally assumes that
+the rail enforces exclusive allocations and atomic transfers, the asset
+transfers the agreed units, and the finality observation is sound. Collection
+requires available evidence, eligible verifier decisions and transaction
+inclusion. The verifier remains a trusted decision authority even if others
+can rerun its checker. D1, S1 and F1 share architectural boundaries but have
+separate evaluated trajectories. No reported execution combines all three
+into one dynamic, funded, independently operated swarm.
 
-We bound only the obligations admitted under the contract. The bound excludes
-unapproved off-protocol spending, opportunity cost, loss of disclosed data,
-verifier fees and transaction fees unless the terms explicitly reserve them.
-The reference experiment uses one fixed-price result and one subcontracting
-level. The composition argument applies to a finite set of distinct funded
-edges; it neither proves that a cyclic task graph finishes nor implements
-unrestricted recursive procurement.
+Three kinds of state answer different questions. Allocation state records
+which capacity is committed. Native custody records what was admitted and
+observed during execution. Settlement state records what is reserved, payable
+and transferred. An unknown tool effect remains unknown after a financial
+refund. A sealed allocation remains committed after a network timeout. A
+historical receipt cannot authorize a new invocation.
+
+The bounds concern operations admitted under these profiles. They exclude
+off-protocol spending, opportunity cost, loss of disclosed data and fees unless
+those costs are explicitly reserved. D1 supports finite trees with bounded
+wire objects; S1 grows finite signed graphs; F1 evaluates distinct funded edges.
+These profiles do not prove that
+an arbitrary task decomposes correctly, that every participant remains
+available or that the work is economically useful.

@@ -1,0 +1,22 @@
+...E
+======================================================================
+ERROR: test_native_inventory_binds_directory_links_and_their_targets (test_provenance.QualificationTests.test_native_inventory_binds_directory_links_and_their_targets)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/test_provenance.py", line 58, in test_native_inventory_binds_directory_links_and_their_targets
+    first = native_sources(self.root)
+  File "/tmp/chio-verifiable-work-paper/docs/papers/verifiable-work/tools/provenance.py", line 77, in native_sources
+    return {name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in selected}
+                                 ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_abc.py", line 625, in read_bytes
+    with self.open(mode='rb') as f:
+         ~~~~~~~~~^^^^^^^^^^^
+  File "/home/connor/.local/share/mise/installs/python/3.13.13/lib/python3.13/pathlib/_local.py", line 537, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IsADirectoryError: [Errno 21] Is a directory: '/tmp/tmp1cisw27k/crates/fixtures'
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.130s
+
+FAILED (errors=1)

@@ -7,6 +7,38 @@ research draft on 2026-10-02. Publication readiness is evaluated separately in
 
 ## Sources and profiles
 
+The current manuscript adds D1, the dynamic delegation profile in
+`crates/platform/chio-workflow/src/delegation/` and
+`crates/kernel/chio-kernel/src/delegated_work.rs`. Its
+[protocol](../../research/dynamic-delegation/PROTOCOL.md) defines allocation,
+signatures, trust boundaries, accepted-output pricing and conservative sealing.
+Its [qualification](../../research/dynamic-delegation/evidence/qualification.json)
+hashes current Rust/build/spec/tool inputs and fresh terminal command outputs.
+The current example uses a durable integer rail fixture, two receiver keys and
+separate native stores under one administrator. It does not use F1's escrow or
+establish independent operation.
+
+The prepublication D1 signed records use v2 domains after the namespace replay
+repair. Subdivision, offers, selection and permits now bind the protected
+allocator/root/slot context. Old v1 records need fresh signatures; an issued
+database without its allocator namespace fails open-time validation. No silent
+migration of live experimental commitments is performed.
+
+S1 extends `crates/kernel/chio-swarm-authority/` and the existing runtime-core
+store and admission hook. Its [protocol](../../research/swarm-evolution/PROTOCOL.md)
+defines additive growth, protected head serialization, exact historical lookup
+and stable native continuation ownership. The same current qualification record
+covers D1 and S1. Their native trajectories are separate; the artifact does not
+claim an evaluated combined D1/S1/F1 economy.
+
+Historical source evidence is checked at retained Git revision
+`71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3`, which preserves every non-paper input
+in the old native inventory. The original source hashes and v2/v3 qualifications
+remain unchanged. A full clone containing that revision is required; a shallow
+clone missing it fails rather than silently substituting the current tree.
+The newer branch base `96c25e99a188bb8d1d084c7324a30050a2fd496d` already includes
+a changed recovery fixture, so it cannot substitute for this historical pin.
+
 The original funded implementation is pinned to
 `7755d3762baa5e0fda0d171835a9000c26de9033`. The committed security candidate is
 `491f585e9013dcb6335589c82d00ac219efbf0a6`. The active security checkout also
@@ -23,6 +55,10 @@ other.
 
 | Paper object | Implemented location | Qualification boundary |
 | --- | --- | --- |
+| D1 slots, signed mutations and sealed permits | `crates/platform/chio-workflow/src/delegation/` | Trusted SQLite allocator, finite trees, full-contract offer binding; ceilings are not deposited funds |
+| D1 native receiver and checked output | `crates/kernel/chio-kernel/src/delegated_work.rs` | Locally activated allocator keys plus an ordinary receiver-issued capability; durable native custody; no allocator connection at dispatch |
+| S1 checked graph growth | `crates/kernel/chio-swarm-authority/src/evolution.rs` | Existing live verifier plus exact retention; declared pool, single-use tasks, additive changes only |
+| S1 durable history and native admission | `crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs` and `src/admission_hook/swarm_authority.rs` | One protected head per pool lineage, exact graph lookup, existing native replay and treaty gates |
 | Joint artifact work agreement | `examples/funded-work/artifacts.py`, `PROFILE.md` | `chio.experimental.funded-w0-agreement.v1`, artifact-only |
 | Native funded agreement | `examples/federated-work/src/funded_work/agreement.rs` | Experimental native v2; exact request digest, local authority UUID, Finding policy, allocation domain; W0 amount is fixed to 100 mock units |
 | Disclosure and procurement | `examples/federated-work/src/subcontract/permit.rs`, `SUBCONTRACT.md` | Bounded three-party example; the conceptual agreement tuple is not a new universal wire schema |
@@ -33,7 +69,7 @@ other.
 | Abstract proof | `formal/WorkClaims.lean` | Specification safety; no Rust/Solidity refinement |
 | Ordinary alternative | `tools/compare.py` | Trusted in-memory SQLite, sequential trace replay, symbolic authenticated roles |
 
-The main paper's agreement tuple describes the intended composition. The
+The main paper's slot tuple maps to D1's `WorkSlot` and `WorkContract`. F1's
 artifact-only and native profiles have different concrete bodies. A parent
 link does not automatically exist in every native agreement, and no parent
 field transfers funds or installs a local issuer. Interoperability claims must
@@ -41,7 +77,7 @@ name a particular profile and its conformance tests.
 
 ## Reproduce the paper
 
-Requirements: Python 3.10+, TeX Live with Latin Modern, TikZ and natbib, BibTeX,
+Requirements: Python 3.11+, TeX Live with Latin Modern, TikZ and natbib, BibTeX,
 and Poppler (`pdftotext`, `pdfinfo`). From this directory:
 
 ```sh
@@ -77,6 +113,28 @@ cmp examples/funded-work-model/claim-traces.json /tmp/chio-claim-traces.json
 python3 -B docs/papers/verifiable-work/tools/compare.py --corpus /tmp/chio-claim-traces.json --output /tmp/chio-comparison.json
 lean +leanprover/lean4:v4.28.0 docs/papers/verifiable-work/formal/WorkClaims.lean
 ```
+
+For the current dynamic profile, use the repository Rust toolchain on Linux:
+
+```sh
+python3 -B docs/papers/verifiable-work/tools/qualify_dynamic.py
+python3 -B docs/papers/verifiable-work/tools/qualify_dynamic.py --record
+```
+
+The first command verifies the retained current-source evidence. The second
+executes eleven checks, including the real SIGKILL native scenario, the existing
+three-owner regression, full swarm/runtime crate tests, all-target Clippy and
+formatting. It archives previous qualified outputs,
+requires a fresh recovery trajectory, records terminal status and rejects source
+changes during qualification. It intentionally changes retained evidence; run it
+in a reproduction checkout, then review the resulting diff before refreezing.
+The independently callable native example is `cargo run --locked -p chio-kernel
+--example dynamic_delegation`. The complete command arrays live in
+`tools/provenance.py`. No broad workspace, hosted CI or release result is implied.
+
+The [conditional-backing report](../../research/kernel-continuation/CAPITAL.md)
+and its `results/capital.json` preserve the 4,095-profile parity result. This is
+retained continuation evidence, not a fresh D1 capital experiment.
 
 Install the exact `contracts/pnpm-lock.yaml` dependencies using the repository's
 package manager with a frozen lockfile, then run:

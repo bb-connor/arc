@@ -467,6 +467,173 @@
         "H5"
       ],
       "limitation": "Neither passing tests nor the approved title establishes a breakthrough."
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "D1 dynamic delegation; single trusted owner allocator and protected native receiver custody",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A transactional reservation tree, signed contracts and durable receiver-local idempotency can implement these rules. No exclusive capability or measured integration advantage is established.",
+      "claim_id": "D01",
+      "exact_claim": "Authenticated subdivision preserves declared effect/reader/expiry bounds and conserves root allocation capacity.",
+      "assumptions": [
+        "atomic protected allocator",
+        "authenticated holders",
+        "complete declared envelopes"
+      ],
+      "limitation": "Declared attenuation is not complete information-flow enforcement. Capacity is not proof of escrow backing.",
+      "adversary": "concurrent overcommit or unauthorized/wider subdivision",
+      "counterexample": "Any accepted overcommit or widening falsifies the declared invariant.",
+      "evidence_paths": [
+        "crates/platform/chio-workflow/tests/delegation.rs",
+        "docs/research/dynamic-delegation/PROTOCOL.md"
+      ],
+      "next_decisive_test": "Independent native implementation and separately administered useful-work evaluation under a matched conventional baseline."
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "D1 dynamic delegation; single trusted owner allocator and protected native receiver custody",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A transactional reservation tree, signed contracts and durable receiver-local idempotency can implement these rules. No exclusive capability or measured integration advantage is established.",
+      "claim_id": "D02",
+      "exact_claim": "A sealed portable permit binds the allocator/root/slot context and exact native receiver, input, capability and request; receivers verify it without allocator access.",
+      "assumptions": [
+        "accepted allocator key",
+        "unforgeable signatures",
+        "no allocator fork or rollback"
+      ],
+      "limitation": "Previously qualified recipients only. No instantaneous offline revocation or independent reconstruction of the allocation tree.",
+      "adversary": "Cross-owner namespace replay, courier substitution, stale selection and same-name offer transplant",
+      "counterexample": "A changed bound invocation that dispatches, or an offer valid under changed terms, falsifies the claim.",
+      "evidence_paths": [
+        "crates/kernel/chio-kernel/tests/dynamic_delegation.rs",
+        "docs/research/dynamic-delegation/PROTOCOL.md",
+        "docs/research/dynamic-delegation/evidence/namespace-review-red.log",
+        "docs/research/dynamic-delegation/evidence/namespace-review-green.log",
+        "docs/research/dynamic-delegation/evidence/clock-review-green.log"
+      ],
+      "next_decisive_test": "Independent native implementation and separately administered useful-work evaluation under a matched conventional baseline."
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "D1 dynamic delegation; single trusted owner allocator and protected native receiver custody",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A transactional reservation tree, signed contracts and durable receiver-local idempotency can implement these rules. No exclusive capability or measured integration advantage is established.",
+      "claim_id": "D03",
+      "exact_claim": "The installed native profile checks the exact released JSON after transforms; qualifying predicate rejection withholds output and gives zero charge.",
+      "assumptions": [
+        "qualified reversible native hold",
+        "receiver-signed accepted-output pricing",
+        "live valid contract"
+      ],
+      "limitation": "The restricted predicate is not a proof of general truth or utility; the executed invocation remains consumed.",
+      "adversary": "result substitution and transform bypass",
+      "counterexample": "A result failing the agreed check that is released or charged under the qualified rejection path falsifies the claim.",
+      "evidence_paths": [
+        "crates/kernel/chio-kernel/tests/dynamic_delegation.rs",
+        "docs/research/dynamic-delegation/PROTOCOL.md"
+      ],
+      "next_decisive_test": "Independent native implementation and separately administered useful-work evaluation under a matched conventional baseline."
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "D1 dynamic delegation; single trusted owner allocator and protected native receiver custody",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A transactional reservation tree, signed contracts and durable receiver-local idempotency can implement these rules. No exclusive capability or measured integration advantage is established.",
+      "claim_id": "D04",
+      "exact_claim": "After an actual SIGKILL at ToolReturnRecorded, a sibling completes, replacement of the original allocation rejects, and native recovery uses zero new tool dispatches.",
+      "assumptions": [
+        "protected native stores",
+        "single receiver custody domain",
+        "retained result at the selected cut"
+      ],
+      "limitation": "One demonstrated recoverable cut; not exactly-once behavior for arbitrary external effects or all crash positions.",
+      "adversary": "lost original response and attempted blind replacement",
+      "counterexample": "Replacement succeeds or recovery dispatches the original tool again.",
+      "evidence_paths": [
+        "docs/research/dynamic-delegation/evidence/qualified-native-recovery.json",
+        "docs/research/dynamic-delegation/PROTOCOL.md"
+      ],
+      "next_decisive_test": "Independent native implementation and separately administered useful-work evaluation under a matched conventional baseline."
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "S1 additive swarm evolution; one protected graph lineage per declared pool and one native custody domain per task",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A protected transactional head, retained signed snapshots and stable native resource IDs can implement the same rule. No exclusive capability or measured integration advantage is established.",
+      "next_decisive_test": "An independent store/receiver implementation and explicit D1/S1/F1 resource handoffs, followed by a matched useful-work evaluation.",
+      "claim_id": "S01",
+      "exact_claim": "Checked additive graph extensions retain all prior allocations and authority artifacts within the original declared envelope.",
+      "assumptions": [
+        "ordinary live swarm verification",
+        "trusted graph issuer and witness keys",
+        "caller-owned freshness checks"
+      ],
+      "limitation": "Declared capacity is not financial backing. The pure pairwise verifier does not serialize competing writers.",
+      "adversary": "Individually valid re-signed rewrites of earlier commitments, duplicate attempts, widening and stale evidence",
+      "counterexample": "An accepted extension that changes an earlier allocation, route, witness, continuation identity or fixed envelope falsifies retention.",
+      "evidence_paths": [
+        "crates/kernel/chio-swarm-authority/src/evolution.rs",
+        "crates/kernel/chio-swarm-authority/tests/swarm_authority_stage0/evolution.rs",
+        "docs/research/swarm-evolution/PROTOCOL.md"
+      ]
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "S1 additive swarm evolution; one protected graph lineage per declared pool and one native custody domain per task",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A protected transactional head, retained signed snapshots and stable native resource IDs can implement the same rule. No exclusive capability or measured integration advantage is established.",
+      "next_decisive_test": "An independent store/receiver implementation and explicit D1/S1/F1 resource handoffs, followed by a matched useful-work evaluation.",
+      "claim_id": "S02",
+      "exact_claim": "Atomic successor installation establishes one local lineage and preserves exact historical bundles across restart.",
+      "assumptions": [
+        "protected nonforking SQLite store",
+        "one provisioned lineage per declared pool",
+        "collision-resistant canonical digests"
+      ],
+      "limitation": "No cross-store consensus, rollback resistance against a hostile store owner or exclusivity across independently provisioned graphs.",
+      "adversary": "Concurrent stale proposals and corrupted archived payload/hash/index bindings",
+      "counterexample": "Two contenders install from the same expected head, a rejected update changes state, or corrupt history is accepted.",
+      "evidence_paths": [
+        "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs",
+        "crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs",
+        "docs/research/swarm-evolution/PROTOCOL.md"
+      ]
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "profile": "S1 additive swarm evolution; one protected graph lineage per declared pool and one native custody domain per task",
+      "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
+      "baseline_result": "A protected transactional head, retained signed snapshots and stable native resource IDs can implement the same rule. No exclusive capability or measured integration advantage is established.",
+      "next_decisive_test": "An independent store/receiver implementation and explicit D1/S1/F1 resource handoffs, followed by a matched useful-work evaluation.",
+      "claim_id": "S03",
+      "exact_claim": "Native graph extension permits new and original unfinished work while preserving consumed continuation ownership, exact replay receipts and the independent bilateral treaty gate.",
+      "assumptions": [
+        "one protected native custody domain per task",
+        "ordinary capability and treaty enforcement",
+        "live original artifacts and current local authorization"
+      ],
+      "limitation": "Author-controlled native fixtures; additive changes only, without automatic reclaim, receiver migration or a unified dynamic funded execution.",
+      "adversary": "Fresh request under a rebound consumed continuation, omitted treaty context, restart and replay",
+      "counterexample": "A consumed continuation yields another effect, old physical-claim revalidation changes its resources, or required treaty removal still dispatches.",
+      "evidence_paths": [
+        "crates/kernel/chio-runtime-core/tests/runtime_admission/operation_owned/live_swarm/evolution.rs",
+        "crates/kernel/chio-runtime-core/tests/runtime_admission/operation_owned/combined/native_validity.rs",
+        "docs/research/swarm-evolution/evidence/task3-native-v3.log"
+      ]
     }
   ],
   "hypothesis_source": "docs/market/open-agent-work/01-thesis.md at 7755d3762baa5e0fda0d171835a9000c26de9033",

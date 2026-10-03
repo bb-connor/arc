@@ -1,40 +1,68 @@
-\section{Work between organizations}
-A buyer commissions a software review for 100 units. Its provider buys a
-specialist's analysis for 60. The specialist delivers acceptable work, but the
-provider crashes before completing the review. Two facts should survive: the
-buyer has not received its result, and the specialist has earned payment.
-Returning the buyer's funds must not erase the specialist's claim. Keeping the
-specialist paid must not require access to the provider's private scheduler,
-database or signing keys.
+\section{Programs across independent owners}
+The agentic web calls for programs whose participants need not share an owner,
+a scheduler or a lifetime. An agent may assemble a research service, a software
+builder and a verifier only after discovering what a task requires. Each
+participant must be able to cooperate while retaining control over its own
+tools, data and obligations. The programming problem is therefore both dynamic
+composition and preservation of authority through change.
 
-This example separates an agent workflow from a work economy. Within one
-application, a coordinator can schedule tasks, allocate a budget and interpret
-success. Between organizations, those decisions belong to different principals.
-A remote operator can fork its database, sign contradictory promises or stop
-responding. Its signature authenticates a statement; it cannot establish that
-all its promises are jointly funded. Likewise, a payment receipt proves a
-financial event, not that the agreed work was performed.
+An owner authorizes an agent to complete a task within a budget and a set of
+permitted actions. The agent then discovers that it needs a specialist. That
+specialist may need another collaborator. Which of these choices can be made
+without asking the owner to authorize an entirely new system? What prevents
+the same allowance from being promised to two providers? If a provider stops
+responding, which work can continue and which obligation must remain intact?
 
-The unit of cooperation we propose is a \emph{work contract}: immutable terms
-that identify a bounded task, its acceptance procedure and a funded obligation.
-The receiver admits the task under its own authority. Evidence of execution and
-acceptance can travel; the power to use the receiver's resources cannot be
-installed by the arriving evidence. Payment becomes collectible through the
-agreed settlement mechanism rather than a new discretionary promise from the
-buyer.
+These questions belong at the boundary between application planning and
+resource control. The planner decides what work to request and from whom. The
+kernel must preserve the owner's constraints when those decisions change.
+A fixed workflow can encode each relationship separately. An agentic operating
+system needs a reusable operation for forming and extending such relationships
+at runtime.
+Across organizations, that operation must also respect each receiver's own
+authority: a remote contract cannot grant itself access to local resources.
 
-This construction uses existing cryptography and settlement. It does not create
-scarcity from signatures or equate useful work with consensus proof of work.
-Bitcoin resolves competing spends through a shared history under explicit
-assumptions~\cite{bitcoin}. Here the settlement domain supplies that history;
-the harder application question is what evidence should make a particular work
-obligation payable, and how that event relates to local execution.
+Consider an owner allocating 100 units to a work tree. A holder assigns up to
+60 to a specialist branch and 40 to an independent sibling. The first branch
+can select among qualified providers before commitment. Once its selection is
+sealed, losing the response cannot justify spending the same allocation with
+a different provider. The sibling can still proceed from its separate share.
+Recovery follows the first branch's original identity. This is the implemented
+delegation problem; it does not require an LLM to be trusted to track the budget.
 
-Our result is a concrete composition with a narrow demonstration. We identify
-the commitments each boundary must preserve, state the safety argument, and
-make its failure cases executable. We also implement the obvious alternative:
-an ordinary database escrow with the same transition rules. Its matching result
-is part of the evaluation. The protocol's broader promise is that parties can
-implement one public contract and change partners without adopting a common
-application. That promise requires an independent interoperability and
-integration study; it does not follow from the safety argument.
+Chio expresses this boundary with a \emph{work slot}, authenticated subdivision,
+a signed provider offer and a sealed dispatch permit. The permit is portable:
+the receiver can check it without querying the owner's allocator. Exclusive
+allocation still requires protected state at that allocator. A receiver admits
+the exact invocation under its own capability, retains its execution identity,
+and checks the exact output before release. The resulting interface separates
+the freedom to choose collaborators from the authority to exceed an allocation.
+
+The economic layer adds a different requirement: a promised payment must be
+backed by funds or another explicitly qualified source of credit. A signed
+budget is insufficient. In our separately evaluated funded profile, a buyer
+reserves 100 and an intermediary separately reserves 60 for a specialist.
+The specialist's recorded earned claim survives a failed parent. The two
+profiles distinguish authority allocation from financial backing; an allocation
+certificate is never silently treated as escrow.
+
+The same distinction applies when a running swarm discovers additional work.
+A replacement graph must preserve earlier promises even if its planner has
+changed its mind or has lost a response. Chio extends its existing signed swarm
+graphs by retaining every issued allocation and continuation identity. An atomic
+head transition admits new tasks within the original envelope. Historical graph
+versions remain available for old requests, and the native kernel retains
+custody of every consumed continuation across versions. Bilateral treaties
+continue to govern local admission.
+
+The contribution is a concrete composition rule: \emph{editable plans with
+preserved commitments}. We give its conditional conservation argument, implement
+it using existing authority and recovery machinery, and exercise the boundary
+at native dispatch. Capability systems and secure linking provide substantial
+antecedents~\cite{miller,securelink}; ordinary transactional and agent-commerce
+constructions match the tested monetary outcomes. Bitcoin obtains a shared
+spend history under its consensus assumptions~\cite{bitcoin}; Chio relies on
+declared allocation and settlement authorities. The scientific hypothesis is
+that this common boundary can make independently operated work systems
+materially easier to compose. The implementation makes that hypothesis
+testable through integration cost and useful-work outcomes.

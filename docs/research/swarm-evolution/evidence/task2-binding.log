@@ -1,0 +1,34 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Finished `test` profile [unoptimized] target(s) in 0.85s
+     Running tests/runtime_admission.rs (/tmp/chio-paper-target/debug/deps/runtime_admission-ef7a4ea6b7db4c90)
+
+running 14 tests
+test swarm_binding::swarm_binding_denies_referenced_sibling_witness ... ok
+test swarm_binding::swarm_binding_denies_same_id_same_scope_reissued_capability ... ok
+test swarm_binding::live_admission::fanout_requires_no_future_join_or_terminal_receipt ... ok
+test swarm_binding::swarm_binding_join_root_requires_consistent_capability_on_every_outgoing_edge ... ok
+test swarm_binding::swarm_binding_checks_graph_scope_even_when_witness_digest_matches_request ... ok
+test swarm_binding::swarm_binding_resumable_revalidation_rejects_stripped_context_and_metadata ... ok
+test swarm_binding::swarm_binding_allows_leaf_of_multihop_witness_and_records_exact_binding ... ok
+test swarm_binding::live_admission::fanin_requires_the_exact_join_reference_before_consumption ... ok
+test swarm_binding::kernel::required_swarm_kernel_dispatches_verified_capability_and_signs_binding ... ok
+test swarm_binding::live_admission::supplied_malformed_join_reference_is_not_treated_as_absent ... ok
+test swarm_binding::kernel::required_swarm_kernel_denies_omission_or_capability_substitution_before_tool ... ok
+test swarm_binding::swarm_binding_revalidates_exact_capability_at_dispatch ... ok
+test swarm_binding::swarm_binding_denies_changed_subject_issuer_scope_and_signature ... ok
+test swarm_binding::swarm_binding_revalidation_pins_even_an_alternative_valid_witness ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 0.18s
+

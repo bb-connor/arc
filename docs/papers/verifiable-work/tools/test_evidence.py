@@ -2,6 +2,7 @@
 import importlib.util
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 
 if importlib.util.find_spec('check'):
@@ -12,6 +13,25 @@ else:
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_historical_source_is_verified_at_its_retained_revision(self):
+        self.assertTrue(hasattr(check, 'verify_revision_files'))
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            (root/'result').write_bytes(b'abc')
+            subprocess.run(['git', '-C', d, 'add', 'result'], check=True)
+            subprocess.run(['git', '-C', d, '-c', 'user.name=Evidence test',
+                            '-c', 'user.email=evidence@example.invalid', 'commit', '-qm', 'fixture'], check=True)
+            revision = subprocess.check_output(['git', '-C', d, 'rev-parse', 'HEAD'], text=True).strip()
+            hashes = {'result': 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'}
+            (root/'result').write_bytes(b'abd')
+            self.assertEqual(check.verify_revision_files(root, revision, hashes), [])
+            self.assertEqual(check.verify_files(root, hashes), ['hash mismatch: result'])
+            self.assertTrue(check.verify_revision_files(root, revision, {'result':'0'*64}))
+            self.assertTrue(check.verify_revision_files(root, revision, {'missing':'0'*64}))
+            self.assertTrue(check.verify_revision_files(root, '--all', hashes))
+            self.assertTrue(check.verify_revision_files(root, revision, {'../result':'0'*64}))
+
     def test_publication_cannot_drop_required_gates(self):
         self.assertTrue(hasattr(check, 'verify_publication'), 'publication validator missing')
         self.assertIn('missing publication gate: independent-operation',

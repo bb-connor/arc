@@ -35,11 +35,11 @@
 
 **Interfaces:** Produces `verify_swarm_authority_extension(previous: &SwarmAuthorityBundle, candidate: &SwarmAuthorityBundle, trusted_keys: &[PublicKey], now_unix_ms: u64) -> Result<SwarmAuthorityVerifierReport, SwarmAuthorityError>`.
 
-- [ ] Write tests using the existing signed sample fixture, reduced to one worker for the parent. Assert ordinary verification accepts both snapshots; extension accepts growth; reissued old nonce, reduced old allocation, changed expiry, changed epoch, no growth, unknown signer, and duplicate allocation/task attempts reject.
-- [ ] Run focused tests and retain their missing-function failure.
-- [ ] Implement the extension invariants by reusing live verification and comparing retained typed artifacts, with checked existing budget accounting.
-- [ ] Run `cargo test -p chio-swarm-authority` and focused Clippy. Expected: all pass.
-- [ ] Commit `feat: verify commitment-preserving swarm extensions`.
+- [x] Write tests using the existing signed sample fixture, reduced to one worker for the parent. Assert ordinary verification accepts both snapshots; extension accepts growth; reissued old nonce, reduced old allocation, changed expiry, changed epoch, no growth, unknown signer, and duplicate allocation/task attempts reject.
+- [x] Run focused tests and retain their missing-function failure.
+- [x] Implement the extension invariants by reusing live verification and comparing retained typed artifacts, with checked existing budget accounting.
+- [x] Run `cargo test -p chio-swarm-authority` and focused Clippy. Expected: all pass.
+- [x] Commit `feat: verify commitment-preserving swarm extensions`.
 
 ## Task 2: Install and resolve swarm versions atomically
 
@@ -47,12 +47,12 @@
 
 **Interfaces:** Consumes Task 1 verifier. Produces `extend_swarm_authority_bundle(&self, expected_bundle_sha256: &str, candidate: SwarmAuthorityBundle, trusted_keys: &[PublicKey]) -> Result<(), ChioRuntimeError>` and trait method `swarm_authority_bundle_for_graph(&self, task_graph_id: &str, graph_sha256: &str) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError>`.
 
-- [ ] Write tests for installation, exact parent/successor lookup after reopen, stale-head rejection, two-connection contention, failed-update rollback, unknown hash, and tampered archive rejection.
-- [ ] Run the focused test filter and retain the missing-method failure.
-- [ ] Add the archive table and immediate-transaction compare-and-swap installer; bind historical reads to index and full digest. Add compatible trait defaults and layered delegation.
-- [ ] Switch the existing admission resolver to the request's already bound graph digest.
-- [ ] Run focused store and swarm binding tests. Expected: all pass, original mismatch rejection unchanged.
-- [ ] Commit `feat: retain and atomically extend runtime swarm authority`.
+- [x] Write tests for installation, exact parent/successor lookup after reopen, stale-head rejection, two-connection contention, failed-update rollback, unknown hash, and tampered archive rejection.
+- [x] Run the focused test filter and retain the missing-method failure.
+- [x] Add the archive table and immediate-transaction compare-and-swap installer; bind historical reads to index and full digest. Add compatible trait defaults and layered delegation.
+- [x] Switch the existing admission resolver to the request's already bound graph digest.
+- [x] Run focused store and swarm binding tests. Expected: all pass, original mismatch rejection unchanged.
+- [x] Commit `feat: retain and atomically extend runtime swarm authority`.
 
 ## Task 3: Exercise native evolution and update the paper
 
@@ -60,14 +60,14 @@
 
 **Interfaces:** Consumes Tasks 1-2 through the actual runtime hook. Uses existing native authority/receipt stores and real test server invocation counters.
 
-- [ ] Add a native trajectory: admit original worker, install checked growth, run newly added worker, replay original exact receipt after reopen, reject new invocation under the used continuation, and execute an original unstarted worker with its historical artifacts after growth.
-- [ ] Add a combined treaty/swarm case preserving signed bilateral evidence and all physical claim resources through growth/reopen. Keep existing combined regression coverage.
-- [ ] Run targeted tests and inspect terminal output; fix boundary failures at their cause.
-- [ ] Run full changed-crate tests, focused Clippy, and format checks. Retain commands, terminal results, and source hashes in a compact evidence record.
-- [ ] Explain the additive composition argument, reuse map, native result, and remaining non-additive changes in the paper. Preserve earlier D1/F1 evidence and its exact historical source boundaries.
-- [ ] Build the PDF and run artifact checks. If prior evidence is source-pinned, keep that pin instead of relabeling it as current.
-- [ ] Request one fresh review of implementation, tests, and paper claims; resolve material findings, rerun affected checks, and record remaining limits.
-- [ ] Commit verified code and manuscript updates; retain this isolated branch for user review.
+- [x] Add a native trajectory: admit original worker, install checked growth, run newly added worker, replay original exact receipt after reopen, reject new invocation under the used continuation, and execute an original unstarted worker with its historical artifacts after growth.
+- [x] Add a combined treaty/swarm case preserving signed bilateral evidence and all physical claim resources through growth/reopen. Keep existing combined regression coverage.
+- [x] Run targeted tests and inspect terminal output; fix boundary failures at their cause.
+- [x] Run full changed-crate tests, focused Clippy, and format checks. Retain commands, terminal results, and source hashes in a compact evidence record.
+- [x] Explain the additive composition argument, reuse map, native result, and remaining non-additive changes in the paper. Preserve earlier D1/F1 evidence and its exact historical source boundaries.
+- [x] Build the PDF and run artifact checks. If prior evidence is source-pinned, keep that pin instead of relabeling it as current.
+- [x] Request one fresh review of implementation, tests, and paper claims; resolve material findings, rerun affected checks, and record remaining limits.
+- [x] Commit verified code and manuscript updates; retain this isolated branch for user review.
 
 ## Execution record
 
@@ -76,3 +76,9 @@ No repeated design approval is requested. The native implementation is a
 specific additive extension of the approved vision, with broader claims bounded
 by the spec. Existing dirty manuscript/provenance files predate this plan and
 belong to this same ongoing user task.
+
+Completion: implementation, fresh combined review, regression repair and all 11
+source-bound qualification commands complete. PDF and artifact checks pass.
+The isolated paper branch is retained as planned; independent operators,
+unified D1/S1/F1 execution and the requested breakthrough judgment remain open.
+See docs/research/swarm-evolution/REVIEW.md for exact scope and evidence.

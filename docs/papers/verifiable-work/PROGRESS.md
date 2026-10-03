@@ -1,5 +1,24 @@
 # Publication execution record
 
+2026-10-02 swarm evolution revision: the user reiterated execution through review
+and manuscript update, with explicit reuse of swarm authority, treaties and
+delegation. The new plan is
+`docs/superpowers/plans/2026-10-02-sovereign-swarm-evolution.md`. The pure extension
+verifier and atomic SQLite history installer are committed. Seven focused
+store/native cases pass. The manuscript now states the additive conservation
+argument alongside D1 and retained F1. Full changed-crate qualification and one
+fresh combined review are in progress. Initial build and fixture failures are
+retained; no new independent operator or scientific-breakthrough result is
+claimed.
+
+2026-10-02 dynamic delegation revision: the user explicitly authorized further
+design, implementation, review and manuscript edits. The active plan is now
+`docs/superpowers/plans/2026-10-02-dynamic-delegation.md`; its result and review
+live in `docs/research/dynamic-delegation/`. The records below preserve the
+earlier funded manuscript's completed work. They are not current qualification
+for the changed native source or the new paper argument. External publication
+and foundational-claim gates remain open.
+
 Plan: `docs/superpowers/plans/2026-10-02-verifiable-work-publication.md`.
 
 2026-10-02: isolated branch `paper/verifiable-work-20261002` starts at funded checkpoint `7755d3762b`. User authorized executing the approved direction continuously. Current security worktree is dirty; only committed `491f585e90` is eligible for this integration. The dry merge has 21 conflict paths. Dedicated integration runs at `/tmp/chio-paper-security-integration`.
@@ -33,3 +52,20 @@ Final Ruling: close both reviewer Minor documentation findings now, honoring the
 Final Ruling: the inherited security audit, full/hosted release qualification, off-host/finality/hostile-administration evidence, external economics and exhaustive novelty remain outside the achieved local boundary. Each remains explicitly unqualified in REVIEW.md and the research gates; the cost of retaining this boundary is that the requested breakthrough/publication judgment remains no.
 
 Task 4: local manuscript/artifact/trial-package work complete after the final check. Both review findings fixed; no deferred minor findings. All four implementation-plan tasks have concrete deliverables. Original external research gates are still open and are not marked completed by those task checkboxes. Branch remains local and reviewable, without public release, shared-branch integration or partner contact.
+
+2026-10-02 final D1/S1 qualification: all 11 commands exited zero against
+36,549 recorded source inputs and 23 hashed outputs. Rust labels: 54 workflow
+(1 pre-existing ignored doctest), 9 native delegation, 5 existing native
+regression, 453 swarm/runtime; 12 artifact tests pass. Three strict Clippy
+commands, two format commands and the runnable example pass. Fresh automated
+review found one Important namespace flaw; both cross-owner regressions failed
+before the fix and pass afterward. An additional configured-clock regression
+failed before the guard adopted the existing kernel clock, and now passes.
+The exact review, declined scopes and repair evidence are retained.
+
+Final ruling: follow the approved plan by retaining the isolated paper branch,
+without reopening an integration-choice prompt. No main-branch merge, external
+publication, operator trial or production release is inferred. Rebuilt PDF and
+artifact checks pass; the breakthrough and independent research gates remain
+false/open. The next concrete integration is recorded in
+docs/research/swarm-evolution/NEXT.md.

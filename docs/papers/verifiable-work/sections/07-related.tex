@@ -1,11 +1,30 @@
 \section{Relation to existing mechanisms}
+Miller's robust composition addresses cooperation among potentially malicious
+distributed components using object capabilities~\cite{miller}. Secure Linking
+uses certified properties and proof-carrying authentication to govern component
+linking~\cite{securelink}. Multiparty session types derive local checks from
+global interaction types and establish communication properties within their
+calculus~\cite{sessiontypes}. These works precede the general ambition of
+composing independently controlled components. S1 contributes a concrete
+extension rule for Chio's existing signed authority and native continuation
+custody. It does not introduce secure composition in general or establish the
+session-type progress guarantees for arbitrary agent programs.
+
 Contract Net already organizes distributed work through announcements, bids
 and awards~\cite{contractnet}. Agent Contracts unifies task specifications,
 resource constraints and success conditions, including delegated budget
 conservation~\cite{agentcontracts}. Chio does not introduce contracting or
-hierarchical budget discipline. Our focus is the boundary between a remote
-operator's local budget and an obligation backed by a settlement authority the
-operator cannot rewrite.
+hierarchical budget discipline. D1 connects such bounds to a sealed, portable
+selection and an exact native invocation; F1 connects accepted work to an
+obligation backed by a declared settlement authority.
+
+Proof-carrying code makes supplied evidence checkable against a consumer's
+safety policy~\cite{pcc}. Interface Automata models component assumptions,
+guarantees, compatibility and refinement~\cite{interfaceautomata}. These are
+important antecedents to locally checked composition. D1's permit carries
+authenticated allocation evidence, not a proof of arbitrary program behavior.
+Its subset rules do not establish semantic refinement between parent and child
+tasks. A successful predicate check certifies only that predicate.
 
 AgentBound places deterministic governance before execution and binds decisions
 to verifiable receipts~\cite{agentbound}. That overlaps substantially with local

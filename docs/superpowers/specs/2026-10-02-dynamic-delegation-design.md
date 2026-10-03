@@ -187,3 +187,16 @@ also belong to the explicit reader set. New enrollment/disclosure authority is
 not inferred from discovery. Dynamic selection in the example uses a previously
 qualified pool; policy-class enrollment and arbitrary information-flow tracking
 remain separate integration work.
+
+## Review corrections, 2026-10-02
+
+Fresh review reproduced holder consent crossing two honest allocator namespaces
+with equal local slot names. Signed v2 subdivisions now bind the parent
+allocation digest. Offers bind the selected allocation, selection signs the
+entire offer, and sealed permits repeat the binding. The digest commits a
+persistent protected allocator namespace plus the complete immutable root and
+slot. Issued stores missing their namespace reject; no silent v1 migration is
+provided. A separate native regression demonstrated expired work being admitted
+under a mismatched wall clock. The installed guard now uses the kernel
+authority clock and its existing fence. See the combined review and retained
+red/green evidence in docs/research/swarm-evolution/REVIEW.md.

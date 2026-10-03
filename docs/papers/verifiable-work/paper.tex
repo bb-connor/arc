@@ -27,21 +27,26 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-An agent buying work from another organization needs more than a message channel
-and permission to pay. The provider needs a funded obligation; the buyer needs
-an agreed way to check the result; each organization needs to retain authority
-over its own resources. We describe a work contract joining these three
-conditions without a shared application operator. Each receiver authorizes
-execution locally. Signed evidence binds the agreed input, acceptance procedure,
-execution record and funding allocation. A separately funded subcontract can
-become payable even when its parent fails. We give a conditional composition
-argument, a reference implementation and a reproducible finite-state and
-contract-bytecode evaluation. An ordinary transactional escrow matches the
-monetary behavior on the same trace corpus: the contribution is the explicit
-composition and its implementation, not a new escrow primitive. The implemented
-profile trusts a selected verifier and settlement domain. It establishes a
-bounded basis for exchanging checked work; independent operation, lower
-integration cost and useful autonomous trade remain empirical questions.
+An agentic web needs programs that recruit collaborators and grow across
+administrative boundaries while each owner retains control over its resources.
+We present Chio, a kernel interface for composing work through local
+authorization and durable commitments. Its organizing rule is that plans may
+evolve while issued commitments retain their authority bounds and execution
+identity. Delegated work contracts subdivide an owner's allocation, select
+signed offers and seal the exact receiver, input and invocation into portable
+evidence. For running swarms, signed graphs grow by retaining earlier tasks,
+allocations and continuation identities. Each receiver applies its own
+capabilities and treaty conditions before dispatch. Under protected allocation
+and receiver custody, the composition conserves declared capacity across graph
+versions and prevents graph growth from refreshing a consumed invocation.
+A Rust implementation demonstrates recursive delegation, collaborator
+replacement before commitment, live swarm extension, checked output and
+recovery after a process kill. Native tests preserve unfinished work and
+original receipts across extension and restart. A separately evaluated funded
+profile preserves recorded child payment claims through parent failure.
+These results establish a concrete execution boundary for evolving work
+relationships: local authority governs admission, and durable commitments
+govern what survives a change of plan.
 \end{abstract}
 \input{sections/01-problem}
 \input{sections/02-model}
