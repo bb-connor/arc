@@ -48,8 +48,7 @@ fn decode_hashed<T: DeserializeOwned + serde::Serialize>(
     raw: &str,
     expected: &str,
 ) -> Result<T, ChioRuntimeError> {
-    let value =
-        serde_json::from_str(raw).map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+    let value = serde_json::from_str(raw).map_err(ChioRuntimeError::Json)?;
     if canonical_sha256(&value)? != expected {
         return rejected(
             "outcome_store_hash_mismatch",
@@ -133,8 +132,7 @@ impl SqliteRuntimeOrchestrationStore {
         rule.validate()?;
         let slot_sha256 = rule.slot.sha256()?;
         let rule_sha256 = canonical_sha256(rule)?;
-        let raw = serde_json::to_string(rule)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw = serde_json::to_string(rule).map_err(ChioRuntimeError::Json)?;
         let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -216,8 +214,7 @@ impl SqliteRuntimeOrchestrationStore {
             claimed_at_unix_ms: now_unix_ms,
         };
         let claim_sha256 = canonical_sha256(&claim)?;
-        let raw = serde_json::to_string(&claim)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw = serde_json::to_string(&claim).map_err(ChioRuntimeError::Json)?;
         let updated = tx.execute(
             "UPDATE runtime_outcome_effect_slots SET claim_sha256 = ?2, claim_json = ?3 WHERE slot_sha256 = ?1 AND claim_sha256 IS NULL AND revoked = 0",
             params![slot_sha256, claim_sha256, raw],
@@ -245,8 +242,7 @@ impl SqliteRuntimeOrchestrationStore {
         result: &serde_json::Value,
     ) -> Result<(), ChioRuntimeError> {
         let result_sha256 = canonical_sha256(result)?;
-        let raw = serde_json::to_string(result)
-            .map_err(|error| ChioRuntimeError::Json(error.to_string()))?;
+        let raw = serde_json::to_string(result).map_err(ChioRuntimeError::Json)?;
         let connection = self.lock_connection()?;
         let updated = connection.execute(
             "UPDATE runtime_outcome_effect_slots SET result_sha256 = ?3, result_json = ?4 WHERE slot_sha256 = ?1 AND claim_sha256 = ?2 AND result_sha256 IS NULL",

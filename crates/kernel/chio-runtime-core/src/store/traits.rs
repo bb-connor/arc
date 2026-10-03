@@ -84,6 +84,17 @@ pub trait RuntimeAdmissionStore: Send + Sync {
         Ok(None)
     }
 
+    /// Resolve the exact signed graph version for an issued request. Backends
+    /// without version history retain their existing behavior; the admission
+    /// verifier still checks the requested graph hash before using any result.
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        _graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.swarm_authority_bundle(task_graph_id)
+    }
+
     fn consume_destructive_lease(
         &self,
         lease_id: &str,
@@ -191,8 +202,7 @@ where
                     "receiver presentation record identity or content hash does not match",
                 );
             }
-            serde_json::from_value(record.raw_json)
-                .map_err(|error| ChioRuntimeError::Json(error.to_string()))
+            serde_json::from_value(record.raw_json).map_err(ChioRuntimeError::Json)
         })
         .transpose()
 }
@@ -306,6 +316,15 @@ impl RuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
         task_graph_id: &str,
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         self.admission_store.swarm_authority_bundle(task_graph_id)
+    }
+
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.admission_store
+            .swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
     }
 
     fn consume_destructive_lease(

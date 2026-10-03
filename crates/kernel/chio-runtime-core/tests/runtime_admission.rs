@@ -69,6 +69,9 @@ use swarm_request_support::{chio_swarm_runtime_request, swarm_runtime_context};
 #[path = "runtime_admission/swarm_binding.rs"]
 mod swarm_binding;
 
+#[path = "runtime_admission/swarm_evolution.rs"]
+mod swarm_evolution;
+
 #[path = "runtime_admission/swarm_fixtures.rs"]
 mod swarm_fixtures;
 use swarm_fixtures::{
