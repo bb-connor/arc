@@ -55,5 +55,5 @@ verification policy. Generated producers retain their existing in-memory signer.
   changed reader/clock/file-hygiene gates. Preserve failed/interrupted evidence.
 - [x] One independent integrated review, severity regrade, one regression-first
   Important/Critical fix pass and affected-owner rerun.
-- [ ] Update operator/roadmap records, archive rulings/evidence, commit/push and
+- [x] Update operator/roadmap records, archive rulings/evidence, commit/push and
   verify origin SHA. Propose the next certificate or retention/denial batch.

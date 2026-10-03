@@ -1,0 +1,9 @@
+{
+  "source_commit": "67b20708a7691a69a26340baee4f189b75993801",
+  "branch": "packet/3-retention-accounting",
+  "remote_ref": "refs/heads/packet/3-retention-accounting",
+  "observed_remote_sha": "67b20708a7691a69a26340baee4f189b75993801",
+  "observed_at_utc": "2026-10-03T22:18:06.425914+00:00",
+  "qualified_source_manifest_sha256": "b987f94aa96872655bcd8de8f7cf2911fe8093f28595ca2686c21223ba9fe2ad",
+  "scope": "local Linux source qualification; no hosted, merge, release or operational acceptance claim"
+}

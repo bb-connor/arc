@@ -1,8 +1,11 @@
 # Authenticated evidence package execution, October 3, 2026
 
-Candidate based on `0a455ac2c0fb9641b96d36bb2289bcd8047c325b` in the isolated
-`packet/3-retention-accounting` worktree. Publication metadata follows terminal
-qualification. This record owns EV6 package authenticity and trusted signer
+Qualified source `67b20708a7691a69a26340baee4f189b75993801` is committed and pushed on
+`packet/3-retention-accounting`, based on
+`0a455ac2c0fb9641b96d36bb2289bcd8047c325b`. The remote ref matched that exact
+source commit after publication. The [publication record](artifacts/2026-10-03-evidence-package-trust/source-publication.json)
+retains the observation and qualified source-manifest hash. This documentation-only
+follow-up records publication without changing the qualified source. This record owns EV6 package authenticity and trusted signer
 inputs, EV7 external anchor acceptance for Chio evidence packages, EV12 strict
 receipt/checkpoint signatures and EV13 receipt/checkpoint signer binding.
 The certificate portion of EV6 and the distinct Mercury proof-package trust

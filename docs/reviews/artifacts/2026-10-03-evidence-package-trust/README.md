@@ -18,6 +18,8 @@ CLI binaries. `review-source-hashes.json` and `review-candidate.diff.gz` retain 
 reviewed candidate. `final-source-files.json` pins the final changed source and
 configuration; fixture/gate changes after review are described in `progress.md`.
 The independent review retains its original verdict and all declined boundaries.
+[source-publication.json](source-publication.json) records the exact source commit,
+observed origin SHA and qualified source-manifest hash.
 This is local Linux qualification, not full-workspace runtime, hosted CI, merge,
 release or operational acceptance.
 
