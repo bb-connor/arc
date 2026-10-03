@@ -46,6 +46,7 @@ fn child(store: &DelegationStore, id: &str, units: u64) -> Result {
         &Signed::sign(
             Subdivision {
                 parent_id: "root".into(),
+                parent_allocation_hash: store.allocation_digest("root")?,
                 child: slot(id, 2, units, 2),
             },
             &key(1),
@@ -54,12 +55,18 @@ fn child(store: &DelegationStore, id: &str, units: u64) -> Result {
     )?;
     Ok(())
 }
-fn selection(id: &str, receiver: u8, revision: u64) -> Result<Signed<Selection>> {
+fn selection(
+    store: &DelegationStore,
+    id: &str,
+    receiver: u8,
+    revision: u64,
+) -> Result<Signed<Selection>> {
     Ok(Signed::sign(
         Selection {
             offer: Signed::sign(
                 WorkOffer {
                     slot_id: id.into(),
+                    allocation_hash: store.allocation_digest(id)?,
                     contract_hash: binding_digest(&slot(id, 2, 60, 2))?,
                     receiver: key(receiver).public_key(),
                     effect: Effect {
@@ -105,6 +112,7 @@ fn nested_holders_allocate_without_copying_parent_capacity() -> Result {
         &Signed::sign(
             Subdivision {
                 parent_id: "research".into(),
+                parent_allocation_hash: store.allocation_digest("research")?,
                 child: slot("specialist", 3, 45, 1),
             },
             &key(2),
@@ -118,6 +126,7 @@ fn nested_holders_allocate_without_copying_parent_capacity() -> Result {
             &Signed::sign(
                 Subdivision {
                     parent_id: "research".into(),
+                    parent_allocation_hash: store.allocation_digest("research")?,
                     child: slot("nested-excess", 3, 16, 1),
                 },
                 &key(2)
@@ -159,6 +168,7 @@ fn mutation_requires_current_holder_and_untampered_signature() -> Result {
     let (_dir, store) = setup()?;
     let body = Subdivision {
         parent_id: "root".into(),
+        parent_allocation_hash: store.allocation_digest("root")?,
         child: slot("child", 2, 30, 2),
     };
     assert!(matches!(
@@ -198,6 +208,7 @@ fn subdivision_preserves_effect_readers_expiry_and_depth() -> Result {
                 &Signed::sign(
                     Subdivision {
                         parent_id: "root".into(),
+                        parent_allocation_hash: store.allocation_digest("root")?,
                         child
                     },
                     &key(1)
@@ -222,6 +233,7 @@ fn replay_cannot_change_a_child_or_move_it_to_another_parent() -> Result {
             &Signed::sign(
                 Subdivision {
                     parent_id: "other".into(),
+                    parent_allocation_hash: store.allocation_digest("other")?,
                     child: slot("child", 2, 30, 1),
                 },
                 &key(2)
@@ -237,16 +249,16 @@ fn provider_replacement_stops_at_dispatch_and_survives_reopen() -> Result {
     let (dir, store) = setup()?;
     child(&store, "leaf", 60)?;
     let qualified = [key(3).public_key(), key(4).public_key()];
-    store.select(&selection("leaf", 3, 0)?, 1000, &qualified)?;
-    store.select(&selection("leaf", 4, 1)?, 1000, &qualified)?;
+    store.select(&selection(&store, "leaf", 3, 0)?, 1000, &qualified)?;
+    store.select(&selection(&store, "leaf", 4, 1)?, 1000, &qualified)?;
     assert!(store
-        .select(&selection("leaf", 3, 0)?, 1000, &qualified)
+        .select(&selection(&store, "leaf", 3, 0)?, 1000, &qualified)
         .is_err());
     assert!(store.claim_dispatch(&binding("leaf", 3), 1000).is_err());
     let accepted = store.claim_dispatch(&binding("leaf", 4), 1000)?;
     assert_eq!(accepted.slot.contract.max_units, 60);
     assert!(store
-        .select(&selection("leaf", 3, 2)?, 1000, &qualified)
+        .select(&selection(&store, "leaf", 3, 2)?, 1000, &qualified)
         .is_err());
     let reopened = DelegationStore::open(dir.path().join("allocation.db"))?;
     reopened.claim_dispatch(&binding("leaf", 4), 1001)?;
@@ -262,7 +274,7 @@ fn selection_and_dispatch_cannot_race_into_different_providers() -> Result {
     let (dir, store) = setup()?;
     child(&store, "leaf", 60)?;
     let qualified = [key(3).public_key(), key(4).public_key()];
-    store.select(&selection("leaf", 3, 0)?, 1000, &qualified)?;
+    store.select(&selection(&store, "leaf", 3, 0)?, 1000, &qualified)?;
     let other = DelegationStore::open(dir.path().join("allocation.db"))?;
     let barrier = Arc::new(std::sync::Barrier::new(2));
     let b = barrier.clone();
@@ -273,7 +285,7 @@ fn selection_and_dispatch_cannot_race_into_different_providers() -> Result {
     });
     barrier.wait();
     let changed = other
-        .select(&selection("leaf", 4, 1)?, 1000, &qualified)
+        .select(&selection(&store, "leaf", 4, 1)?, 1000, &qualified)
         .is_ok();
     assert_ne!(
         changed,
@@ -286,8 +298,10 @@ fn selection_and_dispatch_cannot_race_into_different_providers() -> Result {
 fn neither_containers_nor_unqualified_receivers_can_execute() -> Result {
     let (_dir, store) = setup()?;
     child(&store, "leaf", 60)?;
-    assert!(store.select(&selection("leaf", 3, 0)?, 1000, &[]).is_err());
-    let mut s = selection("leaf", 3, 0)?.body;
+    assert!(store
+        .select(&selection(&store, "leaf", 3, 0)?, 1000, &[])
+        .is_err());
+    let mut s = selection(&store, "leaf", 3, 0)?.body;
     s.offer = Signed::sign(
         WorkOffer {
             slot_id: "root".into(),
@@ -298,12 +312,17 @@ fn neither_containers_nor_unqualified_receivers_can_execute() -> Result {
     assert!(store
         .select(&Signed::sign(s, &key(1))?, 1000, &[key(3).public_key()])
         .is_err());
-    store.select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])?;
+    store.select(
+        &selection(&store, "leaf", 3, 0)?,
+        1000,
+        &[key(3).public_key()],
+    )?;
     assert!(store
         .subdivide(
             &Signed::sign(
                 Subdivision {
                     parent_id: "leaf".into(),
+                    parent_allocation_hash: store.allocation_digest("leaf")?,
                     child: slot("late", 2, 1, 1),
                 },
                 &key(2)
@@ -318,7 +337,11 @@ fn neither_containers_nor_unqualified_receivers_can_execute() -> Result {
 fn dispatch_checks_subject_currency_ceiling_capability_and_arguments() -> Result {
     let (_dir, store) = setup()?;
     child(&store, "leaf", 60)?;
-    store.select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])?;
+    store.select(
+        &selection(&store, "leaf", 3, 0)?,
+        1000,
+        &[key(3).public_key()],
+    )?;
     for mutation in 0..5 {
         let mut b = binding("leaf", 3);
         match mutation {
@@ -340,6 +363,7 @@ fn expiry_and_noncanonical_numeric_envelopes_reject() -> Result {
     let request = Signed::sign(
         Subdivision {
             parent_id: "root".into(),
+            parent_allocation_hash: store.allocation_digest("root")?,
             child: slot("expired", 2, 1, 2),
         },
         &key(1),
@@ -350,7 +374,11 @@ fn expiry_and_noncanonical_numeric_envelopes_reject() -> Result {
     ));
     assert!(store.create_root(slot("overflow", 1, u64::MAX, 1)).is_err());
     child(&store, "leaf", 60)?;
-    store.select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])?;
+    store.select(
+        &selection(&store, "leaf", 3, 0)?,
+        1000,
+        &[key(3).public_key()],
+    )?;
     assert!(matches!(
         store.claim_dispatch(&binding("leaf", 3), 1900),
         Err(DelegationError::Expired)
@@ -399,12 +427,20 @@ fn predicates_validate_and_check_the_actual_json_result() -> Result {
 fn sealed_allocation_is_portable_and_cannot_be_reassigned() -> Result {
     let (dir, store) = setup()?;
     child(&store, "leaf", 60)?;
-    store.select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])?;
+    store.select(
+        &selection(&store, "leaf", 3, 0)?,
+        1000,
+        &[key(3).public_key()],
+    )?;
     let b = binding("leaf", 3);
     let permit = store.seal_dispatch(&b, 1000, &key(1))?;
     assert_eq!(permit, store.seal_dispatch(&b, 1001, &key(1))?);
     assert!(store
-        .select(&selection("leaf", 4, 1)?, 1001, &[key(4).public_key()])
+        .select(
+            &selection(&store, "leaf", 4, 1)?,
+            1001,
+            &[key(4).public_key()]
+        )
         .is_err());
     drop(store);
     drop(dir);
@@ -434,7 +470,98 @@ fn provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_i
     };
     store.create_root(substituted)?;
     assert!(store
-        .select(&selection("leaf", 3, 0)?, 1000, &[key(3).public_key()])
+        .select(
+            &selection(&store, "leaf", 3, 0)?,
+            1000,
+            &[key(3).public_key()]
+        )
         .is_err());
+    Ok(())
+}
+
+#[test]
+fn signed_subdivision_cannot_cross_allocator_or_root_namespaces() -> Result {
+    for same_root_name in [false, true] {
+        let dir = tempfile::tempdir()?;
+        let a = DelegationStore::open(dir.path().join("a.db"))?;
+        let b = DelegationStore::open(dir.path().join("b.db"))?;
+        let second_root = if same_root_name { "root-a" } else { "root-b" };
+        for (store, root) in [(&a, "root-a"), (&b, second_root)] {
+            store.create_root(slot(root, 1, 100, 3))?;
+            store.subdivide(
+                &Signed::sign(
+                    Subdivision {
+                        parent_id: root.into(),
+                        parent_allocation_hash: store.allocation_digest(root)?,
+                        child: slot("shared-parent", 2, 60, 2),
+                    },
+                    &key(1),
+                )?,
+                1000,
+            )?;
+        }
+        let request = Signed::sign(
+            Subdivision {
+                parent_id: "shared-parent".into(),
+                parent_allocation_hash: a.allocation_digest("shared-parent")?,
+                child: slot("worker", 3, 30, 1),
+            },
+            &key(2),
+        )?;
+        a.subdivide(&request, 1000)?;
+        assert!(
+            b.subdivide(&request, 1000).is_err(),
+            "foreign signed mutation must reject"
+        );
+        assert!(b.slot("worker").is_err());
+    }
+    Ok(())
+}
+
+#[test]
+fn signed_selection_cannot_cross_allocator_namespaces() -> Result {
+    let (_a_dir, a) = setup()?;
+    let (_b_dir, b) = setup()?;
+    child(&a, "leaf", 60)?;
+    child(&b, "leaf", 60)?;
+    let request = selection(&a, "leaf", 3, 0)?;
+    a.select(&request, 1000, &[key(3).public_key()])?;
+    assert!(b.select(&request, 1000, &[key(3).public_key()]).is_err());
+    assert!(b.claim_dispatch(&binding("leaf", 3), 1000).is_err());
+    Ok(())
+}
+
+#[test]
+fn allocator_namespace_survives_reopen_and_is_not_silently_recreated() -> Result {
+    let (dir, store) = setup()?;
+    child(&store, "leaf", 60)?;
+    let digest = store.allocation_digest("leaf")?;
+    let selected = selection(&store, "leaf", 3, 0)?;
+    drop(store);
+    let path = dir.path().join("allocation.db");
+    let reopened = DelegationStore::open(&path)?;
+    assert_eq!(reopened.allocation_digest("leaf")?, digest);
+    reopened.select(&selected, 1000, &[key(3).public_key()])?;
+    let permit = reopened.seal_dispatch(&binding("leaf", 3), 1000, &key(1))?;
+    let mut transplanted = permit.body.clone();
+    transplanted.allocation_hash = chio_core::crypto::sha256_hex(b"another-allocation");
+    assert!(verify_dispatch_permit(
+        &Signed::sign(transplanted, &key(1))?,
+        &binding("leaf", 3),
+        1001,
+        &[key(1).public_key()],
+    )
+    .is_err());
+    drop(reopened);
+    let db = rusqlite::Connection::open(&path)?;
+    db.execute("DELETE FROM work_allocator_identity_v1", [])?;
+    assert!(DelegationStore::open(&path).is_err());
+    let count: i64 = db.query_row("SELECT count(*) FROM work_allocator_identity_v1", [], |r| {
+        r.get(0)
+    })?;
+    assert_eq!(
+        count, 0,
+        "opening an issued store must not invent a replacement namespace"
+    );
     Ok(())
 }

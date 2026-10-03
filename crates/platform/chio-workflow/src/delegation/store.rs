@@ -26,7 +26,7 @@ struct Row {
 
 impl DelegationStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let connection = Connection::open(path)?;
+        let mut connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.execute_batch(
             "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
@@ -40,8 +40,38 @@ impl DelegationStore {
             CREATE INDEX IF NOT EXISTS work_slots_root_v1 ON work_slots_v1(root);
             CREATE TABLE IF NOT EXISTS work_dispatch_permits_v1 (
                 slot_id TEXT PRIMARY KEY REFERENCES work_slots_v1(id), body TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS work_allocator_identity_v1 (
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1), domain TEXT NOT NULL
             );",
         )?;
+        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let domain: Option<String> = tx
+            .query_row(
+                "SELECT domain FROM work_allocator_identity_v1 WHERE singleton=1",
+                [],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(domain) = domain {
+            hash(&domain)?;
+        } else {
+            let count: i64 =
+                tx.query_row("SELECT count(*) FROM work_slots_v1", [], |r| r.get(0))?;
+            if count != 0 {
+                return invalid(
+                    "existing allocation store has no namespace; explicit migration required",
+                );
+            }
+            // A random public identifier, not a signing authority. Its protected
+            // persistence prevents equal local names from sharing signed consent.
+            let domain = Keypair::generate().public_key().to_hex();
+            tx.execute(
+                "INSERT INTO work_allocator_identity_v1(singleton,domain) VALUES(1,?1)",
+                [&domain],
+            )?;
+        }
+        tx.commit()?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -72,12 +102,22 @@ impl DelegationStore {
         Ok(required(&connection, id)?.slot)
     }
 
+    /// Bind a mutation or offer to this allocator and the exact root and slot.
+    /// The digest remains stable across connections and process restarts.
+    pub fn allocation_digest(&self, id: &str) -> Result<String> {
+        let connection = self.connection()?;
+        allocation_digest(&connection, &required(&connection, id)?)
+    }
+
     pub fn subdivide(&self, request: &Signed<Subdivision>, now: u64) -> Result<WorkSlot> {
         request.verify()?;
         request.body.child.validate()?;
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let parent = required(&tx, &request.body.parent_id)?;
+        if request.body.parent_allocation_hash != allocation_digest(&tx, &parent)? {
+            return Err(Error::Conflict);
+        }
         if request.signer != parent.slot.holder {
             return Err(Error::Authority);
         }
@@ -149,7 +189,9 @@ impl DelegationStore {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = required(&tx, &offer.slot_id)?;
-        if offer.contract_hash != binding_digest(&row.slot)? {
+        if offer.contract_hash != binding_digest(&row.slot)?
+            || offer.allocation_hash != allocation_digest(&tx, &row)?
+        {
             return Err(Error::Conflict);
         }
         if request.signer != row.slot.holder
@@ -204,7 +246,11 @@ impl DelegationStore {
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let row = required(&tx, &binding.slot_id)?;
+        let allocation_hash = allocation_digest(&tx, &row)?;
         let selection = row.selection.ok_or(Error::Conflict)?;
+        if selection.body.offer.body.allocation_hash != allocation_hash {
+            return Err(Error::Conflict);
+        }
         validate_dispatch(&row.slot, &selection, binding, now)?;
         tx.execute(
             "UPDATE work_slots_v1 SET dispatched=1 WHERE id=?1",
@@ -245,6 +291,7 @@ impl DelegationStore {
             let row = required(&tx, &binding.slot_id)?;
             let permit = Signed::sign(
                 DispatchPermit {
+                    allocation_hash: allocation_digest(&tx, &row)?,
                     root_id: row.root,
                     slot: admission.slot,
                     selection: admission.selection,
@@ -258,6 +305,10 @@ impl DelegationStore {
             )?;
             permit
         };
+        if permit.body.allocation_hash != allocation_digest(&tx, &required(&tx, &binding.slot_id)?)?
+        {
+            return Err(Error::Conflict);
+        }
         verify_dispatch_permit(&permit, binding, now, &[issuer.public_key()])?;
         tx.commit()?;
         Ok(permit)
@@ -315,4 +366,18 @@ fn read(connection: &Connection, id: &str) -> Result<Option<Row>> {
 }
 fn required(connection: &Connection, id: &str) -> Result<Row> {
     read(connection, id)?.ok_or_else(|| Error::Invalid("unknown work slot".into()))
+}
+
+fn allocation_digest(connection: &Connection, row: &Row) -> Result<String> {
+    let domain: String = connection.query_row(
+        "SELECT domain FROM work_allocator_identity_v1 WHERE singleton=1",
+        [],
+        |r| r.get(0),
+    )?;
+    hash(&domain)?;
+    let root = required(connection, &row.root)?;
+    if root.parent.is_some() || root.root != root.slot.id {
+        return invalid("stored allocation root");
+    }
+    binding_digest(&("chio.work-allocation.v2", domain, root.slot, &row.slot))
 }

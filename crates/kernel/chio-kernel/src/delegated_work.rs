@@ -14,7 +14,7 @@ use chio_workflow::delegation::{
 };
 use serde::Deserialize;
 use serde_json::Value;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 /// Install a fail-closed work profile. An ephemeral kernel cannot safely replay
 /// a durable allocation claim, so it is rejected at configuration time.
@@ -31,6 +31,7 @@ pub fn install_delegated_work(
     kernel.add_guard(Box::new(DelegatedWorkGuard {
         accepted_allocators,
         receiver: kernel.public_key(),
+        clock: kernel.authority_clock(),
     }));
     Ok(())
 }
@@ -38,6 +39,7 @@ pub fn install_delegated_work(
 struct DelegatedWorkGuard {
     accepted_allocators: Vec<PublicKey>,
     receiver: PublicKey,
+    clock: Arc<dyn crate::Clock>,
 }
 
 #[derive(Deserialize)]
@@ -78,10 +80,7 @@ impl DelegatedWorkGuard {
         if per_call.currency != total.currency {
             return Err(denied("currency mismatch"));
         }
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(denied)?
-            .as_secs();
+        let now = self.clock.unix_millis().map_err(denied)?.get() / 1000;
         verify_dispatch_permit(
             &args.allocation,
             &DispatchBinding {
@@ -107,7 +106,7 @@ impl DelegatedWorkGuard {
 
 impl Guard for DelegatedWorkGuard {
     fn name(&self) -> &str {
-        "dynamic-work-delegation-v1"
+        "dynamic-work-delegation-v2"
     }
     fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         self.admit(ctx)?;

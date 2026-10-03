@@ -159,15 +159,18 @@ impl WorkSlot {
 #[serde(deny_unknown_fields)]
 pub struct Subdivision {
     pub parent_id: String,
+    /// Commits the allocator namespace and complete immutable root/parent slots.
+    pub parent_allocation_hash: String,
     pub child: WorkSlot,
 }
 
-/// Receiver-signed v1 offer with accepted-output pricing: a result rejected by
+/// Receiver-signed v2 offer with accepted-output pricing: a result rejected by
 /// the bound predicate earns zero charge in the qualified native payment profile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkOffer {
     pub slot_id: String,
+    pub allocation_hash: String,
     /// Includes holder, bounds and acceptance terms, not just a reusable name.
     pub contract_hash: String,
     pub receiver: PublicKey,
@@ -193,13 +196,13 @@ mod sealed {
     }
 }
 impl sealed::Body for Subdivision {
-    const DOMAIN: &'static str = "chio.work-subdivision.v1";
+    const DOMAIN: &'static str = "chio.work-subdivision.v2";
 }
 impl sealed::Body for WorkOffer {
-    const DOMAIN: &'static str = "chio.work-offer.v1";
+    const DOMAIN: &'static str = "chio.work-offer.v2";
 }
 impl sealed::Body for Selection {
-    const DOMAIN: &'static str = "chio.work-selection.v1";
+    const DOMAIN: &'static str = "chio.work-selection.v2";
 }
 
 /// Portable evidence from an explicitly trusted resource allocator. It does
@@ -208,12 +211,13 @@ impl sealed::Body for Selection {
 #[serde(deny_unknown_fields)]
 pub struct DispatchPermit {
     pub root_id: String,
+    pub allocation_hash: String,
     pub slot: WorkSlot,
     pub selection: Signed<Selection>,
     pub issued_at: u64,
 }
 impl sealed::Body for DispatchPermit {
-    const DOMAIN: &'static str = "chio.work-dispatch-permit.v1";
+    const DOMAIN: &'static str = "chio.work-dispatch-permit.v2";
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -289,6 +293,10 @@ pub fn verify_dispatch_permit(
     selection.verify()?;
     selection.body.offer.verify()?;
     let offer = &selection.body.offer.body;
+    hash(&body.allocation_hash)?;
+    if offer.allocation_hash != body.allocation_hash {
+        return Err(Error::Conflict);
+    }
     if selection.signer != body.slot.holder
         || selection.body.offer.signer != offer.receiver
         || !body

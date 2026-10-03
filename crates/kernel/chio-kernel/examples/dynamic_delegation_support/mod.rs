@@ -59,6 +59,7 @@ pub fn split(store: &DelegationStore, parent: &str, holder: u8, mut child: WorkS
         &Signed::sign(
             Subdivision {
                 parent_id: parent.into(),
+                parent_allocation_hash: store.allocation_digest(parent)?,
                 child,
             },
             &key(holder),
@@ -93,6 +94,14 @@ impl ToolServerConnection for Tool {
     }
 }
 pub fn open(root: &Path, receiver: u8, bad: bool) -> Result<(ChioKernel, Arc<AtomicUsize>)> {
+    open_with_clock(root, receiver, bad, None)
+}
+pub fn open_with_clock(
+    root: &Path,
+    receiver: u8,
+    bad: bool,
+    clock: Option<Arc<dyn Clock>>,
+) -> Result<(ChioKernel, Arc<AtomicUsize>)> {
     let dir = root.join(format!("receiver-{receiver}"));
     std::fs::create_dir_all(dir.join("locks"))?;
     #[cfg(unix)]
@@ -105,8 +114,17 @@ pub fn open(root: &Path, receiver: u8, bad: bool) -> Result<(ChioKernel, Arc<Ato
     if !db.exists() {
         SqliteAuthorityStore::provision(&db, dir.join("locks"))?;
     }
-    let authority = SqliteAuthorityStore::open_serving(&db, dir.join("locks"))?;
-    let mut kernel = unconfigured(receiver);
+    let (authority, mut kernel) = if let Some(clock) = clock {
+        (
+            SqliteAuthorityStore::open_serving_with_clock(&db, dir.join("locks"), clock.clone())?,
+            ChioKernel::new_with_clock(configuration(receiver), clock),
+        )
+    } else {
+        (
+            SqliteAuthorityStore::open_serving(&db, dir.join("locks"))?,
+            unconfigured(receiver),
+        )
+    };
     let receipts = SqliteReceiptStore::open(dir.join("receipts.db"))?;
     receipts.wait_for_writer_ready(Duration::from_secs(30))?;
     kernel.set_receipt_store(Box::new(receipts))?;
@@ -192,6 +210,7 @@ pub fn choose(
     let expires_at = store.slot(slot_id)?.contract.expires_at;
     let offer = Signed::sign(
         WorkOffer {
+            allocation_hash: store.allocation_digest(slot_id)?,
             slot_id: slot_id.into(),
             contract_hash: binding_digest(&store.slot(slot_id)?)?,
             receiver: key(receiver).public_key(),
@@ -302,7 +321,10 @@ pub fn seal(store: &DelegationStore, request: &mut ToolCallRequest, ceiling: u64
 }
 
 pub fn unconfigured(receiver: u8) -> ChioKernel {
-    ChioKernel::new(KernelConfig {
+    ChioKernel::new(configuration(receiver))
+}
+fn configuration(receiver: u8) -> KernelConfig {
+    KernelConfig {
         keypair: key(receiver),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
@@ -319,5 +341,5 @@ pub fn unconfigured(receiver: u8) -> ChioKernel {
         retention_config: None,
         memory_budget: MemoryBudgetConfig::defaults(),
         deadlines: HotPathDeadlineConfig::default(),
-    })
+    }
 }

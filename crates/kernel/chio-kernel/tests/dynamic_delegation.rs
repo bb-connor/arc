@@ -170,6 +170,31 @@ fn installation_requires_durable_native_custody() {
     );
 }
 
+#[test]
+fn work_expiry_uses_the_receivers_configured_authority_clock() -> Result {
+    let dir = tempfile::tempdir()?;
+    let store = DelegationStore::open(dir.path().join("allocation.db"))?;
+    let contract = slot("leaf", 2, 60, 2)?;
+    let receiver_time = contract.contract.expires_at + 1;
+    store.create_root(contract)?;
+    let (kernel, calls) = open_with_clock(
+        dir.path(),
+        3,
+        false,
+        Some(Arc::new(
+            chio_security_types::clock::FixedClock::from_millis(receiver_time * 1000),
+        )),
+    )?;
+    let mut call = request(&kernel, "leaf", 2, "expired-at-receiver", 20)?;
+    choose(&store, &call, 2, 3, 0, 20)?;
+    seal(&store, &mut call, 20)?;
+    let response = kernel.evaluate_tool_call_blocking(&call)?;
+    assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
+    assert!(format!("{:?}", response.reason).contains("delegated work"));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
 #[cfg(all(feature = "admission-test-support", unix))]
 #[test]
 fn dynamic_recovery_worker() -> Result {
