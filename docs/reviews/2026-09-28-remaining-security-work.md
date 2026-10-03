@@ -3,7 +3,7 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the October 2 identity, authority and release-verification batch. Each batch has its own
+Updated through the October 2 lease-fencing and framework-ingress batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
 
@@ -38,16 +38,24 @@ redemption, and AP3 explicit approver identity and enforced policy. It records
 review corrections, retained failures and the final source commit. Platform,
 operator, unavailable legacy workflow and hosted boundaries remain explicit.
 
-**Next substantial batch: AC4 plus CA3.** Fence protected run and step writes
-with the current lease token inside the committing transaction, with stale-owner,
-takeover, restart and zero-write controls. Extend the ingress census to framework
-extractors, shared readers and non-JSON decoders, then migrate exposed signed and
-authoritative consumers with duplicate/original-byte route controls.
+The [lease and ingress execution record](2026-10-02-lease-fencing-framework-ingress-execution.md)
+locally accepts AC4 protected run/step/evidence writes and CLI ownership, plus
+CA3 framework inventory and all 104 control-plane JSON bindings. It records 732
+distinct Rust passes, 58 Python passes, four independent review corrections and
+retained failures. Raw decoder debt remains 45 files; other format/API gaps,
+hosted qualification and deployed acceptance remain explicit.
 
-AC4 protected run/step writes, CA3 extractor-aware signed ingress, remaining TCB
-reader semantics, proof-result sealing and error provenance remain separate
-engineering work. Full required hosted CI, branch decomposition, remaining
-compliance/product findings and the parent assurance gates also remain open.
+**Next substantial batch: AP4-AP6 inbound authority.** Deny unmatched routes and
+require explicit local anonymous-read policy; constrain upstream side-effect
+claims to operator-pinned specs; reject unverified JWT confirmation and carry
+sender proofs through production consumers; bind certificate/attestation identity
+to trusted transport context. Close the two remaining API-protect threshold JSON
+boundaries while changing those entry points. The current source still contains
+the reviewed default-allow routing and caller-header sender-binding behavior.
+
+Remaining TCB reader semantics, proof-result sealing and error provenance remain
+engineering work. Full required hosted CI, branch decomposition, other
+compliance/product findings and parent assurance gates also remain open.
 
 ## Current inventory
 
@@ -355,7 +363,7 @@ this grouping. The kernel/SQLite execution record contains the local checks for 
 The [pass 9 execution review](2026-10-01-execution-review.md) reviewed every batch above at `a2630c20a1`, in twelve slice reviews linked
 from it. It found 128 issues: 5 High (one, TR1, since closed), 41 Medium, 67 Low, 15 Note. The decoder figure in
 the inventory table is a count of a lexical pattern: the review demonstrated inventory-only promotion (CA2) and missing axum `Json<T>`
-ingress (CA3). The October 2 checked-contract repair addresses CA2; CA3 remains open. The reader census demonstrated no pre-existing
+ingress (CA3). The October 2 checked-contract repair addresses CA2; the lease/ingress record addresses CA3 inventory and control-plane JSON, retaining the other format/API gaps explicitly. The reader census demonstrated no pre-existing
 defect after September 28 (CA value tally).
 
 Before another batch, in order:

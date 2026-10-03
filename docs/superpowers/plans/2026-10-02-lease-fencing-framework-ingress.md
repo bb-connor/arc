@@ -55,7 +55,7 @@ disposition artifact and route/type coverage.
   findings with reproducing controls, preserving failed evidence.
 - [x] Run changed owner suites, strict Clippy, formatting and affected source
   gates. Retain exact commands, exits, hashes and source/binary identities.
-- [ ] Reconcile each finding with its roadmap owner, commit and push authorized
+- [x] Reconcile each finding with its roadmap owner, commit and push authorized
   security source and documentation, and verify remote SHA. Propose the next
   substantial chunk from the remaining live plans/reviews.
 
@@ -63,3 +63,5 @@ Review focus: alternate public writer escape paths; stale authority renewed by
 reading current tokens; expiry while waiting for a database lock; shared decoder
 alias/helper evasions; route layers that omit preflight or narrow legitimate
 numeric/body-limit behavior. Tests and review must cover each condition.
+
+Completion and retained failures: [execution record](../../reviews/2026-10-02-lease-fencing-framework-ingress-execution.md).

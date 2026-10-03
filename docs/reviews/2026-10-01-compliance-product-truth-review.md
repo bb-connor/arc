@@ -8,7 +8,9 @@ publication or closure of the other findings. KG2/KG3 and AP2/AP3 now have
 bounded local source acceptance in the
 [issuer and approval execution record](2026-10-02-issuer-lifecycle-approval-authority-execution.md).
 Linux custody, explicit provisioning and unavailable legacy workflows are stated
-there. AC4 lease-fenced run/step writes and CA3 framework ingress are next.
+there. AC4 protected writes and scoped CA3 ingress now have local acceptance in
+the [lease and ingress record](2026-10-02-lease-fencing-framework-ingress-execution.md).
+AP4-AP6 inbound authority is the next substantial source batch.
 
 A compliance-documentation review of `main` (`f5566d9a76`) on September 30 and October 1 checked
 every compliance, security and supply-chain claim in the repository against the code, the CI

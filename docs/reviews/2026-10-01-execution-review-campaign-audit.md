@@ -245,6 +245,11 @@ catalog.
 
 ## CA3. Medium: the lexical census cannot see the main network ingress, so 45 is not the size of the S2 problem
 
+**October 2 follow-up:** CA3 now has extractor/format/shared-reader observations and original-byte validation on all 104 control-plane JSON bindings. Other API and format risks remain explicit. See the
+[lease and ingress record](2026-10-02-lease-fencing-framework-ingress-execution.md)
+for source, local evidence and remaining boundaries. The finding below remains
+the historical reviewed-source snapshot.
+
 `json_decoders` (`check-trust-boundaries.py:29-60`) matches `serde_json::from_*` spellings,
 imported aliases, `Deserializer::from_*` and `fn deserialize<`. It cannot see framework
 extractors. At the tip, 15 control-plane HTTP handler files take axum `Json<T>` request

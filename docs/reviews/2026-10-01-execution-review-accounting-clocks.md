@@ -167,6 +167,11 @@ production read traced in the process host.
 
 ## AC4. Low: run-lease fencing tokens fence only heartbeats
 
+**October 2 follow-up:** AC4 run, step and recovery-evidence writes now require current ownership in the committing transaction. See the
+[lease and ingress record](2026-10-02-lease-fencing-framework-ingress-execution.md)
+for source, local evidence and remaining boundaries. The finding below remains
+the historical reviewed-source snapshot.
+
 `8288bd56be` made acquisition and heartbeat transactional with checked, durable,
 monotonic fencing tokens (`leases_scheduler.rs:37-53`, `:261-275`). No protected write
 consumes the token. `record_run_state` and `record_run_step_state`
