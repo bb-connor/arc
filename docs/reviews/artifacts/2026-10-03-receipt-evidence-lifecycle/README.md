@@ -20,6 +20,8 @@ by `readiness-qualified-owner-build`, `readiness-qualified-binaries.json` and
 `readiness-qualified-api-owner`.
 `review-source-files.json` and `review-staged.diff.gz` pin the independently reviewed
 candidate; `final-source-files.json` pins source after required corrections.
+[Source publication](source-publication.json) records the committed candidate,
+verified remote SHA and qualified source-manifest hash.
 `progress.md` contains decisions and failure dispositions. The independent review
 records its original verdict, findings and the author's dispositions.
 

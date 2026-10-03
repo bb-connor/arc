@@ -69,7 +69,7 @@ one worker per store, stop/flush tied to serving lifetime.
 - [x] Run changed-owner runtime suites, strict all-target Clippy, formatting and
   affected contract gates. Expected: pass with retained terminal command/log hashes.
 - [x] One independent integrated review; retain rulings and verify required fixes.
-- [ ] Update roadmap/operator records, commit/push, verify remote SHA and propose
+- [x] Update roadmap/operator records, commit/push, verify remote SHA and propose
   next substantial remaining evidence/security batch.
 
 ## Review Focus

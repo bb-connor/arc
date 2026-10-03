@@ -1,8 +1,12 @@
 # Receipt evidence lifecycle execution, October 3, 2026
 
-Candidate on `packet/3-retention-accounting`, based on
-`62ce6c65c3e9de306bc40d40102fe8c4a4dcf3d1`. Publication identity is recorded after
-source qualification. This record owns AP9, AP10, AP11 and the API/start portion
+Qualified source `ec6359a7d7fbcf0384dc667c50d9b51f3b4f3be4` is committed and pushed on
+`packet/3-retention-accounting`, based on
+`62ce6c65c3e9de306bc40d40102fe8c4a4dcf3d1`. The remote ref matched that exact source
+commit after publication; the [publication record](artifacts/2026-10-03-receipt-evidence-lifecycle/source-publication.json)
+retains the observation and qualified source-manifest hash. This documentation-only
+follow-up records publication without changing qualified code.
+This record owns AP9, AP10, AP11 and the API/start portion
 of EV5, plus retained reads for EV6. Other EV5 launchers and EV6 package signing
 remain open. Historical findings and milestone acceptance keep their own scope.
 
