@@ -9,6 +9,7 @@ mod session_reports;
 
 fn operation(request: &ToolCallRequest) -> SessionOperation {
     SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: request.capability.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

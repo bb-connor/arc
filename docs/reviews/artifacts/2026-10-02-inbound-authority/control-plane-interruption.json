@@ -1,0 +1,7 @@
+{
+  "process": 2028381,
+  "executable": "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-c377478f770036e4",
+  "signal": "SIGINT",
+  "reason": "Stop the obsolete broad control-plane campaign after four reproduced nested proof compatibility failures; use corrected targeted control-plane composition and nested credential tests. Other owner suites continue under --no-fail-fast. This partial campaign is not green.",
+  "time_utc": "2026-10-03T04:19:35.076269+00:00"
+}

@@ -41,6 +41,8 @@ pub enum DpopError {
     Accounting,
     #[error("DPoP nonce store unavailable")]
     Unavailable,
+    #[error("DPoP proof encoding is invalid")]
+    Malformed(#[source] serde_json::Error),
     #[error("required DPoP proof missing")]
     MissingProof,
     #[error("DPoP nonce store not configured")]
@@ -75,6 +77,7 @@ impl DpopError {
             Self::IdentityCapacity => "urn:chio:error:kernel:dpop-identity-capacity",
             Self::Accounting => "urn:chio:error:kernel:dpop-accounting",
             Self::Unavailable => "urn:chio:error:kernel:dpop-unavailable",
+            Self::Malformed(..) => "urn:chio:error:kernel:dpop-malformed",
             Self::MissingProof => "urn:chio:error:kernel:dpop-missing-proof",
             Self::MissingStore => "urn:chio:error:kernel:dpop-missing-store",
             Self::MissingConfiguration => "urn:chio:error:kernel:dpop-missing-configuration",

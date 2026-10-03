@@ -1070,6 +1070,8 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
     let config = ProtectConfig {
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
@@ -1103,6 +1105,8 @@ fn build_budget_store_remote_is_not_hold_capable() {
     let config = ProtectConfig {
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
@@ -1139,6 +1143,8 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
     let config = ProtectConfig {
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
@@ -1174,6 +1180,8 @@ fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
     ProtectConfig {
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,

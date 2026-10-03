@@ -67,6 +67,7 @@ fn runtime_assurance_spec(
         merge_strategy: None,
         rules: Some(Rules {
             tool_access: Some(ToolAccessRule {
+                dpop_required: None,
                 enabled: true,
                 allow: vec!["payments.charge".to_string()],
                 block: Vec::new(),
@@ -120,6 +121,7 @@ fn action(action_type: &str, target: &str) -> EvaluationAction {
 fn workload_identity_spec_with_path_prefixes(path_prefixes: Vec<&str>) -> HushSpec {
     spec_with_rules(Rules {
         tool_access: Some(ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: vec!["payments.charge".to_string()],
             block: Vec::new(),
@@ -552,6 +554,7 @@ fn origin_default_deny_blocks_unmatched_origin_before_base_rules_allow() {
     )]);
     spec.rules = Some(Rules {
         tool_access: Some(ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: Vec::new(),
             block: Vec::new(),
@@ -625,6 +628,7 @@ fn origin_minimal_profile_preserves_base_rule_fallback_for_unmatched_origin() {
     )]);
     spec.rules = Some(Rules {
         tool_access: Some(ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: Vec::new(),
             block: Vec::new(),
@@ -680,6 +684,7 @@ fn tool_access_workload_identity_requirement_denies_mismatched_identity() {
         merge_strategy: None,
         rules: Some(Rules {
             tool_access: Some(ToolAccessRule {
+                dpop_required: None,
                 enabled: true,
                 allow: vec!["payments.charge".to_string()],
                 block: Vec::new(),
@@ -772,6 +777,7 @@ fn tool_access_workload_identity_preference_warns_when_missing() {
         merge_strategy: None,
         rules: Some(Rules {
             tool_access: Some(ToolAccessRule {
+                dpop_required: None,
                 enabled: true,
                 allow: vec!["payments.charge".to_string()],
                 block: Vec::new(),
@@ -916,6 +922,7 @@ fn evaluate_with_context_denies_fail_closed_on_unknown_condition_key() {
 fn generated_glob_compile_errors_fail_closed_for_allow_rules() {
     let spec = spec_with_rules(Rules {
         tool_access: Some(ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: vec!["*".repeat(600_000)],
             block: Vec::new(),

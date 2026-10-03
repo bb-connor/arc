@@ -33,6 +33,7 @@ mod detection;
 mod patterns;
 mod rules;
 mod scope;
+mod sender_proof;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
@@ -233,6 +234,21 @@ fn compile_threshold_approval_requirement(
 }
 
 fn ensure_compilable_policy(policy: &HushSpec) -> Result<(), CompileError> {
+    if policy
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.origins.as_ref())
+        .is_some_and(|origins| {
+            origins.profiles.iter().any(|profile| {
+                profile
+                    .tool_access
+                    .as_ref()
+                    .is_some_and(|rule| rule.enabled && rule.dpop_required == Some(true))
+            })
+        })
+    {
+        return Err(CompileError::Invalid("origin-specific sender proof rules require an origin-aware kernel guard; use rules.tool_access.dpop_required".into()));
+    }
     let unsupported_rule = policy
         .rules
         .as_ref()

@@ -385,6 +385,7 @@ fn nonce_preflight_releases_approval_then_execution_claims_a_new_episode() -> An
                 };
                 let operation = chio_core::session::SessionOperation::ToolCall(Box::new(
                     chio_core::session::ToolCallOperation {
+                        dpop_proof: None,
                         capability: request.capability.clone(),
                         server_id: request.server_id.clone(),
                         tool_name: request.tool_name.clone(),

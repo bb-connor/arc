@@ -3,6 +3,9 @@ use super::*;
 impl RemoteSessionFactory {
     pub(super) fn new(mut config: RemoteServeHttpConfig) -> Result<Self, CliError> {
         session_core_authority_mode::validate_remote_authority_config(&config)?;
+        if let Some(proxy) = &config.trusted_proxy {
+            proxy.validate_separation(&config)?;
+        }
         let loaded_policy = load_policy(&config.policy_path)?;
         let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
             CliError::cli_other_error(
@@ -352,6 +355,16 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
+        let hosted_isolation = self.configured_hosted_isolation();
+        let session_auth_context = hosted_isolation.snapshot_auth_context(auth_context);
+        let proof_required = default_capabilities.iter().any(|cap| {
+            cap.scope
+                .grants
+                .iter()
+                .any(|grant| grant.dpop_required == Some(true))
+        });
+        let agent_pk =
+            derive_session_agent_public_key(&self.config, &session_auth_context, proof_required)?;
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -412,11 +425,6 @@ impl RemoteSessionFactory {
             upstream_server.clone(),
         )));
 
-        let hosted_isolation = self.configured_hosted_isolation();
-        let session_auth_context = hosted_isolation.snapshot_auth_context(auth_context);
-
-        let agent_kp = derive_session_agent_keypair(&self.config, &session_auth_context)?;
-        let agent_pk = agent_kp.public_key();
         let agent_id = agent_pk.to_hex();
         let capabilities: Vec<CapabilityToken> =
             issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
@@ -538,6 +546,15 @@ impl RemoteSessionFactory {
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
+        if default_capabilities.iter().any(|cap| {
+            cap.scope
+                .grants
+                .iter()
+                .any(|grant| grant.dpop_required == Some(true))
+        }) && authenticated_sender_key(&record.auth_context).is_none()
+        {
+            return Ok(None);
+        }
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
             _ => return Ok(None),

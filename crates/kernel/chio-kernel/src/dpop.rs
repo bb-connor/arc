@@ -83,7 +83,7 @@ pub fn is_supported_dpop_schema(schema: &str) -> bool {
 ///
 /// This is the canonical-JSON-serialized message that the agent signs.
 /// All fields are included in the signature; none are mutable after signing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DpopProofBody {
     /// Schema identifier. Must equal `DPOP_SCHEMA`.
@@ -115,7 +115,7 @@ pub struct DpopProofBody {
 /// A signed DPoP proof ready for transmission.
 ///
 /// The `signature` covers the canonical JSON of `body`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DpopProof {
     /// The proof body that was signed.
@@ -305,7 +305,33 @@ impl DpopNonceStore {
                 "identity byte capacity must be positive",
             ));
         }
-        Ok(Self {
+        Ok(Self::with_validated_limits(
+            nz,
+            per_capability_capacity,
+            identity_byte_capacity,
+            ttl,
+            clock,
+        ))
+    }
+
+    pub(crate) fn defaults_with_clock(clock: Arc<dyn Clock>) -> Self {
+        Self::with_validated_limits(
+            NonZeroUsize::MIN.saturating_add(DEFAULT_DPOP_NONCE_STORE_CAPACITY - 1),
+            DEFAULT_DPOP_NONCE_STORE_CAPACITY,
+            DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
+            Duration::from_secs(DpopConfig::default().proof_ttl_secs),
+            clock,
+        )
+    }
+
+    fn with_validated_limits(
+        nz: NonZeroUsize,
+        per_capability_capacity: usize,
+        identity_byte_capacity: usize,
+        ttl: Duration,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        Self {
             inner: Mutex::new(DpopNonceState {
                 source: replay_source::SourceState::new(),
                 cache: LruCache::new(nz),
@@ -318,7 +344,7 @@ impl DpopNonceStore {
             }),
             ttl,
             clock,
-        })
+        }
     }
 
     pub(crate) fn bind_clock(&mut self, clock: Arc<dyn Clock>) -> Result<(), KernelError> {

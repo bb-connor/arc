@@ -70,6 +70,8 @@ pub fn http_authority_tool_grant() -> ToolGrant {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HttpAuthorityPolicy {
+    /// No capability may authorize a route absent from local policy.
+    DenyAll,
     SessionAllow,
     DenyByDefault,
 }
@@ -249,6 +251,9 @@ impl Guard for HttpProjectionGuard {
         }
 
         match projected.policy {
+            HttpAuthorityPolicy::DenyAll => Err(KernelError::GuardDenied(
+                "route is not registered in local policy".to_string(),
+            )),
             HttpAuthorityPolicy::SessionAllow => Ok(GuardDecision::allow()),
             HttpAuthorityPolicy::DenyByDefault => {
                 if projected.capability.id.is_some() {
@@ -382,6 +387,7 @@ impl HttpAuthorityBuilder {
             self.clock
                 .unwrap_or_else(|| Arc::new(chio_security_types::clock::SystemClock)),
         );
+        kernel.install_default_dpop_store();
         if let Some(store) = self.receipt_store {
             kernel
                 .set_receipt_store_handle(store)
@@ -544,6 +550,7 @@ impl HttpAuthority {
             allow_ephemeral_receipt_log,
             allow_ephemeral_revocation_store,
         ));
+        kernel.install_default_dpop_store();
         kernel.register_tool_server(Box::new(HttpAuthorizationServer));
         kernel.add_guard(Box::new(HttpProjectionGuard));
 
@@ -687,30 +694,35 @@ impl HttpAuthority {
         let unsupported_reason = input.unsupported_authorization_extension.map(|field| {
             format!("HTTP authority projection does not support authorization field {field}")
         });
-        let presented_capability =
-            if let Some(reason) = unsupported_reason.or_else(|| binding.invalid_reason.clone()) {
-                PresentedCapabilityState {
-                    input_error: None,
-                    capability_id: None,
-                    invalid_reason: Some(reason),
-                }
-            } else {
-                validate_presented_capability(
-                    input.capability_id_hint,
-                    input.presented_capability,
-                    self.trusted_capability_issuers(),
-                    binding.requested_tool_server.as_deref(),
-                    binding.requested_tool_name.as_deref(),
-                    binding.requested_arguments.as_ref(),
-                    input.model_metadata,
-                    now,
-                    &|capability_id| {
-                        self.kernel
-                            .is_capability_revoked(capability_id)
-                            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
-                    },
-                )
-            };
+        let presented_capability = if input.policy == HttpAuthorityPolicy::DenyAll {
+            PresentedCapabilityState {
+                input_error: None,
+                capability_id: None,
+                invalid_reason: None,
+            }
+        } else if let Some(reason) = unsupported_reason.or_else(|| binding.invalid_reason.clone()) {
+            PresentedCapabilityState {
+                input_error: None,
+                capability_id: None,
+                invalid_reason: Some(reason),
+            }
+        } else {
+            validate_presented_capability(
+                input.capability_id_hint,
+                input.presented_capability,
+                self.trusted_capability_issuers(),
+                binding.requested_tool_server.as_deref(),
+                binding.requested_tool_name.as_deref(),
+                binding.requested_arguments.as_ref(),
+                input.model_metadata,
+                now,
+                &|capability_id| {
+                    self.kernel
+                        .is_capability_revoked(capability_id)
+                        .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
+                },
+            )
+        };
 
         let chio_request = ChioHttpRequest {
             request_id: input.request_id.clone(),
@@ -1237,6 +1249,9 @@ fn projected_verdict(
     }
 
     match policy {
+        HttpAuthorityPolicy::DenyAll => {
+            Verdict::deny("route is not registered in local policy", "RouteGuard")
+        }
         HttpAuthorityPolicy::SessionAllow => Verdict::Allow,
         HttpAuthorityPolicy::DenyByDefault => match &presented_capability.capability_id {
             Some(_) => Verdict::Allow,
@@ -1267,6 +1282,11 @@ fn projected_evidence(
     }
 
     match policy {
+        HttpAuthorityPolicy::DenyAll => vec![GuardEvidence {
+            guard_name: "RouteGuard".to_string(),
+            verdict: false,
+            details: Some("route is not registered in local policy".to_string()),
+        }],
         HttpAuthorityPolicy::SessionAllow => vec![GuardEvidence {
             guard_name: "DefaultPolicyGuard".to_string(),
             verdict: true,
@@ -1333,7 +1353,7 @@ fn validate_capability_token(
         .validate_time(now)
         .map_err(|e| format!("invalid capability token: {e}"))?;
 
-    if let Some(requested_tool) = requested_tool {
+    if let Some(ref requested_tool) = requested_tool {
         let matches = chio_kernel::capability_matches_request_with_model_metadata(
             &token,
             requested_tool.tool_name,
@@ -1349,6 +1369,30 @@ fn validate_capability_token(
             )
             .into());
         }
+    }
+    // Projection mints a separate internal capability and cannot preserve the caller
+    // proof domain. Refuse required proof instead of stripping its constraint.
+    let requires_proof = match requested_tool {
+        Some(ref requested) => chio_kernel::capability_request_requires_dpop_with_model_metadata(
+            &token,
+            requested.tool_name,
+            requested.server_id,
+            requested.arguments,
+            model_metadata,
+        )
+        .map_err(|error| format!("failed to evaluate capability proof requirement: {error}"))?,
+        None => token
+            .scope
+            .grants
+            .iter()
+            .any(|grant| grant.dpop_required == Some(true)),
+    };
+    if requires_proof {
+        return Err(
+            "proof-required capabilities require kernel-mediated dispatch"
+                .to_string()
+                .into(),
+        );
     }
     Ok(token)
 }

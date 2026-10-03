@@ -49,7 +49,7 @@ use chio_store_sqlite::SqliteApprovalStore;
 
 use crate::error::ProtectError;
 use crate::evaluator::{DurableAdmissionStores, RequestEvaluator, RouteEntry};
-use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, load_spec_from_file};
+use crate::spec_discovery::default_upstream_egress_contract;
 
 #[path = "proxy/approval_authority.rs"]
 mod approval_authority;
@@ -85,6 +85,8 @@ mod router;
 mod scope_subset;
 #[path = "proxy/sidecar.rs"]
 mod sidecar;
+#[path = "proxy/spec_authority.rs"]
+mod spec_authority;
 #[path = "proxy/state.rs"]
 mod state;
 use request_ids::*;

@@ -5,6 +5,8 @@ use thiserror::Error;
 /// Errors produced by the protect proxy.
 #[derive(Debug, Error)]
 pub enum ProtectError {
+    #[error("policy encoding failed: {0}")]
+    Canonical(#[from] chio_core_types::error::Error),
     #[error("authority clock rejected the operation: {0}")]
     Clock(#[from] chio_security_types::clock::ClockError),
 

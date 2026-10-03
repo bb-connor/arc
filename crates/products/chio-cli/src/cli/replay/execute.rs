@@ -395,6 +395,7 @@ fn recompute_decision(
         session_agent_id,
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: REPLAY_PRE_OUTPUT_SERVER_ID.to_string(),
         tool_name: invocation.tool_name.clone(),

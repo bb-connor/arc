@@ -154,6 +154,8 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
     let config = ProtectConfig {
         upstream: "http://127.0.0.1:1".into(),
         spec_content: Some("{}".into()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".into(),
         receipt_db: None,

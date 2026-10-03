@@ -644,6 +644,10 @@ pub(crate) enum McpCommands {
 
     /// Wrap an MCP server subprocess and expose a secured MCP edge over stdio.
     Serve {
+        /// Public key held by the agent. Required when policy requires invocation proofs.
+        #[arg(long)]
+        agent_public_key: Option<String>,
+
         /// Path to the policy YAML file. Mutually exclusive with `--preset`.
         #[arg(long, conflicts_with = "preset")]
         policy: Option<PathBuf>,
@@ -752,6 +756,14 @@ pub(crate) enum McpCommands {
         /// Socket address to bind the remote MCP edge to.
         #[arg(long, default_value = "127.0.0.1:8931")]
         listen: SocketAddr,
+
+        /// Exact proxy socket peer IP allowed to attest TLS/runtime identity (repeatable).
+        #[arg(long, requires = "trusted_proxy_token_file")]
+        trusted_proxy_peer: Vec<std::net::IpAddr>,
+
+        /// Dedicated private proxy token file. Proxy must strip caller identity headers.
+        #[arg(long, requires = "trusted_proxy_peer")]
+        trusted_proxy_token_file: Option<PathBuf>,
 
         /// Static bearer token required for remote MCP session admission.
         /// Prefer `CHIO_AUTH_TOKEN` env over the argv form so the bearer
@@ -884,6 +896,14 @@ pub(crate) enum ApiCommands {
         /// Optional local OpenAPI spec path. Auto-discovered when omitted.
         #[arg(long)]
         spec: Option<PathBuf>,
+
+        /// SHA-256 of the exact local spec bytes, required for permissive overrides.
+        #[arg(long, requires = "spec")]
+        spec_sha256: Option<String>,
+
+        /// Permit anonymous reads on known routes classified by local policy.
+        #[arg(long, default_value_t = false)]
+        allow_anonymous_reads: bool,
 
         /// Address to listen on.
         #[arg(long, default_value = "127.0.0.1:9090")]

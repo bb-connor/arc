@@ -632,6 +632,7 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -744,6 +745,7 @@ fn nested_admission_denied_while_rss_shedding() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -897,6 +899,7 @@ fn session_tool_call_records_incomplete_terminal_state() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "broken".to_string(),
         tool_name: "drop_stream".to_string(),

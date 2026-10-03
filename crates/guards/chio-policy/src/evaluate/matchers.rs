@@ -49,6 +49,19 @@ fn evaluate_tool_call(
         return allow_result(None, None, origin_profile_id, posture);
     }
 
+    if [base_rule, profile_rule]
+        .into_iter()
+        .flatten()
+        .any(|rule| rule.dpop_required == Some(true))
+    {
+        return deny_result(
+            Some("rules.tool_access.dpop_required".to_string()),
+            Some("sender proof requires kernel verification".to_string()),
+            origin_profile_id,
+            posture,
+        );
+    }
+
     let target = action.target.as_deref().unwrap_or_default();
     let profile_prefix =
         matched_profile.map(|profile| profile_rule_prefix(&profile.id, "tool_access"));

@@ -1658,6 +1658,7 @@ fn build_governed_intent() -> GovernedTransactionIntent {
 
 fn build_governed_request() -> AgentMessage {
     AgentMessage::ToolCallRequest {
+        dpop_proof: None,
         id: "req-governed-001".to_string(),
         capability_token: Box::new(build_capability(
             "cap-governed-001",
@@ -1687,6 +1688,7 @@ fn build_governed_request() -> AgentMessage {
 
 fn build_revoked_request() -> AgentMessage {
     AgentMessage::ToolCallRequest {
+        dpop_proof: None,
         id: "req-revoked-001".to_string(),
         capability_token: Box::new(build_capability(
             "cap-revoked-001",

@@ -10,7 +10,12 @@ bounded local source acceptance in the
 Linux custody, explicit provisioning and unavailable legacy workflows are stated
 there. AC4 protected writes and scoped CA3 ingress now have local acceptance in
 the [lease and ingress record](2026-10-02-lease-fencing-framework-ingress-execution.md).
-AP4-AP6 inbound authority is the next substantial source batch.
+AP4-AP6 and the two threshold-reader gaps are implemented in the
+[inbound authority record](2026-10-02-inbound-authority-execution.md), with local
+qualification tracked there. Bearer compatibility, volatile replay, unsupported
+origin-specific proof policy and trusted-proxy deployment remain explicit limits.
+The next source batch is AP7 transport confidentiality and AP8 truthful session
+revocation. The findings and counts below retain their historical meaning.
 
 A compliance-documentation review of `main` (`f5566d9a76`) on September 30 and October 1 checked
 every compliance, security and supply-chain claim in the repository against the code, the CI

@@ -483,19 +483,16 @@ impl ProtectProxy {
         self
     }
 
-    async fn load_spec_content(&self) -> Result<String, ProtectError> {
-        if let Some(spec_content) = &self.config.spec_content {
-            return Ok(spec_content.clone());
-        }
-        if let Some(spec_path) = &self.config.spec_path {
-            return load_spec_from_file(spec_path);
-        }
-        discover_spec(&self.config.upstream).await
+    async fn load_spec_content(&self) -> Result<spec_authority::LoadedSpec, ProtectError> {
+        spec_authority::load(&self.config).await
     }
 
     /// Build the route table from the OpenAPI spec.
     /// Parses the spec directly to preserve path and method information.
-    fn build_routes(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
+    pub(super) fn build_routes(
+        spec_content: &str,
+        pinned: bool,
+    ) -> Result<Vec<RouteEntry>, ProtectError> {
         let spec = chio_openapi::OpenApiSpec::parse(spec_content)?;
         let mut routes = Vec::new();
 
@@ -512,7 +509,12 @@ impl ProtectProxy {
                     _ => continue,
                 };
 
-                let extensions = ChioExtensions::from_operation(&operation.raw)?;
+                let mut extensions = ChioExtensions::from_operation(&operation.raw)?;
+                // An upstream may tighten its classification, but cannot remove
+                // side effects without the operator pinning these exact bytes.
+                if !pinned && extensions.side_effects == Some(false) {
+                    extensions.side_effects = None;
+                }
                 let policy = DefaultPolicy::for_method_with_extensions(method, &extensions);
                 routes.push(RouteEntry {
                     pattern: path.clone(),
@@ -543,6 +545,7 @@ impl ProtectProxy {
     where
         F: FnOnce(SocketAddr),
     {
+        spec_authority::validate_source(&self.config)?;
         validate_sidecar_control_token(self.config.sidecar_control_token.as_deref())
             .map_err(|error| ProtectError::Config(error.to_string()))?;
         // Durable-by-default: a missing receipt store means in-memory receipts
@@ -579,7 +582,7 @@ impl ProtectProxy {
         }
 
         let spec_content = self.load_spec_content().await?;
-        let routes = Self::build_routes(&spec_content)?;
+        let routes = Self::build_routes(spec_content.content(), spec_content.is_pinned())?;
         let route_count = routes.len();
 
         let keypair = match &self.config.signer_seed_hex {
@@ -587,7 +590,7 @@ impl ProtectProxy {
                 .map_err(|error| ProtectError::Config(error.to_string()))?,
             None => Keypair::generate(),
         };
-        let policy_hash = chio_core_types::sha256_hex(spec_content.as_bytes());
+        let policy_hash = spec_content.policy_hash(self.config.allow_anonymous_reads)?;
 
         // Open the durable receipt store first so it owns the shared sidecar
         // file's provenance anchor; the approval store then co-locates onto that
@@ -679,6 +682,7 @@ impl ProtectProxy {
             Arc::new(clock.clone()),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
+        let evaluator = evaluator.with_anonymous_reads(self.config.allow_anonymous_reads);
         let receipt_backend = evaluator.receipt_backend();
         let revocation_backend = evaluator.revocation_backend();
 
@@ -971,7 +975,7 @@ impl ProtectProxy {
 
     /// Build routes from spec content for testing.
     pub fn routes_from_spec(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
-        Self::build_routes(spec_content)
+        Self::build_routes(spec_content, false)
     }
 }
 
@@ -983,6 +987,8 @@ mod proxy_builder_tests {
         ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: Some("{}".to_string()),
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
@@ -1061,6 +1067,8 @@ mod windows_authority_tests {
         let result = ProtectProxy::new(ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: None,
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: Some(missing_spec.to_string_lossy().into_owned()),
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: Some(receipt_database_string),

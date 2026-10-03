@@ -1150,6 +1150,8 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
     let config = ProtectConfig {
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,

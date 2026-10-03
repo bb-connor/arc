@@ -374,6 +374,7 @@ fn nested_runtime_release_failure_denies_pending_approval() {
         .expect("nested session should activate");
     let context = make_operation_context(&session_id, request_id, &request.agent_id);
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: request.capability,
         server_id: request.server_id,
         tool_name: request.tool_name,

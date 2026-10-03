@@ -559,6 +559,7 @@ mod tests {
 
     fn request(kp: &Keypair, id: &str, params: serde_json::Value) -> AgentMessage {
         AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: id.to_string(),
             capability_token: Box::new(capability(kp, id)),
             server_id: "srv-1".to_string(),

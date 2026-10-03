@@ -95,6 +95,7 @@ fn wire_and_normalized_approval_shape_checks_agree_for_all_combinations() -> Tes
                 };
                 normalized.threshold_approval_proposal = proposed.then(|| proposal.clone());
                 let wire = chio_core::message::AgentMessage::ToolCallRequest {
+                    dpop_proof: None,
                     id: fixture.request.request_id.clone(),
                     capability_token: Box::new(normalized.capability.clone()),
                     server_id: normalized.server_id.clone(),

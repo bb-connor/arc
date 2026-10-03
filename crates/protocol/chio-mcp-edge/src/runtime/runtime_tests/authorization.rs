@@ -274,3 +274,66 @@ fn restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrad
         assert_eq!(edge.kernel.session_count(), 0);
     }
 }
+
+#[test]
+fn inbound_authority_mcp_proof_reaches_session_dispatch() {
+    use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA};
+    let (mut kernel, _) = make_kernel();
+    let agent = Keypair::generate();
+    kernel
+        .set_dpop_store(
+            DpopNonceStore::new(32, std::time::Duration::from_secs(300)).unwrap(),
+            DpopConfig::default(),
+        )
+        .unwrap();
+    let mut scope = issue_capabilities(&kernel, &agent)[0].scope.clone();
+    for grant in &mut scope.grants {
+        grant.dpop_required = Some(true);
+    }
+    let capability = kernel
+        .issue_capability(&agent.public_key(), scope, 300)
+        .unwrap();
+    let arguments = json!({"path": "/tmp/readme"});
+    let proof = DpopProof::sign(
+        DpopProofBody {
+            schema: DPOP_SCHEMA.into(),
+            replay_authority: None,
+            capability_id: capability.id.clone(),
+            tool_server: "srv".into(),
+            tool_name: "read_file".into(),
+            action_hash: chio_core::sha256_hex(
+                &chio_core::canonical::canonical_json_bytes(&arguments).unwrap(),
+            ),
+            nonce: "mcp-proof-once".into(),
+            issued_at: kernel
+                .authority_clock_reading()
+                .unwrap()
+                .unix_millis()
+                .as_secs(),
+            agent_key: agent.public_key(),
+        },
+        &agent,
+    )
+    .unwrap();
+    let mut edge = ChioMcpEdge::new(
+        McpEdgeConfig::default(),
+        kernel,
+        agent.public_key().to_hex(),
+        vec![capability],
+        vec![sample_manifest()],
+    )
+    .unwrap();
+    initialize_authorization_edge(
+        &mut edge,
+        json!(crate::authorization::authorization_capabilities()),
+    );
+    let call = |id| {
+        json!({"jsonrpc":"2.0", "id":id, "method":"tools/call", "params": {
+            "name":"read_file", "arguments":arguments, "_meta":{"chioDpopProof":proof}
+        }})
+    };
+    let first = edge.handle_jsonrpc(call(20)).unwrap();
+    assert_eq!(first["result"]["isError"], false, "{first}");
+    let replay = edge.handle_jsonrpc(call(21)).unwrap();
+    assert_eq!(replay["result"]["isError"], true, "{replay}");
+}

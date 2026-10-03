@@ -4793,3 +4793,40 @@ The following are intentionally outside the shipped v1 contract:
 
 These gaps are documented explicitly so operators and integrators do not have
 to infer them from source code.
+
+## Inbound sender authority profile
+
+Native tool-call requests may carry `dpop_proof`; MCP `tools/call` carries the
+same signed invocation proof in `_meta.chioDpopProof`. The proof binds the exact
+capability, server, tool, canonical arguments and caller public key. Proof-required
+grants deny missing, malformed, foreign and replayed proofs. MCP validates the
+original proof bytes before projecting the unsigned envelope; ordinary numeric
+arguments retain their document semantics. HushSpec `rules.tool_access.dpop_required`
+is supported at the root and inherited unless explicitly overridden. Origin-specific
+requirements are refused until an origin-aware compiled guard is installed.
+
+`chio run` and `chio mcp serve` accept `--agent-public-key`. A policy requiring
+proofs requires this operator binding; the caller retains the private key. Remote
+sessions use the verified `cnf.chioSenderKey` as their capability subject and retain
+it in authenticated resume state. Static bearer and TLS-only authentication cannot
+bootstrap an invocation-proof policy without a Chio sender key. `chio check` owns
+its ephemeral test key and signs its own request. Unbound grants retain bearer
+semantics. Unsupported required-proof HTTP projections deny. Default kernel replay
+custody is bounded and process-local; it does not activate durable replay authority.
+
+MCP confirmation profiles are closed: unknown members (including unsupported
+RFC 9449 `jkt`), empty or null profiles, and empty bindings reject authentication.
+A present attestation digest must also match the token's transaction context.
+Certificate and attestation identity comes from authenticated transport provenance,
+never directly from a caller-supplied identity header.
+
+For the trusted-proxy profile, configure `--trusted-proxy-peer` and
+`--trusted-proxy-token-file` together. The latter is a private bounded file with a
+32-512 byte ASCII token, distinct from user and administrator credentials. The
+proxy supplies that token in `x-chio-proxy-authorization` and verified identity in
+`x-chio-mtls-thumbprint-sha256` / `x-chio-runtime-attestation-sha256`. Chio requires
+both the actual socket peer IP and token, removes those headers, and passes a
+private transport context to JWT, introspection and local OAuth authentication.
+Forwarded-IP headers do not authenticate the proxy. The proxy must strip inbound
+identity/credential headers and protect its link to Chio. This profile does not
+provide listener TLS termination; that remains a separate deployment boundary.

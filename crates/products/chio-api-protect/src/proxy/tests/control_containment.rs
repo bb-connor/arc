@@ -44,7 +44,10 @@ impl Upstream {
     }
 
     fn proxy_state(&self, token: Option<&str>) -> Arc<ProxyState> {
-        let mut state = test_state(Vec::new(), format!("http://{}", self.address));
+        let mut state = test_state(
+            ProtectProxy::routes_from_spec(PETSTORE_YAML).test_unwrap(),
+            format!("http://{}", self.address),
+        );
         Arc::get_mut(&mut state).test_unwrap().sidecar_control_token = token.map(str::to_owned);
         state
     }
@@ -282,6 +285,8 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
         let error = ProtectProxy::new(ProtectConfig {
             upstream: "http://127.0.0.1:1".into(),
             spec_content: None,
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: Some(
                 directory
                     .path()
@@ -436,6 +441,8 @@ async fn serving_proxy_rejects_control_headers_without_waiting_for_request_body(
     let proxy = ProtectProxy::new(ProtectConfig {
         upstream: format!("http://{}", upstream.address),
         spec_content: Some(PETSTORE_YAML.into()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".into(),
         receipt_db: None,

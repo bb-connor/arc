@@ -497,6 +497,10 @@ pub(crate) enum Commands {
     },
     /// Spawn an agent subprocess and enforce policy via the kernel.
     Run {
+        /// Public key held by the agent. Required when policy requires invocation proofs.
+        #[arg(long)]
+        agent_public_key: Option<String>,
+
         /// Path to the policy YAML file.
         #[arg(long)]
         policy: PathBuf,

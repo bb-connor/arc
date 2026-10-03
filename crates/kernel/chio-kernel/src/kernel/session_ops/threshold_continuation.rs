@@ -10,7 +10,8 @@ fn continuation_binding(
     bound_intent: Option<&GovernedTransactionIntent>,
 ) -> Result<PendingThresholdApproval, KernelError> {
     // Exhaustive destructuring forces new request fields to choose a binding
-    // policy. Only approval evidence may change while this request is pending.
+    // policy. Approval evidence and a fresh invocation proof may change while pending.
+    // The proof is independently bound to the unchanged capability and exact action.
     let ToolCallOperation {
         capability,
         server_id,
@@ -22,6 +23,7 @@ fn continuation_binding(
         threshold_approval_proposal: _,
         supplemental_authorization,
         execution_nonce,
+        dpop_proof: _,
         model_metadata,
         extra_metadata,
     } = operation;

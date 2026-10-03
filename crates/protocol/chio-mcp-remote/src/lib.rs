@@ -12,10 +12,13 @@ pub use oauth_error::{OAuthError, OAuthRejection};
 mod sender_constraint;
 use sender_constraint::SenderConstraintVerifier;
 mod input;
+mod transport_identity;
 use input::{
     decode as decode_json, BoundedJson, SenderConstraintError, MAX_AUTH_JSON_BYTES,
     MAX_SESSION_JSON_BYTES,
 };
+pub use transport_identity::TrustedProxyConfig;
+use transport_identity::{SenderRequest, TransportIdentity};
 
 pub use chio_control_plane::{CliError, JwtProviderProfile};
 

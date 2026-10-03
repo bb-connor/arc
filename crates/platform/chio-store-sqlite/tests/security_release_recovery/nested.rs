@@ -95,6 +95,7 @@ fn run(allowed: bool) -> TestResult {
             security_context.clone(),
         )));
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: request.capability.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

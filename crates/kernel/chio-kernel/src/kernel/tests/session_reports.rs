@@ -26,6 +26,7 @@ pub(super) fn report_operation(
             &agent.public_key().to_hex(),
         ),
         ToolCallOperation {
+            dpop_proof: None,
             capability: cap,
             server_id: "srv-a".into(),
             tool_name: "read_file".into(),

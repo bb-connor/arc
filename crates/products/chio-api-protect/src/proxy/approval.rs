@@ -79,15 +79,11 @@ pub(crate) async fn batch_respond_approvals_handler(
 
 pub(crate) async fn create_threshold_proposal_handler(
     State(state): State<Arc<ProxyState>>,
-    body: Result<Json<CreateThresholdProposalRequest>, axum::extract::rejection::JsonRejection>,
+    request: Request<Body>,
 ) -> Response {
-    let Json(body) = match body {
+    let body: CreateThresholdProposalRequest = match read_body(request, input::decode).await {
         Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid threshold approval proposal payload: {error}"
-            )));
-        }
+        Err(response) => return response,
     };
     let now = match state
         .clock
@@ -124,15 +120,11 @@ pub(crate) async fn get_threshold_proposal_handler(
 pub(crate) async fn submit_threshold_approval_handler(
     State(state): State<Arc<ProxyState>>,
     Path(proposal_id): Path<String>,
-    body: Result<Json<SubmitThresholdApprovalRequest>, axum::extract::rejection::JsonRejection>,
+    request: Request<Body>,
 ) -> Response {
-    let Json(body) = match body {
+    let body: SubmitThresholdApprovalRequest = match read_body(request, input::decode).await {
         Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid threshold approval token payload: {error}"
-            )));
-        }
+        Err(response) => return response,
     };
     let now = match state
         .clock

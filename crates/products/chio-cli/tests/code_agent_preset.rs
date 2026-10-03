@@ -420,3 +420,40 @@ fn check_full_mode_uses_output_fixture_for_output_sensitive_policy() {
     assert_eq!(body["check_mode"].as_str(), Some("full"));
     assert_eq!(body["output_fixture"].as_bool(), Some(true));
 }
+
+#[test]
+fn inbound_authority_check_signs_with_its_owned_subject_key() {
+    let directory = tempfile::tempdir().unwrap();
+    let policy = directory.path().join("proof.yaml");
+    std::fs::write(
+        &policy,
+        "hushspec: '0.1.0'\nrules:\n  tool_access:\n    default: block\n    allow: ['*']\n    dpop_required: true\n",
+    )
+    .unwrap();
+    let (_stores, receipt_db, session_db) = private_store_paths();
+    let output = Command::new(chio_cli_binary())
+        .args(["--format", "json", "check", "--policy"])
+        .arg(&policy)
+        .arg("--receipt-db")
+        .arg(receipt_db)
+        .arg("--session-db")
+        .arg(session_db)
+        .args([
+            "--server",
+            "proof-srv",
+            "--tool",
+            "read_file",
+            "--params",
+            r#"{"path":"README.md"}"#,
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(body["verdict"], "ALLOW");
+}

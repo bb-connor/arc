@@ -1773,6 +1773,17 @@ impl ChioKernel {
         self.emergency_stop_reason.load_full().as_ref().clone()
     }
 
+    /// Install bounded volatile replay custody only when no store is configured.
+    /// This preserves existing history and does not activate durable replay authority.
+    pub fn install_default_dpop_store(&mut self) {
+        if self.dpop_nonce_store.is_none() {
+            self.dpop_nonce_store = Some(dpop::DpopNonceStore::defaults_with_clock(
+                self.clock.clone(),
+            ));
+            self.dpop_config = Some(dpop::DpopConfig::default());
+        }
+    }
+
     /// Install a DPoP nonce replay store and verification config.
     ///
     /// Once installed, any invocation whose matched grant has `dpop_required == Some(true)`

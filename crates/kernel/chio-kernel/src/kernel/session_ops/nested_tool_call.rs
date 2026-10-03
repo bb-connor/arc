@@ -60,6 +60,7 @@ impl ChioKernel {
         if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
             return Ok(response);
         }
+        let proofs = merge_operation_proof(operation, proofs)?;
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
         let retained =
             self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
@@ -141,6 +142,7 @@ impl ChioKernel {
         if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
             return Ok(response);
         }
+        let proofs = merge_operation_proof(operation, proofs)?;
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
         let retained =
             self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
@@ -213,4 +215,26 @@ fn nested_tool_request(
         federated_origin_kernel_id: None,
         declassification_grant: proofs.declassification_grant,
     }
+}
+
+fn merge_operation_proof(
+    operation: &ToolCallOperation,
+    mut proofs: NestedToolCallProofs,
+) -> Result<NestedToolCallProofs, KernelError> {
+    if let Some(wire_proof) = parse_tool_call_operation_dpop(operation)? {
+        // Historical nested callers can carry the same artifact in both the
+        // operation projection and the explicit proof bundle. Coalesce exact
+        // equality, but never choose between conflicting authority inputs.
+        if proofs
+            .dpop_proof
+            .as_ref()
+            .is_some_and(|explicit| explicit != &wire_proof)
+        {
+            return Err(KernelError::InvalidConstraint(
+                "conflicting invocation proof sources".to_string(),
+            ));
+        }
+        proofs.dpop_proof = Some(wire_proof);
+    }
+    Ok(proofs)
 }

@@ -526,6 +526,7 @@ fn session_flow_preflights_and_executes_with_the_same_participant() -> TestResul
     );
     let operation = |nonce: Option<&SignedExecutionNonce>| -> TestResult<SessionOperation> {
         Ok(SessionOperation::ToolCall(Box::new(ToolCallOperation {
+            dpop_proof: None,
             capability: request.capability.clone(),
             server_id: request.server_id.clone(),
             tool_name: request.tool_name.clone(),

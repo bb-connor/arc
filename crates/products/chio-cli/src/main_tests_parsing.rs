@@ -61,10 +61,14 @@ fn api_protect_subcommand_parses() {
                     receipt_store,
                     allow_ephemeral_receipts,
                     upstream_timeout_secs,
+                    spec_sha256,
+                    allow_anonymous_reads,
                 },
         } => {
             assert_eq!(upstream, "http://127.0.0.1:8080");
             assert!(spec.is_none());
+            assert!(spec_sha256.is_none());
+            assert!(!allow_anonymous_reads);
             assert_eq!(listen, "127.0.0.1:9090");
             assert!(receipt_store.is_none());
             assert!(!allow_ephemeral_receipts);
@@ -626,4 +630,22 @@ fn hidden_chio_attest_verify_shortcut_is_rejected() {
     };
 
     assert_eq!(error.kind(), clap::error::ErrorKind::InvalidSubcommand);
+}
+
+#[test]
+fn inbound_authority_native_cli_accepts_operator_bound_agent_key() {
+    let key = chio_core::crypto::Keypair::generate().public_key().to_hex();
+    let result = parse_cli([
+        "chio",
+        "run",
+        "--policy",
+        "policy.yaml",
+        "--agent-public-key",
+        &key,
+        "--",
+        "agent",
+    ]);
+    if let Err(error) = result {
+        panic!("{error}");
+    }
 }

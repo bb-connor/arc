@@ -7,4 +7,4 @@ mod attestation_and_telemetry_tests;
 mod extended_tests;
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 #[path = "tests/core_support.rs"]
-mod tests;
+mod scenarios;

@@ -272,6 +272,7 @@ fn fingerprint_remote_runtime_contract(
     trusted_authority_keys.sort();
     let contract = json!({
         "schema": "chio.remote-mcp.resume-runtime-contract.v1",
+        "trusted_proxy": config.trusted_proxy.as_ref().map(TrustedProxyConfig::fingerprint),
         "service": {
             "server_id": config.server_id,
             "server_name": config.server_name,
@@ -420,19 +421,37 @@ fn fingerprint_remote_policy_contract(loaded_policy: &LoadedPolicy) -> Result<St
     Ok(sha256_hex(&encoded))
 }
 
-fn derive_session_agent_keypair(
+fn derive_session_agent_public_key(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
-) -> Result<Keypair, CliError> {
+    proof_required: bool,
+) -> Result<PublicKey, CliError> {
+    if let Some(key) = authenticated_sender_key(auth_context) {
+        return Ok(key.clone());
+    }
+    if proof_required {
+        return Err(CliError::cli_other_error(
+            "proof-required sessions require an authenticated Chio sender key".to_owned(),
+        ));
+    }
     let Some(seed_path) = config.identity_federation_seed_path.as_deref() else {
-        return Ok(Keypair::generate());
+        return Ok(Keypair::generate().public_key());
     };
     match &auth_context.method {
         SessionAuthMethod::OAuthBearer {
             principal: Some(principal),
             ..
-        } => derive_federated_agent_keypair(seed_path, principal),
-        _ => Ok(Keypair::generate()),
+        } => Ok(derive_federated_agent_keypair(seed_path, principal)?.public_key()),
+        _ => Ok(Keypair::generate().public_key()),
+    }
+}
+
+fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&PublicKey> {
+    match &auth_context.method {
+        SessionAuthMethod::OAuthBearer {
+            federated_claims, ..
+        } => federated_claims.sender_public_key.as_ref(),
+        _ => None,
     }
 }
 
@@ -761,6 +780,9 @@ fn expected_resume_agent_id(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
 ) -> Result<Option<String>, CliError> {
+    if let Some(key) = authenticated_sender_key(auth_context) {
+        return Ok(Some(key.to_hex()));
+    }
     let Some(seed_path) = config.identity_federation_seed_path.as_deref() else {
         return Ok(None);
     };

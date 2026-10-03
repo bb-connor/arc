@@ -139,6 +139,8 @@ type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 pub struct RemoteServeHttpConfig {
     pub clock: RemoteClock,
     pub listen: SocketAddr,
+    /// Explicit authenticated proxy trust for TLS and attestation binding evidence.
+    pub trusted_proxy: Option<TrustedProxyConfig>,
     pub auth_token: Option<String>,
     pub auth_jwt_public_key: Option<String>,
     pub auth_jwt_discovery_url: Option<String>,
@@ -829,7 +831,10 @@ struct AuthorizationCodeGrant {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(
+    rename_all = "camelCase",
+    try_from = "sender_constraint::ConfirmationWire"
+)]
 struct ChioSenderConstraintClaims {
     #[serde(
         default,
@@ -918,7 +923,10 @@ struct JwtClaims {
     authorization_details: Option<Value>,
     #[serde(default)]
     chio_transaction_context: Option<Value>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "sender_constraint::deserialize_confirmation"
+    )]
     cnf: Option<ChioSenderConstraintClaims>,
     #[serde(default)]
     exp: Option<u64>,

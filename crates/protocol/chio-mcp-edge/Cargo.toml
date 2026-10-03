@@ -24,7 +24,7 @@ chio-security-types = { workspace = true }
 chio-manifest = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }

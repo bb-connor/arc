@@ -29,6 +29,9 @@ fn load_enterprise_provider_registry(
 }
 
 async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError> {
+    if let Some(proxy) = &config.trusted_proxy {
+        proxy.validate_separation(&config)?;
+    }
     let listener = tokio::net::TcpListener::bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let enterprise_provider_registry = load_enterprise_provider_registry(
@@ -136,7 +139,11 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         )
         .route(LOCAL_TOKEN_PATH, post(handle_token_endpoint))
         .route(LOCAL_JWKS_PATH, get(handle_local_jwks))
-        .with_state(state);
+        .with_state(state)
+        .layer(axum::middleware::from_fn_with_state(
+            config.trusted_proxy.clone(),
+            transport_identity::authenticate_proxy,
+        ));
 
     info!(
         listen_addr = %local_addr,
@@ -254,7 +261,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     let (request_auth_context, session_credential) =
         match remote_mcp_session_credentials::authenticate_request(
             &state,
-            request.headers(),
+            SenderRequest::from_request(&request),
             "POST",
             &expected_target,
         )
@@ -270,19 +277,21 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         return response;
     }
 
+    let transport = request.extensions().get::<TransportIdentity>().cloned();
     let (headers, body) = match read_limited_mcp_post_body(request).await {
         Ok(body) => body,
         Err(response) => return response,
     };
-    let message: Value = match input::document(&body, MCP_MAX_POST_BODY_BYTES) {
-        Ok(message) => message,
-        Err(error) => {
-            return input::with_source(
-                jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
-                error,
-            );
-        }
-    };
+    let message: Value =
+        match chio_mcp_adapter::edge::decode_mcp_request(&body, MCP_MAX_POST_BODY_BYTES) {
+            Ok(message) => message,
+            Err(error) => {
+                return input::with_source(
+                    jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
+                    error,
+                );
+            }
+        };
 
     if let Some(credential) = session_credential.as_ref() {
         if let Err(response) = credential.validate_message(&message) {
@@ -351,7 +360,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             // response stream. It grants no access to unrelated session events.
             if let Err(response) = remote_mcp_session_credentials::authenticate_request(
                 &state,
-                &headers,
+                SenderRequest::from_extension(&headers, transport.as_ref()),
                 "POST",
                 &expected_target,
             )
@@ -413,7 +422,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     if session_credential.is_some() {
         if let Err(response) = remote_mcp_session_credentials::authenticate_request(
             &state,
-            &headers,
+            SenderRequest::from_extension(&headers, transport.as_ref()),
             "POST",
             &expected_target,
         )
@@ -719,7 +728,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         .to_string();
     let request_auth_context = match remote_mcp_session_credentials::authenticate_request(
         &state,
-        request.headers(),
+        SenderRequest::from_request(&request),
         "GET",
         &expected_target,
     )
@@ -926,6 +935,7 @@ async fn handle_authorization_approval(
 async fn handle_token_endpoint(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
+    transport: Option<axum::Extension<TransportIdentity>>,
     Form(form): Form<TokenRequestForm>,
 ) -> Response {
     let Some(auth_server) = state.local_auth_server.as_deref() else {
@@ -934,7 +944,10 @@ async fn handle_token_endpoint(
             "local authorization server is not configured for this edge",
         );
     };
-    match auth_server.exchange_token(&headers, form) {
+    match auth_server.exchange_token(
+        SenderRequest::from_extension(&headers, transport.as_ref().map(|identity| &identity.0)),
+        form,
+    ) {
         Ok(token_response) => Json(token_response).into_response(),
         Err(response) => response,
     }
@@ -962,7 +975,7 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
         .to_string();
     let request_auth_context = match remote_mcp_session_credentials::authenticate_request(
         &state,
-        request.headers(),
+        SenderRequest::from_request(&request),
         "DELETE",
         &expected_target,
     )

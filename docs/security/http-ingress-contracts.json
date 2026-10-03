@@ -1470,26 +1470,6 @@
       "semantics": "Unsigned hypothetical underwriting policy and query produce a report; ordinary decimal spellings are allowed and no decision is signed or persisted."
     },
     {
-      "source": "crates/products/chio-api-protect/src/proxy/approval.rs",
-      "owner": "create_threshold_proposal_handler",
-      "format": "json",
-      "request_type": "CreateThresholdProposalRequest",
-      "disposition": "remaining-json-gap",
-      "authentication": "Existing api-protect operator/session and approval authorization checks",
-      "semantics": "Threshold proposal or approval request is interpreted by the approval administrator and existing authenticated operator context.",
-      "remaining_risk": "Typed Json extraction still discards original representation before the threshold proposal/approval owner. Original-byte hardening and production route controls remain outside this control-plane packet."
-    },
-    {
-      "source": "crates/products/chio-api-protect/src/proxy/approval.rs",
-      "owner": "submit_threshold_approval_handler",
-      "format": "json",
-      "request_type": "SubmitThresholdApprovalRequest",
-      "disposition": "remaining-json-gap",
-      "authentication": "Existing api-protect operator/session and approval authorization checks",
-      "semantics": "Threshold proposal or approval request is interpreted by the approval administrator and existing authenticated operator context.",
-      "remaining_risk": "Typed Json extraction still discards original representation before the threshold proposal/approval owner. Original-byte hardening and production route controls remain outside this control-plane packet."
-    },
-    {
       "source": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
       "owner": "handle_authorization_approval",
       "format": "form",
@@ -1667,5 +1647,27 @@
       "owner": "frost_coordinator_router",
       "sha256": "d3769f52a1d86dd68a9afe535470c7b3ec2dc08e6b10373205425a1159429b45"
     }
-  }
+  },
+  "manual_reader_closures": [
+    {
+      "source": "crates/products/chio-api-protect/src/proxy/approval.rs",
+      "owner": "create_threshold_proposal_handler",
+      "request_type": "CreateThresholdProposalRequest",
+      "reader": "read_body(request, input::decode)",
+      "max_bytes": 1048576,
+      "authentication": "require_control_auth before body decode",
+      "contract": "Original bounded signed JSON with duplicate and numeric-loss rejection before threshold collector mutation; local typed cause with redacted wire error.",
+      "tests": "crates/products/chio-api-protect/src/proxy/tests/inbound_authority.rs"
+    },
+    {
+      "source": "crates/products/chio-api-protect/src/proxy/approval.rs",
+      "owner": "submit_threshold_approval_handler",
+      "request_type": "SubmitThresholdApprovalRequest",
+      "reader": "read_body(request, input::decode)",
+      "max_bytes": 1048576,
+      "authentication": "require_control_auth before body decode",
+      "contract": "Original bounded signed JSON with duplicate and numeric-loss rejection before threshold collector mutation; local typed cause with redacted wire error.",
+      "tests": "crates/products/chio-api-protect/src/proxy/tests/inbound_authority.rs"
+    }
+  ]
 }

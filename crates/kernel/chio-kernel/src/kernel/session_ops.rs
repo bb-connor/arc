@@ -48,6 +48,19 @@ fn map_session_persist_error(error: SessionPersistError<KernelError>) -> KernelE
     }
 }
 
+fn parse_tool_call_operation_dpop(
+    operation: &ToolCallOperation,
+) -> Result<Option<crate::dpop::DpopProof>, KernelError> {
+    operation
+        .dpop_proof
+        .as_ref()
+        .map(|value| {
+            serde_json::from_value(value.clone()).map_err(crate::dpop::DpopError::Malformed)
+        })
+        .transpose()
+        .map_err(Into::into)
+}
+
 fn parse_tool_call_operation_execution_nonce(
     operation: &ToolCallOperation,
 ) -> Result<Option<crate::execution_nonce::SignedExecutionNonce>, KernelError> {
@@ -738,6 +751,10 @@ impl ChioKernel {
                 | SessionOperation::GetPrompt(_)
                 | SessionOperation::Complete(_)
         );
+        let parsed_dpop_proof = match operation {
+            SessionOperation::ToolCall(call) => parse_tool_call_operation_dpop(call)?,
+            _ => None,
+        };
         let parsed_tool_call_execution_nonce = match operation {
             SessionOperation::ToolCall(tool_call) => {
                 parse_tool_call_operation_execution_nonce(tool_call)?
@@ -774,7 +791,7 @@ impl ChioKernel {
                     server_id: tool_call.server_id.clone(),
                     agent_id: context.agent_id.clone(),
                     arguments: tool_call.arguments.clone(),
-                    dpop_proof: None,
+                    dpop_proof: parsed_dpop_proof,
                     execution_nonce: parsed_tool_call_execution_nonce,
                     governed_intent: tool_call.governed_intent.clone(),
                     approval_token: tool_call.approval_token.clone(),

@@ -45,10 +45,17 @@ fn sender_headers_retain_non_text_causes_before_replay_custody() {
                     "POST",
                 )
                 .unwrap_err();
-        assert!(error
-            .source()
-            .unwrap()
-            .is::<axum::http::header::ToStrError>());
+        if header == DPOP_HEADER {
+            assert!(error
+                .source()
+                .unwrap()
+                .is::<axum::http::header::ToStrError>());
+        } else {
+            assert!(matches!(
+                error,
+                SenderConstraintError::MtlsBinding | SenderConstraintError::UnsupportedSchema
+            ));
+        }
         assert_eq!(store.utilization().unwrap().0, 0);
         assert!(!format!("{error:?} {error}").contains("private-marker"));
     }

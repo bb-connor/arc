@@ -210,6 +210,7 @@ pub fn run_child_flush_mutation(seed: u64, suppress_child_append: bool) -> Resul
         agent.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: capability.clone(),
         server_id: SERVER_ID.to_string(),
         tool_name: TOOL_NAME.to_string(),

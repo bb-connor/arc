@@ -134,6 +134,7 @@ pub(crate) fn normalize_agent_message(
             threshold_approval_proposal,
             supplemental_authorization,
             execution_nonce,
+            dpop_proof,
         } => (
             OperationContext::new(
                 session_id.clone(),
@@ -141,6 +142,7 @@ pub(crate) fn normalize_agent_message(
                 session_agent_id.to_string(),
             ),
             SessionOperation::ToolCall(Box::new(ToolCallOperation {
+                dpop_proof: dpop_proof.as_deref().cloned(),
                 capability: *capability_token.clone(),
                 server_id: server_id.clone(),
                 tool_name: tool.clone(),

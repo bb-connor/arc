@@ -200,6 +200,8 @@ mod budget_governed_fallback;
 mod constraint_variants;
 #[path = "tests/emergency.rs"]
 mod emergency;
+#[path = "tests/inbound_authority.rs"]
+mod inbound_authority;
 #[path = "tests/plan_evaluation.rs"]
 mod plan_evaluation;
 #[path = "tests/receipts.rs"]

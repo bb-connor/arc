@@ -175,6 +175,7 @@ fn build_kernel_components(
     };
 
     let mut kernel = ChioKernel::new_with_clock(config, clock);
+    kernel.install_default_dpop_store();
     if kernel_policy.require_swarm_admission {
         kernel.require_swarm_admission();
     }
@@ -904,5 +905,62 @@ mod tests {
 
         assert!(kernel.guard_count() >= 2);
         assert!(kernel.post_invocation_hook_count() >= 1);
+    }
+    #[test]
+    fn inbound_authority_production_kernel_accepts_subject_proof_preview() {
+        let keypair = Keypair::generate();
+        let loaded_policy = policy::LoadedPolicy {
+            format: policy::PolicyFormat::ChioYaml,
+            identity: policy::PolicyIdentity {
+                source_hash: "source".to_string(),
+                runtime_hash: "runtime".to_string(),
+            },
+            kernel: policy::KernelPolicyConfig::default(),
+            default_capabilities: Vec::new(),
+            guard_pipeline: chio_guards::GuardPipeline::new(),
+            post_invocation_pipeline: PostInvocationPipeline::new(),
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            threshold_approval: None,
+        };
+
+        let kernel = build_kernel(loaded_policy, &keypair);
+
+        let agent = Keypair::generate();
+        let capability = kernel
+            .issue_capability(
+                &agent.public_key(),
+                chio_core::capability::scope::ChioScope::default(),
+                300,
+            )
+            .unwrap();
+        let proof = chio_kernel::DpopProof::sign(
+            chio_kernel::DpopProofBody {
+                schema: chio_kernel::DPOP_SCHEMA.into(),
+                replay_authority: None,
+                capability_id: capability.id.clone(),
+                tool_server: "proof-srv".into(),
+                tool_name: "read".into(),
+                action_hash: chio_core::sha256_hex(b"{}"),
+                nonce: "production-proof".into(),
+                issued_at: kernel
+                    .authority_clock_reading()
+                    .unwrap()
+                    .unix_millis()
+                    .as_secs(),
+                agent_key: agent.public_key(),
+            },
+            &agent,
+        )
+        .unwrap();
+        kernel
+            .verify_dpop_for_permission_preview(
+                &proof,
+                &capability,
+                "proof-srv",
+                "read",
+                &serde_json::json!({}),
+            )
+            .unwrap();
     }
 }

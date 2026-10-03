@@ -216,7 +216,8 @@ fn test_state_with_receipt_db(
         keypair.clone(),
         "test-policy".to_string(),
         Arc::clone(&approval_store),
-    );
+    )
+    .with_anonymous_reads(true);
     let egress_contract = default_upstream_egress_contract(&upstream).test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
         .build()
@@ -461,7 +462,7 @@ paths:
 }
 
 #[test]
-fn x_chio_side_effects_false_overrides_mutating_method() {
+fn unpinned_side_effects_false_cannot_override_mutating_method() {
     let spec = r#"
 openapi: 3.1.0
 info:
@@ -483,7 +484,7 @@ paths:
         .find(|route| route.pattern == "/safe-post" && route.method == HttpMethod::Post)
         .test_unwrap();
 
-    assert_eq!(route.policy, PolicyDecision::SessionAllow);
+    assert_eq!(route.policy, PolicyDecision::DenyByDefault);
 }
 
 #[test]
@@ -1687,6 +1688,8 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
     let config = ProtectConfig {
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some(PETSTORE_YAML.to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:1".to_string(),
         receipt_db: None,
@@ -1723,6 +1726,8 @@ async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
         let config = ProtectConfig {
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: Some(PETSTORE_YAML.to_string()),
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: None,
             listen_addr: "127.0.0.1:1".to_string(),
             receipt_db: Some(receipt_db.to_string()),
@@ -3326,3 +3331,6 @@ async fn ap23_invalid_approval_requester_is_rejected() -> Result<(), Box<dyn std
         .is_empty());
     Ok(())
 }
+
+#[path = "tests/inbound_authority.rs"]
+mod inbound_authority;

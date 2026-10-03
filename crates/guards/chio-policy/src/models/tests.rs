@@ -202,6 +202,7 @@ fn rules_block_helpers_cover_conditionable_rule_blocks() {
     assert!(!rules.has_configured_blocks());
 
     rules.tool_access = Some(ToolAccessRule {
+        dpop_required: None,
         enabled: true,
         allow: Vec::new(),
         block: Vec::new(),

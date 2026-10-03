@@ -101,6 +101,7 @@ impl Fixture {
             approver,
             stats: SessionStats::default(),
             message: AgentMessage::ToolCallRequest {
+                dpop_proof: None,
                 id: "pending-request".into(),
                 capability_token: Box::new(capability),
                 server_id: "pending-server".into(),

@@ -212,9 +212,14 @@ pub(crate) fn run() {
                 crate::process_host::dispatch(command)
             }
         }
-        Commands::Run { policy, command } => cmd_run(
+        Commands::Run {
+            policy,
+            command,
+            agent_public_key,
+        } => cmd_run(
             &policy,
             &command,
+            agent_public_key.as_deref(),
             json_output,
             receipt_db.as_deref(),
             revocation_db.as_deref(),

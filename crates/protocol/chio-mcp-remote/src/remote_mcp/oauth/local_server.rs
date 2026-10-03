@@ -251,11 +251,12 @@ impl LocalAuthorizationServer {
         Ok(Redirect::to(redirect_uri.as_str()))
     }
 
-    pub(super) fn exchange_token(
+    pub(super) fn exchange_token<'a>(
         &self,
-        headers: &HeaderMap,
+        headers: impl Into<SenderRequest<'a>>,
         form: TokenRequestForm,
     ) -> Result<Value, Response> {
+        let headers = headers.into();
         match form.grant_type.as_str() {
             "authorization_code" => self.exchange_authorization_code(headers, form),
             "urn:ietf:params:oauth:grant-type:token-exchange" => {
@@ -271,7 +272,7 @@ impl LocalAuthorizationServer {
 
     pub(super) fn exchange_authorization_code(
         &self,
-        headers: &HeaderMap,
+        headers: SenderRequest<'_>,
         form: TokenRequestForm,
     ) -> Result<Value, Response> {
         let code = form.code.as_deref().ok_or_else(|| {
@@ -395,7 +396,7 @@ impl LocalAuthorizationServer {
 
     pub(super) fn exchange_subject_token(
         &self,
-        headers: &HeaderMap,
+        headers: SenderRequest<'_>,
         form: TokenRequestForm,
     ) -> Result<Value, Response> {
         let subject_token = form.subject_token.as_deref().ok_or_else(|| {

@@ -55,3 +55,4 @@ workspace = true
 chio-siem = { workspace = true }
 chio-test-support = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
+tower = { workspace = true, features = ["util"] }

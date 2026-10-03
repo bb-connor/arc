@@ -1,5 +1,8 @@
 use super::*;
+#[path = "runtime/session_subject.rs"]
+mod session_subject;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+pub(crate) use session_subject::resolve_agent_subject;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -66,6 +69,7 @@ fn open_cli_durable_admission_runtime(
 pub(crate) fn cmd_run(
     policy_path: &Path,
     command: &[String],
+    agent_public_key: Option<&str>,
     json_output: bool,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
@@ -79,6 +83,7 @@ pub(crate) fn cmd_run(
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
     let durable_admission = open_cli_durable_admission_runtime(
@@ -127,8 +132,6 @@ pub(crate) fn cmd_run(
         configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
     }
 
-    let agent_kp = Keypair::generate();
-    let agent_pk = agent_kp.public_key();
     let session_agent_id = agent_pk.to_hex();
     let initial_caps = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
     let session_id = kernel.open_session(session_agent_id.clone(), initial_caps.clone())?;
@@ -401,6 +404,8 @@ fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_api_protect(
     upstream: &str,
+    spec_sha256: Option<&str>,
+    allow_anonymous_reads: bool,
     spec_path: Option<&Path>,
     listen_addr: &str,
     receipt_store: Option<&Path>,
@@ -443,6 +448,8 @@ pub(crate) fn cmd_api_protect(
         let config = ProtectConfig {
             upstream: upstream.to_string(),
             spec_content: None,
+            spec_sha256: spec_sha256.map(str::to_owned),
+            allow_anonymous_reads,
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
             receipt_db: durable_receipt_db_path(receipt_store)
@@ -536,6 +543,8 @@ pub(crate) fn cmd_start(
             // forward.
             upstream: CHIO_START_NO_UPSTREAM_URL.to_string(),
             spec_content: Some(CHIO_START_SIDECAR_OPENAPI_SPEC.to_string()),
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: None,
             listen_addr: listen_addr.to_string(),
             receipt_db: durable_receipt_db_path(receipt_store).map(|path| path.display().to_string()),
@@ -726,6 +735,29 @@ pub(crate) fn cmd_check(
                 ))
             })?,
     };
+    let dpop_proof = if chio_kernel::capability_request_requires_dpop_with_model_metadata(
+        &cap, tool, server, &params, None,
+    )? {
+        let proof = chio_kernel::dpop::DpopProof::sign(
+            chio_kernel::dpop::DpopProofBody {
+                schema: chio_kernel::DPOP_SCHEMA.to_string(),
+                replay_authority: None,
+                capability_id: cap.id.clone(),
+                tool_server: server.to_string(),
+                tool_name: tool.to_string(),
+                action_hash: chio_core::crypto::sha256_hex(
+                    &chio_core::canonical::canonical_json_bytes(&params)?,
+                ),
+                nonce: uuid::Uuid::new_v4().to_string(),
+                issued_at: kernel.authority_clock_reading()?.unix_millis().as_secs(),
+                agent_key: agent_pk.clone(),
+            },
+            &agent_kp,
+        )?;
+        Some(serde_json::to_value(proof)?)
+    } else {
+        None
+    };
     let session_id = kernel.open_session(session_agent_id.clone(), initial_caps)?;
     kernel.activate_session(&session_id)?;
 
@@ -735,6 +767,7 @@ pub(crate) fn cmd_check(
         session_agent_id,
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof,
         capability: cap,
         server_id: server.to_string(),
         tool_name: tool.to_string(),
@@ -902,6 +935,7 @@ pub(crate) fn verdict_label(verdict: chio_kernel::Verdict) -> &'static str {
 }
 
 pub(crate) fn cmd_mcp_serve(
+    agent_public_key: Option<&str>,
     policy_path: Option<&Path>,
     preset: Option<&str>,
     server_id: &str,
@@ -989,6 +1023,7 @@ pub(crate) fn cmd_mcp_serve(
     let loaded_policy = load_policy(resolved_policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -1070,8 +1105,6 @@ pub(crate) fn cmd_mcp_serve(
     }
     kernel.register_tool_server(Box::new(adapted_server));
 
-    let agent_kp = Keypair::generate();
-    let agent_pk = agent_kp.public_key();
     let agent_id = agent_pk.to_hex();
     let capabilities = issue_default_capabilities(&kernel, &agent_pk, &default_capabilities)?;
 
@@ -1121,6 +1154,8 @@ pub(crate) fn cmd_mcp_serve_http(
     tools_list_changed: bool,
     shared_hosted_owner: bool,
     listen: SocketAddr,
+    trusted_proxy_peers: &[std::net::IpAddr],
+    trusted_proxy_token_file: Option<&Path>,
     auth_token: Option<&str>,
     auth_jwt_public_key: Option<&str>,
     auth_jwt_discovery_url: Option<&str>,
@@ -1189,6 +1224,11 @@ pub(crate) fn cmd_mcp_serve_http(
     )?);
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
+        trusted_proxy: trusted_proxy_token_file
+            .map(|path| {
+                remote_mcp::TrustedProxyConfig::from_token_file(trusted_proxy_peers.to_vec(), path)
+            })
+            .transpose()?,
         approval: approval_config
             .map(remote_mcp::RemoteApprovalConfig::load)
             .transpose()?,

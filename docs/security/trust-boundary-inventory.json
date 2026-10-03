@@ -453,6 +453,7 @@
     "crates/protocol/chio-mcp-adapter/src/transport/utils.rs",
     "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs",
     "crates/protocol/chio-mcp-edge/src/authorization.rs",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs",
@@ -1496,7 +1497,8 @@
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire",
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire",
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire",
-    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire",
@@ -1602,6 +1604,15 @@
     "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire"
   ],
   "raw_decoders": [
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
@@ -2324,6 +2335,9 @@
     "crates/protocol/chio-mcp-adapter/src/transport/utils.rs::parse_create_elicitation_operation::from_value",
     "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs::parse_url_elicitation_required_error::from_value",
     "crates/protocol/chio-mcp-edge/src/authorization.rs::negotiate_authorization_capabilities::from_value",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_slice",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_str",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_str",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value",
@@ -2334,6 +2348,7 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_dpop_proof::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_execution_nonce::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value",
@@ -4595,6 +4610,10 @@
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::from::custom_deserialize": "Validated security receipt DTO field deserializers; containing signed receipt readers and trusted producer checks establish provenance.",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc::validate::custom_deserialize": "Validated security receipt DTO field deserializers; containing signed receipt readers and trusted producer checks establish provenance.",
     "crates/core/chio-core-types/src/wire_text.rs::schema::custom_deserialize": "Validated wire text field deserializers; containing original-byte readers establish the document contract.",
+    "crates/core/chio-response-model/src/simulation.rs::decode::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/state.rs::decode_response_record::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/state.rs::validate_effect_contribution::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+    "crates/core/chio-response-model/src/state.rs::validate_effect_plan_binding::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/economy/chio-anchor/src/witness.rs::serialize::custom_deserialize": "Opaque witness proof serialization and base64 decode have a 1 MiB decoded budget; encoded length is checked before allocating decoded proof bytes. Wire receipt shape remains unverified until the pinned lane verifier and batch bindings succeed.",
     "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_slice": "Contract-backed HTTP bounds retention; original unsigned JSON rejects duplicates before Alloy RawValue projection of the same bytes, preserving native integers and ordinary float spellings. Native transport and parser causes survive the public oracle error; public errors never echo provider bodies. Chain, feed, configured decimals, round, price and freshness checks remain.",
     "crates/economy/chio-open-market/src/recovery.rs::verify_finding_recovery_context::from_value": "Recovery members preserve the existing strict external I-JSON and exact typed canonical contract under the carrier limit. Parser causes survive member/context/metadata projection. Original kernel receipt signature, purchase and capability identity, subject and recovery authority binding remain unchanged.",
@@ -4711,11 +4730,14 @@
     "crates/protocol/chio-mcp-adapter/src/transport/utils.rs::parse_create_elicitation_operation::from_value": "Elicitation params are untrusted data from the bounded frame reader; default form mode is the protocol field default, not a compatibility authority path. NestedFlowBridge evaluates authorization.",
     "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs::parse_url_elicitation_required_error::from_value": "URL-required errors contain untrusted typed elicitations. HTTPS/URL and operation shape checks precede the kernel-owned elicitation path; a URL or decoded request grants no authority.",
     "crates/protocol/chio-mcp-edge/src/authorization.rs::negotiate_authorization_capabilities::from_value": "Initialize-only feature negotiation from an already decoded object. Features cannot mint authority; the kernel validates signed artifacts against installed authorities and forbids per-call negotiation upgrades.",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_slice": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader.",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_str": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader.",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_progress_token::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_dpop_proof::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_execution_nonce::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
@@ -4755,10 +4777,6 @@
     "crates/security/chio-quarantine/src/correlation.rs::parse_verified_event::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/correlation.rs::validate_stored_body::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/executor_parts/effect_journal_methods.inc::decode_journal::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/core/chio-response-model/src/simulation.rs::decode::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/core/chio-response-model/src/state.rs::decode_response_record::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/core/chio-response-model/src/state.rs::validate_effect_contribution::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-    "crates/core/chio-response-model/src/state.rs::validate_effect_plan_binding::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_value": "Typed projection after the constrained input parser; no fresh raw bytes.",
     "crates/security/chio-secret-broker/src/ipc_client.rs::read_vector::from_slice": "This-process canonical serialization replay; no external raw bytes.",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::serve_prepared_broker_mcp::from_value": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO.",
@@ -4860,6 +4878,15 @@
       "from_slice::from_slice"
     ],
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs": [
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
@@ -5591,6 +5618,7 @@
       "retain_pending_threshold_request::from_value"
     ],
     "crates/kernel/chio-kernel/src/kernel/session_ops.rs": [
+      "parse_tool_call_operation_dpop::from_value",
       "parse_tool_call_operation_execution_nonce::from_value"
     ],
     "crates/kernel/chio-kernel/src/kernel/settlement_observer.rs": [
@@ -6086,6 +6114,11 @@
     "crates/protocol/chio-mcp-edge/src/authorization.rs": [
       "negotiate_authorization_capabilities::from_value"
     ],
+    "crates/protocol/chio-mcp-edge/src/ingress.rs": [
+      "decode_mcp_request::from_slice",
+      "decode_mcp_request::from_str",
+      "decode_mcp_request::from_str"
+    ],
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs": [
       "create_elicitation::from_value",
       "create_elicitation::from_value",
@@ -6099,6 +6132,7 @@
       "parse_request_approval_artifacts::from_value",
       "parse_request_approval_artifacts::from_value",
       "parse_request_approval_artifacts::from_value",
+      "parse_request_dpop_proof::from_value",
       "parse_request_execution_nonce::from_value",
       "parse_request_governed_intent::from_value",
       "parse_request_model_metadata::from_value",
@@ -6423,7 +6457,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 561
+          "instances": 570
         }
       ]
     },
@@ -6723,6 +6757,60 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-response-model/src/simulation.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+      "readers": [
+        {
+          "reader": "decode",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "CanonicalBody::as_bytes",
+            "canonical_json_bytes+original_equality"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-response-model/src/state.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
+      "readers": [
+        {
+          "reader": "decode_response_record",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "canonical_json_bytes+original_equality"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "validate_effect_contribution",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "CanonicalBody::as_bytes",
+            "canonical_json_bytes+original_equality"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "validate_effect_plan_binding",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "PlannedResponseEffect::canonical_contribution[CanonicalBody]"
           ],
           "checked": true
         }
@@ -7147,6 +7235,22 @@
         }
       ]
     },
+    "crates/kernel/chio-kernel/src/approval/tool_context.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Typed intent context projection only; original request readers reject duplicate keys and the kernel compares the reconstructed context against capability, arguments, request, current policy and tenant before authority.",
+      "readers": [
+        {
+          "reader": "verify",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
     "crates/kernel/chio-kernel/src/caller_delivery.rs": {
       "kind": "reviewed-signed-owner",
       "contract": "flush reparses canonical bytes just written by this process; validate_authorization decodes the bounded caller artifact after its retained wire validation. Neither grants fresh authority.",
@@ -7306,6 +7410,16 @@
       "kind": "typed-value-conversion",
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
       "readers": [
+        {
+          "reader": "parse_tool_call_operation_dpop",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        },
         {
           "reader": "parse_tool_call_operation_execution_nonce",
           "decoders": [
@@ -9620,6 +9734,25 @@
         }
       ]
     },
+    "crates/protocol/chio-mcp-edge/src/ingress.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader.",
+      "readers": [
+        {
+          "reader": "decode_mcp_request",
+          "decoders": [
+            "from_slice",
+            "from_str",
+            "from_str"
+          ],
+          "apis": [
+            "UntrustedJsonText::from_wire#1::decode_document",
+            "UntrustedJsonText::from_wire#2::decode_signed"
+          ],
+          "checked": true
+        }
+      ]
+    },
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs": {
       "kind": "reviewed-protocol-reader",
       "contract": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
@@ -9678,6 +9811,16 @@
           "decoders": [
             "from_value",
             "from_value",
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "parse_request_dpop_proof",
+          "decoders": [
             "from_value"
           ],
           "apis": [
@@ -10246,60 +10389,6 @@
           ],
           "apis": [
             "example-or-fuzz"
-          ],
-          "checked": true
-        }
-      ]
-    },
-    "crates/core/chio-response-model/src/simulation.rs": {
-      "kind": "parser-internal-or-typed",
-      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-      "readers": [
-        {
-          "reader": "decode",
-          "decoders": [
-            "from_slice"
-          ],
-          "apis": [
-            "CanonicalBody::as_bytes",
-            "canonical_json_bytes+original_equality"
-          ],
-          "checked": true
-        }
-      ]
-    },
-    "crates/core/chio-response-model/src/state.rs": {
-      "kind": "parser-internal-or-typed",
-      "contract": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
-      "readers": [
-        {
-          "reader": "decode_response_record",
-          "decoders": [
-            "from_slice"
-          ],
-          "apis": [
-            "canonical_json_bytes+original_equality"
-          ],
-          "checked": true
-        },
-        {
-          "reader": "validate_effect_contribution",
-          "decoders": [
-            "from_slice"
-          ],
-          "apis": [
-            "CanonicalBody::as_bytes",
-            "canonical_json_bytes+original_equality"
-          ],
-          "checked": true
-        },
-        {
-          "reader": "validate_effect_plan_binding",
-          "decoders": [
-            "from_slice"
-          ],
-          "apis": [
-            "PlannedResponseEffect::canonical_contribution[CanonicalBody]"
           ],
           "checked": true
         }
@@ -10974,22 +11063,6 @@
           ],
           "apis": [
             "serde::Deserializer"
-          ],
-          "checked": true
-        }
-      ]
-    },
-    "crates/kernel/chio-kernel/src/approval/tool_context.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Typed intent context projection only; original request readers reject duplicate keys and the kernel compares the reconstructed context against capability, arguments, request, current policy and tenant before authority.",
-      "readers": [
-        {
-          "reader": "verify",
-          "decoders": [
-            "from_value"
-          ],
-          "apis": [
-            "serde_json::from_value"
           ],
           "checked": true
         }
@@ -15811,6 +15884,10 @@
     "crates/products/chio-cli/src/cert/session_receipts.rs": {
       "contract": "Bounded single-snapshot certificate session scan: strict native signed JSON before unambiguous exact metadata selection, then shared typed projection. Per-row and aggregate session limits abort without truncation; selected signatures remain the generator/verifier responsibility. Duplicate, conflicting or unknown membership aborts with private row context.",
       "kind": "reviewed-bounded-input"
+    },
+    "crates/protocol/chio-mcp-edge/src/ingress.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader."
     }
   },
   "decoding_contracts": [
@@ -16185,7 +16262,8 @@
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire#1::decode_document",
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire#1::decode_document",
-    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire#1::decode_document",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#1::decode_document",
+    "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#2::decode_signed",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire#1::decode_signed",
@@ -19471,10 +19549,6 @@
     "crates/platform/chio-trust-market-context/src/policy.rs": [
       "parse_policy::shared-reader::crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json"
     ],
-    "crates/products/chio-api-protect/src/proxy/approval.rs": [
-      "create_threshold_proposal_handler::request-json::CreateThresholdProposalRequest",
-      "submit_threshold_approval_handler::request-json::SubmitThresholdApprovalRequest"
-    ],
     "crates/products/chio-api-protect/src/proxy/approval_authority.rs": [
       "load::original-json-reader::UntrustedJsonText"
     ],
@@ -20259,8 +20333,11 @@
     "crates/protocol/chio-mcp-edge/src/fuzz.rs": [
       "fuzz_mcp_envelope_decode::shared-reader::crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame"
     ],
+    "crates/protocol/chio-mcp-edge/src/ingress.rs": [
+      "decode_mcp_request::original-json-reader::UntrustedJsonText"
+    ],
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs": [
-      "read_jsonrpc_frame::original-json-reader::UntrustedJsonText"
+      "read_jsonrpc_frame::shared-reader::crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request"
     ],
     "crates/protocol/chio-mcp-remote/src/input.rs": [
       "decode::original-json-reader::UntrustedJsonText",

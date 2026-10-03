@@ -192,6 +192,9 @@ pub struct ShellCommandsRule {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolAccessRule {
+    /// Require a subject-signed invocation proof verified by the kernel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_required: Option<bool>,
     #[serde(default = "default_true")]
     pub enabled: bool,
     #[serde(default)]

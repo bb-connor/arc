@@ -15,6 +15,11 @@ pub struct ProtectConfig {
     pub spec_content: Option<String>,
     /// Optional OpenAPI spec path. When omitted, the proxy auto-discovers the spec.
     pub spec_path: Option<String>,
+    /// SHA-256 of the exact local spec bytes. Required to honor permissive
+    /// side-effect overrides; valid only together with spec_path.
+    pub spec_sha256: Option<String>,
+    /// Local operator opt-in for anonymous reads on registered routes.
+    pub allow_anonymous_reads: bool,
     /// Address to listen on (e.g., "127.0.0.1:9090").
     pub listen_addr: String,
     /// Optional SQLite path for receipt persistence.
@@ -80,6 +85,8 @@ impl std::fmt::Debug for ProtectConfig {
                 &self.spec_content.as_ref().map(|_| "<inline>"),
             )
             .field("spec_path", &self.spec_path)
+            .field("spec_sha256", &self.spec_sha256)
+            .field("allow_anonymous_reads", &self.allow_anonymous_reads)
             .field("listen_addr", &self.listen_addr)
             .field("receipt_db", &self.receipt_db)
             .field("allow_ephemeral_receipts", &self.allow_ephemeral_receipts)

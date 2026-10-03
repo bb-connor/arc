@@ -186,6 +186,7 @@ fn empty_header_map() -> HeaderMap {
 
 fn test_remote_config() -> RemoteServeHttpConfig {
     RemoteServeHttpConfig {
+        trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().expect("parse listen addr"),
         auth_token: Some("remote-auth-token".to_string()),
@@ -1364,7 +1365,8 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
             nbf: None,
         },
         JwtProviderProfile::AzureAd,
-    );
+    )
+    .unwrap();
     assert_eq!(federated_claims.client_id.as_deref(), Some("client-azp"));
     assert_eq!(federated_claims.object_id.as_deref(), Some("object-456"));
     assert_eq!(federated_claims.tenant_id.as_deref(), Some("tenant-123"));
@@ -1382,6 +1384,7 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
 #[test]
 fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
     let config = RemoteServeHttpConfig {
+        trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().unwrap(),
         auth_token: None,
@@ -1555,6 +1558,7 @@ fn identity_federation_derives_stable_keypair_per_principal() {
 #[test]
 fn jwt_remote_auth_requires_separate_admin_token() {
     let config = RemoteServeHttpConfig {
+        trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().unwrap(),
         auth_token: None,

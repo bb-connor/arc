@@ -186,6 +186,7 @@ fn invocation_context_reaches_nested_flow_dispatch_without_a_wire_capability(
     kernel.activate_session(&session)?;
     let context = make_operation_context(&session, "nested-context", &agent.public_key().to_hex());
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: cap.clone(),
         server_id: "caller-context".to_owned(),
         tool_name: "work".to_owned(),
