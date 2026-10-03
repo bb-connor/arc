@@ -1,0 +1,424 @@
+{
+  "schema": "chio.planning.source-snapshot.v1",
+  "inspected_on": "2026-10-03",
+  "recorded_at_utc": "2026-10-03T23:03:41.374157+00:00",
+  "purpose": "Code-grounded planning inputs; not runtime or release qualification",
+  "sources": [
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e"
+    }
+  ],
+  "recovery_implementation": {
+    "location": "Owner Mac accessed by its agent over Tailscale",
+    "status": "active, confirmed by owner",
+    "implementation_sha": null,
+    "visible_contract_pr": 1172
+  },
+  "inputs": [
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "Cargo.toml",
+      "sha256": "e536b29d29d59cbfeb4928f8ea676333ee7c55752303843b7fbdf950150c59cc"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/platform/chio-workflow/Cargo.toml",
+      "sha256": "a0e56be0934d3f12cd99923d6ac07228a98e355f53d15c568919a429028b2860"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+      "sha256": "71526dcda6247c35ac6b2a27e6f1822ca897a6ed954a50045a083a0fedecdf16"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+      "sha256": "5b3cd1c850202d23d058a4309796456f6f95e916b1a4ce7b215eca6b4be8c20e"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime/src/lib.rs",
+      "sha256": "08dadb6484a47fb0cad1fe564ec2529645da238a8fe28640f6594ee7317e0814"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime/src/stores.rs",
+      "sha256": "b3271441152a11313423c70c34a419df2ae00a41847c3ab7d1ba671c11144fbd"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime/Cargo.toml",
+      "sha256": "5a054cbbacbd7bf24bd760c838af31b4bdf937c056cbd3d22f4f68dc52483291"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime-core/Cargo.toml",
+      "sha256": "9e9140c780909eb08bf9b60cbfcf8799d99ca580b359aa72dd300f55b29a6962"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime-core/src/store/sqlite.rs",
+      "sha256": "d76f403c5a27d1b3986f107afb345c864d3e0f2aa5c9d785f0b5c5e4039845f0"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs",
+      "sha256": "2c581bf561f968079e0f72f5cb82fbe997375866845690a92bfaaa31868bfde6"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-runtime-core/src/store/sqlite/runs_steps.rs",
+      "sha256": "4bbfde0080a11b4698d72349f76bc713ce6a3869bfbdcdf4edce1b24a5b26e2c"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-swarm-authority/src/evolution.rs",
+      "sha256": "65651ce4677cbce965d1507eb6170eb6dbc3e13414ca1d744d504a035908300b"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-kernel/src/delegated_work.rs",
+      "sha256": "8ca2b68c69b82245375f0d01eeac17d530357724b846857a9827e73cfe20abd3"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-kernel/src/payment.rs",
+      "sha256": "282b97eecdcb00832709ae212c3d8ca192e277c53ba3cc7dd65f744f326901c1"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-kernel/Cargo.toml",
+      "sha256": "5ef4ef130fef19055e240c166a1902c1faedeeabf5ab9855131f6eb70f5d1d1d"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-process/Cargo.toml",
+      "sha256": "6b4962e5bd272071af55afde10f33fcbfe86593173ea2a5d2d4aa3f3fea242d7"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-process/src/lib.rs",
+      "sha256": "7d4b005a57a6a4f3ca453ebab7727492d1e52cabb2462eb4f8937d7ba2de051a"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-process/src/worker.rs",
+      "sha256": "851da9473f9e99b0511abee8ca8e3c901ba82a2c1ae16387b533edf66d846722"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/products/chio-cli/src/cli/process_host/swarm.rs",
+      "sha256": "97340528f8c3a9a790c04c7d6753583a7249c152bb090e73ace409cbfd44cc39"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/platform/chio-control-plane/Cargo.toml",
+      "sha256": "7ac8fd60279464015ed04107f9e7aacec43ed1599d631e9a6218d0c2b6b05cc3"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/trust/chio-federation/src/bilateral.rs",
+      "sha256": "3da14a7909fb74bd57995cf5eeca07aa2e7c0f0d03ce7621f5f5b35984474544"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/trust/chio-federation/src/trust_establishment.rs",
+      "sha256": "e70e3d140520733a415855dc0bc9a5ef5d2833baf23aa5339234ea61c8d47314"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/economy/chio-settle/Cargo.toml",
+      "sha256": "a97d75cf72d053f457f902593860f6496a97865a6dd2869e01f54e1e5d61b16a"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/economy/chio-settle/README.md",
+      "sha256": "646aa9992d6fa8f49a8337be400983bee445938919a026b846b996e7404aefb8"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/economy/chio-open-market/README.md",
+      "sha256": "1b54ae454308e0ecb399eeb4e4c6713f83cb18f41b493e2994d53b120ec861fe"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/Cargo.toml",
+      "sha256": "858e6359e9498c144f2dda7939f50d80b3c945a4b916576f735265a85171483f"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/composition.rs",
+      "sha256": "c2c4154fd7e524a15e0c9b8a664b72863b74b8fcee8d8a3d5b21d26065b572df"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/evolving.rs",
+      "sha256": "fd93831512a48b6d65673b96fedcbd1d5e0b0432961820750b28e0f8f6336376"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/native.rs",
+      "sha256": "3c4e614a6682692d00a644d87eca03017063c2f9ead620025f0e79e7e8176056"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/rail.rs",
+      "sha256": "a66e79838b0d59c3eeceac513e7aeb1ca6be09ee7a61dba8dea629d5ed75a3c5"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/agreement.rs",
+      "sha256": "a80a15d256580ba330a8797c72d9b9713df878df20ca4bd4f7a3c0dc88b56b29"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/peer_client.rs",
+      "sha256": "41075198de611fa2e835573bd13bb56a41930b7da2c2b10f49ea457101ecc360"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/peer_https.rs",
+      "sha256": "684846bf739c280eb568ee01cc851ae1c13766fd356efef6390ad4321a2dbf7a"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "contracts/src/experimental/ChioWorkClaimEscrow.sol",
+      "sha256": "b1def783516523cf58c2e60f9d541cdcc47ec07f80e9662e01f88c8cb77e1df9"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/protocol/chio-mcp-adapter/src/server.rs",
+      "sha256": "b323fde17bfdfc41b137ea109566a0d1876824a622677a41634de913b903127e"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/protocol/chio-a2a-adapter/src/invoke.rs",
+      "sha256": "8cf2c821b86d9aec61bcd18a69aac085b0fbb2e93da18400db10aabe6c56c747"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/protocol/chio-cross-protocol/README.md",
+      "sha256": "00e770a8f61cc2cb6ee09f85d66e5ea5e06248c4c1bb20eb283766c34f9ef4d3"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/protocol/chio-envoy-ext-authz/README.md",
+      "sha256": "a31e4167e5f8871ffb4f949e4f03a6bcf88ac9cbdb421dd199cc01de3109c094"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/guards/chio-policy/README.md",
+      "sha256": "7e8ead4d394496d9bfb322e679a7b30c5650b26c1c722515ec65af47c67224f0"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "sdks/python/chio-process/src/chio_process/__init__.py",
+      "sha256": "93a6e0db164ad04cf6fc3eaa5a3af4a202715ece3e0db5df01db0add37882d8a"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "sdks/typescript/packages/process/package.json",
+      "sha256": "15d41c81a68b0b38041e4c45ad8e10b887a7e75b8c7ac0646187778ce16cdcaf"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "scripts/qualify-process-packages.py",
+      "sha256": "b9472c08f2687dafadcababc494476851f8ef056d7e4479cac0bb1d386087ab4"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json",
+      "sha256": "889179ee6934b161e85cc6034810ab6991fd02d290c90dddc114f3e8c4480207"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/release/RELEASE_CANDIDATE.md",
+      "sha256": "e8a529f2043c5c176572a44f4b3c9ff60e8abe9291a71921df6de2eb0d90b540"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/release/GA_CHECKLIST.md",
+      "sha256": "ccc8c6f606a6a5f68e0f802ce17fa9e5ed7f6c6cab62990bcdcb2a0869c119f8"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/programmable-sovereignty/sections/01-introduction.tex",
+      "sha256": "2821dcddde174ab675121410b4410cc8f99ac0675e292db7bf998aa184c056a0"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/programmable-sovereignty/sections/03-substrate.tex",
+      "sha256": "97fee27f76f783bce1c646dc3a45b91d60d70ea8c9f4e5aa05880d9f04c1798e"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/paper.tex",
+      "sha256": "6b134ac2763f2bfa1686d333cbd8eebc58d058bc8ab7dc93b6e717cf97577588"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/sections/01-problem.tex",
+      "sha256": "3757563c9be325b9704739a769b0f3293729c35f8249fe859a82ae65fcba3be3"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/sections/02-model.tex",
+      "sha256": "65a118100344880f47ede9f19a609d71747da03bd21460fc139229c6ecca8c46"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/sections/06-evaluation.tex",
+      "sha256": "a669a65b0479feff4ab96d7eb41be6394786cc8eec69040792ba69ee9aa0a1d2"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/sections/07-related.tex",
+      "sha256": "014666e58ae487cd64c68f2c70aaa34717365bb69fc792fe4283b6d91dce7941"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/PUBLICATION.json",
+      "sha256": "03c57bb18ec4f9e63871d41c5a4101fabd89e7b1aef89470e937c3d625b5ba54"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/CLAIMS.json",
+      "sha256": "ea7bd58792681efe427348ae5bb5757652004e928e785174607c925e813277cd"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/papers/verifiable-work/tools/check.py",
+      "sha256": "805468cded60a0e627224f3a8c279a429133eff9ee9a96f2ab28cdba61d0255f"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "docs/research/evolving-funded-work/RESULTS.md",
+      "sha256": "f62318583465a914b611776da95c017014e1a3dcac4f3adb9b31e794b4a78608"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "docs/security/launch-status.md",
+      "sha256": "95400d8e11a3eaf180b8128dcfd00b532163429cd9192170da2d634beb205dd2"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "docs/security/launch-execution-plan.md",
+      "sha256": "9854ee9872ba91b1f4ba6e014e5835c4fa508115af48dd147d236f2f09668668"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "docs/superpowers/plans/2026-09-26-security-execution-dispatch.md",
+      "sha256": "3cf6008e38e510caa858e2fcda52216d056babf4814760b13924d0c5dbdb8448"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "docs/superpowers/plans/2026-10-03-evidence-package-trust.md",
+      "sha256": "07264538e71b60e8b928b3e88d6c88b8a6289351487544266e9994b1a0779bd9"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "docs/reviews/2026-10-03-evidence-package-trust-execution.md",
+      "sha256": "bc1e49c8759925e72328c746e4adcdc706fb02040c11756318e22b6a90b1ee41"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/README.md",
+      "sha256": "2b9e9fd7fd3550ff9426258781fa5f9e0dbc6f4b8f124d91561fb875dee2c3fa"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/02-rust-design.md",
+      "sha256": "c64494196045229cc5fd8a6cd6c2cc3fc3ff12fc846c8653b3cb38b38d9bc8f0"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/10-delivery-decisions.md",
+      "sha256": "9e89cb757d5a1b14a6c9842c27bc9529434ff1b718fe32c0ac7055fc11bb9b1c"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/11-contract-catalog.md",
+      "sha256": "fab53560b298ae852dfb5cbdd2d5833aaa966d1031387af784791ae1eb371cc0"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/requirements.json",
+      "sha256": "b3f56200499e037171c602fbbe815426620024073b73be4657fba785197cf125"
+    }
+  ]
+}
