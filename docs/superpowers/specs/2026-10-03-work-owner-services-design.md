@@ -18,11 +18,15 @@ Use one versioned chio.work.v1 contract over:
 
 - POST /v1/work/prepare: WorkPreparationV1 -> WorkPreparedV1, under the configured local authoring role
 - POST /v1/work/commands: WorkCommandV1 -> WorkCommandResultV1
-- POST /v1/work/query: WorkHandleV1 -> authorized WorkViewV1
+- POST /v1/work/query: WorkQueryV1 -> authorized WorkQueryResultV1 (work, original command or original preparation)
 - POST /v1/work/cosign: closed receipt or bilateral-DSSE request -> exact response
 - authenticated negotiation of supported profile/features, with no mutation
 
+Query is read-only; Reconcile advances existing historical obligations. Result bytes use the existing recovery release operation, not a work query or reconciliation response. Closed outcomes distinguish pending owner handoff from a pre-handoff refusal.
+
 Use request bodies for scoped references rather than placing protected identifiers in URL logs. Local credentials may be used on the private worker socket; remote requests require the security lane's verified caller and configured peer binding. TLS server identity and work principal authorization are distinct checks.
+
+Mount the concrete W1 WorkService, with an internal authenticated WorkSession. Reuse current namespace/credential verification and recheck local role scope at mutation. Enforce bounded request/decode/verification budgets, per-owner queue/concurrency limits and configured peer timeouts before expensive signature or network work. Unknown/unauthorized references have bounded audience-safe responses; metadata and error strings receive the same release review as output.
 
 The existing D1 offer and capability issuance happen at the receiver. Selection binds the returned receiver-signed offer and exact capability/request. Agreement acceptance uses locally authorized signers, with both signatures over the same complete body. No provider selection helper has both owners' private keys.
 
@@ -42,9 +46,11 @@ Prototype peer_https.rs and peer_client.rs supply useful framing/authentication 
 
 Unpaid work uses the same work commitment and native checks without a financial reference. Funded work binds an exact signed agreement, configured rail, verified deposited reserve, native authorization/hold and verifier decision.
 
-Move chain/ABI/terms verification from the standalone example into chio-settle::work_claims under its existing web3 feature. Keep native PaymentAdapter wiring in chio-control-plane::work::funding. This avoids a chio-kernel -> chio-settle -> chio-kernel dependency cycle. Retain journal ownership in the existing serving/financial stores; do not copy the example's loosely coupled Journal into a second execution authority.
+Move only chain/ABI/terms and observation/transaction logic into chio-settle::work_claims under its existing web3 feature. Keep the complete F1 Agreement/SignedAgreement, full ToolCallRequest verification, SignedContractualCaptureWaiverTermsV1 integration and PaymentAdapter in chio-control-plane::work::funding. The current agreement embeds a kernel-owned waiver type; moving it wholesale into settle would create a kernel -> settle -> kernel cycle. This split preserves exact existing signature preimages without duplicating/moving waiver types or replacing them with Value. Retain journal ownership in existing serving/financial stores; do not copy the example Journal.
 
 The economic contract remains the existing F1 construction. Lift W0's fixed server, price 100, XTS mapping and fixture checker into explicit validated profile fields. A profile identifies asset/network/contract, integer units, acceptance verifier, custody rule, deadlines, finality and the supported recovery behavior. Observations are verified against that configuration; a caller cannot submit their own reserve attestation as authoritative.
+
+Any new agreement/reserve-to-operation index is non-authorizing. Financial acceptance/capture stays in the existing payment journal and qualified serving owner. New authoritative records must participate in its global commit/projection, integrity, snapshot and migration catalogs, not merely have a fence parameter. Verified reserve observations carry their observed domain/finality context; stale cached verification does not authorize a later financial mutation.
 
 For the initial local-devnet profile, adapt the existing WorkClaimEscrow contract and transaction recovery. Do not change its financial state machine merely to promote packaging. Native settlement and chain settlement retain distinct original references. A child has its own actual funding; unused parent allowance is not money. Payable work remains payable after parent failure/refund. Public-money operation stays unsupported until separately qualified.
 

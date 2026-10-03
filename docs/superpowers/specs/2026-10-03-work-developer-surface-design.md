@@ -20,15 +20,18 @@ Extend the existing Python chio-process and TypeScript @chio-protocol/process pa
 
 - submit(command: WorkCommandV1) -> WorkCommandResultV1
 - prepare(proposal: WorkPreparationV1) -> WorkPreparedV1
-- inspect(handle: WorkHandleV1) -> WorkViewV1
+- query(query: WorkQueryV1) -> WorkQueryResultV1
+- inspect(handle: WorkHandleV1) -> WorkViewV1 as a query convenience
 
 Python raises a bounded WorkError with stable code and original command reference. TypeScript provides matching types and errors. Neither auto-retries a side effect or generates a replacement command ID after timeout.
 
-Higher-level delegate/select/submit/collect helpers construct these commands through the required prepare operation at each owning service. They cannot expose private signing keys or create authority from a local cache. Rust uses chio-runtime, not chio-runtime-core or example modules.
+Higher-level delegate/select/submit helpers construct commands through the required prepare operation at each owning service. collect means historical Reconcile; reading result bytes uses the existing recovery release operation. A lost preparation/command response is resolved by its original ID even when no work handle was returned. They cannot expose private signing keys or create authority from a local cache. Rust uses chio-runtime, not chio-runtime-core or example modules.
 
-Mount the work service through an optional host-owned WorkCommandService in the existing WorkerService. To keep dependencies acyclic, chio-process only owns a bounded transport extension port, while chio-control-plane supplies the work implementation. Keep work-specific orchestration out of the generic process runtime. The recovery lane's new host operations and version negotiation must be joined before either lane changes worker.rs.
+Reuse WorkerService's credential journal, frame limits and InvocationPreparer for ordinary preparation. Add an optional host-owned WorkCommandService only for closed work operations the existing preparer cannot express. To keep dependencies acyclic, chio-process owns this bounded authenticated transport seam, while chio-control-plane supplies the concrete work service. The Rust facade exposes a typed WorkClient over transport, not a constructor for privileged caller context. Keep work-specific orchestration out of the generic process runtime. The recovery lane's new host operations and version negotiation must be joined before either lane changes worker.rs.
 
-CLI work operations live under chio work with init, serve, submit, inspect, collect and export subcommands. init requires a local owner deployment profile and produces a proposed provisioning result; serving requires the existing qualified authority activation. No network caller can call init. Commands use existing process/private-directory/configuration facilities.
+CLI work operations live under chio work with init, serve, submit, inspect, collect and export subcommands. inspect accepts either a handle or the original command/preparation reference; collect reconciles historical obligations and never prints protected result bytes. Existing recovery commands handle result access. init requires a local owner deployment profile and produces a proposed provisioning result; serving requires the existing qualified authority activation. No network caller can call init. Commands use existing process/private-directory/configuration facilities.
+
+Generate schemas/types through existing codegen where supported and share canonical positive/negative vectors across Rust, Python and TypeScript. Wide native identifiers/revisions use their specified lossless wire representation; JavaScript Number coercion may not change signed bytes or digest meanings. SDK errors expose stable codes and authorized references, not nested parser strings. Test metadata canaries, maximum/one-over bounds, unsupported variants, and abandoned/stalled sessions. Keep signing, release decisions and retries in their existing Rust owners.
 
 ## Two applications
 

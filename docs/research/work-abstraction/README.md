@@ -38,6 +38,8 @@ flowchart LR
 
 The work model should be evident in two applications: the growing API-review program and the recovery lane's owner-approved support disclosure with a separate analysis worker. Both use the same runtime, host protocol and SDK contract. Applications supply task logic, policy and acceptance procedures; Chio supplies the recurring authority and recovery coordination.
 
+The [second architecture review](ARCHITECTURE-REVIEW.md) records eleven concrete plan corrections and their source evidence. The revised runtime plan qualifies allocation/graph issuance, uses checked client/service contracts, and keeps protected request custody and original-operation recovery in their existing owners.
+
 ## Decisions fixed by this package
 
 - Extend chio-runtime and existing authorities rather than introducing another kernel, treaty system, scheduler or recovery coordinator.

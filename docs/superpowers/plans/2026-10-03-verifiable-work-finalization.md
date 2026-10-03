@@ -22,6 +22,7 @@
 - Present-tense architecture is mistaken for completed empirical deployment: explicit manuscript type and evidence provenance, no invented shipping claims (P.1/P.4).
 - Adapter breadth implies uniform enforcement or universal compatibility: actual support dimensions and clear kernel boundary (P.2/P.3).
 - Recovery changes a sealed work commitment while claiming preserved identity: distinguish original work from an approved new continuation (P.3).
+- A programming abstraction is described as another bearer token, globally atomic state or novel consensus: explain linked records, per-owner custody, partial failure and distinct authority lifetimes (P.2/P.3).
 - Existing escrow equality is misrepresented as either exclusive novelty or architectural refutation: compare the common contract (P.3/P.4).
 - Publication checker is weakened to turn old research gates green: explicit new profile, preserved legacy record and negative validation (P.1/P.5).
 
@@ -112,7 +113,7 @@ Acceptance: the technical argument explains how the abstraction works and its ac
 - [ ] Put the new evaluation questions in the artifact/design companion during this early draft. Do not leave invented tables, empty results or repeated future-work paragraphs in the manuscript.
 - [ ] Run make -C docs/papers/verifiable-work test and build, followed by the explicit artifact checks appropriate to the new profile. Verify every claim/evidence path and bibliography entry.
 - [ ] Inspect the rendered PDF page by page for awkward breaks, diagram legibility, excessive notation, repetition and abstract/conclusion quality. Verify title, definitions, contribution claims and theorem scope against each other.
-- [ ] Perform technical and prose review: the reader must understand the programming abstraction, authority ownership, failure semantics, assumptions and evidence status. Resolve blocking findings; record the actual reviewer and method.
+- [ ] Perform technical and prose review against the revised W1/W2 construction and second architecture review: client/service/native boundaries, qualified allocator ownership, exact request custody, original-ID resolution, independent observations and current release must agree. The reader must understand the programming abstraction, authority ownership, failure semantics, assumptions and evidence status. Resolve blocking findings; record the actual reviewer and method.
 - [ ] Record architecture-manuscript completion separately from implementation and publication readiness; commit the final source/PDF pair.
 
 Acceptance: a complete, professional manuscript of the intended architecture exists before W1 execution. It reads as a coherent kernel design; it does not claim the unbuilt product has shipped.

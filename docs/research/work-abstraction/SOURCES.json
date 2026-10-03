@@ -419,6 +419,72 @@
       "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
       "path": "docs/architecture/recoverable-agent-runtime/requirements.json",
       "sha256": "b3f56200499e037171c602fbbe815426620024073b73be4657fba785197cf125"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-kernel/src/runtime.rs",
+      "sha256": "d38349544c2283fafadb5ab213c22e4cc52547bbe9f53326af781a347a5783c5"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-kernel/src/payment/contractual_resolution.rs",
+      "sha256": "cba3509b4141da4e057f12350f15b61d98bec3c687c114db59a4c8baad1bab97"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "docs/security/engineering-standard.md",
+      "sha256": "1c9fdecadc2493e4af99159355cf55d39f69213cf7b6d2b97e4dbe18c7ca0ed1"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/core/chio-core-types/src/canonical/untrusted.rs",
+      "sha256": "7cc5c0c0d3b5229cdc7ca65211102e3428de4ac9efb4a3efa50795e4f84eec2d"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/kernel/chio-kernel/src/admission_operation/identity.rs",
+      "sha256": "cdef9817b2e8491e3f5d4546d74ef7776b756a17f7e773fb46b34cda617fd3b9"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner.rs",
+      "sha256": "0b22df988a045455723580d955b4e43715c91b044d0cb1c30d224c858768ae17"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
+      "sha256": "601166c501d9d7690520913ef1f02129ce9ea8ca33b8981dd4c7d34e3beed859"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/schema_migration.rs",
+      "sha256": "3cba3202cad1b03e786aa1b604bc364927f94226da3742a8f3d96627153500e0"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/federation_context.rs",
+      "sha256": "734f79c3aaadbff535148d566f79273e429eb134e3313f6a30acecdfba06caf5"
+    },
+    {
+      "lane": "security",
+      "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+      "path": "crates/platform/chio-control-plane/src/economic_effect_coordinator.rs",
+      "sha256": "6118048eec8010befb057b85260e12dbe1152427c989f5e78fa09f10fc1cbbd2"
     }
-  ]
+  ],
+  "architecture_review": {
+    "plan_baseline": "ab34047473844a045fc425f6d14aaa74cd71263e",
+    "recorded_at_utc": "2026-10-03T23:48:37.021920+00:00",
+    "method": "coordinator source review and inline plan revision",
+    "runtime_qualification": false
+  }
 }

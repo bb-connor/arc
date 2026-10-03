@@ -19,14 +19,14 @@ It is not accurate to say that finishing these features alone proves beta readin
 | Mac recovery agent | Owner confirms it is executing that PR's spec over Tailscale | Active implementation; current SHA/phase acceptance not observed here |
 | Main checkout | docs/nvidia-stack-research at 666274baef7a503a6bf4791816483cbc6eb1b4ed | Not the current integration candidate |
 
-GitHub PR state was refreshed with gh during this review. The paper and active security histories diverge; neither is the union of all active work.
+GitHub PR state in this table was refreshed with gh during the initial planning pass. The second review refreshed the local work/security heads and retained the same pinned recovery contract. The paper and active security histories diverge; neither is the union of all active work.
 
 ## Reuse map and actual gaps
 
 | Area | Inspected existing implementation | Delta assigned to this lane |
 | --- | --- | --- |
-| Work allocation | chio-workflow/src/delegation: holder-signed subdivision, receiver offer, replace-before-seal selection, bounded readers/effects/units, sealed dispatch permit | Expose through a public work interface and owner-scoped preparation; retain exact seal readback |
-| Swarm composition | chio-swarm-authority/src/evolution.rs; runtime-core SQLite swarm_authority_bundles.rs: additive verification, head CAS and archived versions | Public facade wrappers and supported graph authoring; reuse existing transaction/verification |
+| Work allocation | chio-workflow/src/delegation: holder-signed subdivision, receiver offer, replace-before-seal selection, bounded readers/effects/units, sealed dispatch permit | Keep D1 rules; qualify production persistence/issuance under serving ownership. Live seal replay exists; add distinct historical readback |
+| Swarm composition | chio-swarm-authority/src/evolution.rs; runtime-core SQLite swarm_authority_bundles.rs: additive verification, head CAS and archived versions | Reuse S1 verification/history; qualify the issuer head and publish signatures after commitment. Preparation returns an unsigned draft reference |
 | Public runtime | chio-runtime/src/lib.rs and stores.rs already form a facade over runtime-core | Add work feature/API; the inspected facade lacks the new extend_swarm_authority_bundle wrapper |
 | Native execution | chio-kernel/src/delegated_work.rs; admission coordinator; SQLite authority | Install existing checks and bind the same request; no new execution owner |
 | Treaty sovereignty | runtime-core treaty/admission hooks; federation peer configuration and DSSE; protected replay-source activation | Owner-scoped deployment and authenticated peer service; incoming evidence never provisions authority |
@@ -35,7 +35,7 @@ GitHub PR state was refreshed with gh during this review. The paper and active s
 | Composed funded work | Standalone examples/federated-work workspace; funded_work/composition.rs, evolving.rs, native.rs and rail.rs | Extract reusable composition; remove W0 fixed amount/tool/profile assumptions from the public interface |
 | Peer transport | Prototype peer_https/peer_client and verifier-specific service | Reuse cases, not production status; full work service and local-context co-signing remain required |
 | Bilateral delivery | Existing BilateralCoSigningProtocol; composed example uses InProcessCoSigner | Remote co-signer under configured owner authority, exact durable delivery without duplicate dispatch |
-| Funding | Existing F1 agreement/reserve/transaction recovery and ChioWorkClaimEscrow; existing PaymentAdapter | Promote terms/observation to chio-settle and native adapter to control-plane; avoid a kernel dependency cycle |
+| Funding | Existing F1 agreement/reserve/transaction recovery and ChioWorkClaimEscrow; existing PaymentAdapter | Promote chain terms/observation to settle; keep full agreement, kernel waiver and native adapter in control-plane to avoid a cycle |
 | Protocols | MCP/A2A ToolServerConnection; cross-protocol orchestrator; ACP edges; HTTP authority | Shared work-profile negotiation and real adapter conformance |
 | Envoy | ext_authz shim delegates to configured EnvoyKernel | Admission integration until a complete deployment qualifies stronger execution semantics |
 | Policy | HushSpec compiler produces guard pipelines and default scopes | Reuse policy/guard machinery; do not equate technical controls with universal regulatory compliance |
@@ -56,6 +56,8 @@ The core gap is visible in code placement and interface reach: the standalone ex
 - chio-kernel already depends on chio-settle; adding a production kernel dependency to chio-settle would create a cycle.
 - The security roadmap's newer execution notes supersede stale per-finding lists for local repairs. Milestone-wide/native/hosted/release acceptance must still be refreshed.
 - The prior publication gate is intentionally stronger than an architectural contribution. Its four open research hypotheses must remain historical facts when the new publication profile is introduced.
+
+The [second architecture review](ARCHITECTURE-REVIEW.md) found that facade promotion alone was insufficient: allocation/graph issuance need qualified ownership, issuer-local idempotency, protected request custody and closed API outcomes. Those changes preserve the existing authority rules while making their production assumptions enforceable.
 
 ## Planning consequence
 

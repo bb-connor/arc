@@ -1,7 +1,7 @@
 # Agentic work kernel: architecture and beta convergence
 
 Date: 2026-10-03
-Status: proposed execution specification, grounded in the source snapshots below.
+Status: proposed execution specification, revised after the second source review; grounded in the source snapshots below.
 Scope: the third workstream alongside the active security and recovery roadmaps.
 Authorization: the owner approved the architectural thesis and requested the complete planning package. This package does not execute the implementation or revise the manuscript.
 
@@ -37,7 +37,9 @@ Three approaches were considered:
 2. A new universal work engine with its own authority, journals and distributed transaction protocol. It would duplicate the strongest existing machinery and compete with the active roadmaps.
 3. Extend the existing public runtime facade, promote reusable composition, expose owner-scoped services and qualify the resulting interface. Selected.
 
-Use chio-runtime as the public Rust facade and chio-runtime-core for orchestration. Keep D1 in chio-workflow, S1 in chio-swarm-authority and its existing runtime store, execution custody in chio-kernel/chio-store-sqlite, recovery in the recovery lane, and financial custody in the selected rail. No new top-level runtime crate is required.
+Use chio-runtime as the public Rust client facade and chio-runtime-core for checked work contracts, shared binding checks and existing S1 storage. Concrete host composition belongs in chio-control-plane. Keep D1 rules in chio-workflow, qualify production D1 persistence through chio-store-sqlite, and preserve S1, native capture, recovery and financial ownership. No new top-level runtime crate is required.
+
+The [second architecture review](../../research/work-abstraction/ARCHITECTURE-REVIEW.md) records why a generic host pass-through, unrestricted request envelopes and an unfenced allocator are insufficient. Its corrections are incorporated into the specs and tasks, not deferred as optional polish.
 
 ## Component specifications
 
@@ -59,6 +61,11 @@ These requirements apply to every implementation plan.
 - Preserve existing canonical signing domains and encodings. New signed families require explicit versioned domains and negative vectors; old persisted bytes retain their decoder.
 - Use the selected source's Clock port and strict authoritative JSON readers. Rust workspace edition 2021 and Rust 1.94 remain unchanged; preserve the Rust 1.93 floor of proof-substrate crates such as chio-settle.
 - Fail closed, retain typed rejection provenance, forbid new unsafe code, and keep unwrap_used and expect_used denied.
+- Use checked value types and closed outcomes. Wire decoding is not authentication; verified authority and live ownership remain opaque. Pure code uses concrete types/static dispatch; new traits require a real dependency boundary.
+- Reuse the security lane's engineering standard: one module responsibility, no new hand-maintained include!, no module-size ratchet relaxation, and no permissive security-trait defaults. Preserve inner error causes privately and redact external diagnostics.
+- Keep signer intent and idempotency at the issuing authority. Coordinator indexes, copied stores and retry caches cannot mint rights. New authoritative tables join the existing serving projection, integrity, migration and continuity contracts.
+- Bound parsing, verification work, queues and blocking tasks. Never hold a store transaction across remote I/O. Cancellation or dropped futures cannot erase committed obligations.
+- Separate query, historical reconciliation and current result release. Protect metadata as well as payload bytes. Work commitments reference protected exact invocation custody; they do not become generic credential containers.
 - No em dashes. Do not invent observed results, outside participants, shipped surfaces or release acceptance.
 - Run focused checks at each changed boundary. Run the inherited full release qualification once at the integrated candidate boundary, and rerun only what subsequent changes invalidate.
 
@@ -70,8 +77,8 @@ Owner-controlled resources keep separate authoritative stores:
 
 | Resource | Existing owner | Third-lane responsibility |
 | --- | --- | --- |
-| Delegation allowance | DelegationStore | Expose bounded, holder-authenticated subdivision, selection and sealing |
-| Program graph | Protected S1 graph head and archive | Expose additive extension and exact version lookup through the facade |
+| Delegation allowance | D1 rules plus qualified serving-store adapter | Preserve D1 semantics; add fenced allocation, selection, sealing and historical readback |
+| Program graph | Qualified S1 issuer head/archive; existing runtime evidence lookup | Reuse extension verification; commit signed successors before publication; expose exact history |
 | Permission and native effects | Receiver's configured kernel and serving authority | Bind the contract, then enter ordinary admission and capture |
 | Durable process request | ProcessRuntime and recovery P1 bridge | Retain one immutable logical call and exact continuation |
 | Knowledge and result release | Recovery P3/P4/P5 authorities | Project references and request authorized reads/returns |
@@ -120,16 +127,16 @@ Stop adding features when these obligations are met. Open provider discovery, ar
 
 | ID | Requirement | Plan / acceptance |
 | --- | --- | --- |
-| AW01 | Public facade supports the work contract without direct example/core imports | W1.1, W1.4 |
-| AW02 | Existing allocation/selection/seal bindings are preserved | W1.2 |
-| AW03 | Additive growth preserves old rights and uses one protected head | W1.1, W1.2 |
-| AW04 | Command loss/reopen preserves original identities and cannot infer no effect | W1.3 |
-| AW05 | Execution, output release, settlement and bilateral-delivery states remain separate | W1.3, W2.3 |
+| AW01 | Public facade supports the work contract without direct example/core imports | W1.1, W1.5 |
+| AW02 | Existing allocation/selection/seal bindings are preserved | W1.2, W1.3 |
+| AW03 | Additive growth preserves old rights and uses one protected head | W1.1, W1.3, W1.4 |
+| AW04 | Command loss/reopen preserves original identities and cannot infer no effect | W1.4 |
+| AW05 | Execution, output release, settlement and bilateral-delivery states remain separate | W1.4, W2.3 |
 | AW06 | Paid and unpaid work use the same execution contract; amounts are not hardcoded to W0 | W2.3 |
 | AW07 | Each receiver selects trust and admission policy; requests cannot provision | W2.1 |
 | AW08 | Separate owners exchange authenticated work without sharing private keys/stores | W2.2 |
 | AW09 | Bilateral co-signing reconstructs the exact authorized statement and survives loss | W2.2 |
-| AW10 | Existing recovery P1/P3/P4/P5 handles compose without a duplicate coordinator | W1.3, W2.4 |
+| AW10 | Existing recovery P1/P3/P4/P5 handles compose without a duplicate coordinator | W1.4, W2.4 |
 | AW11 | Protocols preserve bindings or explicitly refuse unsupported fidelity | W3.1 |
 | AW12 | Python and TypeScript clients use the same host contract and error semantics | W3.2 |
 | AW13 | A clean installation runs two different applications without authority glue | W3.3 |
@@ -140,6 +147,11 @@ Stop adding features when these obligations are met. Open provider discovery, ar
 | AW18 | The paper leads with the programming model and programmable sovereignty | P.2, P.3 |
 | AW19 | Completed-design prose is separate from unobserved implementation/evaluation | P.1, P.4 |
 | AW20 | Publication and breakthrough claims have claim-specific, explicit acceptance | P.1, P.5 |
+| AW21 | Checked data, opaque authority, closed results and dependency boundaries are enforced by Rust API and feature checks | W1.1, W1.5, W2.3 |
+| AW22 | Production allocation and graph issuance participate in qualified serving ownership, integrity and explicit migration | W1.2, W1.3, W4.2 |
+| AW23 | Every issuance/mutation has owner-local original-ID readback; coordinator loss cannot duplicate rights | W1.3, W1.4, W2.2 |
+| AW24 | Exact invocation custody and distinct digest meanings preserve every signed binding without credential leakage | W1.0, W1.3, W2.3 |
+| AW25 | Bounded concurrency/decoding, metadata release and cancellation preserve ownership under stalled peers | W1.0, W1.1, W1.4, W2.1, W3.2 |
 
 ## Execution order
 

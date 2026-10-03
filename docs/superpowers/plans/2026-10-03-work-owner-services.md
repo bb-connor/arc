@@ -30,18 +30,19 @@
 - Create: crates/platform/chio-control-plane/src/work/config.rs, service.rs, transport.rs.
 - Modify: crates/platform/chio-control-plane/src/work/mod.rs and the existing trust_control.rs router composition.
 - Test: crates/platform/chio-control-plane/tests/work_service.rs.
-- Create: spec/schemas/chio-work/v1/command.schema.json, view.schema.json, profile.schema.json.
+- Create: spec/schemas/chio-work/v1/command.schema.json, preparation.schema.json, query.schema.json, result.schema.json, view.schema.json, profile.schema.json, through the existing schema/codegen convention.
 
 **Interfaces:**
 
 - WorkDeploymentProfileV1 specifies owner/store/program identity and references to already provisioned trust, tools, recovery and payment configuration.
-- WorkService::new(host: Arc<dyn WorkHostPort>, profile: WorkDeploymentProfileV1) -> Result<Self, WorkError>.
-- Authenticated routes are POST /v1/work/prepare, POST /v1/work/commands and POST /v1/work/query, with the W1 request/result types. Preparation is limited to locally configured authoring roles.
-- request fields cannot construct WorkCaller; the existing verified ingress context supplies it.
+- Extend the concrete W1 WorkService with private configured authority fields; no WorkHostPort service locator. WorkDeploymentProfileV1 is validated host configuration, not incoming authority.
+- Authenticated routes are POST /v1/work/prepare, POST /v1/work/commands and POST /v1/work/query, with W1 preparation/command/query types and closed results. Original command/preparation lookup works without a returned handle.
+- Request fields cannot construct the internal WorkSession; the existing verified ingress/worker context supplies it. Resolve principal/program/root/role against current local policy; the namespace constructor is not an authenticator.
 - Provisioning stays host-local and is separate from WorkService.
 
-- [ ] Write service tests for two tenants, wrong peer, changed store identity, untrusted allocator, unsigned configuration and overlarge/duplicate-key requests. Include a useful command accepted by the correct owner.
-- [ ] Run cargo test --locked -p chio-control-plane --test work_service. Expect missing service routes before implementation.
+- [ ] Write service tests for two tenants, wrong peer, changed store identity, untrusted allocator, unsigned configuration and overlarge/nested duplicate-key requests. Include a useful command accepted by the correct owner.
+- [ ] Add metadata/error canaries and queue saturation, stalled peer, timeout and disconnect cases. Assert bounded memory/tasks, unrelated-owner progress and no fresh issuance/dispatch on cancellation. Use W1.0's fixed limits.
+- [ ] Run cargo test --locked -p chio-control-plane --features work --test work_service. Expect missing service routes before implementation.
 - [ ] Mount the service through the security lane's current authenticated/TLS listener and strict reader. Resolve IDs only inside the configured owner's domain. Do not transplant the prototype listener or allow a caller-supplied trust bundle.
 - [ ] Add negotiated feature/profile responses. Unsupported recovery/funding/boundary profiles reject before any side effect.
 - [ ] Re-run tests plus the owning hardened ingress/issuer tests from the selected security checkpoint.
@@ -62,12 +63,12 @@ Acceptance: AW07. A network request can use approved services but cannot provisi
 **Interfaces:**
 
 - PeerWorkClient uses configured origin, peer ID/key, TLS identity, egress policy and bounded timeouts.
-- Implement the existing BilateralCoSigningProtocol::{request_cosignature, request_dsse_cosignature} signatures. Both remain synchronous trait calls; transport work must run on the established blocking/host path, never block an async executor or hold authority locks.
+- Implement the existing BilateralCoSigningProtocol::{request_cosignature, request_dsse_cosignature} signatures explicitly. Both remain synchronous trait calls; transport work must run on the established bounded blocking/host path, never block an async executor or hold authority locks. The client also implements W1 WorkTransport using existing hardened HTTP/egress facilities.
 - Durable completion uses the existing native operation and exact statement digest. WorkViewV1 exposes LocalOnly/Pending/Complete evidence delivery states without changing native execution truth.
 
 - [ ] Port negative framing/identity cases from funded_work/peer_client.rs, peer_https.rs and their tests; add local-context, wrong-purpose and arbitrary-preimage signing controls.
-- [ ] Add a separate-process run with no peer private keys in the receiver's state directory. Kill or disconnect the co-signer after local completion, reopen, and request the same statement again.
-- [ ] Run cargo test --locked -p chio-control-plane --test work_peer. Expected failure is the absent real co-signing transport/completion seam.
+- [ ] Add a separate-process run with no peer private keys in the receiver's state directory. Kill or disconnect the co-signer after local completion, reopen, and request the same statement again. Also lose the response after the remote signer commits but before local projection; resolve the original issuer record with an unchanged body/validity interval.
+- [ ] Run cargo test --locked -p chio-control-plane --features work --test work_peer. Expected failure is the absent real co-signing transport/completion seam.
 - [ ] Implement exact local-context reconstruction, authenticated peer exchange and original-operation reconciliation. If the current native owner cannot persist the delivery intent, add the narrow port under security/recovery review. Do not create a separate daemon that can mark native completion.
 - [ ] Assert complete result signature verification, one tool call, unchanged operation/claim identities and no second payment. Also assert honest Pending state while the remote signer is absent.
 - [ ] Commit: feat(work): complete bilateral evidence across owner services.
@@ -78,9 +79,9 @@ Acceptance: AW08/AW09. Two keys are not reported as two independent administrato
 
 **Files:**
 
-- Create: crates/economy/chio-settle/src/work_claims/mod.rs, agreement.rs, observation.rs, transaction.rs.
+- Create: crates/economy/chio-settle/src/work_claims/mod.rs, terms.rs, observation.rs, transaction.rs.
 - Modify: crates/economy/chio-settle/src/lib.rs and feature dependencies only as required.
-- Create: crates/platform/chio-control-plane/src/work/funding.rs.
+- Create: crates/platform/chio-control-plane/src/work/funding/mod.rs, agreement.rs, adapter.rs. The complete F1 agreement and kernel waiver integration stay here.
 - Create: crates/platform/chio-store-sqlite/src/admission_operation_store/work_claims.rs and src/admission_operation_work_claims.sql.
 - Modify: crates/platform/chio-store-sqlite/src/admission_operation_store.rs and admission_operation_store/schema.rs under the security lane's existing migration, fencing and integrity rules. If that lane has landed an equivalent binding table, extend it and record the actual path instead of creating a duplicate.
 - Test: crates/economy/chio-settle/tests/work_claims.rs; crates/platform/chio-control-plane/tests/work_funding.rs.
@@ -90,19 +91,19 @@ Acceptance: AW08/AW09. Two keys are not reported as two independent administrato
 **Interfaces:**
 
 - WorkClaimProfileV1: rail ID, network/asset/contract identity, currency mapping, acceptance verifier, finality/deadline policy and allowed profile.
-- WorkClaimTerms and signed agreement keep the existing F1 signing/ABI derivations; no accidental signature-preimage migration.
+- WorkClaimTerms in settle contains the existing chain/ABI terms. Agreement/SignedAgreement in control-plane retain full-request validation and the existing kernel SignedContractualCaptureWaiverTermsV1. Do not duplicate that type, replace it with untyped JSON or add a production settle -> kernel dependency. Preserve exact F1/waiver signed bytes.
 - verify_work_reserve(profile: &WorkClaimProfileV1, terms: &WorkClaimTerms, observation: &WorkReserveObservation) -> Result<VerifiedWorkReserve, WorkClaimError>. VerifiedWorkReserve has private fields and no unchecked deserialization.
 - WorkFundingAdapter in control-plane implements the existing kernel PaymentAdapter; chio-settle never depends back on chio-kernel.
 - WorkFundingRefV1 remains a reference, not evidence that funds exist.
-- WorkClaimBindingV1 records allocation ID, agreement digest, configured financial domain, original native operation/hold IDs and verified reserve/evidence references. Insert/read operations require the existing StoreMutationFence; changed binding under the same allocation conflicts. Protected agreement/artifact custody follows the serving store's classification and retention rules. Do not copy raw credentials or output into this index.
+- WorkClaimBindingV1 is a non-authorizing index of allocation, agreement, configured financial domain and original native operation/hold/reserve/evidence references. Changed binding conflicts. Financial mutation still uses the existing payment journal and qualified authority. Integrate new authoritative records into the owning projection/global-commit/integrity/migration catalog; a fence parameter or colocated table is insufficient. Preserve protected custody/retention and do not copy raw credentials/output into the index.
 
-- [ ] Port current agreement, reserve, transaction-recovery and earned-child tests. Add non-100 amounts, two configured tools, unsigned or substituted reserves, wrong network/asset/verifier, and the unpaid profile.
-- [ ] Run cargo test --locked -p chio-settle --test work_claims and cargo test --locked -p chio-control-plane --test work_funding. Expect absent promoted types before implementation.
+- [ ] Port current agreement, reserve, transaction-recovery and earned-child tests. Add non-100 amounts, two configured tools, unsigned or substituted reserves, wrong network/asset/verifier, stale finality observation, and the unpaid profile. Freeze existing agreement/waiver signature-preimage vectors before extraction.
+- [ ] Run cargo test --locked -p chio-settle --test work_claims and cargo test --locked -p chio-control-plane --features work --test work_funding. Expect absent promoted types before implementation.
 - [ ] Extract the reusable financial construction, preserve persisted transaction identity, and replace W0 constants with validated profile values. Reuse existing transaction bytes/nonce recovery and owning payment journal.
 - [ ] Implement the Agreement preparation variant using owner-approved terms. Replace the fixture's two-key Agreement::sign helper in production paths with separate owner signatures and exact-body verification. Use explicit existing rail funding operations under payer authority to establish reserves; preparation alone cannot reserve/transfer funds. SDK applications consume the resulting references without private keys or a custom signing flow.
-- [ ] Make native authorization verify the agreement against the complete selected request and original operation/hold. An observation adapter supplies untrusted data; the configured verifier creates VerifiedWorkReserve.
+- [ ] Make native authorization verify the agreement against the complete selected request and original operation/hold. Assert every ToolCallRequest field has its W1.0 digest/custody mapping and no agreement self-reference. An observation adapter supplies untrusted data; the configured verifier creates VerifiedWorkReserve, and the financial owner rechecks the required freshness/finality before mutation.
 - [ ] Run the explicit devnet child-parent-failure and lost-transaction-ack cases. Required devnet prerequisites missing is unavailable, not passed; retain the ordinary suite's skipped cases separately.
-- [ ] Verify cargo check --locked -p chio-settle --no-default-features and the existing Rust 1.93 substrate/proof lane. Confirm no kernel dependency cycle or unconditional new chain dependency.
+- [ ] Verify cargo check --locked -p chio-settle --no-default-features, the work/web3 feature combination, and the existing Rust 1.93 substrate/proof lane. Compare cargo metadata with W1.0 and confirm no production settle -> kernel edge, public kernel type leakage into settle, signature migration or unconditional new chain dependency.
 - [ ] Commit: feat(work): package funded obligations through existing settlement.
 
 Acceptance: AW06. Paid and unpaid programs share authority semantics; the advertised initial rail remains a devnet profile until operationally qualified.
@@ -120,7 +121,7 @@ Acceptance: AW06. Paid and unpaid programs share authority semantics; the advert
 
 - [ ] Add the support-disclosure positive trajectory from the recovery lane, extended with a separate-owner analysis task and one new approved child allocation. Assert both original sealed work and the continuation relationship remain inspectable.
 - [ ] Add cancellation/expiry after native capture, withholding after completion, a Deny receipt with unknown effect, missing original admission projection and incompatible D1 continuation binding.
-- [ ] Run cargo test --locked -p chio-control-plane --test work_recovery_join. Treat unlanded recovery ports as a dependency, not a stubbed success.
+- [ ] Run cargo test --locked -p chio-control-plane --features work --test work_recovery_join. Treat unlanded recovery ports as a dependency, not a stubbed success.
 - [ ] Implement the narrow join: approved changed work receives a distinct bounded allocation/request; unchanged historical settlement keeps its original operation. Enforce recipient authority at each result read/return.
 - [ ] Assert one allowed publication effect, no duplicate after process loss, no raw output on denial, and no fresh execution using a historical settlement scope.
 - [ ] Commit: feat(work): compose recovery and owner-controlled result release.

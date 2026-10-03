@@ -67,14 +67,15 @@ Acceptance: AW11/AW15. The matrix distinguishes implemented, locally qualified, 
 
 **Interfaces:**
 
-- WorkCommandService is a host-only bounded-byte request/response extension port in chio-process. It receives the authenticated process context; it cannot issue native execution ownership.
+- WorkCommandService is the narrow bounded-byte extension needed beyond existing InvocationPreparer. Reuse WorkerService authentication, credentials, limits and connection lifecycle; do not add a second worker listener/credential store. It receives verified process context and cannot issue native execution ownership.
 - The control-plane adapter decodes and authorizes chio.work.v1 using W1/W2 types. Keep chio-process independent of runtime-core and control-plane.
-- Python WorkClient.prepare(proposal), WorkClient.submit(command), WorkClient.inspect(handle); TypeScript exposes the same methods. Typed results/errors match W1.
+- Python WorkClient.prepare(proposal), submit(command), query(query), and inspect(handle) as a query convenience; TypeScript exposes the same operations and closed outcomes. Original-ID query works before a handle exists. collect helpers submit Reconcile; result access uses the recovery lane's existing release client.
 - The private worker connection descriptor declares negotiated protocols. chio.process.v1 retains its current behavior.
 
 - [ ] Add shared client fixtures for preparation, success, Pending, denied result release, unsupported profile, cross-process handle and lost response. Assert the transmitted command ID is exactly caller-supplied, signed material comes from the owning service, and no hidden second submission occurs.
 - [ ] Run Python unittest discovery and node --test test/work.test.mjs in the process package; run cargo test --locked -p chio-process --features worker-server --test work_transport. Expect missing client/extension before implementation.
-- [ ] Implement transport and client wrappers using existing deadline/frame/secret handling. Do not make signing or policy decisions in SDK code.
+- [ ] Implement transport and client wrappers using existing deadline/frame/secret handling and the same versioned schema/vectors. Preserve lossless wide-integer/digest representations in Python/TypeScript; do not reserialize signed records through JavaScript Number. Do not make signing or policy decisions in SDK code.
+- [ ] Add nested duplicate/unknown-variant, maximum/one-over, metadata/error-canary and stalled-session vectors. Assert original preparation/command lookup, bounded buffers and no raw retained output through query/reconcile.
 - [ ] Test old process clients against the extended host and new work clients against an old-profile host. Unknown work protocol is a clear error, never a fallback to raw invoke.
 - [ ] Re-run installed-package tests, not only source imports: extend scripts/qualify-process-packages.py to install the wheel/tarball and assert module origins and declared work exports.
 - [ ] Commit: feat(sdk): expose work commands through process clients.
@@ -101,11 +102,11 @@ Acceptance: AW12. Language choice does not change authority, retry, release or s
 - Application A uses the API-review workload; B consumes the recovery lane's support-disclosure implementation.
 
 - [ ] Write CLI tests for missing/invalid profile, changed store identity, unsupported work protocol and a successful installed-client run.
-- [ ] Implement CLI adapters with no separate scheduler, retry logic or authority state. Reuse existing process-host startup and source activation.
+- [ ] Implement CLI adapters with no separate scheduler, retry logic or authority state. Reuse existing process-host startup and source activation. inspect supports original command/preparation IDs; collect performs historical reconciliation only. Protected result reads use existing recovery release commands.
 - [ ] Run application A across owner services, with plan growth and intermediary loss. Confirm the child's original accepted claim remains collectible and the parent unknown effect is retained.
 - [ ] Run application B with owner-approved disclosure, a distinct authorized continuation, protected artifact release and process loss. Confirm exactly one permitted publication and no unauthorized output channels.
 - [ ] Switch the client host/language and one supported protocol for newly created commitments, leaving application task logic intact. A sealed route remains immutable.
-- [ ] Audit application imports: no example-private modules, runtime-core, direct native-store writes, custom signature verification, payment state machine or provider retry loop. Necessary policy, checker and task logic remain explicit.
+- [ ] Audit application imports and host glue: no example-private modules, runtime-core, direct native-store writes, raw ToolCallRequest credential containers, custom signature verification, payment state machine or provider retry loop. Necessary policy, checker and task logic remain explicit.
 - [ ] Run cargo test --locked -p chio-cli with the owning CLI filters and the extended installed-package qualification. Retain the actual enforced platform/profile.
 - [ ] Commit: feat(cli): run reusable work programs from installed clients.
 

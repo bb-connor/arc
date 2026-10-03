@@ -52,12 +52,13 @@ Acceptance: AW16 has an auditable candidate and a complete gate inventory.
 
 **Interfaces:** Existing release aggregation must include W1/W2/W3 profiles and the recovery lane's required conformance results. Source, platform, profile, toolchain, command and terminal exit are mandatory evidence fields.
 
-- [ ] Run changed-boundary migration tests: reopen old delegated work and original native requests; fail on changed/absent authoritative stores; recover admitted work across an upgrade and safe rollback; retain original payable claims.
+- [ ] Run changed-boundary migration tests: explicitly import/quiesce legacy D1 once, retire its writer and preserve namespace/allocation/permit bytes. Reject stale fence, missing catalog/table and unqualified restored state. Include new delegation/financial records in serving integrity, projection/global-commit and relocation checks.
+- [ ] Reopen original native requests and recover admitted work across upgrade. Test rollback only to a schema-compatible version; an unsupported old binary must refuse serving rather than discard new obligations. Retain payable claims and authority tombstones independently of coordinator cache retention.
 - [ ] Run the three-lane application suite on the designated enforced native platform with an independent effect observer. Missing platform or optional artifacts required by an advertised feature is unavailable, not a pass.
 - [ ] Run the existing full required release schedule once on the integrated candidate, including supply-chain/source audits and packaging. Never add audit exemptions just to close the gate.
 - [ ] Obtain terminal hosted CI and Release Qualification results for the exact candidate and required workflow definitions. Reconcile remote/local/PR SHA, run attempt, review threads, failed/cancelled/skipped checks and generated package hashes.
 - [ ] Fix a failure at its owning boundary, record the new candidate, and rerun invalidated checks. Preserve the failed campaign instead of overwriting it.
-- [ ] Review the complete candidate. Close blocking security, recovery, work-contract and packaging findings.
+- [ ] Review the complete candidate against AW21 through AW25 as well as the original contract: checked/opaque types, owner-local idempotency, exhaustive request projection, feature graph, bounded executor behavior, private diagnostics and current release. Close blocking security, recovery, work-contract and packaging findings; do not relax engineering ratchets.
 
 Acceptance: required qualification passes on one candidate. If any requirement remains unavailable, report a candidate with that specific blocker; do not infer readiness from the fraction of green checks.
 

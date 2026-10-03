@@ -1,4 +1,6 @@
-# Planning review
+# Initial planning review
+
+Historical review of ab34047473844a045fc425f6d14aaa74cd71263e. The [second architecture review](ARCHITECTURE-REVIEW.md) and revised specs/tasks supersede its interface details; initial validation counts below remain historical.
 
 Date: 2026-10-03
 Method: coordinator source review and inline plan self-review, followed by source-pin, document-link and requirement-coverage checks. No independent agent review or runtime qualification is claimed.
@@ -40,3 +42,5 @@ Unresolved external dependencies are explicit: the Mac recovery implementation's
 Validation of this package checks document structure, local links, exact source hashes, requirement/task mapping, forbidden em dashes and the absence of product/manuscript changes. It does not compile or test the proposed APIs. Runtime, native, hosted and release checks belong to execution of the plans.
 
 The final document validator passed: 12 Markdown files, five plans, 34 local links (including seven anchors), 66 pinned source hashes and all 20 acceptance requirements mapped to 22 tasks. The initial staged whitespace check found three extra trailing blank lines; these were removed. Product source, dependency files and the existing manuscript/artifact remain unchanged from the planning base.
+
+Second pass: the linked architecture review records eleven source-grounded findings and the corresponding plan corrections. Fresh validation now covers 13 Markdown files, 40 local links, 76 pinned source hashes, 25 requirements and 23 tasks. This adds production issuance ownership and Rust API obligations without starting implementation or changing the paper.
