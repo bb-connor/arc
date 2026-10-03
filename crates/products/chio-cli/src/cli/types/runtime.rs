@@ -705,6 +705,8 @@ pub(crate) enum McpCommands {
 
     /// Wrap an MCP server subprocess and expose a secured MCP edge over Streamable HTTP.
     ServeHttp {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Path to the policy YAML file.
         #[arg(long)]
         policy: PathBuf,
@@ -889,6 +891,8 @@ pub(crate) enum McpCommands {
 pub(crate) enum ApiCommands {
     /// Start the Chio HTTP sidecar/reverse proxy.
     Protect {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Upstream base URL to proxy to.
         #[arg(long)]
         upstream: String,

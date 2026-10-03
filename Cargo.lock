@@ -2736,6 +2736,7 @@ dependencies = [
  "chio-test-support",
  "chrono",
  "hex",
+ "rcgen 0.13.2",
  "reqwest 0.13.2",
  "rusqlite",
  "serde",
@@ -4153,11 +4154,16 @@ name = "chio-http-serve"
 version = "0.1.0"
 dependencies = [
  "axum 0.8.8",
+ "base64 0.22.1",
+ "rcgen 0.13.2",
+ "rustls",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-rustls",
  "tower 0.5.3",
  "tower-http",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -4481,6 +4487,7 @@ dependencies = [
  "hmac 0.12.1",
  "p256 0.13.2",
  "p384",
+ "rcgen 0.13.2",
  "reqwest 0.13.2",
  "rsa",
  "rusqlite",
@@ -4489,6 +4496,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "subtle",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tower 0.5.3",

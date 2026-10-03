@@ -1500,6 +1500,7 @@ fn trust_config(
     paths: &ResolvedOperatorPaths,
 ) -> TrustServiceConfig {
     TrustServiceConfig {
+        transport: Default::default(),
         listen: profile.listen,
         service_token: profile.service_token.clone(),
         tenant_read_tokens: BTreeMap::new(),

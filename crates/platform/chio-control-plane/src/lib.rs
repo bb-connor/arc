@@ -488,6 +488,7 @@ pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError
     }
 }
 
+pub mod server_transport;
 mod signing_custody;
 pub use signing_custody::{load_existing_authority_keypair, read_private_signing_custody};
 

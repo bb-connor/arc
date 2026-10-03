@@ -1,0 +1,254 @@
+[
+  {
+    "path": "Cargo.lock",
+    "sha256": "42f92d64ed19eba6bea34bb1e221b08ec0bf166e7ec17a66298a2ae5a4a02270"
+  },
+  {
+    "path": "Cargo.toml",
+    "sha256": "5a675901d97c601b392d998cc70ef6f16fa46dfd4cf0b450b81de0d2ed7d97da"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/lib.rs",
+    "sha256": "018fe113d0b3569f07a88b3ef3e3d54806336153b8357294d288bb4ed69b988c"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/server_transport.rs",
+    "sha256": "5e4baab21ee3a6d182c8276474915c7d6cae64a67ded99ee00ca1c5674e51fe1"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports_tests/config.rs",
+    "sha256": "584fc57f8ca1a09faeced7c774617b633d55314008aa3655cd970c7d7757277b"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/config_and_public.rs",
+    "sha256": "eea100a86e72458a0b2a780de8b558076ab623c1932bf15fc96a88c50010d0eb"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs",
+    "sha256": "444ef1fd60336823b77ed18f65157c9761243ba3ca002f1fe19ce3261f2d6533"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/client/factory.rs",
+    "sha256": "405a92da08949e95367d278cf56b9584fd64c5fefaeafadbe2fa9fd650bd30d1"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/client/validation.rs",
+    "sha256": "15bb7e1de90ffa397803a68b73153d14e81321e3820739e2311fc3469f3b3433"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_challenge_enforcement_e2e_tests/route_fixture.rs",
+    "sha256": "ea3373c6a3fa1a50ca37f3362278b05fe576a49d43562e37f6754891793b6b22"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_market_exit_tests.rs",
+    "sha256": "a4ea6516d16e5fb8aa6c4cc8a32c05c6a6a1342608e143de6bc636be1347275b"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests.rs",
+    "sha256": "410d9b4638cc43cc329282bb3e4570d4c629fcd4d9e37f0f13b96a18aa6bd554"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/init.rs",
+    "sha256": "88da3656516b7bff86fc8720af14f0334f0f55fb55637d79389e8d2e9c4bce40"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router_tests.rs",
+    "sha256": "10a89ec6abf557f6c826ce520c696ac6e3df864566a5bdcb4f0934f9f11e94af"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/tests/client.rs",
+    "sha256": "176885939e4ddf8b92bfa17d59733a1db58b787eb6bf40146ff95911948cc769"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs",
+    "sha256": "1d328b705c9effa4e2b422f16b17799c2f69b56b47a9864d24698dac54a600ba"
+  },
+  {
+    "path": "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support.rs",
+    "sha256": "d1150a088087d8a4f80f5a0865a187019cf760d4cc3fafff119cd5d3502e2181"
+  },
+  {
+    "path": "crates/products/chio-api-protect/Cargo.toml",
+    "sha256": "0982a5e172443e36410816e4d591c733af3110eb2fa3d7d7fb1cef37c4c0839d"
+  },
+  {
+    "path": "crates/products/chio-api-protect/README.md",
+    "sha256": "d26c20720a25d474d5fe52ac0a203a97b2972a050779f8fe7e8743e81dbf8dc2"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/clock_recovery_tests.rs",
+    "sha256": "935091fa864b2c63cd4b8e2d5c111508604a8691148c8bb9c89876d968bfc92f"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/config.rs",
+    "sha256": "6e3cdc615741b0e15cc36810ccd8f4437ef8b6cd851379d7509cd7fdb75b85ef"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/mediated/tests.rs",
+    "sha256": "e82d2dc853045b627560b6ff3ce8ccee436a60fd2017ba367301d574149bbf43"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/mediated/tests/authorization.rs",
+    "sha256": "2c85295df665f1be9db0806c3cf86bf75e96203bd559e6bfc02c6f12fd3ad4ea"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/state.rs",
+    "sha256": "b3e993d300208d10529e9400a1d55e097ed6b002fa446e169cfc5e0341195e4d"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/tests.rs",
+    "sha256": "e0fc3344a396feb6aaa4c0888cf3746cdee65f6ac4051665836038e713ea3edb"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/tests/control_containment.rs",
+    "sha256": "b33deb565792424be8a36731adf05750433cf38b502fc122e470bf57e69ee10c"
+  },
+  {
+    "path": "crates/products/chio-api-protect/src/proxy/tests/inbound_authority.rs",
+    "sha256": "df1162db673f848b19deb84b9b0f44ac5ce08415f88fb5c01c52a0f65e43250e"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/dispatch/api_mcp.rs",
+    "sha256": "0a51c17cc963a6d0b4f7fe7dcff180363b7dd6073bae618548f73d7cb503cac8"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs",
+    "sha256": "614be07d85218ec915d2353941c2e0dee627d37a2e01312ead97e6a3493a25e3"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/dispatch/mod.rs",
+    "sha256": "1370aacca530fd6ec118e018807cf99580733d6aa45c3545a44a3c761ba918b8"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/dispatch/trust.rs",
+    "sha256": "e850e229404f22dfc673203e80cc2b9f4856c0091f7a3ef86916af2c90342e5b"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/runtime.rs",
+    "sha256": "1b9db7925452a14ddef675ff1aa1230d61a1c60bf3f3ded92afb70ee5cb55631"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/types.rs",
+    "sha256": "744679f757bace9551475baa1bed75e2c18dcd3076f195a78150d9f7afb6989b"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/types/runtime.rs",
+    "sha256": "d44a86821dbefc3b4b8100951ab45c4f9a5c7205e67d5745dd1a9de685ea8093"
+  },
+  {
+    "path": "crates/products/chio-cli/src/cli/types/trust.rs",
+    "sha256": "d5252cdc00faee624314983c2f6431dcb8df92fae25336040aa22442d0a426fb"
+  },
+  {
+    "path": "crates/products/chio-cli/src/main_tests_parsing.rs",
+    "sha256": "086ec57fca3a2e24d6308495eab39f1ecc58a8fa9f2982b3e5b7be5ea4e1f987"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/Cargo.toml",
+    "sha256": "6eae4a4829824f6a43525609cfb3ee4dfcf87c1042cb196ec8756471caa004e6"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/README.md",
+    "sha256": "6c1111c0a73885b8b4e9a084a010951c4ac0bfa736342f1078bf6b4a8668dcdd"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/src/lib.rs",
+    "sha256": "da2bdf52814b6d50c85f40c72ab02c4f1519d431bd8044911bfc5a07d9058bf2"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/src/listener.rs",
+    "sha256": "c125ddc77374a639265a53293dbdebc4879beabc2ba63d707f3fecad0dd29a26"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/src/private_pem.rs",
+    "sha256": "115183ed1433f1656ef7df7e8a3348ad399e06af7b052b829b3634cd49495e30"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/src/tests.rs",
+    "sha256": "8c1bb0c3df33470885d0beb93587123358ba76afa76affc3f3615960efed2cc4"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/src/transport.rs",
+    "sha256": "1545ccd9f3ae41112f4c02fe8a327c66ced7338aedf5862b7aa2ba4252132710"
+  },
+  {
+    "path": "crates/protocol/chio-http-serve/src/transport_tests.rs",
+    "sha256": "b8b61e7a2eac2e4b5f44e4442649135d9602635073ef2f479feafba8fcc7bd2d"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/Cargo.toml",
+    "sha256": "cfe736d142ea269a3a531c74cb92bb34909ff190a8c3aa9aa65bf52f7d18760e"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/README.md",
+    "sha256": "a8eaa7bf18b42fa6d2eee961012ea57575edb2314497e252c4d3063cf33f6a6e"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs",
+    "sha256": "a8584adbc4ebbcf999e15a7f23b651f540cf70f3766c102aef82afe838f594ea"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/admin/revocation_batch.rs",
+    "sha256": "6b4c347aa0089a9fd813232299b0e6d407489978f4e38f1c89e5057a79e85359"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/hosted_tests/support.rs",
+    "sha256": "5ec75841fdf0f93d9b48b4b4814d09d3ca4f2f77ff8ce81dc98e318f7a92970c"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+    "sha256": "20e82af62769d6de54053a3b1f861b79e62ddf805e92e6da5078cdf7a02de953"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs",
+    "sha256": "d79b3686453c345f27d50a1e482bd1c8a553b63bc04fdc96bed5ec8ca96caf39"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests.rs",
+    "sha256": "0a48ba99063f6c6250b99beb28a89228248fc55668c3293b140c63a71d355f91"
+  },
+  {
+    "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/revocation_transport.rs",
+    "sha256": "244eaeccf22d42200f6dd422016c3319eb3ee6e781c9b055a905d4dfb85793e1"
+  },
+  {
+    "path": "crates/tooling/chio-conformance/tests/ssrf_external_guard_api_protect_dispatch.rs",
+    "sha256": "3c42f0d961c46bd5fc4af15c919ebe7a9c488f38660137c5387a50f8ae41e508"
+  },
+  {
+    "path": "docs/reviews/2026-09-28-remaining-security-work.md",
+    "sha256": "cf3093c120e82f118ff47cccec197c58973bd1e58c6e0e8de7441d9fd2b03483"
+  },
+  {
+    "path": "docs/reviews/2026-10-01-compliance-product-truth-review.md",
+    "sha256": "e0f1921deaf6dbf1b662acd47e44fb1f0ab825106de94338f7f5f983e8ecac72"
+  },
+  {
+    "path": "docs/reviews/2026-10-02-inbound-authority-execution.md",
+    "sha256": "d9bf9c62e7e1f74a568b00719e14fbfcebaab821d99d54ace748ee2768688ac6"
+  },
+  {
+    "path": "docs/reviews/2026-10-03-transport-revocation-execution.md",
+    "sha256": "840efdcac45d6e490b770ea4e3d81d2e00442502830186e2830e009000b54158"
+  },
+  {
+    "path": "docs/security/http-transport.md",
+    "sha256": "d8d25bdf2b246d41ef13e344cebed59cff9a3c149cb7587e4c3229d6392c01ff"
+  },
+  {
+    "path": "docs/security/sidecar-control-authority.md",
+    "sha256": "480bb0efc4757af15b6860acb84047dd610a0023f711351c9a05e29d392aaf39"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-02-inbound-authority.md",
+    "sha256": "347a8a257baaf352f429ce116eb5b84ae75ef4718881679440fad43938fd165f"
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-03-transport-revocation.md",
+    "sha256": "f4cfe198f4f0e2f34b26b3ba710bfa27decc80d668a0a14fca940d29404ea89b"
+  },
+  {
+    "path": "docs/superpowers/specs/2026-10-03-transport-revocation-design.md",
+    "sha256": "4bdb69ead21c2486f85df64d71882f6f6ef52929a0b5d13bbd3ae53af0cda62d"
+  }
+]

@@ -2,6 +2,9 @@ use super::*;
 use chio_kernel::ReceiptReadContext;
 use subtle::ConstantTimeEq;
 
+#[path = "admin/revocation_batch.rs"]
+mod revocation_batch;
+
 pub(super) fn install_admin_routes(router: Router<RemoteAppState>) -> Router<RemoteAppState> {
     let router = remote_mcp_session_credentials::install_routes(router);
     router
@@ -590,43 +593,7 @@ async fn handle_admin_revoke_session_trust(
         RemoteSessionEntry::Terminal(record) => (*record).clone(),
     };
 
-    let mut newly_revoked_count = 0usize;
-    for capability in &record.capabilities {
-        let newly_revoked = if let Some(client) = match control_client(&state) {
-            Ok(client) => client,
-            Err(response) => return response,
-        } {
-            client
-                .revoke_capability(&capability.id)
-                .map(|response| response.newly_revoked)
-                .unwrap_or(false)
-        } else {
-            let store = match open_revocation_store(&state) {
-                Ok(store) => store,
-                Err(response) => return response,
-            };
-            store.revoke(&capability.id).unwrap_or(false)
-        };
-        if newly_revoked {
-            newly_revoked_count += 1;
-        }
-    }
-
-    let statuses = match load_session_revocation_status(&state, &record.capabilities) {
-        Ok(statuses) => statuses,
-        Err(response) => return response,
-    };
-
-    Json(json!({
-        "sessionId": session_id,
-        "revoked": true,
-        "newlyRevokedCount": newly_revoked_count,
-        "authContext": record.auth_context,
-        "lifecycle": serialize_session_lifecycle(&record.lifecycle, record.protocol_version.clone()),
-        "ownership": record.ownership,
-        "capabilities": statuses,
-    }))
-    .into_response()
+    revocation_batch::revoke(state, record).await
 }
 
 async fn handle_admin_sessions(State(state): State<RemoteAppState>, request: Request) -> Response {
@@ -807,7 +774,15 @@ fn control_client(
     };
     trust_control::service_runtime::client::build_client(url, token)
         .map(Some)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+        .map_err(|error| {
+            input::with_source(
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "trust admin backend unavailable",
+                ),
+                error,
+            )
+        })
 }
 
 fn open_receipt_store(
@@ -819,8 +794,15 @@ fn open_receipt_store(
             "remote receipt admin requires --receipt-db",
         ));
     };
-    chio_store_sqlite::SqliteReceiptStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+    chio_store_sqlite::SqliteReceiptStore::open(path).map_err(|error| {
+        input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "trust admin backend unavailable",
+            ),
+            error,
+        )
+    })
 }
 
 fn open_revocation_store(
@@ -837,8 +819,15 @@ fn open_revocation_store(
             "remote trust admin requires durable revocation state",
         ));
     };
-    chio_store_sqlite::SqliteRevocationStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+    chio_store_sqlite::SqliteRevocationStore::open(path).map_err(|error| {
+        input::with_source(
+            plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "trust admin backend unavailable",
+            ),
+            error,
+        )
+    })
 }
 
 fn open_budget_store(

@@ -560,6 +560,7 @@ fn market_state(
     config: FindingMarketConfig,
 ) -> TrustServiceState {
     let config = TrustServiceConfig {
+        transport: Default::default(),
         listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
         service_token: SERVICE_TOKEN.to_string(),
         tenant_read_tokens: std::collections::BTreeMap::new(),

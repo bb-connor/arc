@@ -63,8 +63,12 @@ fn api_protect_subcommand_parses() {
                     upstream_timeout_secs,
                     spec_sha256,
                     allow_anonymous_reads,
+                    transport,
                 },
         } => {
+            let transport: chio_http_serve::ServerTransportConfig = transport.into();
+            assert!(transport.tls_cert.is_none() && transport.tls_key.is_none());
+            assert!(!transport.allow_plaintext);
             assert_eq!(upstream, "http://127.0.0.1:8080");
             assert!(spec.is_none());
             assert!(spec_sha256.is_none());
@@ -648,4 +652,24 @@ fn inbound_authority_native_cli_accepts_operator_bound_agent_key() {
     if let Err(error) = result {
         panic!("{error}");
     }
+}
+
+#[test]
+fn server_transport_cli_flags_are_paired_and_explicit() {
+    for base in [vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"], vec!["chio", "trust", "serve", "--service-token", "test-token"]] {
+        let mut args = base.clone();
+        args.extend(["--tls-cert", "cert.pem"]);
+        assert!(parse_cli(args.clone()).is_err());
+        args.extend(["--tls-key", "key.pem"]);
+        assert!(parse_cli(args.clone()).is_ok());
+        args.push("--allow-plaintext");
+        assert!(parse_cli(args).is_err());
+        let mut args = base;
+        args.push("--allow-plaintext");
+        assert!(parse_cli(args).is_ok());
+    }
+    let base = ["chio", "mcp", "serve-http", "--policy", "policy.yaml", "--server-id", "test", "--cage-policy", "cage.json", "--cage-policy-signer", "signer"];
+    let mut args = base.to_vec();
+    args.extend(["--tls-cert", "cert.pem", "--tls-key", "key.pem", "--", "/bin/true"]);
+    assert!(parse_cli(args).is_ok());
 }

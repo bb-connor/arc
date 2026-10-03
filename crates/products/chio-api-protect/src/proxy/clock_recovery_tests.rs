@@ -152,6 +152,7 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
         Arc::new(clock.clone()),
     )?;
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".into(),
         spec_content: Some("{}".into()),
         spec_sha256: None,

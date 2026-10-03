@@ -67,6 +67,8 @@ impl TrustFiscalRuntimeConfig {
 #[derive(Clone)]
 pub struct TrustServiceConfig {
     pub listen: SocketAddr,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
     pub service_token: String,
     pub tenant_read_tokens: BTreeMap<String, String>,
     pub authority_workload_token: Option<String>,
@@ -112,6 +114,9 @@ pub struct TrustServiceConfig {
 
 impl TrustServiceConfig {
     pub fn validate(&self) -> Result<(), CliError> {
+        self.transport
+            .validate(self.listen)
+            .map_err(std::io::Error::other)?;
         validate_control_secret(&self.service_token, "control service token")?;
         if self.authority_seed_path.is_some() && self.authority_db_path.is_some() {
             return Err(CliError::cli_other_error(
@@ -290,6 +295,7 @@ mod service_config_tests {
             Err(error) => panic!("test listen address should parse: {error}"),
         };
         TrustServiceConfig {
+            transport: Default::default(),
             listen,
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),

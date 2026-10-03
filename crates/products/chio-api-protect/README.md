@@ -185,3 +185,9 @@ negative-conformance test for the upstream egress contract.
 - `chio-store-sqlite` - durable backing for the kernel's receipt, revocation,
   and approval stores.
 - `chio-cli` - invokes this crate for `chio api protect` and `chio start`.
+
+## Listener transport
+
+See the [shared HTTP transport guide](../../../docs/security/http-transport.md) for
+TLS identity files, explicit plaintext policy, client endpoint rules and revocation
+response semantics.

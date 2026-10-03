@@ -125,3 +125,9 @@ OIDC discovery URLs are denied before any connection is attempted.
   instance runs per session.
 - `chio-control-plane` - authority keypair management, policy loading, and
   store configuration.
+
+## Listener transport
+
+See the [shared HTTP transport guide](../../../docs/security/http-transport.md) for
+TLS identity files, explicit plaintext policy, client endpoint rules and revocation
+response semantics.

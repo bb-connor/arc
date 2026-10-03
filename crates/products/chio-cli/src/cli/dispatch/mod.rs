@@ -425,11 +425,13 @@ pub(crate) fn run() {
             json_output,
         ),
         Commands::Start {
+            transport,
             listen,
             receipt_store,
             allow_ephemeral_receipts,
             print_config,
         } => cmd_start(
+            transport.into(),
             &listen,
             receipt_store.as_deref().or(receipt_db.as_deref()),
             authority_seed_file.as_deref(),

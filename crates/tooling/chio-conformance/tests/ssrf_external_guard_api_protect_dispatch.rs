@@ -197,6 +197,7 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
     });
     let proxy_addr = reserve_loopback_addr();
     let config = ProtectConfig {
+        transport: Default::default(),
         approval: None,
         upstream: format!("http://{upstream_addr}"),
         spec_content: Some(MINIMAL_OPENAPI_SPEC.to_string()),
@@ -262,6 +263,7 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
     });
     let proxy_addr = reserve_loopback_addr();
     let config = ProtectConfig {
+        transport: Default::default(),
         approval: None,
         upstream: format!("http://{upstream_addr}"),
         spec_content: Some(MINIMAL_OPENAPI_SPEC.to_string()),
@@ -331,6 +333,7 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
     });
     let proxy_addr = reserve_loopback_addr();
     let config = ProtectConfig {
+        transport: Default::default(),
         approval: None,
         upstream: format!("http://{upstream_addr}"),
         spec_content: Some(MINIMAL_OPENAPI_SPEC.to_string()),

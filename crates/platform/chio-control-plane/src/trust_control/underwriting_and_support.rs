@@ -1583,6 +1583,7 @@ mod underwriting_and_support_tests {
 
     fn minimal_trust_service_config() -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_unwrap(),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),

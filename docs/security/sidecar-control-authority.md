@@ -121,7 +121,9 @@ path and public health checks; privileged control requests remain unavailable.
 Distribute the token only to trusted operator/controller and reconciliation
 components. Do not give it to agents or untrusted tool subprocesses, reuse an
 agent credential, or forward it upstream. Protect nonlocal transport with the
-deployment's authenticated TLS boundary. The shared credential grants broad
+deployment's authenticated TLS boundary. The [shared listener profile](http-transport.md)
+now refuses non-loopback plaintext without explicit operator opt-in and offers
+paired certificate/key flags. The shared credential grants broad
 sidecar control access. It is not per-user identity, tenant isolation, scoped
 operator RBAC, DPoP, or the enterprise broker's request proof.
 

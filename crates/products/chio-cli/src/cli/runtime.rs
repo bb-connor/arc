@@ -403,6 +403,7 @@ fn durable_receipt_db_path(receipt_store: Option<&Path>) -> Option<&Path> {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_api_protect(
+    transport: chio_http_serve::ServerTransportConfig,
     upstream: &str,
     spec_sha256: Option<&str>,
     allow_anonymous_reads: bool,
@@ -418,6 +419,11 @@ pub(crate) fn cmd_api_protect(
     allow_ephemeral_receipts: bool,
     upstream_timeout_secs: Option<u64>,
 ) -> Result<(), CliError> {
+    // Validate identity before CLI-side key creation or policy/store work.
+    chio_control_plane::server_transport::prepare(
+        &transport,
+        listen_addr.parse::<SocketAddr>().map_err(std::io::Error::other)?,
+    )?;
     require_durable_or_ephemeral_optin(
         receipt_store,
         allow_ephemeral_receipts,
@@ -446,6 +452,7 @@ pub(crate) fn cmd_api_protect(
         );
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
+            transport,
             upstream: upstream.to_string(),
             spec_content: None,
             spec_sha256: spec_sha256.map(str::to_owned),
@@ -500,6 +507,7 @@ pub(crate) const CHIO_START_NO_UPSTREAM_URL: &str = "http://127.0.0.1:1";
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_start(
+    transport: chio_http_serve::ServerTransportConfig,
     listen_addr: &str,
     receipt_store: Option<&Path>,
     authority_seed_path: Option<&Path>,
@@ -510,6 +518,15 @@ pub(crate) fn cmd_start(
     allow_ephemeral_receipts: bool,
     print_config: bool,
 ) -> Result<(), CliError> {
+    chio_control_plane::server_transport::prepare(
+        &transport,
+        listen_addr.parse::<SocketAddr>().map_err(std::io::Error::other)?,
+    )?;
+    let scheme = if transport.tls_cert.is_some() {
+        "https"
+    } else {
+        "http"
+    };
     require_durable_or_ephemeral_optin(
         receipt_store,
         allow_ephemeral_receipts,
@@ -535,6 +552,7 @@ pub(crate) fn cmd_start(
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
+            transport,
             // The chio-start shape never proxies upstream traffic; the
             // catch-all route exists only because the underlying axum
             // router shape is shared with `chio api protect`. Pointing
@@ -570,7 +588,7 @@ pub(crate) fn cmd_start(
         ProtectProxy::new(config)
             .with_payment_adapter(payment_adapter)
             .run_with_observer(move |bound_addr| {
-                let base_url = format!("http://{bound_addr}");
+                let base_url = format!("{scheme}://{bound_addr}");
                 println!("chio sidecar listening on {base_url}");
                 println!(
                     "  routes: /chio/* (health, evaluate, verify), /v1/capabilities/{{,mint,validate,attenuate,release}}, /v1/evaluate, /v1/receipts{{,/verify}}, /approvals/*"
@@ -1141,6 +1159,7 @@ pub(crate) fn cmd_mcp_serve(
 }
 
 pub(crate) fn cmd_mcp_serve_http(
+    transport: chio_http_serve::ServerTransportConfig,
     policy_path: &Path,
     approval_config: Option<&Path>,
     server_id: &str,
@@ -1193,6 +1212,8 @@ pub(crate) fn cmd_mcp_serve_http(
     control_authority_public_key: Option<&chio_core::PublicKey>,
     control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
+    // Validate identity before CLI-side key creation or policy/store work.
+    chio_control_plane::server_transport::prepare(&transport, listen)?;
     let loaded_policy = load_policy(policy_path)?;
     info!(
         policy_path = %policy_path.display(),
@@ -1224,6 +1245,7 @@ pub(crate) fn cmd_mcp_serve_http(
     )?);
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
+        transport,
         trusted_proxy: trusted_proxy_token_file
             .map(|path| {
                 remote_mcp::TrustedProxyConfig::from_token_file(trusted_proxy_peers.to_vec(), path)
@@ -1450,6 +1472,7 @@ pub(crate) fn load_roster_policy(path: &Path) -> Result<trust_control::RosterPol
 }
 
 pub(crate) fn cmd_trust_serve(
+    transport: chio_http_serve::ServerTransportConfig,
     listen: SocketAddr,
     service_token: &str,
     tenant_read_tokens: &[String],
@@ -1486,6 +1509,8 @@ pub(crate) fn cmd_trust_serve(
     cluster_sync_interval_ms: u64,
     roster_policy_file: Option<&Path>,
 ) -> Result<(), CliError> {
+    // Validate identity before CLI-side key creation or policy/store work.
+    chio_control_plane::server_transport::prepare(&transport, listen)?;
     if service_token.trim().is_empty() {
         return Err(CliError::cli_other_error(
             "trust serve requires a non-empty --service-token".to_string(),
@@ -1537,6 +1562,7 @@ pub(crate) fn cmd_trust_serve(
         }
     };
     trust_control::serve(trust_control::TrustServiceConfig {
+        transport,
         listen,
         service_token: service_token.to_string(),
         tenant_read_tokens,

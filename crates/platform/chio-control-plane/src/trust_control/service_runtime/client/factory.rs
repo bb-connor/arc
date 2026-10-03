@@ -62,13 +62,11 @@ fn build_client_with_cluster_peer(
             "control URL must not be empty".to_string(),
         ));
     }
-    let builder = ureq::AgentBuilder::new().timeout(CONTROL_HTTP_TIMEOUT);
-    let http = if cluster_peer_auth.is_some() {
-        builder.redirects(0)
-    } else {
-        builder
-    }
-    .build();
+    // Credential-bearing and public clients use the same fixed authority boundary.
+    let http = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .redirects(0)
+        .build();
     Ok(TrustControlClient {
         endpoints: Arc::new(endpoints),
         preferred_index: Arc::new(Mutex::new(0)),

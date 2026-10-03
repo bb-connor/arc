@@ -15,11 +15,11 @@ fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
     };
     assert!(error.to_string().contains("control URL must not be empty"));
 
-    let client = build_client(" http://one/ , http://two// ,,", "secret")
+    let client = build_client(" https://one/ , https://two// ,,", "secret")
         .test_expect("build client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
-        &vec!["http://one".to_string(), "http://two".to_string()]
+        &vec!["https://one".to_string(), "https://two".to_string()]
     );
     assert_eq!(client.endpoint_order(), vec![0, 1]);
 
@@ -43,11 +43,11 @@ fn build_client_rejects_blank_or_padded_control_token() {
 
 #[test]
 fn build_public_client_allows_empty_token_for_public_endpoints_and_keeps_endpoint_validation() {
-    let client = build_public_client(" http://one/ , http://two// ,,")
+    let client = build_public_client(" https://one/ , https://two// ,,")
         .test_expect("build public client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
-        &vec!["http://one".to_string(), "http://two".to_string()]
+        &vec!["https://one".to_string(), "https://two".to_string()]
     );
     assert_eq!(client.token.as_ref(), "");
 

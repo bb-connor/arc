@@ -1148,6 +1148,7 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
     std::fs::create_dir_all(&dir).unwrap();
     let db = dir.join("budget.sqlite");
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
         spec_sha256: None,

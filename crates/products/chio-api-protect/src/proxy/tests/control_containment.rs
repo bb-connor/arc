@@ -283,6 +283,7 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
         let receipt_db = directory.path().join("state/receipts.db");
         let observed = std::sync::atomic::AtomicBool::new(false);
         let error = ProtectProxy::new(ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".into(),
             spec_content: None,
             spec_sha256: None,
@@ -439,6 +440,7 @@ async fn serving_proxy_rejects_control_headers_without_waiting_for_request_body(
     let upstream = Upstream::start().await;
     let (ready, listening) = tokio::sync::oneshot::channel();
     let proxy = ProtectProxy::new(ProtectConfig {
+        transport: Default::default(),
         upstream: format!("http://{}", upstream.address),
         spec_content: Some(PETSTORE_YAML.into()),
         spec_sha256: None,

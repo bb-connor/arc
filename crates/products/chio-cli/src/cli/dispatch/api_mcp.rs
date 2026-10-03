@@ -15,6 +15,7 @@ pub(crate) fn dispatch_api(
 ) -> Result<(), CliError> {
     match command {
         ApiCommands::Protect {
+            transport,
             upstream,
             spec,
             spec_sha256,
@@ -24,6 +25,7 @@ pub(crate) fn dispatch_api(
             allow_ephemeral_receipts,
             upstream_timeout_secs,
         } => cmd_api_protect(
+            transport.into(),
             &upstream,
             spec_sha256.as_deref(),
             allow_anonymous_reads,
@@ -97,6 +99,7 @@ pub(crate) fn dispatch_mcp(
             control_token.as_deref(),
         ),
         McpCommands::ServeHttp {
+            transport,
             policy,
             approval_config,
             server_id,
@@ -139,6 +142,7 @@ pub(crate) fn dispatch_mcp(
             resume_hmac_keyring,
             command,
         } => cmd_mcp_serve_http(
+            transport.into(),
             &policy,
             approval_config.as_deref(),
             &server_id,

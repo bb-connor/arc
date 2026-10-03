@@ -76,7 +76,7 @@ SubmitThresholdApprovalRequest; response causes remain local and redacted.
 - [x] Run affected owner suites, strict Clippy, formatting and source gates;
   retain commands, terminal exits, log/source/binary hashes and failed attempts.
 - [x] Independent integrated review; fix important findings with RED/GREEN.
-- [ ] Commit/push, verify remote SHA, record task completion and next substantial
+- [x] Commit/push, verify remote SHA, record task completion and next substantial
   batch from the live review queue. Expected: tracked clean and remote matches.
 
 ## Review Focus

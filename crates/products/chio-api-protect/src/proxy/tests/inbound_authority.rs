@@ -142,6 +142,7 @@ fn inbound_authority_local_anonymous_opt_in_never_opens_unknown_routes() {
 
 fn spec_config() -> ProtectConfig {
     ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:9".into(),
         spec_content: None,
         spec_path: None,

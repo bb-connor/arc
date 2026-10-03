@@ -42,6 +42,7 @@ rusqlite = { workspace = true }
 subtle = "2.6"
 
 [dev-dependencies]
+rcgen = "0.13.2"
 chio-test-support = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }

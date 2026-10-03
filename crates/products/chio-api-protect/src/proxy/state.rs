@@ -545,6 +545,12 @@ impl ProtectProxy {
     where
         F: FnOnce(SocketAddr),
     {
+        let listen: SocketAddr = self.config.listen_addr.parse().map_err(|error| {
+            ProtectError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        })?;
+        let transport =
+            chio_control_plane::server_transport::prepare(&self.config.transport, listen)
+                .map_err(std::io::Error::other)?;
         spec_authority::validate_source(&self.config)?;
         validate_sidecar_control_token(self.config.sidecar_control_token.as_deref())
             .map_err(|error| ProtectError::Config(error.to_string()))?;
@@ -900,11 +906,9 @@ impl ProtectProxy {
 
         let app = build_app(Arc::clone(&state));
 
-        let listener = tokio::net::TcpListener::bind(&self.config.listen_addr)
-            .await
-            .map_err(|e| {
-                ProtectError::Config(format!("cannot bind {}: {e}", self.config.listen_addr))
-            })?;
+        let listener = transport.bind(listen).await.map_err(|e| {
+            ProtectError::Config(format!("cannot bind {}: {e}", self.config.listen_addr))
+        })?;
 
         let local_addr = listener.local_addr().map_err(|error| {
             ProtectError::Config(format!("cannot resolve bound address: {error}"))
@@ -983,8 +987,73 @@ impl ProtectProxy {
 mod proxy_builder_tests {
     use super::*;
 
+    #[tokio::test]
+    async fn protect_transport_denies_public_plaintext_before_spec_or_store_work(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("must-not-exist.db");
+        let mut config = minimal_config();
+        config.listen_addr = "0.0.0.0:0".into();
+        config.receipt_db = Some(database.to_string_lossy().into_owned());
+        config.spec_path = Some("missing-spec.yaml".into());
+        config.spec_content = None;
+        let result = ProtectProxy::new(config)
+            .run_with_observer(|_| panic!("unsafe listener published"))
+            .await;
+        assert!(result
+            .err()
+            .ok_or("unsafe listener started")?
+            .to_string()
+            .contains("non-loopback"));
+        assert!(!database.exists());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn protect_transport_serves_over_tls() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
+        let cert = directory.path().join("cert.pem");
+        let key = directory.path().join("key.pem");
+        std::fs::write(&cert, identity.cert.pem())?;
+        std::fs::write(&key, identity.key_pair.serialize_pem())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
+        }
+        let mut config = minimal_config();
+        config.spec_content =
+            Some("openapi: 3.1.0\ninfo: {title: TLS, version: '1'}\npaths: {}\n".into());
+        config.transport = chio_http_serve::ServerTransportConfig {
+            tls_cert: Some(cert),
+            tls_key: Some(key),
+            allow_plaintext: false,
+        };
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(ProtectProxy::new(config).run_with_observer(|address| {
+            let _ = sender.send(address);
+        }));
+        let address = tokio::time::timeout(std::time::Duration::from_secs(5), receiver).await??;
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .add_root_certificate(reqwest::Certificate::from_pem(
+                identity.cert.pem().as_bytes(),
+            )?)
+            .build()?;
+        let response = client
+            .get(format!("https://localhost:{}/chio/live", address.port()))
+            .send()
+            .await?;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        server.abort();
+        let _ = server.await;
+        Ok(())
+    }
+
     fn minimal_config() -> ProtectConfig {
         ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: Some("{}".to_string()),
             spec_sha256: None,
@@ -1065,6 +1134,7 @@ mod windows_authority_tests {
         let observer_called = AtomicBool::new(false);
 
         let result = ProtectProxy::new(ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: None,
             spec_sha256: None,

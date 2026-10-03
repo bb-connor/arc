@@ -5,6 +5,7 @@ pub(super) fn challenge_route_state(
     executor: Arc<dyn FindingChallengeSubmissionExecutor>,
 ) -> TrustServiceState {
     let config = TrustServiceConfig {
+        transport: Default::default(),
         listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
         service_token: "challenge-service-secret".to_string(),
         tenant_read_tokens: BTreeMap::new(),

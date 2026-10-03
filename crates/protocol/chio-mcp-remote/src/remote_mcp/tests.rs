@@ -186,6 +186,7 @@ fn empty_header_map() -> HeaderMap {
 
 fn test_remote_config() -> RemoteServeHttpConfig {
     RemoteServeHttpConfig {
+        transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().expect("parse listen addr"),
@@ -1384,6 +1385,7 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
 #[test]
 fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
     let config = RemoteServeHttpConfig {
+        transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -1558,6 +1560,7 @@ fn identity_federation_derives_stable_keypair_per_principal() {
 #[test]
 fn jwt_remote_auth_requires_separate_admin_token() {
     let config = RemoteServeHttpConfig {
+        transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().unwrap(),
@@ -1716,3 +1719,6 @@ fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queu
     let subscriber_count = subscribers.lock().unwrap().len();
     assert_eq!(subscriber_count, 2);
 }
+
+#[path = "tests/revocation_transport.rs"]
+mod revocation_transport;

@@ -1068,6 +1068,7 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
     std::fs::create_dir_all(&dir).unwrap();
     let db = dir.join("budget.sqlite");
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
         spec_sha256: None,
@@ -1103,6 +1104,7 @@ fn build_budget_store_remote_is_not_hold_capable() {
     // so it must be flagged not hold-capable; the mediated routes then fail
     // closed rather than mint a reservation it can never reconcile or reap.
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
         spec_sha256: None,
@@ -1141,6 +1143,7 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
     std::fs::create_dir_all(&dir).unwrap();
     let db = dir.join("budget.sqlite");
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
         spec_sha256: None,
@@ -1178,6 +1181,7 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
 
 fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
     ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
         spec_sha256: None,

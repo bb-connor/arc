@@ -22,6 +22,8 @@ pub struct ProtectConfig {
     pub allow_anonymous_reads: bool,
     /// Address to listen on (e.g., "127.0.0.1:9090").
     pub listen_addr: String,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
     /// Optional SQLite path for receipt persistence.
     pub receipt_db: Option<String>,
     /// Explicit opt-in to run without a durable receipt store. A durable audit

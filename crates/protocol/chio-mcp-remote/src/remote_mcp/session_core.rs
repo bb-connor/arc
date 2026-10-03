@@ -139,6 +139,8 @@ type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 pub struct RemoteServeHttpConfig {
     pub clock: RemoteClock,
     pub listen: SocketAddr,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
     /// Explicit authenticated proxy trust for TLS and attestation binding evidence.
     pub trusted_proxy: Option<TrustedProxyConfig>,
     pub auth_token: Option<String>,

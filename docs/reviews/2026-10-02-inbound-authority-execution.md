@@ -1,6 +1,7 @@
 # Inbound authority execution, October 2, 2026
 
-Candidate on `packet/3-retention-accounting`, based on
+Published source `aaa413406d63cc109f6aeda14de4e517a6d574a6` on
+`packet/3-retention-accounting`, based on
 `e84e53ae436ed8d8e2e5b85e62dea185cf7c33d6`. The implementation and local qualification below are complete; publication is recorded in Git.
 This record does not establish hosted qualification, deployment, release or
 activation of a durable replay authority.
@@ -99,7 +100,13 @@ must sanitize caller headers and protect its link to Chio. TLS listeners remain
 AP7 work. No new runtime crate was added; raw JSON support and the test router
 harness use existing workspace dependencies.
 
-## Next substantial batch
+## Subsequent execution
+
+AP7/AP8 are implemented and qualified separately in the
+[October 3 transport and revocation record](2026-10-03-transport-revocation-execution.md).
+The proposal below retains this batch's original continuation scope.
+
+## Next substantial batch at publication
 
 AP7 and AP8 remain live in the current source. Add a shared TLS listener profile
 for trust-control, MCP serve-http and API-protect, with explicit certificate/key

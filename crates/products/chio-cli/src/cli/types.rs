@@ -809,6 +809,8 @@ pub(crate) enum Commands {
     /// deployments that need `--upstream`, `--spec`, and persistent
     /// stores.
     Start {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Address to listen on. Defaults to `127.0.0.1:9090` to
         /// match `chio-sdk-python`'s `ChioClient.DEFAULT_BASE_URL`.
         /// Pass `127.0.0.1:0` to bind an ephemeral port; the bound
@@ -1086,4 +1088,23 @@ pub(crate) enum CertCommands {
         #[arg(long)]
         certificate: PathBuf,
     },
+}
+
+#[derive(clap::Args)]
+pub(crate) struct ServerTransportArgs {
+    /// PEM certificate chain for the public TLS listener.
+    #[arg(long, requires = "tls_key", conflicts_with = "allow_plaintext")]
+    tls_cert: Option<PathBuf>,
+    /// Existing owner-only PEM private key matching the certificate.
+    #[arg(long, requires = "tls_cert", conflicts_with = "allow_plaintext")]
+    tls_key: Option<PathBuf>,
+    /// Explicitly permit plaintext outside loopback, for a protected proxy network.
+    #[arg(long)]
+    allow_plaintext: bool,
+}
+
+impl From<ServerTransportArgs> for chio_http_serve::ServerTransportConfig {
+    fn from(args: ServerTransportArgs) -> Self {
+        Self { tls_cert: args.tls_cert, tls_key: args.tls_key, allow_plaintext: args.allow_plaintext }
+    }
 }

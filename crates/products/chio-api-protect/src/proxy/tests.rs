@@ -1686,6 +1686,7 @@ async fn sidecar_evaluate_tool_call_honors_a_durable_only_revocation() {
 #[tokio::test]
 async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some(PETSTORE_YAML.to_string()),
         spec_sha256: None,
@@ -1724,6 +1725,7 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
 async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
     for receipt_db in [":memory:", "file:receipts.db?mode=memory"] {
         let config = ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: Some(PETSTORE_YAML.to_string()),
             spec_sha256: None,

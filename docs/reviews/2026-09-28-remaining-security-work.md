@@ -3,11 +3,11 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the October 2 lease-fencing and framework-ingress batch. Each batch has its own
+Updated through the October 3 transport and revocation batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
 
-## Current continuation (October 2, 2026)
+## Current continuation (October 3, 2026)
 
 The [regression recovery record](2026-10-01-regression-recovery-execution.md)
 records published repairs and local acceptance for SR1/SR6, PB1, PR1/PB2/PR2 and
@@ -45,13 +45,22 @@ distinct Rust passes, 58 Python passes, four independent review corrections and
 retained failures. Raw decoder debt remains 45 files; other format/API gaps,
 hosted qualification and deployed acceptance remain explicit.
 
-**Next substantial batch: AP4-AP6 inbound authority.** Deny unmatched routes and
-require explicit local anonymous-read policy; constrain upstream side-effect
-claims to operator-pinned specs; reject unverified JWT confirmation and carry
-sender proofs through production consumers; bind certificate/attestation identity
-to trusted transport context. Close the two remaining API-protect threshold JSON
-boundaries while changing those entry points. The current source still contains
-the reviewed default-allow routing and caller-header sender-binding behavior.
+The [inbound authority record](2026-10-02-inbound-authority-execution.md)
+records AP4-AP6, both threshold readers, native caller-key bootstrap, original MCP
+proof bytes and URL-normalization denial. Source `aaa413406d` is published.
+The [transport and revocation record](2026-10-03-transport-revocation-execution.md)
+records AP7 shared TLS, explicit plaintext policy and strict control-client
+transport, plus AP8 confirmed partial revocation. Its terminal local checks,
+private-key ownership audit and review dispositions govern acceptance.
+
+**Next substantial batch: AP9/AP10 receipt integrity and evidence lifecycle.**
+Replace mutable API-protect receipt rows with the append-only evidence log,
+attach the mediation kernel's receipts, require stable private signing custody,
+distinguish operator observations from mediated authorization, include those
+records in truthful exports, and wire archive-aware retention using SR1/SR6.
+Current source still uses replaceable receipt rows and labels submitted records
+as mediated decisions. Key/guard findings and hosted/release gates follow that
+batch; they are not implicitly closed by transport qualification.
 
 Remaining TCB reader semantics, proof-result sealing and error provenance remain
 engineering work. Full required hosted CI, branch decomposition, other

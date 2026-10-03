@@ -4,6 +4,8 @@ use super::*;
 pub(crate) enum TrustCommands {
     /// Serve the shared trust-control plane over HTTP.
     Serve {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Socket address to bind the trust-control service to.
         #[arg(long, default_value = "127.0.0.1:8940")]
         listen: SocketAddr,

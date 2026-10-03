@@ -28,12 +28,17 @@ fn load_enterprise_provider_registry(
     Ok(Some(Arc::new(registry)))
 }
 
-async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError> {
+async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {
+    let transport = chio_control_plane::server_transport::prepare(&config.transport, config.listen)?;
+    let tls = transport.is_tls();
     if let Some(proxy) = &config.trusted_proxy {
         proxy.validate_separation(&config)?;
     }
-    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    let listener = transport.bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
+    if tls && config.public_base_url.is_none() {
+        config.public_base_url = Some(format!("https://{local_addr}"));
+    }
     let enterprise_provider_registry = load_enterprise_provider_registry(
         config.enterprise_providers_file.as_deref(),
         "remote_mcp",
@@ -150,7 +155,8 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         endpoint = %MCP_ENDPOINT_PATH,
         "serving remote MCP edge"
     );
-    eprintln!("remote MCP edge listening on http://{local_addr}{MCP_ENDPOINT_PATH}");
+    let scheme = if tls { "https" } else { "http" };
+    eprintln!("remote MCP edge listening on {scheme}://{local_addr}{MCP_ENDPOINT_PATH}");
 
     // The generic per-request timeout is left off here. The edge's GET and POST
     // routes return Server-Sent Event streams that stay open indefinitely while a

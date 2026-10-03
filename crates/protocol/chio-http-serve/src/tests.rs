@@ -406,11 +406,17 @@ async fn slow_request_times_out_cleanly_inside_the_drain_window() {
     // both is denied with 408 by the timeout layer and its connection completes,
     // so the drain observes a clean shutdown rather than force-closing it. This is
     // the behavioral guarantee the default ordering exists to provide.
+    let entered = Arc::new(Notify::new());
+    let handler_entered = entered.clone();
     let router = Router::new().route(
         "/slow",
-        get(|| async {
-            tokio::time::sleep(Duration::from_secs(30)).await;
-            "unreachable"
+        get(move || {
+            let entered = handler_entered.clone();
+            async move {
+                entered.notify_one();
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                "unreachable"
+            }
         }),
     );
     let config = ServeHygieneConfig {
@@ -435,7 +441,9 @@ async fn slow_request_times_out_cleanly_inside_the_drain_window() {
     let request = tokio::spawn(async move { http_request(addr, &get_request("/slow")).await });
     // Admit the request, then stop the server while it is still parked in the
     // handler and inside its own request-timeout budget.
-    tokio::time::sleep(Duration::from_millis(20)).await;
+    tokio::time::timeout(Duration::from_secs(2), entered.notified())
+        .await
+        .unwrap();
     ctrl.trigger();
 
     let (status, _) = request.await.unwrap().unwrap();

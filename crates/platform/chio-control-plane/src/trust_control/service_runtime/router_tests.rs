@@ -11,6 +11,7 @@ mod ingress_tests;
 
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
+        transport: Default::default(),
         listen: "127.0.0.1:0".parse().test_unwrap(),
         service_token: service_token.to_string(),
         tenant_read_tokens: BTreeMap::new(),

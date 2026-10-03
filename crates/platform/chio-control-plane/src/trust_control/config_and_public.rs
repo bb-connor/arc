@@ -1567,6 +1567,7 @@ mod config_and_public_tests {
 
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_expect("parse listen addr"),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
