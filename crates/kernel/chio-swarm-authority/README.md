@@ -49,6 +49,12 @@ complete-artifact entry point requires all graph joins and a terminal receipt.
 - `verify_swarm_authority_for_admission` - the same signature, for live task
   admission. The report includes join/terminal claims only when those artifacts
   are present and valid. An admission report is not evidence of a completed run.
+- `verify_swarm_authority_extension(previous, candidate, trusted_keys, now_unix_ms)` -
+  checks additive growth of a live graph at caller-owned time. Retains the
+  original graph envelope, allocations, witness chains, routes, joins and
+  continuation identities. Existing tokens are re-signed for the successor
+  graph hash without changing their authority or replay identity. Both versions
+  must pass ordinary live admission verification.
 - Bundle types: `SwarmAuthorityBundle`, `SwarmTaskGraph`, `SwarmGraphNode`,
   `SwarmGraphEdge`, `SwarmGraphJoin`, `SwarmContinuationToken`,
   `SwarmDelegationWitnessChain`, `SwarmDelegationWitnessHop`,
@@ -82,6 +88,28 @@ The crate never reads environment variables itself; callers source
 `trusted_witness_issuer_keys`. Rejection messages name
 `CHIO_SWARM_TRUSTED_WITNESS_KEYS` because that is the convention callers use
 to populate the slice.
+
+## Extending a running swarm
+
+The pure extension verifier checks a pair of signed bundles. Serializing
+successors requires protected state. The SQLite runtime store provides
+`extend_swarm_authority_bundle(expected_bundle_sha256, candidate, trusted_keys)`:
+it verifies the current head and extension using the store clock, archives the
+parent, and installs the successor in one immediate transaction. Concurrent
+writers against one head cannot both succeed. Separate copies of the database
+do not form a shared allocation authority.
+
+Admission resolves the graph digest already present in the request. Historical
+bundles are verified against their stored full digest and graph index, so old
+work remains usable within its original lifetime and the ordinary capability,
+revocation and treaty checks. Native custody consumes the same continuation ID
+across versions; changing a graph hash cannot refresh a used invocation.
+
+This profile retains every issued allocation. It adds work within the original
+declared pool, without reclaiming capacity, retiring tasks, moving commitments
+between receivers, or treating declared units as deposited funds. See
+[`swarm-evolution/PROTOCOL.md`](../../../docs/research/swarm-evolution/PROTOCOL.md)
+for the assumptions, composition argument and native evidence.
 
 ## Testing
 

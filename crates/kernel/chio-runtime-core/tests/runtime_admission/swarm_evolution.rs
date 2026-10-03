@@ -5,9 +5,33 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 const NOW: u64 = 1_800_000_001_000;
 
 pub(super) fn versions() -> TestResult<(SwarmAuthorityBundle, SwarmAuthorityBundle)> {
+    versions_with_headroom(true)
+}
+
+pub(super) fn treaty_versions() -> TestResult<(SwarmAuthorityBundle, SwarmAuthorityBundle)> {
+    versions_with_headroom(false)
+}
+
+fn versions_with_headroom(
+    headroom: bool,
+) -> TestResult<(SwarmAuthorityBundle, SwarmAuthorityBundle)> {
     let mut next = runtime_swarm_bundle(false)?;
+    // Leave headroom in the native capability so the rebound-continuation test
+    // cannot pass merely because a one-invocation capability is exhausted.
+    if headroom {
+        let scope = runtime_swarm_scope(2);
+        next.task_graph.nodes[1].scope_hash = scope_hash(&scope)?;
+        let chain = &mut next.witness_chains[0];
+        chain.hops[0].child_scope_hash = scope_hash(&scope)?;
+        chain.hops[0].child_capability_digest = canonical_test_hash(&capability("task-child-a")?)?;
+        chain.hops[0].scope_subset_proof =
+            compute_attenuation_witness(&runtime_swarm_scope(3), &scope)?;
+        chain.hops[0].witness_signature =
+            sign_swarm_delegation_witness_hop(chain, &chain.hops[0], &swarm_witness_keypair())?;
+    }
     next.join_receipts.clear();
     next.terminal_receipts.clear();
+    resign_graph(&mut next)?;
     let mut prior = next.clone();
     prior
         .task_graph
@@ -35,13 +59,46 @@ pub(super) fn versions() -> TestResult<(SwarmAuthorityBundle, SwarmAuthorityBund
         .budget_pool
         .allocations
         .retain(|a| a.task_id != "task-child-b");
-    prior.task_graph.signature =
-        sign_swarm_task_graph(&prior.task_graph, &swarm_witness_keypair())?;
-    for token in &mut prior.continuation_tokens {
-        token.graph_sha256 = canonical_test_hash(&prior.task_graph)?;
+    resign_graph(&mut prior)?;
+    Ok((prior, next))
+}
+
+pub(super) fn capability(task: &str) -> TestResult<CapabilityToken> {
+    let old = swarm_fixtures::runtime_swarm_capability(task)?;
+    if task != "task-child-a" {
+        return Ok(old);
+    }
+    Ok(CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: old.id,
+            issuer: old.issuer,
+            subject: old.subject,
+            scope: runtime_swarm_scope(2),
+            issued_at: old.issued_at,
+            expires_at: old.expires_at,
+            delegation_chain: old.delegation_chain,
+            aggregate_invocation_budget: None,
+        },
+        &swarm_witness_keypair(),
+    )?)
+}
+
+fn resign_graph(bundle: &mut SwarmAuthorityBundle) -> TestResult {
+    bundle.task_graph.signature =
+        sign_swarm_task_graph(&bundle.task_graph, &swarm_witness_keypair())?;
+    for token in &mut bundle.continuation_tokens {
+        token.graph_sha256 = canonical_test_hash(&bundle.task_graph)?;
+        if let Some(id) = &token.witness_chain_ref {
+            let chain = bundle
+                .witness_chains
+                .iter()
+                .find(|c| &c.chain_id == id)
+                .ok_or("witness")?;
+            token.witness_chain_sha256 = Some(canonical_test_hash(chain)?);
+        }
         token.signature = sign_swarm_continuation_token(token, &swarm_witness_keypair())?;
     }
-    Ok((prior, next))
+    Ok(())
 }
 
 pub(super) fn open(path: &std::path::Path) -> TestResult<SqliteRuntimeOrchestrationStore> {

@@ -199,7 +199,7 @@ fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> Te
     let before = snapshot(&path)?;
     let result = store.scheduler_tick_report(&early_profile(), "owner", 10, 2);
     assert!(
-        matches!(result, Err(ChioRuntimeError::Store(ref detail)) if detail.contains("injected late lease failure")),
+        matches!(result, Err(ChioRuntimeError::Sqlite(rusqlite::Error::SqliteFailure(_, Some(ref detail)))) if detail == "injected late lease failure"),
         "{result:?}"
     );
     assert_eq!(snapshot(&path)?, before);

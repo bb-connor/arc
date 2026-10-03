@@ -12,6 +12,85 @@ use chio_kernel::{KernelError, RuntimeAdmissionDecision, RuntimeParticipantClaim
 type Hook = ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>;
 
 #[test]
+fn native_swarm_evolution_preserves_treaty_and_original_physical_claim() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
+    let (prior, next) = crate::swarm_evolution::treaty_versions()?;
+    let fixture = CombinedFixture::with_swarm_input(None, |_, _, _| Ok(()), prior.clone())?;
+    // A restart must retain the owner's verifier configuration, not generate a
+    // fresh trust root as the default independent-test fixture does.
+    let policy_inputs = signed_policy_inputs(0.1)?;
+    let hook = Arc::new(
+        fixture
+            .inner
+            .hook_with_inputs(policy_inputs.clone())?
+            .with_swarm_witness_keys(trusted_swarm_witness_keys()),
+    );
+    let kernel = fixture.kernel(SharedHook(hook.clone()))?;
+    let response = kernel.evaluate_tool_call_blocking_with_metadata(
+        &fixture.inner.request,
+        Some(swarm_route_metadata()),
+    )?;
+    assert_eq!(response.verdict, Verdict::Allow, "{response:#?}");
+    assert!(kernel.dual_signed_receipt(&response.receipt.id).is_some());
+    let (source, intent) = physical_input(&fixture.inner)?;
+    assert_eq!(intent.resources().len(), 3);
+    let before = faults::history(&fixture.inner)?;
+    crate::swarm_evolution::open(&fixture.inner._directory.path().join("runtime.sqlite3"))?
+        .extend_swarm_authority_bundle(
+            &canonical_test_hash(&prior)?,
+            next,
+            &trusted_swarm_witness_keys(),
+        )?;
+    // This explicitly exercises historical artifact resolution; a completed
+    // request's fast receipt replay alone would not test the changed resolver.
+    hook.revalidate_operation_owned_for_native_capture(
+        &revalidation_input(&fixture.inner, &response),
+        &source,
+        &intent,
+    )?
+    .validate_at(NOW)?;
+    drop(kernel);
+    drop(hook);
+    let fixture = fixture.reopen()?;
+    let hook = fixture
+        .inner
+        .hook_with_inputs(policy_inputs)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let (source, intent) = physical_input(&fixture.inner)?;
+    hook.revalidate_operation_owned_for_native_capture(
+        &revalidation_input(&fixture.inner, &response),
+        &source,
+        &intent,
+    )?
+    .validate_at(NOW)?;
+    let mut stripped = fixture.inner.request.clone();
+    stripped
+        .governed_intent
+        .as_mut()
+        .and_then(|i| i.context.as_mut())
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("context")?
+        .remove("chioTreaty");
+    let mut context = revalidation_input(&fixture.inner, &response);
+    context.request = &stripped;
+    assert!(hook
+        .revalidate_operation_owned_for_native_capture(&context, &source, &intent)
+        .is_err());
+    let kernel = fixture.kernel(hook)?;
+    let replay = kernel.evaluate_tool_call_blocking_with_metadata(
+        &fixture.inner.request,
+        Some(swarm_route_metadata()),
+    )?;
+    assert_eq!(
+        canonical_json_bytes(&response.receipt)?,
+        canonical_json_bytes(&replay.receipt)?
+    );
+    assert_eq!(faults::history(&fixture.inner)?, before);
+    assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
 fn native_runtime_deadline_includes_the_verified_bilateral_capability_lease() -> TestResult {
     use base64::Engine;
     use chio_federation::bilateral_dsse::{pae, DsseSignature};

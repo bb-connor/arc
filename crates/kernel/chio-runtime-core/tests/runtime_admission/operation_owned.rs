@@ -84,6 +84,34 @@ impl chio_kernel::ToolServerConnection for CountingTool {
 }
 
 impl Fixture {
+    fn reopen(self) -> TestResult<Self> {
+        let Self {
+            _directory,
+            authority,
+            source,
+            binding,
+            request,
+            invocations,
+        } = self;
+        drop(source);
+        drop(authority);
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            _directory.path().join("authority.sqlite3"),
+            _directory.path().join("locks"),
+            chio_test_support::clock::clock(),
+        )?;
+        let source =
+            SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
+        Ok(Self {
+            _directory,
+            authority,
+            source,
+            binding,
+            request,
+            invocations,
+        })
+    }
+
     fn new(activate: bool) -> TestResult<Self> {
         Self::with_request(activate, |source| {
             let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
@@ -159,7 +187,14 @@ impl Fixture {
     }
 
     fn hook(&self) -> TestResult<ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>> {
-        let (trust, keys, report, policy, weights) = signed_policy_inputs(0.1)?;
+        self.hook_with_inputs(signed_policy_inputs(0.1)?)
+    }
+
+    fn hook_with_inputs(
+        &self,
+        inputs: SignedPolicyInputs,
+    ) -> TestResult<ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>> {
+        let (trust, keys, report, policy, weights) = inputs;
         Ok(ChioRuntimeAdmissionHook::new(
             profile(),
             SqliteRuntimeOrchestrationStore::open(self._directory.path().join("runtime.sqlite3"))?,

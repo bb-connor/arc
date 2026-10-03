@@ -104,24 +104,29 @@ pub fn dispatch_through_kernel(
     target: &KernelDispatchTarget<'_>,
 ) -> Result<KernelDispatchOutcome, Box<dyn std::error::Error>> {
     let keypair = receiver_kernel_keypair();
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: keypair.clone(),
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 5,
-        policy_hash: "policy-live".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-    });
+    let now_unix_secs = target.now_unix_ms / 1000;
+    let _clock = chio_test_support::clock::scope_unix_secs(now_unix_secs);
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: keypair.clone(),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 5,
+            policy_hash: "policy-live".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+        },
+        chio_test_support::clock::clock(),
+    );
     kernel.set_federation_local_kernel_id(target.local_kernel_id.to_string());
     kernel.set_runtime_admission_hook(hook);
 
@@ -137,7 +142,6 @@ pub fn dispatch_through_kernel(
     receipt_store.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
     kernel.set_receipt_store_handle(Arc::new(receipt_store))?;
 
-    let now_unix_secs = target.now_unix_ms / 1000;
     if let Some(origin_kernel_id) = target.origin_kernel_id {
         let origin_key = origin_kernel_keypair();
         let exchange = chio_federation::trust_establishment::KernelTrustExchange::new(
@@ -170,10 +174,8 @@ pub fn dispatch_through_kernel(
         dispatches: Arc::clone(&dispatches),
     }));
 
-    let _fixed_runtime = chio_kernel::scope_fixed_runtime_for_current_thread(
-        now_unix_secs,
-        [format!("rcpt-{}", request.request_id)],
-    );
+    let _receipt_ids =
+        chio_kernel::scope_receipt_ids_for_current_thread([format!("rcpt-{}", request.request_id)]);
     let response = kernel.evaluate_tool_call_blocking(request)?;
     let failure_code = response
         .receipt
