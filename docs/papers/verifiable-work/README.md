@@ -2,28 +2,28 @@
 
 [Read the paper](paper.pdf) · [Source](paper.tex) · [Artifact and reproduction](ARTIFACT.md) · [Claim register](CLAIMS.json) · [Publication gates](PUBLICATION.json)
 
-Chio is a kernel for composing agentic work under the authority of its resource
-owners. Its central rule is simple: **plans may evolve while issued commitments
-retain their bounds and identity.**
+An agent may hire collaborators before it knows its complete plan. Chio lets
+the plan acquire new tasks while each resource owner retains control of what
+it admits and a durable record of what has already happened.
 
-An agent can delegate bounded capacity, select a collaborator and grow a running
-work graph. Each receiver admits the resulting invocation under its own
-capabilities and treaty conditions. Durable custody preserves the original
-execution, and funded claims preserve earned obligations after parent failure.
-This is programmable sovereignty at the execution boundary: owners control what
-may enter their domains, while agents compose work within those bounds.
+The protocol uses a work commitment to connect one selected call with its
+allowance, the receiver's authorization and its payment terms. Later graph
+versions retain the call's execution identity, so a new signature cannot make
+a consumed right executable again. Each paid task has its own reserve; recorded
+acceptance keeps that reserve payable after a parent failure.
 
-The paper gives the protocol, its conditional preservation argument and a Rust
-implementation. One running example connects the design to an executable result:
-an API survey triggers a specialist task, the intermediary is killed after the
-specialist earns payment, and the original claim is collected while earlier
-execution evidence remains unchanged.
+The paper derives these rules from an API-review example, specifies their
+enforcement, and gives a preservation argument under explicit trust assumptions.
+Its Rust implementation runs the example through task discovery, graph growth,
+intermediary process loss and collection of the specialist's original claim.
+This is how the paper develops programmable sovereignty: cooperating owners
+enforce agreements at their own resources.
 
-The manuscript presents the kernel contract, trust model, commitment lifecycle,
-preservation property and evidence as one argument. Appendix A fixes the concrete
-profiles and encodings; Appendix B retains the exact qualification and comparison
-boundaries. The [editorial review](EDITORIAL-REVIEW.md) records the technical
-review and repairs behind this revision.
+Appendix A fixes the concrete profiles and encodings. Appendix B retains the
+qualification and comparison details. The [prose and technical review](PROSE-REVIEW.md)
+records the review of this explanatory revision; the
+[earlier editorial review](EDITORIAL-REVIEW.md) remains available at its original
+scope.
 
 The title was approved on 2026-09-14. The manuscript and artifact were revised on
 2026-10-03. The composed result uses one administrator and a private chain. The
@@ -43,7 +43,7 @@ economics, integration advantage and external foundational critique.
 - `PUBLICATION.json`: fail-closed high-bar readiness gates.
 - `EXTERNAL-TRIAL.md`, `trial/`: independent operator handoff, frozen analysis rules and data templates; no completed trial is implied.
 - `PROGRESS.md`: execution decisions and remaining work.
-- `EDITORIAL-REVIEW.md`, `REVIEW.md`: current manuscript review and retained earlier review records.
+- `PROSE-REVIEW.md`, `EDITORIAL-REVIEW.md`, `REVIEW.md`: current manuscript review and retained earlier review records.
 - [Dynamic delegation](../../research/dynamic-delegation/README.md): protocol,
   results, current native source qualification and implementation review.
 - [Swarm evolution](../../research/swarm-evolution/README.md): reuse map,

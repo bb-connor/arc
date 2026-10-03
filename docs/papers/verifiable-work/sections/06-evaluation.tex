@@ -1,100 +1,99 @@
-\section{Implementation and evidence}
+\section{Implementation and evaluation}
 \label{sec:evaluation}
-The Rust implementation connects the work contract to Chio's existing
-delegation allocator, swarm-authority verifier, bilateral treaty admission,
-native continuation custody, receipt exporter and funded settlement adapter.
-The composed profile adds explicit binding checks at their handoffs. It uses
-the existing capability and escrow mechanisms.
+The Rust implementation joins Chio's delegation allocator, task-graph verifier,
+treaty admission, execution records and funded-settlement adapter. The added
+checks enforce the references described in Section~\ref{sec:contract}.
+Evaluation examines whether the implementation rejects inconsistent commitments,
+preserves earlier execution through plan growth, and pays an earned child after
+its parent process is lost.
 
-The evaluation has two source epochs: current native qualification for the
-composed execution, and retained funded-model and comparison experiments at
-their recorded revisions. The artifact binds each to its source inventory,
-commands and outputs. All observed executions use author-controlled
-infrastructure; the composed run uses separate receiver keys and stores on
-one host, in-process treaty co-signers, a private development chain and mock
-tokens.
+All runs use author-controlled infrastructure. The composed execution has three
+receiving keys and separate stores on one host, in-process treaty co-signers,
+a private development chain and mock tokens. The artifact records the source
+and command output for each run. Earlier financial-model and comparison results
+retain their original source revisions; Appendix~\ref{app:evidence} separates
+them from the current implementation's qualification.
 
-\subsection{A program that grows after its first result}
-The executable begins with a declared envelope of 300 units and a graph
-containing a planning root, a survey task and an unstarted intermediary task.
-The survey inventories an OpenAPI document's authentication declarations and
-identifies an operation without required authentication. That actual result
-triggers selection of an enrolled specialist. Only then are its task,
-capability, sealed selection, funded agreement and 100-unit deposit created.
-The checked graph grows from three nodes to four.
+\subsection{Growth followed by parent failure}
+The API program begins with a declared ceiling of 300 units and three graph
+nodes: a planning root, a survey and an unstarted intermediary task. The buyer
+funds the survey and intermediary tasks under separate agreements. The survey
+has its own receiving key and execution store; its agreement names the
+intermediary as payment beneficiary. The survey examines an OpenAPI document
+and finds an operation without required
+authentication. This returned result triggers selection of an enrolled
+specialist. Its task, capability, sealed selection, payment agreement and
+100-unit deposit are created at that point. The checked graph grows to four
+nodes while preserving the survey's original execution evidence.
 
-The intermediary invokes the specialist. A separately implemented Python
-checker accepts the bound result, and escrow records the specialist's claim
-as \textsf{Payable}. Before the intermediary's own return is captured, its
-process is killed with SIGKILL. Its funding later refunds while its native
-effect remains unknown. Parent and verifier rail signing are disabled.
-The specialist's collector withdraws the original earned claim, then repeats
-collection without another invocation or transfer.
+The intermediary calls the specialist. A separately implemented Python checker
+accepts the bound result, and the escrow records the specialist as
+\textsf{Payable}. The intermediary process is then killed with SIGKILL before
+its own return is captured. Its funding eventually refunds, while its execution
+outcome remains unknown. With parent and verifier settlement signing disabled,
+the specialist's collector withdraws the original claim. Repeating collection
+produces neither another call nor another transfer.
 
 \begin{table}[ht]
 \centering\small
 \begin{tabularx}{\linewidth}{@{}l X l@{}}
 \toprule
-Work & Retained native outcome & Financial result\\
+Task & Execution outcome & Financial outcome\\
 \midrule
-Survey & Completed; original evidence unchanged & Paid 100\\
-Intermediary & Outcome unknown after dispatch & Refunded 100\\
+Survey & Completed; original evidence retained & Paid 100\\
+Intermediary & Unknown after dispatch & Refunded 100\\
 Specialist & Completed; original claim retained & Paid 100\\
 \bottomrule
 \end{tabularx}
-\caption{One composed execution after graph growth, intermediary SIGKILL and
-recovery. Native observations and financial resolution retain distinct meanings.}
+\caption{Recorded outcomes after graph growth, intermediary process loss and
+collection. The intermediary's refund does not establish whether its tool
+completed.}
 \label{tab:trajectory}
 \end{table}
 
-Each receiver records one tool invocation and one native claim episode
-containing its treaty and swarm continuation resources. Operation, allocation,
-hold, authorization and physical claim identities remain unchanged through
-reopen and collection. Starting from 2,000 total mock units, final balances are
-buyer 900, intermediary 1,000, specialist 100 and escrow zero. Survey proceeds
-accrue to the intermediary, which separately funds the specialist.
+Each receiver records one tool call and one acquisition of its treaty and graph
+continuation resources. The operation, allocation, budget hold, authorization
+and durable claim identities remain unchanged through reopening and collection.
+Of the initial 2,000 mock units, the final balances are buyer 900, intermediary
+1,000, specialist 100 and escrow zero. The intermediary receives the survey
+payment and separately funds the specialist.
 
-The first collection report retains an unavailable remote co-signer diagnostic.
-A later open has no unfinished local operation to reconcile. Both reports
-retain the same execution and payment identities. The observed result is
-local completion and payment; final bilateral receipt delivery remains a
-separate boundary.
+The first collection report records an unavailable remote receipt co-signer.
+A later open has no unfinished local operation to reconcile; both reports retain
+the same execution and payment identities. The run establishes local completion
+and payment. It does not establish delivery of a final bilateral receipt.
 
-\subsection{Adversarial and recovery checks}
-The rejection cases use authenticated adversarial inputs. A validly re-signed
+\subsection{Substitution, replay and concurrent growth}
+The rejection tests present authenticated but inconsistent records. A re-signed
 graph that changes an issued continuation is rejected. A sealed allocation
-cannot select another invocation. Missing treaty evidence, a foreign
-capability and a signed route to another receiver fail before funding
-observation or native work. A deliberate removal of the receiver-route check
-makes its regression fail for reaching funding observation.
+cannot select a different invocation. Missing treaty evidence, a capability
+from another receiver, and a signed route naming another receiver are rejected
+before the funding check or tool execution. Removing the route check causes
+its regression test to fail by reaching the funding check.
 
-Native tests also recover recorded tool output after process loss, allow
-independent sibling progress, preserve original unfinished work through graph
-extension, and reject a fresh request using a consumed continuation. Concurrent
-graph extensions yield one committed successor. These cases exercise the
-specific boundaries used in the preservation argument.
+Recovery tests return recorded output after process loss, allow independent
+siblings to proceed, and preserve unfinished work through a graph extension.
+A fresh request using a consumed continuation is rejected. When two extensions
+compete for the same graph head, only one commits. These cases exercise the
+state and reference checks used in the preservation argument.
 
-Current qualification completes 21 commands on an unchanged source inventory,
-including the composed execution and four existing earned-child crash and
-transaction-recovery cases. Six opt-in chain regressions are run explicitly
-in addition to the default standalone suite. Appendix~\ref{app:evidence}
-gives counts and source boundaries; the companion retains the command output
-and the initial failed runs.
+The current qualification records 21 terminal commands, including the composed
+run and four existing child-payment crash and transaction-recovery cases.
+Six optional chain regressions are exercised separately. Exact counts,
+ignored cases and retained initial failures are recorded in
+Appendix~\ref{app:evidence} and the artifact companion.
 
-\subsection{What the comparisons establish}
-The financial state machine is also implemented using ordinary SQL transactions.
-It matches every compared state and balance along the retained representative
-traces. A competent conventional implementation therefore has the same tested
-monetary conservation and earned-child behavior.
+\subsection{Financial comparison}
+An implementation of the financial state machine using ordinary SQL transactions
+matches every compared state and balance on the retained representative traces.
+The pinned ERC-8183 implementation also pays a separately funded child after
+parent refund and rejects overcommitment of available reserves. It supports
+partial settlement in addition to the fixed-price cases considered here.
+Chio records \textsf{Payable} before withdrawal; the pinned upstream completion
+pays immediately.
 
-The pinned upstream ERC-8183 implementation also pays a separately funded child
-after parent refund and rejects overcommitment of the available reserve.
-It additionally supports partial settlement, beyond this paper's fixed-price
-profile. Chio's explicit \textsf{Payable} state preserves recorded acceptance
-until a later withdrawal. These are lifecycle choices within expressive
-settlement systems, not evidence of an exclusive economic primitive.
-
-The composed experiment establishes the implemented connection between evolving
-authority, native execution and an earned obligation. The authentication
-inventory is deliberately easy to check: it measures protocol behavior rather
-than an economic advantage in outsourcing that work.
+These comparisons establish substantial overlap in the financial mechanisms.
+The contribution evaluated by the composed run is their connection to the
+authorized invocation and its changing task graph. The authentication inventory
+provides an easily checked workload for this purpose. It does not measure an
+economic advantage in outsourcing API review.

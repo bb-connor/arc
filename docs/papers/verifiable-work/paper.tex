@@ -27,23 +27,22 @@
 \begin{document}
 \maketitle
 \begin{abstract}
-An agentic web requires programs that can recruit collaborators, delegate work
-and spend resources across organizational boundaries. Those programs must be
-free to change their plans while remaining bound by the commitments they
-issue. We present Chio, a kernel for composing agentic work under the authority
-of its resource owners. Chio binds delegated capacity, a selected invocation,
-receiver-local admission, execution evidence and funded payment into one
-verifiable chain of commitments. Each receiver enforces its own capabilities
-and treaty conditions. A running program can add tasks within its original
-allocation; earlier work retains its terms, execution identity and continuation
-custody. Recorded earned payments remain collectible under their agreed terms
-after the parent fails. We give the protocol, a conditional preservation
-argument and a Rust implementation. In a composed local execution, a first
-result triggers a newly funded collaborator, the intermediary is killed after
-that collaborator earns payment, and the original claim is collected while
-earlier execution evidence remains unchanged. Chio makes programmable sovereignty
-an execution rule: owners control admission, programs compose through explicit
-commitments, and changes to the plan preserve obligations already incurred.
+An autonomous agent may commit resources to a task before it knows the rest of
+its plan. Executing such a plan across organizations requires each resource
+owner to distinguish new work from changes to work already authorized. We
+present Chio, a protocol and runtime kernel that makes this distinction
+explicit. A work commitment links a selected tool call to its delegated
+allowance, the receiver's authorization and a separately funded payment
+agreement. The receiver verifies these links and durably assigns the execution
+right to the original call. A plan grows by adding tasks while retaining
+earlier allocations and execution rights; signing a new plan cannot renew a
+consumed right. The escrow records acceptance against each task's own reserve,
+so an earned child payment survives parent failure. Under the stated trust
+assumptions, we establish preservation of resource bounds, invocation
+identity and earned claims through plan growth and recovery. A Rust
+implementation demonstrates the construction in a local execution that adds a
+specialist after an initial survey returns, survives intermediary process loss
+and collects the specialist's original claim.
 \end{abstract}
 \input{sections/01-problem}
 \input{sections/02-model}
@@ -54,6 +53,7 @@ commitments, and changes to the plan preserve obligations already incurred.
 \input{sections/07-related}
 \input{sections/08-limits}
 \input{sections/09-conclusion}
+\clearpage
 {\raggedright
 \bibliographystyle{unsrtnat}
 \bibliography{bib}

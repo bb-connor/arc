@@ -1,75 +1,92 @@
-\section{Evolution, execution and recovery}
+\section{Plan growth, execution and recovery}
 \label{sec:execution}
-A commitment gives a running program a stable object to preserve. The program
-can discover further work, but extending its plan must not enlarge an earlier
-permission, reassign a sealed invocation or reset a consumed execution right.
+\subsection{Extend the plan}
+Represent the plan as a signed task graph $G_i$. An extension supplies the digest
+of $G_i$ and a candidate $G_{i+1}$. The store verifies both graphs and checks
+that the candidate retains all earlier tasks, dependencies, routes and
+allocations. The original policy limits, resource pool and revocation epoch
+remain fixed. New tasks must fit within the remaining pool and the original
+depth and fan-out bounds.
 
-\subsection{Grow the plan without replacing its history}
-Let $G_i$ be the current signed swarm graph. An extension supplies the expected
-digest of $G_i$ and a signed candidate $G_{i+1}$. The store first runs ordinary
-live-authority verification on both, then checks that the candidate retains
-the earlier graph envelope, tasks, edges, routes, witnesses, allocations and
-revocation epoch. New tasks must fit within the original depth, fan-out and
-pool bounds.
+Each task has at most one allocation and one single-use continuation. A
+continuation is signed evidence of an execution right. When the graph grows,
+an old continuation is signed for the new graph but retains its identifier and
+all other fields. A new task receives a new identifier. The receiver tracks use
+by that stable identifier, which makes the distinction between a new signature
+and a new execution right enforceable.
 
-Each task has at most one allocation and one single-use continuation. An old
-continuation retains its identity and all fields except the graph digest and
-signature that bind it to the successor. A new task receives a new continuation.
-Signing a new graph therefore does not issue another attempt for an old task.
+For example, suppose the survey used continuation $c$ in invocation $q$.
+Table~\ref{tab:extension} shows what happens when the specialist is added. The
+new graph can describe the survey without authorizing another performance of it.
 
-The installer atomically compares the expected head, archives the exact parent
-bundle and installs the successor. Two contenders using the same old head
-cannot both commit. A receiver resolves the graph version named in the original
-request, so old work remains interpretable after growth. Native custody owns
-the continuation by its stable identity across those versions. Fresh work still
-passes current capability, expiry, revocation and treaty checks.
+\begin{table}[ht]
+\centering\small
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
+\toprule
+Record & Before extension & After extension\\
+\midrule
+Survey task and allocation & Original terms & Same terms\\
+Survey continuation & Identifier $c$, signed for $G_i$ & Identifier $c$, signed for $G_{i+1}$\\
+Receiver's execution record & $c$ belongs to invocation $q$ & $c$ still belongs to $q$\\
+Specialist continuation & Absent & New identifier $d$\\
+\bottomrule
+\end{tabularx}
+\caption{Graph versions change; the receiver's record of a consumed execution
+right does not. A request using the earlier graph retains its earlier signature
+and resolves that graph from the archive.}
+\label{tab:extension}
+\end{table}
 
-In the running example, the survey's result creates the specialist task.
-The program seals the specialist's invocation, binds and funds its agreement,
-then installs the checked graph extension. The survey retains its original
-execution evidence. The intermediary can still execute its previously sealed
-request under the earlier graph.
+Installation compares the expected graph digest, archives the old version and
+commits the new head in one transaction. Two candidates based on the same head
+cannot both install. A losing writer must extend the committed successor, which
+already includes the winning allocation. Historical lookup returns the exact
+graph named by an old request. Fresh execution under that graph still requires
+current capability, validity, revocation and treaty checks.
 
-\subsection{Admit one invocation}
-The receiver checks local authority and the complete evidence binding before
-dispatch. It also verifies observed backing for the funded agreement.
-One native operation acquires the treaty and swarm continuation resources and
-binds the original financial allocation to its budget hold. The kernel records
-admission durably before invoking the tool.
+\subsection{Record the invocation before dispatch}
+The receiver checks the commitment and the observed financial backing, then
+creates an execution record for the invocation. The treaty and graph
+continuation rights and the corresponding budget hold are assigned to that
+record. This state becomes durable before the tool is invoked. A later request
+cannot acquire a consumed right by presenting a new graph signature or a
+different request identifier.
 
-For delegated work, the guard checks the exact output after transformations
-against the slot's predicate. Funded acceptance adds the agreement's verification
-procedure. The native execution statement binds the retained original request
-and output so that verification cannot silently consume another invocation's
-result.
+The guard checks the returned value against the slot's predicate after output
+transformations. Paid work also follows the agreement's verification procedure.
+The execution statement identifies the original request and output, so the
+verifier cannot substitute a result from another call without breaking the
+binding.
 
-A federated execution statement is exported from the original frozen admission
-provenance: treaty, participants, request and recorded admission time are checked
-against the retained outcome. Export supplies evidence of receiver-local
-execution. Final bilateral receipt delivery is a separate operation that may
-still require a remote co-signer.
+For federated work, the statement is exported from the stored admission record.
+The exporter checks the original treaty, participants, request and admission
+time against the retained outcome. This authenticates the receiving kernel's
+execution record. Delivery of a final bilateral receipt may still require a
+remote co-signer.
 
-\subsection{Recover the fact that was established}
+\subsection{Recover the original invocation}
 A timeout describes a missing response. It does not establish whether the
-receiver dispatched, whether the tool had an effect, or whether a verifier
-recorded acceptance. Recovery therefore consults the resource owner's durable
-history.
+receiver dispatched, whether the tool had an effect, or whether acceptance was
+recorded. Recovery consults the state held by the authority responsible for
+each of these facts.
 
-Before sealing, revision checks permit another provider choice. After sealing,
-the original allocation and request remain bound even if a crash strands their
-permit. After native dispatch, recorded output can be recovered without another
-tool call. Where authoritative completion evidence is absent, the native state
-remains \textsf{OutcomeUnknownAfterDispatch}. Independent sibling work can
-continue from its own allocations.
+Before sealing, the holder may choose another provider. After sealing, the
+allocation remains bound to the original request even if a crash prevents
+delivery of its permit. A stored permit is returned with its original signature
+and issuance time. If the receiver has recorded a completed result, it can
+return that result without calling the tool again. If dispatch occurred but
+authoritative completion evidence is absent, the state remains
+\textsf{OutcomeUnknownAfterDispatch}. Independent siblings proceed under their
+own allocations.
 
-The same rule governs settlement transactions. The reference implementation
-persists the exact signed transaction before broadcast. A restart reobserves
-or rebroadcasts those bytes; it does not choose a new nonce or substitute a
-different allocation. This preserves particular durable transitions. Arbitrary
-external tool effects still depend on the tool's own effect and recovery model.
+Settlement recovery follows the same discipline. The implementation stores the
+exact signed transaction before broadcasting it. After a restart it observes
+or rebroadcasts those bytes, preserving the nonce and allocation. This prevents
+recovery from issuing a different transaction in place of an uncertain one.
+Recovery of an arbitrary tool effect still depends on that tool's effect model.
 
-\subsection{Earn, then collect}
-The funded lifecycle is
+\subsection{Record acceptance and collect payment}
+A submitted claim follows one of two paths:
 \[
  \textsf{Funded}\to\textsf{Submitted}\to
  \begin{cases}
@@ -77,25 +94,25 @@ The funded lifecycle is
   \textsf{Rejected}\to\textsf{Refunded}.
  \end{cases}
 \]
-Undecided work can time out and refund under its agreed deadlines. An earned
-claim has no transition from \textsf{Payable} to timeout or refund.
+Undecided work can also expire and refund under its agreed deadlines.
 
-The selected verifier's decision binds the allocation, agreement, submission,
-beneficiary, asset and amount through typed signed data~\cite{eip712}. The
-escrow authenticates that decision. A claim is \emph{earned} when an accepting
-decision is recorded under the selected settlement observation rule.
-An output or an unrecorded signature alone does not reach that state.
-An identical decision replay changes nothing; a conflicting replay fails.
+The selected verifier signs a decision identifying the allocation, agreement,
+submission, beneficiary, asset and amount. The escrow authenticates the
+decision and records acceptance under the chosen settlement observation rule.
+That recorded acceptance makes the claim \emph{earned}. A result or an
+unrecorded signature alone does not. Repeating the same decision has no effect;
+a conflicting replay fails.
 
-Once the claim is earned, its beneficiary can withdraw without a new payer
-authorization. Parent completion, failure and refund concern a different
-allocation. In the running example, the specialist's right to its reserved
-100 survives the intermediary's loss; the intermediary bears that subcontract
-cost. Its own refund does not establish that its unknown native invocation had
-no effect.
+An earned claim has no timeout or refund transition. Its beneficiary can
+withdraw without another authorization from the payer. Since the parent and
+child have separate reserves, refunding the parent leaves the child's earned
+claim unchanged. In the API example, the specialist collects its reserved
+100 units even if the buyer is refunded for the intermediary's incomplete task.
+The refund does not resolve uncertainty about the intermediary's tool effects.
 
-The owners commit in order: seal, bind the funded agreement, deposit backing,
-install graph growth, admit and dispatch, then record acceptance. There is no
-distributed transaction across those steps. A failure can leave capacity or
-funds committed until their existing lifecycle resolves them. Preserving that
-obligation is what prevents recovery from manufacturing a second promise.
+The full order is therefore: seal the call, bind its payment agreement, deposit
+backing, install the graph extension, admit and dispatch, then record acceptance.
+No transaction spans this sequence. A crash may strand capacity or funds until
+the existing agreement resolves them. Retaining that commitment prevents a
+missing response from being treated as permission to allocate the resource
+again.

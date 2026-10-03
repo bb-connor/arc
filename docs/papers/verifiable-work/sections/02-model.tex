@@ -1,86 +1,75 @@
-\section{Programmable sovereignty}
+\section{Resources, authority and trust}
 \label{sec:sovereignty}
-A kernel for agentic operating systems must give an untrusted planner useful
-freedom while preserving the owner's control over effects. In Chio, the kernel
-is the trusted mediator for tool access and its durable records. Host isolation
-and tool confinement supply the surrounding enforcement boundary.
+An \emph{agent} proposes work. A \emph{resource owner} decides which work may use
+its tools, data or funds. A provider executes a task through a \emph{receiving
+kernel}, which validates capabilities, runs policy and guard checks, and records
+its decisions. The kernel is trusted for these operations. Host isolation and
+tool confinement must make it the effective mediator of the protected resource.
 
-An \emph{owner} creates a bounded work allocation and qualifies the principals
-that may use it. A \emph{holder} can subdivide its allocation and select a
-provider. A \emph{receiver} issues the capability for its tool and decides
-whether to admit the invocation. A \emph{payer} backs a payment obligation in a
-chosen settlement domain, and a \emph{verifier} applies the agreed acceptance
-procedure. These are roles, not a requirement for six organizations. Couriers
-carry signed evidence without acquiring the authority of its signers.
+An owner can authorize an agent to use part of a resource allocation. That agent
+is the allocation's \emph{holder}; it may subdivide the allowance or select a
+provider within its terms. The owner's \emph{allocator} records these choices.
+A paid task also names a payer, a verifier that judges the result, and an escrow
+that reserves and transfers funds. One organization may perform several roles.
+Couriers need not be trusted: the receiver checks signatures under local
+configuration.
 
-\subsection{Authority stays with the resource owner}
-A work agreement expresses what parties intend to exchange. Admission decides
-whether a particular invocation may use a particular receiver's resources.
-The receiver loads trusted issuers, policy, treaty records and replay state from
-its own protected stores. Request metadata cannot install those authorities.
+\subsection{Admission under local authority}
+A work agreement describes what the parties intend to exchange. Admission is
+the receiver's decision to allow a particular invocation. The receiver loads
+trusted issuers, capabilities, policy, treaties and replay state from stores
+controlled by its owner. A request can refer to these authorities but cannot
+install them.
 
-A bilateral treaty supplies the conditions under which the parties cooperate.
-The receiver checks the configured participants and their signatures over the
-same canonical statement, its permitted action, validity and continuation, and
-the references binding it to this invocation. These checks join the receiver's
-ordinary capability, revocation and guard checks. A valid work permit, treaty
-or funded allocation satisfies its own part of admission; none substitutes
-for the other required decisions.
+A bilateral treaty records the conditions under which two participants
+cooperate. The receiver checks the configured participants' signatures over the
+same statement, the permitted action and validity period, and the invocation
+and continuation records required by the treaty. A continuation identifies a
+right to perform work under that agreement. Its use is recorded so that replay
+cannot create another invocation. Treaty checks apply together with the
+receiver's ordinary capability, revocation and guard checks.
 
-The distinction also governs change. An owner can refuse a fresh invocation
-under its current policy. Replaying an admitted operation resolves its existing
-history. A claim already earned in escrow follows the immutable terms under
-which the payer funded it. Sovereignty determines which commitments an owner
-enters; the commitment's lifecycle determines how it is discharged.
+Local authority also determines how changes take effect. Current policy can
+deny a fresh call. An already admitted call has an execution history that
+recovery must consult. An earned escrow claim follows the terms under which
+its reserve was funded. Control over admission therefore coexists with
+obligations that remain binding after admission.
 
-\subsection{Three kinds of protected state}
-\begin{table}[ht]
-\centering\small
-\begin{tabularx}{\linewidth}{@{}l X X@{}}
-\toprule
-State & Authoritative fact & Preservation rule\\
-\midrule
-Allocation and plan & Which bounded work has been committed & Subdivision conserves capacity; growth retains old tasks and allocations\\
-Native custody & Which invocation was admitted and what execution established & Replay resolves the original operation and consumed continuation\\
-Settlement & Which funds are reserved, earned, paid or refunded & Each transfer follows its own allocation and recorded decision\\
-\bottomrule
-\end{tabularx}
-\caption{The records are linked by authenticated bindings. A transition in one
-domain cannot stand in for evidence owned by another.}
-\label{tab:owners}
-\end{table}
+\subsection{The authorities that must agree}
+The protocol links three kinds of state. The allocator records which allowances
+have been assigned; the receiver records which calls were admitted and what
+their execution established; the escrow records which funds are reserved, earned,
+paid or refunded. Each record answers a different question. In particular, an
+allowance establishes a spending limit, while a deposit supplies the funds.
+A refund records a financial outcome without establishing whether a tool
+executed.
 
-A sealed allowance is not a deposit. An authenticated execution statement is
-not a payment decision. A financial refund is not proof that a tool had no
-effect. Keeping these facts distinct is what allows the domains to compose:
-each contributes a decision it is actually authorized to make.
+A \emph{protected} store is durable state controlled by the authority responsible
+for that resource. All uses of the resource must consult that state. Each
+delegation root has one protected allocator. Each declared pool for a work graph
+has one protected sequence of graph versions, whose updates are serialized.
+Each receiving key has one protected execution and budget domain. The settlement
+system serializes financial transitions and couples them to actual transfers.
+Copying a key and database into independently spendable forks, or provisioning
+two graph sequences against the same declared pool, violates these premises.
 
-\subsection{Trust and failure model}
+\subsection{Failure model and meaning of verification}
 Agents and couriers may be malicious. Messages may be duplicated, reordered,
-delayed or lost, and processes may crash between durable steps. Safety assumes
+delayed or lost; a process may crash between durable steps. Safety assumes
 unforgeable signatures, collision-resistant canonical digests, valid clock
-checks, and honest enforcement by the selected resource custodians. Each
-delegation root has one protected allocator; each declared swarm pool has one
-protected graph lineage. Their custodians serialize allocation and head
-changes. Each receiving key has one protected execution and budget domain.
-The rail serializes financial transitions and couples them to actual asset
-transfers.
+checks and honest enforcement by the selected resource authorities. Tools must
+be confined sufficiently for their declared actions and permitted readers to
+describe their effects and disclosures.
 
-These are local trust requirements. Cloning a signing key and its database into
-independently spendable forks, or provisioning two graph lineages against the
-same declared pool, violates them. Tools must be confined well enough
-for their declared effects and readers to describe the protected operation.
-The acceptance authority and settlement observation must also be trustworthy.
+For paid work, the parties trust the agreed verifier and the rule used to
+recognize a recorded settlement. \emph{Verifiable work} means work whose agreed
+acceptance condition and execution evidence can be checked. A kernel receipt
+authenticates the kernel's account of its mediated call; a verifier's decision
+attests satisfaction of the chosen acceptance condition. Useful work depends
+on choosing that condition well.
 
-The implemented discovery step selects among previously enrolled principals.
-A new result can create work and select its receiver; it cannot authorize a new
-reader or install a new trust root. This paper's Rust profiles instantiate
-delegation, additive graph evolution and funded claims, identified in the
-artifact as D1, S1 and F1. Appendix~\ref{app:profiles} fixes their concrete
-encodings and limits.
-
-\emph{Verifiable work} means work bound to an agreed check and authenticated
-evidence. The kernel's receipt attests its own mediated execution; the selected
-verifier decides the agreed acceptance predicate. Their signatures make those
-statements attributable and checkable. The value of the work depends on what
-the predicate measures.
+The implementation recruits from previously enrolled principals. Discovering
+a task permits a new selection within the authorized set; it does not add a
+trusted issuer or authorize a new reader. Appendix~\ref{app:profiles} maps these
+rules to the delegation, graph-evolution and funded-work profiles used in the
+experiments.

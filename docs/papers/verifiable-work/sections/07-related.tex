@@ -1,55 +1,54 @@
-\section{Relation to existing mechanisms}
+\section{Related work}
 \label{sec:related}
-Chio builds on established mechanisms for secure cooperation. Object
-capabilities support robust composition among mutually suspicious
-components~\cite{miller}; Secure Linking connects certified component properties
-with proof-carrying authentication~\cite{securelink}. Proof-carrying code makes
-supplied evidence checkable against a consumer's policy~\cite{pcc}.
-Chio applies receiver-owned checking to a work commitment whose allocation,
-invocation, execution history and payment are enforced by different custodians.
+Object capabilities provide a basis for cooperation among mutually suspicious
+components~\cite{miller}. Proof-carrying code makes supplied evidence checkable
+against a consumer's policy~\cite{pcc}, and Secure Linking connects certified
+component properties with proof-carrying authentication~\cite{securelink}.
+Chio uses the receiver's policy in the same role: a remote signature is checked
+under locally selected authority. It extends that check across records owned
+by the allocator, executing kernel and settlement system, all referring to
+one work commitment.
 
-Contract Net organizes distributed work through announcements, bids and
+Contract Net organizes task allocation through announcements, bids and
 awards~\cite{contractnet}. Agent Contracts combines task specifications,
-resource bounds and success conditions, including delegated budget
-conservation~\cite{agentcontracts}. The additional boundary developed here is
-sealing that choice to an exact receiver-issued invocation and preserving it
-when the surrounding signed work graph grows.
+resource bounds and success conditions, including delegated-budget
+conservation~\cite{agentcontracts}. Chio follows selection through to the exact
+receiver-issued capability and invocation, and defines how that selection
+survives extension of the signed task graph. Interface Automata and multiparty
+session types address compatibility and communication properties within their
+models~\cite{interfaceautomata,sessiontypes}. The property studied here concerns
+resource bounds and retained execution rights; correctness of task decomposition
+requires properties of the tasks themselves.
 
-Interface Automata and multiparty session types establish compatibility and
-communication properties within their respective models~\cite{interfaceautomata,sessiontypes}.
-The preservation result in Section~\ref{sec:preservation} concerns authority,
-capacity, execution identity and earned obligations. Correct task decomposition
-and progress of an arbitrary agent program require further properties of its
-tasks and interaction model.
+AgentBound supplies deterministic governance and verifiable decision
+receipts~\cite{agentbound}. A2A provides task, message, artifact and discovery
+interfaces~\cite{a2a}; AP2 specifies signed commercial and payment
+mandates~\cite{ap2}. OAuth token exchange leaves trust and token semantics to
+deployment profiles~\cite{oauth}. Such protocols can carry application-specific
+agreements. Chio specifies the reference checks and durable state transitions
+that make those agreements govern the same invocation through execution and
+recovery.
 
-AgentBound's deterministic governance and verifiable decision receipts overlap
-with pre-execution policy enforcement~\cite{agentbound}. A2A supplies task,
-message, artifact and discovery interfaces~\cite{a2a}; AP2 specifies signed
-commercial and payment mandates~\cite{ap2}. OAuth token exchange permits
-deployment-specific trust and token semantics~\cite{oauth}. These mechanisms can
-carry rich application contracts. Chio's contribution is the defined binding
-and enforcement path across the owners of the resources, rather than an
-expressiveness restriction on their message formats.
+Sagas describe compensation for sequences of transactions~\cite{sagas}.
+Durable workflows and transactional outboxes likewise retain work and messages
+across failures. Chio uses durable records to distinguish financial compensation
+from evidence about execution: refunding a request does not establish that its
+tool had no effect. This distinction matters when a recovered planner decides
+whether another action is authorized.
 
-ERC-8183 is the closest economic construction: it defines escrowed agent jobs,
-providers, evaluator-approved completion and expiry refunds~\cite{erc8183}.
+ERC-8183 is the closest economic construction, with escrowed jobs, providers,
+evaluator-approved completion and expiry refunds~\cite{erc8183}.
 Section~\ref{sec:evaluation} and Appendix~\ref{app:evidence} compare the pinned
-implementations directly. ERC-8004 supplies discovery, reputation and validation
-interfaces~\cite{erc8004}; such evidence can inform local policy while admission
-remains the receiver's decision. Neither an agent registry nor a settlement
-ledger must serve as a universal authority over tool access.
+implementations under matched capital and evaluator assumptions.
+ERC-8004 supplies discovery, reputation and validation interfaces~\cite{erc8004}
+that can inform a receiver's policy. Contingent payments and fair exchange
+provide cryptographic constructions for particular verification and exchange
+problems~\cite{zkcsp,fairswap}. The funded profile here uses an agreed verifier
+and settlement system. Its conservation rules also admit a conventional
+transactional implementation.
 
-Sagas use application-defined compensation for sequences of
-transactions~\cite{sagas}. Durable workflows and transactional outboxes likewise
-provide established techniques for retaining work and messages. Chio's recovery
-rule makes the authority of each retained fact explicit: a compensating refund
-resolves money, while an uncertain tool effect retains its original status.
-Contingent payments and fair exchange offer stronger cryptographic constructions
-for particular verification and exchange problems~\cite{zkcsp,fairswap}.
-The funded profile here uses an agreed verifier and settlement domain.
-
-The architectural result is a common native boundary for these concerns.
-Changing a program's plan preserves the authenticated commitments already
-admitted by its resource owners. This gives planners a defined operation for
-composing work, and implementers a concrete set of bindings and lifecycle rules
-against which to test another receiver.
+Bitcoin resolves competing spends through a shared history~\cite{bitcoin}.
+Chio assigns an explicit custodian to each allocation, execution right and
+financial reserve. Its composition argument assumes that these custodians
+prevent conflicting uses of their resources. It requires agreement on the
+records for a particular task, without imposing one history on all programs.

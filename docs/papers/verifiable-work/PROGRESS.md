@@ -1,5 +1,50 @@
 # Publication execution record
 
+2026-10-03 explanatory revision: the user approved the prose critique and asked
+for its execution. The bounded design is to replace component inventory and
+repeated significance statements with a causal argument: define the work
+commitment, expose substitution and replay across changing plans, derive the
+binding and durable-state rules, then establish the preservation guarantee.
+The title, implemented behavior, trust premises and recorded results remain
+fixed. The work is confined to the paper and its companion records.
+
+Execution checklist:
+- [x] Rewrite the abstract and main argument for readers unfamiliar with Chio.
+- [x] Retain every technical premise, comparison and evidence boundary while
+      replacing implementation shorthand with definitions and causal explanations.
+- [x] Obtain a fresh prose and technical review; repair concrete findings.
+- [x] Render, inspect layout, validate claims and source continuity, freeze,
+      reproduce the PDF and commit the revision.
+
+2026-10-03 explanatory revision acceptance: the approved revision is complete.
+Fresh automated prose and technical review identified two Important and three
+Minor findings. All five were repaired and rechecked with no remaining findings
+in the reviewed scope. The record is PROSE-REVIEW.md. The coordinator then cut
+repeated setup and inspected the final abstract, worked receiver mismatch,
+protocol figure, graph-version table, proposition and conclusion. The scientific
+premises, implementation, proof program and measured results are unchanged.
+
+The final PDF has 17 pages (12 main text, two references, three appendices),
+354318 bytes, SHA-256
+6d63cd4e8e7268ee08c12fbb358361d5a13fc76c2a6bda4026fb556e71f8de80.
+The render has no LaTeX warnings or overfull/underfull boxes. All 28 claim records
+retain complete fields, unique IDs and existing evidence paths; all 30 local
+Markdown links checked in edited documents resolve. Labels and references agree.
+
+The final render, artifact freeze and make build pass. The build reproduces the
+frozen PDF bytes and verifies all 656 artifact files, current native inventory,
+historical source pins, bibliography and derived results. The inventory changes
+15 existing paper files and adds one review record. No native input, formal
+program, experiment or artifact tool changes. Native inventory digest remains
+865a331ba3a022f8ee11554a878c0f07727a754190dda36624bdc4e7cf3d24bd.
+No native tests were rerun for this prose revision. Git diff --check passes.
+
+The publication check exits one for the four unchanged open gates (independent
+operation, useful-work economics, integration advantage and foundational
+critique) and the two false readiness flags, with no artifact error. Prose review
+does not supply new independent-operation or breakthrough evidence. The work
+remains on its isolated paper branch; no merge, push or publication is performed.
+
 2026-10-03 manuscript revision: the user redirected the next chunk from an
 outside trial to making the paper itself complete and compelling, then specified
 writing from the completed contribution. This is a bounded revision of the

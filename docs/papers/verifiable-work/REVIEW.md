@@ -1,6 +1,7 @@
 # Final artifact review and disposition
 
-Current manuscript review: [programmable sovereignty and preserved commitments](EDITORIAL-REVIEW.md).
+Current manuscript review: [construction, explanation and prose](PROSE-REVIEW.md).
+Earlier manuscript review: [programmable sovereignty and preserved commitments](EDITORIAL-REVIEW.md).
 Current composed-execution review: [evolving funded work](../../research/evolving-funded-work/REVIEW.md).
 The record below preserves the earlier funded manuscript review and its exact source range.
 

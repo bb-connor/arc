@@ -1,37 +1,29 @@
-\section{Scope and deployment}
+\section{Scope}
 \label{sec:scope}
-The preservation property depends on the custodians identified in
-Section~\ref{sec:sovereignty}. A compromised allocator can overissue; forked
-custody can duplicate execution authority; a dishonest verifier can approve
-bad work; an asset issuer can prevent transfer. Deployment must protect those
-authorities and use a settlement observation appropriate to its failure model.
-A receipt authenticates the issuing kernel's statement, not arbitrary remote
-computation.
+Plan extension is additive: old tasks, allocations, permissions and continuation
+identifiers remain in place. Removing tasks, reclaiming their budgets, migrating
+receivers or changing the graph's policy limits would require closure or fencing
+rules beyond this operation. A timeout cannot justify reclaiming a resource
+whose use is still uncertain. Retaining earlier graph versions also incurs
+storage and verification costs.
 
-The current evolution operation is additive. It preserves earlier allocations,
-permissions and continuation identities. Retirement, budget reclaim, receiver
-migration and changes to the graph's policy envelope need explicit closure or
-fencing rules. A timeout alone is insufficient. Sealing can strand unused
-capacity, and delegation's output and recovery checks can refuse completion
-after contract expiry. Retained graph history also carries storage and
-verification costs.
+Acceptance is as strong as the agreed check. The implemented delegation
+predicates test bounded properties of JSON output; the funded verifier can
+apply a richer procedure. Success of a child does not establish success of its
+parent. The host must mediate declared operations and readers, and revocation
+cannot recall information already disclosed.
 
-The implemented predicates check bounded properties of JSON output. The funded
-verifier may apply a richer agreed procedure, but useful work still depends on
-choosing the right specification. Child success does not establish parent
-success. Declared readers and effects require complete host mediation, and
-revocation cannot recall information already disclosed.
+The safety result permits unavailable or unfinished work. Sealing can strand
+capacity; contract expiry can prevent output or recovery checks from completing.
+Hashes detect altered evidence but cannot retrieve withheld evidence. An earned
+claim preserves the right to withdraw, while collection still requires an
+available settlement system and an eligible beneficiary. Verifier failure before
+acceptance is recorded can leave completed work unpaid.
 
-Availability is separate from integrity. Hashes detect changed bytes but cannot
-recover withheld evidence. Offline allocation permits still rely on the
-receiver's local qualification and current capability checks. A payable claim
-preserves the right to withdraw; collection requires an available rail and
-eligible beneficiary. Until acceptance is recorded, verifier failure can leave
-completed work unpaid.
-
-The evidence is local and deterministic. It establishes the reported execution
-and rejection behavior, with the model and implementation boundaries stated
-in Appendix~\ref{app:evidence}. It supplies no measured claim about public-chain
-finality, independent administration, hostile-load scalability, lower
-integration cost or profitable useful work. Those are deployment and economic
-properties to measure alongside the protocol's safety conditions.
+Deployment must protect the authorities in Section~\ref{sec:sovereignty}.
+A compromised allocator can overissue; forked execution stores can duplicate
+authority; a dishonest verifier can approve bad output. The asset and settlement
+observation rule must support the claimed financial transitions. The local
+experiments establish the reported behavior under their stated configuration.
+They do not measure independent administration, public-chain finality,
+hostile-load scalability, integration savings or useful-work profitability.

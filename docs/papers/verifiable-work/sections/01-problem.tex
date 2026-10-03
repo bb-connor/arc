@@ -1,60 +1,51 @@
-\section{A kernel for the agentic web}
+\section{Introduction}
 \label{sec:introduction}
-An agentic program chooses its next steps while it runs. A result may reveal a
-new task, a new collaborator or a need to delegate part of the work. Across
-organizations, those choices touch resources with different owners: tools,
-data, execution capacity and money. The program needs to compose them without
-absorbing their owners into one administrative domain.
+An agent that delegates work across organizations commits resources before it
+knows how the work will unfold. It may reserve funds or authorize a tool call,
+then discover a task requiring another provider. Each provider must be able to
+determine which actions were authorized, which ran and which earned payment
+as the plan changes.
 
-Consider an intermediary agent commissioned by a buyer to review an API.
-It assigns an initial survey, then uses the returned result to hire a specialist.
-The specialist works under
-its own operator's policy and may finish before the intermediary does. If the
-intermediary crashes, the specialist's completed work and earned payment must
-have a meaning independent of the lost process. Meanwhile, the buyer needs to
-know that adding the specialist neither exceeded its allocation nor
-re-authorized an earlier invocation.
+Consider a buyer who funds an API survey and a follow-on review by an
+intermediary agent. After the survey identifies a problem, the intermediary
+hires a specialist from its own funds. The specialist completes its task and
+earns payment, but the intermediary crashes before returning a result to the
+buyer. Three facts must
+survive the crash: the specialist's call has already run, its payment is owed,
+and the buyer's task may still be incomplete. A replacement process must recover
+those facts before deciding what to do next.
 
-The difficulty is preserving commitments as the plan changes. An allocation
-must not become two promises merely because two providers respond. A new graph
-version must not turn a consumed continuation into another attempt. A signed
-foreign request must still satisfy the receiving owner's policy. A refund must
-not rewrite an uncertain tool effect or consume funds already owed to another
-participant. These conditions span planning, authorization, execution and
-settlement. They must agree on which work they describe.
+Plan changes introduce a related problem. A newly signed plan may contain both
+the completed survey and the new specialist task. If the signature gives every
+task a fresh execution right, the survey can run twice. If the new plan replaces
+the evidence for the old one, a receiver may lose the terms under which the
+survey ran. Valid signatures on each version do not, by themselves, establish
+continuity between them.
 
-Chio supplies that boundary. Its kernel mediates agent tool calls through
-capabilities, guards, durable admission and signed receipts. This paper extends
-that substrate into an execution contract for evolving work: delegate bounded
-capacity, seal an exact invocation, admit it under the receiver's authority,
-retain its execution identity, and discharge its financial obligation under
-the agreed acceptance rule. The planner chooses the work; the resource owners
-enforce the commitments.
+We present Chio, a protocol and runtime kernel that preserves this continuity.
+Its unit of composition is a \emph{work commitment}: signed records that bind
+one selected invocation to a bounded allowance, the receiving owner's
+authorization and, for paid work, its settlement terms. The records refer to
+the same invocation by authenticated identifiers and digests. Each authority
+checks the references relevant to its decision and retains the state needed
+to prevent that decision from being spent twice.
 
-The organizing principle is \emph{plans may evolve while issued commitments
-retain their bounds and identity}. Before a selection is sealed, an agent can
-choose another provider. After sealing, it must resolve the original work under
-its original identity. A running swarm can add tasks within its fixed envelope,
-while existing tasks keep their allocations and continuation resources.
-An earned payment follows its own agreement even when its parent fails.
+The construction separates the identity of a task from the version of the plan
+that contains it. An extension retains earlier tasks and allocations. A receiver
+records the use of each execution right under a stable identity, so a signature
+on a later plan cannot make that right unused again. Settlement reserves funds
+for each agreement separately; once acceptance is recorded, a parent failure
+cannot release a child's earned reserve. These rules permit incremental work
+without a transaction that locks every participant at once.
 
-This is \emph{programmable sovereignty}: an owner expresses conditions for using
-its resources, and a kernel applies those conditions before an effect crosses
-the owner's boundary. Treaties make cooperation explicit without importing a
-foreign participant's authority. Commitments give that cooperation a durable
-meaning after the planner changes or disappears.
+Each receiving kernel admits work under its owner's capabilities, policies and
+treaties. Foreign agreements supply evidence checked under locally selected
+authority. We call this arrangement \emph{programmable sovereignty}: owners
+express conditions for cooperation in verifiable agreements and enforce them
+at their own resources.
 
-The contribution is the composition of these rules at the native invocation
-boundary. We specify the authenticated bindings between delegated work, signed
-swarm plans, receiver-owned admission and funded claims; establish their
-preservation property under stated custody assumptions; and implement the
-complete path in Rust. One executable trajectory runs initial work, discovers
-and funds a collaborator, grows the graph, survives intermediary process loss,
-and collects the collaborator's original earned claim.
-
-The resulting system is peer-to-peer in its authority structure: participants
-negotiate work and enforce their own admission conditions. Allocation and
-settlement still have explicit authorities. Unlike Bitcoin's shared spend
-history~\cite{bitcoin}, Chio requires no single global history for all programs.
-Each scarce resource has an identified custodian, and every handoff binds the
-same work to that custodian's decision.
+We specify the records and transitions, establish a preservation result under
+explicit trust assumptions, and implement the construction in Rust. Evaluation
+follows the API example through graph growth and process loss, tests adversarial
+substitutions, and compares the financial rules with transactional escrow and
+ERC-8183.
