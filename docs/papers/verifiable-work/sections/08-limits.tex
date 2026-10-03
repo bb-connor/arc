@@ -15,10 +15,12 @@ S1 conservatively retains every allocation and prior permission. Its storage
 and verification costs grow with the retained graph and history; no scalability
 or hostile-load result is reported. Policy changes, revocation-epoch replacement,
 task retirement, budget reclaim and receiver migration require explicit
-lifecycle rules beyond additive extension. The D1 and S1 trajectories do not
-yet bind their distinct allocation representations to F1's escrow in a single
-evaluated execution. Doing so requires one explicit owner for each scarce
-resource and preservation of its identity at every handoff.
+lifecycle rules beyond additive extension. The composed adapter now binds
+D1 and S1 allocations to F1 escrow through the exact funded request. It still
+has one protected graph writer and author-controlled receiver replicas. It does
+not establish consensus, atomic cross-owner installation or receiver migration.
+Its execution statements attest receiver-local observations; successful payment
+does not imply that a final bilateral receipt reached the other party.
 
 The two enduring dependencies in F1 are the acceptance authority and the
 settlement domain. Parties may choose them without choosing a shared task

@@ -1,0 +1,20 @@
+{
+  "schema": "chio.evolving-work.supplemental-qualification.v1",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--manifest-path",
+    "examples/federated-work/Cargo.toml",
+    "--",
+    "--ignored"
+  ],
+  "exit_code": 0,
+  "seconds": 85.836,
+  "source_inventory_sha256": "865a331ba3a022f8ee11554a878c0f07727a754190dda36624bdc4e7cf3d24bd",
+  "source_unchanged": true,
+  "outputs": {
+    "docs/research/evolving-funded-work/evidence/chain-regressions.stdout": "1fe0d5acf44d6c885f3e69fd8bb19b6d65ca4b00db28f5faca3d62a2e4503830",
+    "docs/research/evolving-funded-work/evidence/chain-regressions.stderr": "a3693e54e487f8b105b8ede48dd94db2650cfaca0bc7a2fa88b123f86def16dd"
+  }
+}

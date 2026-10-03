@@ -66,3 +66,18 @@ with the same backing, checker, signatures, policy and durability. An outside
 operator and held-out economic trial remain open. This local result can support
 a unified execution claim, not independent administration or unique economic
 advantage. Recovery-spec assumptions do not count as measured behavior.
+
+## Integration finding: federated execution evidence
+
+The existing pre-settlement exporter intentionally rejected all federated
+outcomes. The composed profile requires a receiver-local execution statement,
+not a new bilateral delivery statement. Extend that native projection only
+when the qualified outcome retains the original frozen federation context.
+Revalidate the existing content-addressed outcome, original request, receiver
+identity and original treaty signatures at the recorded admission time. Missing
+or substituted provenance still denies; security-release and caller-delivery
+profiles remain outside this exporter. Export performs no new admission,
+remote co-signing, tool call or financial action. Its signed request hash binds
+the entire governed request. Remote completion remains a separate receipt path.
+This uses the existing federation recovery decoder and existing projection
+custody; it introduces no alternate treaty verifier.

@@ -10,7 +10,10 @@ ceilings no larger than the offer. The offer and slot must be live. Ordinary
 native capability validation, revocation and policy checks still apply.
 
 The installation API requires durable native admission and enables original
-request retention. The guard revalidates before dispatch and checks the exact
+request retention. The receiver selects either the original argument envelope
+or a governed-context layout; the caller cannot select a weaker interpretation.
+In the composed layout the permit commits to every original tool argument,
+including existing financial terms, without rewriting the tool payload. The guard revalidates before dispatch and checks the exact
 JSON value after output transformations. A signed offer in D1 agrees to
 accepted-output pricing: a qualifying predicate rejection withholds output and
 uses the native reversible-hold path to produce a zero-charge denial. The
@@ -60,7 +63,44 @@ treaty evidence. The installer does not need a joint transaction with every
 running operation: additive growth leaves their allocations and identities
 intact. Non-additive retirement would require a different authority boundary.
 
-\subsection{The separately funded profile}
+\subsection{One admission across three resource owners}
+The composed adapter resides in the experimental funded receiver. Its protected
+policy pins the allocator, swarm witness, treaty peer and runtime profile.
+Opening the receiver installs the same delegation guard and runtime admission
+hook before recovery. Removing that configuration changes the pinned policy;
+losing its runtime database cannot silently provision empty custody.
+
+The D1 slot ID equals the native request ID and S1 task ID. The S1 allocation ID
+is the D1 allocation digest; both agree on amount and currency. The sealed
+permit and native swarm witness bind the same capability. The signed route must
+target this receiver. The existing F1 agreement signs the entire final request,
+including the governed D1, swarm and treaty references. Its escrow allocation ID
+therefore commits transitively to those references. These are different hash
+domains joined by checked bindings, not interchangeable identifiers. The
+agreement is downstream of the request, so no circular hash is required.
+
+Before dispatch, the receiver checks treaty and capability authority separately
+from observed escrow backing. One existing native operation acquires both the
+treaty and swarm continuation resources. Its payment adapter compares the
+governed payment context with the original retained intent, then binds the
+original funding allocation to the operation and budget hold. A new graph
+member receives neither a capability nor funds merely by appearing in a graph.
+
+A receiver-local pre-settlement statement authenticates the retained execution
+and output before a funded decision. For a federated invocation, export
+revalidates the original frozen treaty, participants and admission time against
+the content-addressed native outcome. It does not ask for a new remote
+co-signature, imply delivery to the remote party, or settle payment. The agreed
+checker and escrow decision establish the earned claim. Final bilateral
+receipt delivery remains a separate operation.
+
+The commit order is seal, bind the funded agreement, deposit backing, install
+checked growth, admit and dispatch, then record acceptance. No distributed
+transaction spans those owners. A crash between steps may strand unused
+capacity or funds until the existing refund rules apply. It cannot silently
+replace the original receiver, request or allocation.
+
+\subsection{The funded state machine}
 F1's financial state machine has seven states after funding:
 \[
 \textsf{Funded}\to\textsf{Submitted}\to

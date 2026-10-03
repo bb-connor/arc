@@ -1,0 +1,26 @@
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-verifiable-work-paper/examples/federated-work)
+error[E0433]: failed to resolve: could not find `Error` in `delegation`
+   --> src/funded_work/evolving.rs:187:98
+    |
+187 |         std::slice::from_ref(&child.native.policy.provider_key)), Err(chio_workflow::delegation::Error::Conflict));
+    |                                                                                                  ^^^^^ could not find `Error` in `delegation`
+    |
+help: consider importing one of these items
+    |
+  3 + use crate::Error;
+    |
+  3 + use std::error::Error;
+    |
+  3 + use std::fmt::Error;
+    |
+  3 + use std::io::Error;
+    |
+    = and 14 other candidates
+help: if you import `Error`, refer to it directly
+    |
+187 -         std::slice::from_ref(&child.native.policy.provider_key)), Err(chio_workflow::delegation::Error::Conflict));
+187 +         std::slice::from_ref(&child.native.policy.provider_key)), Err(Error::Conflict));
+    |
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `chio-federated-work` (bin "chio-federated-work") due to 1 previous error

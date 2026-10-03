@@ -39,14 +39,15 @@ allocations and continuation identities. Each receiver applies its own
 capabilities and treaty conditions before dispatch. Under protected allocation
 and receiver custody, the composition conserves declared capacity across graph
 versions and prevents graph growth from refreshing a consumed invocation.
-A Rust implementation demonstrates recursive delegation, collaborator
-replacement before commitment, live swarm extension, checked output and
-recovery after a process kill. Native tests preserve unfinished work and
-original receipts across extension and restart. A separately evaluated funded
-profile preserves recorded child payment claims through parent failure.
-These results establish a concrete execution boundary for evolving work
-relationships: local authority governs admission, and durable commitments
-govern what survives a change of plan.
+A local Rust experiment connects recursive delegation, live graph evolution
+and bilateral native admission to funded work in one execution. A first result
+triggers allocation of a new collaborator; after that collaborator earns its
+claim, the intermediary is killed before completing its own work. The original
+child claim is collected without another parent authorization, while earlier
+execution evidence and continuation custody survive graph growth and restart.
+This supplies an execution contract for the agentic web: programs may change
+their plans while resource owners retain authority and accepted work retains
+its claim.
 \end{abstract}
 \input{sections/01-problem}
 \input{sections/02-model}

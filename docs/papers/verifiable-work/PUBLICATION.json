@@ -8,15 +8,15 @@
       "id": "manuscript",
       "status": "passed",
       "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers.",
-      "evidence": "../../research/swarm-evolution/REVIEW.md",
-      "result": "Complete D1/S1/F1 manuscript; fresh automated review finding repaired with red/green regressions. Broader independent scientific claims remain explicitly open."
+      "evidence": "../../research/evolving-funded-work/REVIEW.md",
+      "result": "Complete manuscript covering one composed D1/S1/treaty/F1 execution. Fresh automated review closed both Important findings and the minor wording/platform findings. Independent scientific and economic claims remain open."
     },
     {
       "id": "artifact",
       "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": "artifact-manifest.json",
-      "result": "Rebuilt PDF, exact current D1/S1 qualification (11 terminal commands), historical F1 source pin, bibliography and artifact hashes agree."
+      "result": "Rebuilt PDF, 21 current-source terminal checks plus six opt-in chain regressions, historical F1 source pin, bibliography and artifact hashes agree. Original failed runs and default-suite skips are retained."
     },
     {
       "id": "funded-security-integration",
@@ -36,7 +36,8 @@
       "id": "independent-operation",
       "status": "open",
       "acceptance": "Separately operated participants and independently written provider complete the published contract.",
-      "result": "No partner available as of 2026-10-02; user requested the external trial package. No external trial executed."
+      "result": "No partner available as of 2026-10-03; the requested external trial package now includes the composed receiver contract and public artifacts. No external trial executed.",
+      "evidence": "../../research/evolving-funded-work/RECEIVER-TRIAL.md"
     },
     {
       "id": "useful-work-economics",

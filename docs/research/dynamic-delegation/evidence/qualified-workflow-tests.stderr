@@ -11,8 +11,7 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-   Compiling chio-workflow v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-workflow)
-    Finished `test` profile [unoptimized] target(s) in 4.41s
+    Finished `test` profile [unoptimized] target(s) in 0.75s
      Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_workflow-cf67a5c74c9da490)
      Running tests/delegation.rs (/tmp/chio-paper-target/debug/deps/delegation-f9bf153f43632ef0)
      Running tests/preflight.rs (/tmp/chio-paper-target/debug/deps/preflight-f475c8d866ce4ce2)

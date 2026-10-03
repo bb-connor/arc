@@ -1,5 +1,8 @@
 # Final artifact review and disposition
 
+Current composed-execution review: [evolving funded work](../../research/evolving-funded-work/REVIEW.md).
+The record below preserves the earlier funded manuscript review and its exact source range.
+
 Date: 2026-10-02. Reviewed range: `71e5cbc3bf` through
 `c0d39baaa01071a31254f3ec075319ace0935f02`.
 

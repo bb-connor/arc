@@ -124,6 +124,23 @@ parent transfer from consuming the child's reserve. Eventual collection further
 requires availability, an exercisable beneficiary key and transaction inclusion.
 \end{proof}
 
+\begin{proposition}[Preservation across the composed boundary]
+Assume the D1 and S1 invariants above, receiver-owned native custody, exact
+D1/S1/F1 request bindings, and the F1 allocation rules. Adding a task cannot
+change an earlier sealed invocation or its funded terms. Once a child is earned,
+parent failure cannot create a fresh child invocation or remove that child's
+recorded right to collect.
+\end{proposition}
+\begin{proof}
+The D1 permit fixes the invocation; S1 extension retains its task, allocation
+and continuation identity. The funded agreement authenticates that exact
+request and fixes its independent escrow terms. Native replay retains the
+original operation rather than reacquiring its continuation. Parent transitions
+address a different allocation, so earned child independence applies. The
+argument composes conditional invariants; it adds no global atomicity or
+availability assumption and is not a mechanized implementation refinement.
+\end{proof}
+
 A small Lean specification checks conservation over arbitrary finite account
 traces, the paid-plus-refunded bound, persistence of the earned states, and
 noninterference of distinct map entries. A finite Python explorer checks

@@ -1,5 +1,5 @@
 
-running 9 tests
+running 10 tests
 test dynamic_recovery_worker ... ok
 test installation_requires_durable_native_custody ... ok
 test work_expiry_uses_the_receivers_configured_authority_clock ... ok
@@ -9,6 +9,7 @@ test receiver_executes_with_allocator_offline_and_rejects_another_receiver ... o
 test dynamic_selection_recursion_and_native_replay ... ok
 test unknown_original_keeps_its_allocation_while_a_sibling_completes ... ok
 test changed_native_identity_payload_and_ceiling_never_dispatch ... ok
+test governed_delegation_preserves_tool_arguments_and_denies_binding_substitution ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.95s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.45s
 

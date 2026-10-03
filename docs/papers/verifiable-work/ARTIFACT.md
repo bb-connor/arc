@@ -14,9 +14,9 @@ The current manuscript adds D1, the dynamic delegation profile in
 signatures, trust boundaries, accepted-output pricing and conservative sealing.
 Its [qualification](../../research/dynamic-delegation/evidence/qualification.json)
 hashes current Rust/build/spec/tool inputs and fresh terminal command outputs.
-The current example uses a durable integer rail fixture, two receiver keys and
-separate native stores under one administrator. It does not use F1's escrow or
-establish independent operation.
+The standalone D1 example uses a durable integer rail fixture, two receiver
+keys and separate native stores under one administrator. That illustration does
+not use F1's escrow; the composed experiment below does.
 
 The prepublication D1 signed records use v2 domains after the namespace replay
 repair. Subdivision, offers, selection and permits now bind the protected
@@ -28,8 +28,13 @@ S1 extends `crates/kernel/chio-swarm-authority/` and the existing runtime-core
 store and admission hook. Its [protocol](../../research/swarm-evolution/PROTOCOL.md)
 defines additive growth, protected head serialization, exact historical lookup
 and stable native continuation ownership. The same current qualification record
-covers D1 and S1. Their native trajectories are separate; the artifact does not
-claim an evaluated combined D1/S1/F1 economy.
+covers D1 and S1 and their composition with native treaty admission and F1
+escrow. The [composed result](../../research/evolving-funded-work/RESULTS.md)
+executes work, discovers and funds a new task, installs graph growth, kills the
+intermediary after the child becomes payable, and collects the original child
+claim. This is one local execution under one administrator, with a private
+chain and mock tokens. Independent operation and economic advantage remain
+unmeasured.
 
 Historical source evidence is checked at retained Git revision
 `71e5cbc3bf7b08f477ed0e0361f2cca0c36eaea3`, which preserves every non-paper input
@@ -59,6 +64,7 @@ other.
 | D1 native receiver and checked output | `crates/kernel/chio-kernel/src/delegated_work.rs` | Locally activated allocator keys plus an ordinary receiver-issued capability; durable native custody; no allocator connection at dispatch |
 | S1 checked graph growth | `crates/kernel/chio-swarm-authority/src/evolution.rs` | Existing live verifier plus exact retention; declared pool, single-use tasks, additive changes only |
 | S1 durable history and native admission | `crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs` and `src/admission_hook/swarm_authority.rs` | One protected head per pool lineage, exact graph lookup, existing native replay and treaty gates |
+| Composed D1/S1/treaty/F1 execution | `examples/federated-work/src/funded_work/composition.rs` and `evolving.rs` | Owner-pinned admission, exact request bindings, additive growth and original earned-child collection after SIGKILL; one local administrator |
 | Joint artifact work agreement | `examples/funded-work/artifacts.py`, `PROFILE.md` | `chio.experimental.funded-w0-agreement.v1`, artifact-only |
 | Native funded agreement | `examples/federated-work/src/funded_work/agreement.rs` | Experimental native v2; exact request digest, local authority UUID, Finding policy, allocation domain; W0 amount is fixed to 100 mock units |
 | Disclosure and procurement | `examples/federated-work/src/subcontract/permit.rs`, `SUBCONTRACT.md` | Bounded three-party example; the conceptual agreement tuple is not a new universal wire schema |
@@ -118,19 +124,53 @@ For the current dynamic profile, use the repository Rust toolchain on Linux:
 
 ```sh
 python3 -B docs/papers/verifiable-work/tools/qualify_dynamic.py
-python3 -B docs/papers/verifiable-work/tools/qualify_dynamic.py --record
+CHIO_FUNDED_PYTHON=/tmp/chio-python-buyer-env/bin/python \
+  python3 -B docs/papers/verifiable-work/tools/qualify_dynamic.py --record
 ```
 
 The first command verifies the retained current-source evidence. The second
-executes eleven checks, including the real SIGKILL native scenario, the existing
-three-owner regression, full swarm/runtime crate tests, all-target Clippy and
-formatting. It archives previous qualified outputs,
-requires a fresh recovery trajectory, records terminal status and rejects source
+executes 21 checks, including the real SIGKILL native scenarios, the existing
+three-owner and durable-admission regressions, full swarm/runtime and standalone
+funded suites, changed-boundary Clippy and formatting. It builds the funded
+binary before the evolving execution and four existing earned-child recovery
+cases. The environment check requires the existing locked Python dependencies
+and records interpreter, Rust and Node versions. It archives previous qualified outputs,
+requires fresh recovery and evolving-funded trajectories, records terminal status and rejects source
 changes during qualification. It intentionally changes retained evidence; run it
 in a reproduction checkout, then review the resulting diff before refreezing.
+The composed receiver contract and trial protocol are in
+`docs/research/evolving-funded-work/RECEIVER-TRIAL.md`. Its public input package
+is the `publicArtifacts` object in the qualified evolving JSON; private receiver
+databases and keys are never part of that handoff. Both child collection reports
+are retained, including the first open's missing remote co-signer diagnostic.
+Payment and local completion do not establish bilateral receipt delivery.
+
+First provision the checker without changing global Python packages:
+
+```sh
+uv venv --python /usr/bin/python3 /tmp/chio-python-buyer-env
+uv pip sync --python /tmp/chio-python-buyer-env/bin/python --require-hashes \
+  --index-url https://pypi.org/simple \
+  examples/federated-work/python_buyer/requirements.txt
+```
+
 The independently callable native example is `cargo run --locked -p chio-kernel
 --example dynamic_delegation`. The complete command arrays live in
 `tools/provenance.py`. No broad workspace, hosted CI or release result is implied.
+
+The default standalone Rust suite marks six chain-dependent cases ignored.
+The supplementary current-source run selects those cases explicitly:
+
+```sh
+CHIO_FUNDED_PYTHON=/tmp/chio-python-buyer-env/bin/python \
+  CARGO_TARGET_DIR=/tmp/chio-paper-target CARGO_BUILD_JOBS=2 \
+  cargo test --locked --manifest-path examples/federated-work/Cargo.toml -- --ignored
+```
+
+Its command, terminal status, output hashes and digest of the unchanged native
+source inventory are retained in
+`docs/research/evolving-funded-work/evidence/chain-regressions.json`. This is
+separate from the 21-command campaign, whose default-suite skips remain recorded.
 
 The [conditional-backing report](../../research/kernel-continuation/CAPITAL.md)
 and its `results/capital.json` preserve the 4,095-profile parity result. This is

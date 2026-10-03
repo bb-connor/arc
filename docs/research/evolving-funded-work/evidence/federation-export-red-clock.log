@@ -1,0 +1,51 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+warning: variable does not need to be mutable
+   --> crates/kernel/chio-kernel/src/kernel/tests/durable_admission/execution_evidence.rs:120:9
+    |
+120 |     let mut f = fixture_with_federation(true)?;
+    |         ----^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chio-kernel` (lib test) generated 1 warning (run `cargo fix --lib -p chio-kernel --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 1m 41s
+     Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_kernel-497ebf29aad34e8e)
+
+running 1 test
+test kernel::tests::durable_admission::execution_evidence::federated_execution_export_uses_original_admission_without_remote_completion ... FAILED
+
+failures:
+
+---- kernel::tests::durable_admission::execution_evidence::federated_execution_export_uses_original_admission_without_remote_completion stdout ----
+
+thread 'kernel::tests::durable_admission::execution_evidence::federated_execution_export_uses_original_admission_without_remote_completion' (2027283) panicked at crates/kernel/chio-kernel/src/kernel/tests/durable_admission/execution_evidence.rs:94:5:
+Ok(ToolCallResponse { request_id: "execution-signing-request", verdict: Deny, output: None, reason: Some("internal error: federated receipt persistence unavailable: no durable receipt store configured"), terminal_state: Completed, receipt: ChioReceipt { id: "54d7d293de97809f2daaabf5981dba95fa85aacb516cb820528893999eba54f1", timestamp: 1791000325, capability_id: "cap-01a0fff0-2b88-7376-8836-f8314c4f9fbd", tool_server: "durable-server", tool_name: "mutate", action: ToolCallAction { parameters: Object {"record": String("ledger-7"), "value": String("settled")}, parameter_hash: "aa8362d7be0334878bef410fce1c003e34b687e8780abff7891b817bc03b3ffd" }, decision: Some(Deny { reason: "internal error: federated receipt persistence unavailable: no durable receipt store configured", guard: "kernel.receipt_persistence" }), receipt_kind: MediatedDecision, boundary_class: Prevent, observation_outcome: None, tool_origin: CallerExecuted, redaction_mode: None, actor_chain: [], content_hash: "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b", policy_hash: "56e3fa7969f48b66e2bdf7f72459fb1b1ab14dcadf5751c97222050fab23e40f", evidence: [], metadata: Some(Object {"attribution": Object {"delegation_depth": Number(0), "issuer_key": String("b74f69338b54268ba97c97ff2190613bf54bcedcbcdf02b3ab081addc5ad4bc9"), "subject_key": String("855dce4e7d61b77c57aac0f043d1faf3e1e4bb8e02e581a944ea65da16e65494")}, "chio_receipt_signing_nonce": String("rcpt-01a0fff0-2caf-7a82-ab7d-b384c3e5e827"), "receipt_context": Object {"request_id": String("execution-signing-request")}}), trust_level: Mediated, tenant_id: None, bbs_projection_version: None, kernel_key: PublicKey { material: Ed25519 { verifying_key: VerifyingKey(CompressedEdwardsY: [183, 79, 105, 51, 139, 84, 38, 139, 169, 124, 151, 255, 33, 144, 97, 59, 245, 75, 206, 220, 188, 223, 2, 179, 171, 8, 26, 221, 197, 173, 75, 201]), EdwardsPoint{
+	X: FieldElement51([1497548113585355, 1267883286532285, 124442158074700, 191609125434738, 291420621960742]),
+	Y: FieldElement51([7655259330685, 228073733221340, 2250291071768245, 2099122044278612, 2228117704269528]),
+	Z: FieldElement51([843409119591781, 1664970377254455, 1167948388483214, 125264709690674, 185983193995183]),
+	T: FieldElement51([1232347663827922, 1000740308867362, 1670838946451926, 2174053769577443, 171012036906420])
+}) } }, bbs_signature: None, algorithm: Some(Ed25519), signature: Signature { material: Ed25519 { inner: ed25519::Signature { R: 0x8da0cc951f58aa8753b043291a98a03ba9af7e370b7e766e342e0ba473ca8319, s: 0x401818f298ddeff92327a99992a7af070d87cc96964f13c52efd3f776de7910c } } } }, execution_nonce: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    kernel::tests::durable_admission::execution_evidence::federated_execution_export_uses_original_admission_without_remote_completion
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1513 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `-p chio-kernel --lib`

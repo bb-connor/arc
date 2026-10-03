@@ -570,7 +570,7 @@
       "profile": "S1 additive swarm evolution; one protected graph lineage per declared pool and one native custody domain per task",
       "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
       "baseline_result": "A protected transactional head, retained signed snapshots and stable native resource IDs can implement the same rule. No exclusive capability or measured integration advantage is established.",
-      "next_decisive_test": "An independent store/receiver implementation and explicit D1/S1/F1 resource handoffs, followed by a matched useful-work evaluation.",
+      "next_decisive_test": "An independent store/receiver implementation exercising the public D1/S1/F1 handoff, followed by a matched useful-work evaluation.",
       "claim_id": "S01",
       "exact_claim": "Checked additive graph extensions retain all prior allocations and authority artifacts within the original declared envelope.",
       "assumptions": [
@@ -594,7 +594,7 @@
       "profile": "S1 additive swarm evolution; one protected graph lineage per declared pool and one native custody domain per task",
       "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
       "baseline_result": "A protected transactional head, retained signed snapshots and stable native resource IDs can implement the same rule. No exclusive capability or measured integration advantage is established.",
-      "next_decisive_test": "An independent store/receiver implementation and explicit D1/S1/F1 resource handoffs, followed by a matched useful-work evaluation.",
+      "next_decisive_test": "An independent store/receiver implementation exercising the public D1/S1/F1 handoff, followed by a matched useful-work evaluation.",
       "claim_id": "S02",
       "exact_claim": "Atomic successor installation establishes one local lineage and preserves exact historical bundles across restart.",
       "assumptions": [
@@ -618,7 +618,7 @@
       "profile": "S1 additive swarm evolution; one protected graph lineage per declared pool and one native custody domain per task",
       "supporting_source_version": "docs/research/dynamic-delegation/evidence/qualification.json: exact current native source inventory",
       "baseline_result": "A protected transactional head, retained signed snapshots and stable native resource IDs can implement the same rule. No exclusive capability or measured integration advantage is established.",
-      "next_decisive_test": "An independent store/receiver implementation and explicit D1/S1/F1 resource handoffs, followed by a matched useful-work evaluation.",
+      "next_decisive_test": "An independent store/receiver implementation exercising the public D1/S1/F1 handoff, followed by a matched useful-work evaluation.",
       "claim_id": "S03",
       "exact_claim": "Native graph extension permits new and original unfinished work while preserving consumed continuation ownership, exact replay receipts and the independent bilateral treaty gate.",
       "assumptions": [
@@ -626,7 +626,7 @@
         "ordinary capability and treaty enforcement",
         "live original artifacts and current local authorization"
       ],
-      "limitation": "Author-controlled native fixtures; additive changes only, without automatic reclaim, receiver migration or a unified dynamic funded execution.",
+      "limitation": "Author-controlled additive-growth fixtures, without automatic reclaim or receiver migration. The separate E01 claim covers the composed funded execution.",
       "adversary": "Fresh request under a rebound consumed continuation, omitted treaty context, restart and replay",
       "counterexample": "A consumed continuation yields another effect, old physical-claim revalidation changes its resources, or required treaty removal still dispatches.",
       "evidence_paths": [
@@ -634,6 +634,66 @@
         "crates/kernel/chio-runtime-core/tests/runtime_admission/operation_owned/combined/native_validity.rs",
         "docs/research/swarm-evolution/evidence/task3-native-v3.log"
       ]
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "supporting_source_version": "Current complete source inventory in docs/research/dynamic-delegation/evidence/qualification.json",
+      "original_hypotheses": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "claim_id": "E01",
+      "exact_claim": "One local execution binds D1 delegation, additive S1 growth, native treaty admission and F1 backing; original earned child payment and earlier execution evidence survive intermediary SIGKILL and graph extension.",
+      "profile": "Composed nondestructive W0, enrolled local receivers, private chain and mock XTS",
+      "assumptions": [
+        "one protected D1 allocator and S1 graph writer",
+        "one native custody domain per receiving key",
+        "honest receiver enforcement",
+        "agreed checker and settlement observation"
+      ],
+      "adversary": "Malicious courier or planner substitutions, process loss after child Payable",
+      "evidence_paths": [
+        "docs/research/dynamic-delegation/evidence/qualified-evolving-funded-work.json",
+        "docs/research/dynamic-delegation/evidence/qualification.json",
+        "examples/federated-work/test_evolving_work.py"
+      ],
+      "limitation": "One administrator, deterministic easy-to-check work, one composed parent-kill cut. First collection retains a missing remote co-signer diagnostic; local execution and payment do not establish final bilateral delivery.",
+      "counterexample": "Would falsify: graph growth refreshes an old continuation, replay changes original operation or payment identity, parent refund removes an earned child claim, or any receiver executes twice.",
+      "baseline_result": "No unique conservation or earned-payment claim; SQL and ERC-8183 parity remains. Full integration advantage is unmeasured.",
+      "next_decisive_test": "Independently implemented receiver under separate administration, followed by held-out useful work and matched integration cost."
+    },
+    {
+      "status": [
+        "locally-tested"
+      ],
+      "supporting_source_version": "Current complete source inventory in docs/research/dynamic-delegation/evidence/qualification.json",
+      "original_hypotheses": [
+        "H1",
+        "H2",
+        "H3"
+      ],
+      "claim_id": "E02",
+      "exact_claim": "The composed receiver requires owner-pinned admission policy and exact route, capability, D1, S1 and funded-request bindings; execution export authenticates original frozen federation provenance without minting new dispatch, settlement or remote-completion authority.",
+      "profile": "Experimental composed adapter and native pre-settlement execution projection",
+      "assumptions": [
+        "protected policy and physical custody",
+        "original frozen admission provenance",
+        "qualified local signer"
+      ],
+      "adversary": "Signed foreign route, stripped treaty, foreign capability, missing frozen provenance and policy downgrade",
+      "evidence_paths": [
+        "examples/federated-work/src/funded_work/evolving/tests.rs",
+        "examples/federated-work/src/funded_work/tests/native.rs",
+        "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/execution_evidence.rs",
+        "docs/research/evolving-funded-work/REVIEW.md"
+      ],
+      "limitation": "Receiver-side checks are not a proof of honest remote computation or final bilateral delivery. Security-release and caller-delivery outcomes remain unsupported by this exporter.",
+      "counterexample": "Would falsify: a valid foreign-target route reaches funding observation, missing context downgrades admission, or export performs a tool/payment action.",
+      "baseline_result": "Standard capability and transaction systems can implement equivalent conditions; reusable integration remains the proposed value.",
+      "next_decisive_test": "Outside receiver reproduction using the published original public artifact definitions."
     }
   ],
   "hypothesis_source": "docs/market/open-agent-work/01-thesis.md at 7755d3762baa5e0fda0d171835a9000c26de9033",
@@ -650,18 +710,24 @@
       "C09",
       "C10",
       "C11",
-      "C12"
+      "C12",
+      "E01",
+      "E02"
     ],
     "H2": [
       "H02",
       "C10",
-      "C12"
+      "C12",
+      "E01",
+      "E02"
     ],
     "H3": [
       "H03",
       "C02",
       "C08",
-      "C13"
+      "C13",
+      "E01",
+      "E02"
     ],
     "H4": [
       "H04"

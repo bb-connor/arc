@@ -12,7 +12,6 @@ help: Check that the patched package version and available features are compatib
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
    Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
-   Compiling chio-attest-loopback v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-attest-loopback)
    Compiling chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
    Compiling chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
    Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
@@ -20,7 +19,7 @@ help: Check that the patched package version and available features are compatib
    Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
    Compiling chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
    Compiling chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
-    Finished `test` profile [unoptimized] target(s) in 2m 33s
+    Finished `test` profile [unoptimized] target(s) in 3m 58s
      Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_runtime_core-38195e24b8a8917b)
      Running tests/lease_boundaries.rs (/tmp/chio-paper-target/debug/deps/lease_boundaries-f9fd172fd95771f7)
      Running tests/outcome_continuation.rs (/tmp/chio-paper-target/debug/deps/outcome_continuation-24fc3777b21daa36)

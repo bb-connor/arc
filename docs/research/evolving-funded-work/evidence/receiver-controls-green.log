@@ -1,0 +1,9 @@
+   Compiling chio-federated-work v0.1.0 (/tmp/chio-verifiable-work-paper/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 16.54s
+     Running unittests src/main.rs (/tmp/chio-paper-target/debug/deps/chio_federated_work-6276a32dc736f2b9)
+
+running 1 test
+test funded_work::evolving::tests::receiver_rejects_signed_wrong_route_missing_treaty_and_foreign_capability_before_funding ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 96 filtered out; finished in 11.42s
+

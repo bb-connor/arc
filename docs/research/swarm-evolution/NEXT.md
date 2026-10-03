@@ -1,5 +1,9 @@
 # Next result: one evolving, funded execution
 
+Execution record: [evolving funded work](../evolving-funded-work/RESULTS.md).
+The brief below is the approved task that produced that result. Its outside
+receiver trial remains a separate research gate.
+
 The next implementation should connect the existing D1, S1 and F1 paths into one
 execution. It should make the current composition claim observable at their
 handoffs, using the existing capability, treaty, custody and settlement owners.

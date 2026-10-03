@@ -1,5 +1,37 @@
 # Publication execution record
 
+2026-10-03 composed execution revision: the user reiterated execution using
+existing delegation, swarm authority and treaties. The active plan is
+`docs/superpowers/plans/2026-10-02-evolving-funded-work.md`. The composed
+trajectory passes through real parent SIGKILL, original child withdrawal and
+unchanged physical claims. The new receiver controls and eleven native export
+tests pass. Fresh automated review closed two Important findings. Implementation
+and qualification tools are committed as `d46524ee8c`. All 21 source-bound
+commands pass against 36,556 unchanged inputs and 48 hashed outputs; six
+additional opt-in chain regressions pass against the identical inventory.
+The paper now
+states one local composed result and distinguishes local execution from final
+bilateral receipt delivery. No outside operator or economic-advantage result
+has been added. Historical entries below retain their original scope.
+
+2026-10-03 final composed acceptance: all three implementation-plan tasks are
+complete. Rust totals by boundary are 54 workflow (one pre-existing ignored
+doctest), 10 native delegation labels (including the worker), 5 existing native
+composition, 453 swarm/runtime, 11 execution export, 25 durable SQLite and
+91 default standalone tests. The six default opt-in skips pass in their own
+explicit chain run, making 97 standalone cases exercised. Three Node wire tests,
+13 artifact tests, the composed SIGKILL trajectory and four existing child
+crash subcases pass. Four strict Clippy commands and all three format commands
+pass. The new run does not overwrite historical source qualifications.
+
+Final manuscript/artifact checks pass and the 19-page PDF rebuilds byte-for-byte.
+Edited links and all 28 claim records resolve. The publication command exits
+one for exactly independent operation, useful-work economics, integration
+advantage, foundational critique, and the two false readiness flags. This is
+the expected open research boundary, not a local validation failure. The paper
+and source remain on the isolated branch. The next decisive tasks and public
+receiver package are in `docs/research/evolving-funded-work/NEXT.md`.
+
 2026-10-02 swarm evolution revision: the user reiterated execution through review
 and manuscript update, with explicit reuse of swarm authority, treaties and
 delegation. The new plan is
