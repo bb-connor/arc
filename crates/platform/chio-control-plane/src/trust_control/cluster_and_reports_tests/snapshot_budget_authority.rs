@@ -4,8 +4,9 @@ use super::*;
 fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
     let source_budget_db = unique_temp_path("cluster-source-legacy-budget", "sqlite3");
     let target_budget_db = unique_temp_path("cluster-target-legacy-budget", "sqlite3");
-    let source_authority_db = unique_temp_path("cluster-source-anchor-authority", "sqlite3");
-    let target_authority_db = unique_temp_path("cluster-target-anchor-authority", "sqlite3");
+    let authority_directory = chio_test_support::private_tempdir().test_unwrap();
+    let source_authority_db = authority_directory.path().join("source-authority.sqlite3");
+    let target_authority_db = authority_directory.path().join("target-authority.sqlite3");
     let mut source_state = state_with_cluster(
         "https://node-a",
         &["https://node-b"],

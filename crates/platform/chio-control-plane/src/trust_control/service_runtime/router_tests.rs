@@ -6,6 +6,9 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[path = "ingress_tests.rs"]
+mod ingress_tests;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         listen: "127.0.0.1:0".parse().test_unwrap(),

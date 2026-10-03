@@ -5,6 +5,12 @@ records the actual input check before signature verification or digesting. It is
 not a claim that the whole TCB migration is complete. Production simulation now
 uses the signed receipt boundary described below.
 
+The October 2 [HTTP ingress contract](http-ingress-contracts.md) additionally
+records 109 request extractors, original-byte validation on all 104 control-plane
+JSON bindings, explicit format/transport dispositions and shared-reader callers.
+Remaining API-protect JSON and form-reader work stays explicit. Decoder census
+counts below are historical observations, not the total remaining ingress scope.
+
 Choose the decoder from the producer and its numeric contract.
 `UntrustedJsonText::from_wire` checks the original byte limit and UTF-8;
 the separate `new` constructor does not enforce a size bound.

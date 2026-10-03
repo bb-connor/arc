@@ -1799,8 +1799,9 @@ mod config_and_public_tests {
 
     #[test]
     fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
-        let source_path = unique_temp_path("chio-trust-control-authority-source", "sqlite");
-        let follower_path = unique_temp_path("chio-trust-control-authority-follower", "sqlite");
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let source_path = directory.path().join("source.sqlite3");
+        let follower_path = directory.path().join("follower.sqlite3");
         let source =
             SqliteCapabilityAuthority::open(&source_path).test_expect("open source authority");
         let follower =

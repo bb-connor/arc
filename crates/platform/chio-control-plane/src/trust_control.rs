@@ -11,6 +11,8 @@ mod fiscal_handlers;
 mod fiscal_runtime;
 #[path = "trust_control/frost.rs"]
 pub mod frost;
+#[path = "trust_control/json_ingress.rs"]
+mod json_ingress;
 #[path = "trust_control/health.rs"]
 mod trust_control_health;
 

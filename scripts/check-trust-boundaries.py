@@ -24,6 +24,9 @@ _spec.loader.exec_module(_lexer)
 _contracts_spec = importlib.util.spec_from_file_location("trust_boundary_contracts", ROOT / "scripts/trust_boundary_contracts.py")
 _contracts = importlib.util.module_from_spec(_contracts_spec)
 _contracts_spec.loader.exec_module(_contracts)
+_ingress_spec = importlib.util.spec_from_file_location("trust_boundary_ingress", ROOT / "scripts/trust_boundary_ingress.py")
+_ingress = importlib.util.module_from_spec(_ingress_spec)
+_ingress_spec.loader.exec_module(_ingress)
 LITERALS = re.compile(r'r(?P<hashes>#{0,16})"(?P<raw>.*?)"(?P=hashes)|"(?P<quoted>(?:\\.|[^"\\])*)"', re.S)
 CREATE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(", re.I)
 DECODERS = "from_str|from_slice|from_reader|from_value"
@@ -138,6 +141,8 @@ def sql_statements(path, text):
 def scan(root, catalog):
     found = {"constructors": [], "raw_decoders": [], "schemas": {}, "unscoped_sql": [], "decoder_census": {}, "decoding_contracts": [], "decoding_contract_errors": [], "reader_evidence": {}}
     files = dict(sources(root))
+    production_code = {path: _lexer.blank_rust_noise(text) for path, text in files.items()}
+    found["ingress_census"] = _ingress.scan(production_code, _contracts, json_decoders)
     supports = {path: _lexer.blank_rust_noise(files.get(path, "")) for path in _contracts.SUPPORT_PATHS}
     decoder_owners = set(catalog["signed_input_files"])
     for path, text in files.items():
@@ -187,6 +192,9 @@ def check(root, catalog):
     found, files = scan(root, catalog)
     errors = []
     errors.extend(found["decoding_contract_errors"])
+    if found["ingress_census"] != catalog.get("ingress_census"):
+        errors.append("framework/format/shared-reader census changed; classify each new input consumer")
+    errors.extend(_ingress.check(root, found["ingress_census"], files, _contracts, _lexer.blank_rust_noise))
     if found["decoding_contracts"] != catalog.get("decoding_contracts"):
         errors.append("decoding contracts changed; review constructor, owner and method together")
     if found["decoder_census"] != catalog.get("decoder_census"):

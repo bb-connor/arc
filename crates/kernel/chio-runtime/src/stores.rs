@@ -456,44 +456,67 @@ impl SqliteRuntimeOrchestrationStore {
         wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
     }
 
+    pub fn register_run(&self, run_id: &str) -> Result<bool, ChioRuntimeError> {
+        wrap_runtime(self.inner.register_run(run_id))
+    }
+
     pub fn record_run_state(
         &self,
-        run_id: &str,
+        lease: &RuntimeRunLease,
         status: &str,
         failure_code: Option<&str>,
-        now_unix_ms: u64,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            self.inner
-                .record_run_state(run_id, status, failure_code, now_unix_ms),
-        )
+        wrap_runtime(self.inner.record_run_state(lease, status, failure_code))
     }
 
     pub fn record_step_state(
         &self,
+        lease: &RuntimeRunLease,
         state: RuntimeOrchestrationStepState,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.record_step_state(state))
+        wrap_runtime(self.inner.record_step_state(lease, state))
     }
 
     pub fn record_run_step_state(
         &self,
-        run_id: &str,
+        lease: &RuntimeRunLease,
         state: RuntimeOrchestrationStepState,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.record_run_step_state(run_id, state))
+        wrap_runtime(self.inner.record_run_step_state(lease, state))
+    }
+
+    pub fn complete_run_write(
+        &self,
+        lease: &RuntimeRunLease,
+        status: &str,
+        failure_code: Option<&str>,
+        steps: &[RuntimeOrchestrationStepState],
+        artifacts: &[RuntimeEvidenceManifestEntry],
+    ) -> Result<(), ChioRuntimeError> {
+        wrap_runtime(
+            self.inner
+                .complete_run_write(lease, status, failure_code, steps, artifacts),
+        )
+    }
+
+    pub fn acquire_current_run_lease(
+        &self,
+        run_id: &str,
+        owner_id: &str,
+        ttl_ms: u64,
+    ) -> Result<RuntimeRunLease, ChioRuntimeError> {
+        wrap_runtime(
+            self.inner
+                .acquire_current_run_lease(run_id, owner_id, ttl_ms),
+        )
     }
 
     pub fn record_evidence_artifact(
         &self,
-        run_id: &str,
+        lease: &RuntimeRunLease,
         entry: &RuntimeEvidenceManifestEntry,
-        recorded_at_unix_ms: u64,
     ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            self.inner
-                .record_evidence_artifact(run_id, entry, recorded_at_unix_ms),
-        )
+        wrap_runtime(self.inner.record_evidence_artifact(lease, entry))
     }
 
     pub fn recorded_run_ids(&self) -> Result<Vec<String>, ChioRuntimeError> {

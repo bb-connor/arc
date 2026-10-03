@@ -191,7 +191,7 @@ fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> Te
     let path = dir.path().join("leases.sqlite3");
     let store = SqliteRuntimeOrchestrationStore::open(&path)?;
     for run in ["a-good", "z-bad"] {
-        store.record_run_state(run, "pending", None, 0)?;
+        store.register_run(run)?;
     }
     store.acquire_run_lease("old", "previous", 0, 1)?;
     let connection = Connection::open(&path)?;
@@ -199,7 +199,7 @@ fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> Te
     let before = snapshot(&path)?;
     let result = store.scheduler_tick_report(&early_profile(), "owner", 10, 2);
     assert!(
-        matches!(result, Err(ChioRuntimeError::Store(ref detail)) if detail.contains("injected late lease failure")),
+        matches!(result, Err(ChioRuntimeError::Sqlite(ref error)) if error.to_string().contains("injected late lease failure")),
         "{result:?}"
     );
     assert_eq!(snapshot(&path)?, before);
@@ -221,7 +221,7 @@ fn scheduler_fencing_exhaustion_rolls_back_an_earlier_claim() -> TestResult {
     let path = dir.path().join("leases.sqlite3");
     let store = SqliteRuntimeOrchestrationStore::open(&path)?;
     for run in ["a-good", "z-exhausted"] {
-        store.record_run_state(run, "pending", None, 0)?;
+        store.register_run(run)?;
     }
     store.acquire_run_lease("z-exhausted", "previous", 0, 1)?;
     Connection::open(&path)?.execute(
@@ -243,7 +243,7 @@ fn competing_schedulers_share_one_capacity_snapshot() -> TestResult {
     let path = dir.path().join("leases.sqlite3");
     let store = SqliteRuntimeOrchestrationStore::open(&path)?;
     for index in 0..8 {
-        store.record_run_state(&format!("run-{index}"), "pending", None, 0)?;
+        store.register_run(&format!("run-{index}"))?;
     }
     // Open every connection before starting workers so a failed open cannot strand a barrier.
     let handles = (0..4)

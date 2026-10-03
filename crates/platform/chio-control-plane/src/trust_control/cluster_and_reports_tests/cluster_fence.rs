@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn build_cluster_state_seeds_persisted_authority_fence_term() {
-    let authority_db_path = unique_temp_path("cluster-authority-fence", "sqlite3");
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let authority_db_path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap();
     authority
         .seed_cluster_fence(Some("https://node-b"), 7)
@@ -25,7 +26,8 @@ fn build_cluster_state_seeds_persisted_authority_fence_term() {
 
 #[test]
 fn build_cluster_state_discards_persisted_authority_fence_for_unknown_leader() {
-    let authority_db_path = unique_temp_path("cluster-authority-fence-unknown-leader", "sqlite3");
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let authority_db_path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap();
     authority
         .seed_cluster_fence(Some("https://node-z"), 7)
@@ -51,7 +53,8 @@ fn build_cluster_state_discards_persisted_authority_fence_for_unknown_leader() {
 
 #[test]
 fn build_cluster_state_discards_persisted_authority_fence_after_rotation() {
-    let authority_db_path = unique_temp_path("cluster-authority-fence-stale-generation", "sqlite3");
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let authority_db_path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&authority_db_path).test_unwrap();
     authority
         .seed_cluster_fence(Some("https://node-b"), 7)

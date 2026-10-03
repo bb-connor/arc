@@ -41,6 +41,7 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct Fixture {
+    _clock: chio_test_support::clock::ClockScope,
     _temp: TempDir,
     _authority: SqliteAuthorityStore,
     cache: SqliteEconomicStateCache,
@@ -49,6 +50,9 @@ struct Fixture {
 }
 
 fn fixture() -> Fixture {
+    // Freeze before opening the store so a later whole-second fixture reading
+    // never backdates the authority's already persisted millisecond floor.
+    let (_, clock) = recovery_clock();
     let temp = tempfile::tempdir().expect("tempdir");
     crate::create_private_directory(temp.path()).expect("secure database parent");
     let database = temp.path().join("authority.db");
@@ -65,6 +69,7 @@ fn fixture() -> Fixture {
     let cache = authority.economic_state_cache();
     let operations = Arc::new(authority.admission_operation_store());
     Fixture {
+        _clock: clock,
         _temp: temp,
         _authority: authority,
         cache,
