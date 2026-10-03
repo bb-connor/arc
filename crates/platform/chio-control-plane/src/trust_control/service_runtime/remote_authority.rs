@@ -1,3 +1,6 @@
+#[path = "remote_authority/lifecycle.rs"]
+mod lifecycle;
+
 use super::client::build_client;
 use super::*;
 
@@ -111,16 +114,18 @@ impl RemoteCapabilityAuthority {
         Ok(())
     }
 
-    fn refresh_status_if_stale(&self) {
+    fn refresh_status_if_stale(&self) -> Result<(), CliError> {
         let should_refresh = match self.cache.lock() {
             Ok(guard) => guard.refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
             Err(poisoned) => poisoned.into_inner().refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
         };
         if should_refresh {
-            let _ = self.refresh_status();
+            self.refresh_status()?;
         }
+        Ok(())
     }
 
+    #[cfg(test)]
     fn trusted_keys_snapshot(&self) -> Vec<PublicKey> {
         match self.cache.lock() {
             Ok(guard) => guard.trusted.clone(),
@@ -233,7 +238,7 @@ impl RemoteCapabilityAuthority {
 
 impl CapabilityAuthority for RemoteCapabilityAuthority {
     fn authority_public_key(&self) -> PublicKey {
-        self.refresh_status_if_stale();
+        let _ = self.refresh_status_if_stale();
         match self.cache.lock() {
             Ok(guard) => match &guard.current {
                 Some(public_key) => public_key.clone(),
@@ -247,8 +252,25 @@ impl CapabilityAuthority for RemoteCapabilityAuthority {
     }
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
-        self.refresh_status_if_stale();
-        self.trusted_keys_snapshot()
+        let Ok(now) = self.clock.unix_millis() else {
+            return Vec::new();
+        };
+        if self.refresh_status_if_stale().is_err() {
+            return Vec::new();
+        }
+        let Ok(cache) = self.cache.lock() else {
+            return Vec::new();
+        };
+        cache.live_keys(now.as_secs())
+    }
+
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &PublicKey,
+        issued_at: u64,
+        now: u64,
+    ) -> Result<(), chio_kernel::KernelError> {
+        self.verify_live_issuer(issuer, issued_at, now)
     }
 
     fn issue_capability(
@@ -314,11 +336,12 @@ impl AuthorityKeyCache {
             .map(|value| PublicKey::from_hex(value))
             .collect::<Result<Vec<_>, _>>()?;
         let mut trusted = trusted;
-        if let Some(current) = current.as_ref() {
-            if !trusted.iter().any(|public_key| public_key == current) {
-                trusted.push(current.clone());
-            }
+        if !current.as_ref().is_some_and(|key| trusted.contains(key)) {
+            return Err(CliError::cli_other_error(
+                "authority status omits its current key from live trust",
+            ));
         }
+        lifecycle::validate_status_lifecycle(status)?;
         trusted.sort_by_key(PublicKey::to_hex);
         trusted.dedup();
         Ok(Self {
@@ -326,6 +349,7 @@ impl AuthorityKeyCache {
             trusted,
             generation: status.generation,
             rotated_at: status.rotated_at,
+            issuer_state: status.issuer_state.clone(),
             refreshed_at: Instant::now(),
         })
     }
@@ -352,7 +376,8 @@ impl AuthorityKeyCache {
             ) if candidate_generation == current_generation
                 && (candidate_rotated_at != current_rotated_at
                     || self.current != installed.current
-                    || self.trusted != installed.trusted) =>
+                    || self.issuer_state != installed.issuer_state
+                    || self.trusted.iter().any(|key| !installed.trusted.contains(key))) =>
             {
                 Err(CliError::cli_other_error(format!(
                     "remote authority cache generation {current_generation} equivocated"
@@ -389,6 +414,19 @@ impl AuthorityKeyCache {
 mod tests {
     use super::*;
     use chio_kernel::LocalCapabilityAuthority;
+
+    #[test]
+    fn kg2_remote_stale_cache_failure_cannot_grant_issuer_trust(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let authority = remote_with_trusted_key(Keypair::generate().public_key())?;
+        authority
+            .cache
+            .lock()
+            .map_err(|_| "cache poisoned")?
+            .refreshed_at = Instant::now() - AUTHORITY_CACHE_TTL;
+        assert_eq!(authority.trusted_public_keys(), Vec::new());
+        Ok(())
+    }
 
     #[test]
     fn unavailable_clock_prevents_remote_issuance_rpc() -> Result<(), Box<dyn std::error::Error>> {
@@ -464,6 +502,42 @@ mod tests {
         })
     }
 
+    #[test]
+    fn kg2_remote_expiry_can_shrink_trust_without_new_generation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let current = Keypair::generate().public_key();
+        let old = Keypair::generate().public_key();
+        let mut remote = remote_with_trusted_key(current.clone())?;
+        remote
+            .cache
+            .get_mut()
+            .map_err(|_| "cache poisoned")?
+            .trusted
+            .push(old.clone());
+        let expired = AuthorityKeyCache {
+            current: Some(current.clone()),
+            trusted: vec![current.clone()],
+            generation: Some(1),
+            rotated_at: Some(1),
+            issuer_state: None,
+            refreshed_at: Instant::now(),
+        };
+        remote.install_status_cache(expired)?;
+        assert_eq!(remote.trusted_keys_snapshot(), vec![current.clone()]);
+        let resurrected = AuthorityKeyCache {
+            current: Some(current.clone()),
+            trusted: vec![current, old],
+            generation: Some(1),
+            rotated_at: Some(1),
+            issuer_state: None,
+            refreshed_at: Instant::now(),
+        };
+        assert!(
+            matches!(remote.install_status_cache(resurrected), Err(error) if error.to_string().contains("equivocated"))
+        );
+        Ok(())
+    }
+
     fn remote_with_trusted_key(
         public_key: PublicKey,
     ) -> Result<RemoteCapabilityAuthority, CliError> {
@@ -475,6 +549,7 @@ mod tests {
                 trusted: vec![public_key],
                 generation: Some(1),
                 rotated_at: Some(1),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
@@ -560,6 +635,7 @@ mod tests {
             trusted: vec![previous_key.clone(), rotated_key],
             generation: Some(2),
             rotated_at: Some(2),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -593,6 +669,7 @@ mod tests {
             trusted: vec![previous_key.clone(), rotated_key.clone()],
             generation: Some(2),
             rotated_at: Some(2),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -624,6 +701,7 @@ mod tests {
                 trusted: vec![authority.authority_public_key()],
                 generation: Some(1),
                 rotated_at: Some(1),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
@@ -655,6 +733,7 @@ mod tests {
                 trusted: vec![current_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(2),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
         );
@@ -705,6 +784,7 @@ mod tests {
                 trusted: vec![authority.authority_public_key()],
                 generation: Some(1),
                 rotated_at: Some(1),
+                issuer_state: None,
                 refreshed_at: Instant::now() - AUTHORITY_CACHE_TTL,
             }),
             refresh_lock: Mutex::new(()),
@@ -738,6 +818,7 @@ mod tests {
                 trusted: vec![older_key.clone(), newer_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
@@ -749,6 +830,7 @@ mod tests {
             trusted: vec![older_key],
             generation: Some(1),
             rotated_at: Some(10),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -773,6 +855,7 @@ mod tests {
                 trusted: vec![current_key.clone(), historical_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
@@ -787,13 +870,19 @@ mod tests {
                 trusted: vec![equivocated_key, historical_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
             AuthorityKeyCache {
                 current: Some(current_key.clone()),
-                trusted: vec![current_key.clone()],
+                trusted: vec![
+                    current_key.clone(),
+                    historical_key.clone(),
+                    Keypair::generate().public_key(),
+                ],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
             AuthorityKeyCache {
@@ -801,6 +890,7 @@ mod tests {
                 trusted: vec![current_key.clone(), historical_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(21),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             },
         ] {
@@ -824,6 +914,7 @@ mod tests {
                 trusted: vec![current_key.clone()],
                 generation: Some(2),
                 rotated_at: Some(20),
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
@@ -837,6 +928,7 @@ mod tests {
             trusted: vec![current_key.clone(), next_key],
             generation: Some(3),
             rotated_at: Some(19),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         });
 
@@ -854,6 +946,7 @@ mod tests {
             public_key: Some(current.to_hex()),
             generation: Some(1),
             rotated_at: Some(10),
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![current.to_hex(), current.to_hex()],
         })?;
@@ -874,6 +967,7 @@ mod tests {
             trusted: trusted.clone(),
             generation: Some(2),
             rotated_at: Some(20),
+            issuer_state: None,
             refreshed_at: Instant::now(),
         };
 
@@ -895,6 +989,7 @@ mod tests {
                 trusted: Vec::new(),
                 generation: None,
                 rotated_at: None,
+                issuer_state: None,
                 refreshed_at: Instant::now(),
             }),
             refresh_lock: Mutex::new(()),
@@ -915,6 +1010,7 @@ mod tests {
                     trusted: vec![first_key_for_thread],
                     generation: None,
                     rotated_at: None,
+                    issuer_state: None,
                     refreshed_at: Instant::now(),
                 })
                 .is_ok());
@@ -933,6 +1029,7 @@ mod tests {
                     trusted: vec![second_key_for_thread],
                     generation: None,
                     rotated_at: None,
+                    issuer_state: None,
                     refreshed_at: Instant::now(),
                 })
                 .is_ok());

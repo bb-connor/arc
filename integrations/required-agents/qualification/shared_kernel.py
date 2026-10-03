@@ -10,7 +10,6 @@ from pathlib import Path
 import secrets
 import signal
 import socket
-import sqlite3
 import subprocess
 import sys
 import threading
@@ -67,6 +66,22 @@ capabilities:
         ttl: 3600
         max_invocations: 2
 """
+
+
+UNAVAILABLE_APPROVAL_CASES = frozenset({
+    "approval-workflow", "bounded-approval-workflow", "approved-grant-budget",
+    "approved-unknown-after-dispatch",
+})
+APPROVAL_WORKFLOW_UNAVAILABLE = (
+    "legacy approval workflow unavailable: this driver has no current provisioned "
+    "approval authority with an activated replay-source binding, external signer, "
+    "publisher-signed manifest, or admitted native cage launch configuration; "
+    "current native Rust approval tests are the consumer acceptance boundary"
+)
+
+
+class QualificationUnavailable(RuntimeError):
+    """Missing current provisioning is unavailable evidence, never a pass."""
 
 
 def run(command, **kwargs):
@@ -400,132 +415,15 @@ def approval_case(runtime):
 
 
 def approval_workflow_case(runtime, verify_missing_denial=False):
-    runtime.start()
-    runtime.initialize()
-    trust = runtime.http(f"/admin/sessions/{runtime.session}/trust", token=runtime.admin_token)[2]
-    capability_id = trust["capabilities"][0]["capabilityId"]
-    if verify_missing_denial:
-        missing = runtime.write("native-approval-missing.txt", "must-not-write", "native-approval-missing")
-        assert missing.get("error") or missing.get("result", {}).get("isError"), missing
-        assert runtime.observe("native-approval-missing.txt")["exists"] is False
-
-    def submit(name, ttl=300):
-        payload = {"session_id": runtime.session, "capability_id": capability_id,
-                   "request_id": "approval-" + name, "tool_name": "write_file",
-                   "arguments": {"path": "/workspace/" + name + ".txt", "content": "approved-" + name},
-                   "purpose": "Disposable exact-argument approval qualification", "ttl_seconds": ttl}
-        assert runtime.http("/admin/approvals", payload)[0] == 401
-        status, _, body = runtime.http("/admin/approvals", payload, token=runtime.admin_token)
-        assert status == 201 and body["status"] == "pending", body
-        assert "toolCallParams" not in body
-        assert runtime.observe(name + ".txt")["exists"] is False
-        return body
-
-    def decide(record, decision):
-        return runtime.http("/admin/approvals/" + record["record"]["id"] + "/decision",
-                            {"decision": decision}, token=runtime.admin_token)
-
-    pending = submit("pending")
-    runtime.stop()
-    runtime.start()
-    retained = runtime.http("/admin/approvals/" + pending["record"]["id"], token=runtime.admin_token)[2]
-    assert retained == pending, retained
-    assert runtime.observe("pending.txt")["exists"] is False
-    rejected = decide(pending, "denied")
-    assert rejected[0] == 200 and rejected[2]["status"] == "denied", rejected
-    assert decide(pending, "approved")[0] == 409
-    blocked = runtime.rpc("tools/call", rejected[2]["toolCallParams"])[2]
-    assert blocked.get("error") or blocked.get("result", {}).get("isError"), blocked
-    assert runtime.observe("pending.txt")["exists"] is False
-
-    tamper = submit("tamper")
-    approved_tamper = decide(tamper, "approved")[2]
-    changed = json.loads(json.dumps(approved_tamper["toolCallParams"]))
-    changed["arguments"]["path"] = "/workspace/substituted.txt"
-    blocked = runtime.rpc("tools/call", changed)[2]
-    assert blocked.get("error") or blocked.get("result", {}).get("isError"), blocked
-    assert runtime.observe("substituted.txt")["exists"] is False
-    assert runtime.observe("tamper.txt")["exists"] is False
-
-    valid = submit("valid")
-    approved = decide(valid, "approved")
-    assert approved[0] == 200 and approved[2]["status"] == "approved", approved
-    assert decide(valid, "approved")[2] == approved[2]
-    assert decide(valid, "denied")[0] == 409
-    assert runtime.observe("valid.txt")["exists"] is False
-    result = runtime.rpc("tools/call", approved[2]["toolCallParams"])[2]
-    assert outcome(result).get("outputKind") == "value", result
-    assert runtime.observe("valid.txt")["content"] == "approved-valid"
-    runtime.observe("valid.txt", "independent-after-approved")
-    runtime.stop()
-    runtime.start()
-    retained = runtime.http("/admin/approvals/" + valid["record"]["id"], token=runtime.admin_token)[2]
-    assert retained == approved[2], retained
-    replay = runtime.rpc("tools/call", approved[2]["toolCallParams"])[2]
-    assert outcome(replay).get("receipt", {}).get("id") == outcome(result)["receipt"]["id"], replay
-    assert runtime.observe("valid.txt")["content"] == "independent-after-approved"
-
-    expired = submit("expired", ttl=2)
-    time.sleep(3)
-    assert decide(expired, "approved")[0] == 409
-    assert runtime.observe("expired.txt")["exists"] is False
-    integrity = submit("integrity")
-    with sqlite3.connect(runtime.state / "sessions.db") as database:
-        row = database.execute("SELECT signed_record FROM remote_operator_approvals WHERE id = ?",
-                               (integrity["record"]["id"],)).fetchone()
-        damaged = json.loads(row[0])
-        damaged["record"]["arguments"]["content"] = "unapproved-state-tampering"
-        database.execute("UPDATE remote_operator_approvals SET signed_record = ? WHERE id = ?",
-                         (json.dumps(damaged), integrity["record"]["id"]))
-    assert decide(integrity, "approved")[0] == 409
-    assert runtime.observe("integrity.txt")["exists"] is False
-    revoked = submit("revoked")
-    approved_revoked = decide(revoked, "approved")[2]
-    assert runtime.http("/admin/revocations", {"capability_id": capability_id}, token=runtime.admin_token)[0] == 200
-    blocked = runtime.rpc("tools/call", approved_revoked["toolCallParams"])[2]
-    assert blocked.get("error") or blocked.get("result", {}).get("isError"), blocked
-    assert runtime.observe("revoked.txt")["exists"] is False
+    raise QualificationUnavailable(APPROVAL_WORKFLOW_UNAVAILABLE)
 
 
 def bounded_approval_workflow_case(runtime):
-    approval_workflow_case(runtime, verify_missing_denial=True)
+    raise QualificationUnavailable(APPROVAL_WORKFLOW_UNAVAILABLE)
 
 
 def approved_budget_case(runtime):
-    runtime.start()
-    runtime.initialize()
-    trust = runtime.http(f"/admin/sessions/{runtime.session}/trust", token=runtime.admin_token)[2]
-    capability_id = trust["capabilities"][0]["capabilityId"]
-
-    def approved_call(request_id, tool_name, arguments):
-        proposal = {"session_id": runtime.session, "capability_id": capability_id,
-                    "request_id": request_id, "tool_name": tool_name, "arguments": arguments,
-                    "purpose": "Qualify exact approvals sharing one finite invocation quota", "ttl_seconds": 300}
-        created = runtime.http("/admin/approvals", proposal, token=runtime.admin_token)
-        assert created[0] == 201, created
-        approved = runtime.http("/admin/approvals/" + created[2]["record"]["id"] + "/decision",
-                                {"decision": "approved"}, token=runtime.admin_token)
-        assert approved[0] == 200, approved
-        return runtime.rpc("tools/call", approved[2]["toolCallParams"])[2]
-
-    write = approved_call("approved-budget-write", "write_file", {
-        "path": "/workspace/budgeted-approved.txt", "content": "approved-budget"})
-    assert outcome(write).get("outputKind") == "value", write
-    assert runtime.observe("budgeted-approved.txt")["content"] == "approved-budget"
-    read = approved_call("approved-budget-read", "read_text_file", {"path": "/workspace/budgeted-approved.txt"})
-    assert outcome(read).get("outputKind") == "value", read
-    runtime.stop()
-    runtime.start()
-    blocked = approved_call("approved-budget-exhausted", "write_file", {
-        "path": "/workspace/approved-over-budget.txt", "content": "must-not-write"})
-    assert blocked.get("error") or blocked.get("result", {}).get("isError"), blocked
-    assert runtime.observe("approved-over-budget.txt")["exists"] is False
-    budget = runtime.http("/admin/budgets?capability_id=" + capability_id, token=runtime.admin_token)
-    assert budget[0] == 200, budget
-    assert len(budget[2]["usages"]) == 1, budget
-    assert budget[2]["usages"][0]["grantIndex"] == 0, budget
-    assert budget[2]["usages"][0]["invocationCount"] == 2, budget
-    runtime.evidence.append({"approvedBudget": "approved write and read share one two-invocation grant; restart and a new approved token do not replenish it"})
+    raise QualificationUnavailable(APPROVAL_WORKFLOW_UNAVAILABLE)
 
 
 def cancellation_case(runtime):
@@ -562,39 +460,7 @@ def cancellation_case(runtime):
 
 
 def approved_unknown_case(runtime):
-    runtime.start()
-    runtime.initialize()
-    trust = runtime.http(f"/admin/sessions/{runtime.session}/trust", token=runtime.admin_token)[2]
-    proposal = {"session_id": runtime.session, "capability_id": trust["capabilities"][0]["capabilityId"],
-                "request_id": "approved-uncertain", "tool_name": "write_file",
-                "arguments": {"path": "/workspace/uncertain.txt", "content": "approved-before-crash"},
-                "purpose": "Hold a real approved resource reply before kernel completion", "ttl_seconds": 300}
-    created = runtime.http("/admin/approvals", proposal, token=runtime.admin_token)
-    assert created[0] == 201, created
-    approved = runtime.http("/admin/approvals/" + created[2]["record"]["id"] + "/decision",
-                            {"decision": "approved"}, token=runtime.admin_token)
-    assert approved[0] == 200, approved
-    parameters = approved[2]["toolCallParams"]
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        pending = executor.submit(runtime.rpc, "tools/call", parameters)
-        marker = runtime.directory / "resource-replied.json"
-        deadline = time.monotonic() + 20
-        while not marker.exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert marker.exists(), "approved resource did not reach reply barrier"
-        assert runtime.observe("uncertain.txt")["content"] == "approved-before-crash"
-        runtime.stop(kill=True)
-        try:
-            runtime.evidence.append({"lostApprovedResponse": pending.result(timeout=10)})
-        except Exception as error:
-            runtime.evidence.append({"lostApprovedResponseError": type(error).__name__})
-    runtime.observe("uncertain.txt", "independent-approved-after-crash")
-    (runtime.directory / "release").touch()
-    runtime.start()
-    retry = runtime.rpc("tools/call", parameters)[2]
-    assert retry.get("error") or retry.get("result", {}).get("isError"), retry
-    assert outcome(retry).get("outputKind") != "value", retry
-    assert runtime.observe("uncertain.txt")["content"] == "independent-approved-after-crash"
+    raise QualificationUnavailable(APPROVAL_WORKFLOW_UNAVAILABLE)
 
 
 def budget_case(runtime):
@@ -675,8 +541,18 @@ def main():
     unknown = selected - {case[0] for case in cases}
     if unknown:
         parser.error("unknown qualification cases: " + ", ".join(sorted(unknown)))
-    IMAGE = run(["docker", "image", "inspect", "--format", "{{.Id}}", args.image])
-    resource_image = validate_resource_image(IMAGE)
+    # Unavailable-only campaigns do not inspect Docker or execute the candidate.
+    # Keep a retained negative result even on a machine without those runtimes.
+    IMAGE = args.image
+    resource_image = {"status": "not-run", "reason": "selected cases are unavailable"}
+    kernel_version = None
+    os_version, docker_version = sys.platform, None
+    if selected - UNAVAILABLE_APPROVAL_CASES:
+        IMAGE = run(["docker", "image", "inspect", "--format", "{{.Id}}", args.image])
+        resource_image = validate_resource_image(IMAGE)
+        kernel_version = run([str(args.binary), "--version"])
+        os_version = run(["sw_vers"])
+        docker_version = run(["docker", "version", "--format", "{{.Client.Version}}"])
     args.output.mkdir(parents=True, exist_ok=False)
     # Retain the exact tested driver source beside its hashes, so later
     # qualification-runner improvements cannot obscure historical evidence.
@@ -687,10 +563,10 @@ def main():
                 "runnerSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 "barrierSha256": hashlib.sha256(Path(__file__).with_name("stdio_response_barrier.py").read_bytes()).hexdigest(),
                 "binary": str(args.binary), "binarySha256": hashlib.sha256(args.binary.read_bytes()).hexdigest(),
-                "kernelVersion": run([str(args.binary), "--version"]),
-                "image": run(["docker", "image", "inspect", "--format", "{{.Id}}", IMAGE]),
+                "kernelVersion": kernel_version,
+                "image": IMAGE,
                 "resourceImageValidation": resource_image,
-                "os": run(["sw_vers"]), "docker": run(["docker", "version", "--format", "{{.Client.Version}}"]),
+                "os": os_version, "docker": docker_version,
                 "claim": "shared kernel qualification only, no host acceptance", "cases": []}
     for name, function, options in cases:
         if name not in selected:
@@ -698,9 +574,13 @@ def main():
         runtime = None
         result = {"case": name, "status": "failed"}
         try:
+            if name in UNAVAILABLE_APPROVAL_CASES:
+                raise QualificationUnavailable(APPROVAL_WORKFLOW_UNAVAILABLE)
             runtime = Runtime(args.binary, args.output / name, **options)
             function(runtime)
             result["status"] = "passed"
+        except QualificationUnavailable as error:
+            result.update(status="unavailable", reason=str(error), dispatchAttempted=False)
         except Exception as error:
             result["error"] = f"{type(error).__name__}: {error}"
         finally:

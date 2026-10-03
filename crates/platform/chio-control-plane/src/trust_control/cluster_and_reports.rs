@@ -25,6 +25,8 @@ mod cluster_and_reports_tests {
     #[path = "structured_authority.rs"]
     mod structured_authority;
 
+    #[path = "authority_lifecycle.rs"]
+    mod authority_lifecycle;
     #[path = "authority_replication.rs"]
     mod authority_replication;
 

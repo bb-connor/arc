@@ -152,6 +152,8 @@ pub struct RemoteServeHttpConfig {
     pub auth_jwt_issuer: Option<String>,
     pub auth_jwt_audience: Option<String>,
     pub admin_token: Option<String>,
+    /// Explicit operator principals and activated native approval replay custody.
+    pub approval: Option<RemoteApprovalConfig>,
     pub control_url: Option<String>,
     pub control_token: Option<String>,
     /// Dedicated trust-control bearer used only for remote capability issuance.
@@ -624,6 +626,7 @@ struct RemoteSession {
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
+    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: AtomicU64,
@@ -664,6 +667,7 @@ struct RemoteSessionInit {
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
+    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: u64,

@@ -297,8 +297,8 @@ class ChioClient:
     timeout:
         Request timeout in seconds (default 5).
     control_token:
-        Optional operator bearer for capability minting only. It is never
-        installed as a shared transport header or sent on evaluation requests.
+        Optional operator bearer for capability minting and approval workflow
+        routes. It is never a shared header or sent on evaluation requests.
     """
 
     DEFAULT_BASE_URL = "http://127.0.0.1:9090"
@@ -626,6 +626,7 @@ class ChioClient:
         request_id: str | None = None,
         governed_intent: dict[str, Any] | None = None,
         approval_token: dict[str, Any] | None = None,
+        approval_id: str | None = None,
         dpop_proof: dict[str, Any] | None = None,
     ) -> dict:
         """Reserve a caller invocation, without authorizing external execution.
@@ -646,12 +647,17 @@ class ChioClient:
         Parameters
         ----------
         request_id:
-            Optional caller-chosen request identifier. Supply it when passing an
-            ``approval_token`` so the token can be bound to this exact request
-            (the kernel requires ``approval_token.request_id == request_id``).
-        governed_intent, approval_token:
-            Forward these for a grant that carries ``GovernedIntentRequired`` or
-            an approval threshold; without them such a grant is denied.
+            Optional caller-chosen request identifier. With ``approval_id``, omit
+            this field or use that same ID; the server owns the approval request.
+        approval_id:
+            Redeem a retained server-built approval against the original signed
+            capability, route and arguments. The server loads its signed token.
+        governed_intent:
+            Governed context for calls without ``approval_id``. Approved calls
+            use the retained intent and reject an additional caller envelope.
+        approval_token:
+            Legacy parameter rejected by the server. Use ``approval_id`` for
+            reservation, then supply the token to authenticated execution start.
         dpop_proof:
             Forward this for a ``dpop_required`` grant; without it the grant is
             denied.
@@ -666,6 +672,8 @@ class ChioClient:
             body["request_id"] = request_id
         if governed_intent is not None:
             body["governed_intent"] = governed_intent
+        if approval_id is not None:
+            body["approval_id"] = approval_id
         if approval_token is not None:
             body["approval_token"] = approval_token
         if dpop_proof is not None:
@@ -833,7 +841,7 @@ class ChioClient:
         ``count`` field is dropped to match the documented signature
         from the chio-hermes integration plan.
         """
-        data = await self._get("/approvals/pending", allow_array=True)
+        data = await self._get("/approvals/pending", allow_array=True, headers=self._approval_headers())
         # The sidecar response is `{"approvals": [...], "count": N}`.
         # Tolerate a bare list response for forward compatibility.
         payload = (
@@ -853,7 +861,7 @@ class ChioClient:
         """
         if not approval_id:
             raise ChioValidationError("approval_id must be a non-empty string")
-        data = await self._get(f"/approvals/{approval_id}")
+        data = await self._get(f"/approvals/{approval_id}", headers=self._approval_headers())
         return Approval.model_validate(data)
 
     async def respond_approval(
@@ -861,24 +869,14 @@ class ChioClient:
         approval_id: str,
         verdict: ApprovalVerdict | str,
         reason: str | None = None,
+        *,
+        signed_token: dict[str, Any] | None = None,
     ) -> ApprovalResponse:
-        """Resolve an approval via the operator-respond shortcut.
+        """Submit an approver-signed token for the server-built pending intent.
 
-        v0.2 manual flow: posts to ``POST /approvals/{id}/operator-respond``
-        which has the sidecar sign a `GovernedApprovalToken` with its
-        own keypair. Use the signed `/respond` route directly when an
-        external approver keypair is required.
-
-        Parameters
-        ----------
-        approval_id:
-            Identifier returned by :meth:`submit_for_approval` or
-            surfaced via :meth:`list_pending_approvals`.
-        verdict:
-            ``"approve"``/``"deny"`` shorthand or a
-            :class:`ApprovalVerdict` enum value.
-        reason:
-            Optional free-form note recorded with the resolution.
+        Sign the pending request's ``parameter_hash`` (the complete intent
+        binding hash) and ``approval_id`` with a configured approver key.
+        A control bearer credential alone cannot approve an invocation.
         """
         if not approval_id:
             raise ChioValidationError("approval_id must be a non-empty string")
@@ -887,80 +885,62 @@ class ChioClient:
             if isinstance(verdict, str)
             else verdict
         )
-        body: dict[str, Any] = {"outcome": normalised.value}
+        from chio_sdk.approval_contract import require_decision
+
+        signed_token = require_decision(signed_token, approval_id, normalised.value)
+        body: dict[str, Any] = {
+            "outcome": normalised.value,
+            "approver": signed_token["approver"],
+            "token": signed_token,
+        }
         if reason is not None:
             body["reason"] = reason
-        data = await self._post(
-            f"/approvals/{approval_id}/operator-respond", body
-        )
+        data = await self._post(f"/approvals/{approval_id}/respond", body, headers=self._approval_headers())
         return ApprovalResponse.model_validate(data)
 
     async def submit_for_approval(
         self,
         *,
-        capability_id: str,
         tool_name: str,
         tool_args: dict[str, Any],
+        capability: CapabilityToken | dict[str, Any] | None = None,
+        capability_id: str | None = None,
         tool_server: str | None = None,
         requested_by: str | None = None,
         ttl_seconds: int = 3600,
         summary: str | None = None,
         triggered_by: list[str] | None = None,
     ) -> str:
-        """Hold a tool call in the sidecar pending human approval.
+        """Submit an exact invocation for approval using its signed capability.
 
-        Posts to ``POST /approvals/submit`` and returns the new
-        ``approval_id``. The parameter hash is derived from the
-        canonical JSON of ``tool_args`` so a later operator-respond
-        binds the signature to the exact arguments the LLM proposed.
+        The server validates the capability and requester, assigns the request
+        ID, and binds canonical arguments, route, tenant and current policy.
+        Read the pending request before signing its complete intent hash; a
+        SHA-256 of arguments alone is not an approval artifact. Redeem the
+        returned ID with ``evaluate_tool_call_mediated(approval_id=...)``.
 
-        Parameters
-        ----------
-        capability_id:
-            Capability the agent presented for the held call.
-        tool_name:
-            Name of the tool being invoked (e.g. ``run_command``).
-        tool_args:
-            Arguments the LLM passed; used for the parameter hash and
-            optional summary text. Must be JSON-serializable.
-        tool_server:
-            Server id (e.g. ``shell``, ``git``); defaults to a best
-            guess from the tool name.
-        requested_by:
-            Hex Ed25519 public key of the agent that initiated the
-            call. When omitted the sidecar records an anonymous
-            subject marker; operator-respond will then fail because there
-            is no parseable subject binding, so set this whenever the
-            call originates from a real agent.
-        ttl_seconds:
-            Approval lifetime; clamped to 3600 by the sidecar.
-        summary:
-            Optional human-friendly summary surfaced in dashboards.
-        triggered_by:
-            Optional list of guard ids that forced the approval.
+        ``capability_id`` is retained only for migration diagnostics and must
+        agree with the full token when supplied. ID-only submissions fail.
+        ``requested_by`` must match the signed capability's subject.
         """
-        if not capability_id:
-            raise ChioValidationError(
-                "capability_id is required to submit an approval"
-            )
+        from chio_sdk.approval_contract import require_capability
+
+        token = require_capability(_jsonable(capability), capability_id, requested_by)
         if not tool_name:
-            raise ChioValidationError(
-                "tool_name is required to submit an approval"
-            )
-        param_hash = _sha256_hex(_canonical_json(tool_args))
+            raise ChioValidationError("tool_name is required to submit an approval")
         body: dict[str, Any] = {
-            "capability_id": capability_id,
+            "capability": token,
             "tool_server": tool_server or _default_tool_server(tool_name),
             "tool_name": tool_name,
-            "parameter_hash": param_hash,
-            "requested_by": requested_by or "",
+            "parameters": tool_args,
+            "requested_by": requested_by,
             "ttl_seconds": ttl_seconds,
         }
         if summary is not None:
             body["summary"] = summary
         if triggered_by:
             body["triggered_by"] = list(triggered_by)
-        data = await self._post("/approvals/submit", body)
+        data = await self._post("/approvals/submit", body, headers=self._approval_headers())
         result = SubmitApprovalResult.model_validate(data)
         return result.approval_id
 
@@ -982,11 +962,15 @@ class ChioClient:
     # Internal HTTP helpers
     # ------------------------------------------------------------------
 
+    def _approval_headers(self) -> dict[str, str] | None:
+        return {"Authorization": f"Bearer {self._control_token}"} if self._control_token else None
+
     async def _get(
-        self, path: str, *, allow_array: bool = False
+        self, path: str, *, allow_array: bool = False,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any] | list[Any]:
         try:
-            resp = await self._http.get(path)
+            resp = await self._http.get(path, headers=headers)
         except httpx.ConnectError as exc:
             raise ChioConnectionError(
                 f"Failed to connect to Chio sidecar at {self._base_url}"

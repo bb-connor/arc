@@ -15,6 +15,9 @@
 //! [`ChioKernel::evaluate_tool_call_with_hitl`](crate::ChioKernel).
 
 mod collector;
+mod tool_context;
+
+pub use tool_context::ToolApprovalContext;
 
 pub use collector::{
     ThresholdApprovalCollectorStatus, ThresholdApprovalProposalCreationContext,
@@ -179,8 +182,15 @@ impl ApprovalToken {
         request: &ApprovalRequest,
         now: u64,
     ) -> Result<GovernedApprovalDecision, KernelError> {
+        if now >= request.expires_at || self.governed_token.expires_at > request.expires_at {
+            return Err(KernelError::ApprovalRejected(
+                "approval request expired or token exceeds its deadline".into(),
+            ));
+        }
         // Binding checks: request_id, intent hash, approver identity.
-        if self.governed_token.request_id != request.approval_id {
+        if self.approval_id != request.approval_id
+            || self.governed_token.request_id != request.approval_id
+        {
             return Err(KernelError::ApprovalRejected(
                 "approval token bound to a different request".into(),
             ));
@@ -549,6 +559,12 @@ pub struct ResolvedApproval {
     pub resolved_at: u64,
     pub approver_hex: String,
     pub token_id: String,
+    /// Original request and signed decision. Legacy audit-only resolutions may
+    /// omit these, in which case they cannot authorize a new execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<ApprovalRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<GovernedApprovalToken>,
 }
 
 /// Persistent store for pending and resolved HITL approvals. The trait
@@ -1182,9 +1198,21 @@ impl ApprovalStore for InMemoryApprovalStore {
             .pending
             .write()
             .map_err(|_| ApprovalStoreError::Backend("pending map poisoned".into()))?;
-        let Some(pending) = pending_guard.remove(id) else {
+        let Some(pending) = pending_guard.get(id).cloned() else {
             return Err(ApprovalStoreError::NotFound(id.to_string()));
         };
+
+        let verified = ApprovalToken::from_decision(decision)
+            .verify_against(&pending, decision.received_at)
+            .map_err(|error| ApprovalStoreError::Invalid(error.to_string()))?;
+        if matches!(verified, GovernedApprovalDecision::Approved)
+            != (decision.outcome == ApprovalOutcome::Approved)
+        {
+            return Err(ApprovalStoreError::Invalid(
+                "signed decision disagrees with resolution".into(),
+            ));
+        }
+        pending_guard.remove(id);
 
         {
             let mut consumed = self
@@ -1216,6 +1244,8 @@ impl ApprovalStore for InMemoryApprovalStore {
                 resolved_at: decision.received_at,
                 approver_hex: decision.approver.to_hex(),
                 token_id: decision.token.id.clone(),
+                request: Some(pending.clone()),
+                token: Some(decision.token.clone()),
             },
         );
 

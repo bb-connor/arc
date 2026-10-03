@@ -68,9 +68,11 @@ pub(super) struct HostKeyring {
 
 impl HostKeyring {
     pub fn authority(&self) -> Result<Box<dyn chio_kernel::CapabilityAuthority>, CliError> {
+        self.runtime.capability_verification_state()?;
+        let runtime = self.runtime.clone();
         Ok(Box::new(ParentAuthority {
             inner: self.runtime.capability_authority()?,
-            verification_keys: self.runtime.authority_status()?.witnessed_verification_keys,
+            live_key_log: Box::new(move || runtime.capability_verification_state()),
         }))
     }
 
@@ -134,9 +136,18 @@ impl HostKeyring {
     }
 }
 
+type LiveKeyLog = dyn Fn() -> Result<
+        (
+            chio_security_types::clock::UnixMillis,
+            chio_keyring::KeyLogState,
+        ),
+        CliError,
+    > + Send
+    + Sync;
+
 struct ParentAuthority {
     inner: chio_kernel::GovernedCapabilityAuthority,
-    verification_keys: Vec<chio_core_types::PublicKey>,
+    live_key_log: Box<LiveKeyLog>,
 }
 
 impl chio_kernel::CapabilityAuthority for ParentAuthority {
@@ -145,7 +156,43 @@ impl chio_kernel::CapabilityAuthority for ParentAuthority {
     }
 
     fn trusted_public_keys(&self) -> Vec<chio_core_types::PublicKey> {
-        self.verification_keys.clone()
+        match (self.live_key_log)() {
+            Ok((now, state)) => state
+                .witnessed_verification_keys_at(now.get())
+                .into_iter()
+                .map(|record| record.public_key)
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &chio_core_types::PublicKey,
+        issued_at: u64,
+        _now: u64,
+    ) -> Result<(), chio_kernel::KernelError> {
+        let (now, state) = (self.live_key_log)().map_err(|error| {
+            chio_kernel::KernelError::CapabilityIssuanceFailed(format!(
+                "current witnessed issuer authority unavailable: {error}"
+            ))
+        })?;
+        let permitted = state
+            .witnessed_verification_keys_at(now.get())
+            .into_iter()
+            .any(|key| {
+                key.public_key == *issuer
+                && issued_at >= key.activated_at / 1_000
+                && issued_at <= now.as_secs()
+                // A whole-second token cannot prove that it preceded a cutoff
+                // inside the same second. Require issuance before that second.
+                && key.deactivated_at.is_none_or(|cutoff| issued_at < cutoff / 1_000)
+            });
+        if permitted {
+            Ok(())
+        } else {
+            Err(chio_kernel::KernelError::UntrustedIssuer)
+        }
     }
 
     fn issue_capability(
@@ -208,3 +255,7 @@ impl Evidence {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "keyring/live_tests.rs"]
+mod live_tests;

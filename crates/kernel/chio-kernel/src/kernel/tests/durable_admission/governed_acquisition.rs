@@ -210,7 +210,7 @@ fn fixture(
             Arc::new(Source(source)),
         )
         .expect("configured test port");
-    let intent = chio_core::capability::governance::GovernedTransactionIntent {
+    let mut intent = chio_core::capability::governance::GovernedTransactionIntent {
         id: request.request_id.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -224,6 +224,13 @@ fn fixture(
         context: None,
         body: Default::default(),
     };
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
+    );
     request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,
         &request.capability.subject,
@@ -395,7 +402,11 @@ fn foreign_prepared_kernel_cannot_claim_another_kernels_operation() {
     let (kernel, request, store, _) = fixture(Mode::Normal);
     let mut other_config = make_config();
     other_config.keypair = kernel.config.keypair.clone();
-    let other = ChioKernel::new_with_clock(other_config, chio_test_support::clock::clock());
+    other_config.policy_hash = kernel.config.policy_hash.clone();
+    let mut other = ChioKernel::new_with_clock(other_config, chio_test_support::clock::clock());
+    assert!(other
+        .set_governed_approval_policy("dispatch-fixture-tenant".into(), vec![kernel.public_key()],)
+        .is_ok());
     let prepared = other
         .prepare_dispatch_credentials(
             &request,
@@ -404,7 +415,7 @@ fn foreign_prepared_kernel_cannot_claim_another_kernels_operation() {
             current_unix_timestamp(),
             false,
         )
-        .expect("same signer validates on other kernel");
+        .expect("same signer and explicit approval policy validate on other kernel");
     let mut admission = begin(&kernel, &request);
     let original = admission.operation().clone();
     assert!(kernel

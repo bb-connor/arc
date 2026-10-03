@@ -72,7 +72,13 @@ impl Fixture {
             },
             issuer.as_ref(),
         )?;
-        let intent = GovernedTransactionIntent {
+        let mut request = make_request(
+            "threshold-floor-request",
+            &capability,
+            "transfer",
+            "threshold-server",
+        );
+        let mut intent = GovernedTransactionIntent {
             id: "threshold-floor-intent".into(),
             server_id: "threshold-server".into(),
             tool_name: "transfer".into(),
@@ -86,6 +92,14 @@ impl Fixture {
             context: None,
             body: Default::default(),
         };
+        crate::approval::ToolApprovalContext::bind(
+            &mut intent,
+            &capability,
+            &request.arguments,
+            &request.request_id,
+            kernel.policy_hash(),
+            "threshold-crypto-floor-test",
+        )?;
         let intent_hash = intent.binding_hash()?;
         let proposal = ThresholdApprovalProposal::sign_with_backend(
             ThresholdApprovalProposalBody {
@@ -118,12 +132,6 @@ impl Fixture {
             },
             approver.as_ref(),
         )?;
-        let mut request = make_request(
-            "threshold-floor-request",
-            &capability,
-            "transfer",
-            "threshold-server",
-        );
         request.governed_intent = Some(intent);
         request.threshold_approval_proposal = Some(proposal);
         request.approval_tokens = vec![token];

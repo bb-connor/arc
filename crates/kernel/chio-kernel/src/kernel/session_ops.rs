@@ -6,12 +6,16 @@ use dashmap::mapref::entry::Entry;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
-use crate::session::{SessionAnchorSnapshot, SessionRequestStart};
+use crate::session::{PendingThresholdApproval, SessionAnchorSnapshot, SessionRequestStart};
+use chio_core::capability::governance::GovernedTransactionIntent;
 
 use super::*;
 
 #[path = "session_ops/threshold_continuation.rs"]
 mod threshold_continuation;
+
+#[path = "session_ops/threshold_binding.rs"]
+mod threshold_binding;
 
 #[path = "session_ops/reports.rs"]
 mod reports;
@@ -419,9 +423,9 @@ impl ChioKernel {
         context: &OperationContext,
         operation: &ToolCallOperation,
         execution_nonce: Option<&crate::execution_nonce::SignedExecutionNonce>,
-    ) -> Result<(), KernelError> {
-        if self.resume_pending_threshold_request(context, operation)? {
-            return Ok(());
+    ) -> Result<Option<PendingThresholdApproval>, KernelError> {
+        if let Some(retained) = self.resume_pending_threshold_request(context, operation)? {
+            return Ok(Some(retained));
         }
         if let Some(nonce) = execution_nonce
             .filter(|nonce| nonce.nonce.bound_to.request_id == context.request_id.as_str())
@@ -445,10 +449,11 @@ impl ChioKernel {
                 Ok(false)
             })?;
             if resumed {
-                return Ok(());
+                return Ok(None);
             }
         }
-        self.begin_session_request(context, OperationKind::ToolCall, true)
+        self.begin_session_request(context, OperationKind::ToolCall, true)?;
+        Ok(None)
     }
 
     fn finish_session_tool_request(
@@ -456,10 +461,11 @@ impl ChioKernel {
         context: &OperationContext,
         operation: Option<&ToolCallOperation>,
         response: Option<&ToolCallResponse>,
+        bound_intent: Option<&GovernedTransactionIntent>,
         terminal_state: OperationTerminalState,
     ) -> Result<(), KernelError> {
         if let (Some(operation), Some(response)) = (operation, response) {
-            if self.retain_pending_threshold_request(context, operation, response)? {
+            if self.retain_pending_threshold_request(context, operation, response, bound_intent)? {
                 return Ok(());
             }
         }
@@ -739,9 +745,11 @@ impl ChioKernel {
             _ => None,
         };
 
+        let mut retained_threshold = None;
+        let mut bound_threshold_intent = None;
         if should_track_inflight {
             if let SessionOperation::ToolCall(tool_call) = operation {
-                self.begin_or_resume_tool_request(
+                retained_threshold = self.begin_or_resume_tool_request(
                     context,
                     tool_call,
                     parsed_tool_call_execution_nonce.as_ref(),
@@ -759,7 +767,7 @@ impl ChioKernel {
 
         let evaluation = match operation {
             SessionOperation::ToolCall(tool_call) => {
-                let request = ToolCallRequest {
+                let mut request = ToolCallRequest {
                     request_id: context.request_id.to_string(),
                     capability: tool_call.capability.clone(),
                     tool_name: tool_call.tool_name.clone(),
@@ -777,22 +785,26 @@ impl ChioKernel {
                     federated_origin_kernel_id: None,
                     declassification_grant: None,
                 };
-                let session_roots =
-                    self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
-                let security_context =
-                    self.resolve_security_invocation_context(context, tool_call)?;
+                self.prepare_session_threshold_intent(context, &mut request, retained_threshold)
+                    .and_then(|()| {
+                        bound_threshold_intent = request.governed_intent.clone();
+                        let session_roots = self
+                            .session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
+                        let security_context =
+                            self.resolve_security_invocation_context(context, tool_call)?;
 
-                // Pass the session_id so the evaluate path can resolve
-                // tenant_id from session.auth_context for every receipt
-                // signed during this tool call.
-                self.evaluate_tool_call_sync_with_session_and_security_context(
-                    &request,
-                    Some(session_roots.as_slice()),
-                    tool_call.extra_metadata.clone(),
-                    Some(&context.session_id),
-                    security_context.as_ref(),
-                )
-                .map(SessionOperationResponse::ToolCall)
+                        // Pass the session_id so the evaluate path can resolve
+                        // tenant_id from session.auth_context for every receipt
+                        // signed during this tool call.
+                        self.evaluate_tool_call_sync_with_session_and_security_context(
+                            &request,
+                            Some(session_roots.as_slice()),
+                            tool_call.extra_metadata.clone(),
+                            Some(&context.session_id),
+                            security_context.as_ref(),
+                        )
+                        .map(SessionOperationResponse::ToolCall)
+                    })
             }
             SessionOperation::CreateMessage(_) => Err(KernelError::Internal(
                 "sampling/createMessage must be evaluated by an MCP edge with a client transport"
@@ -858,7 +870,13 @@ impl ChioKernel {
                 SessionOperation::ToolCall(tool_call) => Some(tool_call.as_ref()),
                 _ => None,
             };
-            self.finish_session_tool_request(context, tool_call, response, terminal_state)?;
+            self.finish_session_tool_request(
+                context,
+                tool_call,
+                response,
+                bound_threshold_intent.as_ref(),
+                terminal_state,
+            )?;
         }
 
         evaluation

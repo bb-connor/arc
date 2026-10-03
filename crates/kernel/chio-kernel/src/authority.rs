@@ -12,6 +12,7 @@ use crate::KernelError;
 use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
 use chio_security_types::PrincipalId;
 
+pub mod lifecycle;
 pub mod replication;
 
 mod aggregate;
@@ -308,6 +309,17 @@ pub trait CapabilityAuthority: Send + Sync {
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
         vec![self.authority_public_key()]
+    }
+
+    /// Enforce managed issuer lifetimes in addition to the kernel trust-set check.
+    /// Unknown static pins may be handled by kernel configuration; this hook never grants trust.
+    fn check_issuer_lifecycle(
+        &self,
+        _issuer: &PublicKey,
+        _issued_at: u64,
+        _now: u64,
+    ) -> Result<(), KernelError> {
+        Ok(())
     }
 
     fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {
@@ -1133,6 +1145,7 @@ mod tests {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityStatus {
+    pub issuer_state: AuthoritySnapshot,
     pub public_key: PublicKey,
     pub generation: u64,
     pub rotated_at: u64,
@@ -1145,6 +1158,8 @@ pub struct AuthorityTrustedKeySnapshot {
     pub public_key_hex: String,
     pub generation: u64,
     pub activated_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifecycle: Option<lifecycle::AuthorityKeyLifecycle>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

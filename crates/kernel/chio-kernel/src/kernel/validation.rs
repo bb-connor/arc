@@ -30,6 +30,8 @@ mod caller_budget;
 mod cumulative;
 #[path = "validation/issuance.rs"]
 mod issuance;
+#[path = "validation/issuer_trust.rs"]
+mod issuer_trust;
 #[path = "validation/lineage.rs"]
 mod lineage;
 #[path = "validation/portable.rs"]
@@ -314,33 +316,6 @@ impl ChioKernel {
         self.capability_crypto_floor = floor;
     }
 
-    pub fn capability_issuer_is_trusted(&self, issuer: &chio_core::PublicKey) -> bool {
-        self.trusted_issuer_keys().contains(issuer)
-    }
-
-    /// Verify the capability's signature against the trusted CA keys or the
-    /// kernel's own key (for locally-issued capabilities).
-    /// Resolve the trusted-issuer set for capability verification.
-    ///
-    /// This combines the configured CA public keys, the capability
-    /// authority's trusted keys, and the kernel's own public key. The
-    /// method is also used by the chio-kernel-core delegation path
-    /// so the portable TCB verifier sees the same trust set as the
-    /// inline check.
-    pub(crate) fn trusted_issuer_keys(&self) -> Vec<chio_core::PublicKey> {
-        let mut trusted = self.config.ca_public_keys.clone();
-        for authority_pk in self.capability_authority.trusted_public_keys() {
-            if !trusted.contains(&authority_pk) {
-                trusted.push(authority_pk);
-            }
-        }
-        let kernel_pk = self.config.keypair.public_key();
-        if !trusted.contains(&kernel_pk) {
-            trusted.push(kernel_pk);
-        }
-        trusted
-    }
-
     /// Spec: PROTOCOL.md requires production kernels to route every
     /// capability admission through `verify_capability_full`; this wrapper
     /// is the kernel-side enforcement of that MUST.
@@ -350,6 +325,7 @@ impl ChioKernel {
         remote_kernel_id: Option<&str>,
         now: u64,
     ) -> Result<(), String> {
+        self.check_capability_issuer_lifecycle(cap, now)?;
         let trusted = self.trusted_issuer_keys();
         let clock = chio_kernel_core::FixedClock::new(now);
         let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;

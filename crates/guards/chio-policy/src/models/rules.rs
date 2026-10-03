@@ -340,11 +340,23 @@ pub struct HumanInLoopRule {
     /// `Constraint::RequireApprovalAbove { threshold_units }`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approve_above: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub approve_above_currency: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub timeout_seconds: Option<u64>,
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing,
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub on_timeout: HumanInLoopTimeoutAction,
 }
 

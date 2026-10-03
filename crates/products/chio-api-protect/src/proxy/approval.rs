@@ -1,11 +1,5 @@
 use super::*;
 
-fn approval_timestamp(seconds: i64) -> Result<u64, ApprovalHandlerError> {
-    u64::try_from(seconds).map_err(|_| {
-        ApprovalHandlerError::Internal("approval clock precedes the Unix epoch".to_string())
-    })
-}
-
 pub(crate) async fn list_pending_approvals_handler(
     State(state): State<Arc<ProxyState>>,
     Query(query): Query<PendingQuery>,
@@ -29,21 +23,24 @@ pub(crate) async fn get_approval_handler(
 pub(crate) async fn respond_approval_handler(
     State(state): State<Arc<ProxyState>>,
     Path(approval_id): Path<String>,
-    body: Result<Json<RespondRequest>, axum::extract::rejection::JsonRejection>,
+    request: Request<Body>,
 ) -> Response {
-    let Json(body) = match body {
+    let body: RespondRequest = match read_body(request, input::decode).await {
         Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid approval response payload: {error}"
-            )));
-        }
+        Err(response) => return response,
     };
 
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let now = match state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))
+    {
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
+    if let Err(error) = require_current_approver(&state, &approval_id, &body.approver).await {
+        return approval_error_response(error);
+    }
     match handle_respond(&state.approval_admin, &approval_id, body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -52,21 +49,28 @@ pub(crate) async fn respond_approval_handler(
 
 pub(crate) async fn batch_respond_approvals_handler(
     State(state): State<Arc<ProxyState>>,
-    body: Result<Json<BatchRespondRequest>, axum::extract::rejection::JsonRejection>,
+    request: Request<Body>,
 ) -> Response {
-    let Json(body) = match body {
+    let body: BatchRespondRequest = match read_body(request, input::decode).await {
         Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid batch approval payload: {error}"
-            )));
-        }
+        Err(response) => return response,
     };
 
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let now = match state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))
+    {
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
+    for entry in &body.decisions {
+        if let Err(error) =
+            require_current_approver(&state, &entry.approval_id, &entry.approver).await
+        {
+            return approval_error_response(error);
+        }
+    }
     match handle_batch_respond(&state.approval_admin, body, now) {
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
@@ -85,7 +89,11 @@ pub(crate) async fn create_threshold_proposal_handler(
             )));
         }
     };
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let now = match state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))
+    {
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
@@ -99,7 +107,11 @@ pub(crate) async fn get_threshold_proposal_handler(
     State(state): State<Arc<ProxyState>>,
     Path(proposal_id): Path<String>,
 ) -> Response {
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let now = match state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))
+    {
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
@@ -122,7 +134,11 @@ pub(crate) async fn submit_threshold_approval_handler(
             )));
         }
     };
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let now = match state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))
+    {
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
@@ -136,7 +152,11 @@ pub(crate) async fn deliver_threshold_approval_handler(
     State(state): State<Arc<ProxyState>>,
     Path(proposal_id): Path<String>,
 ) -> Response {
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let now = match state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))
+    {
         Ok(now) => now,
         Err(error) => return approval_error_response(error),
     };
@@ -146,35 +166,23 @@ pub(crate) async fn deliver_threshold_approval_handler(
     }
 }
 
-/// Body for `POST /approvals/submit`. Operator-friendly shape: the
-/// caller hands the sidecar enough context to record a pending request
-/// and the sidecar materializes the full `ApprovalRequest`, signing on
-/// behalf of itself as the trusted approver. Manual flow only: the held call is not auto-resumed.
+/// The server owns request identity and computes the complete intent binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SubmitApprovalRequest {
-    capability_id: String,
+    capability: CapabilityToken,
     tool_server: String,
     tool_name: String,
-    /// Hex SHA-256 of canonical-JSON tool args. The operator-respond
-    /// shortcut binds the synthesized token to this hash.
-    parameter_hash: String,
-    /// Hex Ed25519 public key of the agent that initiated the held call.
+    parameters: serde_json::Value,
     requested_by: String,
-    /// Optional human-readable summary surfaced in dashboards.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     summary: Option<String>,
-    /// Optional policy id; defaults to "policy-hermes-hitl".
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    policy_id: Option<String>,
-    /// TTL in seconds; clamped to MAX_APPROVAL_TTL_SECS (3600) downstream.
     #[serde(default)]
     ttl_seconds: u64,
-    /// Free-form short verb for human summaries.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    action: Option<String>,
-    /// Reason the call was held (e.g. "shell.requires_approval").
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     triggered_by: Vec<String>,
+    #[serde(default)]
+    governed_intent: Option<chio_core_types::capability::governance::GovernedTransactionIntent>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -187,185 +195,243 @@ pub(crate) struct SubmitApprovalResponse {
 
 pub(crate) async fn submit_approval_handler(
     State(state): State<Arc<ProxyState>>,
-    body: Result<Json<SubmitApprovalRequest>, axum::extract::rejection::JsonRejection>,
+    request: Request<Body>,
 ) -> Response {
-    let Json(body) = match body {
+    let body: SubmitApprovalRequest = match read_body(request, input::decode_arguments).await {
         Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid approval submit payload: {error}"
-            )));
+        Err(response) => return response,
+    };
+    let subject = match PublicKey::from_hex(&body.requested_by) {
+        Ok(subject) if subject == body.capability.subject => subject,
+        _ => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(
+                "requested_by must be the capability subject public key".into(),
+            ))
         }
     };
-
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
+    let Some(config) = &state.approval_config else {
+        return approval_error_response(ApprovalHandlerError::Rejected(
+            "approval authority is not configured".into(),
+        ));
+    };
+    let Some(kernel) = &state.mediation_kernel else {
+        return approval_error_response(ApprovalHandlerError::Rejected(
+            "approval admission is unavailable".into(),
+        ));
+    };
+    if state.capability_is_revoked(&body.capability.id).await {
+        return approval_error_response(ApprovalHandlerError::Rejected(
+            "approval capability is revoked".into(),
+        ));
+    }
+    let approval_id = format!("ap-{}", uuid::Uuid::now_v7());
+    let request = chio_kernel::ToolCallRequest {
+        request_id: approval_id.clone(),
+        capability: body.capability,
+        server_id: body.tool_server,
+        tool_name: body.tool_name,
+        arguments: body.parameters,
+        agent_id: subject.to_hex(),
+        governed_intent: body.governed_intent,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        dpop_proof: None,
+        execution_nonce: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let kernel = kernel.lock().await;
+    let intent = match kernel.bind_tool_approval_intent(&request) {
+        Ok(intent) => intent,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
+        }
+    };
+    let now = match state.clock.seconds() {
         Ok(now) => now,
-        Err(error) => return approval_error_response(error),
+        Err(error) => return clock::rejection(error),
     };
     let ttl = if body.ttl_seconds == 0 {
         3600
     } else {
         body.ttl_seconds.min(3600)
     };
-    let approval_id = format!("ap-{}", uuid::Uuid::now_v7());
-    let approver_pubkey = state.signer_keypair.public_key();
-    // When the caller does not supply a parseable subject pubkey we
-    // synthesize the binding using the sidecar's own pubkey so the
-    // operator-respond shortcut can sign a token whose subject still
-    // matches the request. Production agents should always pass their
-    // own hex-encoded Ed25519 pubkey via `requested_by`.
-    let parsed_subject = PublicKey::from_hex(&body.requested_by).ok();
-    let stored_subject_id = if parsed_subject.is_some() {
-        body.requested_by.clone()
-    } else {
-        approver_pubkey.to_hex()
+    let expires_at = now.saturating_add(ttl).min(request.capability.expires_at);
+    let parameter_hash = match intent.binding_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::Rejected(error.to_string()))
+        }
     };
-    let stored_subject_pubkey = parsed_subject
-        .clone()
-        .or_else(|| Some(approver_pubkey.clone()));
     let approval = ApprovalRequest {
         approval_id: approval_id.clone(),
-        policy_id: body
-            .policy_id
-            .unwrap_or_else(|| "policy-hermes-hitl".to_string()),
-        subject_id: stored_subject_id,
-        capability_id: body.capability_id.clone(),
-        subject_public_key: stored_subject_pubkey,
-        tool_server: body.tool_server.clone(),
-        tool_name: body.tool_name.clone(),
-        action: body.action.unwrap_or_else(|| "invoke".to_string()),
-        parameter_hash: body.parameter_hash.clone(),
-        expires_at: now.saturating_add(ttl),
-        callback_hint: None,
+        policy_id: kernel.policy_hash().to_owned(),
+        subject_id: request.agent_id,
+        capability_id: request.capability.id,
+        subject_public_key: Some(subject),
+        tool_server: request.server_id,
+        tool_name: request.tool_name,
+        action: "invoke".into(),
+        parameter_hash,
+        expires_at,
         created_at: now,
+        callback_hint: None,
         summary: body
             .summary
-            .unwrap_or_else(|| format!("{}/{}", body.tool_server, body.tool_name)),
-        governed_intent: None,
-        trusted_approvers: vec![approver_pubkey.clone()],
+            .unwrap_or_else(|| "exact tool invocation".into()),
+        governed_intent: Some(intent),
+        trusted_approvers: config.approvers.clone(),
         triggered_by: body.triggered_by,
     };
-
     if let Err(error) = state.approval_admin.store().store_pending(&approval) {
-        let handler_err: ApprovalHandlerError = error.into();
-        return approval_error_response(handler_err);
+        return approval_error_response(error.into());
     }
-
-    let response = SubmitApprovalResponse {
-        approval_id,
-        expires_at: approval.expires_at,
-        created_at: approval.created_at,
-        trusted_approvers: vec![approver_pubkey.to_hex()],
-    };
-    approval_json(StatusCode::CREATED, response)
+    approval_json(
+        StatusCode::CREATED,
+        SubmitApprovalResponse {
+            approval_id,
+            expires_at,
+            created_at: now,
+            trusted_approvers: config.approvers.iter().map(PublicKey::to_hex).collect(),
+        },
+    )
 }
 
-/// Body for `POST /approvals/{id}/operator-respond`. The sidecar signs
-/// the GovernedApprovalToken using its own keypair, which must already
-/// be registered as a trusted approver on the request (the case for
-/// approvals created via `/approvals/submit`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct OperatorRespondRequest {
-    outcome: ApprovalOutcome,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    reason: Option<String>,
-}
-
+/// The compatibility route requires the same signer-authenticated response.
+/// A bearer credential alone never authorizes the sidecar to mint approval.
 pub(crate) async fn operator_respond_approval_handler(
-    State(state): State<Arc<ProxyState>>,
-    Path(approval_id): Path<String>,
-    body: Result<Json<OperatorRespondRequest>, axum::extract::rejection::JsonRejection>,
+    state: State<Arc<ProxyState>>,
+    path: Path<String>,
+    request: Request<Body>,
 ) -> Response {
-    let Json(body) = match body {
-        Ok(body) => body,
-        Err(error) => {
-            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
-                "invalid operator approval payload: {error}"
-            )));
-        }
-    };
+    respond_approval_handler(state, path, request).await
+}
 
-    let pending = match state.approval_admin.store().get_pending(&approval_id) {
-        Ok(Some(request)) => request,
-        Ok(None) => {
-            return approval_error_response(ApprovalHandlerError::NotFound(approval_id));
-        }
-        Err(error) => {
-            return approval_error_response(error.into());
-        }
-    };
-
-    let approver_pubkey = state.signer_keypair.public_key();
-    if !pending.trusted_approvers.contains(&approver_pubkey) {
-        return approval_error_response(ApprovalHandlerError::Rejected(
-            "sidecar signer is not a trusted approver for this request".into(),
+async fn require_current_approver(
+    state: &ProxyState,
+    approval_id: &str,
+    approver: &PublicKey,
+) -> Result<(), ApprovalHandlerError> {
+    let config = state.approval_config.as_ref().ok_or_else(|| {
+        ApprovalHandlerError::Rejected("approval authority is not configured".into())
+    })?;
+    if !config.approvers.contains(approver) {
+        return Err(ApprovalHandlerError::Rejected(
+            "approval signer is not in configured roster".into(),
         ));
     }
-
-    // Subject pubkey: prefer the explicit binding on the request,
-    // then try to parse subject_id as hex, and finally fall back to
-    // the sidecar's own pubkey. The fallback keeps the operator path
-    // useful for callers (chio-hermes v0.2) that submit holds without
-    // a per-agent Ed25519 keypair; the resulting token is still bound
-    // to the request_id and parameter_hash, so the audit trail records
-    // exactly which call was approved even when the subject identity
-    // is synthetic.
-    let subject_pubkey = pending
-        .subject_public_key
-        .clone()
-        .or_else(|| PublicKey::from_hex(&pending.subject_id).ok())
-        .unwrap_or_else(|| approver_pubkey.clone());
-
-    let now = match approval_timestamp(chrono::Utc::now().timestamp()) {
-        Ok(now) => now,
-        Err(error) => return approval_error_response(error),
-    };
-    let decision = match body.outcome {
-        ApprovalOutcome::Approved => GovernedApprovalDecision::Approved,
-        ApprovalOutcome::Denied => GovernedApprovalDecision::Denied,
-    };
-    let token_body = GovernedApprovalTokenBody {
-        id: format!("op-tok-{}", uuid::Uuid::now_v7()),
-        approver: approver_pubkey.clone(),
-        subject: subject_pubkey,
-        governed_intent_hash: pending.parameter_hash.clone(),
-        request_id: approval_id.clone(),
-        threshold_proposal_hash: None,
-        issued_at: now,
-        expires_at: now.saturating_add(600),
-        decision,
-    };
-    let token = match GovernedApprovalToken::sign(token_body, &state.signer_keypair) {
-        Ok(token) => token,
-        Err(error) => {
-            return internal_json_error_response(
-                "operator_respond_sign_failed",
-                &format!("failed to sign operator approval token: {error}"),
-            );
-        }
-    };
-
-    let respond_body = RespondRequest {
-        outcome: body.outcome.clone(),
-        reason: body.reason,
-        approver: approver_pubkey,
-        token,
-    };
-
-    match handle_respond(&state.approval_admin, &approval_id, respond_body, now) {
-        Ok(response) => approval_json(StatusCode::OK, response),
-        Err(error) => approval_error_response(error),
+    let pending = state
+        .approval_admin
+        .store()
+        .get_pending(approval_id)?
+        .ok_or_else(|| ApprovalHandlerError::NotFound(approval_id.into()))?;
+    let kernel = state
+        .mediation_kernel
+        .as_ref()
+        .ok_or_else(|| ApprovalHandlerError::Rejected("approval admission is unavailable".into()))?
+        .lock()
+        .await;
+    let context = pending
+        .governed_intent
+        .as_ref()
+        .and_then(|intent| intent.context.as_ref())
+        .and_then(|value| value.get("chio_tool_approval"))
+        .ok_or_else(|| {
+            ApprovalHandlerError::Rejected("approval is missing its authority context".into())
+        })?;
+    if pending.policy_id != kernel.policy_hash()
+        || context["tenant_id"] != config.tenant_id
+        || context["policy_hash"] != kernel.policy_hash()
+    {
+        return Err(ApprovalHandlerError::Rejected(
+            "approval policy or tenant changed".into(),
+        ));
     }
+    if state.capability_is_revoked(&pending.capability_id).await {
+        return Err(ApprovalHandlerError::Rejected(
+            "approval capability is revoked".into(),
+        ));
+    }
+    Ok(())
 }
 
-#[cfg(test)]
-mod clock_tests {
-    use super::approval_timestamp;
-
-    #[test]
-    fn approval_clock_rejects_pre_epoch_timestamps() {
-        assert!(approval_timestamp(-1).is_err());
-        assert!(matches!(approval_timestamp(0), Ok(0)));
-        assert!(matches!(approval_timestamp(123), Ok(123)));
+pub(super) fn redeem_approval(
+    state: &ProxyState,
+    kernel: &chio_kernel::ChioKernel,
+    request: &mut chio_kernel::ToolCallRequest,
+    approval_id: &str,
+) -> Result<(), ApprovalHandlerError> {
+    let resolved = state
+        .approval_admin
+        .store()
+        .get_resolution(approval_id)?
+        .ok_or_else(|| ApprovalHandlerError::Rejected("approval is not resolved".into()))?;
+    if resolved.outcome != ApprovalOutcome::Approved {
+        return Err(ApprovalHandlerError::Rejected("approval was denied".into()));
     }
+    let pending = resolved.request.ok_or_else(|| {
+        ApprovalHandlerError::Rejected("legacy approval has no retained intent".into())
+    })?;
+    let token = resolved.token.ok_or_else(|| {
+        ApprovalHandlerError::Rejected("approval has no retained signed decision".into())
+    })?;
+    if request.request_id != pending.approval_id
+        || request.capability.id != pending.capability_id
+        || request.server_id != pending.tool_server
+        || request.tool_name != pending.tool_name
+        || request.agent_id != pending.subject_id
+        || pending.policy_id != kernel.policy_hash()
+    {
+        return Err(ApprovalHandlerError::Rejected(
+            "approval does not bind this request, capability, route or policy".into(),
+        ));
+    }
+    let now = state
+        .clock
+        .seconds()
+        .map_err(|error| ApprovalHandlerError::Internal(error.to_string()))?;
+    chio_kernel::ApprovalToken {
+        approval_id: pending.approval_id.clone(),
+        approver: token.approver.clone(),
+        governed_token: token.clone(),
+    }
+    .verify_against(&pending, now)?;
+    request.governed_intent = pending.governed_intent.clone();
+    let current = kernel
+        .bind_tool_approval_intent(request)
+        .map_err(|error| ApprovalHandlerError::Rejected(error.to_string()))?;
+    if Some(&current) != pending.governed_intent.as_ref() {
+        return Err(ApprovalHandlerError::Rejected(
+            "approval arguments, tenant, policy or capability changed".into(),
+        ));
+    }
+    request.governed_intent = Some(current);
+    request.approval_token = Some(token);
+    Ok(())
+}
+
+async fn read_body<T: serde::de::DeserializeOwned>(
+    request: Request<Body>,
+    decode: impl FnOnce(&[u8], usize) -> Result<T, chio_core_types::canonical::UntrustedJsonError>,
+) -> Result<T, Response> {
+    const LIMIT: usize = 1024 * 1024;
+    let bytes = axum::body::to_bytes(request.into_body(), LIMIT)
+        .await
+        .map_err(|error| {
+            input::with_source(
+                approval_error_response(ApprovalHandlerError::BadRequest(
+                    "approval request exceeds its input bound".into(),
+                )),
+                error,
+            )
+        })?;
+    decode(&bytes, LIMIT).map_err(|error| {
+        input::with_source(
+            approval_error_response(ApprovalHandlerError::BadRequest(error.code().into())),
+            error,
+        )
+    })
 }

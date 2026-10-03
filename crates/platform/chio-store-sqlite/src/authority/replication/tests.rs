@@ -21,7 +21,7 @@ fn clock() -> Arc<TestClock> {
 fn image(
     authority: &SqliteCapabilityAuthority,
 ) -> Result<Vec<(String, String)>, Box<dyn std::error::Error>> {
-    let connection = Connection::open(&authority.path)?;
+    let connection = SqliteCapabilityAuthority::open_connection(&authority.custody)?;
     let mut result = Vec::new();
     for table in [
         "authority_state",
@@ -63,7 +63,7 @@ fn source_pair(
 
 #[test]
 fn honest_rotation_replication_relay_and_restart_preserve_local_custody() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let time = clock();
     let (source, follower, anchor) = source_pair(root.path(), time.clone())?;
     let local_seed = follower.local_keypair()?.seed_hex();
@@ -79,7 +79,8 @@ fn honest_rotation_replication_relay_and_restart_preserve_local_custody() -> Tes
     assert!(follower.current_keypair().is_err());
     assert!(follower.rotate().is_err());
     assert_eq!(follower.signed_snapshot()?, signed);
-    let reopened = SqliteCapabilityAuthority::open_with_clock(&follower.path, time)?;
+    let reopened =
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("follower.db"), time)?;
     assert_eq!(reopened.snapshot()?, source.snapshot()?);
     assert_eq!(reopened.replication_anchor()?, anchor);
     assert!(!reopened.apply_signed_snapshot(&signed)?);
@@ -89,7 +90,7 @@ fn honest_rotation_replication_relay_and_restart_preserve_local_custody() -> Tes
 
 #[test]
 fn network_state_never_bootstraps_or_repins_authority() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let time = clock();
     let source =
         SqliteCapabilityAuthority::open_with_clock(root.path().join("source.db"), time.clone())?;
@@ -115,7 +116,7 @@ fn network_state_never_bootstraps_or_repins_authority() -> TestResult {
 #[test]
 fn unsigned_substituted_stale_conflicting_and_unpinned_state_leave_every_table_unchanged(
 ) -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let (source, follower, _) = source_pair(root.path(), clock())?;
     source.rotate()?;
     let signed = source.signed_snapshot()?;
@@ -147,6 +148,7 @@ fn unsigned_substituted_stale_conflicting_and_unpinned_state_leave_every_table_u
                     public_key_hex: attacker.public_key().to_hex(),
                     generation: 1,
                     activated_at: 99,
+                    lifecycle: None,
                 },
             );
         } else if fault == "head" {
@@ -188,7 +190,7 @@ fn unsigned_substituted_stale_conflicting_and_unpinned_state_leave_every_table_u
 
 #[test]
 fn clock_failure_and_restart_regression_refuse_import_export_and_rotation() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let time = clock();
     let (source, follower, _) = source_pair(root.path(), time.clone())?;
     let snapshot = source.signed_snapshot()?;
@@ -202,23 +204,28 @@ fn clock_failure_and_restart_regression_refuse_import_export_and_rotation() -> T
     assert!(source.rotate().is_err());
     assert_eq!(image(&follower)?, before);
     time.0.store(99_000, Ordering::SeqCst);
-    let reopened = SqliteCapabilityAuthority::open_with_clock(&follower.path, time.clone())?;
     assert!(matches!(
-        reopened.apply_signed_snapshot(&snapshot),
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("follower.db"), time.clone()),
         Err(AuthorityStoreError::Clock(ClockError::WallClockRegression))
     ));
-    assert_eq!(image(&reopened)?, before);
+    assert_eq!(image(&follower)?, before);
     time.0.store(401_000, Ordering::SeqCst);
+    let reopened =
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("follower.db"), time)?;
+    // A successful reopen advances the durable clock floor. The expired import
+    // must preserve that accepted state without changing issuer authority.
+    assert_eq!(reopened.snapshot()?, follower.snapshot()?);
+    let after_reopen = image(&reopened)?;
     assert!(reopened.apply_signed_snapshot(&snapshot).is_err());
-    assert_eq!(image(&reopened)?, before);
+    assert_eq!(image(&reopened)?, after_reopen);
     Ok(())
 }
 
 #[test]
 fn competing_authenticated_successors_have_one_durable_winner() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let time = clock();
-    let (source, follower, anchor) = source_pair(root.path(), time.clone())?;
+    let (source, _follower, anchor) = source_pair(root.path(), time.clone())?;
     let signer = source.current_keypair()?;
     let mut threads = Vec::new();
     let barrier = Arc::new(Barrier::new(3));
@@ -233,7 +240,10 @@ fn competing_authenticated_successors_have_one_durable_winner() -> TestResult {
             &signer,
         )?;
         let snapshot = SignedAuthoritySnapshot::sign(&anchor, vec![transition], 100, &key)?;
-        let handle = SqliteCapabilityAuthority::open_with_clock(&follower.path, time.clone())?;
+        let handle = SqliteCapabilityAuthority::open_with_clock(
+            root.path().join("follower.db"),
+            time.clone(),
+        )?;
         let barrier = barrier.clone();
         threads.push(std::thread::spawn(move || {
             barrier.wait();
@@ -253,7 +263,8 @@ fn competing_authenticated_successors_have_one_durable_winner() -> TestResult {
         }
     }
     assert_eq!((accepted, rejected), (1, 1));
-    let reopened = SqliteCapabilityAuthority::open_with_clock(&follower.path, time)?;
+    let reopened =
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("follower.db"), time)?;
     assert_eq!(reopened.snapshot()?.trusted_keys.len(), 2);
     assert_eq!(reopened.status()?.generation, 2);
     Ok(())
@@ -261,19 +272,19 @@ fn competing_authenticated_successors_have_one_durable_winner() -> TestResult {
 
 #[test]
 fn failed_head_or_replay_write_rolls_back_import_and_rotation() -> TestResult {
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let (source, follower, _) = source_pair(root.path(), clock())?;
     source.rotate()?;
     let snapshot = source.signed_snapshot()?;
     for table in ["authority_state", "authority_replication"] {
-        let connection = Connection::open(&follower.path)?;
+        let connection = SqliteCapabilityAuthority::open_connection(&follower.custody)?;
         connection.execute_batch(&format!("CREATE TRIGGER injected_failure BEFORE UPDATE ON {table} BEGIN SELECT RAISE(ABORT, 'injected failure'); END;"))?;
         let before = image(&follower)?;
         assert!(follower.apply_signed_snapshot(&snapshot).is_err());
         assert_eq!(image(&follower)?, before);
         connection.execute_batch("DROP TRIGGER injected_failure")?;
     }
-    let connection = Connection::open(&source.path)?;
+    let connection = SqliteCapabilityAuthority::open_connection(&source.custody)?;
     connection.execute_batch("CREATE TRIGGER injected_failure BEFORE UPDATE ON authority_state BEGIN SELECT RAISE(ABORT, 'injected failure'); END;")?;
     let before = image(&source)?;
     assert!(source.rotate().is_err());

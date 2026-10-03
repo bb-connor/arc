@@ -73,6 +73,28 @@ The [action inventory](ACTION_INVENTORY.md) describes each enforcement point.
 The legacy `pre_tool_call` plugin is a diagnostic compatibility surface; use
 `chio-hermes-restricted` for this boundary.
 
+### Approval workflow compatibility
+
+The legacy plugin submits approval requests only when it retains the full signed
+capability. `hermes chio issue` stores that token in the private profile cache;
+older ID-only entries fail approval submission. The pending request binds the
+kernel route and complete arguments, and must be reviewed before a configured
+approver signs its intent hash and request ID.
+
+The operator CLI accepts the resulting artifact with
+`hermes chio approvals respond <id> --approve --signed-token-file decision.json`.
+The slash equivalent is `/chio approve <id> '<signed-token-json>' [reason]`.
+Neither interface creates a signer or accepts an unsigned decision. The trusted
+operator CLI can use `CHIO_SIDECAR_CONTROL_TOKEN` for workflow HTTP access; the
+agent runtime does not inherit that bearer into its client. A trusted embedding
+must provide authorized workflow access if it enables submission in this plugin.
+
+Hermes does not yet resume an approved call through the authenticated durable
+caller protocol. Repeating the original command creates a separate request.
+The SDK and API support exact approval-ID redemption, but these compatibility
+and mock tests do not establish live Hermes execution authority or operational
+qualification.
+
 ## Build from source
 
 You need Git, Python 3.11 or later, and uv. The adapter and its Python dependency

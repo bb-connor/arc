@@ -360,7 +360,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 return response;
             }
             if let Err(error) = session.send(message) {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return remote_session_send_error(error);
             }
             return response_with_mode(
                 StatusCode::ACCEPTED.into_response(),
@@ -370,7 +370,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         let mut event_rx = session.subscribe();
         let stream_lock = session.active_request_stream.clone().try_lock_owned().ok();
         if let Err(error) = session.send(message) {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return remote_session_send_error(error);
         }
         let Some(stream_lock) = stream_lock else {
             return response_with_mode(
@@ -449,7 +449,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     };
     if let Err(error) = session.send(message) {
         drop(stream_lock);
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        return remote_session_send_error(error);
     }
 
     let session_for_stream = session.clone();
@@ -550,7 +550,7 @@ async fn handle_initialize_post(
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send(message) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        return remote_session_send_error(error);
     }
 
     let mut buffered_events = Vec::new();
@@ -1324,5 +1324,14 @@ mod http_service_tests {
         assert!(!null_declaration.supports_elicitation);
         assert!(!null_declaration.elicitation_form);
         assert!(!null_declaration.elicitation_url);
+    }
+}
+
+fn remote_session_send_error(error: CliError) -> Response {
+    match error {
+        CliError::Kernel(chio_kernel::KernelError::GovernedTransactionDenied(message)) => {
+            jsonrpc_http_error(StatusCode::FORBIDDEN, -32003, &message)
+        }
+        other => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &other.to_string()),
     }
 }

@@ -2,6 +2,8 @@
 
 use super::*;
 
+#[path = "scope_binding.rs"]
+mod scope_binding;
 #[path = "reports.rs"]
 mod session_reports;
 

@@ -5,6 +5,15 @@ Docker filesystem resource used by the required six-agent program. It is
 shared-contract evidence. It does not qualify any agent host or establish
 I01/I08 installation and release acceptance.
 
+The four approval workflows currently report `unavailable`: this historical
+runner has no integration for an externally provisioned, activated approval
+authority and signer, or the current publisher-signed manifest and admitted
+native cage launch configuration. It does not submit unsigned decisions or
+create an approver. Native Rust MCP approval tests are the current consumer
+acceptance boundary; Docker approval qualification remains outstanding. The
+other historical cases still require their launch configuration to be checked
+against the exact candidate before they can establish current evidence.
+
 Prerequisites are Python 3, Docker, the qualified Chio binary, and the
 `chio-required-agent-filesystem:20260909` image built from the adjacent
 `filesystem/` delivery inputs. The run records the binary SHA-256, declared
@@ -57,20 +66,11 @@ Cases:
   without required approval intent, and rejection of a malformed approval
   token, with no resulting files. Real pending/rejected/approved operator
   workflows remain unresolved by this case.
-- `approval-workflow`: durable operator pending/reject/approve, wrong admin
-  credential rejection, exact arguments, immutable decisions, expiration,
-  record integrity, revoked capability, useful approved execution, and signed
-  outcome replay after restart. See [APPROVALS.md](APPROVALS.md).
-- `approved-unknown-after-dispatch`: a legitimately approved resource effect
-  occurs before the kernel receives its result; restart and retry with the
-  original approved request preserve the effect's unknown outcome and the
-  independent sentinel.
-- `bounded-approval-workflow`: the complete operator workflow using the native
-  `approval-policy.yaml` with a single 64-invocation grant, including direct
-  missing-approval prevention. Every listed tool requires approval in this mode.
-- `approved-grant-budget`: approved write and read share one two-invocation
-  wildcard grant; restart and a new approved token cannot authorize a third
-  effect after the quota is exhausted.
+- `approval-workflow`, `bounded-approval-workflow`, `approved-grant-budget`, and
+  `approved-unknown-after-dispatch`: `unavailable` until the driver is migrated
+  to accept externally provisioned authority, external signed decisions and
+  current authenticated launch inputs. These entries do not create Docker
+  resources or perform dispatch. See [APPROVALS.md](APPROVALS.md).
 - `grant-budget`: one wildcard grant's two-invocation quota spans different
   tools, remains exhausted after restart, and explicitly demonstrates that
   fresh session issuance grants a new quota.
@@ -86,6 +86,12 @@ to the filesystem server and retains the server's actual result; it does not
 invent resource success or a kernel verdict.
 
 ## Interpreting outcomes
+
+`unavailable` means the case was not executed and is not a passing security
+result. Any selected unavailable case makes the runner exit nonzero. Selecting
+only the four unavailable approval cases retains a manifest without executing
+the candidate binary or invoking Docker. Supplying an old binary that accepts
+unsigned decisions does not bypass this gate.
 
 `passed` means the bounded assertions named above passed. All I01-I08 cases
 must still run independently through every required host. These cases do not

@@ -571,7 +571,7 @@ fn make_governed_payment_failure_fixture(
         )]),
         300,
     );
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         &format!("intent-{request_id}"),
         "governed-payment-failure-server",
         "compute",
@@ -579,17 +579,24 @@ fn make_governed_payment_failure_fixture(
         100,
         "USD",
     );
-    let approval_token = make_governed_approval_token(
-        &kernel.config.keypair,
-        &agent.public_key(),
-        &intent,
-        request_id,
-    );
     let mut request = make_request(
         request_id,
         &capability,
         "compute",
         "governed-payment-failure-server",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
+    );
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent.public_key(),
+        &intent,
+        request_id,
     );
     request.governed_intent = Some(intent);
     request.approval_token = Some(approval_token);
@@ -635,17 +642,24 @@ fn make_governed_dispatch_commit_failure_fixture(
         "USD",
     );
     intent.max_amount = None;
-    let approval_token = make_governed_approval_token(
-        &kernel.config.keypair,
-        &agent.public_key(),
-        &intent,
-        request_id,
-    );
     let mut request = make_request(
         request_id,
         &capability,
         "compute",
         "governed-dispatch-failure-server",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
+    );
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent.public_key(),
+        &intent,
+        request_id,
     );
     request.governed_intent = Some(intent);
     request.approval_token = Some(approval_token);

@@ -9,6 +9,7 @@ use chio_security_types::clock::{ClockError, UnixMillis};
 mod persistence;
 pub(super) use persistence::ensure_schema;
 use persistence::*;
+pub(super) use persistence::{persist_snapshot, read_snapshot};
 #[cfg(test)]
 mod tests;
 
@@ -19,10 +20,23 @@ impl SqliteCapabilityAuthority {
         &self,
         stream_id: &str,
     ) -> Result<AuthorityReplicationAnchor, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
+        self.initialize_replication_with_recovery(stream_id, None)
+    }
+
+    pub fn initialize_replication_with_recovery(
+        &self,
+        stream_id: &str,
+        recovery: Option<&PublicKey>,
+    ) -> Result<AuthorityReplicationAnchor, AuthorityStoreError> {
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if let Some(existing) = read_replication(&transaction)? {
-            if existing.anchor.stream_id != stream_id {
+            if existing.anchor.stream_id != stream_id
+                || recovery.is_some_and(|key| {
+                    existing.anchor.recovery_public_key_hex.as_deref()
+                        != Some(key.to_hex().as_str())
+                })
+            {
                 return Err(refused(
                     "authority replication is already pinned to another stream",
                 ));
@@ -40,8 +54,11 @@ impl SqliteCapabilityAuthority {
                 "only the current signing custodian can initialize a stream",
             ));
         }
-        let anchor = AuthorityReplicationAnchor::new(stream_id.into(), state)?;
+        let mut anchor = AuthorityReplicationAnchor::new(stream_id.into(), state)?;
+        anchor.recovery_public_key_hex = recovery.map(PublicKey::to_hex);
+        anchor.validate()?;
         let now = self.clock.unix_millis()?;
+        super::lifecycle::observe_time(&transaction, now)?;
         if now.as_secs() < anchor.snapshot.rotated_at {
             return Err(ClockError::WallClockRegression.into());
         }
@@ -57,7 +74,7 @@ impl SqliteCapabilityAuthority {
         anchor: &AuthorityReplicationAnchor,
     ) -> Result<bool, AuthorityStoreError> {
         anchor.validate()?;
-        let mut connection = Self::open_connection(&self.path)?;
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if let Some(existing) = read_replication(&transaction)? {
             if existing.anchor != *anchor {
@@ -67,6 +84,7 @@ impl SqliteCapabilityAuthority {
             return Ok(false);
         }
         let now = self.clock.unix_millis()?;
+        super::lifecycle::observe_time(&transaction, now)?;
         if now.as_secs() < anchor.snapshot.rotated_at {
             return Err(refused("authority anchor is from the future"));
         }
@@ -75,23 +93,23 @@ impl SqliteCapabilityAuthority {
         let status = Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
         self.update_cached_public_key(status.public_key);
-        self.update_cached_trusted_public_keys(status.trusted_public_keys);
         Ok(true)
     }
 
     pub fn replication_anchor(&self) -> Result<AuthorityReplicationAnchor, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = Self::open_connection(&self.custody)?;
         Ok(require_replication(&connection)?.anchor)
     }
 
     /// Export a fresh head-signed envelope, or relay the exact still-fresh envelope
     /// accepted from the signing custodian. A follower never invents a signature.
     pub fn signed_snapshot(&self) -> Result<SignedAuthoritySnapshot, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let mut replication = require_replication(&transaction)?;
         let current = read_snapshot(&transaction)?;
         let now = self.clock.unix_millis()?;
+        super::lifecycle::observe_time(&transaction, now)?;
         check_clock(&replication, now)?;
         let signer = Self::read_keypair_from_connection(&transaction)?;
         let snapshot = if signer.public_key().to_hex() == current.public_key_hex {
@@ -124,11 +142,12 @@ impl SqliteCapabilityAuthority {
         &self,
         snapshot: &SignedAuthoritySnapshot,
     ) -> Result<bool, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let mut replication = require_replication(&transaction)?;
         let current = read_snapshot(&transaction)?;
         let now = self.clock.unix_millis()?;
+        super::lifecycle::observe_time(&transaction, now)?;
         check_clock(&replication, now)?;
         let proof = snapshot.verify(
             &replication.anchor,
@@ -156,19 +175,28 @@ impl SqliteCapabilityAuthority {
         let status = Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
         self.update_cached_public_key(status.public_key);
-        self.update_cached_trusted_public_keys(status.trusted_public_keys);
         Ok(changed)
     }
 }
 
-pub(super) fn record_rotation(
+pub(super) fn record_lifecycle_change(
     connection: &Connection,
     signer: &Keypair,
     next_key: &PublicKey,
+    change: chio_kernel::authority::lifecycle::AuthorityLifecycleChange,
     now: UnixMillis,
 ) -> Result<(), AuthorityStoreError> {
     let Some(mut replication) = read_replication(connection)? else {
-        return Ok(());
+        return if matches!(
+            change,
+            chio_kernel::authority::lifecycle::AuthorityLifecycleChange::Rotate { .. }
+        ) {
+            Ok(())
+        } else {
+            Err(refused(
+                "lifecycle retirement and recovery require a pinned stream",
+            ))
+        };
     };
     check_clock(&replication, now)?;
     let current = read_snapshot(connection)?;
@@ -178,10 +206,11 @@ pub(super) fn record_rotation(
             "local authority differs from authenticated history",
         ));
     }
-    let transition = SignedAuthorityTransition::sign(
+    let transition = SignedAuthorityTransition::sign_change(
         &replication.anchor,
         &current,
         &commitment,
+        change,
         next_key,
         now.as_secs(),
         signer,
@@ -203,4 +232,10 @@ fn check_clock(replication: &ReplicationState, now: UnixMillis) -> Result<(), Au
 }
 fn refused(message: &str) -> AuthorityStoreError {
     AuthorityStoreError::Fence(message.into())
+}
+
+pub(super) fn decode_lifecycle(
+    text: &str,
+) -> Result<chio_kernel::authority::lifecycle::AuthorityKeyLifecycle, AuthorityStoreError> {
+    persistence::decode(text)
 }

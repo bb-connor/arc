@@ -37,6 +37,8 @@ pub struct ProtectConfig {
     pub signer_seed_hex: Option<String>,
     /// Explicit capability issuers trusted by the HTTP authority.
     pub trusted_capability_issuers: Vec<PublicKey>,
+    /// Explicit ordinary approval authority and authenticated executor.
+    pub approval: Option<super::approval_authority::ProtectApprovalConfig>,
     /// Control-plane URL. When set, budget holds go through a `RemoteBudgetStore`.
     pub control_url: Option<String>,
     /// Bearer token for the control-plane budget endpoints.

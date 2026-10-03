@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import shlex
 from pathlib import Path
 
 import pytest
 
 from chio_hermes.commands import make_slash_handler
-from tests.conftest import make_configured_runtime
+from tests.conftest import make_configured_runtime, sample_decision
 
 
 @pytest.mark.asyncio
@@ -148,7 +150,8 @@ async def test_chio_approvals_lists_pending_from_sidecar(
     runtime = make_configured_runtime(cwd=tmp_workspace)
     # Pre-seed the mock sidecar with one held call.
     approval_id = await runtime.chio_client.submit_for_approval(
-        capability_id=runtime.capability_id,
+        capability=runtime.signed_capability,
+        requested_by=runtime.signed_capability["subject"],
         tool_name="chio_shell_run",
         tool_args={"command": "rm -rf old/"},
         tool_server="shell",
@@ -175,14 +178,17 @@ async def test_chio_approvals_empty_message(tmp_workspace: Path) -> None:
 async def test_chio_approve_resolves_via_sidecar(tmp_workspace: Path) -> None:
     runtime = make_configured_runtime(cwd=tmp_workspace)
     approval_id = await runtime.chio_client.submit_for_approval(
-        capability_id=runtime.capability_id,
+        capability=runtime.signed_capability,
+        requested_by=runtime.signed_capability["subject"],
         tool_name="chio_shell_run",
         tool_args={"command": "rm -rf old/"},
         tool_server="shell",
     )
 
     handle_slash = make_slash_handler(runtime)
-    out = await handle_slash(f"approve {approval_id} ok-by-operator")
+    pending = (await runtime.chio_client.get_approval(approval_id)).pending
+    token_json = shlex.quote(json.dumps(sample_decision(pending)))
+    out = await handle_slash(f"approve {approval_id} {token_json} ok-by-operator")
     assert out is not None
     assert approval_id in out
     assert "approved" in out.lower()
@@ -199,14 +205,17 @@ async def test_chio_approve_resolves_via_sidecar(tmp_workspace: Path) -> None:
 async def test_chio_deny_resolves_via_sidecar(tmp_workspace: Path) -> None:
     runtime = make_configured_runtime(cwd=tmp_workspace)
     approval_id = await runtime.chio_client.submit_for_approval(
-        capability_id=runtime.capability_id,
+        capability=runtime.signed_capability,
+        requested_by=runtime.signed_capability["subject"],
         tool_name="chio_git_run",
         tool_args={"command": "reset --hard"},
         tool_server="git",
     )
 
     handle_slash = make_slash_handler(runtime)
-    out = await handle_slash(f"deny {approval_id}")
+    pending = (await runtime.chio_client.get_approval(approval_id)).pending
+    token_json = shlex.quote(json.dumps(sample_decision(pending, "denied")))
+    out = await handle_slash(f"deny {approval_id} {token_json}")
     assert out is not None
     assert "denied" in out.lower()
 
@@ -219,6 +228,20 @@ async def test_chio_approve_without_id_returns_usage(tmp_workspace: Path) -> Non
     assert out is not None
     assert "usage" in out.lower()
     assert "<approval_id>" in out
+
+
+@pytest.mark.asyncio
+async def test_chio_approve_without_signed_token_keeps_pending(tmp_workspace: Path) -> None:
+    runtime = make_configured_runtime(cwd=tmp_workspace)
+    approval_id = await runtime.chio_client.submit_for_approval(
+        capability=runtime.signed_capability,
+        requested_by=runtime.signed_capability["subject"],
+        tool_name="run_command", tool_server="shell", tool_args={"command": "rm old"},
+    )
+    out = await make_slash_handler(runtime)(f"approve {approval_id}")
+    assert "an externally signed decision is required" in out
+    assert (await runtime.chio_client.get_approval(approval_id)).pending is not None
+    assert not any(call.method == "respond_approval" for call in runtime.chio_client.calls)
 
 
 @pytest.mark.asyncio

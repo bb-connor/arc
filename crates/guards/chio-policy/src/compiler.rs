@@ -233,6 +233,26 @@ fn compile_threshold_approval_requirement(
 }
 
 fn ensure_compilable_policy(policy: &HushSpec) -> Result<(), CompileError> {
+    let unsupported_rule = policy
+        .rules
+        .as_ref()
+        .and_then(|rules| rules.human_in_loop.as_ref())
+        .is_some_and(|rule| {
+            rule.approve_above_currency.is_some()
+                || rule.timeout_seconds.is_some()
+                || rule.on_timeout != crate::models::HumanInLoopTimeoutAction::Deny
+        });
+    let unsupported_extension = policy
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.chio.as_ref())
+        .and_then(|chio| chio.human_in_loop.as_ref())
+        .is_some_and(|rule| !rule.approve_when.is_empty());
+    if unsupported_rule || unsupported_extension {
+        return Err(CompileError::Invalid(
+            "unsupported approval policy fields have no execution enforcement".into(),
+        ));
+    }
     let validation = crate::validate::validate(policy);
     if validation.is_valid() {
         return Ok(());

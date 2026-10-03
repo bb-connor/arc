@@ -1,5 +1,4 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Mutex;
 
 use crate::budget_store::{
@@ -19,6 +18,8 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use uuid::Uuid;
 
 mod boundaries;
+mod custody;
+mod lifecycle;
 mod replication;
 use boundaries::*;
 
@@ -27,13 +28,12 @@ mod transaction_tests;
 
 pub struct SqliteCapabilityAuthority {
     clock: crate::store_clock::StoreClock,
-    path: PathBuf,
+    custody: custody::AuthorityCustody,
     cached_public_key: Mutex<PublicKey>,
-    cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
 }
 
 /// Authority-store schema revision. Bump on every schema-affecting change.
-const AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 2;
+const AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table, distinct from any co-located store's key.
 const AUTHORITY_STORE_SCHEMA_KEY: &str = "authority";
@@ -62,18 +62,13 @@ impl SqliteCapabilityAuthority {
         path: impl AsRef<Path>,
         clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, AuthorityStoreError> {
-        let path = path.as_ref().to_path_buf();
-        // Resolve any `file:` URI to its on-disk parent before creating it, so a
-        // URI-configured store creates the real backing directory rather than a
-        // bogus scheme-prefixed one.
-        if let Some(parent) = crate::sqlite_parent_dir_to_create(&path) {
-            fs::create_dir_all(&parent)?;
-        }
+        let custody = custody::AuthorityCustody::prepare(path.as_ref())?;
 
         let clock = crate::store_clock::StoreClock::new(clock);
         let bootstrap = Keypair::generate();
-        let bootstrap_at = clock.unix_millis()?.as_secs();
-        let mut connection = Self::open_connection(&path)?;
+        let bootstrap_time = clock.unix_millis()?;
+        let bootstrap_at = bootstrap_time.as_secs();
+        let mut connection = Self::open_connection(&custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let inserted = transaction.execute(
             r#"
@@ -128,75 +123,35 @@ impl SqliteCapabilityAuthority {
                 "authority head is absent from persisted issuer history; restore an authenticated backup before reopening".into(),
             ));
         }
+        lifecycle::observe_time(&transaction, bootstrap_time)?;
+        custody.validate(&transaction)?;
         transaction.commit()?;
         Ok(Self {
             clock,
-            path,
+            custody,
             cached_public_key: Mutex::new(status.public_key),
-            cached_trusted_public_keys: Mutex::new(status.trusted_public_keys),
         })
     }
 
     pub fn status(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
-        let transaction = connection.transaction()?;
-        let status = Self::read_status_from_connection(&transaction)?;
+        let mut connection = Self::open_connection(&self.custody)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let now = self.clock.unix_millis()?;
+        lifecycle::observe_time(&transaction, now)?;
+        let snapshot = replication::read_snapshot(&transaction)?;
+        let mut status = Self::read_status_from_connection(&transaction)?;
+        status.trusted_public_keys = lifecycle::live_public_keys(&snapshot, now.as_secs())?;
         transaction.commit()?;
         self.update_cached_public_key(status.public_key.clone());
-        self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
         Ok(status)
     }
 
     pub fn rotate(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
-        // Serialize the read/advance and publish seed, public key and trust
-        // history together. A failed history write must roll back the seed.
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let status_before = Self::read_status_from_connection(&transaction)?;
-        let next_generation = status_before.generation.checked_add(1).ok_or_else(|| {
-            AuthorityStoreError::Fence("authority generation exhausted".to_owned())
-        })?;
-        let generation = authority_generation(next_generation)?;
-        let prior_keypair = Self::read_keypair_from_connection(&transaction)?;
-        if prior_keypair.public_key() != status_before.public_key {
-            return Err(AuthorityStoreError::Fence(
-                "rotation requires custody of the current head".into(),
-            ));
-        }
-        let keypair = Keypair::generate();
-        let observed = self.clock.unix_millis()?;
-        let rotated_at = observed.as_secs();
-        replication::record_rotation(
-            &transaction,
-            &prior_keypair,
-            &keypair.public_key(),
-            observed,
-        )?;
-        transaction.execute(
-            "UPDATE authority_state SET seed_hex = ?1, public_key_hex = ?2,
-             generation = ?3, rotated_at = ?4 WHERE singleton_id = 1",
-            params![
-                keypair.seed_hex(),
-                keypair.public_key().to_hex(),
-                generation,
-                authority_sqlite_integer(rotated_at, "rotation time")?
-            ],
-        )?;
-        persist_trusted_key(
-            &transaction,
-            &keypair.public_key().to_hex(),
-            next_generation,
-            rotated_at,
-        )?;
-        let status = Self::read_status_from_connection(&transaction)?;
-        transaction.commit()?;
-        self.update_cached_public_key(status.public_key.clone());
-        self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
-        Ok(status)
+        self.mutate_lifecycle(None, None)
     }
 
     pub fn snapshot(&self) -> Result<AuthoritySnapshot, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction()?;
         let (public_key, generation, rotated_at) =
             Self::read_public_state_from_connection(&transaction)?;
@@ -225,7 +180,7 @@ impl SqliteCapabilityAuthority {
     }
 
     pub fn local_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = Self::open_connection(&self.custody)?;
         Self::read_keypair_from_connection(&connection)
     }
 
@@ -257,8 +212,12 @@ impl SqliteCapabilityAuthority {
                 "budget snapshot anchor commit time exceeds SQLite range".to_string(),
             )
         })?;
-        let mut connection = Self::open_connection(&self.path)?;
-        let transaction = connection.transaction()?;
+        let mut connection = Self::open_connection(&self.custody)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        lifecycle::observe_time(&transaction, self.clock.unix_millis()?)?;
+        chio_kernel::authority::replication::validate_state(&replication::read_snapshot(
+            &transaction,
+        )?)?;
         let keypair = Self::read_keypair_from_connection(&transaction)?;
         let signer_public_key = keypair.public_key().to_hex();
         let latest = transaction
@@ -362,7 +321,7 @@ impl SqliteCapabilityAuthority {
     }
 
     pub fn cluster_fence(&self) -> Result<AuthorityClusterFence, AuthorityStoreError> {
-        let connection = Self::open_connection(&self.path)?;
+        let connection = Self::open_connection(&self.custody)?;
         Self::read_cluster_fence_from_connection(&connection)
     }
 
@@ -372,7 +331,7 @@ impl SqliteCapabilityAuthority {
         election_term: u64,
     ) -> Result<bool, AuthorityStoreError> {
         authority_sqlite_integer(election_term, "election term")?;
-        let mut connection = Self::open_connection(&self.path)?;
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = Self::read_cluster_fence_from_connection(&transaction)?;
         let (_, authority_generation, authority_rotated_at) =
@@ -407,7 +366,7 @@ impl SqliteCapabilityAuthority {
         election_term: u64,
     ) -> Result<(), AuthorityStoreError> {
         authority_sqlite_integer(election_term, "election term")?;
-        let mut connection = Self::open_connection(&self.path)?;
+        let mut connection = Self::open_connection(&self.custody)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current = Self::read_cluster_fence_from_connection(&transaction)?;
         let (_, authority_generation, authority_rotated_at) =
@@ -448,8 +407,10 @@ impl SqliteCapabilityAuthority {
         Ok(())
     }
 
-    fn open_connection(path: &Path) -> Result<Connection, AuthorityStoreError> {
-        let connection = Connection::open(path)?;
+    fn open_connection(
+        custody: &custody::AuthorityCustody,
+    ) -> Result<Connection, AuthorityStoreError> {
+        let connection = custody.open_connection()?;
         crate::check_schema_version(
             &connection,
             AUTHORITY_STORE_SCHEMA_KEY,
@@ -474,7 +435,8 @@ impl SqliteCapabilityAuthority {
             CREATE TABLE IF NOT EXISTS authority_trusted_keys (
                 public_key_hex TEXT PRIMARY KEY,
                 generation INTEGER NOT NULL,
-                activated_at INTEGER NOT NULL
+                activated_at INTEGER NOT NULL,
+                lifecycle_json TEXT
             );
 
             CREATE TABLE IF NOT EXISTS authority_cluster_fence (
@@ -541,6 +503,18 @@ impl SqliteCapabilityAuthority {
                 [],
             )?;
         }
+        if !Self::table_has_column(&connection, "authority_trusted_keys", "lifecycle_json")? {
+            connection.execute(
+                "ALTER TABLE authority_trusted_keys ADD COLUMN lifecycle_json TEXT",
+                [],
+            )?;
+        }
+        if !Self::table_has_column(&connection, "authority_state", "observed_ms")? {
+            connection.execute(
+                "ALTER TABLE authority_state ADD COLUMN observed_ms INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
         replication::ensure_schema(&connection)?;
         crate::stamp_schema_version(
             &connection,
@@ -548,6 +522,7 @@ impl SqliteCapabilityAuthority {
             AUTHORITY_STORE_SUPPORTED_SCHEMA_VERSION,
         )
         .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
+        custody.validate(&connection)?;
         Ok(connection)
     }
 
@@ -557,6 +532,7 @@ impl SqliteCapabilityAuthority {
         let (public_key, generation, rotated_at) =
             Self::read_public_state_from_connection(connection)?;
         Ok(AuthorityStatus {
+            issuer_state: replication::read_snapshot(connection)?,
             public_key,
             generation,
             rotated_at,
@@ -662,8 +638,12 @@ impl SqliteCapabilityAuthority {
     }
 
     fn read_current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
-        let mut connection = Self::open_connection(&self.path)?;
-        let transaction = connection.transaction()?;
+        let mut connection = Self::open_connection(&self.custody)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        lifecycle::observe_time(&transaction, self.clock.unix_millis()?)?;
+        chio_kernel::authority::replication::validate_state(&replication::read_snapshot(
+            &transaction,
+        )?)?;
         let keypair = Self::read_keypair_from_connection(&transaction)?;
         let status = Self::read_status_from_connection(&transaction)?;
         if keypair.public_key() != status.public_key {
@@ -675,7 +655,6 @@ impl SqliteCapabilityAuthority {
         }
         transaction.commit()?;
         self.update_cached_public_key(status.public_key);
-        self.update_cached_trusted_public_keys(status.trusted_public_keys);
         Ok(keypair)
     }
 
@@ -707,36 +686,12 @@ impl SqliteCapabilityAuthority {
         }
     }
 
-    fn update_cached_trusted_public_keys(&self, public_keys: Vec<PublicKey>) {
-        match self.cached_trusted_public_keys.lock() {
-            Ok(mut guard) => *guard = public_keys,
-            Err(poisoned) => {
-                tracing::error!(
-                    "cached_trusted_public_keys mutex is poisoned - recovering possibly-stale key material"
-                );
-                *poisoned.into_inner() = public_keys;
-            }
-        }
-    }
-
     fn cached_public_key(&self) -> PublicKey {
         match self.cached_public_key.lock() {
             Ok(guard) => guard.clone(),
             Err(poisoned) => {
                 tracing::error!(
                     "cached_public_key mutex is poisoned - reading possibly-stale key material"
-                );
-                poisoned.into_inner().clone()
-            }
-        }
-    }
-
-    fn cached_trusted_public_keys(&self) -> Vec<PublicKey> {
-        match self.cached_trusted_public_keys.lock() {
-            Ok(guard) => guard.clone(),
-            Err(poisoned) => {
-                tracing::error!(
-                    "cached_trusted_public_keys mutex is poisoned - reading possibly-stale key material"
                 );
                 poisoned.into_inner().clone()
             }
@@ -757,7 +712,7 @@ impl SqliteCapabilityAuthority {
     ) -> Result<Vec<AuthorityTrustedKeySnapshot>, AuthorityStoreError> {
         let mut statement = connection.prepare(
             r#"
-            SELECT public_key_hex, generation, activated_at
+            SELECT public_key_hex, generation, activated_at, lifecycle_json
             FROM authority_trusted_keys
             ORDER BY generation ASC, activated_at ASC, public_key_hex ASC
             "#,
@@ -767,10 +722,11 @@ impl SqliteCapabilityAuthority {
                 row.get::<_, String>(0)?,
                 row.get::<_, i64>(1)?,
                 row.get::<_, i64>(2)?,
+                row.get::<_, Option<String>>(3)?,
             ))
         })?;
         rows.map(|row| {
-            let (key, generation, at) = row?;
+            let (key, generation, at, lifecycle) = row?;
             Ok(AuthorityTrustedKeySnapshot {
                 public_key_hex: PublicKey::from_hex(key.trim())?.to_hex(),
                 generation: authority_unsigned(
@@ -781,6 +737,10 @@ impl SqliteCapabilityAuthority {
                     "trusted-key generation",
                 )?,
                 activated_at: authority_unsigned(at, "trusted-key activation time")?,
+                lifecycle: lifecycle
+                    .as_deref()
+                    .map(replication::decode_lifecycle)
+                    .transpose()?,
             })
         })
         .collect()
@@ -857,7 +817,16 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
         self.status()
             .map(|status| status.trusted_public_keys)
-            .unwrap_or_else(|_| self.cached_trusted_public_keys())
+            .unwrap_or_default()
+    }
+
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &PublicKey,
+        issued_at: u64,
+        now: u64,
+    ) -> Result<(), KernelError> {
+        self.check_managed_issuer(issuer, issued_at, now)
     }
 
     fn issue_capability(
@@ -867,23 +836,41 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
         ensure_capability_issuance_supported(&scope)?;
-        let keypair = self
-            .read_current_keypair()
-            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
-        let now = self.clock.unix_millis()?.as_secs();
-        let body = CapabilityTokenBody {
-            id: format!("cap-{}", Uuid::now_v7()),
-            issuer: keypair.public_key(),
-            subject: subject.clone(),
-            scope,
-            issued_at: now,
-            expires_at: chio_kernel::authority::checked_capability_expiry(now, ttl_seconds)?,
-            delegation_chain: vec![],
-            aggregate_invocation_budget: None,
-        };
+        let issue = || -> Result<CapabilityToken, AuthorityStoreError> {
+            let mut connection = Self::open_connection(&self.custody)?;
+            let transaction =
+                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let observed = self.clock.unix_millis()?;
+            lifecycle::observe_time(&transaction, observed)?;
+            let keypair = Self::read_keypair_from_connection(&transaction)?;
+            let snapshot = replication::read_snapshot(&transaction)?;
+            chio_kernel::authority::replication::validate_state(&snapshot)?;
+            if keypair.public_key().to_hex() != snapshot.public_key_hex {
+                return Err(AuthorityStoreError::Fence(
+                    "issuance requires custody of the current head".into(),
+                ));
+            }
+            let now = observed.as_secs();
+            let body = CapabilityTokenBody {
+                id: format!("cap-{}", Uuid::now_v7()),
+                issuer: keypair.public_key(),
+                subject: subject.clone(),
+                scope,
+                issued_at: now,
+                expires_at: now.checked_add(ttl_seconds).ok_or_else(|| {
+                    AuthorityStoreError::Fence(
+                        "capability expiry overflows the timestamp domain".into(),
+                    )
+                })?,
+                delegation_chain: vec![],
+                aggregate_invocation_budget: None,
+            };
 
-        CapabilityToken::sign(body, &keypair)
-            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+            let capability = CapabilityToken::sign(body, &keypair)?;
+            transaction.commit()?;
+            Ok(capability)
+        };
+        issue().map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 }
 
@@ -906,7 +893,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("time before epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+        std::env::temp_dir()
+            .join(format!("{prefix}-{nonce}"))
+            .join("authority.sqlite3")
     }
 
     #[test]

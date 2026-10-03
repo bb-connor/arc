@@ -103,6 +103,7 @@ impl ChioKernel {
             security_context,
             Some(&parent_context.session_id),
         )?;
+        self.validate_session_threshold_intent(request, Some(&parent_context.session_id))?;
         // Install the parent session's tenant_id so every
         // receipt signed while this nested-flow evaluation is in flight
         // carries the correct tenant tag.

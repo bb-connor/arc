@@ -18,7 +18,24 @@ pub(crate) fn dispatch_chio_authority_command(
             database,
             stream_id,
             out,
-        } => replication::initialize(&database, &stream_id, &out),
+            recovery_public_key,
+        } => replication::initialize(&database, &stream_id, &out, recovery_public_key.as_deref()),
+        ChioAuthorityCommands::IssuerRotate {
+            database,
+            verify_until,
+        } => replication::rotate(&database, verify_until),
+        ChioAuthorityCommands::IssuerRetire {
+            database,
+            public_key,
+        } => replication::retire(&database, &public_key),
+        ChioAuthorityCommands::IssuerRevoke {
+            database,
+            public_key,
+        } => replication::revoke(&database, &public_key),
+        ChioAuthorityCommands::IssuerRecover {
+            database,
+            recovery_key_file,
+        } => replication::recover(&database, &recovery_key_file),
         ChioAuthorityCommands::ReplicationPin {
             database,
             anchor,

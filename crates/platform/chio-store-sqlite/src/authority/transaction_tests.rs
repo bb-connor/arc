@@ -7,10 +7,15 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 #[test]
 fn incomplete_legacy_authority_history_is_refused_without_inventing_issuers() -> TestResult {
     for empty_table in [false, true] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("legacy.db");
         let key = Keypair::generate();
         let connection = Connection::open(&path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        }
         connection.execute_batch(
             "CREATE TABLE authority_state (
                 singleton_id INTEGER PRIMARY KEY, seed_hex TEXT NOT NULL,
@@ -54,10 +59,15 @@ fn incomplete_legacy_authority_history_is_refused_without_inventing_issuers() ->
 
 #[test]
 fn complete_legacy_authority_history_survives_explicit_checkpoint_migration() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("legacy.db");
     let key = Keypair::generate();
     let connection = Connection::open(&path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    }
     connection.execute_batch(
         "CREATE TABLE authority_state (
             singleton_id INTEGER PRIMARY KEY, seed_hex TEXT NOT NULL,
@@ -92,7 +102,7 @@ fn complete_legacy_authority_history_survives_explicit_checkpoint_migration() ->
 
 #[test]
 fn rotation_rolls_back_seed_head_and_history_when_trust_insert_fails() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.db");
     let authority = SqliteCapabilityAuthority::open(&path)?;
     let before = authority.snapshot()?;
@@ -124,7 +134,7 @@ fn rotation_rolls_back_seed_head_and_history_when_trust_insert_fails() -> TestRe
 
 #[test]
 fn concurrent_rotations_allocate_unique_generations_and_keep_all_keys() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.db");
     let authority = SqliteCapabilityAuthority::open(&path)?;
     let barrier = Arc::new(Barrier::new(9));
@@ -159,7 +169,7 @@ fn concurrent_rotations_allocate_unique_generations_and_keep_all_keys() -> TestR
 
 #[test]
 fn snapshot_refuses_invalid_late_rows_without_partial_trust_or_head_changes() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let authority = SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
     let before = authority.snapshot()?;
     let seed_before = authority.local_keypair()?.seed_hex();
@@ -179,6 +189,7 @@ fn snapshot_refuses_invalid_late_rows_without_partial_trust_or_head_changes() ->
                 public_key_hex: Keypair::generate().public_key().to_hex(),
                 generation: 1,
                 activated_at: 5,
+                lifecycle: None,
             }],
         };
         match field {
@@ -206,16 +217,21 @@ fn snapshot_refuses_invalid_late_rows_without_partial_trust_or_head_changes() ->
 
 #[test]
 fn generation_exhaustion_does_not_rotate_or_lose_the_signing_seed() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.db");
     let authority = SqliteCapabilityAuthority::open(&path)?;
     let connection = Connection::open(&path)?;
     connection.execute("UPDATE authority_state SET generation = ?1", [i64::MAX])?;
+    connection.execute(
+        "UPDATE authority_trusted_keys SET generation = ?1",
+        [i64::MAX],
+    )?;
     let before = authority.snapshot()?;
+    chio_kernel::authority::replication::validate_state(&before)?;
     let seed_before = authority.local_keypair()?.seed_hex();
     assert!(
         matches!(authority.rotate(), Err(AuthorityStoreError::Fence(message))
-        if message == "authority generation exceeds SQLite INTEGER range")
+        if message == "invalid authority state bounds")
     );
     assert_eq!(authority.snapshot()?, before);
     assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
@@ -224,7 +240,7 @@ fn generation_exhaustion_does_not_rotate_or_lose_the_signing_seed() -> TestResul
 
 #[test]
 fn failed_snapshot_head_write_rolls_back_already_inserted_history() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let source = SqliteCapabilityAuthority::open(directory.path().join("source.db"))?;
     let path = directory.path().join("follower.db");
     let authority = SqliteCapabilityAuthority::open(&path)?;
@@ -251,13 +267,16 @@ fn failed_snapshot_head_write_rolls_back_already_inserted_history() -> TestResul
 
 #[test]
 fn same_term_competing_leaders_have_exactly_one_winner() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    use chio_security_types::clock::FixedClock;
+
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.db");
-    let authority = SqliteCapabilityAuthority::open(&path)?;
+    let clock = Arc::new(FixedClock::new(100));
+    let authority = SqliteCapabilityAuthority::open_with_clock(&path, clock.clone())?;
     let barrier = Arc::new(Barrier::new(9));
     let mut threads = Vec::new();
     for index in 0..8 {
-        let handle = SqliteCapabilityAuthority::open(&path)?;
+        let handle = SqliteCapabilityAuthority::open_with_clock(&path, clock.clone())?;
         let start = Arc::clone(&barrier);
         threads.push(std::thread::spawn(move || {
             let leader = format!("https://leader-{index}");
@@ -297,7 +316,7 @@ fn same_term_competing_leaders_have_exactly_one_winner() -> TestResult {
 
 #[test]
 fn negative_persisted_metadata_is_refused_instead_of_clamped() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.db");
     let authority = SqliteCapabilityAuthority::open(&path)?;
     let connection = Connection::open(&path)?;
@@ -333,12 +352,19 @@ fn negative_persisted_metadata_is_refused_instead_of_clamped() -> TestResult {
 
 #[test]
 fn capability_issuance_refuses_overflowing_expiry() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let authority = SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
+    let before = authority.snapshot()?;
+    let seed_before = authority.local_keypair()?.seed_hex();
+    let expected =
+        AuthorityStoreError::Fence("capability expiry overflows the timestamp domain".into())
+            .to_string();
     assert!(
         matches!(authority.issue_capability(&Keypair::generate().public_key(), ChioScope::default(), u64::MAX),
-        Err(KernelError::CapabilityIssuanceFailed(message)) if message == "capability expiry overflows the timestamp domain")
+        Err(KernelError::CapabilityIssuanceFailed(message)) if message == expected)
     );
+    assert_eq!(authority.snapshot()?, before);
+    assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
     Ok(())
 }
 
@@ -356,7 +382,7 @@ fn injected_clock_failure_preserves_authority_and_cluster_fence() -> TestResult 
             }
         }
     }
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let clock = Arc::new(ControlledClock(AtomicBool::new(false)));
     let authority =
         SqliteCapabilityAuthority::open_with_clock(root.path().join("clock.db"), clock.clone())?;
@@ -380,7 +406,7 @@ fn injected_clock_failure_preserves_authority_and_cluster_fence() -> TestResult 
 
 #[test]
 fn unsigned_authority_snapshot_cannot_add_issuer_even_without_head_change() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let authority = SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
     let before = authority.snapshot()?;
     let mut forged = before.clone();
@@ -388,6 +414,7 @@ fn unsigned_authority_snapshot_cannot_add_issuer_even_without_head_change() -> T
         public_key_hex: Keypair::generate().public_key().to_hex(),
         generation: 1,
         activated_at: before.rotated_at,
+        lifecycle: None,
     });
     assert!(
         authority.apply_snapshot(&forged).is_err(),

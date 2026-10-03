@@ -103,7 +103,7 @@ impl RemoteSessionFactory {
             }
         };
         let lifecycle_policy = config.lifecycle_policy();
-        Ok(Self {
+        let factory = Self {
             config,
             manifest_registry,
             runtime_contract_fingerprint,
@@ -112,7 +112,52 @@ impl RemoteSessionFactory {
             resume_hmac_keyring,
             shared_upstream_owner: Arc::new(StdMutex::new(None)),
             lifecycle_policy,
-        })
+        };
+        if let Some(approval) = &factory.config.approval {
+            let keypair = factory.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
+            let mut kernel = chio_control_plane::build_kernel_with_clock(
+                loaded_policy,
+                &keypair,
+                Arc::new(factory.config.clock.clone()),
+            );
+            factory.attach_durable_admission(&mut kernel)?;
+            remote_mcp_approval_policy::configure(&mut kernel, approval)?;
+        }
+        Ok(factory)
+    }
+
+    /// Revalidate pending approvals against the same authority and policy as a
+    /// live session without reserving admission state or dispatching a tool.
+    pub(super) fn bind_approval_intent(
+        &self,
+        session: &RemoteSession,
+        request: &chio_kernel::ToolCallRequest,
+    ) -> Result<chio_core::capability::governance::GovernedTransactionIntent, CliError> {
+        let approval = self.config.approval.as_ref().ok_or_else(|| {
+            CliError::cli_other_error("explicit approval authority is required".to_string())
+        })?;
+        let loaded_policy = load_policy(&self.config.policy_path)?;
+        if fingerprint_remote_policy_contract(&loaded_policy)? != session.policy_fingerprint
+            || self.runtime_contract_fingerprint != session.runtime_contract_fingerprint
+        {
+            return Err(CliError::cli_other_error(
+                "approval session policy or runtime authority changed".to_string(),
+            ));
+        }
+        let issuance = loaded_policy.issuance_policy.clone();
+        let assurance = loaded_policy.runtime_assurance_policy.clone();
+        let keypair = self.kernel_keypair(loaded_policy.kernel.durable_admission_mode)?;
+        let mut kernel = chio_control_plane::build_kernel_with_clock(
+            loaded_policy,
+            &keypair,
+            Arc::new(self.config.clock.clone()),
+        );
+        self.attach_durable_admission(&mut kernel)?;
+        self.configure_session_capability_authority(&mut kernel, &keypair, issuance, assurance)?;
+        remote_mcp_approval_policy::configure(&mut kernel, approval)?;
+        kernel
+            .bind_tool_approval_intent(request)
+            .map_err(Into::into)
     }
 
     fn kernel_keypair(
@@ -340,6 +385,9 @@ impl RemoteSessionFactory {
             )?;
         }
         self.attach_durable_admission(&mut kernel)?;
+        if let Some(approval) = &self.config.approval {
+            remote_mcp_approval_policy::configure(&mut kernel, approval)?;
+        }
         self.configure_session_capability_authority(
             &mut kernel,
             &kernel_kp,
@@ -403,6 +451,8 @@ impl RemoteSessionFactory {
         edge.set_initial_session_id(restored_kernel_session_id(&session_id))?;
         edge.attach_upstream_transport(upstream_notification_source.clone());
 
+        let approval_redemption =
+            remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
         let (input_tx, input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
         let retained_notification_events =
@@ -442,6 +492,7 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
+            approval_redemption,
             session_store_lease: self.session_store_lease.clone(),
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: 0,
@@ -525,6 +576,9 @@ impl RemoteSessionFactory {
             )?;
         }
         self.attach_durable_admission(&mut kernel)?;
+        if let Some(approval) = &self.config.approval {
+            remote_mcp_approval_policy::configure(&mut kernel, approval)?;
+        }
         self.configure_session_capability_authority(
             &mut kernel,
             &kernel_kp,
@@ -604,6 +658,8 @@ impl RemoteSessionFactory {
             restored_peer_capabilities.clone(),
         )?;
 
+        let approval_redemption =
+            remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
         let (input_tx, input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
         let retained_notification_events =
@@ -643,6 +699,7 @@ impl RemoteSessionFactory {
             retained_notification_events,
             next_event_id,
             session_db_path: self.config.session_db_path.clone(),
+            approval_redemption,
             session_store_lease: self.session_store_lease.clone(),
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: record.resume_generation,

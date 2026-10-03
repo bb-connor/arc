@@ -1182,8 +1182,9 @@ fn authority_key_cache_from_status_validates_and_deduplicates_current_key() {
         public_key: Some(current.clone()),
         generation: Some(7),
         rotated_at: Some(11),
+        issuer_state: None,
         applies_to_future_sessions_only: false,
-        trusted_public_keys: vec![trusted_only.clone()],
+        trusted_public_keys: vec![current.clone(), trusted_only.clone(), current.clone()],
     })
     .test_expect("cache from valid status");
 
@@ -1207,6 +1208,7 @@ fn authority_key_cache_from_status_validates_and_deduplicates_current_key() {
         public_key: None,
         generation: None,
         rotated_at: None,
+        issuer_state: None,
         applies_to_future_sessions_only: false,
         trusted_public_keys: Vec::new(),
     }) {
@@ -1223,6 +1225,7 @@ fn authority_key_cache_from_status_validates_and_deduplicates_current_key() {
         public_key: Some(current),
         generation: None,
         rotated_at: None,
+        issuer_state: None,
         applies_to_future_sessions_only: false,
         trusted_public_keys: Vec::new(),
     }) {

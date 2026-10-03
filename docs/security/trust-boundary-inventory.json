@@ -458,7 +458,10 @@
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs",
     "crates/protocol/chio-mcp-remote/src/input.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/records.rs",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/redemption.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/jwt_support.rs",
@@ -1374,6 +1377,7 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::load_retained_proposal::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::verify_nonce_capture_approval::from_wire",
     "crates/platform/chio-store-sqlite/src/approval_store.rs::deserialize_payload::from_wire",
+    "crates/platform/chio-store-sqlite/src/approval_store.rs::get_resolution::from_wire",
     "crates/platform/chio-store-sqlite/src/approval_store.rs::load_approval_reservation::from_wire",
     "crates/platform/chio-store-sqlite/src/approval_store/threshold_collector.rs::decode_collector::from_wire",
     "crates/platform/chio-store-sqlite/src/authority/replication/persistence.rs::decode::from_wire",
@@ -1455,6 +1459,7 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_connection::from_wire",
     "crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json::from_wire",
     "crates/platform/chio-transaction-passport/src/minimal.rs::transparency_anchor_state::from_wire",
+    "crates/products/chio-api-protect/src/proxy/approval_authority.rs::load::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_signed_value::from_wire",
@@ -1491,6 +1496,7 @@
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire",
     "crates/protocol/chio-openapi/src/input.rs::decode::from_wire",
@@ -5465,6 +5471,14 @@
     "crates/core/chio-core-types/src/wire_text.rs": [
       "schema::custom_deserialize"
     ],
+    "crates/core/chio-response-model/src/simulation.rs": [
+      "decode::from_slice"
+    ],
+    "crates/core/chio-response-model/src/state.rs": [
+      "decode_response_record::from_slice",
+      "validate_effect_contribution::from_slice",
+      "validate_effect_plan_binding::from_slice"
+    ],
     "crates/core/chio-supervisor/src/health.rs": [
       "snapshot_round_trips_through_json::from_str"
     ],
@@ -5538,6 +5552,9 @@
     "crates/kernel/chio-kernel/src/admission_operation.rs": [
       "is_pre_dispatch::custom_deserialize",
       "validate::custom_deserialize"
+    ],
+    "crates/kernel/chio-kernel/src/approval/tool_context.rs": [
+      "verify::from_value"
     ],
     "crates/kernel/chio-kernel/src/caller_delivery.rs": [
       "flush::from_slice",
@@ -6202,14 +6219,6 @@
     ],
     "crates/security/chio-quarantine/src/fuzz.rs": [
       "drive::from_slice"
-    ],
-    "crates/core/chio-response-model/src/simulation.rs": [
-      "decode::from_slice"
-    ],
-    "crates/core/chio-response-model/src/state.rs": [
-      "decode_response_record::from_slice",
-      "validate_effect_contribution::from_slice",
-      "validate_effect_plan_binding::from_slice"
     ],
     "crates/security/chio-secret-broker/src/ipc_client.rs": [
       "decode_canonical_response_with_limit::from_value",
@@ -10966,6 +10975,22 @@
           "checked": true
         }
       ]
+    },
+    "crates/kernel/chio-kernel/src/approval/tool_context.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Typed intent context projection only; original request readers reject duplicate keys and the kernel compares the reconstructed context against capability, arguments, request, current policy and tenant before authority.",
+      "readers": [
+        {
+          "reader": "verify",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
     }
   },
   "tenant_runtime_families": {
@@ -14401,10 +14426,8 @@
       "retained_typed_conversions": []
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs": {
-      "contract": "Approval submission and decision JSON use the bounded extractor. Stored signed approvals decode original bounded bytes before signature validation. Parser causes remain typed and redacted externally.",
-      "migrations": [
-        "load_record::from_str"
-      ],
+      "contract": "Approval submission and external-token decision requests use the bounded duplicate-aware HTTP extractor. Decisions revalidate session, current policy and capability, configured approver, full intent binding, time and signature before an immutable retained transition. Original signed record decoding is centralized in approvals/records.rs; receipt signing protects record integrity and grants no operator authority.",
+      "migrations": [],
       "retained_typed_conversions": []
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": {
@@ -14491,6 +14514,21 @@
     },
     "crates/protocol/chio-hosted-mcp/src/lib.rs": {
       "contract": "Facade reexports the remote MCP owner. It adds no original-byte reader, launch path or authority constructor; remote owner contracts apply.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/records.rs": {
+      "contract": "load_record decodes original persisted signed_record bytes through input::decode with the 8 MiB session bound and duplicate-aware strict signed JSON. SignedRecord and ApprovalRecord reject unknown fields. Record ID and strict receipt-key signature are required before returning a DTO. Typed parser/storage/signature failures are retained in RecordLoadError; HTTP record routes retain local parser sources. Parsing alone grants no live authority.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approvals/redemption.rs": {
+      "contract": "Shared session ingress rejects malformed or conflicting ordinary approval aliases, then canonicalizes the already parsed Value and uses the strict bounded signed decoder for token and intent projection. HTTP original bytes were duplicate-checked by input::document; native Value maps cannot contain duplicate keys. Execution requires the current integrity-verified retained Approved record and exact stored token, session/runtime/current-policy, capability, request, intent, arguments and lifetime. Signature and kernel replay/admission remain independent checks; pure threshold collections retain their policy-owned protocol. Redemption failures become governed-transaction denial messages.",
+      "migrations": [],
+      "retained_typed_conversions": []
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs": {
+      "contract": "Public approval configuration is read with a 64 KiB file limit and duplicate-aware strict signed JSON; unknown DTO fields reject. The tenant and explicit approver roster are installed into the kernel only with durable admission and an already activated replay-source binding. Loading never provisions or activates replay authority and never implicitly trusts receipt or capability keys.",
       "migrations": [],
       "retained_typed_conversions": []
     }
@@ -16026,6 +16064,7 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::load_retained_proposal::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::verify_nonce_capture_approval::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/approval_store.rs::deserialize_payload::from_wire#1::decode_signed",
+    "crates/platform/chio-store-sqlite/src/approval_store.rs::get_resolution::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/approval_store.rs::load_approval_reservation::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/approval_store/threshold_collector.rs::decode_collector::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/authority/replication/persistence.rs::decode::from_wire#1::decode_signed",
@@ -16107,6 +16146,7 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_connection::from_wire#1::decode_canonical",
     "crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json::from_wire#1::decode_signed",
     "crates/platform/chio-transaction-passport/src/minimal.rs::transparency_anchor_state::from_wire#1::decode_external",
+    "crates/products/chio-api-protect/src/proxy/approval_authority.rs::load::from_wire#1::decode_signed",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_wire#1::decode_document",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_signed_value::from_wire#1::decode_signed",
@@ -16143,6 +16183,7 @@
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire#1::decode_document",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire#1::decode_signed",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire#1::decode_document",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire#1::decode_document",
     "crates/protocol/chio-openapi/src/input.rs::decode::from_wire#1::decode_document",

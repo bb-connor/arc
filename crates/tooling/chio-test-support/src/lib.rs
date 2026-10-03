@@ -29,6 +29,22 @@
 
 #![forbid(unsafe_code)]
 
+/// Create a test-owned temporary directory suitable for private key custody.
+/// Set its mode at creation, independently of the test runner's umask.
+pub fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tempfile::Builder::new()
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+    }
+    #[cfg(not(unix))]
+    {
+        tempfile::tempdir()
+    }
+}
+
 /// Context-free unwrap helpers (the dominant workspace convention).
 ///
 /// Methods here mirror `Result::unwrap` / `Option::unwrap` /

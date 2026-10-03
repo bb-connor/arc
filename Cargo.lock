@@ -5341,6 +5341,7 @@ name = "chio-test-support"
 version = "0.1.0"
 dependencies = [
  "chio-security-types",
+ "tempfile",
 ]
 
 [[package]]

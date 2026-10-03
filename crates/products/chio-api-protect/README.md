@@ -72,6 +72,7 @@ let config = ProtectConfig {
     revocation_db: None,
     require_nonce: false,
     allow_advisory: false,
+    approval: None,
     upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
 };
 
@@ -120,6 +121,49 @@ Do not use the following as a concrete-call authorization gate:
   grants with `dpop_required: true` require its proof on mediated evaluation.
 - `POST /v1/receipts` - accepts operator-submitted receipts for logging;
   acceptance does not imply the kernel mediated the original action.
+
+## Execution-bound approvals
+
+Ordinary approvals require `ProtectConfig::approval`, a durable receipt/admission
+store, and an authenticated caller executor. The CLI reads the same JSON
+configuration from `CHIO_API_PROTECT_APPROVAL_CONFIG`. It contains `tenant_id`,
+`approvers` (public keys), `replay_source_path`, the existing activated replay
+`binding`, and `caller_executor`. Loading this file does not activate or import a
+replay source. Provision and activate the operation-owned source through the
+SQLite admission authority migration APIs before serving it. Missing or mismatched
+authority fails closed at startup.
+
+The control bearer grants access to workflow routes. Approver authority comes
+from the separately configured public-key roster and a signed decision. Neither
+the bearer nor the receipt signer automatically becomes an approver.
+
+1. `POST /approvals/submit` carries the complete signed `capability`,
+   `tool_server`, `tool_name`, exact `parameters`, and `requested_by` equal to
+   the capability subject public key. Optional fields are `summary`,
+   `ttl_seconds`, `triggered_by`, and a governed intent envelope. The server
+   validates the capability and builds a `BoundToolInvocation`, hashing the
+   arguments and full capability together with its tenant, policy and generated
+   request identity. A client-supplied parameter hash is rejected.
+2. Retrieve the pending request through `GET /approvals/{id}`. An independent
+   configured approver signs a `GovernedApprovalToken` over the returned intent
+   hash and approval ID. Submit it to `POST /approvals/{id}/respond` as
+   `{"outcome":"approved","approver":<public key>,"token":<signed token>}`.
+   The compatibility `/operator-respond` route requires the same signed body.
+3. `POST /v1/evaluate` carries `approval_id` and the original complete capability,
+   route and arguments. It loads the retained signed decision and compares every
+   binding to current authority before reserving the call. Direct approval-token
+   submission to this route is rejected. A successful reservation still requires
+   authenticated `/v1/caller/start` with the signed decision credential and an
+   executor using durable single-use dispatch custody.
+
+Decision records retain the original request and signed token in SQLite. Legacy
+resolved records without those artifacts remain readable but cannot authorize a
+call. Reservation and dispatch reuse the operation-owned replay authority;
+reopening the HTTP store does not restore spent approval authority. Current
+capability and ancestor revocations, signer roster, tenant, policy, and token
+expiry are rechecked before fresh admission and dispatch. Decisions are immutable;
+there is no independent per-token revoke endpoint. Revoke the capability or retire
+the signer to withdraw authority before dispatch.
 
 ## Testing
 

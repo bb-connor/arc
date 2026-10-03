@@ -166,7 +166,7 @@ pub(super) fn post_dispatch_approval_commit_fixture(
         make_scope(vec![make_grant(server, tool)]),
         300,
     );
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         &format!("intent-{request_id}"),
         server,
         tool,
@@ -175,6 +175,13 @@ pub(super) fn post_dispatch_approval_commit_fixture(
         "USD",
     );
     let mut request = make_request(request_id, &capability, tool, server);
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
+    );
     request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,
         &agent.public_key(),
@@ -359,13 +366,20 @@ pub(super) fn request_with_replayed_approval(
     let arguments = serde_json::json!({"operation": "settle"});
     let mut request =
         make_request_with_arguments(request_id, &capability, tool, server, arguments.clone());
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "dispatch-credentials-intent",
         server,
         tool,
         "settle approved operation",
         1,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
     );
     request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,
@@ -770,7 +784,7 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         InMemoryGovernedApprovalReplayStore::new(1).expect("positive replay store test capacities"),
     ));
 
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "committed-approval-horizon-intent",
         server,
         tool,
@@ -784,6 +798,13 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         tool,
         server,
         serde_json::json!({"operation": "settle"}),
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &committed_request.capability,
+        &committed_request.arguments,
+        &committed_request.request_id,
+        &mut intent,
     );
     committed_request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,
@@ -801,6 +822,7 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         false,
     )?;
     let _disposition = reservation.commit()?;
+    drop(reservation);
 
     let replay_error = match kernel.reserve_dispatch_credentials(
         &committed_request,
@@ -822,6 +844,13 @@ fn committed_approval_retains_signed_horizon_under_capacity_pressure(
         tool,
         server,
         serde_json::json!({"operation": "settle"}),
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &pressure_request.capability,
+        &pressure_request.arguments,
+        &pressure_request.request_id,
+        &mut intent,
     );
     pressure_request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,
@@ -865,13 +894,20 @@ fn default_governed_approval_replay_store_accepts_once_and_denies_replay(
         300,
     )?;
     let request_id = "default-approval-replay-request";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "default-approval-replay-intent",
         server,
         tool,
         "prove the default replay store remains compatible",
         10,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &capability,
+        &serde_json::json!({"operation": "settle"}),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,

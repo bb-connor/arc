@@ -454,6 +454,7 @@ pub(crate) fn cmd_api_protect(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            approval: load_sidecar_approval_config()?,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -545,6 +546,7 @@ pub(crate) fn cmd_start(
             sidecar_control_token,
             signer_seed_hex,
             trusted_capability_issuers,
+            approval: load_sidecar_approval_config()?,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -594,6 +596,16 @@ pub(crate) fn trusted_capability_issuers(
         }
     }
     issuers
+}
+
+fn load_sidecar_approval_config(
+) -> Result<Option<chio_api_protect::ProtectApprovalConfig>, CliError> {
+    let Some(path) = std::env::var_os("CHIO_API_PROTECT_APPROVAL_CONFIG") else {
+        return Ok(None);
+    };
+    chio_api_protect::ProtectApprovalConfig::load(Path::new(&path))
+        .map(Some)
+        .map_err(|error| CliError::transport_error(error.to_string()))
 }
 
 pub(crate) fn parse_trusted_capability_issuers_from_env(
@@ -1097,6 +1109,7 @@ pub(crate) fn cmd_mcp_serve(
 
 pub(crate) fn cmd_mcp_serve_http(
     policy_path: &Path,
+    approval_config: Option<&Path>,
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
@@ -1176,6 +1189,9 @@ pub(crate) fn cmd_mcp_serve_http(
     )?);
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
+        approval: approval_config
+            .map(remote_mcp::RemoteApprovalConfig::load)
+            .transpose()?,
         clock: Default::default(),
         listen,
         auth_token,

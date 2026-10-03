@@ -29,7 +29,7 @@ pub(crate) fn ensure_schema(connection: &Connection) -> Result<(), AuthorityStor
     Ok(())
 }
 
-pub(super) fn read_snapshot(
+pub(in crate::authority) fn read_snapshot(
     connection: &Connection,
 ) -> Result<AuthoritySnapshot, AuthorityStoreError> {
     let (public_key, generation, rotated_at) =
@@ -110,7 +110,7 @@ pub(super) fn write_replication(
     Ok(())
 }
 
-pub(super) fn persist_snapshot(
+pub(in crate::authority) fn persist_snapshot(
     connection: &Connection,
     snapshot: &AuthoritySnapshot,
 ) -> Result<(), AuthorityStoreError> {
@@ -124,6 +124,13 @@ pub(super) fn persist_snapshot(
             key.generation,
             key.activated_at,
         )?;
+        connection.execute(
+            "UPDATE authority_trusted_keys SET lifecycle_json = ?1 WHERE public_key_hex = ?2",
+            params![
+                key.lifecycle.as_ref().map(encode).transpose()?,
+                key.public_key_hex
+            ],
+        )?;
     }
     connection.execute(
         "UPDATE authority_state SET public_key_hex = ?1, generation = ?2, rotated_at = ?3 WHERE singleton_id = 1",
@@ -132,7 +139,7 @@ pub(super) fn persist_snapshot(
     Ok(())
 }
 
-fn decode<T: DeserializeOwned>(text: &str) -> Result<T, AuthorityStoreError> {
+pub(super) fn decode<T: DeserializeOwned>(text: &str) -> Result<T, AuthorityStoreError> {
     Ok(chio_core::canonical::UntrustedJsonText::from_wire(
         text.as_bytes(),
         MAX_AUTHORITY_WIRE_BYTES,

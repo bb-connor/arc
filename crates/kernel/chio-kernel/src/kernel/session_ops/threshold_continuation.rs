@@ -2,11 +2,12 @@
 
 use super::*;
 use crate::session::{PendingThresholdApproval, SessionError};
-use chio_core::capability::governance::ThresholdApprovalProposal;
+use chio_core::capability::governance::{GovernedTransactionIntent, ThresholdApprovalProposal};
 
 fn continuation_binding(
     operation: &ToolCallOperation,
     proposal: &ThresholdApprovalProposal,
+    bound_intent: Option<&GovernedTransactionIntent>,
 ) -> Result<PendingThresholdApproval, KernelError> {
     // Exhaustive destructuring forces new request fields to choose a binding
     // policy. Only approval evidence may change while this request is pending.
@@ -44,10 +45,10 @@ fn continuation_binding(
     let proposal_digest = proposal.artifact_digest().map_err(|_| {
         KernelError::Internal("threshold continuation proposal is not canonical".into())
     })?;
-    Ok(PendingThresholdApproval::new(
-        proposal_digest,
-        operation_digest,
-    ))
+    Ok(
+        PendingThresholdApproval::new(proposal_digest, operation_digest)
+            .with_bound_intent(bound_intent.cloned()),
+    )
 }
 
 impl ChioKernel {
@@ -55,24 +56,24 @@ impl ChioKernel {
         &self,
         context: &OperationContext,
         operation: &ToolCallOperation,
-    ) -> Result<bool, KernelError> {
+    ) -> Result<Option<PendingThresholdApproval>, KernelError> {
         self.with_sessions_read(|sessions| {
             let session = session_from_map(sessions, &context.session_id)?;
             let Some(pending) = session.inflight().get(&context.request_id) else {
-                return Ok(false);
+                return Ok(None);
             };
-            if pending.pending_threshold_approval.is_none() {
-                return Ok(false);
-            }
+            let Some(retained) = pending.pending_threshold_approval.as_ref() else {
+                return Ok(None);
+            };
             let proposal = operation
                 .threshold_approval_proposal
                 .as_ref()
                 .ok_or_else(|| SessionError::ThresholdApprovalRetryMismatch {
                     request_id: context.request_id.clone(),
                 })?;
-            let binding = continuation_binding(operation, proposal)?;
+            let binding = continuation_binding(operation, proposal, retained.bound_intent())?;
             session.claim_threshold_approval_retry(context, &binding)?;
-            Ok(true)
+            Ok(Some(binding))
         })
     }
 
@@ -81,6 +82,7 @@ impl ChioKernel {
         context: &OperationContext,
         operation: &ToolCallOperation,
         response: &ToolCallResponse,
+        bound_intent: Option<&GovernedTransactionIntent>,
     ) -> Result<bool, KernelError> {
         if response.verdict != Verdict::PendingApproval {
             return Ok(false);
@@ -97,7 +99,18 @@ impl ChioKernel {
                 "pending threshold response changed request ID".into(),
             ));
         }
-        let binding = continuation_binding(operation, &proposal)?;
+        let bound_intent = bound_intent.ok_or_else(|| {
+            KernelError::Internal("pending threshold response omitted its intent".into())
+        })?;
+        let hash = bound_intent.binding_hash().map_err(|error| {
+            KernelError::Internal(format!("pending threshold intent is invalid: {error}"))
+        })?;
+        if hash != proposal.body.governed_intent_hash {
+            return Err(KernelError::Internal(
+                "pending threshold proposal changed its bound intent".into(),
+            ));
+        }
+        let binding = continuation_binding(operation, &proposal, Some(bound_intent))?;
         self.with_sessions_write(|sessions| {
             session_from_map(sessions, &context.session_id)?
                 .mark_threshold_approval_pending(context, binding)?;

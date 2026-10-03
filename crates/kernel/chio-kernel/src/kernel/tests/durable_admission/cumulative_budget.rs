@@ -58,7 +58,8 @@ fn cumulative_approval_membership_does_not_change_operation_identity() {
 }
 
 #[test]
-fn cumulative_approval_resumes_the_same_hold_and_dispatches_once() {
+fn cumulative_approval_resumes_the_same_hold_and_dispatches_once(
+) -> Result<(), Box<dyn std::error::Error>> {
     let (mut kernel, mut request, store, invocations) =
         durable_admission_fixture("cumulative-approval-dispatch");
     let approver_a = CoreKeypair::generate();
@@ -97,7 +98,7 @@ fn cumulative_approval_resumes_the_same_hold_and_dispatches_once() {
         });
     request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
         .expect("cumulative capability must sign");
-    let intent = GovernedTransactionIntent {
+    let mut intent = GovernedTransactionIntent {
         id: "cumulative-approval-intent".to_owned(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -114,7 +115,15 @@ fn cumulative_approval_resumes_the_same_hold_and_dispatches_once() {
         context: None,
         body: Default::default(),
     };
-    let intent_hash = intent.binding_hash().expect("intent hash");
+    crate::approval::ToolApprovalContext::bind(
+        &mut intent,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        kernel.policy_hash(),
+        "cumulative-approval-test",
+    )?;
+    let intent_hash = intent.binding_hash()?;
     request.governed_intent = Some(intent);
 
     let pending = kernel
@@ -194,6 +203,7 @@ fn cumulative_approval_resumes_the_same_hold_and_dispatches_once() {
         .expect("completed cumulative replay");
     assert_eq!(replay.verdict, Verdict::Allow);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    Ok(())
 }
 
 #[test]
@@ -310,7 +320,8 @@ fn cumulative_approval_guard_denial_creates_no_budget_state() {
 }
 
 #[test]
-fn nested_cumulative_approval_resumes_and_dispatches_once() {
+fn nested_cumulative_approval_resumes_and_dispatches_once() -> Result<(), Box<dyn std::error::Error>>
+{
     let (mut kernel, mut request, _store, invocations) =
         durable_admission_fixture("nested-cumulative-approval");
     let approver = CoreKeypair::generate();
@@ -342,7 +353,7 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() {
         });
     request.capability = CapabilityToken::sign(body, &kernel.config.keypair)
         .expect("cumulative capability must sign");
-    let intent = GovernedTransactionIntent {
+    let mut intent = GovernedTransactionIntent {
         id: "nested-cumulative-intent".to_owned(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -359,7 +370,15 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() {
         context: None,
         body: Default::default(),
     };
-    let intent_hash = intent.binding_hash().expect("intent hash");
+    crate::approval::ToolApprovalContext::bind(
+        &mut intent,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        kernel.policy_hash(),
+        "nested-cumulative-approval-test",
+    )?;
+    let intent_hash = intent.binding_hash()?;
     request.governed_intent = Some(intent);
     let session_id = kernel
         .open_session("nested-cumulative-parent".to_owned(), Vec::new())
@@ -417,6 +436,7 @@ fn nested_cumulative_approval_resumes_and_dispatches_once() {
         .expect("nested approved response");
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    Ok(())
 }
 
 #[test]

@@ -157,12 +157,32 @@ class OperatorCommandsTest(unittest.TestCase):
         }
         self.proposal.write_text(json.dumps(self.proposal_value))
         self.output = self.root / "decision.json"
+        self.decision_token = self.root / "signed-decision.json"
+
+    def signed_token(self, action):
+        # The disposable HTTP fixture proves exact transport and preflight.
+        # Signature authentication is exercised by the native MCP route tests.
+        return {
+            "id": "approval-test-decision",
+            "approver": "11" * 32,
+            "subject": "22" * 32,
+            "governed_intent_hash": "33" * 32,
+            "request_id": "request-test",
+            "issued_at": 1789000000,
+            "expires_at": 1789000300,
+            "decision": "approved" if action == "approve" else "denied",
+            "signature": "44" * 64,
+        }
+
+    def write_decision_token(self, token):
+        self.decision_token.write_text(json.dumps(token))
+        self.decision_token.chmod(0o600)
 
     def write_operator(self, value):
         self.operator.write_text(json.dumps(value))
         self.operator.chmod(0o600)
 
-    def command(self, action="status", approval=False, extra=(), env=None):
+    def command(self, action="status", approval=False, extra=(), env=None, signed_decision=True):
         args = [
             sys.executable,
             str(HERE / ("operator_approval.py" if approval else "operator_capability.py")),
@@ -177,6 +197,9 @@ class OperatorCommandsTest(unittest.TestCase):
                 if action == "submit"
                 else ["--approval-id", "approval-test"]
             )
+            if action in ("approve", "deny") and signed_decision:
+                self.write_decision_token(self.signed_token(action))
+                args += ["--decision-token-file", str(self.decision_token)]
         else:
             args += ["--capability-id", "cap-test"]
         result = subprocess.run([*args, *extra], capture_output=True, text=True, env=env, timeout=5)
@@ -227,10 +250,41 @@ class OperatorCommandsTest(unittest.TestCase):
                 else:
                     self.assertEqual(
                         json.loads(request["body"]),
-                        {"decision": "approved" if action == "approve" else "denied"},
+                        {"token": self.signed_token(action)},
                     )
                     self.assertEqual(request["path"], "/admin/approvals/approval-test/decision")
                 self.output.unlink()
+
+    def test_decision_requires_operator_signed_token_before_network(self):
+        for action in ("approve", "deny"):
+            with self.subTest(action=action):
+                result = self.command(action, approval=True, signed_decision=False)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(len(self.server.requests), 0)
+                self.assertFalse(self.output.exists())
+
+    def test_decision_rejects_mismatched_or_unsigned_token_before_network(self):
+        for mutation in ("decision", "id", "signature", "expiry", "extra"):
+            with self.subTest(mutation=mutation):
+                token = self.signed_token("approve")
+                if mutation == "decision":
+                    token["decision"] = "denied"
+                elif mutation == "id":
+                    token["id"] = "another-approval-decision"
+                elif mutation == "signature":
+                    del token["signature"]
+                elif mutation == "expiry":
+                    token["expires_at"] = token["issued_at"]
+                else:
+                    token["seed_hex"] = "not-an-approval-field"
+                self.write_decision_token(token)
+                result = self.command(
+                    "approve", approval=True, signed_decision=False,
+                    extra=("--decision-token-file", str(self.decision_token)),
+                )
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(len(self.server.requests), 0)
+                self.assertFalse(self.output.exists())
 
     def test_redirects_never_forward_credentials_or_replay_mutations(self):
         for status in (301, 302, 303, 307, 308):

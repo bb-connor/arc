@@ -705,6 +705,10 @@ pub(crate) enum McpCommands {
         #[arg(long)]
         policy: PathBuf,
 
+        /// Explicit approver roster and already activated durable replay source.
+        #[arg(long)]
+        approval_config: Option<PathBuf>,
+
         /// Server ID to assign to the wrapped MCP server inside Chio.
         #[arg(long)]
         server_id: String,

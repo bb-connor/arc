@@ -124,6 +124,7 @@ pub(crate) struct RemoteCapabilityAuthority {
 }
 
 pub(crate) struct AuthorityKeyCache {
+    pub(crate) issuer_state: Option<chio_kernel::AuthoritySnapshot>,
     pub(crate) current: Option<PublicKey>,
     pub(crate) trusted: Vec<PublicKey>,
     pub(crate) generation: Option<u64>,

@@ -1,6 +1,9 @@
 //! Signed verification-state replication rooted in an operator-pinned checkpoint.
 //!
 //! Service tokens and keys advertised by a peer cannot authorize this chain.
+use super::lifecycle::{
+    apply_lifecycle_change, AuthorityLifecycleChange, DEFAULT_ISSUER_VERIFICATION_GRACE_SECONDS,
+};
 use super::{AuthoritySnapshot, AuthorityStoreError, AuthorityTrustedKeySnapshot};
 use chio_core::canonical::CanonicalBytes;
 use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm};
@@ -10,9 +13,12 @@ pub const MAX_AUTHORITY_CHAIN: usize = 1024;
 pub const MAX_AUTHORITY_KEYS: usize = 4096;
 pub const MAX_AUTHORITY_WIRE_BYTES: usize = 4 * 1024 * 1024;
 pub const AUTHORITY_ENVELOPE_LIFETIME_SECONDS: u64 = 300;
-const ANCHOR_SCHEMA: &str = "chio.authority-replication-anchor.v1";
-const TRANSITION_SCHEMA: &str = "chio.authority-rotation.v1";
-const ENVELOPE_SCHEMA: &str = "chio.authority-snapshot.v1";
+const LEGACY_ANCHOR_SCHEMA: &str = "chio.authority-replication-anchor.v1";
+const ANCHOR_SCHEMA: &str = "chio.authority-replication-anchor.v2";
+const LEGACY_TRANSITION_SCHEMA: &str = "chio.authority-rotation.v1";
+const TRANSITION_SCHEMA: &str = "chio.authority-lifecycle.v2";
+const LEGACY_ENVELOPE_SCHEMA: &str = "chio.authority-snapshot.v1";
+const ENVELOPE_SCHEMA: &str = "chio.authority-snapshot.v2";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -20,6 +26,8 @@ pub struct AuthorityReplicationAnchor {
     pub schema: String,
     pub stream_id: String,
     pub snapshot: AuthoritySnapshot,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery_public_key_hex: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +41,8 @@ pub struct AuthorityTransitionBody {
     pub public_key_hex: String,
     pub rotated_at: u64,
     pub issuer_set_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change: Option<AuthorityLifecycleChange>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,13 +96,14 @@ impl AuthorityReplicationAnchor {
             schema: ANCHOR_SCHEMA.into(),
             stream_id,
             snapshot,
+            recovery_public_key_hex: None,
         };
         anchor.validate()?;
         Ok(anchor)
     }
 
     pub fn validate(&self) -> Result<(), AuthorityStoreError> {
-        if self.schema != ANCHOR_SCHEMA
+        if !matches!(self.schema.as_str(), ANCHOR_SCHEMA | LEGACY_ANCHOR_SCHEMA)
             || self.stream_id.is_empty()
             || self.stream_id.len() > 128
             || !self
@@ -101,6 +112,18 @@ impl AuthorityReplicationAnchor {
                 .all(|c| c.is_ascii_alphanumeric() || b"-_.:".contains(&c))
         {
             return Err(refused("invalid replication anchor domain"));
+        }
+        if let Some(recovery) = &self.recovery_public_key_hex {
+            canonical_key(recovery)?;
+            if self.schema != ANCHOR_SCHEMA
+                || self
+                    .snapshot
+                    .trusted_keys
+                    .iter()
+                    .any(|key| &key.public_key_hex == recovery)
+            {
+                return Err(refused("recovery root must be independently pinned"));
+            }
         }
         validate_state(&self.snapshot)
     }
@@ -120,10 +143,44 @@ impl SignedAuthorityTransition {
         rotated_at: u64,
         signer: &Keypair,
     ) -> Result<Self, AuthorityStoreError> {
-        if signer.public_key().to_hex() != previous.public_key_hex {
-            return Err(refused("rotation requires custody of the current head"));
+        let verify_until = rotated_at
+            .checked_add(DEFAULT_ISSUER_VERIFICATION_GRACE_SECONDS)
+            .ok_or_else(|| refused("issuer deadline overflow"))?;
+        Self::sign_change(
+            anchor,
+            previous,
+            previous_commitment,
+            AuthorityLifecycleChange::Rotate { verify_until },
+            next_key,
+            rotated_at,
+            signer,
+        )
+    }
+
+    pub fn sign_change(
+        anchor: &AuthorityReplicationAnchor,
+        previous: &AuthoritySnapshot,
+        previous_commitment: &str,
+        change: AuthorityLifecycleChange,
+        next_key: &PublicKey,
+        at: u64,
+        signer: &Keypair,
+    ) -> Result<Self, AuthorityStoreError> {
+        let expected = if matches!(change, AuthorityLifecycleChange::Recover) {
+            anchor
+                .recovery_public_key_hex
+                .as_deref()
+                .ok_or_else(|| refused("no independent recovery root is pinned"))?
+        } else {
+            previous.public_key_hex.as_str()
+        };
+        if signer.public_key().to_hex() != expected {
+            return Err(refused(
+                "lifecycle signer does not own the required authority",
+            ));
         }
-        let next = advance(previous, &next_key.to_hex(), rotated_at)?;
+        require_distinct_recovery_root(anchor, &next_key.to_hex())?;
+        let next = apply_lifecycle_change(previous, &change, &next_key.to_hex(), at)?;
         let body = AuthorityTransitionBody {
             schema: TRANSITION_SCHEMA.into(),
             stream_id: anchor.stream_id.clone(),
@@ -131,8 +188,9 @@ impl SignedAuthorityTransition {
             previous_commitment: previous_commitment.into(),
             generation: next.generation,
             public_key_hex: next.public_key_hex.clone(),
-            rotated_at,
+            rotated_at: at,
             issuer_set_digest: digest(&next.trusted_keys)?,
+            change: Some(change),
         };
         let signature = signer.sign_canonical(&body)?.0;
         Ok(Self { body, signature })
@@ -157,8 +215,10 @@ pub fn verify_authority_chain(
     let mut commitment = anchor_digest.clone();
     for transition in chain {
         let body = &transition.body;
-        if body.schema != TRANSITION_SCHEMA
-            || body.stream_id != anchor.stream_id
+        if !matches!(
+            body.schema.as_str(),
+            TRANSITION_SCHEMA | LEGACY_TRANSITION_SCHEMA
+        ) || body.stream_id != anchor.stream_id
             || body.anchor_digest != anchor_digest
             || body.previous_commitment != commitment
             || state.generation.checked_add(1) != Some(body.generation)
@@ -167,17 +227,51 @@ pub fn verify_authority_chain(
                 "authority transition predecessor or domain mismatch",
             ));
         }
-        let key = canonical_key(&state.public_key_hex)?;
+        let signer = if matches!(body.change, Some(AuthorityLifecycleChange::Recover)) {
+            anchor
+                .recovery_public_key_hex
+                .as_deref()
+                .ok_or_else(|| refused("no independent recovery root is pinned"))?
+        } else {
+            state.public_key_hex.as_str()
+        };
+        let key = canonical_key(signer)?;
         if !key.verify_canonical_strict(body, &transition.signature)? {
             return Err(refused("authority transition signature invalid"));
         }
-        state = advance(&state, &body.public_key_hex, body.rotated_at)?;
+        require_distinct_recovery_root(anchor, &body.public_key_hex)?;
+        state = match (body.schema.as_str(), body.change.as_ref()) {
+            (TRANSITION_SCHEMA, Some(change)) => {
+                apply_lifecycle_change(&state, change, &body.public_key_hex, body.rotated_at)?
+            }
+            (LEGACY_TRANSITION_SCHEMA, None)
+                if anchor.schema == LEGACY_ANCHOR_SCHEMA
+                    && state.trusted_keys.iter().all(|key| key.lifecycle.is_none()) =>
+            {
+                advance(&state, &body.public_key_hex, body.rotated_at)?
+            }
+            _ => {
+                return Err(refused(
+                    "authority lifecycle downgrade or missing operation",
+                ))
+            }
+        };
         if digest(&state.trusted_keys)? != body.issuer_set_digest {
             return Err(refused("authority issuer-set digest mismatch"));
         }
         commitment = transition.commitment()?;
     }
     Ok((state, commitment))
+}
+
+fn require_distinct_recovery_root(
+    anchor: &AuthorityReplicationAnchor,
+    issuer: &str,
+) -> Result<(), AuthorityStoreError> {
+    if anchor.recovery_public_key_hex.as_deref() == Some(issuer) {
+        return Err(refused("recovery root cannot be a capability issuer"));
+    }
+    Ok(())
 }
 
 impl SignedAuthoritySnapshot {
@@ -235,7 +329,15 @@ impl SignedAuthoritySnapshot {
             .proof
             .as_ref()
             .ok_or_else(|| refused("unsigned authority snapshot"))?;
-        if proof.schema != ENVELOPE_SCHEMA
+        if !matches!(
+            proof.schema.as_str(),
+            ENVELOPE_SCHEMA | LEGACY_ENVELOPE_SCHEMA
+        ) || (proof.schema == LEGACY_ENVELOPE_SCHEMA
+            && self
+                .snapshot
+                .trusted_keys
+                .iter()
+                .any(|key| key.lifecycle.is_some()))
             || proof.stream_id != anchor.stream_id
             || proof.anchor_digest != anchor.commitment()?
         {
@@ -314,12 +416,19 @@ pub fn validate_state(state: &AuthoritySnapshot) -> Result<(), AuthorityStoreErr
     }
     if !state.trusted_keys.last().is_some_and(|key| {
         key.public_key_hex == state.public_key_hex
-            && key.generation == state.generation
-            && key.activated_at == state.rotated_at
+            && key.generation <= state.generation
+            && key.activated_at <= state.rotated_at
     }) {
         return Err(refused("authority head missing from history"));
     }
-    Ok(())
+    if state.trusted_keys.iter().all(|key| key.lifecycle.is_none())
+        && !state.trusted_keys.last().is_some_and(|key| {
+            key.generation == state.generation && key.activated_at == state.rotated_at
+        })
+    {
+        return Err(refused("legacy authority head does not match generation"));
+    }
+    super::lifecycle::validate_lifecycle(state)
 }
 
 fn advance(
@@ -349,6 +458,7 @@ fn advance(
         public_key_hex: public_key.into(),
         generation,
         activated_at: at,
+        lifecycle: None,
     });
     validate_state(&next)?;
     Ok(next)

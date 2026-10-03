@@ -850,6 +850,7 @@ pub(crate) fn authority_status_for_config(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -1680,6 +1681,7 @@ mod config_and_public_tests {
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: false,
             trusted_public_keys: Vec::new(),
         })
@@ -1695,6 +1697,7 @@ mod config_and_public_tests {
             public_key: Some(current.clone()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![current.clone()],
         })
@@ -1708,6 +1711,7 @@ mod config_and_public_tests {
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         })

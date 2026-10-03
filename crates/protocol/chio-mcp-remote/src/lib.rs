@@ -21,6 +21,9 @@ pub use chio_control_plane::{CliError, JwtProviderProfile};
 
 #[path = "remote_mcp/admin.rs"]
 mod remote_mcp_admin;
+#[path = "remote_mcp/approval_policy.rs"]
+mod remote_mcp_approval_policy;
+pub use remote_mcp_approval_policy::RemoteApprovalConfig;
 #[path = "remote_mcp/approvals.rs"]
 mod remote_mcp_approvals;
 #[path = "remote_mcp/session_credentials.rs"]

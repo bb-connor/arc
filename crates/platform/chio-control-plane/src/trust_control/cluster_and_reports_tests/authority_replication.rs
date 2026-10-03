@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn unsigned_authority_full_snapshot_cannot_insert_issuer() {
-    let root = tempfile::tempdir().test_unwrap();
+    let root = chio_test_support::private_tempdir().test_unwrap();
     let path = root.path().join("authority.db");
     let authority = SqliteCapabilityAuthority::open(&path).test_unwrap();
     authority
@@ -16,6 +16,7 @@ fn unsigned_authority_full_snapshot_cannot_insert_issuer() {
             public_key_hex: Keypair::generate().public_key().to_hex(),
             generation: 1,
             activated_at: before.rotated_at,
+            lifecycle: None,
         });
     let mut state = state_with_cluster(
         "http://127.0.0.1:3300",
@@ -61,7 +62,10 @@ fn unsigned_authority_plaintext_off_loopback_is_refused_even_with_local_override
     }
 }
 
-fn pull_snapshot(state: &TrustServiceState, wire: &AuthoritySnapshotView) -> Result<(), CliError> {
+pub(super) fn pull_snapshot(
+    state: &TrustServiceState,
+    wire: &AuthoritySnapshotView,
+) -> Result<(), CliError> {
     use std::io::{Read, Write};
     let listener = std::net::TcpListener::bind("127.0.0.1:0").test_unwrap();
     let endpoint = format!("http://{}", listener.local_addr().test_unwrap());
@@ -91,7 +95,7 @@ fn pull_snapshot(state: &TrustServiceState, wire: &AuthoritySnapshotView) -> Res
 
 #[test]
 fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_denies_it() {
-    let root = tempfile::tempdir().test_unwrap();
+    let root = chio_test_support::private_tempdir().test_unwrap();
     let source = SqliteCapabilityAuthority::open(root.path().join("source.db")).test_unwrap();
     let follower_path = root.path().join("follower.db");
     let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
@@ -118,6 +122,7 @@ fn authority_replication_both_import_paths_reject_injected_issuer_and_kernel_den
             public_key_hex: attacker.public_key().to_hex(),
             generation: 2,
             activated_at: signed.snapshot.rotated_at,
+            lifecycle: None,
         });
     for mut forged in [injected, signed.clone()] {
         if forged.snapshot == signed.snapshot {

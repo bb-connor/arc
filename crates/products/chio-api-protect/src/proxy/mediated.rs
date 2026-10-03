@@ -105,17 +105,22 @@ pub(crate) fn load_revocation_db_ids(
 /// authorized and captured before the reserve-for-caller path mints a nonce.
 /// When `None` the kernel carries no adapter, so the governed prepayment gate
 /// denies `MustPrepay` fail-closed: only a configured adapter enables it.
+pub(crate) struct MediationPolicy<'a> {
+    pub issuers: &'a [PublicKey],
+    pub hash: Option<&'a str>,
+}
+
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
     budget_store: Arc<dyn BudgetStore>,
-    trusted_capability_issuers: &[PublicKey],
+    policy: MediationPolicy<'_>,
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     durable_admission: Option<DurableAdmissionStores>,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
-    for issuer in trusted_capability_issuers {
+    for issuer in policy.issuers {
         if !ca_public_keys.contains(issuer) {
             ca_public_keys.push(issuer.clone());
         }
@@ -127,7 +132,10 @@ pub(crate) fn build_mediation_kernel(
             max_delegation_depth: 5,
             // Durable admission binds every operation to a canonical SHA-256 policy
             // digest, so the mediation policy is named by its digest.
-            policy_hash: chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1"),
+            policy_hash: policy
+                .hash
+                .map(str::to_owned)
+                .unwrap_or_else(|| chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1")),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -232,11 +240,8 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     parameters: serde_json::Value,
     #[serde(default)]
     agent_id: Option<String>,
-    /// Optional caller-chosen request identifier. When present it is forwarded
-    /// verbatim so the caller can bind a governed approval token to this exact
-    /// request (the kernel requires `approval_token.request_id == request_id`).
-    /// When absent the sidecar mints one; that is fine for capabilities that do
-    /// not carry an approval-gated governed intent.
+    /// Optional caller request identity. With approval_id it must equal that
+    /// server-owned identity; otherwise the sidecar generates one when omitted.
     #[serde(default)]
     request_id: Option<String>,
     /// Optional governed transaction intent bound to this invocation. Forwarded
@@ -244,10 +249,12 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// can be authorized instead of denied.
     #[serde(default)]
     governed_intent: Option<GovernedTransactionIntent>,
-    /// Optional approval token authorizing this governed invocation, forwarded
-    /// alongside `governed_intent` so an approval-gated grant can be authorized.
+    /// Legacy direct token field, rejected in favor of a retained approval_id.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
+    /// Server-assigned identifier of a retained, signed approval.
+    #[serde(default)]
+    approval_id: Option<String>,
     /// Reserved threshold approval fields. The mediated product does not yet
     /// configure a threshold policy resolver, so either field is rejected at the
     /// HTTP boundary instead of being advertised as an unusable kernel feature.
@@ -289,6 +296,12 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             Ok(parsed) => parsed,
             Err(error) => return input::rejected(error),
         };
+    if parsed.approval_token.is_some()
+        || (parsed.approval_id.is_some() && parsed.governed_intent.is_some())
+    {
+        return sidecar_bad_request("use approval_id to redeem the retained server-built approval")
+            .into_response();
+    }
     if parsed.supplemental_authorization.is_some() {
         return sidecar_bad_request(
             "supplemental_authorization is unavailable: no supplemental verifier is configured",
@@ -407,6 +420,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         .unwrap_or_else(|| parsed.capability.subject.to_hex());
     let request_id = parsed
         .request_id
+        .clone()
+        .or_else(|| parsed.approval_id.clone())
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
     // Durable reuse guard that survives a restart, which the in-memory window
     // below cannot: after a restart the window is empty, but a reservation opened
@@ -519,7 +534,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             );
         }
     };
-    let kernel_request = ToolCallRequest {
+    let mut kernel_request = ToolCallRequest {
         request_id: request_id.clone(),
         capability: parsed.capability,
         tool_name: parsed.tool_name,
@@ -539,6 +554,18 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
+    if let Some(approval_id) = parsed.approval_id.as_deref() {
+        if let Err(error) =
+            super::approval::redeem_approval(&state, &kernel, &mut kernel_request, approval_id)
+        {
+            state
+                .minted_request_ids
+                .lock()
+                .await
+                .release(&request_claim);
+            return approval_error_response(error);
+        }
+    }
     // Reservation on the shared, process-lifetime kernel: verify +
     // reserve the budget hold (kept open) + mint a fresh execution nonce. The
     // reserve-for-caller path never dispatches, so it does not require the

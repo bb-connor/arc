@@ -92,6 +92,7 @@ pub(crate) fn dispatch_mcp(
         ),
         McpCommands::ServeHttp {
             policy,
+            approval_config,
             server_id,
             server_name,
             server_version,
@@ -131,6 +132,7 @@ pub(crate) fn dispatch_mcp(
             command,
         } => cmd_mcp_serve_http(
             &policy,
+            approval_config.as_deref(),
             &server_id,
             server_name.as_deref(),
             server_version.as_deref(),

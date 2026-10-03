@@ -108,13 +108,20 @@ fn security_rejection(nested: bool, fault: Fault, rollback: Rollback) -> TestRes
         rollback,
         counts: counts.clone(),
     }));
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "security-credential-intent",
         &request.server_id,
         &request.tool_name,
         "exercise security rejection credential custody",
         1,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
     );
     request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,

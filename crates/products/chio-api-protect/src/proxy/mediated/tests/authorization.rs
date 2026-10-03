@@ -445,7 +445,7 @@ async fn mediated_deny_leaves_committed_cost_zero() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_governed_capability_requires_intent_and_approval() {
+async fn mediated_governed_capability_requires_retained_approval() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -458,8 +458,7 @@ async fn mediated_governed_capability_requires_intent_and_approval() {
     let approver = signer.clone();
     let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
 
-    // Without a governed intent + approval token, the governed
-    // grant is DENIED (the forwarded fields are load-bearing).
+    // A grant requiring approval cannot reserve without its retained decision.
     let bare_body = serde_json::json!({
         "capability": cap_value,
         "tool_server": "cost-srv",
@@ -472,8 +471,7 @@ async fn mediated_governed_capability_requires_intent_and_approval() {
         "a governed grant without a forwarded intent must be denied"
     );
 
-    // With a valid governed intent + approval token bound to the caller-chosen
-    // request_id, the same grant is AUTHORIZED.
+    // Even a signed direct token must use the retained server approval route.
     let request_id = "req-governed-1";
     let intent = governed_intent("intent-gov-1", "cost-srv", "compute", 100, "USD");
     let approval = governed_approval_token(&approver, &agent.public_key(), &intent, request_id);
@@ -486,20 +484,18 @@ async fn mediated_governed_capability_requires_intent_and_approval() {
         "governed_intent": intent,
         "approval_token": approval
     });
-    let (_, authorized) = post_evaluate(Arc::clone(&state), &governed_body).await;
+    let (status, rejected) = post_evaluate(Arc::clone(&state), &governed_body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        authorized["status"], "reserved",
-        "a governed grant with a valid intent and approval must be authorized"
+        rejected["message"],
+        "use approval_id to redeem the retained server-built approval"
     );
-    assert!(authorized["execution_nonce"].is_object());
+    assert!(budget.get_usage(&cap.id, 0).test_unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
-    // An approved governed MustPrepay request authorizes only because a payment
-    // adapter is installed on the mediation kernel: the kernel prepays the
-    // quoted cost through the adapter before the reserve-for-caller path mints
-    // a nonce.
+async fn mediated_governed_direct_token_rejected_even_with_payment_adapter() {
+    // Payment configuration cannot promote a caller-supplied approval envelope.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -533,22 +529,17 @@ async fn mediated_governed_mustprepay_authorizes_with_payment_adapter() {
         "approval_token": approval,
     });
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        json["status"], "reserved",
-        "a configured payment adapter must let an approved governed MustPrepay authorize"
+        json["message"],
+        "use approval_id to redeem the retained server-built approval"
     );
-    assert!(
-        json["execution_nonce"].is_object(),
-        "an authorized MustPrepay reservation must mint an execution nonce"
-    );
+    assert!(budget.get_usage(&cap.id, 0).test_unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_governed_mustprepay_denied_without_payment_adapter() {
-    // The same approved governed MustPrepay request is denied fail-closed when
-    // no payment adapter is configured: the kernel has no rail to prepay the
-    // quote, so the prepayment gate rejects it before any reservation.
+async fn mediated_governed_direct_token_rejected_without_payment_adapter() {
+    // Reject the unsupported wire contract before budget or payment mutation.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -573,20 +564,12 @@ async fn mediated_governed_mustprepay_denied_without_payment_adapter() {
         "approval_token": approval,
     });
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        json["status"], "deny",
-        "governed MustPrepay must deny fail-closed without a configured payment adapter"
+        json["message"],
+        "use approval_id to redeem the retained server-built approval"
     );
-    assert!(
-        json["execution_nonce"].is_null(),
-        "a denied MustPrepay must not mint a reserved nonce"
-    );
-
-    // The governed prepayment gate denies before any reserve, so no budget is
-    // committed against the grant.
-    let usage = budget.get_usage(&cap_id, 0).unwrap();
-    assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
+    assert!(budget.get_usage(&cap_id, 0).test_unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1174,6 +1157,7 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: Some("http://127.0.0.1:1".to_string()),
         control_token: Some("token".to_string()),
         budget_db: Some(db.to_string_lossy().to_string()),

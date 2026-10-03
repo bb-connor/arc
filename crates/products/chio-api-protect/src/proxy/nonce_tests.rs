@@ -37,6 +37,7 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         http_client,
         egress_contract,
         approval_admin: ApprovalAdmin::new(approval_store),
+        approval_config: None,
         receipt_log: Mutex::new(ReceiptLog {
             receipts: Vec::new(),
         }),

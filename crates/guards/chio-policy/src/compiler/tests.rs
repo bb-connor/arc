@@ -987,3 +987,50 @@ fn jailbreak_oversize_threshold_clamped() {
     let cfg = jailbreak_config_from(&jb).unwrap();
     assert!(cfg.threshold <= 1.0 + f32::EPSILON);
 }
+
+#[test]
+fn ap23_unsupported_approval_policy_fields_fail_loading() {
+    for field in [
+        "approve_above_currency: USD",
+        "timeout_seconds: 300",
+        "on_timeout: deny",
+    ] {
+        let yaml = format!("hushspec: '0.1.0'\nrules:\n  human_in_loop:\n    require_confirmation: [shell.*]\n    {field}\n");
+        let error = match HushSpec::parse(&yaml) {
+            Ok(_) => panic!("unenforced field loaded: {field}"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported approval policy field: no execution enforcement"),
+            "{error}"
+        );
+    }
+    let yaml = "hushspec: '0.1.0'\nextensions:\n  chio:\n    human_in_loop:\n      approve_when: [high_risk]\n";
+    let error = match HushSpec::parse(yaml) {
+        Ok(_) => panic!("unenforced approve_when loaded"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("unsupported approval policy field: no execution enforcement"),
+        "{error}"
+    );
+}
+
+#[test]
+fn ap23_dual_approval_policy_is_rejected_at_loading() {
+    let yaml = "hushspec: '0.1.0'\nrules:\n  human_in_loop:\n    require_dual_approval: true\n";
+    let error = match HushSpec::parse(yaml) {
+        Ok(_) => panic!("unsupported dual approval policy loaded"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("unknown field `require_dual_approval`"),
+        "{error}"
+    );
+}

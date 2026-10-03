@@ -587,6 +587,35 @@ fn witnessed_rotation_uses_signed_commit_time_and_strict_majority() {
 }
 
 #[test]
+fn kg2_untimed_projection_cannot_grant_unbounded_verification_only_authority() {
+    let fixture = Fixture::new();
+    let policy = fixture.policy();
+    let genesis = fixture.genesis();
+    let rotation = fixture.rotation(&genesis);
+    let events = vec![genesis.clone(), rotation.clone()];
+    let (checkpoints, commit) = fixture.activation_materials(&[&genesis, &rotation], 1);
+    let history = WitnessedActivationSet::verify_complete(
+        &events,
+        &checkpoints,
+        std::slice::from_ref(&commit),
+        &policy,
+    )
+    .test_unwrap();
+    let state = KeyLogState::replay([&genesis, &rotation], &history, &policy).test_unwrap();
+    let keys = state.witnessed_verification_keys();
+    assert_eq!(
+        keys.len(),
+        1,
+        "verification-only keys require an explicit current time"
+    );
+    assert_eq!(keys[0].key_id, rotation.body.key_id);
+    assert_eq!(state.witnessed_verification_keys_at(8_999).len(), 2);
+    assert_eq!(state.witnessed_verification_keys_at(9_000).len(), 1);
+    assert_eq!(state.witnessed_verification_keys_at(9_001).len(), 1);
+    assert!(state.witnessed_verification_keys_at(0).is_empty());
+}
+
+#[test]
 fn trusted_artifact_time_evidence_blocks_post_deactivation_and_preactivation_use() {
     let fixture = Fixture::new();
     let policy = fixture.policy();

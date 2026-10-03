@@ -61,14 +61,16 @@ impl ChioKernel {
             return Ok(response);
         }
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
+        let retained =
+            self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
 
-        let request = nested_tool_request(context, operation, execution_nonce, proofs);
+        let mut request = nested_tool_request(context, operation, execution_nonce, proofs);
 
         // Once begun, resolution failures must use the same terminal cleanup
         // as evaluation failures. Returning early would leak in-flight state.
         let result = self
-            .resolve_security_invocation_context(context, operation)
+            .prepare_session_threshold_intent(context, &mut request, retained)
+            .and_then(|()| self.resolve_security_invocation_context(context, operation))
             .and_then(|security_context| {
                 self.evaluate_tool_call_with_nested_flow_client_and_security_context(
                     context,
@@ -97,6 +99,7 @@ impl ChioKernel {
             context,
             Some(operation),
             result.as_ref().ok(),
+            request.governed_intent.as_ref(),
             terminal_state,
         )?;
         result
@@ -139,11 +142,15 @@ impl ChioKernel {
             return Ok(response);
         }
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
+        let retained =
+            self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
 
-        let request = nested_tool_request(context, operation, execution_nonce, proofs);
+        let mut request = nested_tool_request(context, operation, execution_nonce, proofs);
 
-        let result = match self.resolve_security_invocation_context(context, operation) {
+        let prepared = self
+            .prepare_session_threshold_intent(context, &mut request, retained)
+            .and_then(|()| self.resolve_security_invocation_context(context, operation));
+        let result = match prepared {
             Ok(security_context) => {
                 self.evaluate_tool_call_with_nested_flow_client_async_and_security_context(
                     context,
@@ -175,6 +182,7 @@ impl ChioKernel {
             context,
             Some(operation),
             result.as_ref().ok(),
+            request.governed_intent.as_ref(),
             terminal_state,
         )?;
         result

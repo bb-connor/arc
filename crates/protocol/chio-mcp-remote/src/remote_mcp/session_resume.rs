@@ -288,6 +288,7 @@ fn fingerprint_remote_runtime_contract(
         },
         "admitted_signed_manifest_sha256": sha256_hex(&signed_manifest),
         "egress_contract": config.egress_contract,
+        "approval_authority": config.approval,
         "remote_authority": {
             "control_url": config.control_url,
             "service_token_sha256": config.control_token.as_deref().map(|token| sha256_hex(token.as_bytes())),

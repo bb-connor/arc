@@ -31,6 +31,12 @@ mod process_recovery;
 
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+// An explicit fixture policy keeps approval authority independent of its
+// capability/receipt key and stable across genuine store reopen controls.
+fn native_approval_keypair() -> Keypair {
+    Keypair::from_seed(&[211; 32])
+}
+
 fn open_kernel(
     directory: &std::path::Path,
     authority: &SqliteAuthorityStore,
@@ -58,6 +64,10 @@ fn open_kernel(
         },
         clock,
     );
+    kernel.set_governed_approval_policy(
+        "native-flow-approval-tenant".into(),
+        vec![native_approval_keypair().public_key()],
+    )?;
     let receipts = SqliteReceiptStore::open(directory.join("receipts.db"))?;
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     kernel.set_receipt_store_handle(Arc::new(receipts))?;

@@ -19,7 +19,7 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use chio_core_types::capability::{
-    governance::{GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody},
+    governance::GovernedApprovalToken,
     scope::{ChioScope, Operation, PromptGrant, ResourceGrant, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -50,6 +50,10 @@ use chio_store_sqlite::SqliteApprovalStore;
 use crate::error::ProtectError;
 use crate::evaluator::{DurableAdmissionStores, RequestEvaluator, RouteEntry};
 use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, load_spec_from_file};
+
+#[path = "proxy/approval_authority.rs"]
+mod approval_authority;
+pub use approval_authority::ProtectApprovalConfig;
 
 #[path = "proxy/approval.rs"]
 mod approval;

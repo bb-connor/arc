@@ -229,7 +229,12 @@ impl KeyringRuntimeComposition {
             ));
         }
         let witnessed_verification_keys = state
-            .witnessed_verification_keys()
+            .witnessed_verification_keys_at(
+                self.clock
+                    .unix_millis()
+                    .map_err(|error| CliError::cli_other_error(error.to_string()))?
+                    .get(),
+            )
             .into_iter()
             .map(|record| record.public_key)
             .collect();

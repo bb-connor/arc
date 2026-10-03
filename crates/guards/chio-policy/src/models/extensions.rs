@@ -94,7 +94,11 @@ pub struct ChioRollback {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ChioHumanInLoopAdvanced {
-    #[serde(default)]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "super::reject_unsupported_approval_field"
+    )]
     pub approve_when: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approvers: Option<ChioApproverSet>,

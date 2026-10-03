@@ -15,6 +15,45 @@ impl KeyringRuntimeComposition {
         ))
     }
 
+    /// Resolve current capability trust using the owned clock and authenticated
+    /// durable key log. Retained hosts must call this again for every admission.
+    /// Historical artifact verification remains a separate evidence API.
+    pub fn capability_verification_state(
+        &self,
+    ) -> Result<
+        (
+            chio_security_types::clock::UnixMillis,
+            chio_keyring::KeyLogState,
+        ),
+        CliError,
+    > {
+        self.ensure_bound_signing_topology()?;
+        let state = self
+            .store
+            .load_state()
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?
+            .ok_or_else(|| {
+                CliError::cli_other_error("capability verification requires a witnessed key log")
+            })?;
+        let public_key = self
+            .router
+            .active_public_key()
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let epoch = self
+            .router
+            .signing_epoch()
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let active = state
+            .active_signing_key()
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        if active.public_key != public_key || state.signing_epoch() != epoch {
+            return Err(CliError::cli_other_error(
+                "capability verification selector differs from witnessed key log",
+            ));
+        }
+        Ok((self.clock.unix_millis()?, state))
+    }
+
     /// Recover the exact evidence persisted when this capability was issued.
     /// This never signs again or substitutes a newer issuance time. A consumer
     /// verifies the result against its independently pinned key-log verifier.

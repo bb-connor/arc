@@ -325,6 +325,7 @@ pub(crate) struct ProxyState {
     pub(crate) http_client: reqwest::Client,
     pub(crate) egress_contract: HttpEgressContract,
     pub(crate) approval_admin: ApprovalAdmin,
+    pub(crate) approval_config: Option<super::approval_authority::ProtectApprovalConfig>,
     pub(crate) receipt_log: Mutex<ReceiptLog>,
     pub(crate) tool_receipt_log: Mutex<ToolReceiptLog>,
     pub(crate) receipt_store: Option<Mutex<SqliteReceiptStore>>,
@@ -657,7 +658,7 @@ impl ProtectProxy {
         let clock = clock::ProxyClock::default();
         let durable_admission = match durable_receipt_db {
             Some(path) => Some(open_durable_admission(path, Arc::new(clock.clone()))?),
-            None if self.caller_executor.is_some() => {
+            None if self.caller_executor.is_some() || self.config.approval.is_some() => {
                 return Err(ProtectError::Config(
                     "authenticated caller execution requires a durable budget authority".into(),
                 ));
@@ -668,7 +669,7 @@ impl ProtectProxy {
         let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
             routes,
             keypair.clone(),
-            policy_hash,
+            policy_hash.clone(),
             Arc::clone(&approval_store),
             self.config.trusted_capability_issuers.clone(),
             durable_receipt_store,
@@ -742,7 +743,19 @@ impl ProtectProxy {
                 .as_ref()
                 .map(|configured| configured.hold_capable)
                 .unwrap_or(false);
-        let budget_store = configured_budget_store.map(|configured| configured.store);
+        let budget_store = if self.config.approval.is_some() {
+            Some(
+                durable_admission
+                    .as_ref()
+                    .ok_or_else(|| {
+                        ProtectError::Config("approval authority requires durable admission".into())
+                    })?
+                    .budget_store
+                    .clone(),
+            )
+        } else {
+            configured_budget_store.map(|configured| configured.store)
+        };
 
         // Automatic reconcile/reverse of open holds requires the durable receipt
         // log (ADR-0013) to build the realized-spend arbitration map. Without
@@ -782,13 +795,40 @@ impl ProtectProxy {
                 let mut kernel = build_mediation_kernel(
                     &keypair,
                     Arc::clone(store),
-                    &trusted_capability_issuers,
+                    super::mediated::MediationPolicy {
+                        issuers: &trusted_capability_issuers,
+                        hash: Some(&policy_hash),
+                    },
                     Vec::new(),
                     payment_adapter,
                     durable_admission,
                     Arc::new(clock.clone()),
                 )?;
+                if let Some(store) = revocation_store.as_ref() {
+                    for capability_id in &revoked_capability_ids {
+                        store
+                            .revoke(capability_id)
+                            .map_err(|error| ProtectError::Config(error.to_string()))?;
+                    }
+                    kernel.set_revocation_store_handle(Arc::clone(store));
+                }
+                if let Some(approval) = &self.config.approval {
+                    super::approval_authority::configure(&mut kernel, approval)?;
+                }
+                let authenticated_caller =
+                    self.caller_executor.is_some() || self.config.approval.is_some();
                 if let Some(executor) = self.caller_executor {
+                    if self
+                        .config
+                        .approval
+                        .as_ref()
+                        .is_some_and(|approval| approval.caller_executor != executor)
+                    {
+                        return Err(ProtectError::Config(
+                            "caller executor conflicts with approval authority configuration"
+                                .into(),
+                        ));
+                    }
                     if !kernel.has_durable_admission_store() {
                         return Err(ProtectError::Config(
                             "authenticated caller execution requires durable admission".into(),
@@ -797,25 +837,15 @@ impl ProtectProxy {
                     kernel
                         .set_caller_executor(executor)
                         .map_err(|error| ProtectError::Config(error.to_string()))?;
-                    if let Some(store) = revocation_store.as_ref() {
-                        // Include the configured startup revocation database in
-                        // the kernel's ancestor walk, not only the sidecar's
-                        // leaf lookup. A report cannot bypass a revoked parent
-                        // after owner restart. Revocations remain monotone.
-                        for capability_id in &revoked_capability_ids {
-                            store
-                                .revoke(capability_id)
-                                .map_err(|error| ProtectError::Config(error.to_string()))?;
-                        }
-                        kernel.set_revocation_store_handle(Arc::clone(store));
-                    }
+                }
+                if authenticated_caller {
                     kernel
                         .reconcile_durable_admission_startup()
                         .map_err(|error| ProtectError::Config(error.to_string()))?;
                 }
                 Some(Mutex::new(kernel))
             }
-            None if self.caller_executor.is_some() => {
+            None if self.caller_executor.is_some() || self.config.approval.is_some() => {
                 return Err(ProtectError::Config(
                     "authenticated caller execution requires a durable budget authority".into(),
                 ));
@@ -830,6 +860,7 @@ impl ProtectProxy {
             upstream: self.config.upstream.clone(),
             http_client,
             egress_contract,
+            approval_config: self.config.approval.clone(),
             approval_admin: match threshold_collector {
                 Some(collector) => {
                     ApprovalAdmin::with_threshold_collector(approval_store, collector)
@@ -959,6 +990,7 @@ mod proxy_builder_tests {
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            approval: None,
             control_url: None,
             control_token: None,
             budget_db: None,
@@ -1036,6 +1068,7 @@ mod windows_authority_tests {
             sidecar_control_token: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            approval: None,
             control_url: None,
             control_token: None,
             budget_db: None,

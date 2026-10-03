@@ -351,6 +351,8 @@ impl ChioKernel {
             execution_nonce_config: None,
             execution_nonce_store: None,
             governed_approval_authority: None,
+            governed_approvers: Vec::new(),
+            governed_approval_tenant: None,
             approval_replay_store: Some(Box::new(
                 crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::with_default_capacity(
                     clock.clone(),

@@ -162,3 +162,12 @@ fn default_burst_factor() -> f64 {
 
 #[cfg(test)]
 mod tests;
+
+fn reject_unsupported_approval_field<'de, D, T>(_deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Err(serde::de::Error::custom(
+        "unsupported approval policy field: no execution enforcement",
+    ))
+}

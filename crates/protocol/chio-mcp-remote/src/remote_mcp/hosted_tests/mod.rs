@@ -2,6 +2,7 @@
 mod auth_flows;
 mod cross_crate_pipeline;
 mod error_contract;
+mod operator_approvals;
 mod session_isolation;
 mod session_lifecycle;
 mod support;

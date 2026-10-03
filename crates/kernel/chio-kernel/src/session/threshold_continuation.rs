@@ -6,10 +6,22 @@ use super::*;
 /// Opaque binding for retrying an original session request after collecting votes.
 /// Only the kernel can install it, from its own pending response. The kernel must
 /// still revalidate all current authorization and durable admission on every retry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct PendingThresholdApproval {
     proposal_digest: String,
     operation_digest: String,
+    bound_intent: Option<chio_core::capability::governance::GovernedTransactionIntent>,
+}
+
+impl std::fmt::Debug for PendingThresholdApproval {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PendingThresholdApproval")
+            .field("proposal_digest", &self.proposal_digest)
+            .field("operation_digest", &self.operation_digest)
+            .field("has_bound_intent", &self.bound_intent.is_some())
+            .finish()
+    }
 }
 
 #[cfg(not(loom))]
@@ -18,7 +30,21 @@ impl PendingThresholdApproval {
         Self {
             proposal_digest,
             operation_digest,
+            bound_intent: None,
         }
+    }
+    pub(crate) fn with_bound_intent(
+        mut self,
+        intent: Option<chio_core::capability::governance::GovernedTransactionIntent>,
+    ) -> Self {
+        self.bound_intent = intent;
+        self
+    }
+
+    pub(crate) fn bound_intent(
+        &self,
+    ) -> Option<&chio_core::capability::governance::GovernedTransactionIntent> {
+        self.bound_intent.as_ref()
     }
 }
 

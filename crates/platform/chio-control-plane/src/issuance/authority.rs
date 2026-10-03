@@ -112,6 +112,15 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         self.inner.trusted_public_keys()
     }
 
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &PublicKey,
+        issued_at: u64,
+        now: u64,
+    ) -> Result<(), KernelError> {
+        self.inner.check_issuer_lifecycle(issuer, issued_at, now)
+    }
+
     fn issue_capability(
         &self,
         subject: &PublicKey,

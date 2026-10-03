@@ -149,6 +149,8 @@ use support_delegation_plain::make_chain_bound_plain_capability;
 
 #[path = "tests/support_monetary.rs"]
 mod support_monetary;
+#[path = "tests/support_tool_approval.rs"]
+mod support_tool_approval;
 use support::budget_store_impls::{
     delegate_authority_fenced_budget_methods, reject_authority_fenced_budget_methods,
 };
@@ -170,6 +172,7 @@ use support_monetary::{
     SiblingSumInvocationFixture, SiblingSumMonetaryFixture, StaticPriceOracle,
     TrackingPaymentAdapter, UnmeasuredCostServer,
 };
+use support_tool_approval::bind_test_tool_approval;
 #[path = "tests/capability_liveness.rs"]
 mod capability_liveness;
 #[path = "tests/capability_validation.rs"]

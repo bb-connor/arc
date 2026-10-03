@@ -100,8 +100,9 @@ async with ChioClient(
     assert token.subject == agent_public_key_hex
 ```
 
-The optional constructor `control_token` supplies the bearer only on capability
-minting, never on health or evaluation requests. It is not a default HTTP header.
+The optional constructor `control_token` supplies the bearer on capability
+minting and approval workflow routes. Health and evaluation requests do not carry
+it, and it is not a default HTTP header.
 Other privileged SDK methods retain their own explicit credential contracts.
 Keep the operator token out of agent processes; give the agent its minted
 capability and its separately owned subject signer.
@@ -140,3 +141,26 @@ from chio_sdk.testing import allow_all, deny_all
 ## License
 
 Apache-2.0
+
+
+### Exact-call approvals
+
+Use a trusted workflow client configured with `control_token` to submit the full
+signed capability, route and arguments using `submit_for_approval`. Set
+`requested_by` to the capability subject public key. The sidecar assigns the
+approval ID and constructs the intent; ID-only capabilities and client argument
+hashes cannot create an executable approval.
+
+Read `get_approval(id).pending` and review the server-built governed intent,
+including the original parameters in `context.chio_tool_approval.arguments`.
+Sign its `parameter_hash` (the complete intent hash) and approval ID using an
+independent configured approver key, then pass that `GovernedApprovalToken` as
+`signed_token` to `respond_approval`. A bearer token grants workflow access; it
+cannot substitute for the approver signature.
+
+The agent uses `evaluate_tool_call_mediated(approval_id=id, ...)` with the original
+signed capability, route and arguments. A `reserved` response still requires the
+trusted executor's authenticated `start_mediated_execution` with that signed
+decision credential, durable dispatch custody, and `report_mediated_execution`.
+See the [sidecar approval contract](../../../crates/products/chio-api-protect/README.md#execution-bound-approvals)
+for deployment prerequisites and revocation behavior.

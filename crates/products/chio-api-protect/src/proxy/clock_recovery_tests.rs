@@ -89,7 +89,10 @@ fn service_clock_recovery_keeps_kernel_and_nonce_expiry_consistent(
     let mut kernel = super::super::build_mediation_kernel(
         &signer,
         Arc::new(InMemoryBudgetStore::with_clock(Arc::new(clock.clone()))),
-        &[],
+        super::super::mediated::MediationPolicy {
+            issuers: &[],
+            hash: None,
+        },
         Vec::new(),
         None,
         None,
@@ -158,6 +161,7 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: Some(

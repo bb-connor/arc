@@ -4,6 +4,8 @@ use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_test_support::prelude::*;
 use tower::ServiceExt;
 
+#[path = "tests/approvals.rs"]
+mod approvals;
 #[path = "tests/authenticated.rs"]
 mod authenticated;
 #[path = "tests/authorization.rs"]
@@ -26,7 +28,10 @@ fn issuing_kernel(
         build_mediation_kernel(
             signer,
             budget,
-            trusted_capability_issuers,
+            super::MediationPolicy {
+                issuers: trusted_capability_issuers,
+                hash: None,
+            },
             Vec::new(),
             None,
             None,
@@ -263,7 +268,10 @@ fn mediated_test_state_with_durable_admission(
         build_mediation_kernel(
             &signer,
             Arc::clone(&budget),
-            &trusted_capability_issuers,
+            super::MediationPolicy {
+                issuers: &trusted_capability_issuers,
+                hash: None,
+            },
             Vec::new(),
             payment_adapter,
             durable_admission,
@@ -279,6 +287,7 @@ fn mediated_test_state_with_durable_admission(
         http_client,
         egress_contract,
         approval_admin: ApprovalAdmin::new(approval_store),
+        approval_config: None,
         receipt_log: Mutex::new(ReceiptLog {
             receipts: Vec::new(),
         }),
@@ -848,13 +857,8 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_mustprepay_receipt_persistence_failure_returns_nonce_without_refund() {
-    // Money-loss guard: a governed MustPrepay reserve authorizes AND captures the
-    // quoted prepayment before minting the nonce. If the sidecar's local receipt
-    // append then fails, tearing the reservation down would leave the captured
-    // prepayment charged for a reservation the caller never received (direct
-    // financial loss). The handler must return 200 with the nonce so the captured
-    // prepayment backs a usable authorization, and must not refund or re-charge.
+async fn mediated_direct_approval_rejects_before_payment_and_receipt_side_effects() {
+    // A legacy approval envelope is rejected before payment or receipt storage.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -897,40 +901,14 @@ async fn mediated_mustprepay_receipt_persistence_failure_returns_nonce_without_r
     });
 
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        status,
-        StatusCode::OK,
-        "a captured MustPrepay reserve whose receipt fails to persist must not 500"
+        json["message"],
+        "use approval_id to redeem the retained server-built approval"
     );
-    assert_eq!(json["status"], "reserved");
-    assert!(
-        json["execution_nonce"].is_object(),
-        "the caller must receive the nonce the captured prepayment backs"
-    );
-
-    // The prepayment was captured exactly once and never refunded: the payer is
-    // billed for the authorization the caller now holds, with no money lost to a
-    // torn-down reservation.
-    assert_eq!(
-        captures.load(std::sync::atomic::Ordering::SeqCst),
-        1,
-        "the MustPrepay quote must be captured exactly once"
-    );
-    assert_eq!(
-        refunds.load(std::sync::atomic::Ordering::SeqCst),
-        0,
-        "the captured prepayment must not be refunded: it backs the returned nonce"
-    );
-
-    // The reservation is intact: the reserved hold stays open.
-    let hold_id = json["execution_nonce"]["nonce"]["reserved_hold_id"]
-        .as_str()
-        .expect("the returned nonce must name its reserved hold");
-    let hold = budget.get_budget_hold(hold_id).unwrap();
-    assert!(
-        hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
-        "the captured MustPrepay reservation must stay open, backing the returned nonce"
-    );
+    assert_eq!(captures.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(refunds.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert!(budget.get_usage(&cap.id, 0).test_unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1099,6 +1077,7 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: Some(db.to_string_lossy().to_string()),
@@ -1131,6 +1110,7 @@ fn build_budget_store_remote_is_not_hold_capable() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: Some("http://127.0.0.1:1".to_string()),
         control_token: Some("token".to_string()),
         budget_db: None,
@@ -1166,6 +1146,7 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: Some("http://127.0.0.1:1".to_string()),
         control_token: Some("token".to_string()),
         budget_db: Some(db.to_string_lossy().to_string()),
@@ -1200,6 +1181,7 @@ fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
         sidecar_control_token: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: None,
@@ -1260,7 +1242,10 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
     let kernel = build_mediation_kernel(
         &signer,
         Arc::clone(&budget),
-        &[],
+        super::MediationPolicy {
+            issuers: &[],
+            hash: None,
+        },
         Vec::new(),
         None,
         None,

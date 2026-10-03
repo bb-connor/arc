@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-168 of 511 identifier constants in the security crates are unpinned.
+168 of 519 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (26)
 
@@ -102,7 +102,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/certify/schema.rs:9` `CERTIFICATION_CONSUMPTION_POLICY_PROFILE_V1` = `chio.certify.consume.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:15` `FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA` = `chio.permissionless-federation-policy.v1`
 - `crates/platform/chio-control-plane/src/federation_policy.rs:17` `FEDERATION_ADMISSION_POLICY_REGISTRY_VERSION` = `chio.permissionless-federation-policy-registry.v1`
-- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1273` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
+- `crates/platform/chio-control-plane/src/keyring_runtime.rs:1312` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:30` `PASSPORT_STATUS_REGISTRY_VERSION` = `chio.passport-status-registry.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:31` `PASSPORT_ISSUANCE_REGISTRY_VERSION` = `chio.passport-issuance-offers.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
@@ -158,7 +158,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-store-sqlite/src/frost_store/signer.rs:34` `SIGNER_AAD_FORMAT` = `chio.frost.signer-nonce-aad.v1`
 - `crates/platform/chio-store-sqlite/src/security_state/participant_source/evidence.rs:10` `SCHEMA` = `chio.security-participant-source-fingerprint.v1`
 - `crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs:21` `FORMAT` = `chio.sqlite-local-path-identity.v1`
-- `crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs:34` `RELOCATION_SEAL_FORMAT` = `chio.sqlite-authority-relocation-seal.v1`
+- `crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs:36` `RELOCATION_SEAL_FORMAT` = `chio.sqlite-authority-relocation-seal.v1`
 
 ## crates/security/chio-active-response-authority (4)
 
