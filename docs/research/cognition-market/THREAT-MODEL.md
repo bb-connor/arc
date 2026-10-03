@@ -328,17 +328,15 @@ profile in parentheses where different.
   Residual: low; the attack degenerates into honest coverage of demanded
   descriptors.
 - **GA2. Wash trading to inflate CCV or farm royalties** (self-buy own
-  inventory). Mitigated: CCV counts the clearing fee NET OF SPREAD, deduplicated
-  by `(finding_id, buyer_cluster)`, EXCLUDING related-party clusters detected by
-  shared `root_budget_holder` / `delegation_depth`
-  (`chio-core-types/src/receipt/economics.rs:33`) and shared operator/funding
-  (GENESIS-PROGRAM 7); royalties are funded ONLY from real D7 clearing fees
-  (the genesis-introduced per-clearing category, ADR-0018 D7), so a
-  self-paid fee nets to a pure loss (the fee is burned, principal round-trips
-  out) and earns no CCV credit and no net royalty. Residual: a patient adversary
-  can pay real fees to fake demand at a cost equal to the fees burned; bounded by
-  that cost, and the related-party filter strips the obvious clusters. Medium
-  (the wash-at-metering-cost residual, C1-adjacent).
+  inventory). Mitigated: CCV counts gross principal only for arm's-length paid
+  clearings and excludes relationships derived from signed consortium org and
+  member identity plus disclosed common control, funding, and operators.
+  `root_budget_holder` / `delegation_depth` are supporting same-root signals,
+  not beneficial-ownership proof. Fee revenue and carve payouts are reported
+  separately. No fee is assumed burned: a ring may recover controlled venue,
+  royalty, or seat portions. Residual: undisclosed cross-org control and patient
+  rings can fabricate external-looking demand; medium-high, requiring audits of
+  relationship disclosures and concentration reporting.
 - **GA3. Sybil across the three mines** (many identities farming floors, audits,
   or seats). Consortium launch: identity is gated by membership, so Sybil is an
   admission-control problem the consortium already owns; per-identity publication
@@ -348,15 +346,18 @@ profile in parentheses where different.
   (`chio-reputation/src/tier.rs:98-139`). Permissionless: Sybil resistance falls
   to bonds plus reputation tiers only, which is materially harder (no identity
   gate). Residual: low (consortium); medium-high (permissionless), which is a
-  primary reason permissionless is deferred (GENESIS-ARCHITECTURE 9).
+  primary reason permissionless activation is qualification-gated
+  (GENESIS-ARCHITECTURE 9); the architecture is still designed now.
 - **GA4. Procurement-list capture / Goodhart** (sellers manufacture demand for
   their own inventory so the pool subsidizes it). Mitigated: the list is
   published by the venue GOVERNANCE operator and is seller-read-only (sellers
   cannot admit descriptors, GENESIS-ARCHITECTURE 3.1.2); a descriptor is admitted
-  only after at least `k_anonymity_floor` DISTINCT identified consortium member
-  orgs have SIGNED demand nominations for it (the launch signal; raw search
+  only after at least `min_distinct_nominating_orgs` DISTINCT identified
+  consortium member orgs have signed demand nominations for it. Requests bind
+  venue, epoch, descriptor, org, nonce, and freshness; quorum deduplicates by
+  org, and the published entry commits the nomination-set root. Raw search
   telemetry gates nothing because searches are stateless, unpriced, and
-  unattributable, review finding GA-R5), so manufacturing demand requires `k`
+  unattributable (review finding GA-R5), so manufacturing demand requires `k`
   distinct member identities, which consortium admission controls. Residual: a
   ring of `k` colluding member orgs can still steer admission; bounded by
   membership control and detectable by related-party clustering (GA2) on the
@@ -367,7 +368,8 @@ profile in parentheses where different.
   demanded-uncovered coverage that passes the full admission gate (with the
   sampled-audit refund path), so a griefer who extracts floors
   is producing the exact coverage the program wants; the per-descriptor cap and
-  declining schedule bound total extractable subsidy; the leading indicators
+  declining schedule bound floor exposure. Commissioned-production spend is a
+  separate treasury line and is capped independently; the leading indicators
   (GENESIS-PROGRAM 9.1) detect a low hit-conversion drain early and the
   stop-loss gates (GENESIS-PLAN) halt a failing mine. Residual: an adversary can
   front-run genesis sellers to capture floors on descriptors they would have
@@ -378,14 +380,18 @@ profile in parentheses where different.
 ### Metric and reliability (Q4)
 
 - **GA5. r-feed manipulation** (auditor-seller collusion, selective challenging,
-  audit-rate gaming). Mitigated: `r` is computed over VENUE-SCHEDULED RANDOM
-  audits, not challenger-selected challenges, so selection bias is controlled by
-  the schedule; for `deterministic_replay` an audit is a mediated re-run whose
+  audit-rate gaming). Mitigated: each epoch commits the frozen population and
+  sampling policy before deriving a seed from the first unpredictable external
+  finalized settlement or federation checkpoint after cutoff;
+  assignments and all terminal receipt outcomes have committed roots, and
+  missing, timed-out, or invalid outcomes count as incomplete denominator
+  trials and operator SLA failures. For
+  `deterministic_replay` an audit is a mediated re-run whose
   receipt is independently checkable, so a colluding pass reduces to slashable
-  fabricated evidence (S1, `chio-market/src/insurance_flow.rs:390-414`); `n`
-  (sample size) and the Wilson lower bound `r_lcb_bps` are mandatory in every
+  fabricated evidence (S1, `chio-market/src/insurance_flow.rs:390-414`);
+  `n_assigned` and the Wilson lower bound `r_lcb_bps` are mandatory in every
   published row, and reliability-gated consumers key off the LCB, so a diluted
-  low-`n` `r` is not just visibly weak but mechanically weak; `r` is stratified by `guarantee_class` so gaming one class cannot
+  small-sample `r` is mechanically weak; `r` is stratified by `guarantee_class` so gaming one class cannot
   inflate another (K6). Residual: for `metered_attested` (non-replayable)
   findings an audit cannot mechanically verify, so `r` there rests on the
   metering floor and reputation, both of which an honest-cost fabricator defeats
@@ -413,16 +419,28 @@ profile in parentheses where different.
   MECHANISMS 9 item 5 and is unchanged. Residual: low while both published
   bounds hold; violating either is a visible governance failure, not silent
   drift.
+- **GA10. Reliability seed grinding or outcome omission.** A reliability
+  operator chooses a favorable seed, omits failed assignments, or publishes
+  only completed audits. Mitigated: population, sampling policy, and auditor
+  roster and checkpoint-source/finality policy freeze before cutoff; the seed
+  uses the first policy-matching unpredictable external finalized checkpoint
+  not authored by the operator and a canonical structured hash preimage;
+  assignment and terminal
+  receipt roots are complete; missing auditors, timeouts, omissions, and
+  integrity failures all enter `incomplete`, lowering buyer-facing reliability
+  and firing the operator SLA without falsely slashing the seller. Residual: external
+  checkpoint censorship or finality failure delays the epoch (liveness), so the
+  previous epoch expires rather than being silently extended. Medium-low.
 
 ### Operator seats (Q5)
 
 - **GA7. Seat neutrality violation** (a seated genesis operator self-deals:
   front-runs reveals it mediates, biases the reliability epoch it signs, or
   favors its own listings). Mitigated: the seat binds an explicit F6 neutrality
-  covenant and a predeclared revocation rule (`chio.genesis.operator-seat.v1`,
-  GENESIS-ARCHITECTURE 3.4); a violation is enforced through a governance
-  `Sanction`/`Freeze` case (`chio-governance/src/evaluation.rs:304-317`) that
-  revokes the seat, plus on-chain `deactivateOperator`
+  covenant and a predeclared transition rule in
+  `chio.genesis.operator-seat-roster.v1` (GENESIS-ARCHITECTURE 3.4). A
+  governance `Sanction`/`Freeze` receipt can authorize the next signed roster
+  epoch; it does not directly revoke a seat. On-chain `deactivateOperator`
   (`contracts/src/ChioIdentityRegistry.sol:89`); the escrow F6 requirement
   (ARCHITECTURE F6) already forbids a seller-aligned mediator for cross-org
   purchases; equivocation on the reliability epoch is detectable by anchoring
@@ -434,6 +452,20 @@ profile in parentheses where different.
   trade is explicitly labeled the GENESIS DEMONSTRATION (self-dealing, excluded);
   CCV counts only from the first external arm's-length clearing
   (GENESIS-PROGRAM 7). Residual: low.
+- **GA11. Fee-reference substitution or seat time travel.** A collector uses a
+  cheaper fee schedule, a future roster, an inactive seat, or unrelated service
+  evidence to redirect a clearing fee. Mitigated: `GenesisClearingBreakdown`
+  binds the finding, listing, royalty, fee-schedule, roster, clearing time, and
+  service receipts; D7 arithmetic is recomputed in integer minor units; only
+  entries active at clearing time and matching one referenced operator per
+  vertical are eligible; the joint cap is checked at settlement. Residual:
+  operator withholding remains T6, but substitution is evidence-invalid. Low.
+- **GA12. CCV cherry-picking.** The reporter drops refunds, related trades, or
+  low-value clearings to shape the headline number. Mitigated: each report pins
+  the complete settlement-receipt root, relationship-snapshot root, included
+  and excluded roots, one exclusion reason per receipt, and separately reports
+  unclassifiable volume. A root mismatch or unaccounted receipt invalidates the
+  report. Residual: false signed relationship disclosures remain GA2. Medium.
 
 ### Trust-role additions (extend section 2)
 
@@ -445,10 +477,11 @@ profile in parentheses where different.
 - T6. The royalty split trusts the collecting operator to apply the signed
   `royalty-right` table correctly; a mis-split is challengeable (table and fee
   receipt are both signed) but the trust is an F6-neutrality dependency (K3).
-- T7. The reliability-oracle operator is trusted for liveness; safety
-  (equivocation, small-sample inflation) is checkable via signed epochs,
-  mandatory `n`, class stratification, and anchoring (mirrors T2 for the status
-  feed).
+- T7. The reliability-oracle operator is trusted for liveness and for publishing
+  a complete epoch on time. Safety is independently checkable only when the
+  frozen population, policy, post-cutoff seed, assignment root, and complete
+  terminal receipt root are available; omissions count as incomplete trials
+  and operator SLA failures.
 
 ### Residual-risk register additions (extend section 5)
 
@@ -456,11 +489,14 @@ profile in parentheses where different.
 |---|---|---|---|
 | Exhaustion before demand: bounded pool empties before organic clearing self-sustains (Q1) | both | high | economics sizing + leading indicators (GENESIS-PROGRAM 9.1) + per-mine stop-loss gates (GENESIS-PLAN) |
 | r-manipulation on `metered_attested` findings (Q4/GA5) | R&D | high | class-stratified r + guarantee-class discount; open research (same as S2) |
-| Adverse selection on exhaust: subsidizing low-demand or negative-P_max coverage (Q6) | R&D | medium-high | procurement-list demanded-only admission; wedge-first sequencing; abandonment expected (Homestead precedent, GENESIS-PROGRAM 8.4) |
+| Adverse selection on exhaust: subsidizing low-demand or negative-`B_hit` coverage (Q6) | R&D | medium-high | procurement-list demanded-only admission; wedge-first sequencing; abandonment expected (Homestead precedent, GENESIS-PROGRAM 8.4) |
+| Legal or accounting misclassification of fee-bearing rights | both | high | counsel and accounting approval before external grants; non-transferability is not a safe harbor |
 | Royalty operator mis-split trust (Q2/T6) | both | medium | signed table + challengeable mis-split; F6 neutrality (K3) |
 | Off-chain subsidy-pool custody trust (Q1/T5) | both | medium | bonded operator + receipt-auditable outflow; permissionless needs an on-chain fund (deferred ADR-0015 Follow-up A, K1/K10) |
-| Sybil across mines under the permissionless profile (GA3) | permissionless | medium-high | bonds + reputation only; a primary reason permissionless is deferred |
-| Procurement capture via manufactured demand (GA4) | both | medium | governance-published list + k-anonymity floor + related-party detection |
+| Sybil across mines under the permissionless profile (GA3) | permissionless | medium-high | design now; activation requires qualified bond, reputation, and identity defenses |
+| Procurement capture via manufactured demand (GA4) | both | medium | governance-published list + distinct-member quorum + related-party detection |
+| Fee reference substitution / seat time travel (GA11) | both | low | clearing breakdown binding + current-at-clearing validation + exact arithmetic |
+| CCV receipt cherry-picking (GA12) | both | medium | complete receipt and relationship roots + exclusion accounting + unclassified volume |
 
 ### Invariant-candidate additions (extend section 6)
 
@@ -469,8 +505,13 @@ never references a pre-existing settled trade, preserving K2 no-clawback); floor
 admission soundness (a floor release implies the FULL admission gate:
 matched demanded-uncovered descriptor with the venue acceptance recipe,
 mode-A burn, bond backing, class rule, and a survived sampled-audit window;
-release-by-default means no per-floor audit is implied); seat-cap monotonicity (issued
-seats per vertical never exceed the charter cap); and CCV related-party exclusion
-(no CCV credit for a trade whose buyer and seller share a root budget holder).
+release-by-default means no per-floor audit is implied); seat-roster validity
+(active seats never exceed the signed cap and transitions link to the prior
+roster); audit-assignment completeness (every selected population leaf has one
+terminal correct, incorrect, or incomplete outcome); clearing conservation (buyer total, seller
+principal, and all D7 legs recompute exactly with no negative residual);
+service eligibility (every paid seat leg matches an active seat and referenced
+service receipt); and CCV partition completeness (every receipt is included,
+excluded with one reason, or reported unclassified).
 These are listed for the program plan (GENESIS-PLAN) alongside the finding-market
 candidates.

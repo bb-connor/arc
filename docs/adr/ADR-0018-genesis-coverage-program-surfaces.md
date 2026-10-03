@@ -1,4 +1,4 @@
-# ADR-0018: Genesis Coverage Program Surfaces (Royalty Right, Procurement List, Reliability Epoch, Operator Seat, Clearing Fee)
+# ADR-0018: Genesis Coverage Program Surfaces (Royalty Right, Procurement List, Reliability Epoch, Operator Seat Roster, Clearing Fee)
 
 - Status: Proposed (research spike; see
   `docs/research/cognition-market/GENESIS-PROGRAM.md` and
@@ -14,14 +14,16 @@
 ## Context
 
 The cognition market (ADR-0017) has a cold-start problem: buyer willingness-to-
-pay is increasing in coverage, coverage needs sellers, sellers need paying
-buyers. The Genesis Coverage Program bootstraps supply (coverage), security
+pay-on-hit price clears only after coverage exists, coverage needs sellers, and
+sellers need expected revenue. The Genesis Coverage Program bootstraps supply, security
 (audits), and operations (clearing) ahead of organic demand, without a token, on
 a bounded treasury, consortium-first. It pays exactly three things: money from a
 bounded pre-funded subsidy pool, royalty rights on future clearing fees, and
 position (reputation, coverage share, capped operator seats).
 
-The program needs four new signed surfaces. Verification against the current
+The program needs four new Genesis signed surfaces. D7 additionally needs the
+cross-program sibling `chio.registry.market-clearing-fee-schedule.v1` ratified at G5;
+it is not counted as a fifth Genesis family. Verification against the current
 surface (pre-#974 main; PR #974 is unmerged, GENESIS-PROGRAM section 0)
 established that none of the four can be assembled from existing primitives
 without new wire surface:
@@ -48,7 +50,7 @@ without new wire surface:
 
 The program adds `chio.genesis.procurement-list.v1`,
 `chio.genesis.royalty-right.v1`, `chio.genesis.reliability-epoch.v1`, and
-`chio.genesis.operator-seat.v1`, defined in a new leaf crate
+`chio.genesis.operator-seat-roster.v1`, defined in a new leaf crate
 `crates/economy/chio-genesis` (pure types plus fail-closed validators, no
 storage), each registered at its OWNING milestone (GENESIS-PLAN G1b, G2, G3,
 G4 respectively) via the existing four-place registration (JSON schema,
@@ -66,20 +68,25 @@ rail is introduced.
 ### D2. The royalty right is a signed forward-flow split table, non-transferable
 
 A royalty right (`chio.genesis.royalty-right.v1`) is a signed CLAIM on a
-fraction (`share_bps`) of the D7 CLEARING FEE (net of operator spread) that
+fraction of the D7 splittable fee base that
 future hits to a finding generate, granted by the venue governance charter,
-keyed by `finding_id` only, with a published step-down schedule and a genesis
-expiry. Rights mint at either genesis admission door (floor admission, or
+keyed by `finding_id` only. It also binds the venue and fee-schedule revision,
+beneficiary identity and signed settlement binding, currency, absolute-time
+step-down schedule, carve policy, change-of-control rule, charter, and
+authorized signer. Rights mint at either genesis admission door (floor admission, or
 royalty-only admission for classes the audit lane cannot verify). The right is
 realized only once the D7 fee exists (G5) on the collection machinery the
 finding-market milestones establish (M2 publication fee, M5 dispute fee); until
-then it accrues against a declared table with zero live flow.
+then it accrues against a declared table with zero live flow. The right is
+additional to the seller's existing `price_per_call` revenue and compensates
+the coverage-bootstrap externality rather than duplicating the ordinary sale
+price.
 
 Payment is FORWARD-FLOWING only: the fee split is a new fee on a new hit and
 never claws back settled seller revenue (ADR-0015 immediate-release posture
 unchanged). Payment rides the EXISTING settlement path: each royalty leg is an
-ordinary single-beneficiary release, or a batched epoch settlement through the
-exact-sum distribution shape generalized beyond bond-impair (D5). The right is
+ordinary separately opened single-beneficiary release. Any batched epoch
+settlement is the additive surface described in D5. The right is
 NON-TRANSFERABLE by construction (the beneficiary is bound in the artifact and
 no transfer operation exists), with a CHANGE-OF-CONTROL LAPSE: validity is
 conditioned on continuity of control of the beneficiary org, and change of
@@ -92,20 +99,26 @@ Non-transferability is normative, not a preference: a transferable right paying
 a fee stream is a transferable financial reward unit, the token the program
 forbids. Any future transferable profile is a separate ADR and out of scope
 here. Royalty and seat shares are JOINTLY capped by the published genesis
-carve-out cap (default 25 percent of the clearing fee) so the
-security-self-funding inequality stays satisfiable (GENESIS-PROGRAM 9.1).
+carve-out cap. The current 25 percent figure is a modeling ceiling, not an
+approved default; the executable runway model must justify the adopted cap so
+the security-self-funding inequality stays satisfiable (GENESIS-PROGRAM 9.1).
+The royalty validator enforces its maximum scheduled share against the royalty
+ceiling. The settlement validator, which also has the roster and service
+evidence, enforces the joint cap for each clearing.
 
 ### D3. The reliability epoch (r feed) is a signed statistic, not a proof, and not the oracle
 
 The public hit-reliability statistic `r` is published as
-`chio.genesis.reliability-epoch.v1`: a signed, windowed aggregate carrying
-`{ corpus, seller, guarantee_class, r_bps, r_lcb_bps, n, decayed }` rows
-(`r_lcb_bps` the Wilson lower confidence bound; reliability-gated consumers
-key off it, not the point estimate), computed as the
-time-decayed audit-success rate (the `compute_reliability` math,
-`chio-reputation/src/compare.rs:160`; crate-private today, so the builder
-exports or re-derives it) stratified by guarantee class, over audit receipts,
-following the `SignedPortableReputationSummary` WINDOWED-AGGREGATE pattern
+`chio.genesis.reliability-epoch.v1`: a signed fixed-window aggregate committing
+the frozen population, sampling-policy digest, checkpoint-source/finality policy
+fixed before cutoff, the first policy-matching post-cutoff external finalized
+checkpoint and its canonical seed,
+assignment root, complete terminal receipt root, confidence level, and rows
+`{ corpus, seller, guarantee_class, correct, incorrect, incomplete, n_assigned,
+r_bps, r_lcb_bps }`. Missing, timed-out, and integrity-invalid assignments count
+as incomplete denominator trials and operator SLA failures, not seller fraud.
+The Wilson lower bound is what consumers read. This follows the
+`SignedPortableReputationSummary` WINDOWED-AGGREGATE pattern
 (`chio-credentials/src/portable_reputation.rs:224`; its envelope is not used,
 D1). It MUST NOT reuse the
 revocation oracle's membership tree (which cannot carry a per-key value). It is
@@ -113,40 +126,49 @@ named "reliability epoch", not "feed", to avoid collision with the existing
 `ReputationFeed` vocabulary (`chio-reputation/src/feed.rs`).
 
 `r` is a STATISTIC buyers weight, never a proof (P10 / `ChioProofClaims`
-discipline, ADR-0017 D3): it never upgrades a finding's evidence class. `n`
-(sample size) is mandatory so low-sample `r` is visibly weak. Stratification by
+discipline, ADR-0017 D3): it never upgrades a finding's evidence class.
+`n_assigned` is mandatory so low-sample `r` is mechanically weak. Stratification by
 `guarantee_class` is mandatory so a `metered_attested` `r` (not mechanically
 verifiable) is never read as a `deterministic_replay` `r`.
 
-### D4. Operator seats are capped, non-transferable position with a neutrality covenant
+Sampling is reproducible: canonical population leaves are hash-ranked within
+each stratum using a domain-separated canonical structured seed derived from the
+frozen population root and first policy-matching unpredictable external finalized
+checkpoint after cutoff. The policy fixes the checkpoint source/finality rule,
+integer sample-count rounding, and an auditor roster before cutoff;
+related-party auditors are skipped. Missing eligible auditors and every missing,
+timed-out, or invalid terminal receipt count as incomplete trials.
 
-A genesis operator seat (`chio.genesis.operator-seat.v1`) is a signed grant from
-the governance charter binding a vertical, an operator identity, a
-`fee_share_bps` (denominated in the D7 clearing fee, realized only once D7
-lands at G5 on the M2/M5 collection machinery), the F6 neutrality
-covenant (ARCHITECTURE F6), a predeclared revocation rule, and a genesis expiry.
-The per-vertical cap is a charter parameter enforced at issue time (the issuer
-refuses to sign beyond the cap); there is no on-chain slot machine. Seats are
+### D4. Operator seats use a complete signed roster so caps are enforceable
+
+A genesis seat roster (`chio.genesis.operator-seat-roster.v1`) is an
+epoch-linked signed artifact containing the charter, per-vertical caps, and the
+complete active, revoked, and lapsed seat set. Each entry binds vertical,
+operator identity, fee share, neutrality and change-of-control rules, state,
+expiry, and evidence. Validators reject cap overflow, duplicate active pairs,
+and invalid prior-to-next transitions. Seats are
 NON-TRANSFERABLE (bound to the operator identity; position, not a tradeable
 unit), with the same CHANGE-OF-CONTROL LAPSE as royalty rights (D2): a sale of
 the seated org lapses the seat unless the charter re-grants it, named as a
-trigger beside `revocation_rule_ref`. Revocation on a neutrality violation
-fires through the EXISTING levers: a
-governance `Sanction`/`Freeze` case (`chio-governance/src/evaluation.rs:304-317`)
-named by `revocation_rule_ref`, plus on-chain `deactivateOperator`
-(`contracts/src/ChioIdentityRegistry.sol:89`). No new revocation authority is
-created.
+trigger beside the neutrality rule. A governance `Sanction`/`Freeze` receipt
+may authorize the next roster transition, but does not itself revoke an
+arbitrary seat. On-chain `deactivateOperator` is a separate side effect when
+applicable. No new revocation authority is created.
+An active seat earns on a clearing only when signed service evidence references
+that exact vertical and operator. At most one paid operator per vertical is
+eligible; holding an idle seat produces no fee leg.
 
-### D5. Settlement carries royalties by generalizing the exact-sum distribution, not by a new rail
+### D5. Settlement carries v1 royalties as ordinary legs; batching is additive surface
 
 The only multi-party split primitive today is bond-impair-only
 (`bond_distribution_hash` / `validate_bond_impair_distribution`,
 `chio-settle/src/evm/prepare.rs:971-1020`, at most 16 beneficiaries, exact-sum).
-Batched royalty settlement generalizes THIS shape (same exact-sum, non-zero-
-address, bounded-beneficiary invariants) beyond the impair action, as a thin
-`chio-settle` extension reviewed with that lane's owner. No new value-movement
-contract, no atomic swap, no kernel change. Single-leg royalties use the existing
-single-beneficiary release unchanged. This keeps the program inside the ADR-0015
+Batched royalty settlement may reuse THIS shape's exact-sum, non-zero-address,
+and bounded-beneficiary invariants, but bond impair cannot move collected venue
+fees. V1 opens N ordinary single-beneficiary legs. Any batch is a distinct
+fee-distribution action and may require an additive EVM router or contract entry
+point. This is not a new settlement rail, atomic swap, or kernel change, but it
+is real contract surface. This keeps the program inside the ADR-0015
 predeclared-terminal-state posture: a royalty leg is an ordinary release, and its
 only terminal states remain release or refund.
 
@@ -162,8 +184,9 @@ end plus cadence margin) that RELEASES BY DEFAULT at window end via the
 operator-signed path (`releaseWithSignature`,
 `contracts/src/ChioEscrow.sol:199-228`; digest binds the admission receipt
 hash, or a sampled passed audit's receipt hash for early release), with the
-deadline refund returning the floor to the pool only when a SAMPLED audit
-fails; junk stays negative-EV without per-floor audits because the floor is
+deadline refund returning the floor to the pool when a sampled audit proves the
+finding incorrect. A system-incomplete audit releases only at deadline and
+records an operator SLA failure; junk stays negative-EV without per-floor audits because the floor is
 capped at `kappa <= 0.5` of verified metered burn. No new custody primitive and
 no third terminal state (ADR-0015 D2 posture unchanged). Floors are payable at
 launch only for findings whose guarantee class the audit lane can mechanically
@@ -180,26 +203,39 @@ level, not code-level) ADR-0015 D4 recipient discipline (see Consequences).
 The settled fee taxonomy (`OpenMarketFeeScheduleArtifact`: publication,
 dispute, participation fees; MECHANISMS 6) contains NO per-clearing venue fee,
 and the finding-market milestones build collection only for the publication
-(M2) and dispute (M5) fees. The royalty (D2), the seat fee share (D4), and CCV
-all denominate in a per-clearing fee; without this decision they would be
-claims on a category nothing collects. D7 therefore INTRODUCES the clearing
-fee: a small ad-valorem venue take on each finding purchase, collected at
+(M2) and dispute (M5) fees. The royalty (D2) and seat fee share (D4)
+denominate in a per-clearing fee; without this decision they would be claims on
+a category nothing collects. CCV instead measures gross purchase principal and
+reports fee revenue separately. D7 therefore INTRODUCES the clearing fee
+through the ratified sibling `chio.registry.market-clearing-fee-schedule.v1`;
+the existing market-fee schedule remains byte- and meaning-stable and implies
+no D7 fee without the sibling. The fee is a small
+ad-valorem venue take on each finding purchase, collected at
 reveal settlement by the mediating operator as an ordinary metered/settled
 charge (the same machinery pattern M2 establishes for the publication fee),
 with `operator_spread` as the operator-retained portion and the remainder the
-splittable base for royalty and seat legs. It is a fee-schedule EXTENSION (a
-new field family on the fee-schedule artifact or a sibling signed schedule),
-not a new settlement rail; its owning milestone is G5 (landing together with
-the CCV methodology that denominates in it); and it requires ratification by
+splittable base for royalty and seat legs. It is an additive sibling of the
+existing signed fee schedule, not a new settlement rail; its owning milestone is G5
+(landing together with the CCV reporting surface); and it requires ratification by
 the finding-market fee-schedule owners, recorded here as a cross-program
-dependency, not assumed. Until D7 lands there is no clearing fee, no royalty
-or seat live flow, and no CCV.
+dependency, not assumed. Until D7 lands there is no clearing fee and no royalty
+or seat live flow; paid principal can still be reported as gross CCV.
+
+The buyer pays the full seller `price_per_call` plus D7; seller principal is
+never haircut. Checked integer minor-unit arithmetic computes gross fee,
+operator spread, post-spread base, royalty leg, service-eligible seat legs, and
+venue residual. The existing signed receipt carries a validated
+`GenesisClearingBreakdown` through `FinancialReceiptMetadata.cost_breakdown`;
+its embedded discriminator is `chio.genesis.clearing-breakdown.v1`, and it binds
+every amount and schedule, roster, royalty, and service reference. It is typed
+receipt metadata, not another independently signed artifact.
 
 ## Consequences
 
-- Positive: the program reduces to four signed artifacts plus one thin,
-  invariant-preserving settle generalization plus a metric, reusing every
-  signing, governance, reputation, anchoring, and settlement primitive already
+- Positive: the program reduces to four Genesis signed artifacts, one ratified
+  cross-program clearing-fee schedule, ordinary settlement legs, an optional additive batch
+  action, and a metric, reusing the signing, governance, reputation, anchoring,
+  and settlement primitives already
   ratified. No token, no new rail, no kernel change. The anti-token boundary is
   enforced structurally (all three durable rewards are non-transferable:
   royalties bound to a key, seats bound to an identity, position is reputation).
@@ -228,6 +264,9 @@ or seat live flow, and no CCV.
     k-anonymity over telemetry is a deferred profile needing an authenticated
     query surface that does not exist), and there is no commit-to-query layer
     to lean on.
+  - Non-transferability is an architecture constraint, not a legal safe harbor.
+    External royalty or seat grants require securities, tax, accounting,
+    custody, and jurisdictional review.
 
 ## Non-goals
 

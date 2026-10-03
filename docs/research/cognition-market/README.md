@@ -36,10 +36,13 @@ milestones without changing them:
 7. [GENESIS-PROGRAM.md](GENESIS-PROGRAM.md) - economics and mechanism: the
    constraint register, the three mines (coverage/audit/operator), the treasury
    runway model with its exhaustion boundary and leading indicators, the CCV
-   methodology, prior-art survey, and the mandatory honest-limits sections.
+   methodology, prior-art survey, and the mandatory honest-limits sections. The
+   executable structural model is
+   [`models/genesis_runway.py`](models/genesis_runway.py).
 8. [GENESIS-ARCHITECTURE.md](GENESIS-ARCHITECTURE.md) - the four new signed
-   surfaces (procurement list, royalty right, reliability epoch, operator seat)
-   mapped to existing crates with real paths, reuse over invention.
+   Genesis surfaces (procurement list, royalty right, reliability epoch,
+   operator seat roster), the additive cross-program D7 clearing-fee schedule,
+   and receipt-level CCV inputs mapped to existing crates with real paths.
 9. [ADR-0018](../../adr/ADR-0018-genesis-coverage-program-surfaces.md) (Proposed)
    - the compressed decision set for the new wire surfaces.
 10. [GENESIS-PLAN.md](GENESIS-PLAN.md) - the Genesis milestone ladder (G0-G6)

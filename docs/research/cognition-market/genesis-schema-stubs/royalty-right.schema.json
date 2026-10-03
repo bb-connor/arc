@@ -9,10 +9,16 @@
     "schema",
     "right_id",
     "finding_id",
-    "beneficiary",
-    "share_bps",
+    "venue_id",
+    "fee_schedule_id",
+    "beneficiary_identity_key",
+    "beneficiary_settlement_binding_ref",
+    "settlement_currency",
     "step_down_schedule",
+    "carve_out_policy_ref",
+    "change_of_control_rule_ref",
     "granted_by",
+    "signer_key",
     "issued_at",
     "expires_at",
     "signature"
@@ -20,29 +26,38 @@
   "properties": {
     "schema": { "const": "chio.genesis.royalty-right.v1" },
     "right_id": { "$ref": "#/$defs/sha256" },
-    "finding_id": { "type": "string", "minLength": 1 },
-    "beneficiary": {
-      "description": "Ed25519 issuer public key (64-hex). Bound here because the right is NON-transferable: there is no transfer operation, so the payee is fixed at grant time (ADR-0018 D2).",
+    "finding_id": { "$ref": "#/$defs/sha256" },
+    "venue_id": { "type": "string", "minLength": 1 },
+    "fee_schedule_id": { "$ref": "#/$defs/sha256" },
+    "beneficiary_identity_key": {
+      "description": "Ed25519 beneficiary identity key (64-hex). Bound here because the right is NON-transferable: there is no transfer operation, so the payee identity is fixed at grant time (ADR-0018 D2).",
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
-    "share_bps": {
-      "description": "Basis points of the clearing fee (net of operator spread) this right receives on a hit to finding_id.",
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 10000
-    },
+    "beneficiary_settlement_binding_ref": { "$ref": "#/$defs/sha256" },
+    "settlement_currency": { "type": "string", "minLength": 1 },
     "step_down_schedule": {
-      "description": "Published bps steps keyed by elapsed genesis time (the TIER_DISCOUNT_PER_HUNDRED idiom, chio-appraisal/src/marketplace_pricing.rs:148). The share declines on this public schedule.",
+      "description": "Published absolute-time bps steps. Semantic validation requires strictly increasing effective_at and non-increasing share_bps.",
       "type": "array",
       "minItems": 1,
-      "items": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["effective_at", "share_bps"],
+        "properties": {
+          "effective_at": { "type": "integer", "minimum": 0 },
+          "share_bps": { "type": "integer", "minimum": 0, "maximum": 10000 }
+        }
+      }
     },
+    "carve_out_policy_ref": { "$ref": "#/$defs/sha256" },
+    "change_of_control_rule_ref": { "$ref": "#/$defs/sha256" },
     "granted_by": {
       "description": "The governance charter id that granted this right (the split authority).",
       "type": "string",
       "minLength": 1
     },
+    "signer_key": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "issued_at": { "type": "integer", "minimum": 0 },
     "expires_at": {
       "description": "Genesis clock T_g; after this the share is 0.",

@@ -58,13 +58,13 @@ to respect it, not relax it. Citations are to the settled docs.
 
 | # | Settled constraint | Source | How Genesis respects it |
 |---|---|---|---|
-| K1 | Fee collection is declarative today; real collection is M2 (publication fee) and M5 (dispute fee). Nothing charges a fee at runtime, and the shipped fee taxonomy contains NO per-clearing venue fee. | MECHANISMS 6; re-verified: `chio-open-market/src/fee_schedule.rs:79-81` fees are validated + echoed only (`evaluation.rs:468-470`), never charged | The royalty/seat denominator (a per-clearing fee) is NOT an M2/M5 fee: it is a genesis-INTRODUCED category (ADR-0018 D7) whose collection reuses the M2/M5 machinery pattern and lands at G5; royalties accrue against a declared split table with zero live flow until then (Q2) |
+| K1 | Fee collection is declarative today; real collection is M2 (publication fee) and M5 (dispute fee). Nothing charges a fee at runtime, and the shipped fee taxonomy contains NO per-clearing venue fee. | MECHANISMS 6; re-verified: `chio-open-market/src/fee_schedule.rs:79-81` fees are validated + echoed only (`evaluation.rs:468-470`), never charged | The royalty/seat denominator is introduced by the ratified sibling `chio.registry.market-clearing-fee-schedule.v1` at G5; the existing schedule remains unchanged and royalties have zero live flow until sibling collection lands (Q2) |
 | K2 | v1 settlement has NO revenue clawback: release and reconcile are immediate; bonds are sized to finalized fraud exposure over a published detection horizon. | MECHANISMS 4; `chio-settle` releases on proof, `dispute_window_secs` observes but does not custody (`config.rs:122`) | Royalties are FORWARD-flowing only (paid from future clearing fees, never reaching back into settled trades); the pool never claws back a paid floor (Q2) |
 | K3 | Cross-org escrow REQUIRES a neutral mediating operator; with a seller-aligned mediator, paid non-delivery (attest-and-withhold) is HIGH residual. | ARCHITECTURE F6; THREAT-MODEL O5/S7 | Operator seats (Q5) bind the F6 neutrality obligation as a seat condition; a neutrality violation is a seat-revocation trigger |
 | K4 | `evidence_cost` is verifiable only in full-receipt mode (mode A); projected-mode values are seller assertions until audit. Money must never gate on unverifiable cost. | MECHANISMS 1; ARCHITECTURE 4.1, F2 | The bounty floor (Q1) is gated on mode-A proof-of-burn; a mode-B `evidence_cost` gates NOTHING and earns no floor until audited |
 | K5 | No exclusive first-commit listing slots; duplicate-context findings coexist with informational anchored-commitment ordering; nobody is paid for duplication. | MECHANISMS 3 | Coverage mining pays at most one floor per demanded descriptor (an inventory unit), never per listing; duplicates earn neither floor nor a second royalty stream (Q1, Q6) |
 | K6 | Challenge exposure is bounded by the finding's advertised guarantee class. | ADR-0017 D3/D4 | Audit mining (Q4) audits within the guarantee class; the r statistic is stratified BY guarantee class so a class's reliability is never averaged across classes |
-| K7 | Reveal is a governed tool call; delivery-vs-payment is the kernel digest gate. No new settlement rail, escrow contract, or atomic swap. | ADR-0017 D2; ARCHITECTURE 6 | Genesis adds no settlement rail; the royalty is an operator-applied split at fee-collection time on the existing release path, not a new value-movement contract (Q2) |
+| K7 | Reveal is a governed tool call; delivery-vs-payment is the kernel digest gate. No new settlement rail, escrow contract, or atomic swap. | ADR-0017 D2; ARCHITECTURE 6 | V1 royalties open ordinary legs on the existing rail. Optional batching is additive fee-distribution contract/router surface, not a new rail, and requires separate review (Q2) |
 | K8 | Proof claims stay inside the verifier boundary (`ChioProofClaims`); evidence classes never upgraded (P10). | ARCHITECTURE 2; THREAT-MODEL 6 | The r feed is a signed statistic, NOT a proof; it never upgrades a finding's evidence class, and buyers weight it, they do not treat it as verification |
 | K9 | No job daemon exists; epoch/audit/anchor cadence runs on operator cron with after-the-fact assessment. | ARCHITECTURE 8.2; re-verified `chio-anchor/src/automation.rs`, `chio-revocation-oracle/src/epoch.rs` (no scheduler) | The audit scheduler and r-feed epoch ticking are operator-cron conventions, not new daemons (Q4, Q7) |
 | K10 | Slash destinations are constrained to harmed parties or a registered community fund (ADR-0015 D4), and no discretionary settlement path exists. | ADR-0017 D4; THREAT-MODEL C2 | Audit bounties and slash shares ride the existing constrained distribution; the pool never becomes a discretionary payee (Q4, Q6). See the honest-limit in section 9: D4's recipient allowlist is prose, not code, today |
@@ -90,13 +90,16 @@ must flag honestly, not paper over:
 
 ## 2. The problem, stated as a fixed point
 
-Cold start is a coverage fixed point. Buyer willingness-to-pay per query is
-increasing in coverage; coverage requires sellers; sellers require paying
-buyers. The pricing context the brief supplies (treated as design input,
-re-derived in section 3) makes the dependency explicit:
+Cold start is a transaction-opportunity fixed point. Coverage requires sellers;
+sellers require expected revenue; and no buyer can clear when no matching
+inventory exists. The pay-on-hit market prices a confirmed match, so coverage
+does not multiply the price of that hit. It multiplies how often a priced hit
+exists:
 
 ```
-P_max(query) = h * [ (C + W) - (1 - r) * (V - dB) ]
+B_hit        = (C + W) - (1 - r) * (V - dB)
+Q_net(p)     = h * (B_hit - p) - c_q
+p_max_hit    = max(B_hit - c_q / h, 0)  for h > 0
 ```
 
 - `h` = coverage = probability the book contains a finding matching the query
@@ -106,12 +109,17 @@ P_max(query) = h * [ (C + W) - (1 - r) * (V - dB) ]
   re-deriving)
 - `V` = decision stakes (what the finding informs)
 - `dB` = expected bond recovery if the finding is wrong
+- `c_q` = marginal query/discovery cost paid whether or not a hit exists
 
-When `h = 0` the ceiling is `0`: there is literally nothing to buy, so no
-price clears, so no seller earns, so `h` stays `0`. The program's whole job is
-to move the system off `h = 0` on the descriptors buyers actually query,
-cheaply enough and fast enough that organic clearing takes over before a
-bounded pool is exhausted.
+`p_max_hit` is the maximum all-in price after accounting for the expected cost
+of misses. When `c_q = 0` or discovery cost is sunk, it reduces to
+`max(B_hit, 0)` and coverage cancels from the per-hit ceiling. When `c_q > 0`,
+coverage also raises the rational hit bid by spreading query friction across
+more successful searches. At `h = 0` there is no finite clearing price: there is
+literally nothing to buy, so no seller earns and coverage stays zero. The
+program's job is to create transaction opportunities on descriptors buyers
+actually demand, cheaply enough that organic clearing and security funding take
+over before a bounded pool is exhausted.
 
 Constraints on how (from the brief, treated as hard):
 
@@ -127,38 +135,39 @@ Constraints on how (from the brief, treated as hard):
 
 ---
 
-## 3. Pricing model: re-deriving the ceiling and the demand-curve claim
+## 3. Pricing model: separating hit price from coverage value
 
 Confidence: the algebra is high; the parameter magnitudes are labeled modeling
 assumptions with ranges.
 
-### 3.1 The ceiling survives re-derivation, with one modeling choice named
+### 3.1 Pay-on-hit isolates the per-hit ceiling when query friction is negligible
 
-Derive `P_max` as a buyer's per-query expected ceiling. A buyer facing a
-decision with stakes `V` has a reliable outside option: re-derive at cost `C`,
-which also frees no budget (you spent it) so the redeployed value `W` is
-foregone. Buying instead:
+The current market charges `ListingPricingHint.price_per_call` after a matching
+listing is found (`chio-listing/src/discovery.rs:48,61`). A buyer facing a
+decision with stakes `V` has a reliable
+outside option: re-derive at cost `C`, which also foregoes redeployed value
+`W`. Conditional on a hit:
 
-- With probability `h` a matching finding exists (else the decision proceeds
-  without a purchase, contributing nothing to willingness-to-pay).
-- Given a hit, with probability `r` the finding is correct: the buyer saves
-  the re-derivation cost `C` and gains redeployed-budget value `W`. Benefit
-  relative to re-deriving: `(C + W)`.
-- Given a hit, with probability `(1 - r)` the finding is wrong: the buyer acts
-  on wrong information, incurs decision damage up to `V`, recovers `dB` from
-  the bond. Net loss relative to a reliable answer: `(V - dB)`.
+- Buying a hit avoids the immediate re-derivation cost `C` and frees budget
+  worth `W` regardless of whether the answer later proves correct.
+- With probability `(1 - r)` the finding is wrong: the buyer acts on wrong
+  information, incurs decision damage up to `V`, and recovers `dB` from the
+  bond. Define `0 <= dB <= V`, so the incremental wrong-answer loss is
+  `(V - dB)` and the model does not assume profitable over-insurance.
 
-Taking the expectation over correctness and scaling by coverage yields exactly
-the input form `P_max = h[(C + W) - (1 - r)(V - dB)]`. The one modeling choice
-worth naming: this form credits the buyer with `(C + W)` on every hit, not
-`r(C + W)`. That is defensible (you pay to avoid the work regardless of whether
-the answer later proves wrong; the wrongness shows up separately in the
-`(1 - r)(V - dB)` penalty), and the `r`-scaled variant
-`P_max = h[r(C + W) - (1 - r)(V - dB)]` is the sensitivity case: at the wedge
-midpoints used in 3.2 it moves the ceiling from $14.20 to $13.90 (about 2
-percent, immaterial), and for the unpinned R&D null it deepens an already
-negative ceiling ($-75 to $-85.50). Both forms agree on every qualitative
-conclusion in this section, so the choice of form is not load-bearing.
+The conditional net benefit is `B_hit`. If the hit price is `p`, expected
+payment is `h * p`, so the buyer's ex-ante participation condition is
+`h * (B_hit - p) >= c_q`. For `h > 0`, `p <= B_hit - c_q/h`. Coverage therefore
+always changes served-query frequency and aggregate transaction opportunity;
+it leaves the confirmed-match ceiling unchanged only in the pay-on-hit,
+negligible-query-friction case. The conservative alternative
+that credits the saved work only on correct hits uses
+`B_hit = r(C + W) - (1 - r)(V - dB)`; it is retained as a sensitivity case.
+
+Once D7 exists, `p` means the buyer's ALL-IN charge:
+`seller_price_per_call + D7_clearing_fee`. The seller receives the full listed
+price; the D7 fee is additive and is the only royalty/seat denominator. A
+listing clears only when this all-in amount is at or below `p_max_hit`.
 
 ### 3.2 The wedge clears; the R&D null often does not (quantified)
 
@@ -180,9 +189,10 @@ Modeling assumptions (coding wedge, "make this failing suite pass at commit C",
   exposure (K2); assume `dB` covers 60 to 90 percent of `V`.
 
 Then the penalty `(1 - r)(V - dB)` is roughly `0.02 * (0.2 * 200) = $0.8` at
-the midpoints, against `C + W ~= $15`, so `P_max ~= h * $14.2`. With coverage
-`h ~= 1` on the exact context, the wedge clears at any seller ask below ~$14
-against near-zero marginal delivery cost. The wedge works.
+the midpoints, against `C + W ~= $15`, so the zero-query-friction ceiling is
+`p_max_hit ~= $14.2`. Any non-zero `c_q/h` is deducted from that ceiling. The wedge
+clears at any seller ask below about $14. Coverage determines how many such
+clearings are available, not that price ceiling.
 
 Modeling assumptions (R&D null, "this experiment shows no effect",
 `metered_attested`, not replay-checkable):
@@ -193,17 +203,20 @@ Modeling assumptions (R&D null, "this experiment shows no effect",
   cover semantic wrongness), so `(V - dB) ~= V`.
 
 Then the penalty `(1 - r) * V` can approach or exceed `(C + W)`, driving
-`P_max` toward or below zero: for `r = 0.65`, `V = $300`, `C + W = $30`,
-penalty `= 0.35 * 300 = $105 >> $30`, so `P_max < 0` and no rational buyer
+`B_hit` toward or below zero: for `r = 0.65`, `V = $300`, `C + W = $30`,
+penalty `= 0.35 * 300 = $105 >> $30`, so `B_hit < 0` and no rational buyer
 purchases. This is the adverse-selection-on-exhaust residual (section 9),
 falling straight out of the model: the R&D null is structurally the hard case,
 which is why the wedge (verified fixes and failing-test findings for major OSS
 ecosystems, plus ML non-convergence sweeps ONLY where the recipe is pinned
 deterministic; the launch determinism rule in 4.1 makes this a floor-admission
-condition, not an aspiration) launches first. The program does not solve
-R&D-null pricing; it sequences around it.
+condition, not an aspiration) launches first. The program still ships the
+R&D-null descriptor, royalty-only, guarantee-class, and reliability semantics
+from the start. It withholds only the treasury floor for claims whose semantic
+correctness the audit lane cannot adjudicate. That is a security boundary, not
+a demand-validation gate.
 
-### 3.3 The demand-curve-investment claim, pressure-tested and corrected
+### 3.3 Coverage creates served demand and can amortize query friction
 
 Pooled coverage composes as `h_pool = 1 - Prod_i (1 - h_i)`. In the wedge's
 exact-context regime (`descriptor.context_sha256` equality,
@@ -212,54 +225,45 @@ nothing else, so for a query on descriptor `d`, `h_pool(d) = 1` if any admitted
 finding covers `d`, else `0`. Aggregate coverage `h` is then the query-weighted
 mass of covered descriptors ("covered demand mass").
 
-The brief's claim: "every subsidized finding raises `h`, which raises every
-buyer's ceiling across the whole book; subsidy is demand-curve investment, not
-marketing spend." Modeled precisely, the claim is TRUE with a sharp boundary:
+The original unconditional claim that coverage raises every buyer's ceiling is
+false. In the shipped pay-on-hit case with negligible `c_q`, coverage creates
+the inventory against which a demand curve can clear. With non-negligible
+query friction it also raises the ceiling from `B_hit - c_q/h` toward `B_hit`:
 
 - Subsidizing the FIRST finding on a demanded, currently-uncovered descriptor
-  `d` flips `h_pool(d)` from 0 to 1, moving `P_max` on every query to `d` from
-  `0` (nothing to buy) to the positive ceiling. This is not moving down an
-  existing demand curve (marketing); it is bringing the demand curve on `d`
-  into existence. Demand-curve investment, exactly as claimed. (Scope
-  condition, review finding GA-R10: the `h`-scaled ceiling is an EX-ANTE
-  per-query quantity, correct in the launch regime where exact-context
-  matching makes `h(d)` an indicator in {0, 1}; a buyer that has already
-  inspected a confirmed descriptor match must not discount its bid by `h`.
-  Fractional `h` applies only to aggregate demand mass, never to an
-  inspected match.)
+  `d` flips `h_pool(d)` from 0 to 1. The conditional bid remains
+  `p_max_hit` (and reaches the zero-friction ceiling when `c_q` is negligible),
+  but query demand can now become a paid clearing. The investment
+  buys durable served-demand capacity rather than temporary buyer behavior.
 - Subsidizing a SECOND finding on an already-covered `d` adds `h_i` to a
-  saturated `h_pool(d) ~= 1`: near-zero coverage gain, near-zero
-  demand-curve investment. Pure waste (duplication).
+  saturated `h_pool(d) ~= 1`: near-zero new transaction opportunity. Pure
+  waste for the floor program (duplication).
 - Subsidizing any finding on an UN-demanded `d` (no query mass) yields coverage
-  with zero realized `P_max * query_mass`: dead inventory. Also waste (adverse
+  with zero realized clearing opportunity: dead inventory. Also waste (adverse
   selection on exhaust).
 
-So the input claim is false AS STATED ("every subsidized finding") and true in
-its corrected form ("every subsidized finding ON A DEMANDED, UNCOVERED
-DESCRIPTOR"). The correction is not a footnote; it is the reason two mechanism
-rules exist:
+This boundary is the reason two mechanism rules exist:
 
 - The **procurement list** (Q3) gates admission to demanded descriptors, so the
   pool cannot fund dead inventory.
 - **No-duplication-payout** (K5, MECHANISMS 3) denies a floor to the second
   finding on a covered descriptor, so the pool cannot fund duplication.
 
-These two rules are precisely what make "subsidy is demand-curve investment"
-true rather than aspirational. The program buys covered demand mass, and only
-covered demand mass.
+These rules make the subsidy an investment in covered demand mass and durable
+transaction opportunity, not a claim that coverage changes the conditional
+value of a hit.
 
 **Why the SUPPLY side is the subsidy side (the objection this model answers).**
 The obvious alternative bootstrap is buyer-side coupons (subsidize purchases
 instead of listings). The model says no, twice over. First, with `h = 0` on a
 descriptor there is nothing to buy at any coupon size: coverage is the binding
-constraint, and only supply-side subsidy relaxes it. Second, the cross-side
-externality is asymmetric: one covered demanded descriptor raises `P_max` for
-EVERY buyer who will ever hit that context (the `h_pool` composition), while
-one additional buyer raises seller value only through fees that do not exist
-until D7; the standard two-sided-market prescription is to subsidize the side
-whose participation exerts the larger externality on the other (Caillaud-
-Jullien's divide-and-conquer: subsidize one side to recruit it, monetize the
-other; 8.5). Coupons also pay for BEHAVIOR (purchases), which hard constraint
+constraint, and only supply-side subsidy relaxes it. Second, a covered demanded
+descriptor creates a sale opportunity for every future buyer of that context.
+An additional buyer also creates seller revenue through the existing
+`price_per_call`, so the asymmetry is not absolute; at genesis, however, supply
+is the prerequisite side and has the stronger cross-side effect. This is the
+two-sided-market reason to subsidize supply first (8.5). Coupons also pay for
+BEHAVIOR (purchases), which hard constraint
 2 forbids and which is Goodhartable into wash volume, whereas floors buy
 durable inventory. Buyer-side subsidy is therefore rejected as a launch
 mechanism, not merely unchosen.
@@ -275,10 +279,10 @@ list; a two-part tariff pays a small bounty floor at listing (gated on mode-A
 proof-of-burn, descriptor match, audit sampling) plus a royalty share on future
 query hits.
 
-**Pressure test and adopted design.** The two-part tariff is the correct shape
-(prior art: Oi 1971, section 8.2). The floor is the lump-sum access fee; the
-royalty is the per-use charge. But two input details break against the
-constraints and are redesigned:
+**Pressure test and adopted design.** A fixed-plus-use-contingent supplier
+payment is the correct shape. Oi 1971 is only a structural analogy because it
+prices consumers, while this program compensates suppliers (section 8.2). Two
+input details break against the constraints and are redesigned:
 
 1. **The floor must not be a function of claimed production cost.** If
    `floor = evidence_cost`, the program pays full production cost, which (a)
@@ -302,6 +306,10 @@ constraints and are redesigned:
    verified cost is only an anti-triviality cap. The floor covers the seller's
    marginal LISTING cost (sealing the payload, publishing, bond opportunity
    cost), not the production cost, which is sunk exhaust of a metered run.
+   This formula therefore governs HARVEST admission. If the program commissions
+   a new run against the procurement list, verified production cost is
+   contracted and budgeted separately; it is never hidden inside the listing
+   floor or described as sunk exhaust (section 9.1).
 
 2. **The floor is per covered demanded descriptor, not per listing.** One
    floor per descriptor per coverage epoch (K5 intent; the ordering paragraph
@@ -341,8 +349,12 @@ constraints and are redesigned:
   pay for claims the audit lane cannot check;
 - it survives the sampled-audit window (Q4): the floor is escrowed at
   admission and RELEASES BY DEFAULT at the audit-window end; a venue-scheduled
-  sampled audit that FAILS blocks release (deadline refund to the pool) and
-  feeds the slash lane. Release-by-default is deliberate (review finding
+  sampled audit that proves the finding incorrect blocks release (deadline
+  refund to the pool) and feeds the slash lane. Auditor absence, timeout, or
+  invalid audit evidence is SYSTEM-INCOMPLETE, not seller fraud: it prevents
+  early release but the floor releases at the deadline against the assignment
+  and incomplete-outcome receipts, while lowering the conservative reliability
+  bound and firing the operator SLA. Release-by-default is deliberate (review finding
   GA-R2): gating every release on a passed audit would either make the floor a
   lottery for honest sellers (an unsampled floor could never release,
   destroying the floor's purpose of covering certain listing cost) or force
@@ -376,8 +388,9 @@ checkpoint-cadence margin (the F6 timing lesson). Release semantics follow the
 release-by-default rule above: at window end the operator signs the release
 digest binding the ADMISSION receipt hash (unsampled floors) or the passed
 audit's receipt hash (sampled floors, releasable early); a sampled audit that
-FAILS means the operator signs nothing and the deadline refund returns the
-floor to the pool. Two predeclared price-free terminal states, unchanged
+proves incorrect means no signature and a deadline refund. A system-incomplete
+audit releases only at deadline, binding both admission and incomplete-outcome
+receipts. Two predeclared price-free terminal states, unchanged
 (ADR-0015 D2). The trust residual (an operator that withholds a due release
 signature) is T5, receipt-visible. In the non-EVM consortium profile the same
 contract shape runs as a settle-mediated hold; the mapping, not the chain, is
@@ -386,9 +399,9 @@ the design.
 The royalty is reward type (b) and is designed in Q2. It pays for value: a
 finding that gets hits earns a share of the clearing fees those hits generate;
 junk gets no hits, so junk earns no royalty. The royalty is self-funded from
-real clearing fees, never from the pool, which is the wash-trade defense
-(Q6/C1): to fake royalty income you would have to pay real clearing fees to
-yourself.
+real clearing fees, never from the pool. That limits treasury exposure but is
+not the wash-trade defense: a controlled ring can recover parts of the fee, so
+the signed related-party exclusion in section 7 remains primary.
 
 ### 4.2 Audit mining (Q4): manufacturing the r statistic, and sizing its bounties
 
@@ -428,8 +441,9 @@ machinery.
   rules close it:
   (1) the pool's top-up is paid ONLY to the venue-ASSIGNED auditor of a
   scheduled random audit, where assignment is drawn from the published
-  randomized schedule (seeded from the epoch-root randomness the cron
-  cadence already produces, K9); a voluntary self-selected challenger gets
+  randomized schedule using the first external finalized checkpoint after the
+  frozen population cutoff (GENESIS-ARCHITECTURE 3.3); a voluntary
+  self-selected challenger gets
   the ordinary MECHANISMS 5 economics but NO top-up, so a ring cannot
   appoint itself auditor of its own listing and collects `beta` only with
   probability equal to its share of the assigned-auditor pool;
@@ -447,16 +461,16 @@ machinery.
   with the coverage the program itself builds, and the runway model (9.1,
   conclusion 2) shows it, not the floor line, is what exhausts pools:
   self-sustain requires the security-self-funding inequality
-  `(1 - carve) * f * X >= (alpha_new * a + alpha_corpus * C) * c_a`, where
-  `carve` is the combined genesis carve-out (royalty `share_bps` plus seat
-  `fee_share_bps`) on the same fee (review finding GA-R3: during genesis
+  `(1 - o) * (1 - carve) * f * X >=
+  (alpha_new * a + alpha_corpus * C) * c_a`, where `o` is operator spread and
+  `carve` is the combined genesis carve-out (effective royalty share plus seat
+  `fee_share_bps`) on the post-spread base (review finding GA-R3: during genesis
   nearly every clearing is a hit on subsidized inventory, so nearly all of
   `f * X` carries splits; counting the gross fee double-counts the same
   dollar). The program therefore publishes a combined genesis carve-out CAP:
-  modeling the base scenario, self-sustain slips from month 13 to 15 to 18 as
-  `carve` rises 0 to 15 to 25 percent and degrades to the zombie regime at 40
-  percent (9.1), so the cap defaults to 25 percent and the royalty and seat
-  schedules must fit under it jointly. Audit-rate schedules
+  royalty and seat schedules must fit under it jointly. The 25 percent figure
+  is a modeling ceiling to test, not an approved default; the executable runway
+  model and owned cost inputs must justify the adopted cap. Audit-rate schedules
   must therefore be published WITH their step-down conditions (accumulating
   per-class reliability evidence lets `alpha_corpus` fall), exactly as the
   floor publishes its decay.
@@ -472,13 +486,8 @@ machinery.
   cryptographic path (`sparse_merkle.rs:77-79`). It cannot carry a per-key
   numeric `r` without a leaf-schema change.
 
-- **What the r feed DOES reuse (confidence: high).** Two shipped primitives:
-  (1) `chio-reputation` already computes a time-decayed reliability rate over
-  integrity-gated receipts: `ReliabilityMetrics { completion_rate,
-  cancellation_rate, incompletion_rate, receipts_observed }`
-  (`chio-reputation/src/model.rs:250-257`) via `compute_reliability`
-  (`src/compare.rs:160-212`), where `completion_rate = allow_weight / total`
-  over receipts whose kernel key is in a trusted set. (2)
+- **What the r feed DOES reuse (confidence: high).** It reuses the signed,
+  windowed-aggregate pattern, not the existing reliability calculation.
   `SignedPortableReputationSummary = SignedExportEnvelope<...>`
   (`chio-credentials/src/portable_reputation.rs:224`) is already a signed,
   windowed, receipt-derived numeric aggregate (`effective_score: f64`,
@@ -499,19 +508,29 @@ machinery.
   post-genesis), not a
   "feed", in ADR-0018 and GENESIS-ARCHITECTURE.
 
-**How `r` is computed, attested, published (design):** `r(corpus, seller,
-class) = correct_audits / total_audits` over a published window, time-decayed
-like `compute_reliability`, computed only over integrity-gated audit receipts
-(the audit is a mediated re-run; its receipt is checkable exactly as claim
-evidence is, `chio-market/src/insurance_flow.rs:390-414`). Each epoch publishes
-`(r, r_lcb, n, window, class)` rows: `n` (sample size) is mandatory, and
-`r_lcb` is the lower confidence bound of the rate at the published confidence
-level (a Wilson-interval bound over the decayed effective sample [modeling
-choice]), so a small-sample `r` is not merely discountable by buyers but
-mechanically weak: consumers that gate on reliability (the guarantee-class
-multipliers, and the audit-rate step-down conditions in the bullet above) key
-off `r_lcb`, never the point estimate, which defuses both audit-rate gaming
-and low-`n` inflation. The statistic
+**How `r` is computed, attested, and made independently auditable:** each
+epoch freezes a population and publishes `population_root`,
+`sampling_policy_sha256`, `checkpoint_policy_sha256`, `checkpoint_ref`,
+`assignment_seed`, `assigned_audits_root`, and `audit_receipts_root`. The seed
+hashes a canonical structured preimage containing the population root and the
+first finalized checkpoint accepted by a source, network, finality rule, and
+maximum-wait policy ratified before cutoff. The checkpoint must be unpredictable
+and not authored by the reliability operator. This prevents the operator from choosing a favorable
+sample after seeing outcomes. The
+window is fixed and non-overlapping; there is no time decay or fractional
+effective sample. Every assigned audit must have a terminal receipt. Missing,
+timed-out, or integrity-invalid audit outcomes count as `incomplete` trials in
+the buyer-facing denominator and as operator SLA failures, not as evidence of
+seller fraud.
+
+Each row publishes `{ corpus, seller, guarantee_class, correct, incorrect,
+incomplete, n_assigned, r_bps, r_lcb_bps }`. `r_bps` is
+`correct / n_assigned`; `r_lcb_bps` is the Wilson lower bound at the epoch's
+published `confidence_bps`. Consumers key off the lower bound, never the point
+estimate. A verifier can recompute the sample from the frozen population and
+seed, prove every assignment against `assigned_audits_root`, prove every
+terminal receipt against `audit_receipts_root`, and reproduce every row. The
+statistic
 feeds the `guarantee_class_bps` and the elicitation ceiling (MECHANISMS 2),
 never a proof (K8): buyers weight it, they do not treat it as verification.
 
@@ -524,9 +543,8 @@ never a proof (K8): buyers weight it, they do not treat it as verification.
   cannot mechanically verify, so `r` for that class is inherently weaker and
   carried as residual (section 9).
 - Selective challenging (challengers cherry-pick winnable targets): `r` is
-  computed over VENUE-SCHEDULED RANDOM AUDITS, not over challenger-chosen
-  challenges, so selection is controlled by the random schedule, not by
-  challengers.
+  computed over the committed, externally seeded assignment set, not over
+  challenger-chosen challenges or an operator-selected completion subset.
 - Audit-rate gaming (flood cheap findings to dilute per-finding audit
   probability): the audit rate is per-listing-class and the publication fee plus
   per-listing bond make flooding costly (S6); `n` is published so diluted (low-
@@ -566,20 +584,34 @@ implies today:
   `contracts/src/interfaces/IChioEscrow.sol:7`) IS the F6 conflict surface: it
   names the release-authorizing party, with no neutrality flag or enforcement.
 
-**Adopted design (honest about what is new).** An operator seat is therefore a
-NEW signed artifact (`chio.genesis.operator-seat.v1`, ADR-0018), not a reuse.
-It is:
+**Adopted design (honest about what is new).** The fourth signed artifact is a
+NEW epoch-linked roster, `chio.genesis.operator-seat-roster.v1`, rather than an
+individually signed seat. A local validator cannot prove a global cap from one
+grant, but it can verify the complete roster. Each epoch binds the charter,
+per-vertical caps, the full active/revoked seat set, `previous_roster_id`, issue
+and expiry times, signer key, and inline signature. Each seat entry binds the
+seat id, vertical, operator identity, fee share, neutrality and
+change-of-control rules, state, and evidence references. Validation rejects
+duplicate ids, duplicate active `(vertical, operator)` pairs, cap overflow,
+invalid state transitions, and combined fee shares above the published carve
+policy.
 
-- a signed grant from the consortium governance charter (which already carries
-  `allowed_listing_operator_ids`, `chio-open-market/src/fee_schedule.rs:32`, and
-  is `SignedGenericGovernanceCharter`), binding: the vertical
-  (`mediating_kernel` / `registry` / `status_oracle` / `reliability_oracle`),
-  the operator identity, a fee-share basis-points entry, the F6 neutrality
-  obligation, and an expiry (the genesis clock);
-- capped by the charter: the cap is a governance parameter (a published integer
-  per vertical), enforced at seat-issue time by the charter's issuer, not a new
-  on-chain slot machine. This is the minimal representation that is not a token
-  (see below);
+A seat earns on a clearing only when the clearing receipt references signed
+service evidence for that exact `(vertical, operator_id)` and the entry was
+active at clearing time. A clearing can name at most one paid operator for each
+of the mediating-kernel, registry, status-oracle, and reliability-oracle
+verticals. Merely holding a seat does not earn every market fee. The settlement
+validator loads the royalty right, roster epoch, and referenced service
+receipts, selects eligible entries, then enforces the transaction-level carve
+cap. An individual royalty validator can enforce only its schedule ceiling; it
+cannot prove the joint cap alone.
+
+The roster is:
+
+- signed by an authority authorized by the consortium governance charter
+  (which already carries `allowed_listing_operator_ids`,
+  `chio-open-market/src/fee_schedule.rs:32`); issuance, revocation, lapse, or
+  expiry publishes the next monotone roster epoch;
 - NON-transferable: the seat is bound to the operator identity and cannot be
   sold. A transferable seat carrying a fee share is a security-like transferable
   reward unit, which is exactly the token the hard constraint forbids. Seats are
@@ -589,14 +621,14 @@ It is:
   change of control LAPSES the seat unless the charter re-grants it, and the
   lapse trigger is named in the seat's rule refs alongside the neutrality
   revocation rule.
-- revocable on neutrality violation through the EXISTING levers: a governance
-  `Sanction`/`Freeze` case (`chio-governance/src/generic.rs:20`,
-  `evaluation.rs:304-317`) against the seat, and, for the on-chain settlement
-  key, admin `deactivateOperator` (`contracts/src/ChioIdentityRegistry.sol:89`).
-  The seat artifact names the decision rule that fires revocation, so revocation
-  is predeclared, not discretionary.
+- revocable by a new signed roster epoch. An existing governance
+  `Sanction`/`Freeze` decision can be evidence authorizing that transition, but
+  it does not itself revoke an arbitrary seat. If the operator has an on-chain
+  settlement key, `deactivateOperator`
+  (`contracts/src/ChioIdentityRegistry.sol:89`) is a separate required side
+  effect. Both receipts are referenced from the roster transition.
 
-The fee share the seat carries denominates in the D7 clearing fee and is
+The fee share each active roster entry carries denominates in the D7 clearing fee and is
 realized only once D7 lands (G5) on the M2/M5 collection machinery (K1). Until
 then the seat is a signed claim on a declared split with zero live flow,
 exactly like the royalty (Q2). The seat is thus a reputation-and-fee-
@@ -642,22 +674,45 @@ dispute fee, and NO per-clearing venue fee exists or is planned by any
 finding-market milestone. A royalty defined as a share of "the clearing fee"
 is therefore a claim on a category nothing collects. The program fixes this
 honestly rather than by implication: ADR-0018 D7 INTRODUCES the clearing fee
-as a new, genesis-owned fee category (a small ad-valorem venue take on each
+through the ratified sibling `chio.registry.market-clearing-fee-schedule.v1`.
+The existing market-fee schedule remains byte- and meaning-stable and implies
+no D7 fee without the sibling. D7 is a small ad-valorem venue take on each
 finding purchase, collected at reveal settlement by the mediating operator,
 using the same metered/settled-charge machinery pattern M2 establishes for
-the publication fee), with `operator_spread` as the operator-retained portion
+the publication fee, with `operator_spread` as the operator-retained portion
 and the remainder the splittable base. Its owning milestone is G5; the
-finding-market owners must ratify it as a fee-schedule extension, and until
+finding-market owners must ratify it as an additive fee-schedule sibling, and until
 it lands the royalty and seat shares denominate in a fee that does not exist
 (zero live flow, as the register already required for other reasons).
+
+The charge and split are integer minor-unit arithmetic, with checked
+multiplication and floor division:
+
+```
+gross_fee       = floor(seller_price * clearing_fee_bps / 10_000)
+buyer_total     = seller_price + gross_fee
+operator_spread = floor(gross_fee * operator_spread_bps / 10_000)
+splittable_base = gross_fee - operator_spread
+royalty_leg     = floor(splittable_base * effective_royalty_bps / 10_000)
+seat_leg_i      = floor(splittable_base * eligible_seat_bps_i / 10_000)
+venue_residual  = splittable_base - royalty_leg - sum(seat_leg_i)
+```
+
+The seller principal is never haircut. `effective_royalty_bps +
+sum(eligible_seat_bps_i)` must be at or below the carve policy cap; overflow,
+currency mismatch, arithmetic overflow, stale schedules, or missing service
+evidence fail closed. Floor-division dust remains in `venue_residual`, which
+funds audits before becoming venue surplus.
 
 **Minimal representation that respects the constraints (adopted):** the royalty
 right is a **signed fee-split table bound at admission time**, applied by the
 clearing operator at fee-collection time. Concretely:
 
-- A `chio.genesis.royalty-right.v1` artifact (ADR-0018) binds
-  `{ finding_id, beneficiary (issuer key), share_bps, schedule (step-down),
-  expiry }`, signed by the venue governance charter that granted it. Keyed by
+- A `chio.genesis.royalty-right.v1` artifact (ADR-0018) binds the finding,
+  venue and fee-schedule ids, beneficiary identity and settlement binding,
+  settlement currency, an explicit time-keyed step-down schedule, carve policy,
+  change-of-control rule, issuer, signer key, and expiry. It is signed by a key
+  authorized by the venue governance charter. Keyed by
   `finding_id` ONLY (an earlier draft said "or descriptor"; a
   descriptor-keyed royalty would be a different economic object, a share of a
   whole topic's fees, and is not designed). It is a CLAIM on a fraction of
@@ -666,19 +721,30 @@ clearing operator at fee-collection time. Concretely:
   admission (deterministic_replay, full gate) mints floor plus royalty;
   royalty-only admission (descriptor match, mode-A burn, bond; no floor)
   mints the royalty alone, which is how a non-replayable finding
-  participates without subsidized money it cannot audit-release.
+  participates without subsidized money it cannot audit-release. This royalty
+  is ADDITIONAL to the seller's existing `price_per_call` sale revenue. It pays
+  for the early contributor's coverage-bootstrap externality, not for the
+  finding's ordinary per-hit value a second time.
 - When the D7 fee exists (G5) and its collection machinery has landed (the
   M2/M5 pattern, K1), the operator collecting a clearing fee splits it per
   the royalty table before remitting the venue's residual, paying each
-  royalty leg as an ordinary receipt-backed transfer on the existing
-  single-beneficiary release path. N royalty holders = N ordinary transfers,
-  or a batched epoch settlement using the existing exact-sum distribution
-  shape generalized beyond impair (a G6-gated settle extension,
-  GENESIS-PLAN). Either way, no new value-movement contract.
+  royalty leg as a separately opened, ordinary receipt-backed
+  single-beneficiary release. N royalty holders means N ordinary settlement
+  legs in v1. A later batched payout may reuse the bond-distribution
+  invariants (exact sum, non-zero recipients, bounded fan-out), but bond impair
+  itself cannot move collected venue fees. A batch therefore needs a distinct
+  fee-distribution action and may require an additive EVM router or contract
+  entry point. That is still the existing settlement rail, but it is new
+  contract surface and must be reviewed as such.
 - **Forward-flowing only (K2):** the fee being split is a NEW fee on a NEW hit,
   never a clawback of the seller's already-settled revenue. Immediate-release
   settlement is untouched. This is why the royalty is compatible with the
   no-clawback posture: it never reaches backward.
+- **Exact denominator:** every fee receipt binds gross D7 fee, operator spread,
+  splittable base, currency, venue, fee-schedule revision, royalty schedule
+  revision, and seat-roster epoch. Royalty plus seat shares may not exceed the
+  published carve cap. Integer rounding dust goes deterministically to the
+  venue residual; no participant can select a rounding order.
 - **Step-down schedule:** reuse the shipped discount-table idiom
   (`TIER_DISCOUNT_PER_HUNDRED: [u32; 4]`,
   `chio-appraisal/src/marketplace_pricing.rs:148`), a small published array of
@@ -723,8 +789,8 @@ as an honest limit in section 9 and drives the sequencing in Q7.
 ## 6. Decay schedule and reputation-as-difficulty (the land-grant clock)
 
 **Published declining schedule (the land-grab clock).** Both the floor
-`schedule(d)` and the royalty `share_bps` step down on a published calendar
-schedule, and genesis seats/terms expire on a fixed date `T_g`. The schedule is
+`schedule(d)` and the effective royalty share step down on a published calendar,
+and genesis seats/terms expire on a fixed date `T_g`. The schedule is
 a small published array (the `TIER_DISCOUNT_PER_HUNDRED` idiom), so it is
 auditable and non-discretionary. The economic purpose (prior art: Homestead Act
 proving-up, section 8.4; declining emissions, section 8.1) is to convert the
@@ -751,7 +817,9 @@ consequence of the existing scorecard math, not a new lever.
 
 **Seeding with our own swarms.** The program seeds the book by running our own
 producer swarms against the procurement list, so demanded descriptors are
-covered before organic sellers arrive. The hazard is that self-produced
+covered before organic sellers arrive. These are COMMISSIONED runs, not
+near-zero-cost exhaust, and their verified production cost is an explicit
+treasury line in section 9.1. The hazard is that self-produced
 inventory, if bought by our own buyer swarms, is wash volume. The boundary:
 
 - Genesis inventory we LIST and no one buys = coverage (inventory). It raises
@@ -763,28 +831,36 @@ inventory, if bought by our own buyer swarms, is wash volume. The boundary:
 from day one):**
 
 ```
-CCV = sum over arm's-length clearings of (D7 clearing fee net of operator
-      spread), deduplicated by (finding_id, buyer_cluster),
-      excluding trades where buyer and seller share a related-party cluster.
+CCV[currency, window] = sum of gross finding purchase principal over all
+                        arm's-length paid clearings in the reporting window.
 ```
 
-CCV denominates in the D7 clearing fee (section 5), which is introduced at the
-SAME milestone as the CCV methodology (G5): the fee and the metric land
-together, because without a per-clearing fee a self-buy costs only metering
-and the "wash trading burns real fees" defense below would be vacuous (review
-finding GA-R2c). There is no CCV before the D7 fee exists.
+CCV is volume, so its unit is the gross purchase principal, not venue revenue.
+The report partitions by settlement currency and never silently converts or
+adds currencies. Alongside CCV it reports `clearing_fee_revenue`,
+`genesis_carve_payouts`, `external_clearings`, and
+`unique_external_buyer_finding_pairs`. D7 is required for the two revenue
+measures and live royalty flow, but gross CCV can exist as soon as paid
+clearings exist.
 
-- **Net-of-spread, not gross.** CCV counts the clearing fee net of operator
-  spread, not the round-tripped principal. Wash trading to inflate CCV would
-  require paying real fees to yourself, which nets to a pure loss and earns no
-  CCV credit (the fee is burned, the principal round-trips out).
+- **No permanent deduplication.** Every arm's-length paid clearing in the
+  window counts. Unique buyer-finding pairs are a separate adoption measure;
+  collapsing repeat purchases would make the volume metric cease to be volume.
 - **Related-party exclusion.** Trades within a related-party cluster are
-  excluded, detected by shared `root_budget_holder` / `delegation_depth` on the
-  receipt financial metadata (the C1 wash-trading signal,
-  `chio-core-types/src/receipt/economics.rs:33`) and shared operator/funding.
-- **Deduplication.** CCV counts unique `(finding_id, buyer_cluster)` clearings,
-  so repeated self-buys of the same finding by the same cluster count once (and
-  are excluded anyway by related-party filtering).
+  excluded using signed consortium organization/member identity plus disclosed
+  common control, common funding, and operator relationships.
+  `root_budget_holder` / `delegation_depth` are useful same-capability-root
+  signals, not proof of beneficial ownership.
+- **Fees do not make wash trading safe.** A controlled ring may recover venue,
+  royalty, or seat portions of a fee; nothing here calls those transfers
+  "burned." Related-party exclusion is the primary defense. Irrecoverable fees
+  paid to independent parties are only a secondary cost signal.
+- **Reproducible report boundary.** Each report pins methodology, window,
+  currency, settlement-receipt root, relationship-snapshot root, included and
+  excluded roots, and exclusion counts by reason. Unclassifiable relationships
+  go to a separately reported `unclassified_volume`, never CCV. The report body
+  is content-addressed and its root can be anchored through the existing
+  `AnchorAutomationJob`; this does not add a fifth registered artifact family.
 - CCV is a new metric: no `cleared_volume` / `CCV` / `market_volume` primitive
   exists in the repo today (verified: empty grep), so the methodology is
   defined here before any number is reported, which is the point.
@@ -833,27 +909,31 @@ reported and single-source figures are flagged inline.
 ### 8.2 Two-part tariff (the floor-plus-royalty structure)
 
 - Oi (1971), "A Disneyland Dilemma: Two-Part Tariffs for a Mickey Mouse
-  Monopoly," QJE 85(1):77-96 [paper]. The origin of the lump-sum-access-fee-
-  plus-per-use-charge structure the coverage mine adopts: the floor is the
-  access fee (paid to bring inventory into existence), the royalty is the per-
-  use charge (paid for realized value). Oi's central result, that the optimal
-  split depends on demand heterogeneity, is why the floor is small and the
-  royalty carries the value: buyers' `P_max` is heterogeneous (section 3), so a
-  large fixed floor would exclude low-`P_max` demanded descriptors, while a
-  royalty-heavy split lets value sort itself.
+  Monopoly," QJE 85(1):77-96 [paper]. This is a structural analogy for a fixed
+  payment plus use-contingent payment, not a literal mapping: Oi prices consumer
+  access and use, while Genesis compensates suppliers. The seller already earns
+  `price_per_call`; the additional royalty rewards the bootstrap externality.
+  Procurement contracts, advance commitments, and revenue-sharing agreements
+  are closer precedents for the actual supplier-side instrument.
 
 ### 8.3 Advance market commitments (the procurement list's closest precedent)
 
-- Kremer and Glennerster proposed, and the 2007 pneumococcal pilot deployed,
-  the Advance Market Commitment: donors pledge a BOUNDED fund from which a
+- The Advance Market Commitment literature proposed the mechanism; donors later
+  committed $1.5B to the pneumococcal pilot, whose design and implementation
+  work spanned the late 2000s. Under the mechanism, donors pledge a BOUNDED fund from which a
   specified per-unit subsidy is paid on delivered supply meeting a published
   specification, until the fund exhausts, with suppliers keeping a long-run
   per-unit revenue tail [paper/report; $1.5B pilot, launched 2007]. The
-  structural mapping to the Genesis coverage mine is exact: bounded pool =
+  structural mapping to the Genesis coverage mine is close but not exact:
+  bounded pool =
   AMC fund; procurement-list entry = the published product specification;
   floor paid on gate-passed delivery (venue acceptance recipe, burn proof,
   sampled-audit window) = the per-unit subsidy on verified supply; royalty = the long-run tail; pool exhaustion = the AMC's designed
-  end state. Two AMC design lessons adopted: pay on VERIFIED DELIVERY against
+  end state. The closest faithful implementation also needs committed buyer
+  demand, independent qualification, fiduciary custody, and explicit long-term
+  obligations. Genesis currently proposes operator custody, unlike the pilot's
+  independent financial administration, so that trust difference remains
+  material. Two AMC design lessons adopted: pay on VERIFIED DELIVERY against
   a pre-published spec (never on effort or claims), and keep the demanded
   spec under the buyer coalition's control, not suppliers' (the pilot's
   target product profile), which is the Q3 anti-Goodhart governance rule.
@@ -868,8 +948,9 @@ reported and single-source figures are flagged inline.
 
 - Homestead Act of 1862 [tertiary/report]. Free grants of up to 160 acres
   conditioned on "proving up": five years of residency plus IMPROVEMENT
-  (cultivation), then a deed. Over one million claims were abandoned without
-  proving up. Three lessons adopted directly: (1) grant on proof-of-improvement,
+  (cultivation), then a deed. Government histories record that many claimants
+  did not remain long enough to fulfill the claim, but the cited sources do not
+  establish a precise national abandonment count. Three lessons adopted directly: (1) grant on proof-of-improvement,
   not on claim-staking, which maps to the floor gated on mode-A proof-of-burn
   plus the venue acceptance recipe plus the sampled-audit window (you get paid
   for improving a demanded
@@ -907,9 +988,9 @@ reported and single-source figures are flagged inline.
   [paper]. Rochet and Tirole (2003) generalize the price-structure result:
   platforms optimally skew pricing toward the side with the larger cross-side
   externality and the more elastic participation [paper]. The Genesis mapping
-  is direct: coverage (supply) is the subsidized side because its cross-side
-  externality is the whole demand curve (section 3.3), and the monetized side
-  is clearing (the D7 fee), which begins only after coverage exists. The
+  is direct: coverage is the subsidized side because it creates served-query
+  capacity and transaction opportunities (section 3.3), while clearing is the
+  monetized side. The
   divide-and-conquer literature also carries the program's discipline
   warning: the subsidy must END (the genesis clock `T_g`), because a platform
   that never flips to monetization is the zombie regime (9.1).
@@ -926,7 +1007,8 @@ All URLs retrieved 2026-07-21.
    https://www.archives.gov/education/lessons/homestead-act
 3. [report] Nansen. "All Hail MasterChef: Analysing Yield Farming Activity."
    June 2021 (42 percent day-one exit within 24h; ~70 percent by day three).
-   https://www.nansen.ai/research/all-hail-masterchef-analysing-yield-farming-activity
+   Archived 2021-06-18 because the live route no longer serves the report:
+   https://web.archive.org/web/20210618041016/https://www.nansen.ai/research/all-hail-masterchef-analysing-yield-farming-activity
 4. [news] SushiSwap vampire attack, mechanics and liquidity-migration figures
    (self-reported/analyst, FLAGGED). https://finematics.com/vampire-attack-sushiswap-explained/
 5. [paper] Kremer, Levin, Snyder. "Advance Market Commitments: Insights from
@@ -971,12 +1053,17 @@ Modeled as a monthly recurrence (every parameter a labeled modeling
 assumption; the value of the model is the STRUCTURE of the boundary, not the
 numbers). State: demanded-uncovered descriptors `U(t)`, covered live corpus
 `C(t)`, pool balance `B(t)`. Flows: demand inflow `lambda_d`; staleness `mu` on
-`C`; queries `q(t) = Q_max * logistic((t - t_d)/s_d)` (a ramp delayed by
-`t_d`); clearings `X = q * (C/(C+U)) * p_clear`; venue fee `f` per clearing;
-seller price `~4f`. Supply: genesis capacity `cap_g` while the pool is solvent;
-organic listings respond to per-finding lifetime value vs listing cost
-(threshold response with capacity `A_o`). Spend: floors
-`(admissions) * b0 * decay^t`, and audits
+`C`; queries `q(t) = query_capacity * logistic((t - t_d)/s_d)` (a ramp delayed by
+`t_d`); cleared seller-principal volume
+`X = q * (C/(C+U)) * p_clear`; ad-valorem venue fee fraction `f`;
+seller price `~4f`. Supply has two distinct modes: HARVEST admits pre-existing
+exhaust, whose production cost is sunk; COMMISSIONED runs new work against the
+procurement list, whose verified production cost is a treasury expense. Let
+`rho_h` be the harvested share and `c_g` the commissioned production cost per
+admission. Genesis capacity is `cap_g` while the pool is solvent; organic
+listings respond to lifetime value versus listing cost. Spend is floors
+`admissions * b0 * decay^t`, commissioned production
+`admissions * (1 - rho_h) * c_g`, and audits
 `(alpha_new * admissions + alpha_corpus * C) * c_a`, where `alpha_corpus` is
 the PUBLISHED-RATE STANDING SURVEILLANCE of the live corpus (MECHANISMS 5
 audits listed findings, not only new admissions); fee inflow funds audits
@@ -986,12 +1073,27 @@ section 5; a modeling parameter until G5 lands), the fee available for audits
 is net of the genesis carve-out (conclusion 2), and the floor line charges
 EVERY admission because floors release by default at window end (4.1); only
 the sampled `alpha_new` fraction incurs audit cost, so mechanism and model
-agree.
+agree. The pool recurrence is:
+
+```
+B(t+1) = B(t)
+       - floor_spend(t)
+       - commissioned_production_spend(t)
+       - max(audit_spend(t) - spread_and_carve_net_fee_inflow(t), 0)
+```
+
+The executable model deliberately replaces the unknown response functions with
+explicit per-month assumptions for genesis admissions, organic admissions,
+demanded-descriptor inflow, and paid clearings. It declares self-sustain only
+after both takeover inequalities hold for `sustain_months` consecutive periods;
+organic admissions are included in the new-audit bill. This keeps the model
+honest until measured response curves exist.
 
 The recurrence admits THREE regimes, not two:
 
 - **SELF-SUSTAIN**: organic supply covers demand inflow (`a_o >= lambda_d`)
-  AND carve-net fees cover the security bill (`(1 - carve) * f * X >=
+  AND spread-and-carve-net fees cover the security bill
+  (`(1 - o) * (1 - carve) * f * X >=
   (alpha_new * a + alpha_corpus * C) * c_a`, conclusion 2), sustained. The
   program exits.
 - **EXHAUST**: `B(t)` hits the month's committed spend before self-sustain.
@@ -999,71 +1101,50 @@ The recurrence admits THREE regimes, not two:
   take over; coverage is high, the market is permanently subsidy-dependent.
   The exit criterion is organic takeover, NOT pool solvency.
 
-Simulation results (36-month horizon; base parameters: `B0 = $75k`,
-`N0 = 2,000` demanded descriptors, `lambda_d = 150`/month, `mu = 5%`/month,
-`cap_g = 300`/month, `b0 = $6` with `decay = 0.93`, `alpha_new = 20%`,
-`alpha_corpus = 1%`/month, `c_a = $10`, `Q_max = 6,000` queries/month ramping
-at `t_d = 8` months, `p_clear = 0.35`, `f = $0.40`; reproducible from the
-recurrence above):
-
-| Scenario | Verdict | Coverage g(12) | Cumulative floors (36m) | Pool-funded audits (36m) |
-|---|---|---|---|---|
-| base (carve 0) | SELF-SUSTAIN month 13 | 95% | $20.5k | $6.5k |
-| base, carve 15% | SELF-SUSTAIN month 15 | 95% | $20.5k | $6.9k |
-| base, carve 25% | SELF-SUSTAIN month 18 | 95% | $20.5k | $7.3k |
-| base, carve 40% | ZOMBIE | 95% | $20.5k | $10.3k |
-| optimistic (early, strong demand) | SELF-SUSTAIN month 6 | 94% | $22.0k | $4.4k |
-| pessimistic (demand at month 16, weak clearing) | ZOMBIE | 95% | $19.9k | $20.4k |
-| no-demand | ZOMBIE | 95% | $19.9k | $20.3k |
-| half pool ($37.5k) | SELF-SUSTAIN month 13 | 95% | $20.5k | $6.5k |
-| tenth pool ($7.5k) | EXHAUST month 2 | 87% | $5.7k | $2.1k |
-| costly audit (c_a $40, corpus rate 2%) | EXHAUST month 17 | 95% | $18.0k | $58.0k |
-| no floor decay | SELF-SUSTAIN month 13 | 95% | $43.5k | $6.5k |
-| big book (N0 10k, lambda_d 600) | EXHAUST month 20 | 40% | $43.5k | $33.7k |
-
-(Rows without a carve label assume `carve = 0`; the carve rows are the GA-R3
-re-run and feed the published carve-out cap.)
+The earlier precise 36-month scenario table is removed because the prose
+recurrence did not define its organic-supply response, logistic width, scenario
+overrides, or initial conditions, and it omitted commissioned production. It
+was not reproducible evidence. The minimal executable recurrence now lives at
+[`models/genesis_runway.py`](models/genesis_runway.py) with every assumption in
+one immutable input record and explicit harvest, commissioned, fee-offset,
+organic-takeover, exhaustion, and zombie paths. It is a structural sensitivity
+tool, not a forecast. No pool amount or default carve cap is approved until its
+inputs are replaced with owned estimates. This is a parameterization gate, not
+a gate on building the mechanisms.
 
 Three structural conclusions, which survive parameter variation and are the
 actual content of this section:
 
 1. **The floor is self-bounding by schedule construction.** With a geometric
    step-down, worst-case cumulative floor outlay is bounded by
-   `b0 * admission_capacity / (1 - decay)` regardless of duration (~$20k at
-   base; only ~2x that even with NO decay). The declining schedule is not just
-   a land-grab clock; it is a hard cap on floor exposure. Floors are never the
-   exhaustion driver.
-2. **The standing audit cost is the exhaustion driver, and it scales with the
-   program's own success.** `alpha_corpus * C * c_a` grows with the covered
-   corpus the program builds; the better coverage mining works, the bigger the
-   monthly security bill the pool carries until fees arrive. The costly-audit
-   scenario exhausts even the base pool. Self-sustain therefore requires the
-   SECURITY-SELF-FUNDING INEQUALITY `(1 - carve) * f * X >= (alpha_new * a +
-   alpha_corpus * C) * c_a`, where `carve` is the combined genesis carve-out
+   `b0 * admission_capacity / (1 - decay)` for a fixed per-period admission
+   capacity. The declining schedule is a hard cap on floor exposure. It does
+   not bound commissioned production or standing surveillance.
+2. **Standing audit and commissioned-production costs are the tail risks.**
+   The audit line scales with the program's own success, and commissioned work
+   is not exhaust. `alpha_corpus * C * c_a` grows with the covered corpus the
+   program builds. Self-sustain therefore requires the
+   SECURITY-SELF-FUNDING INEQUALITY
+   `(1 - o) * (1 - carve) * f * X >= (alpha_new * a + alpha_corpus * C) * c_a`,
+   where `o` is operator spread and `carve` is the combined genesis carve-out
    (royalty plus seat shares of the same fee; review finding GA-R3, which
-   caught the gross-fee double count). The carve-out is material: re-running
-   the base scenario, self-sustain slips 13 -> 15 -> 18 months as `carve`
-   rises 0 -> 15 -> 25 percent, and at 40 percent the base case degrades to
-   ZOMBIE (fees never clear the audit bill). Hence the published combined
-   carve-out cap (default 25 percent, 4.2). That inequality (not the floor
-   schedule) is what sizes the pool, the ongoing fee, and the carve-out cap
-   jointly. The corpus audit rate must be tunable downward as per-class
+   caught the gross-fee double count). That inequality, together with the
+   commissioned-production line, sizes the pool, fee, and carve cap jointly.
+   The current 25 percent value is a modeling ceiling to test, not an approved
+   default. The corpus audit rate must be tunable downward as per-class
    reliability data accumulates, or the fee must price it.
 3. **The zombie regime is a real failure the two-outcome framing misses.** A
    pool that survives while nothing organic happens is not success; it is
    subsidy-dependence. The stop-loss gates and indicator 3 below exist for it.
 
-Pool sizing consistent with the model: a wedge genesis pool on the order of
-`$30k` to `$150k` (deliberately small, because negatives are exhaust: production
-cost is sunk and the floor pays only the listing margin), with the caveat that
-the pool's tail exposure is the audit line, not the floor line. The real
-`N_demand`, floor, and audit-cost parameters come from the telemetry the
-M-gates produce; the sizing must be recomputed against that telemetry before
-any pool is funded.
+No dollar pool range is decision-grade yet. Harvest-mode pricing may treat
+production as sunk; commissioned mode may not. Funding approval requires the
+executable model to report both modes and sensitivity across `rho_h`, `c_g`,
+audit cost, carve, demand arrival, and organic-supply response.
 
 Leading indicators (observable from receipts and telemetry; alarm thresholds
 are modeling assumptions to be tuned on data). ALL indicators compute over the
-CCV-FILTERED receipt set (arm's-length, related-party-excluded, section 7);
+arm's-length receipt set (related-party-excluded, section 7);
 unfiltered variants are gameable by exactly the wash trades the stop-loss
 exists to catch (review finding GA-R7):
 
@@ -1071,7 +1152,7 @@ exists to catch (review finding GA-R7):
    / (subsidized findings admitted). Alarm if below ~10 to 20 percent after a 4
    to 8 week warm-up: the pool is buying dead inventory.
 2. Coverage-to-CCV elasticity dCCV/dg. Alarm if coverage-of-demand `g` rises
-   while CCV stays flat: coverage is not converting to demand; the `P_max` cap
+   while CCV stays flat: coverage is not converting to demand; the per-hit bid
    is not clearing.
 3. Organic listing share = (unsubsidized admitted) / (total admitted). Alarm if
    flat or declining: the market is not becoming self-sustaining. This is the
@@ -1081,7 +1162,7 @@ exists to catch (review finding GA-R7):
    outflow). Alarm if eta stays near 0 while `B/B0` falls below a runway
    threshold: runway is burning without conversion.
 5. Repeat-buyer rate (distinct returning buyer clusters). Alarm if one-and-done
-   buyers dominate: `P_max` is not real for buyers.
+   buyers dominate: the modeled per-hit value is not producing repeat demand.
 6. Runway months = `B(t)` / current outflow. Cross-reference against the `T(g*)`
    estimate; alarm if runway < estimated time-to-self-sustaining.
 7. Security-self-funding ratio = (fee inflow) / (total audit spend at the
@@ -1098,17 +1179,16 @@ others).
 ### 9.2 The adverse-selection residual (Q6)
 
 The exhaust that seeds the book is biased. The coding wedge is chosen precisely
-because its exhaust is high-value (failing suites map to real developer demand)
-and replay-checkable. The R&D-null exhaust is the residual: its exhaust may be
-low-demand (nobody queries most dead ends) and its `P_max` is often negative
-(section 3.2), so subsidizing R&D-null coverage risks buying dead inventory the
-model predicts nobody will buy. This is documented, not solved: the program
-launches the coding wedge, defers R&D-null coverage to a later gate contingent
-on wedge telemetry (does coverage there actually convert?), and treats the
-Homestead abandonment rate as the expected shape of the risk. The procurement
-list (demanded-only admission) is the primary defense, but it cannot fully
-distinguish "demanded and uncovered" from "queried once by an outlier"; residual
-adverse selection remains and is carried in the register.
+because its correctness is replay-checkable. The R&D-null exhaust is the
+residual: its `B_hit` is often negative (section 3.2), and proof-of-burn proves
+cost rather than semantic value. This is documented, not hand-waved. The
+program implements R&D-null procurement, listing, royalty-only admission,
+guarantee-class separation, and reliability reporting from the start. It does
+not pay the treasury floor until the configured guarantee profile has an
+adjudicable correctness rule; doing so earlier would violate the floor's own
+security invariant. The procurement list remains the relevance defense, but it
+cannot distinguish durable demand from an outlier nomination. Abandonment is
+therefore expected and residual adverse selection remains in the register.
 
 ### 9.3 The r-manipulation residual (Q4)
 
@@ -1142,6 +1222,18 @@ allowlist that would constrain where pool and slash money goes is prose, not
 code (K1/K10 gap). None of these is fatal; all are honest limits that shape the
 sequencing (Q7) and the threat model.
 
+### 9.5 Anti-token is an architecture boundary, not a legal conclusion
+
+Binding royalties and seats to identities, forbidding protocol transfer, and
+omitting a secondary market are deliberate product constraints. They do not by
+themselves determine whether a fee-bearing right is a security, compensation,
+property, a taxable instrument, or a regulated revenue-sharing arrangement.
+Change-of-control and off-protocol side contracts make that especially clear.
+Before any external grant, counsel and accounting owners must approve the
+instrument, disclosures, tax treatment, custody, and jurisdictional launch
+profile. The protocol design must not market "non-transferable" as a legal safe
+harbor.
+
 ---
 
 ## 10. Summary: what the protocol pays for, from what pool, on what schedule
@@ -1152,10 +1244,11 @@ sequencing (Q7) and the threat model.
   acceptance recipe plus mode-A proof-of-burn plus an audit-verifiable
   guarantee class (`deterministic_replay` at launch), escrowed on the existing
   two-terminal-state escrow (release by default at the audit-window end; a
-  sampled failing audit refunds to the pool), ordered by anchored commitment
+  sampled incorrect audit refunds to the pool; system-incomplete releases at
+  deadline and fires the operator SLA), ordered by anchored commitment
   on contested descriptors, on a **published declining schedule** expiring at
-  `T_g`; plus a **royalty** (reward type b, from the **D7 clearing fee**, a
-  genesis-introduced per-clearing fee category, never the pool),
+  `T_g`; plus a **royalty** (reward type b, from the **D7 clearing fee** in the
+  ratified market-clearing-fee schedule, never the pool),
   non-transferable with a change-of-control lapse, forward-only, stepping
   down on schedule, minted at either admission door (floor or royalty-only).
 - **Audit mining** pays **slashed bonds plus protocol bounties** (pool top-up
@@ -1164,7 +1257,8 @@ sequencing (Q7) and the threat model.
 - **Operator mining** grants **capped, non-transferable genesis seats** (reward
   type c) carrying a **D7 clearing-fee share** (realized only once D7 lands at
   G5 on the M2/M5 collection machinery), bound to the F6 neutrality covenant,
-  lapsing on change of control, and revocable on violation.
+  lapsing on change of control, and revocable on violation. A seat earns only
+  when the clearing references that operator's signed service evidence.
 
 Every subsidy unit becomes inventory (a covered demanded descriptor) or security
 (an audit that establishes `r`), never rented behavior: the floor is per-
