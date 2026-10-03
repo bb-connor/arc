@@ -8,15 +8,15 @@
       "id": "manuscript",
       "status": "passed",
       "acceptance": "Complete argument, exact sources, no unresolved scientific-review blockers.",
-      "evidence": "PROSE-REVIEW.md",
-      "result": "The revised manuscript defines the work commitment, demonstrates signed-record mismatch and replay failures, explains the construction and derives its conditional guarantee. Fresh automated prose and technical review closed two Important and three Minor findings, with no remaining findings in its reviewed scope. Independent foundational critique remains a separate gate."
+      "evidence": "ARCHITECTURE-REVIEW.md",
+      "result": "The revision presents Chio as a kernel architecture, defining the boundary, local admission, programmable sovereignty and distributed program state before the work-commitment construction and evaluation. Fresh automated review found no Critical or Important defect; both Minor findings were repaired and checked by the coordinator. The conditional proposition, proof and qualification text retain their original scope. Independent foundational critique remains a separate gate."
     },
     {
       "id": "artifact",
       "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": "artifact-manifest.json",
-      "result": "The revised 17-page PDF, bibliography, source references and artifact hashes agree. This prose revision changes no native implementation, formal program, experiment or comparison tool. The 21 qualified native commands, six opt-in chain regressions and historical F1 source pin retain their original scope; initial failures and default-suite skips remain recorded."
+      "result": "The revised 19-page PDF, bibliography, source references and artifact hashes agree. The architecture revision changes no native implementation, formal program, experiment or comparison tool. The 21 qualified native commands, six opt-in chain regressions and historical F1 source pin retain their original scope; initial failures and default-suite skips remain recorded."
     },
     {
       "id": "funded-security-integration",

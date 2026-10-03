@@ -1,12 +1,24 @@
-\section{Work commitments}
+\section{Delegation and work commitments}
 \label{sec:contract}
-A work commitment is constructed from decisions made by different authorities.
-The owner allocates an allowance, a provider offers to perform a task, the
-holder selects that offer, and the allocator freezes the choice. For paid work,
-the payer then reserves funds under an agreement referring to the selected
-call. Figure~\ref{fig:work} shows how execution and settlement use these records.
+A work commitment connects the decisions through which a proposed task acquires
+permission, resources and an execution identity. The owner allocates an
+allowance, a provider offers to perform the task, the holder selects that offer,
+and the allocator freezes the choice. For paid work, the payer reserves funds
+under an agreement referring to the selected call. The receiver admits the call
+only when these records agree with its own authorization.
 
-\subsection{Allocate an allowance}
+Consider a buyer who funds an API survey and a follow-on review by an
+intermediary agent. After the survey identifies a problem, the intermediary
+hires a specialist from its own funds. The specialist completes its task and
+earns payment, but the intermediary crashes before returning a result to the
+buyer. The program now contains completed work, an earned claim and an
+unfinished parent task. Each must retain its identity and terms. In particular,
+adding the specialist to the plan must not renew the survey's execution right,
+and failure of the intermediary must not cancel the specialist's payment.
+We use this example to develop the commitment and its lifecycle.
+
+\Needspace{12\baselineskip}
+\subsection{Bounded delegation}
 A work slot specifies a task that may be delegated or assigned to a provider:
 \[
  S=(i,h,E,A,b,c,t,d,Q).
@@ -35,7 +47,7 @@ the same local names. The child may have its own acceptance predicate: a survey
 and a specialist review require different checks. The parent task still needs
 its own result and acceptance.
 
-\subsection{Select and seal an invocation}
+\subsection{Provider selection}
 The provider signs an offer containing the allocation and slot digests, its
 receiving key, the tool operation and input, a price ceiling and an expiry.
 The holder selects the offer together with a request identifier and the digest
@@ -79,8 +91,10 @@ the verifier, whose recorded decision governs payment.}
 \label{fig:work}
 \end{figure}
 
-\subsection{Reserve payment}
-The payment agreement identifies the complete final request, payer, beneficiary,
+\subsection{Payment agreements}
+Paid work adds a payment agreement to the commitment. Figure~\ref{fig:work}
+shows how the execution and settlement authorities use it. The agreement
+identifies the complete final request, payer, beneficiary,
 verifier, asset, amount, settlement system and deadlines. Before dispatch, the
 receiver requires evidence, under its chosen settlement observation rule, that
 the agreement's allocation holds the required funds. The escrow identifier
@@ -93,7 +107,7 @@ remains locked under a different agreement. The intermediary therefore bears
 the subcontract cost if its own task fails; the specialist's earned payment does
 not depend on completion of that task.
 
-\subsection{Check the references}
+\subsection{Binding decisions to the invocation}
 The receiver connects the commitment to the program by checking its signed task
 graph. The graph identifies tasks and their dependencies, assigns ceilings from
 the program's declared pool, and carries routes naming the receiving kernels.
@@ -111,6 +125,12 @@ task must have one task identity. The graph allocation must name the delegated
 allocation digest and agree on amount and currency. The permit and graph
 authorization records must name the same capability. These checks establish
 which invocation the otherwise separate records authorize.
+
+These checks form the common admission contract. A planner can select a new
+provider or add a task by producing records that satisfy it; the receiving kernel
+enforces the same relationship between authority, resources and invocation for
+each such choice. The planner's decomposition of the work can change while this
+relationship remains fixed.
 
 The payment agreement authenticates the complete request, including its
 delegation, graph and treaty references. Its financial allocation has a separate

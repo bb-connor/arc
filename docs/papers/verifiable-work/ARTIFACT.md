@@ -2,26 +2,28 @@
 
 This artifact accompanies *Chio: A Peer-to-Peer Economy of Verifiable Work*.
 The title was approved on 2026-09-14. The manuscript was first completed as a
-research draft on 2026-10-02 and restructured around programmable sovereignty
-and preserved work commitments on 2026-10-03. A subsequent prose revision on
-the same date explains the construction through the failure it prevents and
-the state each authority must retain. Publication readiness is evaluated
-separately in `PUBLICATION.json`.
+research draft on 2026-10-02. The current revision, dated 2026-10-03, presents
+the kernel architecture, programmable sovereignty and preserved work commitments
+before developing the supporting construction and experiment. Earlier editorial
+revisions retain their records in `PROGRESS.md`. Publication readiness is
+evaluated separately in `PUBLICATION.json`.
 
 ## Reading the paper
 
-Sections 1-2 introduce the failed-intermediary example, the replay problem
-created by graph versions, and the authority model. Section 3 constructs a work
+Sections 1-2 establish the architectural problem, kernel boundary, admission
+rules, programmable sovereignty, distributed program state and trust model.
+Section 3 introduces the failed-intermediary example and constructs a work
 commitment. Section 4 follows its execution right across graph versions and
-explains recovery and payment. Section 5 derives the preservation guarantee.
+explains admission, recovery and payment. Section 5 derives the preservation guarantee.
 Sections 6-9 present the evaluation, related work, scope and conclusion.
 
 Appendix A maps the argument to the concrete D1, S1 and F1 profiles, including
 their encodings and acceptance rules. Appendix B records source qualification,
 model coverage and matched alternatives. This companion supplies the exact
 source paths and reproduction commands. The
-[prose and technical review](PROSE-REVIEW.md) records the current manuscript review and
-repairs. This revision changes no native source, proof program, comparison tool
+[architecture review](ARCHITECTURE-REVIEW.md) records the current manuscript review
+and repairs; the [earlier prose review](PROSE-REVIEW.md) retains its original scope.
+This revision changes no native source, proof program, comparison tool
 or experimental output; the existing qualifications keep their original scope.
 
 ## Sources and profiles
@@ -102,8 +104,8 @@ name a particular profile and its conformance tests.
 
 ## Reproduce the paper
 
-Requirements: Python 3.11+, TeX Live with Latin Modern, TikZ and natbib, BibTeX,
-and Poppler (`pdftotext`, `pdfinfo`). From this directory:
+Requirements: Python 3.11+, TeX Live with Latin Modern, TikZ, natbib, titlesec and
+needspace, BibTeX, and Poppler (`pdftotext`, `pdfinfo`). From this directory:
 
 ```sh
 make build

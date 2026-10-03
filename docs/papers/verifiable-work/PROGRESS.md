@@ -1,5 +1,49 @@
 # Publication execution record
 
+2026-10-03 architecture revision (base `f4a4c4db9f`): the approved revision is
+complete. The abstract and introduction state the kernel architecture;
+Section 2 develops admission, programmable sovereignty, treaties, state ownership
+and trust boundaries before the delegated-work construction. A new diagram
+shows two locally governed kernels. Implementation, evaluation, related work,
+scope and conclusion follow that argument. The title and all experimental
+results remain unchanged. Plan: `ARCHITECTURE-PLAN.md`; review:
+`ARCHITECTURE-REVIEW.md`.
+
+One fresh automated reviewer found no Critical or Important defect and two
+Minor issues. Both were repaired: the abstract now briefly identifies the
+implemented runtime and local evaluation before its architectural conclusion,
+and the artifact reading guide matches the revised sections. Coordinator
+verification covered the repairs and rendered abstract, architecture, slot
+definition, proposition and conclusion. No finding is deferred; no second
+review or independent human peer review is claimed.
+
+Verification for this revision:
+- Baseline artifact check: passed.
+- Existing artifact-tool suite: 13 passed, zero failed.
+- First freeze and build: failed with native inventory drift. Exact comparison
+  found one added editorial plan, zero changed inputs and zero removed inputs.
+  Moving the plan into the separately qualified paper directory restored all
+  36,556 inputs. Neither verifier nor native evidence was changed.
+- Final render, freeze and build: passed; 658 artifact files agree.
+- PDF: 19 pages (14 main, two references, three appendices), 361,747 bytes;
+  rebuild is byte-identical. No LaTeX warnings or overfull/underfull boxes.
+- All 28 unchanged claim records and evidence paths resolve; all 30 local links
+  in the revised companion documents resolve.
+- Proposition, proof and qualification tail are byte-identical to the base.
+  Native code, formal programs, experiments and artifact tools are unchanged.
+- Publication check: expected exit one for independent operation, useful-work
+  economics, integration advantage, foundational claim and the two false
+  readiness flags. No artifact failure remains.
+- PDF SHA256: `0b923c230e45fbcd8293f20dd4cef4bb3ddb5bd535460a4d9f8402bafc8daa7b`.
+
+Execution decisions: use the existing isolated paper worktree and the user's
+explicit execution authorization; validate this prose revision with rendering,
+semantic review and existing artifact checks; repair both editorial findings
+within the requested quality bar; keep the editorial plan in the paper package
+to preserve exact native qualification. No new implementation test campaign,
+external publication, shared-branch merge or research-gate promotion is implied.
+The review's declined scopes remain explicit in ARCHITECTURE-REVIEW.md.
+
 2026-10-03 explanatory revision: the user approved the prose critique and asked
 for its execution. The bounded design is to replace component inventory and
 repeated significance statements with a causal argument: define the work

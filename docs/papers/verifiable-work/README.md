@@ -2,28 +2,29 @@
 
 [Read the paper](paper.pdf) · [Source](paper.tex) · [Artifact and reproduction](ARTIFACT.md) · [Claim register](CLAIMS.json) · [Publication gates](PUBLICATION.json)
 
-An agent may hire collaborators before it knows its complete plan. Chio lets
-the plan acquire new tasks while each resource owner retains control of what
-it admits and a durable record of what has already happened.
+Chio is a kernel architecture for peer-to-peer verifiable work. It separates
+agent planning from the authority and durable execution state governing its
+effects. Programs can develop across independently controlled resources while
+each owner enforces its own conditions for admission.
 
-The protocol uses a work commitment to connect one selected call with its
-allowance, the receiver's authorization and its payment terms. Later graph
-versions retain the call's execution identity, so a new signature cannot make
-a consumed right executable again. Each paid task has its own reserve; recorded
-acceptance keeps that reserve payable after a parent failure.
+The paper develops this architecture through programmable sovereignty,
+capabilities, treaties and work commitments. A commitment connects a selected
+call with its allowance, receiving authority and, for paid work, settlement
+terms. Plan growth preserves earlier execution rights; recovery retains their
+history; separately funded agreements preserve earned payments.
 
-The paper derives these rules from an API-review example, specifies their
-enforcement, and gives a preservation argument under explicit trust assumptions.
-Its Rust implementation runs the example through task discovery, graph growth,
-intermediary process loss and collection of the specialist's original claim.
-This is how the paper develops programmable sovereignty: cooperating owners
-enforce agreements at their own resources.
+The manuscript defines the kernel boundary and distributed program state,
+specifies the composition rules, and gives a preservation argument under
+explicit trust assumptions. The implementation and evaluation follow an API
+review through task discovery, graph growth, intermediary process loss and
+collection of the specialist's original claim.
 
 Appendix A fixes the concrete profiles and encodings. Appendix B retains the
-qualification and comparison details. The [prose and technical review](PROSE-REVIEW.md)
-records the review of this explanatory revision; the
-[earlier editorial review](EDITORIAL-REVIEW.md) remains available at its original
-scope.
+qualification and comparison details. The [architecture review](ARCHITECTURE-REVIEW.md)
+records the review and validation of this revision. The
+[previous prose review](PROSE-REVIEW.md) and
+[earlier editorial review](EDITORIAL-REVIEW.md) remain available at their original
+scopes.
 
 The title was approved on 2026-09-14. The manuscript and artifact were revised on
 2026-10-03. The composed result uses one administrator and a private chain. The
@@ -43,7 +44,7 @@ economics, integration advantage and external foundational critique.
 - `PUBLICATION.json`: fail-closed high-bar readiness gates.
 - `EXTERNAL-TRIAL.md`, `trial/`: independent operator handoff, frozen analysis rules and data templates; no completed trial is implied.
 - `PROGRESS.md`: execution decisions and remaining work.
-- `PROSE-REVIEW.md`, `EDITORIAL-REVIEW.md`, `REVIEW.md`: current manuscript review and retained earlier review records.
+- `ARCHITECTURE-REVIEW.md`, `PROSE-REVIEW.md`, `EDITORIAL-REVIEW.md`, `REVIEW.md`: current manuscript review and retained earlier review records.
 - [Dynamic delegation](../../research/dynamic-delegation/README.md): protocol,
   results, current native source qualification and implementation review.
 - [Swarm evolution](../../research/swarm-evolution/README.md): reuse map,

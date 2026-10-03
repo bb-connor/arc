@@ -1,11 +1,18 @@
 \section{Implementation and evaluation}
 \label{sec:evaluation}
-The Rust implementation joins Chio's delegation allocator, task-graph verifier,
-treaty admission, execution records and funded-settlement adapter. The added
-checks enforce the references described in Section~\ref{sec:contract}.
-Evaluation examines whether the implementation rejects inconsistent commitments,
-preserves earlier execution through plan growth, and pays an earned child after
-its parent process is lost.
+Chio implements capability evaluation, guarded tool dispatch and receipt signing
+in its Rust runtime. Delegation allocators and protected stores retain resource
+assignments; the swarm authority verifier checks task graphs and continuations;
+treaty admission governs cooperation between receivers. The work-commitment
+construction binds these mechanisms to durable execution records and the
+funded-settlement adapter through the checks in Section~\ref{sec:contract}.
+The concrete profiles and their encodings are specified in
+Appendix~\ref{app:profiles}.
+
+Evaluation examines three consequences of this architecture: rejection of
+inconsistent commitments at admission, continuity of execution rights through
+plan growth and recovery, and preservation of earned payment through parent
+failure. The composed run follows the API example through all three boundaries.
 
 All runs use author-controlled infrastructure. The composed execution has three
 receiving keys and separate stores on one host, in-process treaty co-signers,
@@ -93,7 +100,7 @@ Chio records \textsf{Payable} before withdrawal; the pinned upstream completion
 pays immediately.
 
 These comparisons establish substantial overlap in the financial mechanisms.
-The contribution evaluated by the composed run is their connection to the
-authorized invocation and its changing task graph. The authentication inventory
+The composed run evaluates their connection to the kernel's admission contract,
+the authorized invocation and its changing task graph. The authentication inventory
 provides an easily checked workload for this purpose. It does not measure an
 economic advantage in outsourcing API review.

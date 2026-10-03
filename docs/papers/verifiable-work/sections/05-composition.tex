@@ -1,9 +1,14 @@
 \section{Preservation of commitments}
 \label{sec:preservation}
-The construction must preserve two quantities and one identity: the capacity
+The kernel contract must preserve two quantities and one identity: the capacity
 allocated to work, the funds reserved for payment, and the invocation to which
 each execution right belongs. We first state the accounting invariants, then
 show why plan growth and recovery preserve them together.
+
+This is the property a planner needs when extending a distributed program:
+the extension must account for earlier commitments even when their execution
+or settlement is incomplete. The following argument concerns the specified
+composition rules and the authorities that enforce them.
 
 \subsection{Delegated and planned capacity}
 Let $B_D$ be a delegation root's ceiling, $b_v$ a leaf's ceiling and $U_v$ an
@@ -52,6 +57,7 @@ This is the financial reason that a parent refund cannot revoke a child's
 earned payment. Withdrawal also requires the beneficiary's key, available
 evidence, transaction inclusion and a functioning asset.
 
+\Needspace{18\baselineskip}
 \subsection{The combined guarantee}
 \begin{proposition}[Preservation under plan growth and recovery]
 Assume the protected allocation, graph, execution and settlement state of
