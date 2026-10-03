@@ -28,3 +28,5 @@ Final runtime qualification: API-protect245, remote MCP129, shared HTTP19, focus
 Final contract gates pass:476 constructors,85 tenant tables,170 SQL contracts;426 clock observations and38 compositions with no additions;1254 unchanged weak-assertion baseline; no raised Rust hygiene caps. Final formatting passes.
 
 Final strict workspace/all-target Clippy passes with --locked and -D warnings after the last test changes (fixture-qualified-clippy, exit 0). Formatting also passes (fixture-qualified-format). All local plan qualification steps are complete; source and evidence are ready for the authorized commit/push.
+
+Publication complete: source ccf902c7f198dcf96d7cbaf74dd2ca528c0de703 pushed to origin/packet/3-retention-accounting; git ls-remote matched the local SHA. Publication status and the completed plan follow in a documentation-only commit. AP7/AP8 and both Important review corrections are complete within the recorded local Linux scope. Next: AP9/AP10 receipt integrity and evidence lifecycle; broader gates remain open.

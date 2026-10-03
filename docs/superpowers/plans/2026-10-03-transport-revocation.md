@@ -25,7 +25,8 @@ TransportListener; MaxConnListener remains the outer owner of connection permits
   key loading, explicit rustls provider and timed asynchronous handshake IO.
 - [x] Verify actual trusted TLS, untrusted/wrong-name/plaintext refusal, key mismatch,
   malformed PEM, unsafe custody, timeout, concurrent honest client and permit reuse.
-- [x] Run `cargo test -p chio-http-serve`. Expected: all pass.
+- [x] Run the complete shared HTTP library test suite. All 19 tests pass in the
+  retained `fixture-qualified-http` binary run.
 
 ### Task 2: Three production listeners and control client
 
@@ -64,7 +65,8 @@ review queue and plan checkboxes.
   Retain terminal exits, logs and source/binary hashes. Expected: pass.
 - [x] One independent integrated review; reproduce/fix Important or Critical
   findings, record all rulings and declined boundaries. Expected: resolved controls.
-- [ ] Commit/push and verify remote SHA. Confirm each completed task; propose AP9
+- [x] Commit/push and verify remote SHA. Source `ccf902c7f198dcf96d7cbaf74dd2ca528c0de703`
+  matches origin. Confirm each completed task; propose AP9/AP10
   receipt immutability/export/retention and remaining key/guard/release gates.
 
 ## Review Focus

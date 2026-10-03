@@ -1,6 +1,8 @@
 # Transport and revocation execution, October 3, 2026
 
-Branch `packet/3-retention-accounting`, based on published source
+Published source `ccf902c7f198dcf96d7cbaf74dd2ca528c0de703` on
+`packet/3-retention-accounting`; the origin branch matched that SHA after push.
+Publication metadata follows in a documentation-only commit. The source is based on
 `aaa413406d63cc109f6aeda14de4e517a6d574a6`. That parent completes the AP4-AP6 and
 threshold-reader batch. This record owns AP7 and AP8; it does not change the
 historical qualification boundaries of earlier batches.

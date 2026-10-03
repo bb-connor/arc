@@ -229,7 +229,7 @@
   },
   {
     "path": "docs/reviews/2026-10-03-transport-revocation-execution.md",
-    "sha256": "840efdcac45d6e490b770ea4e3d81d2e00442502830186e2830e009000b54158"
+    "sha256": "622480d7a0e55fc376681fd1dc95dc27659a742c9b879b44851e8496796674dd"
   },
   {
     "path": "docs/security/http-transport.md",
@@ -245,7 +245,7 @@
   },
   {
     "path": "docs/superpowers/plans/2026-10-03-transport-revocation.md",
-    "sha256": "f4cfe198f4f0e2f34b26b3ba710bfa27decc80d668a0a14fca940d29404ea89b"
+    "sha256": "c1dbc1d9a619ba3eae400983219714419c00bef7778581a1bc115faed1d48540"
   },
   {
     "path": "docs/superpowers/specs/2026-10-03-transport-revocation-design.md",
