@@ -93,60 +93,69 @@ impl RetentionMaintenanceHandle {
     /// Spawn the maintenance worker. `store` is a dedicated `Arc` clone held
     /// by the worker thread for its lifetime, independent of the kernel's own
     /// `receipt_store` handle.
-    pub(crate) fn spawn(store: std::sync::Arc<dyn ReceiptStore>, config: RetentionConfig) -> Self {
+    pub fn spawn(
+        store: std::sync::Arc<dyn ReceiptStore>,
+        config: RetentionConfig,
+    ) -> Result<Self, ReceiptStoreError> {
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let worker_stop = std::sync::Arc::clone(&stop);
         let interval = std::time::Duration::from_secs(config.check_interval_secs.max(1));
-        let join = std::thread::spawn(move || {
-            while !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
-                // Sleep in short slices so shutdown is responsive.
-                let mut waited = std::time::Duration::ZERO;
-                let slice = std::time::Duration::from_millis(200);
-                while waited < interval && !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
-                    std::thread::sleep(slice);
-                    waited += slice;
-                }
-                if worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
-                    break;
-                }
-                // Never panic: a rotation error OR a caught panic is surfaced
-                // as a warning and retried next interval, rather than
-                // crashing the worker thread (and, unwrapped, the kernel).
-                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    store.rotate_receipts(&config)
-                }));
-                // Persist the outcome into health so a persistent rotation
-                // failure (an unwritable archive path, a missing/replaced
-                // archive that no longer backs the ledger) is observable outside
-                // this log: a store serving under a retention policy that is not
-                // being honored must not keep reporting healthy. A success clears
-                // the prior failure.
-                match outcome {
-                    Ok(Ok(_archived)) => {
-                        store.record_retention_rotation_outcome(None);
+        let join = std::thread::Builder::new()
+            .name("chio-receipt-retention".into())
+            .spawn(move || {
+                while !worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    // Sleep in short slices so shutdown is responsive.
+                    let mut waited = std::time::Duration::ZERO;
+                    let slice = std::time::Duration::from_millis(200);
+                    while waited < interval
+                        && !worker_stop.load(std::sync::atomic::Ordering::SeqCst)
+                    {
+                        std::thread::sleep(slice);
+                        waited += slice;
                     }
-                    Ok(Err(error)) => {
-                        store.record_retention_rotation_outcome(Some(&error.to_string()));
-                        tracing::warn!(
-                            target: "chio::retention",
-                            error = %redacted!(&error),
-                            "receipt rotation failed; will retry next interval"
-                        );
+                    if worker_stop.load(std::sync::atomic::Ordering::SeqCst) {
+                        break;
                     }
-                    Err(_panic) => {
-                        store.record_retention_rotation_outcome(Some("receipt rotation panicked"));
-                        tracing::warn!(
-                            target: "chio::retention",
-                            "receipt rotation panicked; will retry next interval"
-                        );
+                    // Never panic: a rotation error OR a caught panic is surfaced
+                    // as a warning and retried next interval, rather than
+                    // crashing the worker thread (and, unwrapped, the kernel).
+                    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        store.rotate_receipts(&config)
+                    }));
+                    // Persist the outcome into health so a persistent rotation
+                    // failure (an unwritable archive path, a missing/replaced
+                    // archive that no longer backs the ledger) is observable outside
+                    // this log: a store serving under a retention policy that is not
+                    // being honored must not keep reporting healthy. A success clears
+                    // the prior failure.
+                    match outcome {
+                        Ok(Ok(_archived)) => {
+                            store.record_retention_rotation_outcome(None);
+                        }
+                        Ok(Err(error)) => {
+                            store.record_retention_rotation_outcome(Some(&error.to_string()));
+                            tracing::warn!(
+                                target: "chio::retention",
+                                error = %redacted!(&error),
+                                "receipt rotation failed; will retry next interval"
+                            );
+                        }
+                        Err(_panic) => {
+                            store.record_retention_rotation_outcome(Some(
+                                "receipt rotation panicked",
+                            ));
+                            tracing::warn!(
+                                target: "chio::retention",
+                                "receipt rotation panicked; will retry next interval"
+                            );
+                        }
                     }
                 }
-            }
-        });
-        Self {
+            })?;
+        Ok(Self {
             stop,
             join: Some(join),
-        }
+        })
     }
 }
 
@@ -1751,7 +1760,7 @@ mod tests {
             check_interval_secs: 1,
             ..RetentionConfig::default()
         };
-        let handle = RetentionMaintenanceHandle::spawn(store.clone(), config);
+        let handle = RetentionMaintenanceHandle::spawn(store.clone(), config).unwrap();
 
         // The worker sleeps one interval (in 200ms slices) before its first
         // rotation, then records the failure into health. Poll until it appears.

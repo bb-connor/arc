@@ -22,6 +22,7 @@ pub(crate) fn dispatch_api(
             allow_anonymous_reads,
             listen,
             receipt_store,
+            receipt_retention,
             allow_ephemeral_receipts,
             upstream_timeout_secs,
         } => cmd_api_protect(
@@ -32,6 +33,7 @@ pub(crate) fn dispatch_api(
             spec.as_deref(),
             &listen,
             receipt_store.as_deref().or(receipt_db.as_deref()),
+            receipt_retention.into_config()?,
             authority_seed_file.as_deref(),
             budget_db.as_deref(),
             revocation_db.as_deref(),

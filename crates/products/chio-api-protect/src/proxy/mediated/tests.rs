@@ -31,6 +31,7 @@ fn issuing_kernel(
             super::MediationPolicy {
                 issuers: trusted_capability_issuers,
                 hash: None,
+                receipt_store: None,
             },
             Vec::new(),
             None,
@@ -271,6 +272,10 @@ fn mediated_test_state_with_durable_admission(
             super::MediationPolicy {
                 issuers: &trusted_capability_issuers,
                 hash: None,
+                // Legacy financial regression fixtures intentionally exercise the
+                // ephemeral admission profile. Durable production composition is
+                // exercised separately with qualified admission stores.
+                receipt_store: None,
             },
             Vec::new(),
             payment_adapter,
@@ -602,12 +607,14 @@ fn open_temp_receipt_store() -> (std::path::PathBuf, SqliteReceiptStore) {
 }
 
 /// A receipt store whose `append_tool_receipt` fails deterministically: the
-/// backing `tool_receipts` table is dropped through a second connection to
+/// backing `chio_tool_receipts` table is dropped through a second connection to
 /// the same database, so every append errors.
 fn failing_receipt_store() -> SqliteReceiptStore {
     let (db, store) = open_temp_receipt_store();
     let dropper = rusqlite::Connection::open(&db).unwrap();
-    dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+    dropper
+        .execute("DROP TABLE chio_tool_receipts", [])
+        .unwrap();
     drop(dropper);
     store
 }
@@ -707,6 +714,7 @@ async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservatio
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["status"], "reserved");
+    assert_eq!(json["evidence_persisted"], false);
     assert!(
         json["execution_nonce"].is_object(),
         "a persistence failure after a successful reserve must still return the nonce"
@@ -771,6 +779,7 @@ async fn mediated_receipt_persistence_success_keeps_reservation() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["status"], "reserved");
+    assert_eq!(json["evidence_persisted"], true);
     assert!(json["execution_nonce"].is_object());
 
     let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -821,6 +830,7 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["status"], "reserved");
+    assert_eq!(json["evidence_persisted"], false);
     let nonce_json = json["execution_nonce"].clone();
     assert!(
         nonce_json.is_object(),
@@ -1078,6 +1088,8 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,
@@ -1114,6 +1126,8 @@ fn build_budget_store_remote_is_not_hold_capable() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,
@@ -1153,6 +1167,8 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,
@@ -1191,6 +1207,8 @@ fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,
@@ -1257,6 +1275,7 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
         super::MediationPolicy {
             issuers: &[],
             hash: None,
+            receipt_store: None,
         },
         Vec::new(),
         None,
@@ -1522,7 +1541,9 @@ async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
     // post-settle append fails: unlike a reversible reservation, the settled
     // spend cannot be undone, so the authoritative receipt is the only proof.
     let dropper = rusqlite::Connection::open(&db).unwrap();
-    dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+    dropper
+        .execute("DROP TABLE chio_tool_receipts", [])
+        .unwrap();
     drop(dropper);
 
     let reconcile_body = serde_json::json!({
@@ -1536,6 +1557,7 @@ async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
     // authoritative receipt rather than a 500 that discards the only proof.
     assert_eq!(status, StatusCode::OK);
     assert_eq!(reconciled["status"], "reconciled");
+    assert_eq!(reconciled["evidence_persisted"], false);
     let receipt: ChioReceipt = serde_json::from_value(reconciled["receipt"].clone()).unwrap();
     let nonce: SignedExecutionNonce = serde_json::from_value(nonce_json).unwrap();
     assert_eq!(
@@ -1590,7 +1612,9 @@ async fn reconcile_still_fails_closed_on_replayed_nonce_when_persistence_fails()
     // Even with receipt persistence broken, a replayed nonce is a reconcile
     // ERROR: it is rejected 4xx and never returns a receipt.
     let dropper = rusqlite::Connection::open(&db).unwrap();
-    dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+    dropper
+        .execute("DROP TABLE chio_tool_receipts", [])
+        .unwrap();
     drop(dropper);
     let (status, replay) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);

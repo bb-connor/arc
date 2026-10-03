@@ -176,7 +176,7 @@ fn run_history_recovery(history: u64) -> TestResult {
     assert_eq!(status.latest_checkpointed_entry_seq, history);
     assert_eq!(
         store
-            .query_receipts(&ReceiptQuery {
+            .query_live_receipts(&ReceiptQuery {
                 limit: 1,
                 read_context: Some(chio_kernel::ReceiptReadContext::local_operator_admin_all()),
                 ..ReceiptQuery::default()

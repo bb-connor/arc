@@ -152,6 +152,8 @@ fn spec_config() -> ProtectConfig {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: vec![],
         approval: None,

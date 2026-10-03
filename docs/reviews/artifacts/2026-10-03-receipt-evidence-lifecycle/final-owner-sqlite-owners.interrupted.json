@@ -1,0 +1,7 @@
+{
+  "status": "interrupted",
+  "wrapper_exit_code": 143,
+  "child_terminal_exit_unavailable": true,
+  "reason": "Execution wrapper terminated before terminal child status was recorded. No live child remains. Cause was not established.",
+  "log_sha256": "94948b3d90d0c2fb22034be9355fc255e4ddfccff3b5a147bc52159cdeabc223"
+}

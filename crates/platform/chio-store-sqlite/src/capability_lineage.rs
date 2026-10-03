@@ -427,8 +427,14 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
-        let row = self
-            .connection()?
+        Self::get_lineage_on_connection(&*self.connection()?, capability_id)
+    }
+
+    pub(crate) fn get_lineage_on_connection(
+        connection: &rusqlite::Connection,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
+        let row = connection
             .query_row(
                 r#"
                 SELECT

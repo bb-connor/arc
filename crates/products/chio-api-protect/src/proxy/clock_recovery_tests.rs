@@ -92,6 +92,7 @@ fn service_clock_recovery_keeps_kernel_and_nonce_expiry_consistent(
         super::super::mediated::MediationPolicy {
             issuers: &[],
             hash: None,
+            receipt_store: None,
         },
         Vec::new(),
         None,
@@ -162,6 +163,8 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,

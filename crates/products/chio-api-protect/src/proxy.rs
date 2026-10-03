@@ -13,7 +13,6 @@ use axum::routing::{any, get, post};
 use axum::Json;
 use axum::Router;
 use chio_http_serve::{CappedPeerAddr, MaxConnListener};
-use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
@@ -67,6 +66,12 @@ mod config;
 mod control;
 #[path = "proxy/decision.rs"]
 mod decision;
+#[path = "proxy/evidence.rs"]
+mod evidence;
+mod retention;
+use evidence::SqliteReceiptStore;
+pub use retention::ProtectRetentionConfig;
+
 #[path = "proxy/errors.rs"]
 mod errors;
 #[path = "proxy/http.rs"]

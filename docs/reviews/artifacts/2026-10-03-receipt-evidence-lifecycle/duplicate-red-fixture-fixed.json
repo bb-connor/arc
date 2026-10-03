@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-api-protect",
+    "-p",
+    "chio-http-core",
+    "--lib",
+    "--locked",
+    "evidence_sink"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 122.3,
+  "log_sha256": "a1c90df4f583afa09af69e009232cbded00caf46efcc82f6cac4a393a62c897c"
+}

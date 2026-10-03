@@ -5,6 +5,7 @@ use serde::de::DeserializeOwned;
 
 pub(crate) const MAX_BODY_BYTES: usize = 10 * 1024 * 1024;
 pub(crate) const MAX_HEADER_BYTES: usize = 64 * 1024;
+#[cfg(test)]
 pub(crate) const MAX_RECEIPT_BYTES: usize = 1024 * 1024;
 
 pub(crate) fn decode<T: DeserializeOwned>(

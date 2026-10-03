@@ -211,6 +211,8 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         // does not refuse to start.
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         control_url: None,
@@ -277,6 +279,8 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         // does not refuse to start.
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         control_url: None,
@@ -347,6 +351,8 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         // does not refuse to start.
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         control_url: None,

@@ -211,6 +211,24 @@ mod cli_env_tests {
             .unwrap_or_else(|_| panic!("parse thread must not panic"))
     }
 
+    #[test]
+    fn receipt_retention_cli_accepts_explicit_policy_on_both_launchers() {
+        for prefix in [vec!["chio", "start"], vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"]] {
+            let mut argv = prefix;
+            argv.extend(["--receipt-retention-days", "7", "--receipt-archive", "/tmp/receipts-archive.db", "--receipt-retention-interval-secs", "60"]);
+            assert!(parse_cli(argv).is_ok(), "explicit retention arguments must parse");
+        }
+    }
+
+    #[test]
+    fn receipt_retention_cli_rejects_partial_and_zero_policy() {
+        for args in [vec!["--receipt-retention-days", "7"], vec!["--receipt-archive", "/tmp/a"], vec!["--receipt-retention-interval-secs", "60"], vec!["--receipt-retention-days", "0", "--receipt-archive", "/tmp/a", "--receipt-retention-interval-secs", "60"]] {
+            let mut argv = vec!["chio", "start"];
+            argv.extend(args);
+            assert!(parse_cli(argv).is_err());
+        }
+    }
+
     fn env_lock() -> MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
@@ -821,6 +839,8 @@ pub(crate) enum Commands {
         /// Optional SQLite receipt store path for a durable audit log.
         #[arg(long = "receipt-store")]
         receipt_store: Option<PathBuf>,
+        #[command(flatten)]
+        receipt_retention: ReceiptRetentionArgs,
 
         /// Permit in-memory receipts, whose audit evidence is lost on every
         /// restart. Required to boot without `--receipt-store`. For local

@@ -40,7 +40,11 @@ pub struct ProtectConfig {
     /// 512 bytes after trimming; invalid configuration rejects before startup I/O.
     /// Proxy routes reject this token's bytes in any header value before egress.
     pub sidecar_control_token: Option<String>,
-    /// Optional seed used to keep the sidecar signer stable across restarts.
+    /// Explicit archive policy. Disabled when absent.
+    pub receipt_retention: Option<super::ProtectRetentionConfig>,
+    /// Existing private signing custody, required with a durable receipt store.
+    pub signer_seed_file: Option<std::path::PathBuf>,
+    /// Inline seed for explicit ephemeral embedding only; conflicts with a file.
     pub signer_seed_hex: Option<String>,
     /// Explicit capability issuers trusted by the HTTP authority.
     pub trusted_capability_issuers: Vec<PublicKey>,
@@ -91,6 +95,8 @@ impl std::fmt::Debug for ProtectConfig {
             .field("allow_anonymous_reads", &self.allow_anonymous_reads)
             .field("listen_addr", &self.listen_addr)
             .field("receipt_db", &self.receipt_db)
+            .field("receipt_retention", &self.receipt_retention)
+            .field("signer_seed_file", &self.signer_seed_file)
             .field("allow_ephemeral_receipts", &self.allow_ephemeral_receipts)
             .field(
                 "sidecar_control_token",

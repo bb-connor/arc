@@ -64,6 +64,7 @@ fn api_protect_subcommand_parses() {
                     spec_sha256,
                     allow_anonymous_reads,
                     transport,
+                    receipt_retention: _,
                 },
         } => {
             let transport: chio_http_serve::ServerTransportConfig = transport.into();

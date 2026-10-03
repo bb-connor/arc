@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "scripts/check-trust-boundaries.py"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 91.42,
+  "log_sha256": "1fe696661ac59da901f40a14dab4693ccf3d18f72be93eb71514b11fe0009d61"
+}

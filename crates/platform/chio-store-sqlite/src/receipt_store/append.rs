@@ -1,3 +1,6 @@
+#[path = "strict_append.rs"]
+mod strict_append;
+
 use super::*;
 
 pub(super) fn append_chio_receipt_tx(

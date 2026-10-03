@@ -327,21 +327,6 @@ pub(crate) async fn sidecar_release_handler(
 
     let capability_id = release_request.capability_id.trim().to_string();
 
-    // Record the release in the receipt store's revoked-capabilities table when
-    // a durable receipt database is configured, so a restart reloads it into the
-    // in-memory validate set. In ephemeral mode there is no such table; the
-    // shared revocation store below still makes the release effective in-process.
-    if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
-        if let Err(error) = store.revoke_capability(&capability_id) {
-            warn!("failed to persist capability revocation: {error}");
-            return internal_json_error_response(
-                "chio_capability_release_failed",
-                &error.to_string(),
-            );
-        }
-    }
-
     // Record in the revocation store shared with the embedded kernel. It is
     // present in every serving mode (the durable sibling database, or an
     // in-memory store in ephemeral mode), so a release takes effect for mediated
@@ -439,11 +424,13 @@ pub(crate) async fn sidecar_submit_receipt_handler(
             method: HttpMethod::Post,
             caller_identity_hash,
             session_id: None,
-            verdict: Verdict::Allow,
-            receipt_kind: chio_core_types::receipt::kinds::ReceiptKind::MediatedDecision,
-            boundary_class: chio_core_types::receipt::kinds::BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: chio_core_types::receipt::kinds::ToolOrigin::CallerExecuted,
+            verdict: Verdict::Incomplete {
+                reason: "operator observation does not authorize execution".into(),
+            },
+            receipt_kind: chio_core_types::receipt::kinds::ReceiptKind::AdvisoryEvaluation,
+            boundary_class: chio_core_types::receipt::kinds::BoundaryClass::AdvisoryOnly,
+            observation_outcome: Some(ObservationOutcome::Observed),
+            tool_origin: chio_core_types::receipt::kinds::ToolOrigin::HostExecutedUnmediated,
             redaction_mode: chio_core_types::receipt::kinds::RedactionMode::None,
             actor_chain: Vec::new(),
             evidence: Vec::new(),
@@ -454,7 +441,7 @@ pub(crate) async fn sidecar_submit_receipt_handler(
             },
             content_hash: chio_core_types::sha256_hex(&body_bytes),
             policy_hash: manual_receipt_policy_hash("chio_api_protect_sidecar_receipt_submission"),
-            trust_level: chio_core_types::receipt::kinds::TrustLevel::Mediated,
+            trust_level: chio_core_types::receipt::kinds::TrustLevel::Advisory,
             capability_id,
             metadata: Some(sidecar_submit_receipt_metadata(&receipt_request)),
             kernel_key: state.signer_keypair.public_key(),

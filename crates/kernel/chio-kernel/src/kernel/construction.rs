@@ -957,7 +957,7 @@ impl ChioKernel {
                 Some(crate::receipt_store::RetentionMaintenanceHandle::spawn(
                     Arc::clone(&receipt_store),
                     config,
-                ));
+                )?);
         }
         self.receipt_store = Some(receipt_store);
         Ok(())

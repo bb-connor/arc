@@ -1158,6 +1158,8 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,

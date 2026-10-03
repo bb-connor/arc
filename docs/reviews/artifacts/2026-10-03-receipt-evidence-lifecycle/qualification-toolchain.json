@@ -1,0 +1,9 @@
+{
+  "command": [
+    "rustc",
+    "-Vv"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.05,
+  "log_sha256": "05ab2838f795d30dee11b3a4078deded9525e5158abc7ec591be1f8a5bc8f2ce"
+}

@@ -3310,6 +3310,9 @@ mod append;
 mod bootstrap;
 use append::{append_chio_receipt_tx, append_chio_receipt_tx_with_insert_status};
 mod chaos_test_hooks;
+#[path = "receipt_store/retained_read.rs"]
+pub(crate) mod retained_read;
+
 #[path = "receipt_store/evidence_retention.rs"]
 mod evidence_retention;
 #[path = "receipt_store/liability_claims.rs"]

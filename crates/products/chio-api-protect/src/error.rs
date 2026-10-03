@@ -42,6 +42,12 @@ pub enum ProtectError {
     #[error("receipt persistence failed: {0}")]
     ReceiptStore(String),
 
+    #[error("receipt evidence persistence failed: {0}")]
+    EvidenceStore(#[from] chio_kernel::ReceiptStoreError),
+
+    #[error("private signing custody rejected")]
+    SigningCustody(#[source] Box<chio_control_plane::CliError>),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

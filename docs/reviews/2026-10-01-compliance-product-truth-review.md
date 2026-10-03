@@ -16,9 +16,12 @@ qualification tracked there. Bearer compatibility, volatile replay, unsupported
 origin-specific proof policy and trusted-proxy deployment remain explicit limits.
 AP7 shared TLS/control-client transport and AP8 truthful revocation are implemented
 in the [October 3 execution record](2026-10-03-transport-revocation-execution.md),
-which owns their local qualification and review boundaries. AP9/AP10 receipt
-integrity and the export/retention lifecycle are next. The findings and counts
-below retain their historical meaning.
+which owns their local qualification and review boundaries. The next continuation
+implements AP9/AP10 receipt integrity, AP11 history removal, authenticated retained
+reads and API/start retention. Its source qualification and publication boundary
+are tracked in the [receipt lifecycle record](2026-10-03-receipt-evidence-lifecycle-execution.md).
+Other EV5 launchers and EV6/EV7 package signing and external trust remain open.
+The findings and counts below retain their historical meaning.
 
 A compliance-documentation review of `main` (`f5566d9a76`) on September 30 and October 1 checked
 every compliance, security and supply-chain claim in the repository against the code, the CI

@@ -57,13 +57,18 @@ outcome, allowed or denied. It is the library behind `chio api protect` and
 use chio_api_protect::{ProtectConfig, ProtectProxy, DEFAULT_UPSTREAM_REQUEST_TIMEOUT};
 
 let config = ProtectConfig {
+    transport: Default::default(),
     upstream: "https://api.example.com".to_string(),
     spec_content: None,
     spec_path: Some("openapi.json".to_string()),
+    spec_sha256: None,
+    allow_anonymous_reads: false,
     listen_addr: "127.0.0.1:9090".to_string(),
     receipt_db: Some("receipts.db".to_string()),
     allow_ephemeral_receipts: false,
     sidecar_control_token: None, // Control endpoints disabled, including on loopback.
+    receipt_retention: None,
+    signer_seed_file: Some("/var/lib/chio/authority.seed".into()),
     signer_seed_hex: None,
     trusted_capability_issuers: Vec::new(),
     control_url: None,
@@ -191,3 +196,53 @@ negative-conformance test for the upstream egress contract.
 See the [shared HTTP transport guide](../../../docs/security/http-transport.md) for
 TLS identity files, explicit plaintext policy, client endpoint rules and revocation
 response semantics.
+
+## Durable evidence and explicit retention
+
+Durable mode requires an existing owner-only signing seed file. Startup never
+creates or repairs custody; provision a private 32-byte seed as hexadecimal,
+owned by the service account, without symlinks or hard links (0600 on Unix).
+`signer_seed_hex` is limited to explicit ephemeral embedding and conflicts with
+a seed file. Native launchers use `--authority-seed-file`.
+
+HTTP projections retain the entire signed HTTP receipt inside the signed core
+record under `metadata.chio_http_receipt_v1`. HTTP and tool evidence share the
+kernel's immutable SQLite writer and checkpoint chain. Duplicate sidecar
+submissions cannot replace existing evidence. Kernel result redelivery is
+idempotent; reserve and reconcile responses expose `evidence_persisted` and
+preserve signed recovery evidence after an irreversible settlement.
+
+`POST /v1/receipts` produces an advisory observation of an operator report.
+Verification checks its signature but returns `authorized: false`. It does not
+attest that the reported job ran or succeeded.
+
+Retention is disabled until all three policy values are explicit:
+
+```bash
+chio --authority-seed-file /var/lib/chio/authority.seed start \
+  --receipt-store /var/lib/chio/receipts.db \
+  --receipt-retention-days 180 \
+  --receipt-archive /var/lib/chio/receipts-archive.db \
+  --receipt-retention-interval-secs 3600
+```
+
+The same flags apply to `chio api protect`. Embedders set
+`ProtectConfig.receipt_retention: Some(ProtectRetentionConfig { ... })`.
+The archive parent directory must exist; intervals are 1 through 86400 seconds.
+Rotation moves whole eligible checkpoint batches, so the live window may be
+longer than the chosen duration. It does not delete archived evidence or compact
+admission/outcome blobs. One owned worker records failures in readiness and stops
+before the final receipt-writer flush on graceful shutdown.
+
+Ordinary receipt queries and evidence exports authenticate both live and archived
+history, preserve sequence cursors and reconstruct original inclusion proofs.
+They refuse a missing or corrupt archive. Validation reads the authenticated
+archive prefix; `query_live_receipts` is an explicitly live-only diagnostic API.
+A copied archive tail beyond the committed live watermark is excluded.
+
+Legacy mutable `http_receipts` / `tool_receipts` rows are preserved without
+loading their history at startup. Legacy revocations remain enforced. Export
+refuses when legacy receipt rows exist rather than silently omitting them or
+re-signing historical claims. Preserve the original database and select a new
+evidence database to migrate. Keep the old revocation source configured or
+migrate its revocations through the operator authority before switching stores.

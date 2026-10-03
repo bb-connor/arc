@@ -168,7 +168,7 @@ impl MockUpstreamServer {
     }
 }
 
-fn test_state(routes: Vec<RouteEntry>, upstream: String) -> Arc<ProxyState> {
+pub(super) fn test_state(routes: Vec<RouteEntry>, upstream: String) -> Arc<ProxyState> {
     test_state_with_receipt_db(routes, upstream, None)
 }
 
@@ -179,7 +179,8 @@ fn test_state_with_receipt_db(
 ) -> Arc<ProxyState> {
     let keypair = Keypair::generate();
     let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
-        Arc::new(SqliteApprovalStore::open(path).test_unwrap())
+        let _receipt = chio_store_sqlite::SqliteReceiptStore::open(path).test_unwrap();
+        Arc::new(SqliteApprovalStore::open_colocated_with_receipt_store(path).test_unwrap())
     } else {
         Arc::new(InMemoryApprovalStore::new())
     };
@@ -1696,6 +1697,8 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
         receipt_db: None,
         allow_ephemeral_receipts: false,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
         approval: None,
@@ -1735,6 +1738,8 @@ async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
             receipt_db: Some(receipt_db.to_string()),
             allow_ephemeral_receipts: false,
             sidecar_control_token: None,
+            receipt_retention: None,
+            signer_seed_file: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
             approval: None,
@@ -3336,3 +3341,6 @@ async fn ap23_invalid_approval_requester_is_rejected() -> Result<(), Box<dyn std
 
 #[path = "tests/inbound_authority.rs"]
 mod inbound_authority;
+
+#[path = "tests/receipt_evidence.rs"]
+mod receipt_evidence;

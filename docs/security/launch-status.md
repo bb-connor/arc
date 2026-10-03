@@ -1,5 +1,13 @@
 # Security launch: current execution status
 
+**October 3 review-remediation continuation:** current source work is on
+`packet/3-retention-accounting` in `/tmp/arc-security-launch`. AP9/AP10/AP11 and the
+API/start receipt lifecycle continuation are tracked in the
+[receipt evidence lifecycle execution record](../reviews/2026-10-03-receipt-evidence-lifecycle-execution.md),
+following the [transport/revocation batch](../reviews/2026-10-03-transport-revocation-execution.md).
+Those records own their local source and publication evidence. They do not change
+the earlier milestone, hosted, native or release qualification boundaries below.
+
 Updated 2026-09-22. The continuation on `integration/process-security-m4` in
 `/tmp/arc-security-launch` is maintained on
 [draft PR #1160](https://github.com/bb-connor/arc/pull/1160). Original nonce/log

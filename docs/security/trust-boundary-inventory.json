@@ -1467,8 +1467,6 @@
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_wire",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_signed_value::from_wire",
-    "crates/products/chio-api-protect/src/proxy/state.rs::append::from_wire",
-    "crates/products/chio-api-protect/src/proxy/state.rs::append_tool_receipt::from_wire",
     "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire",
     "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire",
     "crates/products/chio-cli/src/active_response_authority.rs::read_canonical::from_wire",
@@ -3108,6 +3106,17 @@
       "contract": "Global operation deduplication must compare stored tenant, namespace, reference key, mutation kind and digest before returning a replay."
     },
     {
+      "path": "crates/platform/chio-store-sqlite/src/evidence_export.rs",
+      "owner": "collect_evidence_export_bundle",
+      "sha256": "b552ab61002cef02cc3a5586b44a85b95eb33c8699196046ea3fc14dcd446b2f",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT MIN(timestamp) FROM chio_tool_receipts WHERE (?1 IS NULL OR tenant_id = ?1)",
+      "principal": "receipt-read-adapter",
+      "contract": "The export validates and normalizes the authenticated read boundary before opening a pinned retained snapshot. Tenant reads bind the exact tenant to MIN(timestamp); only an explicit admin boundary has no tenant predicate. No raw tenant selector grants authority."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store/capacity.rs",
       "owner": "seller_finding_artifact_bytes",
       "sha256": "64e55e154454505e99995c78dfdcdf2d39b235be8500e5c78c2f569a4348a0de",
@@ -3834,6 +3843,28 @@
       "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
     },
     {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_projection.rs",
+      "owner": "validate",
+      "sha256": "23b9385f6a15a0823565a35d6060927e4b0be06d7cb11f682c59655765644a66",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) = 1 FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id WHERE r.seq = ?1 AND r.receipt_id = ?2 AND r.raw_json = ?3 AND r.timestamp = ?4 AND r.capability_id = ?5 AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8 AND r.tenant_id IS ?9 AND r.cost_currency IS ?10 AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12 AND COALESCE(r.subject_key, cl.subject_key) IS ?13 AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14 AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17",
+      "principal": "receipt-read-adapter",
+      "contract": "Internal retained-snapshot integrity validation streams the already-authenticated committed archive prefix before any count, filter, point lookup or export. Parameters are the signed receipt identity and projections, with attribution fallback from validated pinned live lineage. This checks exact membership and payload/filter equality; it returns no receipt rows and cannot grant read scope. Outer read/export adapters still require their explicit authenticated tenant or admin boundary."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs",
+      "owner": "receipt",
+      "sha256": "47c4315930f833c66a2694d63b5acbc21a551fa470ac86cfbf7f45e234a0de82",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r JOIN claim_receipt_log_entries e ON e.receipt_kind = 'tool_receipt' AND e.source_seq = r.seq AND e.receipt_id = r.receipt_id WHERE r.receipt_id = ?1 AND (?2 IS NULL OR r.tenant_id = ?2) AND e.entry_seq <= ?3",
+      "principal": "receipt-read-adapter",
+      "contract": "User-facing callers derive the optional tenant solely from effective_read_scope; no tenant requires explicit admin authority. Internal retained provenance lookups use the native receipt-store authority. Both paths pin the authenticated live/archive snapshot, constrain archived claims to the live watermark, and verify signed identity and tenant after decoding."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs",
       "owner": "load_tool_claim_receipt_projection_row_by_id",
       "sha256": "63b4eb3257cb5e0be1fce3b887aaf7dce5119af6b57987e98338e97b9e7ecbd0",
@@ -3964,17 +3995,6 @@
       "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1",
       "principal": "receipt-integrity",
       "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
-      "owner": "load_chio_receipt_with_context",
-      "sha256": "008c3389cbbb180e72699968e5259ad70f9bbc352cc16d54e42c1998d94eceec",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "SELECT seq, raw_json FROM chio_tool_receipts WHERE receipt_id = ?1 AND (?2 IS NULL OR tenant_id = ?2)",
-      "principal": "receipt-read-adapter",
-      "contract": "The optional SQL tenant comes only from effective_read_scope; None requires an explicit administrative context. Signed tenant is rechecked after decode."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state.rs",
@@ -16232,8 +16252,6 @@
     "crates/products/chio-api-protect/src/proxy/input.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_wire#1::decode_document",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_signed_value::from_wire#1::decode_signed",
-    "crates/products/chio-api-protect/src/proxy/state.rs::append::from_wire#1::bounds_only",
-    "crates/products/chio-api-protect/src/proxy/state.rs::append_tool_receipt::from_wire#1::bounds_only",
     "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire#1::canonicalize",
     "crates/products/chio-cli/src/active_defense_migration.rs::parse_shadow_migration_input::from_wire#2::decode_signed",
     "crates/products/chio-cli/src/active_response_authority.rs::read_canonical::from_wire#1::decode_canonical",
@@ -18628,7 +18646,7 @@
     ],
     "crates/platform/chio-store-sqlite/src/evidence_export.rs": [
       "collect_child_receipts_for_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt",
-      "enrich_evidence_export_transparency_summary::shared-reader::crates/platform/chio-store-sqlite/src/evidence_export.rs::load_checkpoint_publication_trust_anchor_binding",
+      "enrich_transparency_on_connection::shared-reader::crates/platform/chio-store-sqlite/src/evidence_export.rs::load_checkpoint_publication_trust_anchor_binding",
       "load_checkpoint_publication_trust_anchor_binding::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/finding_challenge_store/input_validation.rs": [
@@ -18802,6 +18820,10 @@
       "decode_envelope::original-json-reader::UntrustedJsonText",
       "get_by_receipt_id::shared-reader::crates/platform/chio-store-sqlite/src/iou_store.rs::decode_envelope"
     ],
+    "crates/platform/chio-store-sqlite/src/receipt_query/read.rs": [
+      "query_receipts_impl::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query/read.rs::query_receipts_on_connection",
+      "query_receipts_on_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"
+    ],
     "crates/platform/chio-store-sqlite/src/receipt_store.rs": [
       "append_chio_receipt_canonical_returning_seq::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store.rs::decode_canonical_chio_receipt",
       "append_receipt_batch::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store.rs::verify_head_against_latest_checkpoint",
@@ -18821,7 +18843,7 @@
       "start::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store.rs::receipt_commit_actor_loop"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/bootstrap/federated.rs": [
-      "get_federated_share_for_capability::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::signed_capability_from_row",
+      "get_federated_share_for_capability_on_connection::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::signed_capability_from_row",
       "import_federated_evidence_share::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::ensure_snapshots_compatible",
       "list_federated_share_subject_corpora::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::signed_capability_from_row",
       "persist_federated_delegation_lineage::shared-reader::crates/platform/chio-store-sqlite/src/capability_lineage.rs::persist_compatible_snapshot",
@@ -18835,6 +18857,12 @@
       "retention_repair_on_writer::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::archive_path_backs_prefix",
       "rotate_on_writer_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::archive_range",
       "store_checkpoint::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::store_kernel_checkpoint_validated_tx"
+    ],
+    "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs": [
+      "query_receipts::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query/read.rs::query_receipts_on_connection",
+      "query_receipts::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query/read.rs::query_receipts_on_connection",
+      "with_retained_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity",
+      "with_retained_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs": [
       "backfill_checkpoint_transparency_projections::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
@@ -18923,21 +18951,15 @@
       "load_chio_receipt_batch_with_snapshot_hook::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_row",
       "load_chio_receipt_commitment_row::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt",
       "load_chio_receipt_row::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt",
-      "load_chio_receipt_with_context::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity",
-      "load_chio_receipt_with_context::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt",
       "load_chio_receipts::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_batch_with_snapshot_hook",
       "load_indexed_security_evidence#2::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity",
       "load_indexed_security_evidence#2::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_retained_indexed_security_evidence",
       "load_latest_checkpoint::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_checkpoint_chain_integrity",
       "load_receipt_lineage_statement_row::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_verified_lineage_statement",
-      "load_retained_chio_receipt::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_retained_chio_receipt_with_archive_hook",
       "load_retained_chio_receipt_commitment::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity",
       "load_retained_chio_receipt_commitment::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_commitment_row",
       "load_retained_chio_receipt_commitment::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_commitment_row",
       "load_retained_chio_receipt_commitment::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive",
-      "load_retained_chio_receipt_with_archive_hook::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_row",
-      "load_retained_chio_receipt_with_archive_hook::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_row",
-      "load_retained_chio_receipt_with_archive_hook::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive",
       "load_retained_indexed_security_evidence::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_row",
       "load_retained_indexed_security_evidence::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::load_chio_receipt_row",
       "load_retained_indexed_security_evidence::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection",
@@ -19560,10 +19582,6 @@
       "validate_governed_fields::shared-reader::crates/products/chio-api-protect/src/proxy/input.rs::validate_signed_value",
       "validate_governed_fields::shared-reader::crates/products/chio-api-protect/src/proxy/input.rs::validate_signed_value",
       "validate_signed_value::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/products/chio-api-protect/src/proxy/state.rs": [
-      "append::original-json-reader::UntrustedJsonText",
-      "append_tool_receipt::original-json-reader::UntrustedJsonText"
     ],
     "crates/products/chio-cli/src/active_defense_migration.rs": [
       "cmd_shadow_migrate::shared-reader::crates/products/chio-cli/src/active_defense_migration.rs::load_and_build_report",

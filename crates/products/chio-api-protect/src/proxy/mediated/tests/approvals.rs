@@ -142,6 +142,8 @@ impl ApprovalHarness {
             Arc::new(chio_store_sqlite::SqliteRevocationStore::open(
                 self.directory.path().join("revocations.db"),
             )?);
+        let evidence_path = self.directory.path().join("receipts.db");
+        let evidence = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(&evidence_path)?);
         let policy_hash = chio_core_types::sha256_hex(policy.as_bytes());
         let mut kernel = build_mediation_kernel(
             &self.signer,
@@ -149,6 +151,7 @@ impl ApprovalHarness {
             super::super::MediationPolicy {
                 issuers: &[],
                 hash: Some(&policy_hash),
+                receipt_store: Some(evidence.clone()),
             },
             Vec::new(),
             None,
@@ -169,6 +172,7 @@ impl ApprovalHarness {
             Some(revocation),
         );
         let mutable = Arc::get_mut(&mut state).ok_or("unexpected shared fixture state")?;
+        mutable.receipt_store = Some(Mutex::new(SqliteReceiptStore::from_shared(evidence)));
         mutable.clock = self.clock.clone();
         mutable.mediation_kernel = Some(Mutex::new(kernel));
         mutable.approval_admin = ApprovalAdmin::new(Arc::new(SqliteApprovalStore::open(
@@ -334,6 +338,27 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         )?;
     }
     assert_eq!(effects.load(Ordering::SeqCst), 1);
+    let store = state
+        .receipt_store
+        .as_ref()
+        .ok_or("shared receipt sink")?
+        .lock()
+        .await;
+    let bundle = store
+        .core
+        .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
+    assert!(
+        bundle
+            .tool_receipts
+            .iter()
+            .any(|row| row.receipt.id == receipt.id),
+        "kernel reservation must reach the shared export sink"
+    );
+    assert!(bundle
+        .tool_receipts
+        .iter()
+        .all(|row| row.receipt.verify_signature().unwrap_or(false)));
+    drop(store);
     drop(state);
     let reopened = harness.open(harness.config.clone()).await?;
     let (status, replay) = post_evaluate(reopened, &body).await;

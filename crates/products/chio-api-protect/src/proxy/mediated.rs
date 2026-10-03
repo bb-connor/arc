@@ -108,6 +108,7 @@ pub(crate) fn load_revocation_db_ids(
 pub(crate) struct MediationPolicy<'a> {
     pub issuers: &'a [PublicKey],
     pub hash: Option<&'a str>,
+    pub receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>>,
 }
 
 pub(crate) fn build_mediation_kernel(
@@ -148,7 +149,7 @@ pub(crate) fn build_mediation_kernel(
             // hold reconciled by the recovery sweep. The ephemeral log has no sweep, so
             // any hold retained on this non-durable kernel is surfaced instead by
             // chio_ambiguous_dispatch_retained_hold_total{reconciliation="none"}.
-            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_receipt_log: policy.receipt_store.is_none(),
             // Revocation is enforced sidecar-side over the durable revoked set (the
             // revoked-ancestor walk below); this kernel's internal store is
             // intentionally empty, so its durability gate must not deny mediation.
@@ -160,6 +161,11 @@ pub(crate) fn build_mediation_kernel(
         },
         clock.clone(),
     );
+    if let Some(store) = policy.receipt_store {
+        kernel
+            .set_receipt_store_handle(store)
+            .map_err(|error| ProtectError::Config(error.to_string()))?;
+    }
     match durable_admission {
         Some(durable) => {
             // Durable operations, their preflight holds and their executable
@@ -617,18 +623,12 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             .retain_until(&request_claim, nonce.nonce.expires_at);
     }
     drop(kernel);
-    if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
-        // The reserve receipt persisted here is a local audit entry, not the
-        // authoritative record. When the reserve SUCCEEDED (Verdict::Allow with a
-        // minted nonce) the reservation is durable in the budget store and the
-        // caller holds the signed nonce, which reconciles at /v1/reconcile (that
-        // route persists its own authoritative receipt). Any governed MustPrepay
-        // prepayment was already captured to back this exact reservation. Tearing
-        // the reservation down here would refund nothing on the prepaid path (direct
-        // financial loss) and strand the caller without the nonce it paid for, so
-        // return the nonce and log the persistence failure, mirroring the accepted
-        // /v1/reconcile behavior. A denied or pending verdict placed no hold and
-        // minted no nonce, so its unpersisted receipt still fails closed.
+    // Kernel delivery is idempotent on the shared sink. An irreversible reserve
+    // may return its signed nonce after an append failure; retry persistence and
+    // report that outcome without discarding the caller's only recovery evidence.
+    let persistence = record_kernel_receipt(&state, &response.receipt).await;
+    let evidence_persisted = state.receipt_store.is_some() && persistence.is_ok();
+    if let Err(error) = persistence {
         if !matches!(
             (&response.verdict, response.execution_nonce.as_deref()),
             (chio_kernel::Verdict::Allow, Some(_))
@@ -655,6 +655,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         StatusCode::OK,
         axum::Json(serde_json::json!({
             "status": status_str,
+            "evidence_persisted": evidence_persisted,
             "protocol": "chio.caller-delivery.v1",
             "execution_authorized": false,
             "start_required": matches!(response.verdict, chio_kernel::Verdict::Allow),
@@ -767,18 +768,18 @@ pub(crate) async fn sidecar_reconcile_handler(
                 .into_response();
         }
     };
-    // Kernel reconciliation has already produced the authoritative receipt.
-    // Failure of this separate sidecar receipt copy cannot undo settlement.
-    // Legacy replay cannot recover the receipt; durable completion retains its
-    // own replay evidence. In either profile, return the signed receipt even
-    // when this secondary write fails so the caller can retain its evidence.
-    if let Err(error) = record_tool_receipt(&state, &reconciled.receipt).await {
+    // A completed settlement cannot be undone. Preserve its signed result even
+    // if retrying the shared evidence append fails, and expose persistence truthfully.
+    let persistence = record_kernel_receipt(&state, &reconciled.receipt).await;
+    let evidence_persisted = state.receipt_store.is_some() && persistence.is_ok();
+    if let Err(error) = persistence {
         warn!("reconcile settled but receipt persistence failed; returning authoritative receipt to caller: {error}");
     }
     (
         StatusCode::OK,
         axum::Json(serde_json::json!({
             "status": "reconciled",
+            "evidence_persisted": evidence_persisted,
             "receipt": reconciled.receipt,
         })),
     )

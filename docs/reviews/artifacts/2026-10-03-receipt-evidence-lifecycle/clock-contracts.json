@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "scripts/check-security-clocks.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 26.62,
+  "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993"
+}

@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "scripts/check-negative-assertions.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 1.23,
+  "log_sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+}

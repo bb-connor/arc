@@ -269,6 +269,13 @@ fn require_durable_or_ephemeral_optin(
             "running with in-memory receipts (--allow-ephemeral-receipts): audit evidence is lost on every restart"
         );
     }
+    if !ephemeral_receipts && authority_seed_path.is_none() {
+        return Err(CliError::cli_other_error(
+            "durable receipts require existing private signing custody: pass --authority-seed-file"));
+    }
+    if let Some(path) = authority_seed_path {
+        chio_control_plane::load_existing_authority_keypair(path)?;
+    }
     if authority_seed_path.is_none() {
         tracing::warn!(
             target: "chio::sidecar",
@@ -410,6 +417,7 @@ pub(crate) fn cmd_api_protect(
     spec_path: Option<&Path>,
     listen_addr: &str,
     receipt_store: Option<&Path>,
+    receipt_retention: Option<chio_api_protect::ProtectRetentionConfig>,
     authority_seed_path: Option<&Path>,
     budget_db: Option<&Path>,
     revocation_db: Option<&Path>,
@@ -442,10 +450,6 @@ pub(crate) fn cmd_api_protect(
             .or_else(|| std::env::var("CHIO_API_PROTECT_CONTROL_TOKEN").ok())
             .map(|token| token.trim().to_string())
             .filter(|token| !token.is_empty());
-        let signer_seed_hex = authority_seed_path
-            .map(load_or_create_authority_keypair)
-            .transpose()?
-            .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = trusted_capability_issuers(
             parse_trusted_capability_issuers_from_env()?,
             control_authority_public_key,
@@ -466,7 +470,9 @@ pub(crate) fn cmd_api_protect(
             // choice into the proxy's own durable-by-default gate.
             allow_ephemeral_receipts,
             sidecar_control_token,
-            signer_seed_hex,
+            receipt_retention,
+            signer_seed_file: authority_seed_path.map(Path::to_path_buf),
+            signer_seed_hex: None,
             trusted_capability_issuers,
             approval: load_sidecar_approval_config()?,
             control_url: control_url.map(str::to_string),
@@ -510,6 +516,7 @@ pub(crate) fn cmd_start(
     transport: chio_http_serve::ServerTransportConfig,
     listen_addr: &str,
     receipt_store: Option<&Path>,
+    receipt_retention: Option<chio_api_protect::ProtectRetentionConfig>,
     authority_seed_path: Option<&Path>,
     budget_db: Option<&Path>,
     revocation_db: Option<&Path>,
@@ -545,10 +552,6 @@ pub(crate) fn cmd_start(
             .or_else(|| std::env::var("CHIO_API_PROTECT_CONTROL_TOKEN").ok())
             .map(|token| token.trim().to_string())
             .filter(|token| !token.is_empty());
-        let signer_seed_hex = authority_seed_path
-            .map(load_or_create_authority_keypair)
-            .transpose()?
-            .map(|keypair| keypair.seed_hex());
         let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
         let payment_adapter = resolve_sidecar_payment_adapter()?;
         let config = ProtectConfig {
@@ -571,7 +574,9 @@ pub(crate) fn cmd_start(
             // choice into the proxy's own durable-by-default gate.
             allow_ephemeral_receipts,
             sidecar_control_token,
-            signer_seed_hex,
+            receipt_retention,
+            signer_seed_file: authority_seed_path.map(Path::to_path_buf),
+            signer_seed_hex: None,
             trusted_capability_issuers,
             approval: load_sidecar_approval_config()?,
             control_url: control_url.map(str::to_string),
@@ -1782,15 +1787,15 @@ mod runtime_local_error_domain_tests {
     }
 
     #[test]
-    fn durable_receipt_path_boots_without_the_ephemeral_optin() {
+    fn durable_receipt_path_requires_private_signing_custody() {
         assert!(
             require_durable_or_ephemeral_optin(
                 Some(Path::new("/var/lib/chio/receipts.db")),
                 false,
                 None,
             )
-            .is_ok(),
-            "a filesystem receipt path is durable and needs no ephemeral opt-in"
+            .is_err(),
+            "a durable receipt path without private signing custody must fail closed"
         );
     }
 
