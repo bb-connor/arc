@@ -977,7 +977,7 @@
       "method": "POST",
       "route": "EVIDENCE_IMPORT_PATH",
       "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
-      "semantics": "The import wrapper embeds retained receipt evidence and signed manifests that undergo evidence verification before store import."
+      "semantics": "Authenticated service administrators provide an explicit independent verification policy. The common verifier authenticates the envelope, manifest and complete decoded payload, pins every signer, binds receipt/checkpoint keys, and checks any externally supplied anchor before forwarding or store import. No trust is inferred from the package."
     },
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs",

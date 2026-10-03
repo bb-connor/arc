@@ -1624,7 +1624,7 @@ pub fn verify_checkpoint_signature(checkpoint: &KernelCheckpoint) -> Result<bool
     Ok(checkpoint
         .body
         .kernel_key
-        .verify(&body_bytes, &checkpoint.signature))
+        .verify_strict(&body_bytes, &checkpoint.signature))
 }
 
 #[cfg(test)]

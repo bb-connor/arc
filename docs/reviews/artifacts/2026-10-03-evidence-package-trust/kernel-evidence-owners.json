@@ -1,0 +1,11 @@
+{
+  "command": [
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-22b53e5b65c376c2",
+    "checkpoint::",
+    "evidence_export::",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.52,
+  "log_sha256": "17b64cac43503111685cd9e5817159200f824013873997229353addd37d4f7d2"
+}

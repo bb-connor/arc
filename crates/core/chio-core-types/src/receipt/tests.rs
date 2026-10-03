@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[path = "tests/backend_identity.rs"]
 mod backend_identity;
+#[path = "tests/strict_evidence.rs"]
+mod strict_evidence;
 
 use super::{
     body::{chio_receipt_id, prepare_receipt_body_for_signing, ChioReceipt, ChioReceiptBody},

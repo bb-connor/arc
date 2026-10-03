@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-168 of 519 identifier constants in the security crates are unpinned.
+168 of 520 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (26)
 
@@ -76,7 +76,7 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:45` `CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION` = `chio_attestation_binding_v1`
 - `crates/kernel/chio-kernel/src/payment.rs:535` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
 - `crates/kernel/chio-kernel/src/payment.rs:536` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
-- `crates/kernel/chio-kernel/src/receipt_store.rs:1073` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
+- `crates/kernel/chio-kernel/src/receipt_store.rs:1082` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:24` `RAW_INVOCATION_OUTCOME_SCHEMA` = `chio.raw-invocation-outcome.v1`

@@ -5,8 +5,11 @@ use super::utils::*;
 pub(crate) fn build_proof_package(
     input: &Path,
     bundle_manifest_paths: &[PathBuf],
+    trusted_kernel_keys: &[String],
 ) -> Result<MercuryProofPackage, CliError> {
-    let verified = evidence_export::load_verified_evidence_package_summary(input)?;
+    let verification =
+        evidence_export::EvidenceVerificationPolicy::from_cli(trusted_kernel_keys, None)?;
+    let verified = evidence_export::load_verified_evidence_package_summary(input, &verification)?;
     let bundle_manifests = load_bundle_manifests(bundle_manifest_paths)?;
     MercuryProofPackage::build(
         verified.bundle,
@@ -129,7 +132,7 @@ pub(crate) fn populate_mercury_receipt_store(
     receipt_db: &Path,
     capability_id: &str,
     steps: &[MercuryPilotStep],
-) -> Result<(), CliError> {
+) -> Result<Keypair, CliError> {
     let store = SqliteReceiptStore::open(receipt_db)?;
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
@@ -166,7 +169,7 @@ pub(crate) fn populate_mercury_receipt_store(
         &kernel_keypair,
     )?;
     store.store_checkpoint(&checkpoint)?;
-    Ok(())
+    Ok(kernel_keypair)
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "scripts/check-domain-separation.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 1.41,
+  "log_sha256": "cd40b28dcd8ef10ae487ba086ffe75be6a6122ec61d4d3b112da5abdcc672cae"
+}

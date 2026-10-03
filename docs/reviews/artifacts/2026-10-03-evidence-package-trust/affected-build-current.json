@@ -1,0 +1,29 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-core-types",
+    "-p",
+    "chio-kernel",
+    "-p",
+    "chio-control-plane",
+    "-p",
+    "chio-cli",
+    "-p",
+    "chio-mercury",
+    "-p",
+    "chio-wall",
+    "--lib",
+    "--bins",
+    "--test",
+    "evidence_export",
+    "--test",
+    "cli",
+    "--locked",
+    "--no-run"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 270.69,
+  "log_sha256": "b429331ca49870bc661a8018b9a7f88b9e8c29169586fdc373b108e32d0e2ef7"
+}

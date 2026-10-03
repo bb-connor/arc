@@ -17282,31 +17282,42 @@
       "load#2::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/evidence_export.rs": [
-      "cmd_evidence_export::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::write_evidence_package",
+      "cmd_evidence_export::shared-reader::crates/platform/chio-control-plane/src/evidence_export/package_write.rs::write_evidence_package",
+      "cmd_evidence_import::shared-reader::crates/platform/chio-control-plane/src/evidence_export/package_read.rs::load_verified_evidence_package",
+      "cmd_evidence_verify::shared-reader::crates/platform/chio-control-plane/src/evidence_export/package_read.rs::load_verified_evidence_package",
       "policy_metadata::shared-reader::crates/platform/chio-control-plane/src/policy/loader.rs::load_policy",
       "read_federation_policy::original-json-reader::UntrustedJsonText",
       "read_json_file::original-json-reader::UntrustedJsonText",
-      "read_ndjson_file::original-json-reader::UntrustedJsonText",
-      "read_optional_ndjson_file::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "read_ndjson_file::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-control-plane/src/evidence_export/envelope.rs": [
+      "from_cli::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::read"
+    ],
+    "crates/platform/chio-control-plane/src/evidence_export/package_read.rs": [
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export/verification.rs::verify_federation_policy_attachment",
+      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export/verification.rs::verify_policy_attachment",
+      "load_verified_evidence_package_summary::shared-reader::crates/platform/chio-control-plane/src/evidence_export/package_read.rs::load_verified_evidence_package"
+    ],
+    "crates/platform/chio-control-plane/src/evidence_export/package_write.rs": [
       "write_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::policy_metadata"
     ],
     "crates/platform/chio-control-plane/src/evidence_export/verification.rs": [
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_federation_policy",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_optional_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_optional_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_optional_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_optional_ndjson_file",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export/verification.rs::verify_federation_policy_attachment",
-      "load_verified_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export/verification.rs::verify_policy_attachment",
-      "verify_federation_policy_attachment::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_federation_policy",
+      "verify_federation_policy_attachment::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file",
       "verify_policy_attachment::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file"
     ],
     "crates/platform/chio-control-plane/src/federation_policy.rs": [
@@ -20040,6 +20051,7 @@
       "export_supervised_live_qualification::shared-reader::crates/products/chio-mercury/src/commands/core_cli/exports.rs::export_supervised_live_capture"
     ],
     "crates/products/chio-mercury/src/commands/shared/builders.rs": [
+      "build_proof_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export/package_read.rs::load_verified_evidence_package_summary",
       "build_proof_package::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::load_bundle_manifests"
     ],
     "crates/products/chio-mercury/src/commands/shared/utils.rs": [
@@ -20204,7 +20216,7 @@
       "cmd_chio_wall_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::export_control_path",
       "cmd_chio_wall_control_path_validate::shared-reader::crates/products/chio-wall/src/commands.rs::export_control_path",
       "export_control_path::shared-reader::crates/products/chio-wall/src/commands.rs::verify_control_path_export",
-      "export_control_path::shared-reader::crates/products/chio-wall/src/commands.rs::write_chio_evidence_package",
+      "export_control_path::shared-reader::crates/products/chio-wall/src/commands/evidence.rs::write_chio_evidence_package",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
@@ -20212,7 +20224,9 @@
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
-      "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
+      "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file"
+    ],
+    "crates/products/chio-wall/src/commands/evidence.rs": [
       "write_chio_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::cmd_evidence_export"
     ],
     "crates/products/chio-wall/src/main.rs": [

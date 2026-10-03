@@ -22,21 +22,29 @@ use chio_kernel::evidence_export::{
 use chio_kernel::{
     is_supported_checkpoint_schema, verify_checkpoint_signature, CapabilitySnapshot,
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
-    EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
-    EvidenceUncheckpointedReceipt, KernelCheckpoint, ReceiptInclusionProof, ReceiptReadBoundary,
+    EvidenceExportQuery, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+    KernelCheckpoint, ReceiptInclusionProof, ReceiptReadBoundary,
 };
 use chio_store_sqlite::SqliteReceiptStore;
 
 use crate::policy::load_policy;
 use crate::{load_or_create_authority_keypair, CliError};
 
+mod envelope;
+mod package_io;
+mod package_read;
+mod package_write;
 mod verification;
 
-pub use verification::load_verified_evidence_package_summary;
+pub use crate::evidence_export::envelope::EvidenceVerificationPolicy;
+use crate::evidence_export::package_read::load_verified_evidence_package;
+use crate::evidence_export::package_write::write_evidence_package;
+
+pub use crate::evidence_export::package_read::load_verified_evidence_package_summary;
 pub(crate) use verification::{build_federated_share_import, validate_import_package_data};
 use verification::{
-    evidence_receipt_semantic_summary, load_verified_evidence_package,
-    validate_checkpoint_transparency_summary, verify_checkpoint_transparency_records,
+    evidence_receipt_semantic_summary, validate_checkpoint_transparency_summary,
+    verify_checkpoint_transparency_records,
 };
 
 const EVIDENCE_EXPORT_MANIFEST_SCHEMA: &str = "chio.evidence_export_manifest.v1";
@@ -56,7 +64,7 @@ fn federated_evidence_share_schema_for_manifest(_schema: &str) -> &'static str {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EvidenceExportCounts {
     tool_receipts: u64,
     child_receipts: u64,
@@ -67,14 +75,14 @@ struct EvidenceExportCounts {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EvidenceProofCoverage {
     checkpointed_receipts: u64,
     uncheckpointed_receipts: u64,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EvidenceReceiptSemanticSummary {
     mediated_decisions: u64,
     trace_observations: u64,
@@ -87,7 +95,7 @@ struct EvidenceReceiptSemanticSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EvidenceExportFileHash {
     path: String,
     sha256: String,
@@ -95,7 +103,7 @@ struct EvidenceExportFileHash {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PolicyAttachmentMetadata {
     format: String,
     source_hash: String,
@@ -105,7 +113,7 @@ struct PolicyAttachmentMetadata {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct FederationPolicyAttachmentMetadata {
     issuer: String,
     partner: String,
@@ -159,8 +167,9 @@ pub struct RemoteEvidenceExportResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EvidenceImportPackage {
+    envelope: envelope::PackageEnvelope,
     manifest: EvidenceExportManifest,
     bundle: EvidenceExportBundle,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -170,9 +179,11 @@ pub struct EvidenceImportPackage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RemoteEvidenceImportRequest {
     pub package: EvidenceImportPackage,
+    /// Explicit administrative trust input, independent of package contents.
+    pub verification: EvidenceVerificationPolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -270,7 +281,7 @@ fn maybe_build_disclosure_notice(query: &EvidenceExportQuery) -> Option<Evidence
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EvidenceExportManifest {
     schema: String,
     exported_at: u64,
@@ -425,19 +436,18 @@ fn read_json_file<T: for<'de> Deserialize<'de>>(
     input_dir: &Path,
     relative_path: &str,
 ) -> Result<T, CliError> {
-    let path = input_dir.join(relative_path);
-    Ok(
-        chio_core::canonical::UntrustedJsonText::from_wire(&fs::read(path)?, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed())?,
+    Ok(chio_core::canonical::UntrustedJsonText::from_wire(
+        &package_io::read_bytes(input_dir, relative_path)?,
+        package_io::MAX_FILE_BYTES,
     )
+    .and_then(|input| input.decode_signed())?)
 }
 
 fn read_ndjson_file<T: for<'de> Deserialize<'de>>(
     input_dir: &Path,
     relative_path: &str,
 ) -> Result<Vec<T>, CliError> {
-    let path = input_dir.join(relative_path);
-    let bytes = fs::read(path)?;
+    let bytes = package_io::read_bytes(input_dir, relative_path)?;
     if bytes.is_empty() {
         return Ok(Vec::new());
     }
@@ -453,17 +463,6 @@ fn read_ndjson_file<T: for<'de> Deserialize<'de>>(
                 .map_err(CliError::from)
         })
         .collect()
-}
-
-fn read_optional_ndjson_file<T: for<'de> Deserialize<'de>>(
-    input_dir: &Path,
-    relative_path: &str,
-) -> Result<Vec<T>, CliError> {
-    let path = input_dir.join(relative_path);
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    read_ndjson_file(input_dir, relative_path)
 }
 
 fn render_readme(
@@ -501,6 +500,11 @@ fn render_readme(
 Chio evidence export
 
 This directory is a local SQLite export assembled by `chio evidence export`.
+export-envelope.json authenticates the manifest and complete decoded payload.
+Verify with an independently obtained kernel public key:
+  chio evidence verify --input <directory> --trusted-kernel-pubkey <key>
+Repeat the key flag for every trusted receipt/checkpoint and package signer.
+Without --trusted-anchor-file, publication metadata is only a transparency preview.
 It contains signed receipts, checkpoints, inclusion proofs, capability lineage,
 and retention metadata for offline review.
 
@@ -509,7 +513,7 @@ signed checkpoint continuity, and inclusion-proof coverage.
 Publication state: {}
 Trust anchor: {}
 Transparency log identity and append-only growth remain preview-only unless
-the package itself carries verifiable trust-anchor publication material.
+the verifier independently trusts the exact signed publication anchor binding.
 
 Tool receipts: {}
 Child receipts: {}
@@ -878,8 +882,11 @@ fn safe_relative_path(relative_path: &str) -> Result<PathBuf, CliError> {
     }
     for component in path.components() {
         match component {
-            Component::Normal(_) | Component::CurDir => {}
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+            Component::Normal(_) => {}
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => {
                 return Err(CliError::attest_error(format!(
                     "evidence package manifest path escapes the package root: {relative_path}"
                 )));
@@ -887,167 +894,6 @@ fn safe_relative_path(relative_path: &str) -> Result<PathBuf, CliError> {
         }
     }
     Ok(path.to_path_buf())
-}
-
-fn write_evidence_package(
-    output: &Path,
-    bundle: EvidenceExportBundle,
-    transparency: Option<CheckpointTransparencySummary>,
-    policy_file: Option<&Path>,
-    federation_policy: Option<&FederationPolicyDocument>,
-) -> Result<(), CliError> {
-    let clock_now = unix_now()?;
-    ensure_clean_output_dir(output)?;
-    let transparency = match transparency {
-        Some(summary) => {
-            verify_checkpoint_transparency_records(
-                &bundle.checkpoints,
-                &summary.publications,
-                &summary.witnesses,
-                &summary.consistency_proofs,
-                &summary.equivocations,
-            )?;
-            summary
-        }
-        None => validate_checkpoint_transparency_summary(&bundle.checkpoints)?,
-    };
-    let claim_boundary = build_evidence_transparency_claims(&bundle, &transparency, None);
-    let disclosure_notice = maybe_build_disclosure_notice(&bundle.query);
-
-    let mut file_hashes = Vec::new();
-    write_json_file(output, "query.json", &bundle.query, &mut file_hashes)?;
-    write_ndjson_file(
-        output,
-        "receipts.ndjson",
-        &bundle.tool_receipts,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "child-receipts.ndjson",
-        &bundle.child_receipts,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "checkpoints.ndjson",
-        &bundle.checkpoints,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "checkpoint-publications.ndjson",
-        &transparency.publications,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "checkpoint-witnesses.ndjson",
-        &transparency.witnesses,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "checkpoint-consistency-proofs.ndjson",
-        &transparency.consistency_proofs,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "checkpoint-equivocations.ndjson",
-        &transparency.equivocations,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "capability-lineage.ndjson",
-        &bundle.capability_lineage,
-        &mut file_hashes,
-    )?;
-    write_ndjson_file(
-        output,
-        "inclusion-proofs.ndjson",
-        &bundle.inclusion_proofs,
-        &mut file_hashes,
-    )?;
-    write_json_file(
-        output,
-        "retention.json",
-        &bundle.retention,
-        &mut file_hashes,
-    )?;
-    write_bytes_file(
-        output,
-        "README.txt",
-        render_readme(
-            &bundle,
-            &transparency,
-            &claim_boundary,
-            disclosure_notice.as_ref(),
-        )
-        .as_bytes(),
-        &mut file_hashes,
-    )?;
-
-    let policy = if let Some(policy_file) = policy_file {
-        let source_bytes = fs::read(policy_file)?;
-        let source_path = policy_source_relative_path(policy_file);
-        write_bytes_file(output, &source_path, &source_bytes, &mut file_hashes)?;
-        let metadata = policy_metadata(
-            policy_file,
-            &source_path,
-            crate::integer::count(source_bytes.len()),
-        )?;
-        write_json_file(output, "policy/metadata.json", &metadata, &mut file_hashes)?;
-        Some(metadata)
-    } else {
-        None
-    };
-
-    let federation_policy = if let Some(policy) = federation_policy {
-        write_json_file(
-            output,
-            federation_policy_relative_path(),
-            policy,
-            &mut file_hashes,
-        )?;
-        Some(federation_policy_metadata(policy))
-    } else {
-        None
-    };
-
-    let counts = EvidenceExportCounts {
-        tool_receipts: crate::integer::count(bundle.tool_receipts.len()),
-        child_receipts: crate::integer::count(bundle.child_receipts.len()),
-        checkpoints: crate::integer::count(bundle.checkpoints.len()),
-        capability_lineage: crate::integer::count(bundle.capability_lineage.len()),
-        inclusion_proofs: crate::integer::count(bundle.inclusion_proofs.len()),
-        uncheckpointed_receipts: crate::integer::count(bundle.uncheckpointed_receipts.len()),
-    };
-    let proof_coverage = EvidenceProofCoverage {
-        checkpointed_receipts: counts
-            .tool_receipts
-            .saturating_sub(counts.uncheckpointed_receipts),
-        uncheckpointed_receipts: counts.uncheckpointed_receipts,
-    };
-    let receipt_semantics = evidence_receipt_semantic_summary(&bundle.tool_receipts);
-    let manifest = EvidenceExportManifest {
-        schema: EVIDENCE_EXPORT_MANIFEST_SCHEMA.to_string(),
-        exported_at: clock_now,
-        query: bundle.query,
-        counts,
-        proof_coverage,
-        receipt_semantics,
-        child_receipt_scope: bundle.child_receipt_scope,
-        claim_boundary: Some(claim_boundary),
-        files: file_hashes,
-        policy,
-        federation_policy,
-        disclosure_notice,
-    };
-    let manifest_path = output.join("manifest.json");
-    fs::write(&manifest_path, serde_json::to_vec_pretty(&manifest)?)?;
-    Ok(())
 }
 
 pub struct EvidenceFederationPolicyCreateArgs<'a> {
@@ -1158,6 +1004,7 @@ pub fn cmd_evidence_export(
     receipt_db: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    signing_key: &chio_core::Keypair,
 ) -> Result<(), CliError> {
     if admin_all && tenant.is_some() {
         return Err(CliError::attest_error(
@@ -1226,6 +1073,7 @@ pub fn cmd_evidence_export(
         response.transparency,
         policy_file,
         response.federation_policy.as_ref(),
+        signing_key,
     )
 }
 
@@ -1239,8 +1087,9 @@ pub fn cmd_evidence_import(
     control_url: Option<&str>,
     control_token: Option<&str>,
     json_output: bool,
+    verification: &EvidenceVerificationPolicy,
 ) -> Result<(), CliError> {
-    let package = load_verified_evidence_package(input)?;
+    let package = load_verified_evidence_package(input, verification)?;
     let share_import = build_federated_share_import(&package)?;
 
     let share = match (receipt_db, control_url) {
@@ -1259,7 +1108,10 @@ pub fn cmd_evidence_import(
             let client =
                 crate::trust_control::service_runtime::client::build_client(control_url, token)?;
             client
-                .import_evidence(&RemoteEvidenceImportRequest { package })?
+                .import_evidence(&RemoteEvidenceImportRequest {
+                    package,
+                    verification: verification.clone(),
+                })?
                 .share
         }
         (None, None) => {
@@ -1289,9 +1141,13 @@ pub fn cmd_evidence_import(
     clippy::print_stdout,
     reason = "This CLI command emits its requested report to standard output."
 )]
-pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
+pub fn cmd_evidence_verify(
+    input: &Path,
+    verification: &EvidenceVerificationPolicy,
+    json_output: bool,
+) -> Result<(), CliError> {
     let clock_now = unix_now()?;
-    let package = load_verified_evidence_package(input)?;
+    let package = load_verified_evidence_package(input, verification)?;
     let manifest = package.manifest;
     let transparency = match package.transparency.as_ref() {
         Some(summary) => chio_kernel::checkpoint::verify_checkpoint_transparency_records(
@@ -1305,7 +1161,7 @@ pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliErr
         })?,
         None => validate_checkpoint_transparency_summary(&package.bundle.checkpoints)?,
     };
-    let claim_boundary = build_evidence_transparency_claims(&package.bundle, &transparency, None);
+    let claim_boundary = verification.claims(&package.bundle, &transparency)?;
 
     let result = EvidenceVerificationResult {
         schema: manifest.schema,

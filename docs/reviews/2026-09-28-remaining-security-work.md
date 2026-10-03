@@ -3,7 +3,7 @@
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
-Updated through the October 3 transport and revocation batch. Each batch has its own
+Updated through the October 3 authenticated evidence package batch. Each batch has its own
 implementation and verification record below; this queue does not establish
 hosted or release qualification.
 
@@ -53,14 +53,26 @@ records AP7 shared TLS, explicit plaintext policy and strict control-client
 transport, plus AP8 confirmed partial revocation. Its terminal local checks,
 private-key ownership audit and review dispositions govern acceptance.
 
-**Next substantial batch: AP9/AP10 receipt integrity and evidence lifecycle.**
-Replace mutable API-protect receipt rows with the append-only evidence log,
-attach the mediation kernel's receipts, require stable private signing custody,
-distinguish operator observations from mediated authorization, include those
-records in truthful exports, and wire archive-aware retention using SR1/SR6.
-Current source still uses replaceable receipt rows and labels submitted records
-as mediated decisions. Key/guard findings and hosted/release gates follow that
-batch; they are not implicitly closed by transport qualification.
+The [receipt lifecycle record](2026-10-03-receipt-evidence-lifecycle-execution.md)
+owns AP9/AP10 append-only signed receipts, AP11 preload removal, retained archive
+reads and the API/start portion of EV5. The
+[authenticated package record](2026-10-03-evidence-package-trust-execution.md)
+owns EV6 package signatures and external signer pins, EV7 external anchor
+acceptance, EV12 strict signatures and EV13 receipt/checkpoint signer binding.
+
+**Next substantial batch: certificate and downstream proof verification (EV8,
+EV17, the remaining EV6 certificate case and Mercury proof-package trust).** Read real retained Chio receipts by signed
+session metadata; derive or require evaluation policy; verify guard outcomes,
+capability scope and delegation; validate per-session continuity and timestamp
+ordering; reject empty/incomplete full bundles and require independent signer
+trust through native certificate workflows. Carry authenticated Chio envelope
+provenance into the separate Mercury proof format and require verifier-owned
+anchor inputs there; its historical self-declared anchor behavior is not closed
+by this ingestion migration. EV5's remaining launchers,
+independent child inclusion proofs, EV1/EV2 secret minimization, EV3/EV4 denial
+evidence, SIEM defects and other KG/RL findings remain open. The
+[compliance/product review](2026-10-01-compliance-product-truth-review.md)
+retains the historical findings.
 
 Remaining TCB reader semantics, proof-result sealing and error provenance remain
 engineering work. Full required hosted CI, branch decomposition, other

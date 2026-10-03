@@ -20,7 +20,12 @@ which owns their local qualification and review boundaries. The next continuatio
 implements AP9/AP10 receipt integrity, AP11 history removal, authenticated retained
 reads and API/start retention. Its source qualification and publication boundary
 are tracked in the [receipt lifecycle record](2026-10-03-receipt-evidence-lifecycle-execution.md).
-Other EV5 launchers and EV6/EV7 package signing and external trust remain open.
+The [authenticated package record](2026-10-03-evidence-package-trust-execution.md)
+owns the subsequent EV6 package-signing/key-pinning work, EV7 external anchor
+acceptance for Chio evidence packages, EV12 strict signatures and EV13
+receipt/checkpoint signer binding. The separate Mercury proof-package verifier
+still needs independent anchor trust. Other EV5 launchers, independent child inclusion proofs and the EV6 empty
+certificate-bundle defect remain open.
 The findings and counts below retain their historical meaning.
 
 A compliance-documentation review of `main` (`f5566d9a76`) on September 30 and October 1 checked

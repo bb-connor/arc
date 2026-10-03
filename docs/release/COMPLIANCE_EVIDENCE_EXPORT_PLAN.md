@@ -11,6 +11,53 @@ later.
 
 ## Initial Implementation Boundary
 
+### Authenticated package continuation (October 3, 2026)
+
+The current package producer requires an existing private `--kernel-seed-file`.
+It signs `export-envelope.json` using `SignedExportEnvelope` over the domain
+`chio.evidence_export_commitment.v1`, the canonical manifest digest, and the
+canonical complete bundle/transparency/federation-policy digest. Every consumed
+package file must appear exactly once in the signed manifest. Unsigned legacy
+packages require re-export from a trusted source.
+
+`evidence verify` and `evidence import` require independently obtained
+`--trusted-kernel-pubkey` values (repeat for explicitly trusted rotation keys).
+The package signer and every tool receipt, child receipt and checkpoint signer
+must belong to that set. Each tool proof also binds its receipt signer to its
+checkpoint signer. Signatures use strict verification. File reads are bounded to
+64 MiB each and the manifest inventory to 256 MiB total; Unix readers refuse
+symlink components and non-regular files.
+
+```sh
+chio evidence verify --input ./evidence-package \
+  --trusted-kernel-pubkey "$CHIO_KERNEL_PUBKEY"
+chio --receipt-db imported.sqlite3 evidence import --input ./evidence-package \
+  --trusted-kernel-pubkey "$CHIO_KERNEL_PUBKEY"
+```
+
+Import also requires the existing signed bilateral federation policy attachment.
+An optional `--trusted-anchor-file` contains a complete independently obtained
+`CheckpointPublicationTrustAnchorBinding`. Every publication must match its
+identity, anchor identity/reference, certificate reference and profile version;
+the binding is covered by the signed payload. Without this input, a package's own
+anchor assertion remains `transparency_preview`. This is configured external
+trust, not online PKI or transparency discovery. Obtain keys and anchor files
+through an independent trusted channel, never from the package being verified.
+
+Authenticated remote export collects raw records; the CLI signs locally with
+explicit custody and never sends the private seed. Remote import uses the same
+verifier before forwarding or storage. Its authenticated service administrator
+supplies the independent verification policy in the request; the service does
+not derive trust from embedded package keys. A receiver-owned persistent trust
+roster is a separate deployment policy.
+
+Retained archive reads use the authenticated watermark ledger. Uncheckpointed
+tool records are retained explicitly in `uncheckpointed-receipts.ndjson`. Child
+records have pinned signatures and envelope coverage; independent child Merkle
+proofs and full-bundle certificate remediation remain separate work.
+
+The original first-pass plan below is retained as historical scope.
+
 This plan was the pulled-forward foundation work for the later roadmap item. The
 first coding pass shipped:
 
@@ -34,6 +81,8 @@ It still explicitly defers:
 ```sh
 chio evidence export \
   --receipt-db receipts.sqlite3 \
+  --kernel-seed-file ./kernel.seed \
+  --admin-all \
   --output ./evidence-package \
   --since 1700000000 \
   --until 1700600000 \
@@ -52,12 +101,18 @@ Optional follow-on flags:
 
 ```text
 evidence-package/
+  export-envelope.json
   manifest.json
   receipts.ndjson
   child-receipts.ndjson
   checkpoints.ndjson
   capability-lineage.ndjson
   inclusion-proofs.ndjson
+  uncheckpointed-receipts.ndjson
+  checkpoint-publications.ndjson
+  checkpoint-witnesses.ndjson
+  checkpoint-consistency-proofs.ndjson
+  checkpoint-equivocations.ndjson
   retention.json
   query.json
   policy/

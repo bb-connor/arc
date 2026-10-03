@@ -1520,6 +1520,11 @@ files = ["crates/sdk/chio-eval-receipt/src/lib.rs"]
 first_seen = "2d6c8ed146"
 
 [[schema]]
+value = "chio.evidence_export_commitment.v1"
+files = ["crates/platform/chio-control-plane/src/evidence_export/envelope.rs"]
+first_seen = "0a455ac2c0"
+
+[[schema]]
 value = "chio.evidence_export_disclosure_notice.v1"
 files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
 first_seen = "0acd05adbf"

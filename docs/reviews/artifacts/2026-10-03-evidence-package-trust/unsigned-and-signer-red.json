@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-control-plane",
+    "--lib",
+    "--locked",
+    "package_trust",
+    "--",
+    "--test-threads=2"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 208.49,
+  "log_sha256": "7546c9892a5a6b5e1f729719c157dbdc35052981cd02c2ac40fe112aaa99303a"
+}

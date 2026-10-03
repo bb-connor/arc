@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-core-types",
+    "-p",
+    "chio-kernel",
+    "--lib",
+    "--locked",
+    "evidence_export_marks_bound_publication_as_trust_anchored",
+    "--",
+    "--test-threads=2"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 0.97,
+  "log_sha256": "8cb9247558b60e76039409b8a8972b72735b57407bbff89b383fef45cf44f063"
+}

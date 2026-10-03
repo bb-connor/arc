@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "scripts/check-wire-schemas.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 8.9,
+  "log_sha256": "777125f00440bbe887c68dde10476e82a79c488d66a4eae8dcde01e7e4814c95"
+}

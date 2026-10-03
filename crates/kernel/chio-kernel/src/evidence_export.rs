@@ -428,7 +428,7 @@ fn trusted_publication_anchor(
     match (shared_trust_anchor, requested_trust_anchor) {
         (Some(shared), Some(requested)) if shared == requested => Some(shared),
         (Some(_), Some(_)) => None,
-        (Some(shared), None) => Some(shared),
+        (Some(_), None) => None,
         (None, _) => None,
     }
 }
@@ -767,6 +767,12 @@ mod tests {
                 .expect("second anchored publication"),
         ];
 
+        let unpinned = build_evidence_transparency_claims(&bundle, &transparency, None);
+        assert_ne!(
+            unpinned.publication_state,
+            EvidencePublicationState::TrustAnchored
+        );
+        assert_eq!(unpinned.trust_anchor, None);
         let anchored_claims =
             build_evidence_transparency_claims(&bundle, &transparency, Some("witness-root"));
         assert_eq!(

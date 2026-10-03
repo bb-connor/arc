@@ -167,6 +167,7 @@ pub(crate) fn dispatch_evidence(
     match command {
             EvidenceCommands::Export {
                 output,
+                kernel_seed_file,
                 capability,
                 agent_subject,
                 since,
@@ -176,7 +177,9 @@ pub(crate) fn dispatch_evidence(
                 policy_file,
                 federation_policy,
                 require_proofs,
-            } => evidence_export::cmd_evidence_export(
+            } => {
+                let signing_key = chio_control_plane::load_existing_authority_keypair(&kernel_seed_file)?;
+                evidence_export::cmd_evidence_export(
                 &output,
                 capability.as_deref(),
                 agent_subject.as_deref(),
@@ -190,17 +193,24 @@ pub(crate) fn dispatch_evidence(
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-            ),
-            EvidenceCommands::Verify { input } => {
-                evidence_export::cmd_evidence_verify(&input, json_output)
+                &signing_key,
+            )
+            },
+            EvidenceCommands::Verify { input, trusted_kernel_pubkey, trusted_anchor_file } => {
+                let verification = evidence_export::EvidenceVerificationPolicy::from_cli(&trusted_kernel_pubkey, trusted_anchor_file.as_deref())?;
+                evidence_export::cmd_evidence_verify(&input, &verification, json_output)
             }
-            EvidenceCommands::Import { input } => evidence_export::cmd_evidence_import(
+            EvidenceCommands::Import { input, trusted_kernel_pubkey, trusted_anchor_file } => {
+                let verification = evidence_export::EvidenceVerificationPolicy::from_cli(&trusted_kernel_pubkey, trusted_anchor_file.as_deref())?;
+                evidence_export::cmd_evidence_import(
                 &input,
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
                 json_output,
-            ),
+                &verification,
+            )
+            },
             EvidenceCommands::FederationPolicy { command } => match command {
                 EvidenceFederationPolicyCommands::Create {
                     output,
