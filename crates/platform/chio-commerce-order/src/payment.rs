@@ -260,7 +260,7 @@ fn validate_recovery_posture(
                 ));
             }
         }
-        "failed_closed" => {}
+        "disputed" | "failed_closed" => {}
         _ if has_recovery_state => {
             return Err(CommerceOrderError::PaymentFailed(
                 "unresolved payment recovery state".to_string(),

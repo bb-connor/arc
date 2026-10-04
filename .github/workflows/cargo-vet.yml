@@ -16,6 +16,9 @@ on:
       - "scripts/check-supply-chain.sh"
       - "scripts/tests/check-aws-lc-fork.test.py"
       - "scripts/tests/check-supply-chain-workflows.test.py"
+      - "scripts/render-vcpkg-release.py"
+      - "scripts/tests/render-vcpkg-release.test.py"
+      - "tools/vcpkg-overlay/**"
       - "docs/security/audits/**"
       - ".github/workflows/cargo-vet.yml"
   pull_request:
@@ -29,6 +32,9 @@ on:
       - "scripts/check-supply-chain.sh"
       - "scripts/tests/check-aws-lc-fork.test.py"
       - "scripts/tests/check-supply-chain-workflows.test.py"
+      - "scripts/render-vcpkg-release.py"
+      - "scripts/tests/render-vcpkg-release.test.py"
+      - "tools/vcpkg-overlay/**"
       - "docs/security/audits/**"
       - ".github/workflows/cargo-vet.yml"
 

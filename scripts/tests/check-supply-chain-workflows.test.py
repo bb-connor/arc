@@ -37,7 +37,33 @@ def require_dependency(text, producer):
         raise AssertionError("producer must not run after prerequisite failure")
 
 
+def require_cpp_source_binding(text):
+    publisher = job(text, "publish-vcpkg")
+    if 'archive/${SOURCE_SHA}.tar.gz' not in publisher:
+        raise AssertionError("C++ source archive must use the audited immutable commit")
+    if publisher.count('SOURCE_SHA: ${{ github.sha }}') != 2:
+        raise AssertionError("archive and registry rendering must use the audited event commit")
+    if 'ref: ${{ github.sha }}' not in publisher:
+        raise AssertionError("port templates must come from the audited event commit")
+    if '--source-repository "$SOURCE_REPOSITORY"' not in publisher:
+        raise AssertionError("registry must retain the qualified source repository")
+    if '--source-sha "$SOURCE_SHA"' not in publisher:
+        raise AssertionError("registry must retain the qualified source commit")
+
+
 class PublishingBoundaryTests(unittest.TestCase):
+    def test_cpp_archive_and_ports_use_the_audited_source(self):
+        text = (ROOT / ".github/workflows/release-cpp.yml").read_text()
+        require_cpp_source_binding(text)
+        for old, new in (
+            ('archive/${SOURCE_SHA}.tar.gz', 'archive/refs/tags/cpp/v${VERSION}.tar.gz'),
+            ('SOURCE_SHA: ${{ github.sha }}', 'SOURCE_SHA: ${{ github.ref }}'),
+            ('--source-sha "$SOURCE_SHA"', '--source-sha "$VERSION"'),
+            ('--source-repository "$SOURCE_REPOSITORY"', '--source-repository backbay-labs/chio'),
+        ):
+            with self.subTest(mutation=new), self.assertRaises(AssertionError):
+                require_cpp_source_binding(text.replace(old, new))
+
     def test_release_producers_require_successful_composite_gate(self):
         for name, producer in PRODUCERS.items():
             with self.subTest(workflow=name):

@@ -6,7 +6,7 @@
   "upstream_commit": "22e629d5c46276497a24ee3e575be4315940e7cb",
   "report": {
     "path": "docs/security/audits/aws-lc-rs-1.18.1-fork.md",
-    "sha256": "93febcc2b324f2c963ec01893b3e577a37598efbcd2aa13ce7af9b6ae6c11acf"
+    "sha256": "69494a33a646f4a5d4b1603b6fde3effba012c4a940c301116d9882c7487c4d5"
   },
   "files": {
     ".cargo_vcs_info.json": "c05a6a7f27510c3724ef74fb4711c81662d7da9328bd82808a92b5497bcc21f8",

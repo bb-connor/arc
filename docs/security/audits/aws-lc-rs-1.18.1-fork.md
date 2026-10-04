@@ -122,7 +122,9 @@ The unit mutation controls exercise changed, omitted, added and symlinked source
 registry and alternate-path substitution, duplicate AWS-LC copies and unreviewed
 features. Independent PR review must additionally verify the required workflow
 wiring; candidate-owned scripts cannot attest their own trusted execution.
-The workflow mutation checks reject missing and conditional prerequisites. A
+The workflow mutation checks reject missing and conditional prerequisites and
+mutable C++ archive identities. C++ registry ports retain the qualified source
+repository and commit, rather than resolving a release tag again. A
 repeat-run regression verifies that Cargo outputs stay outside the audited fork;
 the default output is `target/aws-lc-audit`, and an explicitly supplied target is
 preserved. Two actual consecutive combined invocations with an initially unset

@@ -11,6 +11,7 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${PWD}/target/aws-lc-audit}"
 # the independently reviewed fork, its authenticated reconstruction and every
 # deployment resolution before accepting the registry/transitive audit graph.
 python3 scripts/tests/check-supply-chain-workflows.test.py
+python3 scripts/tests/render-vcpkg-release.test.py
 python3 scripts/tests/check-aws-lc-fork.test.py
 python3 scripts/check-aws-lc-fork.py "$@"
 cargo vet --locked
