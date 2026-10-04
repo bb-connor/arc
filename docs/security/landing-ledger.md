@@ -104,7 +104,9 @@ The foundation integration adds two concrete qualification repairs, reaching
 precise stub classification. KG4-KG8 now link their committed bounded repairs
 and [retained source evidence](foundation-containment-20261004.md). Broader
 original requirements and candidate acceptance remain open. The length-8
-formal check is still pending. The broader affected-package run ended with
+`SafetyInv` check passed in 5,598.248 seconds with retained exact model inputs.
+The earlier 300-second timeout remains a separate unsuccessful calibration.
+This is bounded model evidence, not runtime refinement. The broader affected-package run ended with
 1,437 passed, one failed and one ignored. Its stale weak-key fixture was repaired
 and all 83 finding-verifier package tests passed; the original campaign remains
 failed and did not reach whole-package kernel tests.
@@ -115,8 +117,37 @@ security-binding loss, post-refresh authority-time gaps and unbounded child
 stderr. SF6 now links its explicit numeric decision. Preparatory packet 1 and 2
 reviews and unsuccessful campaigns are in the
 [review evidence bundle](audits/foundation-review-reconciliation-20261004.json.gz).
-Open P1 repairs, aggregate MCP bounds, secret-output growth and final qualification
-remain pending. No prerequisite or foundation merge is claimed.
+The HTTP/portable binding and post-refresh authority-time repairs are now
+committed and independently source-reviewed. Aggregate MCP bounds, secret-output
+growth and final qualification remain pending. No prerequisite or foundation
+merge is claimed.
+
+All six preparatory source packets now have retained reports and 148 linked
+requirement assessments (including reviewed follow-ups). The
+[acceptance scope](foundation-acceptance-scope.md) distinguishes included-owner
+review from completion of every product feature. The
+[frozen packet bundle](audits/foundation-packet-reviews-20261004.json.gz) has SHA-256
+`dc2b69529a77c9a7cdad6aca1479beac587e988e72fcd708ed638fbfa36ac545`.
+None of those reports qualifies the final integrated candidate. Later repairs,
+remaining source findings and unexecuted acceptance stay distinct.
+
+The current inventory contains **1,343 records**, including the three stale
+kernel fixture migrations. Binding containment is committed at `ec1640c460`;
+the owned-time repair at `7f168a0fb9`; and authenticated receipt, bounded journal
+and retention fixture updates at `5ec8472b72`. The clock owner passed 33 tests.
+The whole kernel campaign recorded 1,735 passed, one failed and two ignored;
+its only failing target was the stale retention fixture. After correction, all
+11 retention tests and strict lint passed. That focused result does not relabel
+the earlier campaign or qualify the final integrated candidate.
+
+The [authority follow-up evidence](audits/foundation-authority-followup-20261004.json.gz)
+retains 109 records, their hashes, original failed commands, later successful
+checks and independent reviews. Its SHA-256 is
+`82a0fc321c609ab455e421d81ebc473163fff561df6b25882c5b4dc0155c5053`.
+It also preserves the completed length-8 model result, scope review and archive
+retrieval evidence. A fresh isolated Git fetch and anonymous HTTPS download both
+retrieved the 14,764 evidence files selected for externalization with matching
+bytes. Retrieval proves availability, not the truth of historical evidence.
 
 ## Active queue
 
