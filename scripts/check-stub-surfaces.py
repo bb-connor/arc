@@ -117,6 +117,10 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     # Exact upstream comments only. New code and comments remain checked;
     # supply-chain audits separately cover this pinned cryptographic source.
+    "third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json": allow(
+        "serialized unchanged upstream import-maintenance comment in reviewed patch context",
+        "2026-12-31",
+    ),
     "third_party/aws-lc-rs-chio/Makefile": allow(
         "upstream optional macOS build recipe comments",
         "2026-12-31",
@@ -435,6 +439,9 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     ),
     "third_party/seccompiler-chio/src/frontend/json.rs": (
         "^/// Dummy placeholder type for a JSON comment\\. Holds no value\\.$",
+    ),
+    "third_party/aws-lc-rs-chio/CHIO-PATCH.patch.json": (
+        r'^" // TODO: Uncomment when MSRV >= 1\.64\\n",$',
     ),
     "third_party/aws-lc-rs-chio/Makefile": (
         r"^# TODO: This build target produces linker error on Mac\.$",
