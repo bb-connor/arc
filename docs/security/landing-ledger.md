@@ -15,7 +15,7 @@ all 13 review threads are resolved. #1167 is the sole active prerequisite at
 Its 20 behavioral methods pass locally; hosted qualification is running.
 #1160 remains local preparation and has not been projected or landed.
 
-The current inventory contains **1,349 requirement records**. Native startup
+The current inventory contains **1,351 requirement records**. Native startup
 repairs include source modes, exact bind-mount identity independent of Docker's
 array order, bounded escaped verifier diagnostics, and constrained normalization
 of valid Cargo-mutants Rust module paths. The latter passes eight boundary
@@ -37,6 +37,24 @@ passes. Real Cargo-mutants 25.3.1 selects all 35 intended viable mutants. Existi
 outcomes remain unchanged and stale, and actual native execution is still
 required. The [owner repair bundle](audits/foundation-mutant-owner-repairs-20261004.json.gz)
 retains the source scan, regressions, exact selectors and failed native attempt.
+
+The next native attempt on `0e5a5812e6` was cancelled after a confirmed invocation
+defect: Cargo-mutants' cross-package baseline ran zero matching consumer tests
+and derived its deadline from the smaller extracted owner. Commit `37cdda0454`
+includes the existing consumer in the baseline. A real two-package Rust
+regression failed before repair and then passed with one positive control and
+one caught mutant. Commit `7c6bf2c8fd` permits four candidate compile jobs within
+the existing four-CPU container quota. Mutation scheduling, command resets and
+the memory/PID limits remain unchanged; forwarded concurrency variables are
+rejected. Wrapper and adversarial fixtures pass. The complete shell gate still
+rejects stale outcomes. The [baseline repair bundle](audits/foundation-mutant-baseline-repair-20261004.json.gz)
+preserves the cancelled attempt, regressions, source review and cache cleanup.
+Fresh native execution on the repaired source is pending.
+
+Ruling: use the existing container CPU quota for candidate compilation while
+keeping one mutation and one broker command active at a time. Retain complete
+state disposal between commands. Higher compilation memory may fail within the
+unchanged 12 GiB limit; native duration and memory acceptance remain open.
 
 Ruling: #1167's non-required controller run rejected the historical configured
 source authorization, which predates the foundation execution files. Preserve
