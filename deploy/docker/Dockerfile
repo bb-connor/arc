@@ -29,6 +29,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS proof-room-builder
 RUN apk add --no-cache build-base cmake perl openssl-dev openssl-libs-static pkgconf protoc
+# The quickstart runtime has no shared OpenSSL dependencies.
+ENV OPENSSL_STATIC=1
 WORKDIR /workspace
 
 COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml
