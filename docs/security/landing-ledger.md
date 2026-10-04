@@ -99,6 +99,13 @@ reproduced. These are review and acceptance assignments, not 126 newly confirmed
 defects or completed requirements. Source identities, linked checklist records,
 historical evidence and remaining acceptance stay intact.
 
+The foundation integration adds two concrete qualification repairs, reaching
+1,337 records: current formal traceability/cancellation-clock modeling and
+precise stub classification. KG4-KG8 now link their committed bounded repairs
+and [retained source evidence](foundation-containment-20261004.md). Broader
+original requirements and candidate acceptance remain open. The length-8
+formal check and broader affected-package integration run are still pending.
+
 ## Active queue
 
 | Order | PR | Responsibility | Acceptance |
