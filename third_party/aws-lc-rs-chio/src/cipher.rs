@@ -251,7 +251,6 @@ use crate::aws_lc::{
 };
 use crate::buffer::Buffer;
 use crate::error::{KeyRejected, Unspecified};
-use crate::hkdf;
 use crate::hkdf::KeyType;
 #[cfg(feature = "legacy-des")]
 use crate::iv::IV_LEN_64_BIT;
@@ -765,18 +764,6 @@ impl Debug for UnboundCipherKey {
         f.debug_struct("UnboundCipherKey")
             .field("algorithm", &self.algorithm)
             .finish()
-    }
-}
-
-impl From<hkdf::Okm<'_, &'static Algorithm>> for UnboundCipherKey {
-    // CHIO-LINT cipher-from-okm: Preserve upstream infallible From; native derivation or key initialization failure panics.
-    #[allow(clippy::unwrap_used)]
-    fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
-        let mut key_bytes = [0; MAX_CIPHER_KEY_LEN];
-        let key_bytes = &mut key_bytes[..okm.len().key_len];
-        let algorithm = *okm.len();
-        okm.fill(key_bytes).unwrap();
-        Self::new(algorithm, key_bytes).unwrap()
     }
 }
 

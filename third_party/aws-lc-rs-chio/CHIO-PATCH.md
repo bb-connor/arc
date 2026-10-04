@@ -37,6 +37,8 @@ panicking. Existing upstream infallible compatibility methods and verified
 invariants retain narrowly identified exceptions. The mandatory lint gate checks
 their exact compiler spans and source hashes for default/legacy and FIPS library
 builds; the fork is not claimed panic-free.
+The unchanged HKDF conversion for `UnboundCipherKey` lives in the existing
+`cipher/key.rs` module to keep the public cipher module within its size cap.
 
 Five em dashes in upstream documentation and Rust documentation comments are
 normalized to hyphens for the repository text convention. They do not affect

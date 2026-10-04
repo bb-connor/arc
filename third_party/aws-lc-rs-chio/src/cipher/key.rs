@@ -8,10 +8,14 @@ use crate::cipher::block::Block;
 use crate::cipher::chacha::ChaCha20Key;
 #[cfg(feature = "legacy-des")]
 use crate::cipher::des::{DesKey, DES_EDE3_KEY_LEN, DES_EDE_KEY_LEN, DES_KEY_LEN};
-use crate::cipher::{AES_128_KEY_LEN, AES_192_KEY_LEN, AES_256_KEY_LEN};
+use crate::cipher::{
+    Algorithm, UnboundCipherKey, AES_128_KEY_LEN, AES_192_KEY_LEN, AES_256_KEY_LEN,
+    MAX_CIPHER_KEY_LEN,
+};
 #[cfg(feature = "legacy-des")]
 use crate::constant_time;
 use crate::error::{KeyRejected, Unspecified};
+use crate::hkdf;
 use core::mem::{size_of, MaybeUninit};
 use core::ptr::copy_nonoverlapping;
 // TODO: Uncomment when MSRV >= 1.64
@@ -324,6 +328,18 @@ impl SymmetricCipherKey {
                 panic!("Unsupported algorithm!")
             }
         }
+    }
+}
+
+impl From<hkdf::Okm<'_, &'static Algorithm>> for UnboundCipherKey {
+    // CHIO-LINT cipher-from-okm: Preserve upstream infallible From; native derivation or key initialization failure panics.
+    #[allow(clippy::unwrap_used)]
+    fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
+        let mut key_bytes = [0; MAX_CIPHER_KEY_LEN];
+        let key_bytes = &mut key_bytes[..okm.len().key_len];
+        let algorithm = *okm.len();
+        okm.fill(key_bytes).unwrap();
+        Self::new(algorithm, key_bytes).unwrap()
     }
 }
 

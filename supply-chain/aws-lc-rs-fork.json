@@ -10,8 +10,8 @@
   },
   "files": {
     ".cargo_vcs_info.json": "c05a6a7f27510c3724ef74fb4711c81662d7da9328bd82808a92b5497bcc21f8",
-    "CHIO-PATCH.md": "9b39f636ace5aa9e6ac76b2ad93b5d4ad11725f504d922601bc7306c628d4923",
-    "CHIO-PATCH.patch.json": "adc10e59dffe4848b41dab28caca4e17d67dff9ab13d20172c371af60590c4f7",
+    "CHIO-PATCH.md": "70d66d6a427c4ef632dae7eef2c2f324af579c635773be2b3e41afa47ad93412",
+    "CHIO-PATCH.patch.json": "5f1c7fe528e95a4b934cfad3c0847ee21eab952919045bdcc16cb0286e32852c",
     "CHIO-RESTORED-FIXTURES.sha256": "ccd1bbde37b377f8f9cc7c2e3a1507a7af4d7ac204878efa126fd83838abdded",
     "Cargo.lock": "6643ec0a203a13f494820b62ff0f4d14873d37ae374301555af9bee1c6aeb579",
     "Cargo.toml": "e42856111f1f443598d64bd9aa117659a7542bf742fe1871d9cdffd8e3d34f46",
@@ -56,13 +56,13 @@
     "src/buffer.rs": "7935f484a83d9cef770f4ca1e7200b37da8f7c5839826e654e1a89dab8a58d81",
     "src/cbb.rs": "a7ba7bb962d7d3350d09623ee0f924a7aa72b898890aa9b5094ab97a818c0b58",
     "src/cbs.rs": "04e2b86c88e74b9c21312a75026c9acdcbb49a04eba9d287f932ad1c8f98021e",
-    "src/cipher.rs": "2a53947976b1f847898e391ad9e82241c9ab30d9dd61f60d56f5e5fcecbb603a",
+    "src/cipher.rs": "019f918892dc9c872705bb5217576ef7d089a7b626907cfc6308b3f9178b1b5a",
     "src/cipher/aes.rs": "ef6e2152d450cf60709ca85b091b3e9c0c57326b4581cc28be349c0fcbd64df1",
     "src/cipher/block.rs": "9083ff73ac022c5b7c2a884b14db71ad5f8b49cf447fb7f6921a43b122a536b9",
     "src/cipher/chacha.rs": "7a2076445b9ec78c06ff8062ff9aff5608eedf62ded1123776d64ce80e68aab8",
     "src/cipher/data/chacha_tests.txt": "6ed1303cef7a0ffa30cc76f9933509a2d952a334b80c731d52d32c6ef3b37042",
     "src/cipher/des.rs": "e6509807675e676d1896399a7694006fb5fee13bab68b86b29282f97ecf3317a",
-    "src/cipher/key.rs": "03393eb3fc06b0fd1ca8b6b0eb8550a35493340cc79e02229ff234cb072894b8",
+    "src/cipher/key.rs": "fcc48e7b40d7d49c84bdfce29ba1ffe035e86806dfc70d156723f2ad144619e4",
     "src/cipher/padded.rs": "9e3f17427160587b56a8f34cd25db3c7fba2c2c01f388723c084f866b6520e09",
     "src/cipher/streaming.rs": "b90f12698eb73999710b9e5454e38b517e6bc6351eb0d8a162ddb00246dc5ff6",
     "src/cipher/tests/fips.rs": "b03ce005dcb47c94fe01e08c801376e81421042aa090c549e44b729ec862bd90",
@@ -196,5 +196,5 @@
     "tests/data/sskdf.txt": "41c813ce0acc73c26585208c5d055a147a0d83d7e907c6115d507a4a730b3114",
     "util/process-criterion-csv.rs": "32d9dd5f5e58231a9411320c86f5d312b027ac33f198d6c66648aeb7f3f29e88"
   },
-  "lint_policy_sha256": "67f60312ece45199c02350366b5472e426cc82197273ee2f6739a065e9ec913f"
+  "lint_policy_sha256": "ad0eb612b559e15f0cda859f5eab9cad7f5da71d4b0274a5ede0ba7ad9cd8ccd"
 }

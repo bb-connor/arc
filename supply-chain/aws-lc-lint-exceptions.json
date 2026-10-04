@@ -18,8 +18,8 @@
     "src/aead/chacha20_poly1305_openssh.rs": "8800f1d9d917b5b652d43dbd2b84676502b4f60262fc2c51ad5c5aca2f6339e4",
     "src/aead/quic.rs": "16b3e5f7904cf3385e98b2b56f4b63f25ebab2a142b32a86f213927273a27eb0",
     "src/aead/unbound_key.rs": "8e1479fabe0910705c75be42a9c9a6301340cf68fc12600131917a82a1030143",
-    "src/cipher.rs": "2a53947976b1f847898e391ad9e82241c9ab30d9dd61f60d56f5e5fcecbb603a",
-    "src/cipher/key.rs": "03393eb3fc06b0fd1ca8b6b0eb8550a35493340cc79e02229ff234cb072894b8",
+    "src/cipher.rs": "019f918892dc9c872705bb5217576ef7d089a7b626907cfc6308b3f9178b1b5a",
+    "src/cipher/key.rs": "fcc48e7b40d7d49c84bdfce29ba1ffe035e86806dfc70d156723f2ad144619e4",
     "src/cmac.rs": "d57a64dc4177efea17e5cd60f8b9cfc0929ee74f5d778428036b013c2f7dd26f",
     "src/digest.rs": "a8e1284d26b59a2d1e983ce4af51c63e60f5e53c2fedc2c2558c0f872f469be3",
     "src/digest/digest_ctx.rs": "80a750ec85bd8aaad8bcd75ecae4f03c4b2b674bbb8b09c1cc3ea7446a02a83f",
@@ -124,29 +124,29 @@
     },
     {
       "id": "cipher-from-okm",
-      "file": "src/cipher.rs",
+      "file": "src/cipher/key.rs",
       "item": "cipher::UnboundCipherKey::from",
       "lint": "clippy::unwrap_used",
       "rationale": "Preserve upstream infallible From; native derivation or key initialization failure panics.",
       "sites": {
         "default-legacy": [
           [
-            30159,
-            30187
+            13631,
+            13659
           ],
           [
-            30197,
-            30237
+            13669,
+            13709
           ]
         ],
         "fips": [
           [
-            30159,
-            30187
+            13631,
+            13659
           ],
           [
-            30197,
-            30237
+            13669,
+            13709
           ]
         ]
       }
@@ -475,14 +475,14 @@
       "sites": {
         "default-legacy": [
           [
-            2167,
-            2310
+            2244,
+            2387
           ]
         ],
         "fips": [
           [
-            2167,
-            2310
+            2244,
+            2387
           ]
         ]
       }
@@ -496,14 +496,14 @@
       "sites": {
         "default-legacy": [
           [
-            2607,
-            2750
+            2684,
+            2827
           ]
         ],
         "fips": [
           [
-            2607,
-            2750
+            2684,
+            2827
           ]
         ]
       }
@@ -517,8 +517,8 @@
       "sites": {
         "default-legacy": [
           [
-            3313,
-            3450
+            3390,
+            3527
           ]
         ]
       }
