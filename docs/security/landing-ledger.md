@@ -15,16 +15,28 @@ all 13 review threads are resolved. #1167 is the sole active prerequisite at
 Its 20 behavioral methods pass locally; hosted qualification is running.
 #1160 remains local preparation and has not been projected or landed.
 
-The current inventory contains **1,348 requirement records**. Native startup
+The current inventory contains **1,349 requirement records**. Native startup
 repairs include source modes, exact bind-mount identity independent of Docker's
 array order, bounded escaped verifier diagnostics, and constrained normalization
 of valid Cargo-mutants Rust module paths. The latter passes eight boundary
 methods, the existing checker fixtures and the real 16-file package inventory.
-Ordinary validation still rejects stale mutation evidence. The next image build
-failed during unpacking because the worker disk was full; it is retained as a
-failed attempt, with no native campaign pass claimed. The
+Ordinary validation still rejects stale mutation evidence. The first `c8d15236d2`
+image build failed during unpacking because the worker disk was full. After
+reclaiming unused private build cache and preserving every image ID, the exact
+rebuild and all 14 installed boundary checks passed. The native run then failed
+on an outdated mutation target after 127.052 seconds. These attempts remain
+separate. The
 [startup evidence bundle](audits/foundation-native-startup-20261004.json.gz)
 preserves the original failures and component results.
+
+The complete target scan found seven moved campaign owners and four moved test
+paths after the response-model and cage crate extractions, affecting eight
+campaigns. Commit `0e5a5812e6` repairs those references and two helper build gaps.
+Both new helper regressions failed before their repairs; the final fixture block
+passes. Real Cargo-mutants 25.3.1 selects all 35 intended viable mutants. Existing
+outcomes remain unchanged and stale, and actual native execution is still
+required. The [owner repair bundle](audits/foundation-mutant-owner-repairs-20261004.json.gz)
+retains the source scan, regressions, exact selectors and failed native attempt.
 
 Ruling: #1167's non-required controller run rejected the historical configured
 source authorization, which predates the foundation execution files. Preserve
