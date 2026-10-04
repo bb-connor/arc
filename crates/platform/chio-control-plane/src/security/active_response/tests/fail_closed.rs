@@ -1,6 +1,62 @@
 use super::*;
 
 #[test]
+fn dry_run_executor_request_is_rejected_before_dispatch_or_effects() {
+    let harness = Harness::new();
+    let mut response_plan = harness.automatic_request().response_plan;
+    response_plan.execution = chio_security_types::ResponseExecutionBinding::new(
+        chio_security_types::ResponseExecutionMode::DryRun,
+    );
+    let body = require_success(
+        serde_json::to_value(response_plan.authorization_body()),
+        "dry-run authorization body",
+    );
+    response_plan.plan_hash = Digest32::new(
+        *require_success(
+            chio_core::capability::governance::GovernedResponsePlanIntentBody::compute_plan_body_digest(
+                &body,
+            ),
+            "dry-run authorization hash",
+        )
+        .as_bytes(),
+    );
+    let request = raw_request(
+        response_plan,
+        harness.identity.clone(),
+        ActiveResponseExecutionApproval::Automatic,
+    );
+
+    let error = require_error(harness.executor.execute_source(&request));
+    assert!(
+        matches!(
+            error,
+            ActiveResponseExecutorError::RejectedBeforeCommit(ref reason)
+                if reason == "response plan is bound to dry_run execution; live execution requires live"
+        ),
+        "unexpected rejection: {error:?}"
+    );
+    assert!(matches!(
+        require_success(
+            harness.store.load_dispatch(&ResponseDispatchKey {
+                tenant_id: request.response_plan.tenant_id.clone(),
+                dispatch_id: request.dispatch_id.clone(),
+            }),
+            "dispatch after refused dry-run request",
+        ),
+        ResponseDispatchLoadOutcome::Missing
+    ));
+    assert_eq!(
+        harness
+            .effects
+            .state
+            .lock()
+            .unwrap_or_else(|error| panic!("effect state: {error}"))
+            .executions,
+        0
+    );
+}
+
+#[test]
 fn expired_request_and_approval_mode_mismatch_fail_before_commit() {
     let harness = Harness::new();
     let expired_plan = plan(

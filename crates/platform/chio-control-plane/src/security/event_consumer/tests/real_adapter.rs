@@ -996,6 +996,8 @@ fn mutate_real_adapter_artifact_digest(request: &mut GovernedApprovalRequest) {
     request.admission_artifact.body.artifact_digest = Digest32::new([0xb4_u8; 32]);
 }
 
+#[path = "real_adapter/execution_mode.rs"]
+mod execution_mode;
 #[path = "real_adapter/response_dry_run.rs"]
 mod response_dry_run;
 #[cfg(unix)]

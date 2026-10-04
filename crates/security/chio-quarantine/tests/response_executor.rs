@@ -1,3 +1,5 @@
+#[path = "response_executor/execution_mode.rs"]
+mod execution_mode;
 mod response_support;
 
 use chio_core_types::receipt::security::{ActiveDefenseEffectOutcome, ActiveDefenseReceiptBody};
