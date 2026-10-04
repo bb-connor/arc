@@ -24,6 +24,9 @@ use chio_siem::Exporter;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
+#[path = "alerting_dispatch/payload_minimization.rs"]
+mod payload_minimization;
+
 fn test_server_authority(server: &MockServer) -> String {
     let url = url::Url::parse(&server.uri()).expect("wiremock uri parses");
     let host = url.host_str().unwrap_or("127.0.0.1").to_string();

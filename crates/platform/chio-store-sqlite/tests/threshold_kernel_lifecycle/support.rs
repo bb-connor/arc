@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    GovernedTransactionIntent, ThresholdApprovalProposal,
+    GovernedTransactionIntent, GovernedTransactionIntentBody, ThresholdApprovalProposal,
 };
 use chio_core::capability::scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant};
 use chio_core::capability::threshold_approval::{
@@ -234,7 +234,10 @@ impl Fixture {
             call_chain: None,
             autonomy: None,
             context: None,
-            body: Default::default(),
+            body: GovernedTransactionIntentBody::BoundToolInvocation {
+                capability_id: request.capability.id.clone(),
+                parameters_hash: chio_core::sha256(&canonical_json_bytes(&request.arguments)?),
+            },
         });
         Ok(request)
     }

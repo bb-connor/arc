@@ -58,6 +58,27 @@ impl RemoteSession {
 
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
         remote_mcp_approvals::validate_redemption(self, &message)?;
+        // Redemption can inspect lifecycle itself. Take the lock afterward and
+        // retain it through enqueue, serializing with drain/terminal transitions.
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        match lifecycle.state {
+            RemoteSessionState::Ready => {
+                lifecycle
+                    .deadline
+                    .as_mut()
+                    .ok_or(ClockError::InvalidWindow)?
+                    .remaining(self.clock.read()?)?;
+            }
+            RemoteSessionState::Initializing
+                if message.get("method").and_then(Value::as_str) == Some("initialize")
+                    && message.get("id").is_some() => {}
+            _ => {
+                return Err(chio_kernel::KernelError::GovernedTransactionDenied(
+                    "remote MCP session does not admit this message in its current state".into(),
+                )
+                .into())
+            }
+        }
         self.input_tx.send(message).map_err(|_| {
             CliError::cli_other_error("remote MCP session worker is unavailable".to_string())
         })

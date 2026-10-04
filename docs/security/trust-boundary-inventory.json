@@ -3460,13 +3460,13 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
       "owner": "compute_archival_watermark",
-      "sha256": "204bc5c47488640c43b920857feea7b74688994b77538b7a63fdd238bf80bd84",
+      "sha256": "4be637e21b130f22750ea9fdb1e5ab289f94a972b3b4d43c401bb236b171b484",
       "tables": [
         "chio_authorization_receipt_consumptions"
       ],
-      "sql": "SELECT COALESCE(MAX(kc.batch_end_seq), 0) FROM kernel_checkpoints kc WHERE NOT EXISTS ( SELECT 1 FROM claim_receipt_log_entries e WHERE e.entry_seq <= kc.batch_end_seq AND e.timestamp >= ?1 ) AND NOT EXISTS ( SELECT 1 FROM chio_authorization_receipt_consumptions ac JOIN claim_receipt_log_entries ae ON ae.receipt_id = ac.authorization_receipt_id JOIN claim_receipt_log_entries ce ON ce.receipt_id = ac.consumer_receipt_id WHERE ae.entry_seq <= kc.batch_end_seq AND ce.entry_seq > kc.batch_end_seq ) AND NOT EXISTS ( SELECT 1 FROM receipt_lineage_statements ls JOIN claim_receipt_log_entries pe ON pe.receipt_id = ls.parent_receipt_id JOIN claim_receipt_log_entries ce ON ce.receipt_id = ls.receipt_id WHERE pe.entry_seq <= kc.batch_end_seq AND ce.entry_seq > kc.batch_end_seq ) AND NOT EXISTS ( SELECT 1 FROM settlement_reconciliations sr JOIN claim_receipt_log_entries e ON e.receipt_id = sr.receipt_id WHERE e.entry_seq <= kc.batch_end_seq AND sr.reconciliation_state IN ('open', 'retry_scheduled') ) AND NOT EXISTS ( SELECT 1 FROM metered_billing_reconciliations mbr JOIN claim_receipt_log_entries e ON e.receipt_id = mbr.receipt_id WHERE e.entry_seq <= kc.batch_end_seq AND mbr.reconciliation_state IN ('open', 'retry_scheduled') ) {active_settlement_guard}",
+      "sql": "SELECT COALESCE(MAX(kc.batch_end_seq), 0) FROM kernel_checkpoints kc WHERE kc.batch_end_seq <= ?2 AND NOT EXISTS ( SELECT 1 FROM claim_receipt_log_entries e WHERE e.entry_seq <= kc.batch_end_seq AND e.timestamp >= ?1 ) AND NOT EXISTS ( SELECT 1 FROM chio_authorization_receipt_consumptions ac JOIN claim_receipt_log_entries ae ON ae.receipt_id = ac.authorization_receipt_id JOIN claim_receipt_log_entries ce ON ce.receipt_id = ac.consumer_receipt_id WHERE ae.entry_seq <= kc.batch_end_seq AND ce.entry_seq > kc.batch_end_seq ) AND NOT EXISTS ( SELECT 1 FROM receipt_lineage_statements ls JOIN claim_receipt_log_entries pe ON pe.receipt_id = ls.parent_receipt_id JOIN claim_receipt_log_entries ce ON ce.receipt_id = ls.receipt_id WHERE pe.entry_seq <= kc.batch_end_seq AND ce.entry_seq > kc.batch_end_seq ) AND NOT EXISTS ( SELECT 1 FROM settlement_reconciliations sr JOIN claim_receipt_log_entries e ON e.receipt_id = sr.receipt_id WHERE e.entry_seq <= kc.batch_end_seq AND sr.reconciliation_state IN ('open', 'retry_scheduled') ) AND NOT EXISTS ( SELECT 1 FROM metered_billing_reconciliations mbr JOIN claim_receipt_log_entries e ON e.receipt_id = mbr.receipt_id WHERE e.entry_seq <= kc.batch_end_seq AND mbr.reconciliation_state IN ('open', 'retry_scheduled') ) {active_settlement_guard}",
       "principal": "receipt-integrity",
-      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
+      "contract": "Store-owned retention selection must consider all tenants so it cannot split any live dependency. Bound candidate checkpoints by the verified ceiling before MAX; revalidate exactly the selected checkpoint under BEGIN IMMEDIATE before deletion. The query returns only a boundary, never receipt data or read authority. See RV2 in docs/reviews/2026-10-03-security-p0-p1-review.md."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs",
@@ -3845,13 +3845,24 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_projection.rs",
       "owner": "validate",
-      "sha256": "23b9385f6a15a0823565a35d6060927e4b0be06d7cb11f682c59655765644a66",
+      "sha256": "545b01564c6624d18ef822267d4761dd820bf9f8770e40595bedd235395334be",
       "tables": [
         "chio_tool_receipts"
       ],
-      "sql": "SELECT COUNT(*) = 1 FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id WHERE r.seq = ?1 AND r.receipt_id = ?2 AND r.raw_json = ?3 AND r.timestamp = ?4 AND r.capability_id = ?5 AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8 AND r.tenant_id IS ?9 AND r.cost_currency IS ?10 AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12 AND COALESCE(r.subject_key, cl.subject_key) IS ?13 AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14 AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17",
+      "sql": "SELECT COUNT(*) = 1 AND COALESCE(MIN(r.receipt_id = ?2 AND r.raw_json = ?3 AND r.timestamp = ?4 AND r.capability_id = ?5 AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8 AND r.tenant_id IS ?9 AND r.cost_currency IS ?10 AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12 AND COALESCE(r.subject_key, cl.subject_key) IS ?13 AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14 AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17), 0) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id WHERE r.seq = ?1",
       "principal": "receipt-read-adapter",
-      "contract": "Internal retained-snapshot integrity validation streams the already-authenticated committed archive prefix before any count, filter, point lookup or export. Parameters are the signed receipt identity and projections, with attribution fallback from validated pinned live lineage. This checks exact membership and payload/filter equality; it returns no receipt rows and cannot grant read scope. Outer read/export adapters still require their explicit authenticated tenant or admin boundary."
+      "contract": "Internal pinned retained-snapshot integrity check before any tenant/admin read or export. Source sequences must be unique within the committed prefix, within the trusted live allocator and absent from live rows. Count every archived source and lineage candidate before comparing signed projections. These queries return booleans/counts only, never receipt data or read scope; outer adapters still enforce effective authenticated tenant or explicit admin authority. See RV1 in docs/reviews/2026-10-03-security-p0-p1-review.md."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_projection.rs",
+      "owner": "validate",
+      "sha256": "c654f8faf6d3c8f9759e45e52ac235be89ced3a0347497b0a4fcf70d6ea603f7",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE seq = ?1)",
+      "principal": "receipt-read-adapter",
+      "contract": "Internal pinned retained-snapshot integrity check before any tenant/admin read or export. Source sequences must be unique within the committed prefix, within the trusted live allocator and absent from live rows. Count every archived source and lineage candidate before comparing signed projections. These queries return booleans/counts only, never receipt data or read scope; outer adapters still enforce effective authenticated tenant or explicit admin authority. See RV1 in docs/reviews/2026-10-03-security-p0-p1-review.md."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs",

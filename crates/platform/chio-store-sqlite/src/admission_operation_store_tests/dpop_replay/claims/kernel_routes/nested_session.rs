@@ -123,13 +123,17 @@ fn session_call(
         .kernel
         .open_session(request.agent_id.clone(), vec![request.capability.clone()])?;
     route.kernel.activate_session(&session)?;
+    let mut operation: ToolCallOperation = serde_json::from_value(serde_json::to_value(request)?)?;
+    // These fixtures supply proofs through the explicit bundle. A missing-proof
+    // case must also omit the wire field, which now carries a usable proof.
+    operation.dpop_proof = None;
     Ok((
         OperationContext::new(
             session,
             RequestId::new(&request.request_id),
             request.agent_id.clone(),
         ),
-        serde_json::from_value(serde_json::to_value(request)?)?,
+        operation,
     ))
 }
 
@@ -196,6 +200,28 @@ fn proofs(request: &ToolCallRequest) -> NestedToolCallProofs {
         dpop_proof: request.dpop_proof.clone(),
         declassification_grant: request.declassification_grant.clone(),
     }
+}
+
+#[test]
+fn public_nested_wire_proof_preserves_required_dpop_without_an_explicit_bundle(
+) -> AnchoredTestResult {
+    for async_native in [false, true] {
+        let route = Route::new()?;
+        let request = route.request("nested-public-wire-proof", &[1])?;
+        let (context, mut operation) = session_call(&route, &request)?;
+        operation.dpop_proof = Some(serde_json::to_value(
+            request.dpop_proof.as_ref().ok_or("proof absent")?,
+        )?);
+        let response = invoke(&route, &context, &operation, None, async_native)?;
+        assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+        assert_eq!(route.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(route.counts()?, (1, 1));
+        assert_eq!(
+            route.history(&request)?.1[0].disposition,
+            DpopReplayClaimDisposition::RetainedAfterDispatchCommit
+        );
+    }
+    Ok(())
 }
 
 #[test]

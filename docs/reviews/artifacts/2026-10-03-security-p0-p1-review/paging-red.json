@@ -1,0 +1,16 @@
+{
+  "source_head": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-siem",
+    "--test",
+    "alerting_dispatch",
+    "p0p1_",
+    "--locked"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 113.41,
+  "log_sha256": "28359b985a0fbb68567d24466e572e75ef649b030ef82d52b2d13faba9ab5482"
+}

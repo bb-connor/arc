@@ -70,6 +70,9 @@ fn retained_fixture() -> (tempfile::TempDir, SqliteReceiptStore, std::path::Path
     (directory, store, archive)
 }
 
+#[path = "retained_tests/source_sequences.rs"]
+mod source_sequences;
+
 #[test]
 fn retained_pages_preserve_sequence_scope_children_and_proofs() {
     let (_directory, store, _archive) = retained_fixture();

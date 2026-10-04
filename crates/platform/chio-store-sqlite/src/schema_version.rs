@@ -363,6 +363,7 @@ mod tests {
     #[test]
     fn every_own_file_store_stamps_application_id() -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
+        crate::test_authority::secure_directory(dir.path());
         let stamped = |name: &str| -> Result<i32, Box<dyn std::error::Error>> {
             let conn = Connection::open(dir.path().join(name))?;
             Ok(conn.query_row("PRAGMA application_id", [], |r| r.get(0))?)

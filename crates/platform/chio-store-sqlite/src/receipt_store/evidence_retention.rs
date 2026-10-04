@@ -222,8 +222,13 @@ impl SqliteReceiptStore {
 fn compute_archival_watermark(
     connection: &rusqlite::Connection,
     cutoff_unix_secs: u64,
+    verified_checkpoint_ceiling: Option<u64>,
 ) -> Result<u64, ReceiptStoreError> {
     let cutoff = sqlite_i64(cutoff_unix_secs, "retention cutoff")?;
+    let ceiling = verified_checkpoint_ceiling
+        .map(|value| sqlite_i64(value, "verified checkpoint ceiling"))
+        .transpose()?
+        .unwrap_or(i64::MAX);
     let settlement_attempts_installed: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM main.sqlite_master \
          WHERE type = 'table' AND name = 'settle_attempts')",
@@ -245,7 +250,7 @@ fn compute_archival_watermark(
         r#"
         SELECT COALESCE(MAX(kc.batch_end_seq), 0)
         FROM kernel_checkpoints kc
-        WHERE NOT EXISTS (
+        WHERE kc.batch_end_seq <= ?2 AND NOT EXISTS (
             SELECT 1 FROM claim_receipt_log_entries e
             WHERE e.entry_seq <= kc.batch_end_seq
               AND e.timestamp >= ?1
@@ -279,7 +284,8 @@ fn compute_archival_watermark(
         {active_settlement_guard}
         "#
     );
-    let watermark: i64 = connection.query_row(&query, params![cutoff], |row| row.get(0))?;
+    let watermark: i64 =
+        connection.query_row(&query, params![cutoff, ceiling], |row| row.get(0))?;
     sqlite_u64(watermark, "retention watermark")
 }
 
@@ -638,11 +644,11 @@ fn archive_range(
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
-    // Never archive past the checkpoint boundary the caller has verified. The
-    // ceiling is itself a checkpoint `batch_end_seq`, and `compute_archival_watermark`
-    // returns one too, so the minimum still lands on a real boundary.
-    let watermark = compute_archival_watermark(connection, cutoff_unix_secs)?
-        .min(verified_checkpoint_ceiling.unwrap_or(u64::MAX));
+    // Eligibility is not monotone: a later checkpoint may contain both ends of
+    // a dependency that an earlier checkpoint splits. Bound the candidates
+    // before selecting an eligible prefix, never clamp the result afterward.
+    let watermark =
+        compute_archival_watermark(connection, cutoff_unix_secs, verified_checkpoint_ceiling)?;
     if watermark == 0 {
         return Ok(0); // fail-safe: nothing checkpointed has fully aged.
     }
@@ -1393,6 +1399,14 @@ pub(super) fn delete_archived_prefix_in_tx(
     // prefix intact and re-runnable.
     ensure_archive_path_matches_ledger(&tx, archive_path)?;
     ensure_committed_prefix_still_backed(&tx)?;
+    // A new dependency may have been copied faithfully while invalidating the
+    // selected boundary. Check that exact prefix under the destructive lock.
+    let selected = sqlite_positive_u64(w, "selected archival watermark")?;
+    if compute_archival_watermark(&tx, cutoff_unix_secs, Some(selected))? != selected {
+        return Err(ReceiptStoreError::Conflict(
+            "selected archive prefix is no longer eligible for retention".into(),
+        ));
+    }
     tx.execute_batch(&format!(
         r#"
         DROP TRIGGER IF EXISTS chio_tool_receipts_reject_delete;

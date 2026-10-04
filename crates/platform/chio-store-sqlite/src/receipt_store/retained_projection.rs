@@ -11,6 +11,27 @@ pub(super) fn validate(
             "archived receipt projection diverges from its authenticated claim log".into(),
         )
     };
+    // Source cursors are unsigned projections. Neither archive DDL nor matching
+    // claim/source columns establish their uniqueness or allocation authority.
+    let duplicate_cursors: bool = archive.query_row(
+        "SELECT EXISTS(SELECT 1 FROM claim_receipt_log_entries WHERE entry_seq <= ?1
+         GROUP BY receipt_kind, source_seq HAVING COUNT(*) > 1)",
+        [sqlite_i64(watermark, "retained watermark")?],
+        |row| row.get(0),
+    )?;
+    if duplicate_cursors {
+        return Err(drift());
+    }
+    let (tool_ceiling, child_ceiling): (i64, i64) = live.query_row(
+        "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'chio_tool_receipts'), 0),
+                COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'chio_child_receipts'), 0)",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let mut live_tools =
+        live.prepare("SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE seq = ?1)")?;
+    let mut live_children =
+        live.prepare("SELECT EXISTS(SELECT 1 FROM chio_child_receipts WHERE seq = ?1)")?;
     // Walk the authenticated prefix, including claims whose source row was
     // deleted. Starting at the source tables would silently miss those rows.
     // Stream one claim at a time; do not retain a second history in memory.
@@ -19,23 +40,24 @@ pub(super) fn validate(
          FROM claim_receipt_log_entries WHERE entry_seq <= ?1 ORDER BY entry_seq",
     )?;
     let mut tools = archive.prepare(
-        "SELECT COUNT(*) = 1 FROM chio_tool_receipts r
-         LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id
-         WHERE r.seq = ?1 AND r.receipt_id = ?2 AND r.raw_json = ?3
+        "SELECT COUNT(*) = 1 AND COALESCE(MIN(r.receipt_id = ?2 AND r.raw_json = ?3
            AND r.timestamp = ?4 AND r.capability_id = ?5
            AND r.tool_server = ?6 AND r.tool_name = ?7 AND r.decision_kind = ?8
            AND r.tenant_id IS ?9 AND r.cost_currency IS ?10
            AND r.cost_charged_be IS ?11 AND r.attempted_cost_be IS ?12
            AND COALESCE(r.subject_key, cl.subject_key) IS ?13
            AND COALESCE(r.issuer_key, cl.issuer_key) IS ?14
-           AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17",
+           AND r.grant_index IS ?15 AND r.policy_hash = ?16 AND r.content_hash = ?17), 0)
+         FROM chio_tool_receipts r
+         LEFT JOIN capability_lineage cl ON cl.capability_id = r.capability_id
+         WHERE r.seq = ?1",
     )?;
     let mut children = archive.prepare(
-        "SELECT COUNT(*) = 1 FROM chio_child_receipts
-         WHERE seq = ?1 AND receipt_id = ?2 AND raw_json = ?3 AND timestamp = ?4
+        "SELECT COUNT(*) = 1 AND COALESCE(MIN(receipt_id = ?2 AND raw_json = ?3 AND timestamp = ?4
            AND session_id = ?5 AND parent_request_id = ?6 AND request_id = ?7
            AND operation_kind = ?8 AND terminal_state = ?9
-           AND policy_hash = ?10 AND outcome_hash = ?11",
+           AND policy_hash = ?10 AND outcome_hash = ?11), 0)
+         FROM chio_child_receipts WHERE seq = ?1",
     )?;
     let rows = claims.query_map([sqlite_i64(watermark, "retained watermark")?], |row| {
         Ok((
@@ -54,6 +76,11 @@ pub(super) fn validate(
         let entry_seq = sqlite_positive_u64(entry_seq, "retained claim sequence")?;
         let matches = match kind.as_str() {
             "tool_receipt" => {
+                if source_seq > tool_ceiling
+                    || live_tools.query_row([source_seq], |row| row.get::<_, bool>(0))?
+                {
+                    return Err(drift());
+                }
                 let receipt = decode_verified_chio_receipt(
                     &raw,
                     "retained claim projection",
@@ -106,6 +133,11 @@ pub(super) fn validate(
                 )?
             }
             "child_receipt" => {
+                if source_seq > child_ceiling
+                    || live_children.query_row([source_seq], |row| row.get::<_, bool>(0))?
+                {
+                    return Err(drift());
+                }
                 let receipt = decode_verified_child_receipt(
                     &raw,
                     "retained child projection",

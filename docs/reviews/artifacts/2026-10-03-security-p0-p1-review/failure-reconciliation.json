@@ -1,0 +1,166 @@
+{
+  "all_initial_owner_failures_have_passing_reruns": true,
+  "failures": [
+    {
+      "test": "hosted_tests::operator_approvals::native::ap23_mcp_pending_decision_rechecks_current_policy_and_revocation",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "hosted_tests::operator_approvals::native::ap23_mcp_rejects_unconfigured_signers_and_altered_decision_bindings",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "hosted_tests::operator_approvals::native::ap23_mcp_signed_approval_executes_once_and_replay_survives_restart",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "hosted_tests::operator_approvals::native::redemption::ap23_mcp_redemption_refuses_ambiguous_ordinary_approval_aliases",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "hosted_tests::operator_approvals::native::redemption::ap23_mcp_redemption_refuses_direct_signed_token_while_pending",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "hosted_tests::operator_approvals::native::redemption::ap23_mcp_redemption_refuses_lifetime_beyond_expired_pending_record",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "hosted_tests::operator_approvals::native::redemption::ap23_mcp_redemption_refuses_signed_approval_after_retained_denial",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::dpop_replay::claims::kernel_routes::composition::composed_dpop_and_approval_preserve_each_grant_episode_across_preflight",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::dpop_replay::claims::kernel_routes::composition::unsupported_caller_retry_keeps_issued_nonce_and_composed_history_usable_by_kernel",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_compatibility_entrypoints_cannot_downgrade_required_dpop",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_missing_and_substituted_proofs_deny_before_claim_or_effect",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::authenticated_caller::authenticated_caller_start_retains_approval_without_legacy_replay_or_reacquisition",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::boundaries::dropped_evaluation_releases_only_before_the_durable_effect_boundary",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::boundaries::source_failure_after_readiness_denies_and_releases_without_source_reverification",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::budget_denial_compensates_approval_without_legacy_rollback",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::grant_fallback_releases_only_the_preceding_approval_episode",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::nonce_preflight_releases_approval_then_execution_claims_a_new_episode",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::normal_approval_dispatch_claims_before_budget_without_legacy_consumption",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "admission_operation_store::tests::governed_approval_replay::claims::kernel_routes::rejected_source_reconfiguration_preserves_the_installed_authority",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "storage-authority-fixtures-recheck"
+      ]
+    },
+    {
+      "test": "budget_store::composite::caller_resume::tests::approved_caller_replay_refuses_expired_lease_without_new_hold_or_event",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "budget-owner-recheck"
+      ]
+    },
+    {
+      "test": "budget_store::import_boundaries::verified_snapshot_refuses_corrupted_local_provenance_without_replacing_it",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "budget-owner-recheck"
+      ]
+    },
+    {
+      "test": "schema_version::tests::every_own_file_store_stamps_application_id",
+      "failed_command": "security-owner-libraries",
+      "passing_reruns": [
+        "schema-owner-recheck"
+      ]
+    },
+    {
+      "test": "splunk_hec_honors_configured_timeout",
+      "failed_command": "siem-owner",
+      "passing_reruns": [
+        "mcp-siem-owner-recheck"
+      ]
+    }
+  ]
+}

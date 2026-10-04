@@ -220,7 +220,8 @@ pub struct Alert {
     pub tool_server: String,
     /// Receipt identifier for cross-referencing with the receipt log.
     pub receipt_id: String,
-    /// Full serialized [`ChioReceipt`] for custom details / drill-down.
+    /// Receipt-reference projection for paging. Raw payloads, reasons, evidence
+    /// and metadata are omitted; this is not a serialized or signed receipt.
     pub receipt_json: serde_json::Value,
 }
 
@@ -728,43 +729,10 @@ impl AlertingExporter {
         }
         true
     }
-
-    fn build_alert(event: &SiemEvent) -> Result<Alert, ExportError> {
-        let (guard, reason) = match &event.receipt.decision {
-            Some(Decision::Deny { guard, reason }) => (guard.clone(), reason.clone()),
-            _ => ("chio.kernel".to_string(), "non-deny event".to_string()),
-        };
-
-        let severity = derive_event_severity(event);
-        let summary = format!(
-            "Chio guard deny: {} ({}) on {}/{}",
-            guard, reason, event.receipt.tool_server, event.receipt.tool_name
-        );
-
-        let dedup_key = format!(
-            "{}::{}::{}",
-            guard, event.receipt.tool_name, event.receipt.id
-        );
-
-        let receipt_json = serde_json::to_value(&event.receipt).map_err(|e| {
-            ExportError::SerializationError(format!(
-                "failed to serialize receipt {}: {e}",
-                event.receipt.id
-            ))
-        })?;
-
-        Ok(Alert {
-            summary,
-            severity,
-            dedup_key,
-            guard,
-            tool_name: event.receipt.tool_name.clone(),
-            tool_server: event.receipt.tool_server.clone(),
-            receipt_id: event.receipt.id.clone(),
-            receipt_json,
-        })
-    }
 }
+
+#[path = "alerting/projection.rs"]
+mod projection;
 
 impl Exporter for AlertingExporter {
     fn name(&self) -> &str {
@@ -800,7 +768,7 @@ impl Exporter for AlertingExporter {
                     continue;
                 }
 
-                let alert = Self::build_alert(event)?;
+                let alert = projection::build_alert(event);
                 let mut any_failure = false;
 
                 for backend in &self.backends {

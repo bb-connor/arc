@@ -126,10 +126,14 @@ Implement non-vacuous session certificates (EV8, EV17 and the remaining EV6
 certificate case): collect real retained receipts by signed session metadata,
 derive or require evaluation policy, check actual guard verdicts and capability
 scope/delegation, validate session continuity/timestamps, and reject empty or
-incomplete full bundles under independent signer pins. In the same verifier
-batch, retain Chio envelope provenance in Mercury's separate proof format and
-replace its self-supplied anchor input with verifier-owned trust. Drive both
-through native positive, omission, substitution, bad-guard and wrong-anchor tests.
+incomplete full bundles under independent signer pins. Drive this through native
+positive, omission, substitution, bad-guard and wrong-anchor tests. The separate
+Mercury proof-format follow-on is withdrawn from this security execution queue.
+
+The user's subsequent instruction prioritizes the
+[P0/P1 review and repairs](2026-10-03-security-p0-p1-review.md) before any further
+roadmap execution. That review also retains broader EV1/EV2 privacy as unfinished
+work; no certificate implementation is authorized by this status paragraph alone.
 
 Remaining EV5 launchers, EV1/EV2 secret minimization, EV3/EV4 denial evidence,
 SIEM defects, other key/guard/release findings and hosted qualification remain

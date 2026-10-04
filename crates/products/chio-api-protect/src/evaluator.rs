@@ -14,6 +14,9 @@ use chio_kernel::{ApprovalStore, ReceiptStore, RevocationStore, SignedExecutionN
 use chio_openapi::PolicyDecision;
 use serde_json::Value;
 
+#[path = "evaluator/route_matching.rs"]
+mod route_matching;
+
 /// Backend label reported through the sidecar health endpoint. A durable store
 /// survives restart; an ephemeral one does not.
 const BACKEND_DURABLE: &str = "durable";
@@ -457,45 +460,6 @@ impl RequestEvaluator {
         })?;
         Ok(result.into())
     }
-
-    fn match_route_with_status(
-        &self,
-        method: HttpMethod,
-        path: &str,
-    ) -> (String, PolicyDecision, bool) {
-        // Reject paths the HTTP client's URL parser would rewrite before dispatch.
-        // In particular, encoded dot segments must not authorize one route and
-        // then reach a different upstream handler.
-        if !path.starts_with('/')
-            || !url::Url::parse(&format!("http://chio.invalid{path}")).is_ok_and(|url| {
-                url.path() == path && url.query().is_none() && url.fragment().is_none()
-            })
-        {
-            return (path.to_string(), PolicyDecision::DenyByDefault, false);
-        }
-        // Exact paths outrank templates. Equally specific overlapping templates
-        // select the restrictive policy, independent of document order.
-        let selected = self
-            .routes
-            .iter()
-            .filter(|route| route.method == method && path_matches_pattern(path, &route.pattern))
-            .max_by_key(|route| {
-                (
-                    route
-                        .pattern
-                        .split('/')
-                        .filter(|part| !(part.starts_with('{') && part.ends_with('}')))
-                        .count(),
-                    route.policy == PolicyDecision::DenyByDefault,
-                    &route.pattern,
-                )
-            });
-        if let Some(route) = selected {
-            return (route.pattern.clone(), route.policy, true);
-        }
-
-        (path.to_string(), PolicyDecision::DenyByDefault, false)
-    }
 }
 
 fn extract_presented_capability<'a>(
@@ -564,7 +528,7 @@ fn path_matches_pattern(path: &str, pattern: &str) -> bool {
 }
 
 fn path_segment_matches_pattern(path_segment: &str, pattern_segment: &str) -> bool {
-    pattern_segment.starts_with('{') && pattern_segment.ends_with('}')
+    !path_segment.is_empty() && pattern_segment.starts_with('{') && pattern_segment.ends_with('}')
         || path_segment == pattern_segment
 }
 

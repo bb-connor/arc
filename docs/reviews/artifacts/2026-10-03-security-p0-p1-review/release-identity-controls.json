@@ -1,0 +1,10 @@
+{
+  "source_head": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+  "command": [
+    "python3",
+    "scripts/tests/release-identity.test.py"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 0.09,
+  "log_sha256": "35ab57d63ed996b3f4cbd9d1c8263f011238f9fc9b555456c319e22b397ec685"
+}

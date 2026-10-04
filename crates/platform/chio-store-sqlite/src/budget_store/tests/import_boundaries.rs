@@ -63,6 +63,7 @@ fn import_floor_refuses_empty_authority_without_persisting_it() -> TestResult {
 #[test]
 fn verified_snapshot_refuses_corrupted_local_provenance_without_replacing_it() -> TestResult {
     let directory = tempfile::tempdir()?;
+    crate::test_authority::secure_directory(directory.path());
     let path = directory.path().join("budget.db");
     let store = SqliteBudgetStore::open(&path)?;
     let authority =

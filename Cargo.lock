@@ -2736,6 +2736,7 @@ dependencies = [
  "chio-test-support",
  "chrono",
  "hex",
+ "percent-encoding",
  "rcgen 0.13.2",
  "reqwest 0.13.2",
  "rusqlite",

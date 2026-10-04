@@ -3342,5 +3342,8 @@ async fn ap23_invalid_approval_requester_is_rejected() -> Result<(), Box<dyn std
 #[path = "tests/inbound_authority.rs"]
 mod inbound_authority;
 
+#[path = "tests/path_authority.rs"]
+mod path_authority;
+
 #[path = "tests/receipt_evidence.rs"]
 mod receipt_evidence;

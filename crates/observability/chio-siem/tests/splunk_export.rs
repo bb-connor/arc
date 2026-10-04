@@ -431,6 +431,7 @@ async fn splunk_hec_honors_configured_timeout() {
                 .set_delay(Duration::from_secs(5))
                 .set_body_raw(r#"{"text":"Success","code":0}"#, "application/json"),
         )
+        .expect(1)
         .mount(&server)
         .await;
 
@@ -454,9 +455,12 @@ async fn splunk_hec_honors_configured_timeout() {
 
     match result.unwrap_err() {
         ExportError::HttpError(msg) => {
-            assert!(
-                msg.contains("timed out") || msg.contains("timeout"),
-                "HttpError should mention timeout, got: {msg}"
+            // The egress boundary redacts transport details. A real request
+            // reached the delayed server and failed inside the configured
+            // timeout bound; its public error remains the stable transport code.
+            assert_eq!(
+                msg,
+                "HEC request failed: urn:chio:error:transport:http-failed"
             );
         }
         other => panic!("expected ExportError::HttpError, got: {other:?}"),

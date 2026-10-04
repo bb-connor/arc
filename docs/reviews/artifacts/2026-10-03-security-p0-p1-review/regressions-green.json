@@ -1,0 +1,20 @@
+{
+  "source_head": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-store-sqlite",
+    "-p",
+    "chio-mcp-remote",
+    "-p",
+    "chio-api-protect",
+    "--lib",
+    "p0p1_",
+    "--locked",
+    "--no-fail-fast"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 135.52,
+  "log_sha256": "e3c98f14784f76523eab22ccf49ebbd5e07b06475f60450afd2ba689227127be"
+}

@@ -153,11 +153,13 @@ async fn initialize(session: &RemoteSession) -> TestResult {
     )
     .await?;
     assert!(result.get("error").is_none(), "{result}");
-    session.send(json!({"jsonrpc":"2.0", "method":"notifications/initialized"}))?;
     let mut peer = parse_remote_session_peer_capabilities(&params);
     peer.authorization =
         Some(chio_mcp_adapter::edge::authorization::negotiate_authorization_capabilities(&params)?);
     session.mark_ready(Some("2025-11-25".into()), params, peer)?;
+    // Match the HTTP owner: commit Ready after a successful initialize response
+    // before accepting any subsequent client message.
+    session.send(json!({"jsonrpc":"2.0", "method":"notifications/initialized"}))?;
     Ok(())
 }
 

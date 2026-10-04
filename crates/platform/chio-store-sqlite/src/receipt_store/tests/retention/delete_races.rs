@@ -2,6 +2,147 @@
 
 use super::*;
 
+#[test]
+fn p0p1_delete_rechecks_exact_prefix_eligibility() -> Result<(), Box<dyn std::error::Error>> {
+    use crate::receipt_store::evidence_retention::{
+        copy_archived_prefix, create_archive_schema, delete_archived_prefix_in_tx,
+    };
+    for dependency in ["open", "retry_scheduled", "lineage"] {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("live.db");
+        let archive = directory.path().join("archive.db");
+        let archive_path = archive.to_str().ok_or("archive path invalid")?.to_string();
+        let keypair = super::super::support::receipt_test_keypair();
+        let store = SqliteReceiptStore::open(&path)?;
+        store.enable_background_checkpoints(super::super::support::signer(&keypair, 2))?;
+        for i in 0..4 {
+            store.append_chio_receipt_returning_seq(
+                &super::super::support::sample_receipt_with_keypair_and_timestamp(
+                    &format!("eligible-{i}"),
+                    i + 1,
+                    100,
+                    &keypair,
+                ),
+            )?;
+        }
+        store.flush_receipt_writes()?;
+        let refusal = store.writer_handle().run_write(move |connection| {
+            // W=2 was selected before this new dependency. W=4 remains eligible
+            // for lineage, so checking an unbounded maximum cannot validate W=2.
+            add_new_prefix_dependency(connection, dependency)?;
+            connection.execute("ATTACH DATABASE ?1 AS archive", [&archive_path])?;
+            create_archive_schema(connection)?;
+            copy_archived_prefix(connection, 2)?;
+            let result = delete_archived_prefix_in_tx(
+                connection,
+                2,
+                150,
+                &archive_path,
+                None,
+                &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
+            );
+            connection.execute_batch("DETACH DATABASE archive")?;
+            Ok(matches!(result, Err(ReceiptStoreError::Conflict(_))))
+        })?;
+        assert!(refusal, "selected prefix became ineligible: {dependency}");
+        let live = store.reader_connection_for_test()?;
+        assert_eq!(
+            live.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |r| r
+                .get::<_, i64>(0))?,
+            4
+        );
+        assert_eq!(
+            crate::receipt_store::support::retention_watermark(&live)?,
+            None
+        );
+        if dependency != "lineage" {
+            assert_eq!(
+                live.query_row(
+                    "SELECT reconciliation_state FROM settlement_reconciliations",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )?,
+                dependency
+            );
+        }
+    }
+    Ok(())
+}
+
+fn add_new_prefix_dependency(
+    connection: &rusqlite::Connection,
+    dependency: &str,
+) -> Result<(), ReceiptStoreError> {
+    let parent: String = connection.query_row(
+        "SELECT receipt_id FROM claim_receipt_log_entries WHERE entry_seq = 1",
+        [],
+        |r| r.get(0),
+    )?;
+    if dependency == "lineage" {
+        connection.execute(
+            "INSERT INTO receipt_lineage_statements
+             (receipt_id, statement_id, chain_id, parent_receipt_id, evidence_class,
+              verified_session_anchor, verified_parent_request, verified_parent_receipt,
+              replay_protected, recorded_at, source_kind, json_sha256, raw_json)
+             SELECT receipt_id, 'new-lineage', 'chain', ?1, 'delegated',
+                    0, 0, 1, 0, 100, 'test', 'sha', '{}' FROM claim_receipt_log_entries WHERE entry_seq = 3",
+            [parent],
+        )?;
+    } else {
+        connection.execute(
+            "INSERT INTO settlement_reconciliations (receipt_id, reconciliation_state, updated_at) VALUES (?1, ?2, 1)",
+            rusqlite::params![parent, dependency],
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn p0p1_rotation_validates_dependencies_within_verified_ceiling(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("archive.db");
+    let store = SqliteReceiptStore::open(directory.path().join("live.db"))?;
+    let keypair = super::super::support::receipt_test_keypair();
+    store.enable_background_checkpoints(super::super::support::signer(&keypair, 2))?;
+    for i in 0..4 {
+        store.append_chio_receipt_returning_seq(
+            &super::super::support::sample_receipt_with_keypair_and_timestamp(
+                &format!("ceiling-{i}"),
+                i + 1,
+                100,
+                &keypair,
+            ),
+        )?;
+    }
+    store.flush_receipt_writes()?;
+    let config = RetentionConfig {
+        archive_path: archive.to_str().ok_or("archive path invalid")?.into(),
+        explicit_cutoff_unix_secs: Some(150),
+        ..RetentionConfig::default()
+    };
+    let archived = store.writer_handle().run_write(move |connection| {
+        add_new_prefix_dependency(connection, "lineage")?;
+        crate::receipt_store::evidence_retention::rotate_on_writer_connection(
+            connection,
+            &config,
+            Some(2),
+            None,
+            &crate::store_clock::StoreClock::new(chio_test_support::clock::clock()),
+        )
+    })?;
+    assert_eq!(
+        archived, 0,
+        "the verified boundary splits a live dependency"
+    );
+    // A subsequent verified rotation can co-archive both endpoints.
+    assert_eq!(
+        store.archive_receipts_before(150, archive.to_str().ok_or("archive path invalid")?)?,
+        4
+    );
+    Ok(())
+}
+
 /// A dependent row that a second store handle commits into the archived prefix
 /// AFTER the co-archival copy but BEFORE the delete transaction takes its write
 /// lock must never be deleted un-archived. The delete re-checks co-archival

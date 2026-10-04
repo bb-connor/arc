@@ -9,6 +9,10 @@ use chio_kernel::admission_operation::governed_approval_claim::{
 };
 
 fn add_approval(route: &mut Route, request: &mut ToolCallRequest) -> AnchoredTestResult {
+    let tenant_id = "composed-approval-tenant";
+    route
+        .kernel
+        .set_governed_approval_policy(tenant_id.into(), vec![route.signer.public_key()])?;
     let path = route.fixture._temp.path().join("composed-approval.db");
     drop(crate::SqliteGovernedApprovalReplayStore::open_with_capacity(&path, 16)?);
     let source = Arc::new(crate::SqliteGovernedApprovalReplaySource::open(&path)?);
@@ -48,7 +52,7 @@ fn add_approval(route: &mut Route, request: &mut ToolCallRequest) -> AnchoredTes
             .push(chio_core::capability::scope::Constraint::GovernedIntentRequired);
     }
     request.capability = chio_core::capability::token::CapabilityToken::sign(body, &route.signer)?;
-    let intent = GovernedTransactionIntent {
+    let mut intent = GovernedTransactionIntent {
         id: request.request_id.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -62,6 +66,14 @@ fn add_approval(route: &mut Route, request: &mut ToolCallRequest) -> AnchoredTes
         context: None,
         body: Default::default(),
     };
+    chio_kernel::approval::ToolApprovalContext::bind(
+        &mut intent,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        route.kernel.policy_hash(),
+        tenant_id,
+    )?;
     request.approval_token = Some(GovernedApprovalToken::sign(
         GovernedApprovalTokenBody {
             id: format!("approval-{}", request.request_id),
