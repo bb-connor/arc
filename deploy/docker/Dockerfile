@@ -8,7 +8,7 @@ ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS rust-builder
-RUN apk add --no-cache build-base cmake openssl-dev pkgconf
+RUN apk add --no-cache build-base cmake perl openssl-dev pkgconf protoc
 WORKDIR /workspace
 
 COPY deploy/docker/chio-workspace/Cargo.toml ./Cargo.toml
@@ -28,6 +28,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
  && cp target/docker-release/chio /chio
 
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS proof-room-builder
+RUN apk add --no-cache build-base cmake perl openssl-dev pkgconf protoc
 WORKDIR /workspace
 
 COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml

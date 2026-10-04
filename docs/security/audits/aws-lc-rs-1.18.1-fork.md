@@ -106,7 +106,11 @@ native/transitive dependency retains the standard `safe-to-deploy` requirement.
 No new exemption is introduced for the fork or its native dependencies.
 
 The mandatory combined command is `bash scripts/check-supply-chain.sh`. Both
-required Cargo Vet jobs and release/hosted qualification call that command. It
+required Cargo Vet jobs and release/hosted qualification call that command.
+Rust binary, sidecar, C++ and npm/Wasm release producers also require the shared
+Cargo Vet workflow at their immutable event commit before building or publishing.
+The reusable workflow uses a caller-specific concurrency group, so another
+publisher cannot cancel its prerequisite. It
 requires the complete fork source inventory and audit report, authenticated
 archive reconstruction, actual locked Cargo metadata for the root, fuzz, Lambda,
 verdict matrix and reduced Docker workspaces, the Cargo Vet audit graph, and the
@@ -118,6 +122,11 @@ The unit mutation controls exercise changed, omitted, added and symlinked source
 registry and alternate-path substitution, duplicate AWS-LC copies and unreviewed
 features. Independent PR review must additionally verify the required workflow
 wiring; candidate-owned scripts cannot attest their own trusted execution.
+The workflow mutation checks reject missing and conditional prerequisites. A
+repeat-run regression verifies that Cargo outputs stay outside the audited fork;
+the default output is `target/aws-lc-audit`, and an explicitly supplied target is
+preserved. Two actual consecutive combined invocations with an initially unset
+`CARGO_TARGET_DIR` passed without changing the source inventory.
 
 ## Limits and remaining hardening
 

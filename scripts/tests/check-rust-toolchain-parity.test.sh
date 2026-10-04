@@ -8,15 +8,20 @@ trap 'rm -rf "${fixture_root}"' EXIT
 
 copy_fixture() {
   rm -rf "${fixture_root}/deploy"
-  mkdir -p "${fixture_root}/deploy/docker/chio-workspace" "${fixture_root}/deploy/sidecar"
+  mkdir -p "${fixture_root}/deploy/docker/chio-workspace" \
+    "${fixture_root}/deploy/docker/proof-room-workspace" "${fixture_root}/deploy/sidecar" \
+    "${fixture_root}/deploy/cognition-market"
   cp "${repo_root}/Cargo.toml" "${fixture_root}/Cargo.toml"
   cp "${repo_root}/rust-toolchain.toml" "${fixture_root}/rust-toolchain.toml"
   cp "${repo_root}/deploy/docker/Dockerfile" "${fixture_root}/deploy/docker/Dockerfile"
   cp "${repo_root}/deploy/docker/Dockerfile.sidecar" "${fixture_root}/deploy/docker/Dockerfile.sidecar"
   cp "${repo_root}/deploy/docker/Dockerfile.tee" "${fixture_root}/deploy/docker/Dockerfile.tee"
   cp "${repo_root}/deploy/sidecar/Dockerfile" "${fixture_root}/deploy/sidecar/Dockerfile"
+  cp "${repo_root}/deploy/cognition-market/Dockerfile" "${fixture_root}/deploy/cognition-market/Dockerfile"
   cp "${repo_root}/deploy/docker/chio-workspace/Cargo.toml" \
     "${fixture_root}/deploy/docker/chio-workspace/Cargo.toml"
+  cp "${repo_root}/deploy/docker/proof-room-workspace/Cargo.toml" \
+    "${fixture_root}/deploy/docker/proof-room-workspace/Cargo.toml"
 }
 
 expect_rejection() {
@@ -39,6 +44,16 @@ copy_fixture
 sed -i '0,/rust-version = "[0-9.]*"/s//rust-version = "1.0"/' \
   "${fixture_root}/deploy/docker/chio-workspace/Cargo.toml"
 expect_rejection "a stale generated workspace MSRV"
+
+copy_fixture
+sed -i '0,/rust-version = "[0-9.]*"/s//rust-version = "1.0"/' \
+  "${fixture_root}/deploy/docker/proof-room-workspace/Cargo.toml"
+expect_rejection "a stale Proof Room workspace MSRV"
+
+copy_fixture
+sed -i 's/ARG RUST_VERSION=[0-9.]*/ARG RUST_VERSION=1.0.0/' \
+  "${fixture_root}/deploy/cognition-market/Dockerfile"
+expect_rejection "a stale cognition-market builder version"
 
 copy_fixture
 sed -i '0,/@sha256:[a-f0-9]*/s//@sha256:0000000000000000000000000000000000000000000000000000000000000000/' \

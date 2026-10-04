@@ -43,8 +43,16 @@ env:
   CHIO_VCPKG_REGISTRY_REPO: backbay-labs/chio-vcpkg-registry
 
 jobs:
+  supply-chain:
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    uses: ./.github/workflows/cargo-vet.yml
+
   qualify:
     name: Release qualification
+    needs: supply-chain
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}

@@ -64,10 +64,35 @@ zero), 386 library tests with DES enabled, three DES regressions, 36 doctests
 (one ignored), and 491 FIPS tests on both the earlier Rust 1.94.1 harness and
 the candidate's Rust 1.95.0 toolchain. The patched Wasmtime passed 151 library
 tests and 27 escape tests; advisories pass. The source gate validates all six
-deployment workspace resolutions and eight source/policy mutation tests.
+deployment workspace resolutions and nine source/output/policy regression tests,
+plus two workflow contract tests with prerequisite-removal mutations.
 The inherited cpp_demangle exemption remains debt: its genuine 0.4.5-to-0.5.1
 delta review preserves baseline acceptance and does not claim a complete audit.
 Exact-head hosted checks and independent PR review remain required before merge.
+
+Independent review of `4bc1332617` rejected that candidate because direct
+publishers could omit the composite gate, default Cargo output contaminated the
+audited tree, a hosted contract assertion and generated coverage were stale,
+and the reduced Proof Room builder lacked native packages. The repaired
+candidate makes the shared gate a prerequisite for Rust binary, sidecar, C++
+and npm/Wasm producers, isolates build output, updates the contract/coverage,
+and supplies the builder's native dependencies. Negative controls exercise
+missing/conditional prerequisites and source-tree contamination. Two consecutive
+combined invocations with the default target selection pass.
+
+Rust 1.95 exposed two ordinary Clippy improvements, retaining checked overflow
+and payment rejection semantics. The Aeneas scalar helper preserves its exact
+body with a function-scoped lint allowance; its mirror digest records that
+reviewed attribute-only change. Workspace production-target Clippy and all
+Cargo Deny categories pass locally. Zed's separate extension ABI requires the
+older 0.227 component tools alongside Wasmtime's 0.254 family; only those exact
+duplicate versions are allowed, without changing advisory or source policy.
+
+The October 4 JavaScript scan initially reported 25 advisory IDs. Patched
+versions remove 23. Two unpatched Expo/React Native peer-tooling dependencies
+have a separate, scoped and expiring disposition; they remain release debt,
+not repaired upstream vulnerabilities. See
+[the tooling advisory record](npm-peer-tooling-advisories-2026-10-04.md).
 
 Review the vendor provenance, dependency/audit closure, container inputs, SDK
 compatibility and qualification documentation as separate slices. Require terminal

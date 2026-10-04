@@ -3,7 +3,9 @@
 
 import hashlib
 import importlib.util
+import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -106,6 +108,40 @@ class ForkBoundaryTests(unittest.TestCase):
         ))
         with self.assertRaises(CHECK.AuditError):
             CHECK.verify_policy(self.root)
+
+    def test_repeated_composite_builds_preserve_the_audited_tree(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        wrapper = scripts / "check-supply-chain.sh"
+        shutil.copyfile(SCRIPT.parent / wrapper.name, wrapper)
+        binaries = self.root / "bin"
+        binaries.mkdir()
+        # Model Cargo's documented target-directory selection. The real source
+        # inventory checker must still accept the tree after repeated builds.
+        cargo = binaries / "cargo"
+        cargo.write_text(
+            '#!/bin/sh\nset -eu\n'
+            'if [ "$1" = test ]; then\n'
+            '  build_dir="${CARGO_TARGET_DIR:-third_party/aws-lc-rs-chio/target}"\n'
+            '  mkdir -p "$build_dir"\n'
+            '  printf compiled > "$build_dir/regression-artifact"\n'
+            'fi\n'
+        )
+        python = binaries / "python3"
+        python.write_text('#!/bin/sh\nexit 0\n')
+        cargo.chmod(0o755)
+        python.chmod(0o755)
+        env = dict(os.environ, PATH=f"{binaries}:{os.environ['PATH']}")
+        env.pop("CARGO_TARGET_DIR", None)
+        for _ in range(2):
+            subprocess.run(["bash", str(wrapper)], env=env, check=True)
+            CHECK.verify_source_tree(self.fork, self.files)
+        self.assertTrue((self.root / "target/aws-lc-audit/regression-artifact").is_file())
+        external = self.root / "external-target"
+        env["CARGO_TARGET_DIR"] = str(external)
+        subprocess.run(["bash", str(wrapper)], env=env, check=True)
+        self.assertTrue((external / "regression-artifact").is_file())
+        CHECK.verify_source_tree(self.fork, self.files)
 
 
 if __name__ == "__main__":
