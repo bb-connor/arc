@@ -1026,7 +1026,7 @@ mod fips_backends {
         EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING,
     };
 
-    /// ECDSA P-256 signing backend (aws-lc-rs, FIPS 140-3 validated).
+    /// ECDSA P-256 signing backend using `aws-lc-rs` (`fips` feature).
     pub struct P256Backend {
         keypair: EcdsaKeyPair,
         rng: SystemRandom,
@@ -1092,7 +1092,7 @@ mod fips_backends {
         }
     }
 
-    /// ECDSA P-384 signing backend (aws-lc-rs, FIPS 140-3 validated).
+    /// ECDSA P-384 signing backend using `aws-lc-rs` (`fips` feature).
     pub struct P384Backend {
         keypair: EcdsaKeyPair,
         rng: SystemRandom,

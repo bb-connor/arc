@@ -571,3 +571,61 @@ fn signing_key_custody_is_canonical_zeroizing_and_redacted() {
         ))
     ));
 }
+
+#[test]
+fn signing_key_custody_roundtrips_long_escaped_ids_and_multiple_seed_sets() {
+    use secrecy::ExposeSecret;
+
+    fn entries(label: &str, first: u8) -> Vec<crate::NamedSeedHex> {
+        (first..first + 6)
+            .map(|seed| crate::NamedSeedHex {
+                id: format!(
+                    "did:chio:{label}:{seed}:{}",
+                    "\"\\\n\u{0001}\u{1f600}".repeat(513)
+                ),
+                seed_hex: hex::encode([seed; 32]).into(),
+            })
+            .collect()
+    }
+    let keys = LocalAuthoritySigningKeysDocument {
+        schema: LOCAL_SIGNING_KEYS_SCHEMA.to_string(),
+        lease_authority_seeds: entries("lease", 21),
+        governance_authority_seeds: entries("governance", 41),
+        revocation_authority_seed_hex: hex::encode([61; 32]).into(),
+    };
+    let encoded = crate::signing_keys_json(&keys).expect("long canonical custody");
+    assert!(encoded.len() > 64 * 1024);
+    assert_eq!(encoded.capacity(), encoded.len());
+    let decoded = crate::signing_keys_from_json(&encoded).expect("decode long custody");
+    for (actual, expected) in decoded
+        .lease_authority_seeds
+        .iter()
+        .zip(&keys.lease_authority_seeds)
+        .chain(
+            decoded
+                .governance_authority_seeds
+                .iter()
+                .zip(&keys.governance_authority_seeds),
+        )
+    {
+        assert_eq!(actual.id, expected.id);
+        assert_eq!(
+            actual.seed_hex.expose_secret(),
+            expected.seed_hex.expose_secret()
+        );
+    }
+    assert_eq!(decoded.lease_authority_seeds.len(), 6);
+    assert_eq!(decoded.governance_authority_seeds.len(), 6);
+    assert_eq!(
+        decoded.revocation_authority_seed_hex.expose_secret(),
+        keys.revocation_authority_seed_hex.expose_secret()
+    );
+    assert_eq!(
+        crate::signing_keys_json(&decoded).expect("re-export long custody"),
+        encoded
+    );
+    let debug = format!("{decoded:?} {:?}", decoded.lease_authority_seeds);
+    for seed in (21..27).chain(41..47).chain(core::iter::once(61)) {
+        assert!(!debug.contains(&hex::encode([seed; 32])));
+    }
+}

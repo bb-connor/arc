@@ -195,64 +195,72 @@ pub fn canonicalize(value: &Value) -> Result<String> {
     Ok(out)
 }
 
-fn write_canonical_value(value: &Value, out: &mut String) -> Result<()> {
+/// Output shared by ordinary strings and the bounded private-custody writer.
+/// A fallible sink lets custody count the exact bytes before allocating and then
+/// encode into a fixed slice without permitting growth after a secret is copied.
+trait CanonicalOutput {
+    fn write_str(&mut self, value: &str) -> Result<()>;
+
+    fn write_char(&mut self, value: char) -> Result<()> {
+        self.write_str(value.encode_utf8(&mut [0; 4]))
+    }
+}
+
+impl CanonicalOutput for String {
+    fn write_str(&mut self, value: &str) -> Result<()> {
+        self.push_str(value);
+        Ok(())
+    }
+
+    fn write_char(&mut self, value: char) -> Result<()> {
+        self.push(value);
+        Ok(())
+    }
+}
+
+fn write_canonical_value(value: &Value, out: &mut impl CanonicalOutput) -> Result<()> {
     match value {
         Value::Object(map) => write_canonical_object(map, out),
         Value::Array(arr) => write_canonical_array(arr, out),
         Value::String(s) => {
-            out.push('"');
-            write_escaped_json_string(s, out);
-            out.push('"');
-            Ok(())
+            out.write_char('"')?;
+            write_escaped_json_string(s, out)?;
+            out.write_char('"')
         }
-        Value::Number(n) => {
-            out.push_str(&canonicalize_number(n)?);
-            Ok(())
-        }
-        Value::Bool(true) => {
-            out.push_str("true");
-            Ok(())
-        }
-        Value::Bool(false) => {
-            out.push_str("false");
-            Ok(())
-        }
-        Value::Null => {
-            out.push_str("null");
-            Ok(())
-        }
+        Value::Number(n) => out.write_str(&canonicalize_number(n)?),
+        Value::Bool(true) => out.write_str("true"),
+        Value::Bool(false) => out.write_str("false"),
+        Value::Null => out.write_str("null"),
     }
 }
 
-fn write_canonical_object(map: &Map<String, Value>, out: &mut String) -> Result<()> {
+fn write_canonical_object(map: &Map<String, Value>, out: &mut impl CanonicalOutput) -> Result<()> {
     let mut pairs: Vec<_> = map.iter().collect();
     // RFC 8785: sort object keys by UTF-16 code unit comparison.
     pairs.sort_by(|(a, _), (b, _)| cmp_utf16_code_units(a.as_str(), b.as_str()));
 
-    out.push('{');
+    out.write_char('{')?;
     for (idx, (key, value)) in pairs.into_iter().enumerate() {
         if idx > 0 {
-            out.push(',');
+            out.write_char(',')?;
         }
-        out.push('"');
-        write_escaped_json_string(key, out);
-        out.push_str("\":");
+        out.write_char('"')?;
+        write_escaped_json_string(key, out)?;
+        out.write_str("\":")?;
         write_canonical_value(value, out)?;
     }
-    out.push('}');
-    Ok(())
+    out.write_char('}')
 }
 
-fn write_canonical_array(values: &[Value], out: &mut String) -> Result<()> {
-    out.push('[');
+fn write_canonical_array(values: &[Value], out: &mut impl CanonicalOutput) -> Result<()> {
+    out.write_char('[')?;
     for (idx, value) in values.iter().enumerate() {
         if idx > 0 {
-            out.push(',');
+            out.write_char(',')?;
         }
         write_canonical_value(value, out)?;
     }
-    out.push(']');
-    Ok(())
+    out.write_char(']')
 }
 
 /// Compare two strings by UTF-16 code unit values, as required by RFC 8785.
@@ -528,26 +536,27 @@ fn trim_decimal(mut s: String) -> String {
     clippy::as_conversions,
     reason = "Only ASCII control characters reach this escape branch; their codepoints fit usize and masked nibbles index the 16-entry table."
 )]
-fn write_escaped_json_string(s: &str, result: &mut String) {
+fn write_escaped_json_string(s: &str, result: &mut impl CanonicalOutput) -> Result<()> {
     for c in s.chars() {
         match c {
-            '"' => result.push_str("\\\""),
-            '\\' => result.push_str("\\\\"),
-            '\u{08}' => result.push_str("\\b"),
-            '\u{0C}' => result.push_str("\\f"),
-            '\n' => result.push_str("\\n"),
-            '\r' => result.push_str("\\r"),
-            '\t' => result.push_str("\\t"),
+            '"' => result.write_str("\\\"")?,
+            '\\' => result.write_str("\\\\")?,
+            '\u{08}' => result.write_str("\\b")?,
+            '\u{0C}' => result.write_str("\\f")?,
+            '\n' => result.write_str("\\n")?,
+            '\r' => result.write_str("\\r")?,
+            '\t' => result.write_str("\\t")?,
             c if c <= '\u{001f}' => {
                 // C0 controls without a short form use \uXXXX.
                 let digits = b"0123456789abcdef";
-                result.push_str("\\u00");
-                result.push(char::from(digits[(c as usize) >> 4]));
-                result.push(char::from(digits[(c as usize) & 15]));
+                result.write_str("\\u00")?;
+                result.write_char(char::from(digits[(c as usize) >> 4]))?;
+                result.write_char(char::from(digits[(c as usize) & 15]))?;
             }
-            c => result.push(c),
+            c => result.write_char(c)?,
         }
     }
+    Ok(())
 }
 
 /// A strictly-validated JSON value tree used by the text-parsing entry points.
@@ -665,7 +674,7 @@ impl StrictJson {
             StrictJson::Float(f) => out.push_str(&canonicalize_f64(*f)?),
             StrictJson::Str(s) => {
                 out.push('"');
-                write_escaped_json_string(s, out);
+                write_escaped_json_string(s, out)?;
                 out.push('"');
             }
             StrictJson::Array(items) => {
@@ -688,7 +697,7 @@ impl StrictJson {
                         out.push(',');
                     }
                     out.push('"');
-                    write_escaped_json_string(key, out);
+                    write_escaped_json_string(key, out)?;
                     out.push_str("\":");
                     value.write_canonical(out)?;
                 }
