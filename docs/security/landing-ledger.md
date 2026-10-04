@@ -78,6 +78,18 @@ inventory to 1,331 records. They cover repository command framing, offline repor
 compatibility, preserved adaptive timeout provenance, macOS temporary paths,
 release provenance ordering, six-host acceptance and the HTTP 201 approval client.
 Their repairs and acceptance remain explicit; presence in the ledger is not closure.
+The HTTP 201 client repair is committed at
+`05b16402964e7288a80ed367d82b0ec88b2708eb`: final focused fixtures and independent
+source review pass. Its foundation integration, native/hosted acceptance and
+original thread disposition remain pending.
+Three subsequent #1168 review threads and the exact serialized-patch-context
+scanner repair bring the inventory to 1,335 records from the same 49 source
+documents. The checker-context failure was reproduced and repaired; the reported
+OpenSSL startup failure was not reproduced in the original static executable.
+Explicit linkage hardening passed the real pinned native rebuild and a
+read-only scratch-container runtime check. All three new threads are reconciled;
+terminal exact-commit hosted checks and protected merge remain required. These
+results are separate from full quickstart image or publication qualification.
 
 The October 4 reconciliation assigns the 197 named October 1 findings by their
 included owners: 126 foundation obligations and 71 bounded follow-ups. Of the
