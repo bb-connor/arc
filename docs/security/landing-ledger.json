@@ -3972,8 +3972,13 @@
       "open_threads": 322,
       "new_ledger_rows": 201
     },
-    "state": "prepared-before-remote-mutations",
-    "unique_work_policy": "Keep valuable unique work open through completion and merge; no closed backlog."
+    "state": "duplicate-consolidation-complete-unique-work-open",
+    "unique_work_policy": "Keep valuable unique work open through completion and merge; no closed backlog.",
+    "verified_open_count": 22,
+    "outcomes": {
+      "path": "docs/security/audits/pr-consolidation-outcomes-20261004.json.gz",
+      "sha256": "dde0d765e3fca43dc87c6afaa85a44e5d82f421c26dff19e3a5aa2c521861c87"
+    }
   },
   "requirements": [
     {"id": "launch-execution-plan:M0","label": "M0","requirement": "M0. Reset execution and consolidate the candidate","context": "M0. Reset execution and consolidate the candidate","source": {"path": "docs/security/launch-execution-plan.md","line": 161,"additional_lines": [],"line_sha256": "afbbbf3bbe715ac3f55b5eadaceb3c971d33eaf80c65e0042fcc58884add8866"},"disposition": "open-acceptance","source_repair": null,"verification_evidence": [],"remaining_acceptance": ["Reconcile the requirement against current source and its review corrections; no completion is inferred from this inventory.","Verify the owning source and tests on its selected landing candidate.","Obtain required exact-candidate qualification and review before landing."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false},

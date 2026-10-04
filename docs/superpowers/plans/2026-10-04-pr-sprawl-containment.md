@@ -52,17 +52,17 @@ snapshot under `docs/security/audits/`.
 retirement manifest and source histories. Produces a published source/review
 transfer record and one recorded GitHub outcome per candidate.
 
-- [ ] Refresh the open inventory, review threads and published refs; refuse any
+- [x] Refresh the open inventory, review threads and published refs; refuse any
   unexplained drift or incomplete pagination.
-- [ ] Verify 54 original heads through ancestry and all absent commits of the
+- [x] Verify 54 original heads through ancestry and all absent commits of the
   other three through exact patch/blob equivalence and published archives.
-- [ ] Preserve every live review obligation in the ledger; retain original
+- [x] Preserve every live review obligation in the ledger; retain original
   thread bodies and resolution states without marking them repaired by closure.
-- [ ] Retarget #1155 to the surviving foundation branch and verify its unique
+- [x] Retarget #1155 to the surviving foundation branch and verify its unique
   change remains intact.
-- [ ] Publish the transfer record, then close duplicates in child-before-parent
+- [x] Publish the transfer record, then close duplicates in child-before-parent
   order with exact source and review links. Preserve all branches and archives.
-- [ ] Verify the resulting 28 open PRs, source refs and closure outcomes.
+- [x] Verify the resulting 28 open PRs, source refs and closure outcomes.
 
 ### Task 2: Consolidate the workbench stack into #1164
 
@@ -73,11 +73,11 @@ acceptance.
 **Interfaces:** Consumes the six older workbench heads and review records.
 Produces one surviving workbench candidate, separate from foundation acceptance.
 
-- [ ] Verify #1164 contains all six complete older heads and refresh reviews.
-- [ ] Transfer each original review obligation and inherited feature to #1164.
-- [ ] Retarget #1164 to main, verify the expanded diff, then close the six older
+- [x] Verify #1164 contains all six complete older heads and refresh reviews.
+- [x] Transfer each original review obligation and inherited feature to #1164.
+- [x] Retarget #1164 to main, verify the expanded diff, then close the six older
   PRs as superseded while keeping their branches.
-- [ ] Verify the resulting 22 open PRs and all preserved source refs.
+- [x] Verify the resulting 22 open PRs and all preserved source refs.
 
 ### Task 3: Account for all remaining valuable work
 

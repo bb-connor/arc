@@ -18,8 +18,13 @@ thread as repaired. All 57 security candidate heads and their source preservatio
 were refreshed; #1164 retains all six older workbench heads and their 12 open
 review obligations.
 
-The transfer is prepared and publication/remote mutations are pending. The open
-count is still 85. The only active landing candidate is #1160. There are now
+The published transfer is complete: all 57 process/security duplicates and six
+workbench duplicates are closed as superseded. The verified open count is 22.
+#1155 now targets the foundation and retains its complete unique 24-file patch.
+#1164 targets main and retains the complete seven-PR, 141-file workbench scope.
+All original source branches and archive tags remain published. The
+[outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
+actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
 1583 ledger requirements, including 201 newly carried review records.
 The original 1,382 rows and their source/acceptance dispositions remain intact.
 
@@ -119,8 +124,9 @@ and final-source native qualification have not completed.
 These commits still require fresh independent review, exact-candidate hosted
 checks, complete source-bound mutation/native evidence and the trusted capture
 chain. Source authorization has not been rotated to an unqualified candidate.
-There is one active landing PR, #1160; the 57 conditional retirement candidates
-remain draft and none has been closed.
+There is one active landing PR, #1160. The later consolidation above closes the
+57 superseded containers while carrying all source and review obligations into
+this still-unmerged foundation.
 
 Projection `059c33104a` externalizes exactly 14,764 evidence files, keeps six
 required local inputs byte for byte, and rewrites 101 links in 38 documents to
