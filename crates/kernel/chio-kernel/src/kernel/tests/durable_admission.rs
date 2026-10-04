@@ -1084,7 +1084,7 @@ pub(super) fn admission_test_fence() -> StoreMutationFence {
     }
 }
 
-struct DurableAdmissionCheckingServer {
+pub(super) struct DurableAdmissionCheckingServer {
     pub(super) id: String,
     pub(super) tools: Vec<String>,
     pub(super) invocations: std::sync::Arc<AtomicU64>,

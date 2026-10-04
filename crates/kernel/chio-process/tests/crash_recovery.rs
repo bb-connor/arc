@@ -300,7 +300,7 @@ async fn subprocess_worker() -> Result {
                 assert_eq!(preflight.verdict, Verdict::Allow, "{:?}", preflight.reason);
                 request.execution_nonce = Some(*preflight.execution_nonce.ok_or("issued nonce")?);
             } else {
-                let intent: chio_core_types::capability::governance::GovernedTransactionIntent =
+                let mut intent: chio_core_types::capability::governance::GovernedTransactionIntent =
                     serde_json::from_value(
                         json!({"id": "read-intent", "server_id": "tools", "tool_name": "read", "purpose": "one recorded read"}),
                     )?;
@@ -308,6 +308,8 @@ async fn subprocess_worker() -> Result {
                     use chio_core_types::capability::governance::{
                         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
                     };
+                    request.governed_intent = Some(intent);
+                    intent = kernel.bind_tool_approval_intent(&request)?;
                     request.approval_token = Some(GovernedApprovalToken::sign(
                         GovernedApprovalTokenBody {
                             id: "read-approval".into(),

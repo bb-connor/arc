@@ -29,7 +29,6 @@ ACTIVE_SCHEMAS = {
 
 ACTIVE_CASES = {
     "slow_cumulative_exfiltration",
-    "pii_phi_adapter_round_trip",
     "canary_pre_dispatch_denial",
     "honey_tool_pre_dispatch_denial",
     "temporal_within_boundary",
@@ -41,11 +40,11 @@ ACTIVE_CASES = {
     "partial_rollback_truth",
 }
 
-ENTERPRISE_CATEGORIES = {
-    "keyring_transparency",
-    "secret_broker_boundary",
-    "cage_enforcement",
-    "protocol_primitives",
+ENTERPRISE_VECTOR_INDEXES = {
+    "keyring_transparency": "key-log/index.json",
+    "secret_broker_boundary": "broker/index.json",
+    "cage_enforcement": "cage/index.json",
+    "protocol_primitives": "signed-wire/index.json",
 }
 
 
@@ -83,8 +82,12 @@ class SecurityWireLane(unittest.TestCase):
         entrypoint = ROOT / "crates/tooling/chio-conformance/tests/active_defense.rs"
         source = entrypoint.read_text(encoding="utf-8")
         includes = set(re.findall(r'(?m)^\s*include!\("([^"]+\.rs)"\);\s*$', source))
+        modules = set(re.findall(
+            r'(?m)^#\[path = "([^"]+\.rs)"\]\s*\nmod [a-z_]+;\s*$', source
+        ))
+        fragments_in_source = includes | modules
         self.assertEqual(
-            includes,
+            fragments_in_source,
             {
                 "active_defense/deception_dispatch.rs",
                 "active_defense/partial_rollback.rs",
@@ -95,22 +98,28 @@ class SecurityWireLane(unittest.TestCase):
         fragments = {
             path.relative_to(entrypoint.parent) for path in fragment_root.rglob("*.rs")
         }
-        self.assertEqual(fragments, {Path(include) for include in includes})
+        self.assertEqual(fragments, {Path(path) for path in fragments_in_source})
         source += "\n".join(
             (entrypoint.parent / include).read_text(encoding="utf-8")
-            for include in sorted(includes)
+            for include in sorted(fragments_in_source)
         )
         names = set(re.findall(r"#\[test\]\s*fn\s+([a-z0-9_]+)\s*\(", source))
         self.assertEqual(names, ACTIVE_CASES)
 
-    def test_enterprise_categories_are_nonempty(self) -> None:
-        scenario_root = ROOT / "tests/conformance/native/scenarios"
-        counts = {category: 0 for category in ENTERPRISE_CATEGORIES}
-        for path in scenario_root.rglob("*.json"):
-            category = load_json(path).get("category")
-            if category in counts:
-                counts[category] += 1
-        self.assertTrue(all(count == 1 for count in counts.values()), counts)
+    def test_enterprise_vector_families_are_nonempty(self) -> None:
+        # Enterprise wire cases belong to the recursive security vector corpus.
+        # The separate native protocol scenario runner has different categories.
+        vector_root = ROOT / "tests/bindings/vectors/security"
+        root_index = load_json(vector_root / "v1.json")
+        for category, relative in ENTERPRISE_VECTOR_INDEXES.items():
+            with self.subTest(category=category):
+                self.assertIn(relative, root_index["indexes"])
+                index_path = vector_root / relative
+                index = load_json(index_path)
+                for polarity in ("positive", "negative"):
+                    self.assertGreater(len(index[polarity]), 0)
+                    for entry in index[polarity]:
+                        self.assertTrue((index_path.parent / entry["file"]).is_file())
 
 
 if __name__ == "__main__":

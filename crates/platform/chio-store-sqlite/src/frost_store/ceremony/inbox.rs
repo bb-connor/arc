@@ -353,5 +353,5 @@ pub(super) fn verify_invariants(connection: &Connection) -> Result<(), FrostStor
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;

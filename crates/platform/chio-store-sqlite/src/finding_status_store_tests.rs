@@ -1886,6 +1886,7 @@ fn same_key_authorization_state_update_is_rejected() {
 }
 
 #[path = "finding_status_store_tests/connection_recovery.rs"]
+#[cfg(unix)]
 mod connection_recovery;
 
 #[test]

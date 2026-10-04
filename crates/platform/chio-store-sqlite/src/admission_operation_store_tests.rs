@@ -854,6 +854,7 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() {
 }
 
 #[path = "admission_operation_store_tests/connection_recovery.rs"]
+#[cfg(unix)]
 mod connection_recovery;
 
 #[path = "admission_operation_store_tests/authorization_consumption.rs"]

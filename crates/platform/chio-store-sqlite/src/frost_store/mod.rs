@@ -579,7 +579,7 @@ pub(super) fn secret_kind_name(secret: &FrostCeremonySecret) -> &'static str {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[allow(
     clippy::expect_used,
     clippy::unwrap_used,

@@ -1081,4 +1081,5 @@ fn secure_temp_directory(path: &std::path::Path) -> std::io::Result<()> {
     clippy::unwrap_used,
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
+#[cfg(unix)]
 mod connection_recovery;

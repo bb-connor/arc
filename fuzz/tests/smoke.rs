@@ -57,6 +57,9 @@ const NO_IN_PROCESS_SMOKE_TARGETS: &[&str] = &[
     "fuzz_tool_action",
     "manifest_roundtrip",
     "revocation_oracle_merkle",
+    // These optional targets run through their scheduled, feature-enabled binaries.
+    "response_authority_protocol",
+    "response_lifecycle",
 ];
 
 /// Resolve a seed-corpus directory by target name. Lives under

@@ -1233,4 +1233,5 @@ fn secure_temp_directory(path: &std::path::Path) {
 }
 
 #[path = "economic_state_cache_tests/connection_recovery.rs"]
+#[cfg(unix)]
 mod connection_recovery;

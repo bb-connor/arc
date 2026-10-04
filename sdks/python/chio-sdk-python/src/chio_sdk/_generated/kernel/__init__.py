@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: eb3605a1594254370980dcf328ad3f0c7a751ff746d1530b9981c40163f5694a
+# Schema sha256: 67efd95f8fba5bacf75bfc6b1a98b744c1c20e1926e9d9e813e27d8193058364
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -15,6 +15,7 @@ from .caller_dispatch_authorization_schema import Authorization, CallerDigest, C
 from .capability_list_schema import ChioKernelmessageCapabilityList
 from .capability_revoked_schema import ChioKernelmessageCapabilityRevoked
 from .combined_capture_metadata_schema import ChioCombinedAdmissionCaptureMetadata, QuotaKey
+from .dpop_proof_schema import Body, ChioInvocationProofOfPossession, ReplayAuthority, Schema
 from .execution_nonce_schema import BoundTo, ChioSignedExecutionNonce, Nonce, Schema
 from .heartbeat_schema import ChioKernelmessageHeartbeat
 from .tool_call_chunk_schema import ChioKernelmessageToolCallChunk
@@ -22,6 +23,7 @@ from .tool_call_response_schema import ChioKernelmessageToolCallResponse, Detail
 
 __all__ = [
     "Authorization",
+    "Body",
     "BoundTo",
     "CallerDigest",
     "CallerExecutor",
@@ -30,6 +32,7 @@ __all__ = [
     "CallerPublicKey",
     "CallerSignature",
     "ChioCombinedAdmissionCaptureMetadata",
+    "ChioInvocationProofOfPossession",
     "ChioKernelmessageCapabilityList",
     "ChioKernelmessageCapabilityRevoked",
     "ChioKernelmessageHeartbeat",
@@ -52,6 +55,7 @@ __all__ = [
     "ProviderAttempt",
     "QuotaKey",
     "RealizedCost",
+    "ReplayAuthority",
     "Report",
     "Result",
     "Result3",

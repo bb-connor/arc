@@ -4448,7 +4448,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
             "method": "tools/call",
             "params": {
                 "name": "echo_json",
-                "arguments": {"message": "old session still valid"}
+                "arguments": {"message": "unannounced rotation must refuse"}
             }
         }),
     );
@@ -4456,9 +4456,16 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let (tool_call_after_rotation, notifications) =
         read_sse_until_response(tool_call_after_rotation, json!(42), |_| {});
     assert!(notifications.is_empty());
-    assert_eq!(
-        tool_call_after_rotation["result"]["structuredContent"]["echo"],
-        "old session still valid"
+    // Fresh admission refreshes lifecycle authority even for an existing
+    // session. An unannounced key rotation cannot silently change operator pins.
+    assert_eq!(tool_call_after_rotation["result"]["isError"], true);
+    assert!(tool_call_after_rotation["result"]["structuredContent"].is_null());
+    assert!(
+        tool_call_after_rotation["result"]["content"][0]["text"]
+            .as_str()
+            .expect("rotation refusal text")
+            .contains("current key does not match the operator pin"),
+        "rotation refusal: {tool_call_after_rotation:#}"
     );
 
     let rejected_session = post_json(
@@ -4510,7 +4517,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         wait_for_server_result,
     );
     let base_url_b = format!("http://{repinned_listen_b}");
-    let (session_b, _protocol_b) = initialize_session(&client, &base_url_b, auth_token);
+    let (session_b, protocol_b) = initialize_session(&client, &base_url_b, auth_token);
     let trust_b = get_admin_session_trust(&client, &base_url_b, admin_token, &session_b);
     assert_eq!(trust_b.status(), reqwest::StatusCode::OK);
     let trust_b: Value = trust_b.json().expect("session trust json");
@@ -4542,12 +4549,40 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     assert_eq!(control_revocations["revoked"], true);
     assert_eq!(control_revocations["count"], 1);
 
+    // Prove the repinned node can still execute, then revoke its live token
+    // through the other node. The final denial must be due to revocation rather
+    // than the already demonstrated stale-pin refusal on node A.
+    let repinned_call = post_json(
+        &client,
+        &base_url_b,
+        auth_token,
+        Some(&session_b),
+        Some(&protocol_b),
+        &json!({
+            "jsonrpc": "2.0", "id": 44, "method": "tools/call",
+            "params": {"name": "echo_json", "arguments": {"message": "repinned authority"}}
+        }),
+    );
+    assert_eq!(repinned_call.status(), reqwest::StatusCode::OK);
+    let (repinned_call, _) = read_sse_until_response(repinned_call, json!(44), |_| {});
+    assert_eq!(
+        repinned_call["result"]["structuredContent"]["echo"], "repinned authority",
+        "repinned tool response: {repinned_call:#}"
+    );
+    let capability_b_id = caps_b[0]["capabilityId"]
+        .as_str()
+        .expect("session B capability id");
+    let revoke_b = post_admin_capability_revoke(&client, &base_url_a, admin_token, capability_b_id);
+    assert_eq!(revoke_b.status(), reqwest::StatusCode::OK);
+    let revoke_b: Value = revoke_b.json().expect("revoke session B capability");
+    assert_eq!(revoke_b["revoked"], true);
+
     let denied_response = post_json(
         &client,
-        &base_url_a,
+        &base_url_b,
         auth_token,
-        Some(&session_a),
-        Some(&protocol_a),
+        Some(&session_b),
+        Some(&protocol_b),
         &json!({
             "jsonrpc": "2.0",
             "id": 43,

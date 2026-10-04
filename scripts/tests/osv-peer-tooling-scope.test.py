@@ -19,7 +19,8 @@ DEADLINE = datetime.datetime(2026, 10, 18, tzinfo=datetime.timezone.utc)
 REVIEWED_PARENTS = {
     "braces": {("node_modules/micromatch", "4.0.8", "^3.0.3")},
     "micromatch": {
-        ("node_modules/metro-file-map", "0.84.4", "^4.0.4"),
+        ("node_modules/metro-file-map", "0.84.5", "^4.0.4"),
+        ("node_modules/@expo/metro/node_modules/metro-file-map", "0.84.5", "^4.0.4"),
         ("node_modules/@expo/metro-file-map", "57.0.0", "^4.0.4"),
     },
     "node-forge": {
@@ -29,8 +30,9 @@ REVIEWED_PARENTS = {
     "@expo/code-signing-certificates": {("node_modules/@expo/cli", "57.0.4", "^0.0.6")},
     "@expo/cli": {("node_modules/expo", "57.0.2", "^57.0.4")},
     "metro-file-map": {
-        ("node_modules/@expo/metro", "56.0.0", "0.84.4"),
-        ("node_modules/metro", "0.84.4", "0.84.4"),
+        ("node_modules/@expo/metro", "56.0.2", "0.84.5"),
+        ("node_modules/@expo/metro/node_modules/metro", "0.84.5", "0.84.5"),
+        ("node_modules/metro", "0.84.5", "0.84.5"),
     },
     "@expo/metro-file-map": {("node_modules/@expo/cli", "57.0.4", "^57.0.0")},
 }

@@ -112,6 +112,6 @@ fn mcp_serve_http_rejects_malformed_jsonrpc_body() {
     assert_eq!(body["error"]["code"], -32700);
     assert_eq!(
         body["error"]["message"],
-        "urn:chio:error:attest:signed-json-invalid-input"
+        "urn:chio:error:attest:signed-json-invalid-shape"
     );
 }

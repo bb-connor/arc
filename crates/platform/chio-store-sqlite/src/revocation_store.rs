@@ -1329,7 +1329,7 @@ fn verify_revocation_foreign_keys(connection: &Connection) -> Result<(), Revocat
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[allow(
     clippy::expect_used,
     clippy::unwrap_used,

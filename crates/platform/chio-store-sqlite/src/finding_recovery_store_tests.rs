@@ -253,4 +253,5 @@ fn receipt_lineage_is_idempotent_and_substitution_resistant() {
 }
 
 #[path = "finding_recovery_store_tests/connection_recovery.rs"]
+#[cfg(unix)]
 mod connection_recovery;

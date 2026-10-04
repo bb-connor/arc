@@ -3280,7 +3280,7 @@ use validation::{
     stored_slot_index, stored_u64, verify_stored_digest,
 };
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod connection_recovery;
 #[cfg(test)]
 #[path = "finding_purchase_store_tests.rs"]

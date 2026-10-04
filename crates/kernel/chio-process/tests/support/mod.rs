@@ -109,6 +109,8 @@ pub fn kernel_with_artifacts(
         authority.mutation_fence(),
     )?;
     kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
+    kernel
+        .set_governed_approval_policy("process-test-tenant".into(), vec![issuer().public_key()])?;
     kernel.set_governed_approval_replay_store(Box::new(
         chio_kernel::InMemoryGovernedApprovalReplayStore::new(64)?,
     ));

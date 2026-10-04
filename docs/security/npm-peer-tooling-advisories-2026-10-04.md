@@ -98,3 +98,27 @@ removed because the candidate resolves sharp 0.35.4. Rust advisory gates are
 unaffected. Raw unfiltered and effective OSV results must both be retained with
 qualification evidence: an effective zero-finding result includes these accepted
 debts and must never be reported as all upstream vulnerabilities being fixed.
+
+## Foundation composition re-review
+
+The foundation uses Metro and metro-file-map 0.84.5 plus `@expo/metro` 56.0.2.
+The prerequisite used 0.84.4 and 56.0.0. The parent-inventory guard correctly
+rejected reuse of the earlier graph. The new graph also contains nested copies
+of Metro and metro-file-map beneath `@expo/metro`; all incoming edges are now
+explicit in `REVIEWED_PARENTS`.
+
+Both versions of these three packages were downloaded from the lockfile's npm
+archive URLs and verified against their SHA-512 integrity records before
+comparison. Every metro-file-map JavaScript file is byte-identical across the
+change. Its only changed file is package metadata. The inspected watcher still
+calls `micromatch.some`, and the affected braces path is unchanged. Metro's
+JavaScript delta replaces its image-size dependency with local image parsers;
+the Expo wrapper adds the corresponding forwarding module. Neither change adds
+a braces or node-forge consumer. The locked micromatch, braces, Expo CLI,
+code-signing certificates, node-forge and Expo records remain identical to the
+landed prerequisite. This re-review covers these advisory paths, not a blanket
+audit of the new image parsers or mobile product acceptance.
+
+The two advisory IDs, affected versions, directory scope and October 18 expiry
+remain unchanged. The archive integrity records, source deltas and repeated
+scope-guard evidence are retained with the foundation review repair bundle.

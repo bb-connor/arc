@@ -67,7 +67,7 @@ pub use snapshot::{
 };
 pub(crate) use store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[allow(
     clippy::expect_used,
     clippy::unwrap_used,

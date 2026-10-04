@@ -44,6 +44,7 @@ TARGETS=(
     manifest_roundtrip
     federation_trust_establishment
     finding_worker_protocol
+    frost_round2_envelope
     response_authority_protocol
     response_lifecycle
     underwriting_policy_input

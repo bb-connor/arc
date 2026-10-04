@@ -728,7 +728,7 @@ include!("finding_challenge_store/schema_migrations.rs");
 include!("finding_challenge_store/input_bounds.rs");
 include!("finding_challenge_store_root_refresh.rs");
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod connection_recovery;
 #[cfg(test)]
 #[path = "finding_challenge_store_tests.rs"]
