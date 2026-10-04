@@ -68,7 +68,19 @@ execution findings and 69 product/compliance findings. These records overlap by
 design and are not 1,303 distinct defects. Uncorroborated historical claims remain
 open for source/acceptance reconciliation; no count establishes readiness.
 The October 4 prerequisite review adds 14 audit, regression and residual-debt
-records: the current inventory is 1,317 records from 45 source documents.
+records, reaching 1,317 records from 45 source documents. Four further dependency
+findings and three trusted-definition obligations bring the current inventory to
+1,324 records from 49 source documents. These include the standalone lint boundary,
+FIPS wrong-key regression, duplicate inventory, cipher module size, late-label
+publication, conditional CI-history failure and bounded App issuance hardening.
+
+The October 4 reconciliation assigns the 197 named October 1 findings by their
+included owners: 126 foundation obligations and 71 bounded follow-ups. Of the
+126, 38 retain inspected source repairs, eight retain partial repairs, six have
+open archive-source observations and 74 retain original findings not freshly
+reproduced. These are review and acceptance assignments, not 126 newly confirmed
+defects or completed requirements. Source identities, linked checklist records,
+historical evidence and remaining acceptance stay intact.
 
 ## Active queue
 
@@ -105,7 +117,8 @@ audit records, regression and workflow inputs; PR #1167's five workflow files.
 **Interfaces:** Consume Task 1's exact source and review IDs; produce reviewed
 dependency closure and trusted workflow definitions on `main`.
 
-- [x] Reproduce the Cargo Vet failure and disposition all nine #1168 threads.
+- [x] Reproduce the Cargo Vet failure and disposition all ten #1168 threads,
+  including the subsequent standalone-vendor lint review.
 - [x] Complete genuine source review and exact fork reconstruction; retain
   failures and run default, FIPS and DES regression qualification.
 - [x] Repair confirmed regressions with failing-then-passing checks. Verify
@@ -129,6 +142,71 @@ produce a source-pinned qualified foundation on `main`.
 - [ ] Run complete foundation acceptance and independent review, repair failures
   without weakening assertions, then require terminal exact-candidate CI.
 - [ ] Merge #1160 through protection and verify the resulting main ancestry.
+
+### October 1 finding reconciliation
+
+The JSON's `review_reconciliation` fields distinguish the original review tip
+from the archive source inspected on October 4. Product findings were reviewed
+at `122414b48e`; execution findings were reviewed at `a2630c20a1`. Their original
+wording and source line hashes remain unchanged. An open historical finding has
+not been newly reproduced merely because its owner is included in foundation.
+Each row records its scope reason, review packet, owner references, concrete
+source observations where available and remaining acceptance. Null candidate
+identity, `candidate_qualified: false` and `finding_closed: false` are explicit.
+
+Review the foundation in this dependency order:
+
+1. Wire, trust and time contracts.
+2. Durable authority and receipts.
+3. Kernel/process and privileged native boundaries.
+4. Response and control-plane composition.
+5. Exposed consumers and network authority.
+6. Export, notification and existing product consumers.
+7. Qualification and operational definitions.
+
+Carry SR1/PB1/PR1/PR6/TR1 and AP1-AP11 with their exposed owners. TR1's previous
+September 30 guard-record pointer was unrelated: its source repair is
+`66e9ecc5bda75b15cf2e60d67a220a0c4bb396b2`, with direct-consumer qualification at
+`f6c8c39067b7264aed41afbfb8f639675e3137d8`. The superseded pointer is retained as
+bookkeeping, and the original failed consumer run stays distinct from its later
+passing rerun. Repair checkpoints record provenance, not a cherry-pick recipe.
+
+Keep the partial boundaries explicit:
+
+- EV5 includes API/start retention arguments and serving maintenance wiring;
+  other launchers and deployed retention acceptance remain open.
+- NC1 includes native grant/base-tool and build/download workflow repairs;
+  final supported native and trusted capture acceptance remains open. NC8 has
+  an injected preparation clock, with direct issuance expiry/grant/failure
+  acceptance still unverified.
+- EV1 covers automatic pager minimization, with general receipt/SIEM privacy and
+  EV15 signer trust still open. EV6 covers signed packages, independent pins and
+  retained reads, with complete certificates, independent child proofs and a
+  separate Mercury proof format still open.
+- CA3 covers the catalogued actual JSON routers, not arbitrary macros, dynamic
+  routes, generators or other formats. GT1's historical structural repair does
+  not classify the later eight `chio-http-serve` paths. CA1's final hosted
+  integration remains open.
+
+The observed KG4/KG5/KG6 policy behavior, KG7/KG8 normalized attestation records
+and RC9 ambient trust-control clock require current composition and contract
+acceptance. Adjacent repairs do not close these questions. Other open historical
+findings retain their original evidence and specific acceptance without being
+relabeled as newly confirmed defects. The 71 follow-ups retain explicit limits
+on foundation claims; moving a finding is not a waiver of an exposed authority
+contract or permission to discard an existing repair.
+
+Foundation acceptance still requires a concrete source SHA and supported
+constructor/feature set, required owner regressions and full checks, fresh
+independent integrated review and terminal exact-source hosted results. The
+supported native Linux x86_64 profile requires kernel 6.7 or newer and all cage
+prerequisites, source authorization, trusted workflow/caller/controller identity,
+helper/runtime and immutable image identity, signed capture and independent
+observation. Run the joined capability/task/cage/nonce/receipt evidence against
+that candidate through the merged #1167 chain. Preserve required test fixtures,
+retrievable original evidence and the distinct failed, interrupted, skipped or
+ignored outcomes. No mapping entry establishes M5 operational acceptance,
+M10/M11 completion, FIPS certification, broad privacy compliance or a release.
 
 ### Task 4: Retire superseded PRs and establish sequential follow-ups
 
@@ -192,3 +270,37 @@ produce fewer open PRs with preserved source and explicit follow-up ownership.
   The eight `chio-http-serve` paths also need a review-slice owner before the
   broad-diff gate can accept the projection. Existing Mercury security consumer
   repairs remain in scope; new proof development stays in its separate track.
+- October 4 named-finding reconciliation: applied all 128 execution and 69
+  product/compliance records without adding requirements. Assigned 126 to
+  foundation/#1160 (122 newly moved) and retained 71 bounded follow-ups. Corrected
+  TR1 provenance and partial EV5/NC1/NC8 records, retained 13 repair provenance
+  groups and 57 bounded source observations, and preserved all original source
+  identities and prerequisite execution prose. The active queue remains
+  #1168 then #1167; no foundation candidate is qualified by this bookkeeping.
+
+- October 4 prerequisite follow-up: dependency candidate `83e8e22cbbf3180430d0025a5627187c4cd1c0e4`
+  preserves the reviewed standalone unwrap/expect policy and FIPS wrong-key repair.
+  An exact forced-warning inventory supplements normal deny enforcement; 34 narrow
+  items cover 39 distinct sites. The library passed 386 default/legacy and 492 FIPS
+  tests; the mandatory source/audit/lint composite passed with authenticated
+  reconstruction of all 186 files. Independent review approved the module move
+  and exact exception spans. All ten source review threads are resolved; terminal
+  exact-head CI and protected merge remain open.
+- The superseded `5e17dd7703` hosted run failed the unchanged cipher file-size cap.
+  The new source moves the identical HKDF key conversion into the existing key
+  module, reducing the public cipher module from 2,271 to 2,258 lines under the
+  unchanged 2,266 cap. The failed campaign is retained, alongside the earlier
+  duplicate-baseline failure and actual FIPS wrong-key failure.
+- Trusted-definition repair `859b2c26354099f6a11e5565768b77607780b344`
+  revalidates labels/mode at success publication and explicitly propagates CI
+  catalog failures from helpers invoked in Bash conditionals. The initial 14
+  passing controls did not cover the catalog defect; independent reproduction
+  and the later 20-method suite exercise the actual conditional helpers/callers,
+  retries and all five revocation namespaces. Independent source review and a
+  fresh root rerun passed. The actual merged dependency base, exact-candidate
+  hosted checks and protected merge remain required. Real App operation and
+  native/trusted foundation evidence are not established by these fixtures.
+- Ruling: retain explicit repository selection at App token issuance as bounded
+  follow-up hardening. Current publisher/revoker code rejects any post-issuance
+  scope other than this repository before writes; no cross-repository write path
+  was established by review. This is not a waiver of identity or scope checks.
