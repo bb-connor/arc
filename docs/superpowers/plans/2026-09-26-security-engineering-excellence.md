@@ -402,6 +402,13 @@ Packet 0 gate passes for that family, and the commit provably changes no bytes.
 
 ### Correction 1F: Name the strict-canonicalization boundaries before adding a new signed payload (S2)
 
+> Numeric contract reconciliation (October 4, 2026): the
+> [dated producer-specific decision](../../security/signed-json-boundaries.md#numeric-contract-decision-2026-10-04)
+> supersedes the uniform strict-form selection rule and simulation entry-point
+> requirement in the original items below. Their wording and unchecked status
+> remain as history. Exhaustive boundary coverage and exact-candidate
+> qualification remain open.
+
 **Owners:** `chio-core-types/src/canonical.rs` (documentation only), the security
 TCB crates' wire, file and database read boundaries.
 

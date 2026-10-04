@@ -4,6 +4,13 @@
 > required for all plans and recovery. The unshipped legacy path and retirement
 > queue are removed. See [production response simulation](2026-09-27-production-response-simulation.md).
 
+> Numeric contract reconciliation (October 4, 2026): the historical "existing
+> compatibility parser" description below predates the named
+> `UntrustedJsonText::decode_signed` contract. The
+> [dated numeric decision](../security/signed-json-boundaries.md#numeric-contract-decision-2026-10-04)
+> records current native signed, external I-JSON, canonical and document readers.
+> The original assertions and test results below retain their checkpoint scope.
+
 This batch follows the user's direction to prioritize substantial implementation
 with focused verification. The previous broad sweep was deliberately interrupted;
 its partial results remain in the [response/keyring checkpoint](2026-09-26-execution-boundaries.md).

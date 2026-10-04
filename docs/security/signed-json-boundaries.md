@@ -11,6 +11,54 @@ JSON bindings, explicit format/transport dispositions and shared-reader callers.
 Remaining API-protect JSON and form-reader work stays explicit. Decoder census
 counts below are historical observations, not the total remaining ingress scope.
 
+## Numeric contract decision (2026-10-04)
+
+This decision records the contracts implemented at `9552bf14eccaca117471859f2ff78bd695503b79`
+and reconciles [SF6](../reviews/2026-10-01-execution-review-signed-input-frost.md).
+For current boundary work, it supersedes the uniform strict-form selection rule
+and simulation entry-point requirement in
+[correction 1F](../superpowers/plans/2026-09-26-security-engineering-excellence.md#correction-1f-name-the-strict-canonicalization-boundaries-before-adding-a-new-signed-payload-s2).
+The original plan and dated execution assertions remain historical records.
+
+Select the reader from the producer's numeric and byte-identity contract:
+
+- External signed producers that promise the I-JSON profile use `canonicalize`
+  or `decode_external` before typed projection and signature verification.
+- Native signed artifacts use `decode_signed` to reject original duplicate keys
+  and unsupported numeric lexemes while preserving full-width `u64` and supported
+  canonical/Serde number spellings, including whole-valued floats. Their owners
+  still verify signatures, trusted issuers, bindings and authority windows.
+- Chio-owned canonical wire and storage records use `decode_canonical` or
+  `decode_canonical_with`, requiring the complete typed canonical export to equal
+  the original bytes. This contract preserves native integer width.
+- Unsigned documents use `decode_document` for duplicate rejection and ordinary
+  Serde numeric conversion, including decimal spellings such as `0.50` and
+  `1e-05`. Mixed documents retain separate original-byte checks on signed slices
+  before the surrounding document is projected.
+
+The simulation report uses the native signed receipt contract. SQLite receipt
+readback applies `decode_signed`; the kernel's
+`validate_response_simulation_receipt_binding` reconstructs the complete receipt
+body from closed report metadata and checks its canonical identity.
+`verify_response_simulation_receipt` additionally requires an independently
+selected signer and configuration digest. The resulting report remains advisory
+and cannot supply live admission authority. The original simulation checklist
+item is superseded by this named contract; no new simulation execution is claimed.
+
+`from_wire` establishes only the requested byte bound and UTF-8, while `new`
+marks an existing buffer without enforcing a bound. Closed typed readers and
+private producer reparses retain their explicitly checked owner contracts.
+Parsing and exact-byte equality do not establish authentication by themselves.
+The [checked decoding contracts](#checked-decoding-contracts-october-2-2026) gate
+pins source-observed methods and reader evidence; it remains lexical and does not
+prove control flow, same-byte use, signature validity or complete ingress coverage.
+
+This is a documentation reconciliation of current behavior. Exhaustive ingress
+enumeration, the remaining reader queue, owning runtime regressions and required
+exact-candidate full/native/hosted qualification remain open. Historical test
+counts below retain their original source scope. Correction 1F's unchecked items
+are preserved; this decision does not mark unexecuted work complete.
+
 Choose the decoder from the producer and its numeric contract.
 `UntrustedJsonText::from_wire` checks the original byte limit and UTF-8;
 the separate `new` constructor does not enforce a size bound.
