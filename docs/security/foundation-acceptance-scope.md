@@ -62,7 +62,7 @@ The ledger also retains the following follow-up boundaries:
   provider identity lookup require their storage and trust hardening wave.
 - Adapter task-registry durability, remaining unsigned A2A numeric compatibility,
   discovery allocation limits, recursive offline readers, local diagnostic
-  provenance, secret-bearing Debug output, stale ACP-Client contexts, sender equality,
+  provenance, secret-bearing Debug output, sender equality,
   manifest documentation and mobile consumer ABI require their consumer wave.
 - Type-level API closure, complete reader census, resource-scale campaigns,
   platform matrices and operational rollout remain distinct acceptance. A local
@@ -74,6 +74,13 @@ in the ledger, including its history and the acceptance needed to close it.
 Follow-up PRs receive a queue slot sequentially after the prerequisites and
 foundation. Workbench, funded-work, research and Mercury proof development remain
 separate tracks.
+
+ACP-Client stale context repair `dcae5d7ba4` is now part of the foundation source:
+five file/terminal operations reject reused authorization after a failed check,
+and the complete owning library passes 206 tests. PB10 still requires fresh
+candidate review and landing acceptance; it is no longer assigned to the later
+consumer repair wave. Worker clock and malformed audit-frame regressions were
+also repaired in that commit and remain subject to final foundation qualification.
 
 ## Landing and release truth
 

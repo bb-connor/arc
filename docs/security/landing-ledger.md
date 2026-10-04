@@ -28,6 +28,54 @@ qualification remain pending. The [definition landing bundle](audits/foundation-
 retains the exact PR, protection, merge and component records. The foundation has
 not landed.
 
+The bounded-candidate review of `bc10d2b523` produced seven threads. Production
+repair `dcae5d7ba4` uses the shared authority clock for worker issuance and
+authentication, retires stale ACP contexts before every capability check, and
+keeps malformed audit frames from terminating the broker daemon. Six worker
+controls reproduce the original defect; all 18 worker protocol tests, 206 ACP
+library tests, and three broker process tests pass. The broker process tests
+reject wrong shapes, malformed JSON, duplicate keys and invalid UTF-8 before
+valid provisioning, and retain graceful restart and no-secret-crossing checks.
+The owning Clippy checks pass.
+
+Fixture repair `a59fb7f564` reconciles Unix-only SQLite test modules, PQ fixture
+visibility, injected nonce expiry, typed JWT errors, generated SDK models and
+vectors, no-std tests, Cargo Deny inventory, and formal/fuzz/conformance test
+inventories. All four generated-language checks, 73 Python model tests, Go
+package tests, 109 vectors, 91 Unix recovery tests, 75 PQ threshold tests, all
+ten active-defense scenarios and all ten process crash/recovery tests pass in
+their retained component runs. Native MCP targets compile and four proxy
+identity controls pass; actual Windows and native MCP execution remain required.
+The runtime spine campaign is retained with its observed status, rather than
+being inferred green from its component output. The separate npm parent-source
+re-review passes eight real-scanner controls without broadening advisory scope
+or claiming the advisory itself fixed.
+
+Formal repair `b5ac107a94` pins Kani 0.68.0 and compiles its exact upstream source
+with the one-line [upstream signature correction](https://github.com/model-checking/kani/pull/4819).
+The actual Linux installer passes, the hosted kernel component verifies, and
+reachable `catch_unwind` still fails as unsupported. The patch changes no proof
+assumption or runtime source. The older MSRV failure, compiler crash and initial
+zero-matching-harness invocation remain retained. The complete final proof sweep
+is still required.
+
+The [bounded review repair bundle](audits/foundation-bounded-review-repairs-20261004.json.gz)
+retains these results and the unsuccessful hosted campaign. The ledger now has
+**1,375 requirement records**, including all seven current threads and fourteen
+repair boundaries. The worker and ACP threads have source repairs; five consumer
+threads remain open under PR2, PB5, PB9, PR10 and TR9. Their original acceptance
+and earlier foundation review assignment are preserved in each row's history.
+They receive sequential follow-up landings under the existing
+[foundation acceptance scope](foundation-acceptance-scope.md), and are not marked
+fixed. Missing native fixtures in separate PostgreSQL and C++ consumers and
+unqualified packaging jobs also remain explicit consumer acceptance.
+
+These commits still require fresh independent review, exact-candidate hosted
+checks, complete source-bound mutation/native evidence and the trusted capture
+chain. Source authorization has not been rotated to an unqualified candidate.
+There is one active landing PR, #1160; the 57 conditional retirement candidates
+remain draft and none has been closed.
+
 Projection `059c33104a` externalizes exactly 14,764 evidence files, keeps six
 required local inputs byte for byte, and rewrites 101 links in 38 documents to
 the immutable archive. The latest complete source is preserved remotely at
@@ -60,7 +108,7 @@ existing classifier retains its 15 defined classes, with 14 active in this diff.
 Native execution, full mutation refresh, independent final review and exact
 hosted qualification remain required before the foundation can land.
 
-The current inventory contains **1,353 requirement records**. Commit
+Before the bounded review repairs, the inventory contained 1,353 records. Commit
 `dfb7543f40` adds five negative response-mode controls. Each detects deletion of
 its production guard; restored source passes 39 focused tests with none ignored,
 formatting and both owning crates' all-target Clippy. RP1 remains partial:
