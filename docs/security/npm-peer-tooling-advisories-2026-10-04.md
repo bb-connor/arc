@@ -103,9 +103,9 @@ debts and must never be reported as all upstream vulnerabilities being fixed.
 
 The foundation uses Metro and metro-file-map 0.84.5 plus `@expo/metro` 56.0.2.
 The prerequisite used 0.84.4 and 56.0.0. The parent-inventory guard correctly
-rejected reuse of the earlier graph. The new graph also contains nested copies
-of Metro and metro-file-map beneath `@expo/metro`; all incoming edges are now
-explicit in `REVIEWED_PARENTS`.
+rejected reuse of the earlier graph. The initial foundation graph contained
+nested copies of Metro and metro-file-map beneath `@expo/metro`; their incoming
+edges were included in that review.
 
 Both versions of these three packages were downloaded from the lockfile's npm
 archive URLs and verified against their SHA-512 integrity records before
@@ -122,3 +122,14 @@ audit of the new image parsers or mobile product acceptance.
 The two advisory IDs, affected versions, directory scope and October 18 expiry
 remain unchanged. The archive integrity records, source deltas and repeated
 scope-guard evidence are retained with the foundation review repair bundle.
+
+The subsequent hosted CVE scan found stale lock entries despite the manifest's
+patched overrides. Regenerating the workspace and standalone node-http locks
+resolves brace-expansion 5.0.12, fast-uri 3.1.8/4.1.5 and undici 7.29.1. npm also
+deduplicates the nested Metro tree. The removed Metro, metro-file-map,
+metro-config and metro-transform-worker entries have the same versions,
+integrity hashes and dependency declarations as the retained root copies.
+The Expo forwarder now resolves those existing root copies. This removes two
+duplicate incoming edges from `REVIEWED_PARENTS`; it adds no consumer, affected
+version, advisory exception or expiry extension. The effective OSV scan passes
+with the original accepted advisory debts still visible in unfiltered evidence.
