@@ -66,7 +66,7 @@ class FipsContractTests(unittest.TestCase):
                 if step.get("name") == "Install Rust toolchain"
             )
             for original, substitute in [
-                ("1.94.1", "stable"),
+                ("1.95.0", "stable"),
                 ("rustc --version --verbose", "true"),
                 ("cargo --version", "true"),
             ]:

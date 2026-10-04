@@ -127,6 +127,7 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/check-linux-enforcement-stack.py"),
     Path("scripts/check-secret-broker-boundary.sh"),
     Path("scripts/check-security-adversarial-evidence.py"),
+    Path("scripts/check-supply-chain.sh"),
     Path("scripts/check-temporal-security.sh"),
     Path("scripts/run-security-execution-container.py"),
     Path("scripts/security-execution-command-client.py"),
@@ -386,6 +387,57 @@ def assert_boundary_file_rejected(
                 ) from error
         else:
             raise AssertionError(f"security CI accepted boundary mutation: {label}")
+
+
+def assert_supply_chain_wrapper_contract() -> None:
+    relative = Path("scripts/check-supply-chain.sh")
+    for label, old, new in (
+        ("audit removed", "cargo vet --locked\n", ""),
+        ("audit soft-failed", "cargo vet --locked\n", "cargo vet --locked || true\n"),
+        ("audit unlocked", "cargo vet --locked\n", "cargo vet\n"),
+        ("early success", "set -euo pipefail\n", "set -euo pipefail\nexit 0\n"),
+        ("fail-fast removed", "set -euo pipefail\n", "set -uo pipefail\n"),
+        (
+            "fork verification removed",
+            'python3 scripts/check-aws-lc-fork.py "$@"\n',
+            "",
+        ),
+    ):
+        assert_boundary_file_rejected(
+            "supply-chain " + label,
+            relative,
+            replace_once(old, new),
+            "supply-chain gate digest ratchet changed",
+        )
+    assert_boundary_file_rejected(
+        "supply-chain wrapper replaced by success",
+        relative,
+        lambda _: "#!/usr/bin/env bash\nexit 0\n",
+        "supply-chain gate digest ratchet changed",
+    )
+    for shape in ("missing", "symlink", "directory"):
+        with tempfile.TemporaryDirectory(prefix="chio-supply-chain-shape-") as raw:
+            fixture = Path(raw)
+            populate_fixture(fixture)
+            target = fixture / relative
+            original = target.read_bytes()
+            target.unlink()
+            if shape == "symlink":
+                backing = fixture / "reviewed-wrapper.sh"
+                backing.write_bytes(original)
+                target.symlink_to(backing)
+            elif shape == "directory":
+                target.mkdir()
+            try:
+                CHECKER.validate(fixture)
+            except CHECKER.ContractError as error:
+                if "supply-chain gate is not a regular file" not in str(error):
+                    raise AssertionError(f"{shape}: unexpected rejection: {error}") from error
+            else:
+                raise AssertionError(f"security CI accepted {shape} supply-chain wrapper")
+
+
+assert_supply_chain_wrapper_contract()
 
 
 def extraction_program() -> str:
@@ -1041,8 +1093,8 @@ assert_boundary_file_rejected(
     "security image loses digest-pinned Rust base",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "rust:1.94.1-alpine3.22",
+        "rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa",
+        "rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1050,9 +1102,9 @@ assert_boundary_file_rejected(
     "security image ignores a commented pinned-base decoy",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "# FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67\n"
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22",
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa",
+        "# FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa\n"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1070,9 +1122,9 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         " && cmp \\\n"
-        "      /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
+        "      /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
         "bin/cargo-clippy \\\n"
-        "      /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/clippy-preview/"
+        "      /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/clippy-preview/"
         "bin/cargo-clippy \\\n",
         " && true \\\n",
     ),
@@ -1083,7 +1135,7 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         'test "$(cargo clippy --version)" = '
-        '"clippy 0.1.94 (e408947bfd 2026-03-25)"',
+        '"clippy 0.1.95 (59807616e1 2026-04-14)"',
         'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
     ),
     "image Rust component closure changed",

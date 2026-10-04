@@ -355,10 +355,7 @@ impl ReservedActiveDefenseCleanup {
                 }
             }
         }
-        loop {
-            let Some(worker_handle) = self.worker_handle.as_mut() else {
-                break;
-            };
+        while let Some(worker_handle) = self.worker_handle.as_mut() {
             match worker_handle.shutdown().await {
                 Ok(()) => {
                     self.worker_handle = None;

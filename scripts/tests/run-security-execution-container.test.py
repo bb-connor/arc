@@ -139,29 +139,29 @@ def candidate_helper_environment_tests() -> None:
 def static_contract_tests() -> None:
     dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
     expected_base = (
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:"
-        "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:"
+        "064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa"
     )
     if expected_base not in dockerfile:
         raise AssertionError(
-            "security image base is not pinned to the reviewed Rust 1.94.1 digest"
+            "security image base is not pinned to the reviewed Rust 1.95.0 digest"
         )
     for marker in (
         "bash=5.2.37-r0",
         "security-evidence-apk.lock",
-        "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd",
-        "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda",
-        "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b",
+        "65c6ed6a7ec4e3c85fa27b46aa259ed217f93e2ce6f0ecb15b26fd5163c715ca",
+        "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61",
+        "688a9ba3b40e9fd360dc083ff28b7ae43c110f2919ee939bb788a46a1e579a84",
         "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028",
         "cargo install \\",
         "--path /tmp/cargo-mutants-25.3.1",
         "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
         "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
-        'test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)"',
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
+        'test "$(rustc --version)" = "rustc 1.95.0 (59807616e 2026-04-14)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
         'ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]',
         "/opt/chio-security/command-client.py",
         "/opt/chio-security/verifier-bin/cargo",
@@ -2304,7 +2304,7 @@ exec "$real" "$@"
             raise AssertionError(
                 "candidate Cargo, target, temp, Python, or detached poison ran"
             )
-        if "cargo 1.94.1" not in cargo_log:
+        if "cargo 1.95.0" not in cargo_log:
             raise AssertionError("fresh disposable Cargo verification did not run")
         if "detached candidate quiescence verified" not in cargo_log:
             raise AssertionError("detached Cargo process quiescence was not verified")
