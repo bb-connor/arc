@@ -114,6 +114,23 @@ fn trusted_nitro_runtime_attestation() -> RuntimeAttestationEvidence {
     }
 }
 
+fn authenticated_runtime_attestation_record(
+    evidence: &RuntimeAttestationEvidence,
+    policy: &AttestationTrustPolicy,
+) -> chio_appraisal::VerifiedRuntimeAttestationRecord {
+    let authority = Keypair::generate();
+    let envelope =
+        chio_core::receipt::lineage::SignedExportEnvelope::sign(evidence.clone(), &authority)
+            .expect("test authority signs the complete attestation evidence");
+    chio_appraisal::verify_signed_runtime_attestation_record(
+        &envelope,
+        &authority.public_key(),
+        Some(policy),
+        150,
+    )
+    .expect("record is authenticated by the independently pinned test authority")
+}
+
 #[test]
 fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
     let call_chain = GovernedCallChainContext {
@@ -423,7 +440,7 @@ fn governed_request_metadata_omits_unverified_runtime_assurance() {
 }
 
 #[test]
-fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
+fn governed_request_metadata_requires_authenticated_scoped_runtime_assurance() {
     let request = ToolCallRequest {
         request_id: "req-current-4".to_string(),
         capability: test_capability(),
@@ -456,10 +473,28 @@ fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
         declassification_grant: None,
     };
 
-    let metadata =
+    let unsigned_metadata =
         governed_request_metadata(&request, Some(&trusted_attestation_trust_policy()), 150)
             .expect("metadata should build")
             .expect("governed metadata should exist");
+    let unsigned: GovernedTransactionReceiptMetadata =
+        serde_json::from_value(unsigned_metadata["governed_transaction"].clone())
+            .expect("receipt metadata should deserialize");
+    assert!(
+        unsigned.runtime_assurance.is_none(),
+        "matching a policy must not authenticate raw attestation claims"
+    );
+
+    // This scopes an authority-authenticated record for receipt projection. It
+    // does not simulate hardware quote verification or fresh live admission.
+    let record = authenticated_runtime_attestation_record(
+        &trusted_runtime_attestation(),
+        &trusted_attestation_trust_policy(),
+    );
+    let _scope = scope_governed_runtime_attestation_receipt_record(Some(record));
+    let metadata = governed_request_metadata(&request, None, 150)
+        .expect("metadata should build")
+        .expect("governed metadata should exist");
     let governed: GovernedTransactionReceiptMetadata =
         serde_json::from_value(metadata["governed_transaction"].clone())
             .expect("receipt metadata should deserialize");
@@ -485,12 +520,10 @@ fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
 #[test]
 fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
     let attestation = trusted_nitro_runtime_attestation();
-    let verified_runtime_attestation = verify_governed_runtime_attestation_record(
+    let verified_runtime_attestation = authenticated_runtime_attestation_record(
         &attestation,
-        Some(&trusted_nitro_attestation_trust_policy()),
-        150,
-    )
-    .expect("nitro attestation should verify at governed admission");
+        &trusted_nitro_attestation_trust_policy(),
+    );
     let request = ToolCallRequest {
         request_id: "req-current-nitro".to_string(),
         capability: test_capability(),
@@ -550,12 +583,10 @@ fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
 #[test]
 fn governed_request_metadata_rejects_mismatched_scoped_runtime_attestation_record() {
     let attestation = trusted_nitro_runtime_attestation();
-    let verified_runtime_attestation = verify_governed_runtime_attestation_record(
+    let verified_runtime_attestation = authenticated_runtime_attestation_record(
         &attestation,
-        Some(&trusted_nitro_attestation_trust_policy()),
-        150,
-    )
-    .expect("nitro attestation should verify at governed admission");
+        &trusted_nitro_attestation_trust_policy(),
+    );
     let mut mismatched_attestation = attestation.clone();
     mismatched_attestation.evidence_sha256 = sha256_hex(b"mismatched-nitro-runtime-attestation");
     let request = ToolCallRequest {

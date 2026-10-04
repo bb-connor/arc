@@ -389,7 +389,11 @@ mod retention {
         let live_path = unique_db_path("retention-size-live");
         let archive_path = unique_db_path("retention-size-archive");
 
-        let store = SqliteReceiptStore::open(&live_path).unwrap();
+        let store = SqliteReceiptStore::open_with_clock(
+            &live_path,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(2_000)),
+        )
+        .unwrap();
         let kp = Keypair::generate();
 
         // Insert 100 receipts (timestamps 1000-1099), all signed by `kp`.
@@ -404,18 +408,26 @@ mod retention {
         let cp1 = checkpoint_range(&store, 1, seqs[0], seqs[49], &kp, None);
         checkpoint_range(&store, 2, seqs[50], seqs[99], &kp, Some(&cp1));
 
-        let current_size = store.db_size_bytes().unwrap();
-        assert!(current_size > 0, "DB should have nonzero size");
-
-        // retention_days = u64::MAX disables the time threshold (time_cutoff
-        // saturates to 0), so only the size threshold can trigger.
-        let config = RetentionConfig {
-            retention_days: u64::MAX,
-            max_size_bytes: current_size.saturating_sub(1),
+        // The owned clock is less than one day after epoch, so this valid
+        // retention interval gives a zero time cutoff. Size alone must trigger.
+        // The first maintenance pass initializes retention metadata, so leave
+        // finite headroom for those pages before measuring the size threshold.
+        let time_only = RetentionConfig {
+            retention_days: 1,
+            max_size_bytes: 128 * 1024 * 1024,
             archive_path: archive_path.to_str().unwrap().to_string(),
             tenant_id: None,
             explicit_cutoff_unix_secs: None,
             ..RetentionConfig::default()
+        };
+        assert_eq!(store.rotate_if_needed(&time_only).unwrap(), 0);
+
+        let current_size = store.live_db_size_bytes().unwrap();
+        assert!(current_size > 0, "DB should have nonzero size");
+        assert!(current_size < time_only.max_size_bytes);
+        let config = RetentionConfig {
+            max_size_bytes: current_size - 1,
+            ..time_only
         };
 
         let archived = store.rotate_if_needed(&config).unwrap();
