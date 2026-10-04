@@ -345,7 +345,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: ./.github/actions/setup-rust
         with:
-          toolchain: "1.94.1"
+          toolchain: "1.95.0"
 
       - name: MSRV workspace lane
         env:
@@ -362,17 +362,17 @@ jobs:
     name: cargo-vet (locked supply-chain audit)
     # owner: Chio maintainers
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install --profile minimal
+          rustup toolchain install --profile minimal --component clippy
           rustup show active-toolchain
       - name: Install cargo-vet
         run: cargo install cargo-vet --locked --version 0.10.2
-      - name: cargo vet --locked
-        run: cargo vet --locked
+      - name: Verify source-bound fork and locked supply-chain audits
+        run: bash scripts/check-supply-chain.sh
 
   cargo-deny:
     name: cargo-deny (supply-chain bans/advisories/licenses)

@@ -41,6 +41,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  supply-chain:
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    uses: ./.github/workflows/cargo-vet.yml
+
   plan:
     name: Plan matrix
     runs-on: ubuntu-latest
@@ -151,7 +158,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.package }}
-    needs: plan
+    needs: [plan, supply-chain]
     runs-on: ubuntu-latest
     permissions:
       # Required for cosign keyless signing via Sigstore Fulcio.

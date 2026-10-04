@@ -10,6 +10,7 @@ on:
       - crates/platform/chio-store-sqlite/**
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
   push:
     branches:
       - main
@@ -22,6 +23,7 @@ on:
       - crates/platform/chio-store-sqlite/**
       - Cargo.toml
       - Cargo.lock
+      - third_party/aws-lc-rs-chio/**
   workflow_dispatch:
 
 concurrency:

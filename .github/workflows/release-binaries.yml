@@ -24,8 +24,16 @@ env:
   CARGO_PACKAGE: chio-cli
 
 jobs:
+  supply-chain:
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    uses: ./.github/workflows/cargo-vet.yml
+
   build:
     name: Build ${{ matrix.target }}
+    needs: supply-chain
     runs-on: ${{ matrix.runner }}
     # `id-token: write` is required so `cosign sign-blob --yes` can
     # exchange the GitHub-issued OIDC token for a short-lived Fulcio

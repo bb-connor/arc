@@ -5,14 +5,9 @@
 # CHIO_CPP_REPO_ROOT. Cargo needs a Rust toolchain on PATH and either
 # network access OR a vendored ${SOURCE_PATH}/vendor/ directory.
 
-# The release-cpp.yml workflow tags chio-cpp releases under the
-# `cpp/v<MAJOR.MINOR.PATCH>` tag family (alongside the unprefixed
-# `v<MAJOR.MINOR.PATCH>` Rust release tags) and computes the SHA512
-# from `archive/refs/tags/cpp/v<VERSION>.tar.gz` before publishing to
-# the registry. The previous `REF "v${VERSION}"` fetched a different
-# (or non-existent) ref than the one the SHA was hashed against, so
-# consumers installing from the published registry hit a checksum
-# mismatch.
+# Release templates use the version tag for local package checks. Publishing
+# replaces REPO, REF and SHA512 with the qualified repository, immutable
+# commit and archive digest, and removes the moving HEAD_REF.
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO backbay-labs/chio
