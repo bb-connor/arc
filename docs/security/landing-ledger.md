@@ -306,8 +306,9 @@ Keep the partial boundaries explicit:
   final supported native and trusted capture acceptance remains open. NC8 has
   an injected preparation clock, with direct issuance expiry/grant/failure
   acceptance still unverified.
-- EV1 covers automatic pager minimization, with general receipt/SIEM privacy and
-  EV15 signer trust still open. EV6 covers signed packages, independent pins and
+- EV1 covers automatic pager minimization; general receipt/SIEM privacy remains
+  open. EV15 signer containment is source-repaired, with final qualification
+  pending. EV6 covers signed packages, independent pins and
   retained reads, with complete certificates, independent child proofs and a
   separate Mercury proof format still open.
 - CA3 covers the catalogued actual JSON routers, not arbitrary macros, dynamic
@@ -442,3 +443,9 @@ produce fewer open PRs with preserved source and explicit follow-up ownership.
   AWS-LC fork from #1168. Resolve shared manifests, locks, workflow contracts and
   source ratchets semantically, preserving the foundation's later exposed-owner
   repairs. No blanket choice of either branch qualifies that composition.
+
+- Ruling: qualify current protocol names as ACP-Client in current documentation
+  and review synopses. Preserve the original frozen reviews and source identities.
+  The release-copy gate remains unchanged; three ambiguous historical artifact
+  lines remain failing until the reviewed archive projection removes those local
+  copies. No passing whole-tree release-copy result is claimed before projection.

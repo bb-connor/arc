@@ -62,7 +62,7 @@ The ledger also retains the following follow-up boundaries:
   provider identity lookup require their storage and trust hardening wave.
 - Adapter task-registry durability, remaining unsigned A2A numeric compatibility,
   discovery allocation limits, recursive offline readers, local diagnostic
-  provenance, secret-bearing Debug output, stale ACP contexts, sender equality,
+  provenance, secret-bearing Debug output, stale ACP-Client contexts, sender equality,
   manifest documentation and mobile consumer ABI require their consumer wave.
 - Type-level API closure, complete reader census, resource-scale campaigns,
   platform matrices and operational rollout remain distinct acceptance. A local
