@@ -7,6 +7,8 @@ WORKFLOW="${REPO_ROOT}/.github/workflows/release-qualification.yml"
 GENERATOR="${REPO_ROOT}/scripts/generate-proof-report.sh"
 CHECKER="${REPO_ROOT}/scripts/check-proof-report.sh"
 
+python3 "${REPO_ROOT}/scripts/tests/install-kani-toolchain.test.py"
+
 python3 - <<'PY' "${WORKFLOW}" "${GENERATOR}" "${CHECKER}"
 from pathlib import Path
 import sys
@@ -27,8 +29,7 @@ required_markers = {
     "./scripts/install-aeneas-toolchain.py": "authenticated Aeneas installer",
     "target/formal/aeneas-toolchain/${architecture}/bin": "authenticated Aeneas tool path",
     "Install Rust verification tools": "Kani and Creusot install step",
-    "cargo install kani-verifier": "Kani installer",
-    "cargo kani setup": "Kani setup",
+    "bash scripts/install-kani-toolchain.sh": "pinned Kani installer with upstream compatibility repair",
     "git clone https://github.com/creusot-rs/creusot": "Creusot source checkout",
     "cargo creusot version": "Creusot post-install probe",
     "cargo install wasm-bindgen-cli --version \"$(cat .tooling/wasm-bindgen.version)\" --locked": "pinned wasm-bindgen-cli installer",

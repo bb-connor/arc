@@ -54,7 +54,7 @@ env:
   CARGO_TERM_COLOR: always
   CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
   # These pins must stay in lockstep with nightly.yml.
-  CHIO_KANI_VERSION: 0.67.0
+  CHIO_KANI_VERSION: 0.68.0
   CHIO_ELAN_VERSION: v4.2.1
   CHIO_ELAN_TARBALL_SHA256: 4e717523217af592fa2d7b9c479410a31816c065d66ccbf0c2149337cfec0f5c
 
@@ -258,10 +258,7 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
         run: |
           set -euo pipefail
-          if ! cargo kani --version >/dev/null 2>&1; then
-            cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          fi
-          cargo kani setup
+          bash scripts/install-kani-toolchain.sh
 
       - name: Verify Kani version
         run: cargo kani --version
@@ -319,10 +316,7 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/chio-kani-tool-target
         run: |
           set -euo pipefail
-          if ! cargo kani --version >/dev/null 2>&1; then
-            cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
-          fi
-          cargo kani setup
+          bash scripts/install-kani-toolchain.sh
 
       - name: Verify Kani version
         run: cargo kani --version
