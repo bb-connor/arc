@@ -160,7 +160,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def request_json(base, route, operator, data=None, timeout=30):
+def request_json(base, route, operator, data=None, timeout=30, *, expected_status=200):
+    """Return validated JSON with its actual, route-checked transport status."""
     if not math.isfinite(timeout) or not 0 < timeout <= 60:
         raise OperatorError("timeout_must_be_between_zero_and_60_seconds")
     request = urllib.request.Request(
@@ -179,14 +180,20 @@ def request_json(base, route, operator, data=None, timeout=30):
     )
     try:
         with opener.open(request, timeout=timeout) as response:
-            if response.status != 200:
+            if response.status != expected_status:
                 raise OperatorError("unexpected_http_status", response.status)
             if response.headers.get_content_type() != "application/json":
                 raise OperatorError("response_is_not_json", response.status)
             payload = response.read(MAX_JSON_BYTES + 1)
             if len(payload) > MAX_JSON_BYTES:
                 raise OperatorError("response_too_large", response.status)
-            return decode_object(payload)
+            try:
+                result = decode_object(payload)
+            except OperatorError as error:
+                raise OperatorError(error.code, response.status) from error
+            # Transport metadata cannot be supplied by the response JSON.
+            result["httpStatus"] = response.status
+            return result
     except urllib.error.HTTPError as error:
         error.close()
         code = "redirect_refused" if 300 <= error.code < 400 else "http_error"
