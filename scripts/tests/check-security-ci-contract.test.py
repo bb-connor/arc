@@ -5284,4 +5284,170 @@ assert_rejected(
     "not bound to the protected test merge",
 )
 
+# Bind late publication labels, conditional history failures and CI execution.
+
+assert_rejected(
+    'publisher omits late refresh-mode refusal',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'test "$(jq -r \'.labels | any(.name == "refresh-linux-evidence")\' <<< "${live_pr}")" = "false"',
+        ':',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'publisher omits sorted late label inventory',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'labels_json="$(jq -cS \'[.labels[].name] | sort\' <<< "${live_pr}")"',
+        ':',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'publisher omits late label digest binding',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'test "$(printf \'%s\' "${labels_json}" | sha256sum | cut -d\' \' -f1)" = "$(jq -r \'.labels_digest\' <<< "${canonical_binding}")"',
+        ':',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'wait_history ignores failed API with successful-looking body',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Authenticate exact successful current CI run',
+        '})" || return 1',
+        '})"',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'wait_history accepts untyped total',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Authenticate exact successful current CI run',
+        'total_count="$(jq -er \'.total_count | select(type == "number" and . >= 0 and floor == .)\' <<< "${first_response}")" || return 1',
+        'total_count="$(jq -r \'.total_count\' <<< "${first_response}")" || return 1',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'wait_history accepts oversized page',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Authenticate exact successful current CI run',
+        'page_runs="$(jq -ceS \'.workflow_runs | select(type == "array" and length <= 100 and all(.[]; type == "object" and (.id | type == "number" and . > 0 and floor == .)))\' <<< "${page_response}")" || return 1',
+        'page_runs="$(jq -ceS \'.workflow_runs | select(type == "array" and length <= 101 and all(.[]; type == "object" and (.id | type == "number" and . > 0 and floor == .)))\' <<< "${page_response}")" || return 1',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'wait_history ignores duplicate history IDs under conditional call',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Authenticate exact successful current CI run',
+        'test "$(jq -r \'[.[].id] | unique | length\' <<< "${runs}")" = "${total_count}" || return 1',
+        'test "$(jq -r \'[.[].id] | unique | length\' <<< "${runs}")" = "${total_count}"',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'publisher_history ignores failed API with successful-looking body',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        '})" || return 1',
+        '})"',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'publisher_history accepts untyped total',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'total_count="$(jq -er \'.total_count | select(type == "number" and . >= 0 and floor == .)\' <<< "${first_response}")" || return 1',
+        'total_count="$(jq -r \'.total_count\' <<< "${first_response}")" || return 1',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'publisher_history accepts oversized page',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'page_runs="$(jq -ceS \'.workflow_runs | select(type == "array" and length <= 100 and all(.[]; type == "object" and (.id | type == "number" and . > 0 and floor == .)))\' <<< "${page_response}")" || return 1',
+        'page_runs="$(jq -ceS \'.workflow_runs | select(type == "array" and length <= 101 and all(.[]; type == "object" and (.id | type == "number" and . > 0 and floor == .)))\' <<< "${page_response}")" || return 1',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'publisher_history ignores duplicate history IDs under conditional call',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'test "$(jq -r \'[.[].id] | unique | length\' <<< "${ci_runs}")" = "${total_count}" || return 1',
+        'test "$(jq -r \'[.[].id] | unique | length\' <<< "${ci_runs}")" = "${total_count}"',
+    ),
+    'normalized job contract changed',
+)
+
+assert_rejected(
+    'outer reconciler can return unhandled error',
+    "enterprise-evidence-finalizer.yml",
+    replace_in_named_step(
+        'Reconcile exact five-context merge authority',
+        'bad_ci_observed=false',
+        'bad_ci_observed=false\n            return 1',
+    ),
+    'bad-CI evidence does not dominate failure reconciliation',
+)
+
+assert_rejected(
+    'CI removes trusted definition regressions',
+    "ci.yml",
+    replace_once(
+        "      - name: Trusted security definition regressions\n        run: |\n          python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.3'\n          python3 scripts/tests/check-security-definitions.test.py\n",
+        '',
+    ),
+    'expected exactly one workflow step named: Trusted security definition regressions',
+)
+
+assert_rejected(
+    'CI conditionally skips trusted definition regressions',
+    "ci.yml",
+    replace_in_named_step(
+        'Trusted security definition regressions',
+        '        run: |\n',
+        '        if: false\n        run: |\n',
+    ),
+    'conditionally skips mandatory step: Trusted security definition regressions',
+)
+
+assert_rejected(
+    'CI soft-fails trusted definition regressions',
+    "ci.yml",
+    replace_in_named_step(
+        'Trusted security definition regressions',
+        '          python3 scripts/tests/check-security-definitions.test.py\n',
+        '          python3 scripts/tests/check-security-definitions.test.py || true\n',
+    ),
+    'changes mandatory step body: Trusted security definition regressions',
+)
+
 print("security CI contract rejects trust-boundary and evidence mutations")

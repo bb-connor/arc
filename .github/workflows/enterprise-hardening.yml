@@ -285,7 +285,7 @@ jobs:
 
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install 1.94.1 --profile minimal --component clippy --component rustfmt
+          rustup toolchain install 1.95.0 --profile minimal --component clippy --component rustfmt
           rustup show active-toolchain
 
       - name: Install native prerequisites
@@ -406,7 +406,7 @@ jobs:
 
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install 1.94.1 --profile minimal --component clippy
+          rustup toolchain install 1.95.0 --profile minimal --component clippy
           rustup target add wasm32-unknown-unknown
           rustup show active-toolchain
 

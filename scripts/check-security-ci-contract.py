@@ -909,11 +909,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "44f78d1b6726ccb4f9dcf5ffcf1f8f447e6af3c0cd6446803e9719a7bc7ae0ea",
+    ): "ba12570c0bfc4982d977643e12522dc90b64d941224a18861556405c08140186",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "36c623035b6ea06ee45a06f29ba8232d059994fd990bba5f7a10a315df6f447d",
+    ): "96b283337273721fffd49fbd1787d0f6d85791da36e1ac042cf72ecf911e5947",
     (
         "security contract revocation",
         "bind-revocation",
@@ -1158,6 +1158,11 @@ cargo test -p chio-cli --bin chio finding
 cargo test -p chio-finding -p chio-finding-verifier
 """.strip()
 EXPECTED_CI_EVIDENCE_STEPS = (
+    (
+        "Trusted security definition regressions",
+        "python3 -m pip install --disable-pip-version-check 'PyYAML==6.0.3'\n"
+        "python3 scripts/tests/check-security-definitions.test.py",
+    ),
     ("Formal traceability gate", "bash scripts/check-mapping.sh"),
     ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
     ("Workspace format", "cargo fmt --all -- --check"),
@@ -7157,6 +7162,14 @@ def validate(root: Path) -> None:
     bad_ci_routine = publisher_run[reconciliation_start:success_start]
     success_routine = publisher_run[success_start:branch_start]
     branch_routine = publisher_run[branch_start:]
+    history_helpers = re.findall(
+        r"(?ms)^  list_matching_ci_runs\(\) \{\n.*?^  \}$", bad_ci_routine
+    )
+    if len(history_helpers) != 1:
+        raise ContractError("dedicated Security contract CI history helper is not unique")
+    # The nested catalog helper must propagate errors to its conditional
+    # callers. The outer reconciler still cannot return an unhandled failure.
+    bad_ci_control_flow = bad_ci_routine.replace(history_helpers[0], "", 1)
     if (
         failure_routine.count("--request POST") != 1
         or failure_routine.count("--request PATCH") != 1
@@ -7177,7 +7190,7 @@ def validate(root: Path) -> None:
         or "--request PATCH" in bad_ci_routine
         or bad_ci_routine.count("normalize_bad_ci_namespace ") != 5
         or bad_ci_routine.count("return 0") != 2
-        or "return 1" in bad_ci_routine
+        or "return 1" in bad_ci_control_flow
         or "bad_ci_observed=false" not in bad_ci_routine
         or "bad_ci_observed=true" not in bad_ci_routine
         or "bad_ci_create_missing=false" not in bad_ci_routine
