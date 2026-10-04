@@ -1353,6 +1353,20 @@ fn validate_capability_token(
         .validate_time(now)
         .map_err(|e| format!("invalid capability token: {e}"))?;
 
+    // The internal capability minted by this projection cannot carry the
+    // original token's authenticated workload and invocation context.
+    if token
+        .security_binding()
+        .map_err(|error| format!("invalid capability security binding: {error}"))?
+        .is_some()
+    {
+        return Err(
+            "security-bound capabilities require authenticated context-preserving kernel dispatch"
+                .to_string()
+                .into(),
+        );
+    }
+
     if let Some(ref requested_tool) = requested_tool {
         let matches = chio_kernel::capability_matches_request_with_model_metadata(
             &token,

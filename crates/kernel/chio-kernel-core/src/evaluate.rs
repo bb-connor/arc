@@ -84,8 +84,9 @@ pub struct EvaluationVerdict {
     pub reason: Option<String>,
     /// Grant index that admitted the request. Populated on Allow.
     pub matched_grant_index: Option<usize>,
-    /// Verified capability snapshot. Populated when signature + time
-    /// checks succeeded, even if a later guard denied.
+    /// Verified capability snapshot. May be populated after signature and time
+    /// checks succeed, including when a later guard denies. Unsupported security
+    /// bindings are refused without exposing this snapshot.
     pub verified: Option<VerifiedCapability>,
 }
 
@@ -417,6 +418,31 @@ fn finish_verified_evaluation(
     verified: VerifiedCapability,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
+    // Pure verification is shared with native admission, which retains the
+    // original token and enforces an authoritative security context. Portable
+    // evaluation has no such context and must refuse before guards or budgets.
+    match input.capability.security_binding() {
+        Ok(Some(_)) => {
+            return deny(
+                KernelCoreError::UnsupportedCapabilityFeature {
+                    feature: "authenticated security context".to_string(),
+                },
+                None,
+                None,
+            );
+        }
+        Ok(None) => {}
+        Err(error) => {
+            return deny(
+                KernelCoreError::InvalidCapability(CapabilityError::AttenuationViolation(
+                    error.to_string(),
+                )),
+                None,
+                None,
+            );
+        }
+    }
+
     // Step 2: subject binding.
     if verified.subject_hex() != input.request.agent_id {
         let core_err = KernelCoreError::SubjectMismatch {

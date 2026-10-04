@@ -492,3 +492,113 @@ async fn inbound_authority_dot_segments_never_reach_unregistered_upstream_route(
     }
     server.abort();
 }
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn security_binding_projection_refuses_without_upstream_effects() {
+    use chio_core_types::capability::caveat::{
+        CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA,
+    };
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counted = calls.clone();
+    let upstream = Router::new().fallback(any(move || {
+        counted.fetch_add(1, Ordering::SeqCst);
+        async { StatusCode::CREATED }
+    }));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .test_unwrap();
+    let url = format!("http://{}", listener.local_addr().test_unwrap());
+    let server = tokio::spawn(async move { axum::serve(listener, upstream).await });
+    let state = test_state(
+        ProtectProxy::routes_from_spec(PETSTORE_YAML).test_unwrap(),
+        url,
+    );
+    let issuer = &state.signer_keypair;
+    let now = chrono::Utc::now().timestamp() as u64;
+    let binding = CapabilitySecurityBinding {
+        schema: CAPABILITY_SECURITY_BINDING_SCHEMA.into(),
+        tenant_id: "tenant-a".into(),
+        lineage_id: "lineage-a".into(),
+        session_id: "session-a".into(),
+        principal_id: issuer.public_key().to_hex(),
+        isolation_epoch_id: "epoch-a".into(),
+        context_generation: 1,
+        workload_id: "workload-a".into(),
+        server_id: chio_http_core::HTTP_AUTHORITY_SERVER_ID.into(),
+        workload_signer_public_key: issuer.public_key().to_hex(),
+    };
+    let token = CapabilityToken::sign_with_security_binding(
+        CapabilityTokenBody {
+            id: "bound-upstream-capability".into(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ChioScope {
+                grants: vec![chio_http_core::http_authority_tool_grant()],
+                ..ChioScope::default()
+            },
+            issued_at: now.saturating_sub(60),
+            expires_at: now + 3600,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        binding.clone(),
+        issuer,
+    )
+    .test_unwrap();
+    assert!(token.verify_signature().test_unwrap());
+    assert_eq!(token.security_binding().test_unwrap(), Some(binding));
+    token.validate_time(now).test_unwrap();
+    let bound = serde_json::to_string(&token).test_unwrap();
+    let unbound = signed_capability_token_json(issuer, "ordinary-upstream-capability");
+    let app = build_app(state.clone());
+
+    // POST /pets is registered and DenyByDefault. A valid unbound token grants
+    // this route, but an HTTP request cannot authenticate the bound context.
+    let denied = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/pets")
+                .header("x-chio-capability", bound)
+                .body(Body::empty())
+                .test_unwrap(),
+        )
+        .await
+        .test_unwrap();
+    assert_eq!(
+        (denied.status(), calls.load(Ordering::SeqCst)),
+        (StatusCode::FORBIDDEN, 0),
+        "a valid context-bound token must not authorize an upstream effect"
+    );
+    {
+        let log = state.receipt_log.lock().await;
+        let receipt = log.receipts.last().test_unwrap();
+        assert!(receipt.verdict.is_denied());
+        assert!(receipt.capability_id.is_none());
+        assert!(receipt.verify_signature().test_unwrap());
+    }
+
+    let allowed = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/pets")
+                .header("x-chio-capability", unbound)
+                .body(Body::empty())
+                .test_unwrap(),
+        )
+        .await
+        .test_unwrap();
+    assert_eq!(allowed.status(), StatusCode::CREATED);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let log = state.receipt_log.lock().await;
+    let receipt = log.receipts.last().test_unwrap();
+    assert!(receipt.verdict.is_allowed());
+    assert_eq!(
+        receipt.capability_id.as_deref(),
+        Some("ordinary-upstream-capability")
+    );
+    assert!(receipt.verify_signature().test_unwrap());
+    server.abort();
+}
