@@ -9,7 +9,7 @@ confinement acceptance, or M5 completion.
 All five implementation tasks are complete, including the final review fixes.
 Terminal logs, compiler privacy probes, inventory comparisons and investigated
 failures are retained in
-[the evidence directory](artifacts/2026-09-29-security-module-boundaries/README.md).
+[the evidence directory](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-security-module-boundaries/README.md).
 
 ## Delivered boundaries
 

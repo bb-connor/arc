@@ -58,7 +58,7 @@ shared provider core/fabric and seven provider consumers of the changed SSE/erro
 contract. The pre-review campaign passed 883; six review regressions were added.
 The original failing OAuth-cache and duplicate-input regressions and
 intermediate consumer taxonomy failures are retained with the
-[terminal evidence](artifacts/2026-09-29-protocol-authority-boundaries/README.md).
+[terminal evidence](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-protocol-authority-boundaries/README.md).
 
 Trust-boundary, clock and negative-assertion gates passed. The clock scanner's
 three calibration cases passed. The trust gate records 364 constructors,
@@ -79,7 +79,7 @@ protocol owners satisfy their existing caps. No allowance was raised.
 
 ## Review fixes and completion
 
-The [single fresh review](artifacts/2026-09-29-protocol-authority-boundaries/final-review.md)
+The [single fresh review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-protocol-authority-boundaries/final-review.md)
 found four Important defects. The one fix pass serializes OAuth sampling with
 cache publication, validates advertised token expiry at the final cache-locked
 observation, isolates an expired writer command from healthy queued commands,
@@ -97,7 +97,7 @@ after an expired command still writes. Both capacity regressions retrieve the
 unexpired terminal result and then prove capacity becomes available at expiry.
 
 All four approved tasks are complete within the scope above. The
-[execution ledger](artifacts/2026-09-29-protocol-authority-boundaries/execution-ledger.md)
+[execution ledger](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-protocol-authority-boundaries/execution-ledger.md)
 records the scope decisions and costs. There are no unresolved review findings
 or deferred Minor findings in this batch. The initial reviewer judgment required
 fixes; closure rests on the reproduced regressions, repaired code and terminal

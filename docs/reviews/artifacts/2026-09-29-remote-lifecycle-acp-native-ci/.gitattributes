@@ -1,3 +1,0 @@
-# Preserve verbatim command output, including terminal blank lines.
-*.log -whitespace
-*.stderr -whitespace

@@ -1,1 +1,0 @@
-isolated adapter import and entrypoint removed

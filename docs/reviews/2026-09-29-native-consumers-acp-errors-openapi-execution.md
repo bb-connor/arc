@@ -96,7 +96,7 @@ insufficient to qualify its current direct Docker/provider callers.
 
 ## Verification
 
-[Artifacts](artifacts/2026-09-29-native-consumers-acp-errors-openapi/README.md)
+[Artifacts](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-consumers-acp-errors-openapi/README.md)
 include terminal logs, compressed original Cargo streams, source/binary hashes,
 worker identity, review disposition and earlier failures.
 

@@ -32,14 +32,14 @@ direct consumers. This continues remaining-work item 2 and mechanisms B/C.
    semantic review debt, not vulnerabilities or threat closure.
 
 The [plan](../superpowers/plans/2026-09-30-guard-security-readers.md),
-[per-reader dispositions](artifacts/2026-09-30-guard-security-readers/reviewed-readers.json),
-[supporting contracts](artifacts/2026-09-30-guard-security-readers/supporting-owners.json)
-and [review resolutions](artifacts/2026-09-30-guard-security-readers/review.md)
+[per-reader dispositions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-guard-security-readers/reviewed-readers.json),
+[supporting contracts](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-guard-security-readers/supporting-owners.json)
+and [review resolutions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-guard-security-readers/review.md)
 provide the detailed ownership record.
 
 ## Qualification and limits
 
-The [evidence record](artifacts/2026-09-30-guard-security-readers/README.md)
+The [evidence record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-guard-security-readers/README.md)
 contains terminal commands, failed attempts, final test counts, source/binary
 hashes and consumer compilation. This is local scoped qualification. Parsing
 never substitutes for signatures, replay, issuer/policy checks or live admission.
@@ -58,7 +58,7 @@ or activation.
 ## Next implementation batch
 
 Execute all **31 platform readers** pinned in
-[next-readers.json](artifacts/2026-09-30-guard-security-readers/next-readers.json):
+[next-readers.json](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-guard-security-readers/next-readers.json):
 
 - HTTP authority/compliance/emergency/plan inputs and transaction-passport
   evidence graphs, runtime security and verifier policy.

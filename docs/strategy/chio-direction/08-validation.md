@@ -4,7 +4,7 @@
 
 Every experiment answers a named decision. Record the hypothesis, current alternative, required guarantees, observable result, cost envelope, and what each outcome changes before writing supporting code. Thresholds come from the consumer's operating requirements. No result may be promoted from a narrow technical check into a broader adoption or market claim.
 
-Use existing source fixtures, package qualification, process crash tests, resource adapters and receipt verifiers wherever they match the selected contract. The [testing map](../../integrations/acceptance/planning-testing-map-20260910.md.gz) identifies these assets and their limits. An integration test and a live-model task answer different questions; neither replaces the other when both are relevant.
+Use existing source fixtures, package qualification, process crash tests, resource adapters and receipt verifiers wherever they match the selected contract. The [testing map](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/acceptance/planning-testing-map-20260910.md.gz) identifies these assets and their limits. An integration test and a live-model task answer different questions; neither replaces the other when both are relevant.
 
 ## Experiment catalog
 

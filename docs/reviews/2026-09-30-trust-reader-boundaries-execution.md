@@ -37,7 +37,7 @@ direct consumers needed to enforce their contracts.
 20 packages, 125 test binaries and 20 doctest groups. CLI consumers compile with
 `--tests --features iroh`. Trust inventory, file hygiene, negative-assertion,
 wire-schema and changed-file formatting checks pass without increasing limits
-or exemptions. The [artifact record](artifacts/2026-09-30-trust-reader-boundaries/README.md)
+or exemptions. The [artifact record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-trust-reader-boundaries/README.md)
 contains exact commands, terminal results, retained failed attempts and hashes.
 The compiler also exposed a missing receipt import in an existing CLI test; it
 is fixed and the consumer check rerun successfully.
@@ -57,7 +57,7 @@ No push, merge, publication or activation occurred.
 
 ## Next substantial chunk
 
-Execute the [33 pinned guard and security readers](artifacts/2026-09-30-trust-reader-boundaries/next-readers.json):
+Execute the [33 pinned guard and security readers](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-trust-reader-boundaries/next-readers.json):
 
 1. Guard loading and decisions: registry/cache/OCI/marketplace input, external
    verdict responses, embedding/classification inputs, and WASM manifest,

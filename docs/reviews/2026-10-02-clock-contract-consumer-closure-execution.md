@@ -58,7 +58,7 @@ issuance request despite a failed clock. The fix supplies the shared reputation
 context and probes before remote mutation while retaining response-time validation.
 The Minor escaped-SQL scanner gap also failed before its repair and passed after.
 
-The [review record](artifacts/2026-10-02-clock-contract-consumer-closure/independent-review.md)
+The [review record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-clock-contract-consumer-closure/independent-review.md)
 preserves the original assessment and the root fix pass. The same reviewer later
 performed a bounded CI-only follow-up, described below. Compiler-found callsite,
 module-import and unused-helper repairs
@@ -91,7 +91,7 @@ native protocol tests, plus three actual consumer-transfer and dependency-result
 controls. The committed-source review gate accounts for 116 changed
 files across six review slices.
 
-The [qualification artifact](artifacts/2026-10-02-clock-contract-consumer-closure/qualification.json)
+The [qualification artifact](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-clock-contract-consumer-closure/qualification.json)
 records commands, exit codes, raw-log digests, source-manifest digest and separate
 non-acceptance runs. Raw evidence remains in
 `/home/connor/chio-security-evidence/2026-10-02-clock-contract-consumer-closure/`.

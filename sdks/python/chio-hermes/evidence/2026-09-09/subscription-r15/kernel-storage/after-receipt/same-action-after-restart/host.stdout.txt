@@ -1,1 +1,0 @@
-The write_file call returned an unsuccessful/uncertain result and I stopped immediately as instructed.

@@ -46,9 +46,9 @@ unrepresentable-defects mechanisms A/B/C.
    in the linked evidence.
 
 The [plan](../superpowers/plans/2026-10-01-economy-authority-readers.md),
-[reader contracts](artifacts/2026-10-01-economy-authority-readers/reviewed-readers.json),
-[supporting owners](artifacts/2026-10-01-economy-authority-readers/supporting-owners.json)
-and [terminal evidence](artifacts/2026-10-01-economy-authority-readers/)
+[reader contracts](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-economy-authority-readers/reviewed-readers.json),
+[supporting owners](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-economy-authority-readers/supporting-owners.json)
+and [terminal evidence](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-economy-authority-readers)
 separate implementation from qualification.
 
 ## Contract decisions
@@ -77,7 +77,7 @@ actual adapter cause tests and seven Rekor conformance cases also pass. A full
 79-test market rerun and the settlement identity fixture qualify the test-only
 cleanups after review; they repeat coverage in the owner campaign.
 
-The [qualification record](artifacts/2026-10-01-economy-authority-readers/README.md)
+The [qualification record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-economy-authority-readers/README.md)
 identifies accepted runs and exact source hashes. The only production changes
 after independent review are an equivalent trait-object coercion for the
 existing kernel lint and a private oracle constructor feature gate. The final
@@ -99,7 +99,7 @@ the overall roadmap.
 ## Next substantial batch
 
 Execute all **23 core, kernel and SDK readers** pinned in
-[next-readers.json](artifacts/2026-10-01-economy-authority-readers/next-readers.json):
+[next-readers.json](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-economy-authority-readers/next-readers.json):
 
 - Core adversarial/supervisor ingestion (2 readers).
 - Browser/mobile kernels, process persistence/mailboxes/nonces/children/worker,

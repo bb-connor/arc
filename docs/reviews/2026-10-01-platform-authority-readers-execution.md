@@ -40,10 +40,10 @@ approved unrepresentable-defects mechanisms A/B/C.
    using checked access to its existing zeroizing buffer.
 
 The [plan](../superpowers/plans/2026-10-01-platform-authority-readers.md),
-[31 reader contracts](artifacts/2026-10-01-platform-authority-readers/reviewed-readers.json),
-[supporting owners](artifacts/2026-10-01-platform-authority-readers/supporting-owners.json),
-[review resolutions](artifacts/2026-10-01-platform-authority-readers/review.md) and
-[qualification record](artifacts/2026-10-01-platform-authority-readers/README.md)
+[31 reader contracts](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-platform-authority-readers/reviewed-readers.json),
+[supporting owners](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-platform-authority-readers/supporting-owners.json),
+[review resolutions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-platform-authority-readers/review.md) and
+[qualification record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-platform-authority-readers/README.md)
 pin implementation and validation separately.
 
 ## Publication scope
@@ -54,7 +54,7 @@ pushed before this batch. Divergent local packet tips were preserved under
 `archive/20261001/packet-1-dry-run` and
 `archive/20261001/packet-9-measurement`, without force-pushing remote history.
 All 24 selected starting security branch tips have recorded
-[remote containment](artifacts/2026-10-01-platform-authority-readers/published-starting-tips.json).
+[remote containment](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-platform-authority-readers/published-starting-tips.json).
 
 Unfinished formal-model, adversarial-case and checkpoint snapshots were committed
 and pushed separately as WIP (`806b42c12c`, `21b32859b9`, `534e8040c3`). They are
@@ -79,7 +79,7 @@ Broader semantic error taxonomy and clock/arithmetic ownership remain queued.
 ## Next substantial batch
 
 Execute all **22 economy readers** pinned in
-[next-readers.json](artifacts/2026-10-01-platform-authority-readers/next-readers.json):
+[next-readers.json](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-platform-authority-readers/next-readers.json):
 
 - Credit credentials, IOUs, factors and obligation binding/status (5 readers).
 - Fiscal evidence, continuity and readiness (3 readers).

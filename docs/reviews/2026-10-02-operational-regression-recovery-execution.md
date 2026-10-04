@@ -60,7 +60,7 @@ It found no Critical or Important issue, and one Minor: SQLite TEXT conversion
 could reject invalid UTF-8 before attaching the receipt row ID. The missing row
 context reproduced before the fix. The repaired conversion retains the row ID
 and native cause, and controls cover both UTF-16 database byte orders. The
-[review record](artifacts/2026-10-02-operational-regression-recovery/independent-review.md)
+[review record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-operational-regression-recovery/independent-review.md)
 preserves the original assessment and exclusions. Root verified the fix pass;
 no second independent review is claimed.
 
@@ -80,7 +80,7 @@ limits and remaining work, not completed acceptance claims.
 
 Raw terminal logs and SHA-256 metadata are preserved under
 `/home/connor/chio-security-evidence/2026-10-02-operational-regression-recovery/`.
-The [qualification artifact](artifacts/2026-10-02-operational-regression-recovery/qualification.json)
+The [qualification artifact](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-operational-regression-recovery/qualification.json)
 selects passing acceptance runs, verifies their raw log hashes, records the
 committed source manifest and retains all failed/intermediate runs separately.
 The accepted suites passed **640 tests and doc tests**, with no failures or

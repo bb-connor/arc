@@ -3,7 +3,7 @@
 Qualified source `67b20708a7691a69a26340baee4f189b75993801` is committed and pushed on
 `packet/3-retention-accounting`, based on
 `0a455ac2c0fb9641b96d36bb2289bcd8047c325b`. The remote ref matched that exact
-source commit after publication. The [publication record](artifacts/2026-10-03-evidence-package-trust/source-publication.json)
+source commit after publication. The [publication record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-evidence-package-trust/source-publication.json)
 retains the observation and qualified source-manifest hash. This documentation-only
 follow-up records publication without changing the qualified source. This record owns EV6 package authenticity and trusted signer
 inputs, EV7 external anchor acceptance for Chio evidence packages, EV12 strict
@@ -59,7 +59,7 @@ scope and task acceptance.
 
 ## Qualification
 
-The immutable [command index](artifacts/2026-10-03-evidence-package-trust/README.md)
+The immutable [command index](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-evidence-package-trust/README.md)
 retains every terminal command, exit and log hash, including failed campaigns.
 
 | Owner | Passing tests | Terminal command |
@@ -107,9 +107,9 @@ One independent read-only review returned **With fixes**: no new consequential
 production defect, two Important fixture corrections, no Critical or Minor. The
 author adopted those grades because both tests must reach the intended trust
 boundary. Both fixture fixes now have terminal owner passes (40/40 and 14/14);
-no production source changed during review and no Minor remains deferred. The [review](artifacts/2026-10-03-evidence-package-trust/independent-review.md)
+no production source changed during review and no Minor remains deferred. The [review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-evidence-package-trust/independent-review.md)
 preserves the original verdict; the
-[ledger](artifacts/2026-10-03-evidence-package-trust/progress.md) records each failed
+[ledger](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-evidence-package-trust/progress.md) records each failed
 run, correction and declined-boundary ruling. No second review is requested.
 
 The design deliberately requires trusted-source re-export of unsigned packages;

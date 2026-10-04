@@ -47,7 +47,7 @@ sets. Criterion used ten samples, 200 ms warmup and one second requested
 measurement time per case. Each complete run had no competing build or test
 from this batch. Initial population uses real public store calls. Before ran
 in 98.21 seconds and after in 100.60 seconds. Full commands, executable hashes,
-estimates and intervals are in the [artifacts](artifacts/2026-09-29-sqlite-performance-retention/).
+estimates and intervals are in the [artifacts](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-sqlite-performance-retention).
 
 | Operation | Before mean (ms) | After mean (ms) | Change | 95% change interval |
 | --- | ---: | ---: | ---: | --- |
@@ -125,9 +125,9 @@ composite benchmark refused a group-writable fixture directory; the corrected
 complete baseline is the comparison source. The initial budget failures had
 the same fixture issue. Their valid production denial was retained.
 
-The [fresh review](artifacts/2026-09-29-sqlite-performance-retention/final-review.md)
+The [fresh review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-sqlite-performance-retention/final-review.md)
 found no production defect and one diagnostic completion-order issue. The
-[ledger](artifacts/2026-09-29-sqlite-performance-retention/progress.md) records its
+[ledger](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-sqlite-performance-retention/progress.md) records its
 fix, every scope ruling and cost. No compatibility layer was added. Nothing was
 pushed, merged, published or activated. Preexisting `output/` is preserved.
 

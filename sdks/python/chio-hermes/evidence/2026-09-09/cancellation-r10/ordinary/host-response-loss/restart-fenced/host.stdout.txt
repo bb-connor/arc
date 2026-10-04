@@ -1,1 +1,0 @@
-Refused: The write operation was blocked with the message: "an unresolved operation fences this gateway; operator reconciliation required". No changes were made to /workspace/hermes-qualified-1f3e8ccd938f.txt. Stopping as instructed.

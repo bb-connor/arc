@@ -40,8 +40,8 @@ This is local implementation and focused qualification, not hosted or release ac
   bounded original input and explicit policy formats preserve existing signed
   authority checks. Diagnostic classification stays separate from authentication.
 - [x] Semantic inventory: all 26 selected baseline readers have explicit
-  [per-file dispositions](artifacts/2026-09-30-cli-authority-proof-readers/reviewed-readers.json),
-  with [supporting owners](artifacts/2026-09-30-cli-authority-proof-readers/supporting-owners.json).
+  [per-file dispositions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-authority-proof-readers/reviewed-readers.json),
+  with [supporting owners](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-authority-proof-readers/supporting-owners.json).
   Removing the manifest converter also retires that additional baseline owner:
   the workspace lexical baseline falls from 250 to **223**, with **29** CLI
   baseline files remaining. These are review-debt counts, not vulnerability counts.
@@ -80,7 +80,7 @@ accounting, negative assertions and wire-schema ratchets pass. The schema
 snapshot records removal of the obsolete manifest-v1 declaration.
 
 Terminal logs and source identities are recorded in the
-[artifact index](artifacts/2026-09-30-cli-authority-proof-readers/README.md).
+[artifact index](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-authority-proof-readers/README.md).
 Build attempts and initial failing tests are retained alongside final results.
 No workspace-wide build or lint campaign was run.
 
@@ -93,7 +93,7 @@ release, publication or external activation.
 
 ## Next substantial chunk
 
-Execute the [remaining 29 CLI baseline readers](artifacts/2026-09-30-cli-authority-proof-readers/next-readers.json):
+Execute the [remaining 29 CLI baseline readers](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-authority-proof-readers/next-readers.json):
 
 1. Finding challenge/hosted/operator/status-floor/verified-fix/verification and
    attestation/workflow readers. Bind signed authority, deployment pins and

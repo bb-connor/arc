@@ -35,7 +35,7 @@ owned time. No whole-database rollback defense is claimed.
 
 ## Qualification and retained failures
 
-The [qualification manifest](artifacts/2026-10-02-lease-fencing-framework-ingress/qualification.json)
+The [qualification manifest](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-lease-fencing-framework-ingress/qualification.json)
 records commands, exits, complete-log hashes, source hashes, binary hashes and
 the remote source SHA. Full logs remain under
 `/home/connor/chio-security-evidence/2026-10-02-lease-fencing-framework-ingress`.
@@ -77,7 +77,7 @@ Earlier attempts retain their actual outcomes:
   module/value namespaces. Their failing controls, diagnostics, a stale reader
   hash and the initial formatting failure remain retained.
 
-One [independent review](artifacts/2026-10-02-lease-fencing-framework-ingress/independent-review.md)
+One [independent review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-lease-fencing-framework-ingress/independent-review.md)
 found four Important issues: SQLite storage classes, nested-router bypass,
 middleware placement and alias visibility. All four have reproducing controls
 and author-verified corrections. The original negative review verdict is retained;

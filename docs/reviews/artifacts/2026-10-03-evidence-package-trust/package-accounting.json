@@ -1,9 +1,0 @@
-{
-  "command": [
-    "python3",
-    "scripts/check-accounting-arithmetic.py"
-  ],
-  "exit_code": 0,
-  "elapsed_seconds": 0.63,
-  "log_sha256": "a5f00d44c8e60bb00a557450ab30e0f4c30b729c71f875e9e1875f48167253dd"
-}

@@ -46,7 +46,7 @@ independent review. No minor findings were deferred.
 ## Verification
 
 All selected implementation tasks and review repairs are complete locally.
-[Terminal evidence and earlier failures](artifacts/2026-09-29-enforced-native-protocol-boundaries/README.md)
+[Terminal evidence and earlier failures](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-enforced-native-protocol-boundaries/README.md)
 retain the exact commands, logs and source boundary.
 
 | Boundary | Terminal result |

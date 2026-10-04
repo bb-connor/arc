@@ -38,7 +38,7 @@ Remote library tests passed 54/54. Final clippy and CLI build passed; the initia
 needless-borrow lint error and aggregate import-format failure are retained.
 Formatting was corrected before the immutable final build. Raw observations,
 the exact runner and hashes are in
-[evidence/20260909-ack-run1](evidence/20260909-ack-run1/SHA256SUMS).
+[evidence/20260909-ack-run1](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/20260909-ack-run1/SHA256SUMS).
 
 This is shared kernel qualification. Host packages must implement durable save
 before acknowledgement and pass their own I01-I08 cases on the matching build.
@@ -66,5 +66,5 @@ observed the known error, refusal of a new call before acknowledgement, exact
 error replay, and useful work after durable verification and acknowledgement.
 The regression test failed before the fix; all 55 remote library tests and
 clippy passed afterward. Exact build/source identity, raw tests, runner and
-independent dispatch log are in [20260909-tool-error-ack](evidence/20260909-tool-error-ack/SHA256SUMS).
+independent dispatch log are in [20260909-tool-error-ack](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/20260909-tool-error-ack/SHA256SUMS).
 Host-specific qualification against this artifact remains required.

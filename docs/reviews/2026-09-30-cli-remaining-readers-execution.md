@@ -2,7 +2,7 @@
 
 Source base: `da4086017f`, branch `packet/3-retention-accounting`, checkout
 `/tmp/arc-security-launch`. This batch implements the 29-reader queue in the
-[preceding handoff](artifacts/2026-09-30-cli-authority-proof-readers/next-readers.json).
+[preceding handoff](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-authority-proof-readers/next-readers.json).
 
 ## Delivered boundaries
 
@@ -50,8 +50,8 @@ The final iroh-enabled build and **266 focused tests pass** (247 CLI unit
 controls, 18 integration tests and one private-profile custody test). Trust
 inventory, file hygiene, clock, arithmetic, negative-assertion, wire-schema and
 changed-file formatting checks pass. Qualification and source identities are recorded in the
-[artifact index](artifacts/2026-09-30-cli-remaining-readers/README.md).
-The [one independent review](artifacts/2026-09-30-cli-remaining-readers/review-resolutions.md)
+[artifact index](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-remaining-readers/README.md).
+The [one independent review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-remaining-readers/review-resolutions.md)
 identified failed-read budget accounting, profile custody, publish identity and
 binary size contracts; each has an explicit resolution. Initial failed build,
 fixture/expectation failures and ratchet diagnostics are retained.
@@ -68,7 +68,7 @@ concurrent replacement of ancestor directories still requires OS isolation.
 
 ## Next substantial chunk
 
-Execute the [28 remaining protocol reader owners](artifacts/2026-09-30-cli-remaining-readers/next-readers.json):
+Execute the [28 remaining protocol reader owners](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-cli-remaining-readers/next-readers.json):
 
 1. Provider-adapter-core and egress HTTP: original-byte and response-size limits,
    redacted typed failures, transport deadlines and response identity.

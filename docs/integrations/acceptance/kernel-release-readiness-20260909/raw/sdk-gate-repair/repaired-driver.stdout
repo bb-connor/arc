@@ -1,2 +1,0 @@
-TS release driver executes packed dependency consumers and fails closed on consumer/nounset errors
-check-sdk-release-ts-bun.test.sh: toolchain and behavioral consumer checks passed

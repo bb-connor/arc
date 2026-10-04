@@ -50,7 +50,7 @@ kernel admission. That full pre-repair sequence was not executed. The repaired
 controls exercise both actual network import paths and composed kernel denial;
 the execution checklist records this narrower baseline evidence explicitly.
 
-The [bounded independent review](artifacts/2026-10-02-identity-authority-release-closure/independent-review.md)
+The [bounded independent review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-identity-authority-release-closure/independent-review.md)
 found no Critical issue and two Important issues: the generic public-key parser
 accepted syntactically valid off-curve keys, and incomplete legacy authority
 history could appear to open successfully with an empty trust set. Both failed
@@ -77,7 +77,7 @@ allowance was added.
 
 ## Terminal qualification
 
-The [qualification artifact](artifacts/2026-10-02-identity-authority-release-closure/qualification.json)
+The [qualification artifact](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-identity-authority-release-closure/qualification.json)
 records commands, exact committed file hashes, terminal exit codes and raw log
 hashes. Raw evidence, including failed and intermediate attempts, remains at
 `/home/connor/chio-security-evidence/2026-10-02-identity-authority-release-closure/`.

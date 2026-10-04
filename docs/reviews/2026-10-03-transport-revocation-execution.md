@@ -37,7 +37,7 @@ The [operator guide](../security/http-transport.md) documents migration and flag
 ## Verification and review
 
 Terminal commands, logs and source/binary identities are retained in
-[the command index](artifacts/2026-10-03-transport-revocation/README.md).
+[the command index](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-transport-revocation/README.md).
 The final runtime results are:
 
 | Boundary | Passing controls | Retained command |
@@ -80,10 +80,10 @@ findings and no Critical or Minor findings: private PEM parsing left secret
 copies unwiped and native errors retained private input for debug/source output.
 Both were accepted and repaired in one pass. A diagnostic regression failed on
 private marker byte arrays before the change and passed afterward. The
-[private-key ownership audit](artifacts/2026-10-03-transport-revocation/private-key-ownership.md)
+[private-key ownership audit](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-transport-revocation/private-key-ownership.md)
 accounts for successful and failing scratch/DER paths; it does not claim a
 post-free memory probe or a native crypto-library audit. The
-[review and dispositions](artifacts/2026-10-03-transport-revocation/independent-review.md)
+[review and dispositions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-transport-revocation/independent-review.md)
 retain the original verdict and declined boundaries. There was no second review.
 
 ## Decisions and limits

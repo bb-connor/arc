@@ -57,10 +57,10 @@ resolver; actual proposal and token admission still require explicit policy.
 The retained local archive is
 `/home/connor/chio-security-evidence/2026-10-02-lifecycle-approval-authority`.
 Each runner record contains the exact command, terminal exit code, elapsed time
-and SHA-256 of the complete log. The [qualification manifest](artifacts/2026-10-02-issuer-lifecycle-approval-authority/qualification.json)
+and SHA-256 of the complete log. The [qualification manifest](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-issuer-lifecycle-approval-authority/qualification.json)
 binds terminal records, binary hashes and changed source hashes to the source
 commit. Earlier failures and cancellation remain separate records. The
-[independent review](artifacts/2026-10-02-issuer-lifecycle-approval-authority/independent-review.md)
+[independent review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-issuer-lifecycle-approval-authority/independent-review.md)
 records all four findings and their accepted source corrections.
 
 | Final executed scope | Passed | Limits |

@@ -3,7 +3,7 @@
 Qualified source `ec6359a7d7fbcf0384dc667c50d9b51f3b4f3be4` is committed and pushed on
 `packet/3-retention-accounting`, based on
 `62ce6c65c3e9de306bc40d40102fe8c4a4dcf3d1`. The remote ref matched that exact source
-commit after publication; the [publication record](artifacts/2026-10-03-receipt-evidence-lifecycle/source-publication.json)
+commit after publication; the [publication record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-receipt-evidence-lifecycle/source-publication.json)
 retains the observation and qualified source-manifest hash. This documentation-only
 follow-up records publication without changing qualified code.
 This record owns AP9, AP10, AP11 and the API/start portion
@@ -66,7 +66,7 @@ define the batch boundary.
 ## Qualification
 
 Terminal commands, exact log hashes and source/binary manifests are retained in
-[the command index](artifacts/2026-10-03-receipt-evidence-lifecycle/README.md).
+[the command index](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-receipt-evidence-lifecycle/README.md).
 
 | Boundary | Passing controls | Terminal command |
 | --- | ---: | --- |
@@ -120,9 +120,9 @@ tool/decision/cost/subject filter drift, point reads and export. Redelivery cont
 also retain strict duplicate, changed-content and missing-archive failures.
 
 The original report, severity labels, declined boundaries and dispositions are in
-[the independent review](artifacts/2026-10-03-receipt-evidence-lifecycle/independent-review.md).
+[the independent review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-receipt-evidence-lifecycle/independent-review.md).
 All decisions and their costs are in the
-[execution ledger](artifacts/2026-10-03-receipt-evidence-lifecycle/progress.md).
+[execution ledger](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-03-receipt-evidence-lifecycle/progress.md).
 There is no second review and no deferred Minor after the regrade. The fresh 821-test
 owner campaign passes after both fixes; two scale campaigns remain ignored.
 

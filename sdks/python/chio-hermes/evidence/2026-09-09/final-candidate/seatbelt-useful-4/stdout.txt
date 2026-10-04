@@ -1,5 +1,0 @@
-  ⚠ tirith security scanner enabled but not available — command scanning will use pattern matching only
-The verified contents of /workspace/hermes-final.txt are:
-Chio Hermes final workflow.
-
-All steps completed successfully.

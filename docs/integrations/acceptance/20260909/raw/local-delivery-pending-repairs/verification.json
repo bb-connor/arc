@@ -1,8 +1,0 @@
-{
-  "verifiedManifests": {
-    "/Users/connor/.local/share/chio-required-candidates/20260909": 47,
-    "/Users/connor/.local/share/chio-required-candidates/20260909/pending/provider-blocked-repairs": 3
-  },
-  "nativeProviderChecks": "blocked, not performed by installation",
-  "acceptedIntegrations": 0
-}

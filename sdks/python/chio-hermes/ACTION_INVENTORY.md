@@ -57,10 +57,10 @@ inherit the same boundary; Node runs only outside the agent sandbox.
 The implementation is bound by [`restricted.py`](src/chio_hermes/restricted.py)
 and [`GatewayTransport`](src/chio_hermes/gateway_transport.py). Actual direct and
 descendant controls, native excluded tools, useful work and recovery are retained
-in the [final local record](evidence/2026-09-10/static-kernel-native/README.md).
+in the [final local record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-10/static-kernel-native/README.md).
 That record identifies the tested versions and its publication boundary.
 
 Historical allow-default profiles and host-writable gateway journals were
 rejected authority boundaries. Their narrow observations and omitted harness
-source are retained in the [historical followup archive](evidence/2026-09-10/historical-followup/README.md).
+source are retained in the [historical followup archive](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-10/historical-followup/README.md).
 Those observations do not qualify the current parent-owned architecture.

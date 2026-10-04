@@ -13,7 +13,7 @@ Codex ChatGPT login cache and explicit `gpt-5.5` model. The guest receives only
 an ephemeral loopback token. It receives neither the provider credential nor
 kernel/journal authority. Native login owns token renewal.
 
-[Subscription evidence](evidence/2026-09-09/subscription-r15/) identifies the
+[Subscription evidence](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/subscription-r15) identifies the
 cold-installed wheel, source hashes, commands, raw host output, gateway delivery
 records and independent resource observations. Wheel SHA-256:
 `625979d5331796e7aef5906e69e3e2c746796aa570291af026c305ed4227c818`.
@@ -50,7 +50,7 @@ SIGKILL. Original authorities remained fenced after uncertain results. Where a
 trusted completed owner result existed, explicit import or delivery export and
 acknowledgment restored a native read without repeating the write.
 
-The [current gate and boundary record](evidence/2026-09-09/subscription-r15/COVERAGE.md)
+The [current gate and boundary record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/subscription-r15/COVERAGE.md)
 maps each observation to retained raw evidence, separates startup refusals from
 native dispatch tests, and names the four unresolved legacy tests. Current
 plugin omission exposed no alternate tools; missing, crashed and timed-out
@@ -78,7 +78,7 @@ The same r15 host also passed five exact alternate-path/tool denials: forbidden
 secret file, normalized secret read and normalized forbidden write. Every case
 records the exact native arguments and returned tool call, a verified denial,
 zero dispatches and an unchanged independent resource snapshot. See
-[all five runs](evidence/2026-09-09/subscription-r15/alternate-paths/).
+[all five runs](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/subscription-r15/alternate-paths).
 
 Three fresh dedicated owners now have real kernel storage-failure evidence
 under the same r15 wheel. Each first completed and acknowledged one native
@@ -87,7 +87,7 @@ before dispatch, and admission store after an effect yielded respectively
 one, zero and one effects, with no delivery ACK. Twelve exact native same/new
 action retries across unlock and same-owner restart produced no further
 dispatch. Original configuration, session, journal and databases were retained.
-[Kernel storage evidence](evidence/2026-09-09/subscription-r15/kernel-storage/)
+[Kernel storage evidence](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/subscription-r15/kernel-storage)
 includes read-only DB snapshots and independent resource observations.
 
 A separate healthy owner supplied three paired read-only timing observations.
@@ -96,7 +96,7 @@ direct installed-bridge execution intervals of 493.979, 493.591 and 446.094 ms.
 Total native process times were 13.519, 12.422 and 12.325 seconds. Startup and
 model latency cannot be separated from these observations. All six reads are
 independently audited and bytes stayed unchanged. See the
-[timing evidence](evidence/2026-09-09/subscription-r15/operational-timing/) and
+[timing evidence](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/subscription-r15/operational-timing) and
 coverage record for the method, all differences, operator interventions and
 limits; these are not a general overhead or performance guarantee.
 
@@ -108,7 +108,7 @@ limits; these are not a general overhead or performance guarantee.
 - Runs used a tracked-only archive of the installed revision. Unrelated
   upstream untracked files and the normal Hermes profile were preserved.
 - Plugin baseline: project 0.1.1, manifest incorrectly 0.1.0. Candidate 0.1.2.
-  [Baseline identities](evidence/2026-09-09/baseline.json) record OS,
+  [Baseline identities](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/baseline.json) record OS,
   architecture and preliminary wheel hashes.
 - Legacy source SDKs: `chio-sdk-python` 0.1.0, `chio-code-agent` 0.1.0,
   `chio-adapter-base` 0.2.0. Current id-only evaluation intentionally cannot
@@ -177,7 +177,7 @@ request method trace, tool outcomes and operation journals are retained.
 
 ## Final candidate observations
 
-[Final evidence](evidence/2026-09-09/final-candidate/) includes the exact kernel
+[Final evidence](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/final-candidate) includes the exact kernel
 source `04b7d366d62c886c39bc202f58ef0d44e8f5aee7`, binary SHA-256
 `e7539855906bd5eb7b4eb2e5a12ca0533889cf61ced3bf4adf5850b792aa6447`,
 image/policy/signer identities and wheel hashes. The bridge archive tested here

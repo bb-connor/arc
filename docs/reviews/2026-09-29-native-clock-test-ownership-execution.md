@@ -74,9 +74,9 @@ Preexisting `output/` is preserved.
 
 ## Failure evidence and decisions
 
-The [artifact ledger](artifacts/2026-09-29-native-clock-test-ownership/progress.md)
+The [artifact ledger](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/progress.md)
 records every scope decision and its cost if wrong. The
-[fresh review](artifacts/2026-09-29-native-clock-test-ownership/final-review.md)
+[fresh review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/final-review.md)
 records two Important findings and no Critical/Minor findings. The emergency
 stop now latches before reading time; clock failure produces absent timestamp
 metadata and cannot resume execution after time recovers. Its unavailable,
@@ -110,7 +110,7 @@ so the runtime evidence expires first without changing either duration. Its
 subsequent history/reopen queries also use the current fixture clock; the
 intermediate stale-observation failure is retained.
 
-The [native qualification inventory](artifacts/2026-09-29-native-clock-test-ownership/native-qualification.json)
+The [native qualification inventory](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/native-qualification.json)
 reconciles all 143 selected names against terminal logs, in execution order:
 
 | Run | Result | Selected boundary |
@@ -123,11 +123,11 @@ reconciles all 143 selected names against terminal logs, in execution order:
 
 The full campaign's running executable was preserved by renaming it before
 rebuilding the focused repairs, so its subprocess cases continued to execute
-the same candidate. The [executable record](artifacts/2026-09-29-native-clock-test-ownership/native-campaign-executable.json)
+the same candidate. The [executable record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/native-campaign-executable.json)
 retains that observation. All failed/interrupted campaigns and intermediate
 repair failures remain evidence. No second full native campaign was repeated
 after these narrow fixes; this is local boundary qualification, not
-exact-candidate whole-workspace CI. The [artifact index](artifacts/2026-09-29-native-clock-test-ownership/README.md)
+exact-candidate whole-workspace CI. The [artifact index](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/README.md)
 records build/command scope, limitations and checksums. Both Important review
 findings are fixed and locally qualified; there are no deferred Minor findings.
 

@@ -1,3 +1,0 @@
-The operation was not performed. The result state is "not_dispatched" due to an "operation identity conflict with retained request," meaning it could not proceed because the operation identity conflicted with a tracked prior request.
-
-No further action was taken.

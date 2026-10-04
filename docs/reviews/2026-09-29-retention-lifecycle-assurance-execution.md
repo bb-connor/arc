@@ -69,7 +69,7 @@ vacuity cannot pass. The eleven obligations completed in under one second on
 this host. Focused Clippy passed before the final capture isolation change;
 the final verification record states the post-repair result separately.
 
-The [artifacts](artifacts/2026-09-29-retention-lifecycle-assurance/) preserve
+The [artifacts](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-retention-lifecycle-assurance) preserve
 terminal evidence. No full-workspace build, release campaign or long 256-case
 retention rerun was needed for this implementation batch.
 
@@ -102,7 +102,7 @@ candidate-wide qualification as separately bounded acceptance work.
 
 ## Final verification
 
-The [fresh review](artifacts/2026-09-29-retention-lifecycle-assurance/final-review.md)
+The [fresh review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-retention-lifecycle-assurance/final-review.md)
 found two Important checker gaps: unchecked native command authority/identifiers
 and intermediate commit hashes. Six failing refusal regressions reproduced them.
 One fix pass derives command identities, binds their full authority and expiry
@@ -127,6 +127,6 @@ Post-fix evidence is terminal:
 
 Both Important findings are fixed, with no deferred minors. The workflow uses
 one fresh review and one tested fix pass; there was no second review. The
-[execution ledger](artifacts/2026-09-29-retention-lifecycle-assurance/execution-ledger.md)
+[execution ledger](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-retention-lifecycle-assurance/execution-ledger.md)
 records the five explicit scope rulings and their costs. The branch and worktree
 remain local; preexisting `output/` is preserved.

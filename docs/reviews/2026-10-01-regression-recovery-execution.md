@@ -44,7 +44,7 @@ An absent diagnostic tombstone never restores authority.
 ## Qualification record
 
 Terminal commands, outcomes, durations and SHA-256 log digests are recorded in the
-[qualification artifact](artifacts/2026-10-01-regression-recovery/qualification.json). New raw logs remain outside Git. Failed,
+[qualification artifact](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-regression-recovery/qualification.json). New raw logs remain outside Git. Failed,
 interrupted and superseded runs are retained distinctly from final acceptance.
 Qualification is local; publication and exact-candidate hosted checks are separate.
 

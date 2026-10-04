@@ -44,7 +44,7 @@ Implementation is local; this record does not establish hosted or release qualif
 - [x] Semantic inventory: 27 active baseline readers reviewed and one retired;
   the lexical baseline falls from 278 to 250. Per-file contracts and supporting
   decoder owners are registered, and the gate protects the reviewed owner set.
-  See [all 28 dispositions](artifacts/2026-09-30-product-authority-readers/reviewed-readers.json).
+  See [all 28 dispositions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-product-authority-readers/reviewed-readers.json).
 
 Bounds are 16 MiB per general CLI/proof artifact, 1 MiB for private CLI host files
 and stored API receipts, 8 MiB per replay record, 64 MiB per replay corpus and
@@ -70,7 +70,7 @@ Final focused validation passes **557 tests**, with no failures or ignored tests
 | Sealed proof-result deserialization compile-fail | 1 passed |
 | Trust boundaries, file hygiene, changed-file formatting | Passed |
 
-[Commands, source hashes and raw terminal logs](artifacts/2026-09-30-product-authority-readers/README.md)
+[Commands, source hashes and raw terminal logs](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-product-authority-readers/README.md)
 are retained with the earlier failed attempts. The CLI container scenarios use
 an engine double with real local supervision/journal behavior. Their passing
 result does not qualify native container enforcement. Cargo emitted the existing
@@ -96,7 +96,7 @@ No push, merge, release or external activation is performed here.
 
 ## Next substantial chunk
 
-Execute the [26 CLI proof and authority readers](artifacts/2026-09-30-product-authority-readers/next-readers.json):
+Execute the [26 CLI proof and authority readers](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-product-authority-readers/next-readers.json):
 
 1. Proof collection, assembly, export, doctor, environment, risk, explanation and
    fixture readers. Carry original bytes, bounded collection and verified-result

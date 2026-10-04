@@ -154,8 +154,8 @@ negative controls passed before the complete final rerun. Every prior full sweep
 remains retained with its actual source boundary and result.
 
 Terminal command outcomes, log hashes and the final source manifest are recorded
-in the [compact qualification artifact](artifacts/2026-10-01-ci-authority-time-repair/qualification.json) beside the
-[structural review](artifacts/2026-10-01-ci-authority-time-repair/structural-gate-review.json).
+in the [compact qualification artifact](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-ci-authority-time-repair/qualification.json) beside the
+[structural review](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-01-ci-authority-time-repair/structural-gate-review.json).
 Raw logs remain outside Git. Failed, interrupted and superseded runs retain their
 actual statuses. Publication and exact-candidate hosted qualification remain separate.
 

@@ -120,6 +120,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/protocol/chio-envoy-ext-authz/**",
             "crates/protocol/chio-hosted-mcp/**",
             "crates/protocol/chio-mcp-remote/**",
+            "crates/protocol/chio-http-serve/**",
             "crates/observability/chio-otel-receipt-exporter/**",
             "crates/protocol/chio-openai-adapter/**",
             "crates/protocol/chio-provider-adapter-core/**",

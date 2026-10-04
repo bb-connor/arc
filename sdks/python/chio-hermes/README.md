@@ -128,7 +128,7 @@ requires uv 0.12.11 in the recorded installation.
 | Kernel | CLI 0.1.1-rc.1 at `bafa02b06de93553cecb6f60b340f3dd8fd9b401` |
 | Protected platform | macOS with `/usr/bin/sandbox-exec` |
 
-[Exact artifact identities](evidence/2026-09-10/static-kernel-native/README.md#frozen-inputs)
+[Exact artifact identities](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-10/static-kernel-native/README.md#frozen-inputs)
 include the separately installed recovery operator. Version numbers alone are
 insufficient to select a compatible installation.
 
@@ -192,8 +192,8 @@ uv run --locked --extra dev ruff check src tests scripts
 | Record | What it establishes |
 | --- | --- |
 | [Acceptance ledger](ACCEPTANCE.md) | Observed cases, source/artifact identities, failures and remaining gates |
-| [Native subscription coverage](evidence/2026-09-09/subscription-r15/COVERAGE.md) | Useful work, negative controls and identity/recovery checks through Hermes |
-| [Static-kernel native record](evidence/2026-09-10/static-kernel-native/README.md) | Pinned public host install, failure cutpoints and offline lifecycle observations |
+| [Native subscription coverage](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-09/subscription-r15/COVERAGE.md) | Useful work, negative controls and identity/recovery checks through Hermes |
+| [Static-kernel native record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-10/static-kernel-native/README.md) | Pinned public host install, failure cutpoints and offline lifecycle observations |
 | [Action inventory](ACTION_INVENTORY.md) | Reachable tools, disabled paths and resource ownership |
 
 Four legacy sidecar tests are opt-in and remain unresolved. Mock-client tests

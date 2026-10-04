@@ -28,7 +28,7 @@ build cache, `CARGO_INCREMENTAL=0`, `CARGO_BUILD_JOBS=2`, and default debug prof
 
 ## Actual resource results
 
-[Run 3 raw cases](evidence/20260909-run3/cases.json) records **24 passed, zero
+[Run 3 raw cases](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/20260909-run3/cases.json) records **24 passed, zero
 failed, zero skipped**. Its private runtime is
 `/tmp/chio-session-credential-resource-20260909-3`, random TCP port `56483`, and
 Docker volume `chio-required-credentials-6e9501377a53`. The kernel was stopped and
@@ -50,24 +50,24 @@ the volume and databases retained. The test operated only on its own resources.
 | Restart | Known useful work resumed under the same retained session; uncertain work remained fenced after restart |
 | Lost owner session state | Removing the test's retained session database made the old credential unusable; no new session was minted and no effect occurred |
 
-[Request timings](evidence/20260909-run3/timings.json) are local observations,
+[Request timings](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/20260909-run3/timings.json) are local observations,
 not a comparative benchmark. The 14 HTTP-200 tool requests, including completed
 replay and signed denials, ranged from 6.309 ms through 762.541 ms, with median
 485.1815 ms. The intentionally timed-out request is excluded from that range.
 
 ## Retained failures and limits
 
-[Run 1](evidence/20260909-run1/runner.log) stopped after two successful observer
+[Run 1](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/20260909-run1/runner.log) stopped after two successful observer
 controls because the harness passed both `--authority-db` and
 `--authority-seed-file`, which the kernel correctly rejected. The harness now
-uses only the durable authority database. [Run 2](evidence/20260909-run2/cases.json)
+uses only the durable authority database. [Run 2](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/20260909-run2/cases.json)
 passed 23 cases; run 3 added actual credential rotation under an unresolved call.
 No failed run was replaced with fabricated or synthetic acceptance.
 
 Both operator secrets were scanned against all retained raw files and were
 absent. Exchanged bearer secrets are absent from the evidence as well. The
 operator-only runtime files intentionally retain credentials outside the
-committed evidence. [SHA256SUMS](evidence/SHA256SUMS) binds the raw records.
+committed evidence. [SHA256SUMS](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/integrations/session-credentials/evidence/SHA256SUMS) binds the raw records.
 
 Pending or uncertain calls have no automatic unfencing procedure. The delivered
 operator procedure is inspect the original receipt/resource outcome, revoke

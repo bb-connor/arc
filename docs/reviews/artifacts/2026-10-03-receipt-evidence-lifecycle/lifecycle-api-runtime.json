@@ -1,9 +1,0 @@
-{
-  "command": [
-    "/home/connor/chio-security-target-6d-final/debug/deps/chio_api_protect-ccd2b5c469a28190",
-    "--test-threads=2"
-  ],
-  "exit_code": 101,
-  "elapsed_seconds": 39.82,
-  "log_sha256": "b568e5b0388b670910807cb2ea188c25984c2de9fe4db23e9207b290b2723724"
-}

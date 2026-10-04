@@ -1,9 +1,0 @@
-{
-  "command": [
-    "python3",
-    "scripts/check-rust-hygiene.py"
-  ],
-  "exit_code": 2,
-  "elapsed_seconds": 0.03,
-  "log_sha256": "837e887489b041bb0751facb4a4e102b99e840c5618b7017cc72ed0cf02c07ef"
-}

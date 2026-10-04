@@ -35,7 +35,7 @@ migrated by task 1.
 ## Final review and repairs
 
 One independent read-only reviewer inspected the implementation without running
-builds or spawning additional agents. Its [record](artifacts/2026-09-29-remote-lifecycle-acp-native-ci/review.txt)
+builds or spawning additional agents. Its [record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-remote-lifecycle-acp-native-ci/review.txt)
 identifies two substantive findings:
 
 1. `Ready` and `touch` could publish extended authority before persistence
@@ -55,7 +55,7 @@ independent approval or native-host qualification is inferred.
 ## Terminal local evidence
 
 All Cargo commands below used `CARGO_INCREMENTAL=0`. Logs and the progress
-ledger are archived under [the evidence directory](artifacts/2026-09-29-remote-lifecycle-acp-native-ci/).
+ledger are archived under [the evidence directory](https://github.com/bb-connor/arc/tree/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-remote-lifecycle-acp-native-ci).
 `SHA256SUMS` records exact artifact bytes. The source manifest records changed
 production, test and workflow inputs independently of generated evidence.
 

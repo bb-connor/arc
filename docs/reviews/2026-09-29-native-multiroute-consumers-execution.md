@@ -94,7 +94,7 @@ socket paths, independent of human-readable scenario names.
 
 ## Verification and evidence
 
-The [continuation evidence](artifacts/2026-09-29-native-multiroute-consumers/continuation-20260930/README.md)
+The [continuation evidence](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-29-native-multiroute-consumers/continuation-20260930/README.md)
 contains terminal logs, reports, source differences and binary/package hashes.
 The original artifact directory preserves the preceding partial qualification.
 Exact commands/selectors and failures belong to those records; counts below

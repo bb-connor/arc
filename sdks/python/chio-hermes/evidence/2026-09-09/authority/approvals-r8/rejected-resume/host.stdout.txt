@@ -1,1 +1,0 @@
-The request was not executed. The operator denied the proposal before dispatch, so no action was taken. Task stopped as instructed — no substitution or retries attempted.

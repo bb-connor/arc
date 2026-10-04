@@ -24,7 +24,7 @@ Authority: mechanisms B/C in `2026-09-26-unrepresentable-defects-design.md`, `do
 
 All four tasks are complete in the local scope. The
 [execution record](../../reviews/2026-09-30-guard-security-readers-execution.md)
-and [terminal evidence](../../reviews/artifacts/2026-09-30-guard-security-readers/README.md)
+and [terminal evidence](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-guard-security-readers/README.md)
 record the implemented repairs, retained existing contracts, review resolutions,
 failed attempts, focused reruns, consumer compilation and remaining acceptance
 boundaries. The next implementation batch is the 31 pinned platform readers.

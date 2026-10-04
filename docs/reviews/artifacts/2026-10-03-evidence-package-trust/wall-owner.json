@@ -1,9 +1,0 @@
-{
-  "command": [
-    "/home/connor/chio-security-target-6d-final/debug/deps/chio_wall-1113f1553764562e",
-    "--test-threads=2"
-  ],
-  "exit_code": 0,
-  "elapsed_seconds": 1.12,
-  "log_sha256": "dbed2d57fd5e0ad1d47fb6953a92e3d39a0f26248ac7c0350a28f4d40bae1546"
-}

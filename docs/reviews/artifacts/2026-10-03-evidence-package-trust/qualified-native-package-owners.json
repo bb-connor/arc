@@ -1,9 +1,0 @@
-{
-  "command": [
-    "/home/connor/chio-security-target-6d-final/debug/deps/evidence_export-cc9b3ab5dbda2341",
-    "--test-threads=2"
-  ],
-  "exit_code": 0,
-  "elapsed_seconds": 3.31,
-  "log_sha256": "f88810a40198e6075220b140b19c5df2d4a78a356a8fca65e7f890eb68795fd9"
-}

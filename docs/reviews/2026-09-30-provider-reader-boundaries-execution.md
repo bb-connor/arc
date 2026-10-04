@@ -38,7 +38,7 @@ I-JSON policy.
 
 **596 tests pass** across 12 affected packages with all eight provider fixture
 features. Trust inventory, file hygiene, negative-assertion, wire-schema and
-changed-file formatting checks pass. The [artifact record](artifacts/2026-09-30-provider-reader-boundaries/README.md)
+changed-file formatting checks pass. The [artifact record](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-provider-reader-boundaries/README.md)
 contains commands, terminal results, failed attempts, source identities and
 review resolutions. Tests are local, including actual loopback HTTP and the
 native AWS SDK with an injected transport; they do not establish live-provider
@@ -56,7 +56,7 @@ isolation concerns rather than claims of this helper layer.
 
 ## Next substantial chunk
 
-Execute the [35 remaining trust readers](artifacts/2026-09-30-provider-reader-boundaries/next-readers.json):
+Execute the [35 remaining trust readers](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-09-30-provider-reader-boundaries/next-readers.json):
 
 1. Attestation, credentials, buyer proofs and model cards: bound original imports,
    preserve exact signature/digest meaning and native numeric domains, and retain

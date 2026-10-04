@@ -1,1 +1,0 @@
-Hermes restricted launch refused: private gateway transport timed out; preserve original operation

@@ -1,1 +1,0 @@
-Request denied: writing to /workspace/forbidden.txt is not permitted by policy ("guard denied the request: guard 'guard-pipeline' denied the request"). No change was made. Stopping as directed.

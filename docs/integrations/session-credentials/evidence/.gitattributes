@@ -1,2 +1,0 @@
-# Preserve exact test output, including whitespace in initial formatter failures.
-**/*.log -text -whitespace

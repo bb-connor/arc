@@ -37,7 +37,7 @@ and model-relay loopback ports are reachable, not the kernel port. The relay
 accepts the selected supported model route and tool format; provider credentials
 remain in the parent. Kernel-owned uncertainty fencing complements the private
 gateway journal. Other operating systems and providers are refused pending
-qualification. See the [action inventory](../ACTION_INVENTORY.md) and the [current local evidence](../evidence/2026-09-10/static-kernel-native/README.md) for the boundary and supporting source links.
+qualification. See the [action inventory](../ACTION_INVENTORY.md) and the [current local evidence](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/sdks/python/chio-hermes/evidence/2026-09-10/static-kernel-native/README.md) for the boundary and supporting source links.
 
 ## Installation and launch
 

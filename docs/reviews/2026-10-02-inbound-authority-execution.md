@@ -57,7 +57,7 @@ as did the production proof-preview control. CLI parsing and 22 focused review
 controls passed. Counts above describe individual owner runs, not one full
 workspace runtime campaign. Failed compiler/fixture runs and the CLI test abort
 remain retained. Final commands, logs and source/binary identities are in the
-[artifact directory](artifacts/2026-10-02-inbound-authority/README.md).
+[artifact directory](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-inbound-authority/README.md).
 
 Workspace qualification also repaired stale A2A/ACP-Client example callers, all three
 examples' unbounded line allocation, and MCP's duplicate-collapsing example reader.
@@ -71,7 +71,7 @@ findings and no Critical or Minor finding. Both were reproduced and repaired:
 native/stdio issuance now uses an operator-bound caller key, remote issuance and
 resume retain the verified sender key, and URL normalization changes deny before
 route authorization. The 22 focused controls subsequently passed. The
-[original verdict and dispositions](artifacts/2026-10-02-inbound-authority/independent-review.md)
+[original verdict and dispositions](https://github.com/bb-connor/arc/blob/ecb44791501c2aba671de2a967d2506f039ab42e/docs/reviews/artifacts/2026-10-02-inbound-authority/independent-review.md)
 remain retained; there was no second independent review and no Minor deferral.
 The integrated run additionally found that existing nested clients send the same
 proof both explicitly and in their operation. Equal typed proofs now coalesce;
