@@ -7,6 +7,14 @@
 superseded PRs without losing source or review obligations, and retain an exact
 remaining-work ledger.
 
+**Current landing state (October 4):** #1168 is merged to `main` at
+`4e3d94f07df30f37f364dd562b3e793c5cbf4e68`. All 25 exact-head workflow runs
+passed on attempt 1, with 79 successful and ten explicitly skipped checks;
+all 13 review threads are resolved. #1167 is the sole active prerequisite at
+`dd0e727ae6bc49728ec0e7e77be9b52ef85768a4`, composed on that actual main base.
+Its 20 behavioral methods pass locally; hosted qualification is running.
+#1160 remains local preparation and has not been projected or landed.
+
 **Architecture:** Preserve the accumulated branch as an immutable reference.
 Land dependency closure and trusted workflow definitions first. Use PR #1160 for
 the bounded foundation; qualify subsequent changes in dependency order. Keep at
@@ -169,7 +177,7 @@ two unqualified FIPS Rustdoc claims and one test-only sorting lint. The
 retains the input snapshots, command logs and independent reviews. The inventory
 remains 1,343 records at that checkpoint; composed foundation acceptance is still open.
 
-The latest inventory contains **1,344 records**. The additional obligation records
+The consumer-repair checkpoint contains **1,344 records**. The additional obligation records
 the reproduced native unsigned-discovery decimal regression. Its repair and the
 wrap evidence-claim containment are committed at `690ab00ada`. Sixty portable
 tests and strict lint passed. The real native discovery control failed on the
@@ -202,12 +210,25 @@ named controls passed after including the 15 approved additions. The earlier
 observer failure and incomplete 581-control assembly remain separate records.
 Actual merged-base checks and final foundation qualification are still required.
 
+The current inventory contains **1,346 records**. Twenty-five bounded #1168
+requirements now have verified main ancestry and completed prerequisite landing
+acceptance. Their prior acceptance lists remain in the JSON history. The two
+new obligations record native wrapper defects: Docker's bind inventory order
+was treated as authority, and `umask 077` prevented the isolated identity from
+reading materialized source. Both failed before repair and pass component tests
+at `98911149a4`. A native retry passed those startup boundaries but failed later
+in the trusted verifier. The diagnostic repair at `77b8302ade` preserves a bounded,
+escaped output tail only after verifier and broker cleanup; it does not change
+acceptance. Final native/trusted evidence and independent hosted review remain
+required. The [prerequisite landing evidence](audits/foundation-prerequisite-landing-20261004.json.gz)
+retains 62 records, including unsuccessful attempts, with SHA-256
+`fcaa9561afc96351a7f5cb9db108d6ae3d741c498e12c22215a439bce3305893`.
+
 ## Active queue
 
 | Order | PR | Responsibility | Acceptance |
 | --- | --- | --- | --- |
-| 1 | [#1168](https://github.com/bb-connor/arc/pull/1168) | Dependency closure and genuine upstream/fork audit | Review dispositions, exact-source tests, required terminal CI, protected merge |
-| 2 | [#1167](https://github.com/bb-connor/arc/pull/1167) | Trusted workflow definitions | Qualified dependency base, complete reviewed definitions, required terminal CI, protected merge |
+| 1 | [#1167](https://github.com/bb-connor/arc/pull/1167) | Trusted workflow definitions | Dependency base is merged; exact-head hosted checks, refreshed review and protected merge remain |
 | Waiting | [#1160](https://github.com/bb-connor/arc/pull/1160) | Bounded process/security foundation | Both histories, required security repairs, independent review, native/trusted evidence, exact-candidate CI |
 
 Later hardening and product-evidence slices receive a PR only when an active
@@ -250,7 +271,7 @@ dependency closure and trusted workflow definitions on `main`.
   failures and run default, FIPS and DES regression qualification.
 - [x] Repair confirmed regressions with failing-then-passing checks. Verify
   standalone locks, reduced build contexts and workflow triggers.
-- [ ] Obtain an independent review and required terminal checks for #1168's exact
+- [x] Obtain an independent review and required terminal checks for #1168's exact
   head, then merge without bypassing protection.
 - [ ] Integrate that main base into #1167, qualify its reviewed definitions and
   exact-head checks, then merge without bypassing protection.
