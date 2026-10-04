@@ -1748,7 +1748,12 @@ pub fn verify_oracle_inclusion_walk_parity() {
         return;
     };
     let model_root = model_inclusion_root(leaf, model_index, model_size, &proof.audit_path);
-    let actual_root = proof.compute_root_from_hash(leaf).ok();
+    let actual_result = proof.compute_root_from_hash(leaf);
+    let actual_root = actual_result.as_ref().ok().copied();
+    // This harness proves the traversal's returned value. Retain the result
+    // without exploring destructors of unrelated variants in the shared Error
+    // type, as the other public harnesses do for owned response values.
+    core::mem::forget(actual_result);
     assert!(abstract_hash_options_equal(actual_root, model_root));
 }
 

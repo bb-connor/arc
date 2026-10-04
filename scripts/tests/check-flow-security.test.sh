@@ -101,7 +101,7 @@ expected_counts = {
     "native global journal migration": 4,
     "native nonce issuance custody": 1,
     "native policy clock bounds": 1,
-    "security types library": 20,
+    "security types library": 26,
     "security capability-set suspension types": 4,
     "security egress-restriction types": 2,
     "security event types": 3,

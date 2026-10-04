@@ -47,6 +47,11 @@ cargo check -p chio-security-types --no-default-features --target wasm32-unknown
 cargo check -p chio-flow --no-default-features --target wasm32-unknown-unknown
 
 run_exact_target --label "security types library" --expected \
+  clock::advancing::tests::overflow_and_regression_cannot_replace_the_anchor \
+  clock::tests::authority_expiry_and_skew_boundaries_are_exact \
+  clock::tests::clock_fence_refuses_regression_without_replacing_the_high_water \
+  clock::tests::conversions_never_wrap_or_substitute_epoch_zero \
+  clock::tests::retries_cannot_extend_authority_when_wall_time_stops \
   declassification::tests::invalid_time_and_top_target_reject_before_signing \
   declassification::tests::validated_body_round_trips_strictly \
   flow::tests::blank_principal_and_compartment_are_rejected \
@@ -67,6 +72,7 @@ run_exact_target --label "security types library" --expected \
   flow::tests::tool_flow_declaration_is_strict_and_canonical \
   flow::tests::unknown_and_variant_payload_fields_are_rejected \
   flow::tests::utf8_identifier_limit_is_normative_in_bytes \
+  ports::bounded::reader_boundary_tests::collection_limit_does_not_construct_overflow_elements \
   -- cargo test -p chio-security-types --lib
 
 run_exact_target --label "security capability-set suspension types" --expected \

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Smoke runs create authority databases and bearer tokens. Their fresh state
+# must be private; the authority still rejects unsafe existing ancestors.
+umask 077
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 pick_free_port() {

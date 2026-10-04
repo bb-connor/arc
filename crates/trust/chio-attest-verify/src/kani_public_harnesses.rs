@@ -42,6 +42,9 @@
 //!   listed below. Anyone reading the manifest must rely on those
 //!   tests, not Kani, for proof that production fail-closed
 //!   semantics hold.
+//! - These return-value models retain their owned error results without
+//!   running destructors. Error cleanup, including unrelated nested error
+//!   variants, is outside the modeled quote acceptance contract.
 //!
 //! Negative-conformance regression coverage for the three modelled
 //! verify_quote impls (live runtime, not model):
@@ -285,6 +288,7 @@ pub fn public_nitro_verify_quote_rejects_report_data_mismatch() {
         // model's algebra (no false negatives).
         assert!(result.is_ok());
     }
+    core::mem::forget(result);
 }
 
 /// Real public surface exercised symbolically: a `SevSnp`-style quote
@@ -347,6 +351,7 @@ pub fn public_sev_snp_verify_quote_rejects_unacceptable_tcb() {
     // boolean; this pins the predicate against any future regression
     // that would make `is_acceptable()` time-dependent or impure.
     assert_eq!(tcb_status.is_acceptable(), acceptable);
+    core::mem::forget(result);
 }
 
 /// Real public surface exercised symbolically: a `Tdx`-style quote
@@ -402,4 +407,6 @@ pub fn public_tdx_verify_quote_rejects_algorithm_mismatch() {
     };
     let bad_result = model_verify_quote(bad_outcome);
     assert!(matches!(bad_result, Err(AttestError::Malformed(_))));
+    core::mem::forget(result);
+    core::mem::forget(bad_result);
 }

@@ -4855,7 +4855,7 @@ def validate_isolated_execution_job(
 # pinned action and unprivileged job setting. Update only after reviewing the
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
-    "threshold-crypto-floor": "58997985e30007a2de2535df94d8899cde6f234d2a56d1d842dc24c90821c5bf",
+    "threshold-crypto-floor": "5ae66bc1cb766994b1d568e592acd66b294404bf3dbb1f5ef7ebc9761b07bf19",
     "session-reports": "d1c24c08fdfe5a79033589e1d370a8103249353792a1b690c98de9f29e2ccbfe",
     "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
 }

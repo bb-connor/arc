@@ -35,6 +35,8 @@ fi
 bash -n examples/hello-drogon/run.sh examples/hello-drogon/smoke.sh
 cargo build --locked -p chio-cli --bin chio
 CHIO_BIN="${CARGO_TARGET_DIR:-${repo_root}/target}/debug/chio" \
+  bash scripts/tests/hello-http-authority.test.sh
+CHIO_BIN="${CARGO_TARGET_DIR:-${repo_root}/target}/debug/chio" \
   CHIO_DROGON_REQUIRE_DEPS=1 ./examples/hello-drogon/smoke.sh
 
 echo "chio-drogon checks passed"
