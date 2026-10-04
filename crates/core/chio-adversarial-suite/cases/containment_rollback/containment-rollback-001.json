@@ -64,8 +64,8 @@
       {
         "id": "approval_plan_field_omission",
         "control_id": "plan_hash_control",
-        "package": "chio-quarantine",
-        "source": "crates/security/chio-quarantine/src/state_machine.rs",
+        "package": "chio-response-model",
+        "source": "crates/core/chio-response-model/src/state.rs",
         "function": "compute_plan_hash",
         "minimum_caught": 1,
         "mutant": {

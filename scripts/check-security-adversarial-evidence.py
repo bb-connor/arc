@@ -5321,7 +5321,7 @@ def prepare_enterprise_descriptor_control(
             "--target",
             "x86_64-unknown-linux-musl",
             "--package",
-            "chio-cage",
+            "chio-cage-init",
             "--bin",
             "chio-cage-init",
             "--features",
@@ -5679,7 +5679,10 @@ def run_campaign(
     if campaign["id"] == "sandbox_fd_leak":
         # The descriptor closer runs in cage-init. An externally prebuilt
         # helper would stay unchanged while cargo-mutants edits its source.
-        # Build the static PIE helper and integration test from each mutant.
+        # Include the helper package's integration target so Cargo rebuilds
+        # its standalone binary alongside the consuming cage test.
+        if cross_package_control:
+            command.extend(["--test-package", campaign["package"]])
         command.append("--cargo-arg=--target=x86_64-unknown-linux-musl")
         mutation_environment = dict(environment)
         mutation_environment.pop("CHIO_CAGE_TEST_HELPER", None)

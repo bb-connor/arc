@@ -22,8 +22,8 @@
       {
         "id": "sandbox_false_exec_success",
         "control_id": "exec_truth_control",
-        "package": "chio-cage",
-        "source": "crates/security/chio-cage/src/enforcement.rs",
+        "package": "chio-cage-plan",
+        "source": "crates/security/chio-cage-plan/src/enforcement.rs",
         "function": "FullyEnforcedEvidence::validate",
         "minimum_caught": 1,
         "mutant": {

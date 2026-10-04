@@ -12,7 +12,7 @@
       {
         "id": "manifest_signature_control",
         "package": "chio-cage",
-        "test_source": "crates/security/chio-cage/src/lib_parts/part_02.rs",
+        "test_source": "crates/security/chio-cage/src/lib.rs",
         "target_kind": "lib",
         "test_name": "tests::signature_is_verified_before_permissions_are_read"
       }

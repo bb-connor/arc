@@ -4056,6 +4056,45 @@ checker.atomic_replace_many(
     else:
         raise AssertionError("outcome with a different replacement passed semantic binding")
 
+    # Resolve the generated helper command against Cargo's actual target graph.
+    # A library dependency on the helper crate does not register its binary in
+    # the cage package.
+    workspace_metadata = json.loads(subprocess.check_output(
+        ["cargo", "metadata", "--offline", "--locked", "--no-deps", "--format-version=1"],
+        cwd=root,
+    ))
+
+    class HelperBuildObserved(Exception):
+        pass
+
+    def observe_helper_build(command: list[str], *_args: object) -> str:
+        package_name = command[command.index("--package") + 1]
+        binary_name = command[command.index("--bin") + 1]
+        package = next(
+            package for package in workspace_metadata["packages"]
+            if package["name"] == package_name
+        )
+        if not any(
+            target["name"] == binary_name and target["kind"] == ["bin"]
+            for target in package["targets"]
+        ):
+            raise AssertionError(
+                f"descriptor helper build names no registered binary: {package_name}/{binary_name}"
+            )
+        raise HelperBuildObserved
+
+    original_helper_runner = checker.run_checked
+    checker.run_checked = observe_helper_build
+    try:
+        try:
+            checker.prepare_enterprise_descriptor_control(root, {})
+        except HelperBuildObserved:
+            pass
+        else:
+            raise AssertionError("descriptor setup did not build its helper")
+    finally:
+        checker.run_checked = original_helper_runner
+
     checker.run_control = lambda *_args, **_kwargs: None
     checker.validate_outcomes = lambda *_args, **_kwargs: None
     actual_cargo_mutants_executable = checker.cargo_mutants_executable
@@ -4296,6 +4335,54 @@ checker.atomic_replace_many(
             f"unexpected cross-package outcome path: {cross_package_returned}"
         )
 
+    def observe_descriptor_mutation(
+        command: list[str],
+        _root: Path,
+        environment: dict[str, str],
+        **kwargs: object,
+    ) -> str:
+        packages = [
+            command[index + 1] for index, argument in enumerate(command)
+            if argument == "--test-package"
+        ]
+        if packages != ["fixture-control-package", "fixture-package"]:
+            raise AssertionError(
+                f"descriptor mutation must rebuild the helper package and its consuming test: {packages}"
+            )
+        if "CHIO_CAGE_TEST_HELPER" in environment:
+            raise AssertionError("descriptor mutation reused an external unmutated helper")
+        if environment.get("CHIO_CAGE_TEST_FD_LEAK") != "/target/artifacts/probe-12":
+            raise AssertionError("descriptor mutation lost its real native probe")
+        if "--cargo-arg=--target=x86_64-unknown-linux-musl" not in command:
+            raise AssertionError("descriptor mutation lost its static helper target")
+        if any(argument.startswith("--cargo-arg=--test=") for argument in command):
+            raise AssertionError("descriptor mutation narrowed away the helper binary build")
+        if kwargs.get("execution_options") != {
+            "executable": "/proc/self/fd/97", "pass_fds": (97,),
+        }:
+            raise AssertionError("descriptor mutation lost its authenticated execution binding")
+        output = Path(command[command.index("--output") + 1]) / "mutants.out"
+        output.mkdir()
+        (output / "outcomes.json").write_text("{}\n", encoding="utf-8")
+        return ""
+
+    checker.run_checked = observe_descriptor_mutation
+    checker.run_campaign(
+        campaign_root,
+        {**runner_campaign, "id": "sandbox_fd_leak"},
+        {
+            "id": "descriptor_closure_control", "package": "fixture-control-package",
+            "features": [], "target_kind": "test", "target": "linux_enforcement",
+            "test_name": "target_exec_has_no_leaked_control_or_resource_descriptors",
+        },
+        temp / "descriptor-campaign-output",
+        {
+            **enterprise_campaign_environment,
+            "CHIO_CAGE_TEST_HELPER": "/target/artifacts/prebuilt-helper",
+            "CHIO_CAGE_TEST_FD_LEAK": "/target/artifacts/probe-12",
+        },
+    )
+
     duplicate_native = copy.deepcopy(runner_native)
     duplicate_native["span"]["start"]["line"] = 2
     duplicate_native["span"]["end"]["line"] = 2
@@ -4380,9 +4467,9 @@ checker.atomic_replace_many(
     else:
         raise AssertionError("in-place mutation left changed source without rejection")
     if (
-        campaign_authentications != [trusted_tool, trusted_tool, trusted_tool]
-        or campaign_version_checks != [trusted_tool, trusted_tool, trusted_tool]
-        or len(campaign_execution_bindings) != 6
+        campaign_authentications != [trusted_tool] * 4
+        or campaign_version_checks != [trusted_tool] * 4
+        or len(campaign_execution_bindings) != 8
     ):
         raise AssertionError("campaign executions did not bind the pinned engine")
     checker.cargo_mutants_executable = actual_cargo_mutants_executable
