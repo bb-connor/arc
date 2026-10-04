@@ -193,6 +193,8 @@ impl Salt {
 }
 
 impl From<Okm<'_, Algorithm>> for Salt {
+    // CHIO-LINT hkdf-salt-from: Preserve upstream infallible From; native derivation failure panics.
+    #[allow(clippy::unwrap_used)]
     fn from(okm: Okm<'_, Algorithm>) -> Self {
         let algorithm = okm.len;
         let salt_len = okm.len.len();
@@ -343,6 +345,8 @@ impl Prk {
     /// # Panics
     /// Panics if the given Prk length exceeds the limit
     #[must_use]
+    // CHIO-LINT hkdf-prk-new: Preserve documented rejection by panic when the PRK exceeds its length limit.
+    #[allow(clippy::expect_used)]
     pub fn new_less_safe(algorithm: Algorithm, value: &[u8]) -> Self {
         Prk::try_new_less_safe(algorithm, value).expect("Prk length limit exceeded.")
     }
@@ -404,6 +408,8 @@ impl Prk {
 }
 
 impl From<Okm<'_, Algorithm>> for Prk {
+    // CHIO-LINT hkdf-prk-from: Preserve upstream infallible From; native derivation failure panics.
+    #[allow(clippy::unwrap_used)]
     fn from(okm: Okm<Algorithm>) -> Self {
         let algorithm = okm.len;
         let key_len = okm.len.len();

@@ -13,6 +13,8 @@ on:
       - "supply-chain/**"
       - "third_party/aws-lc-rs-chio/**"
       - "scripts/check-aws-lc-fork.py"
+      - "scripts/check-aws-lc-lints.py"
+      - "scripts/tests/check-aws-lc-lints.test.py"
       - "scripts/check-supply-chain.sh"
       - "scripts/tests/check-aws-lc-fork.test.py"
       - "scripts/tests/check-supply-chain-workflows.test.py"
@@ -29,6 +31,8 @@ on:
       - "supply-chain/**"
       - "third_party/aws-lc-rs-chio/**"
       - "scripts/check-aws-lc-fork.py"
+      - "scripts/check-aws-lc-lints.py"
+      - "scripts/tests/check-aws-lc-lints.test.py"
       - "scripts/check-supply-chain.sh"
       - "scripts/tests/check-aws-lc-fork.test.py"
       - "scripts/tests/check-supply-chain-workflows.test.py"
@@ -62,7 +66,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install --profile minimal
+          rustup toolchain install --profile minimal --component clippy
           rustup show active-toolchain
 
       - name: Install cargo-vet

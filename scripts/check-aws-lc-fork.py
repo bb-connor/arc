@@ -184,6 +184,9 @@ def check(root: Path, args: argparse.Namespace) -> None:
     report = root / record["report"]["path"]
     if not report.resolve().is_relative_to(root) or digest(report.read_bytes()) != record["report"]["sha256"]:
         raise AuditError("fork audit report changed")
+    lint_policy = root / "supply-chain/aws-lc-lint-exceptions.json"
+    if digest(lint_policy.read_bytes()) != record.get("lint_policy_sha256"):
+        raise AuditError("fork lint dispositions changed since source review")
     fork = root / FORK
     verify_source_tree(fork, record["files"])
     verify_policy(root)

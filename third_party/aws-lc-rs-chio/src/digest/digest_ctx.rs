@@ -44,6 +44,8 @@ unsafe impl Send for DigestContext {}
 unsafe impl Sync for DigestContext {}
 
 impl Clone for DigestContext {
+    // CHIO-LINT digest-clone: Preserve upstream Clone; native context-copy failure panics.
+    #[allow(clippy::expect_used)]
     fn clone(&self) -> Self {
         self.try_clone().expect("Unable to clone DigestContext")
     }

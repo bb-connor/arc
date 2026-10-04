@@ -61,11 +61,15 @@ impl Drop for SymmetricCipherKey {
             SymmetricCipherKey::Aes128 { enc_key, dec_key }
             | SymmetricCipherKey::Aes192 { enc_key, dec_key }
             | SymmetricCipherKey::Aes256 { enc_key, dec_key } => unsafe {
+                // CHIO-LINT zeroize-enc: Pointer is derived from a live exclusive reference; cast preserves nonnull address for full zeroization.
+                #[allow(clippy::unwrap_used)]
                 let enc_bytes: &mut [u8; size_of::<AES_KEY>()] = (enc_key as *mut AES_KEY)
                     .cast::<[u8; size_of::<AES_KEY>()]>()
                     .as_mut()
                     .unwrap();
                 enc_bytes.zeroize();
+                // CHIO-LINT zeroize-dec: Pointer is derived from a live exclusive reference; cast preserves nonnull address for full zeroization.
+                #[allow(clippy::unwrap_used)]
                 let dec_bytes: &mut [u8; size_of::<AES_KEY>()] = (dec_key as *mut AES_KEY)
                     .cast::<[u8; size_of::<AES_KEY>()]>()
                     .as_mut()
@@ -77,6 +81,8 @@ impl Drop for SymmetricCipherKey {
             SymmetricCipherKey::Des { key }
             | SymmetricCipherKey::DesEde { key }
             | SymmetricCipherKey::DesEde3 { key } => unsafe {
+                // CHIO-LINT zeroize-key: Pointer is derived from a live exclusive reference; cast preserves nonnull address for full zeroization.
+                #[allow(clippy::unwrap_used)]
                 let key_bytes: &mut [u8; size_of::<DesKey>()] = (key as *mut DesKey)
                     .cast::<[u8; size_of::<DesKey>()]>()
                     .as_mut()
@@ -165,7 +171,9 @@ impl SymmetricCipherKey {
         if key_bytes.len() != DES_KEY_LEN {
             return Err(KeyRejected::unspecified());
         }
-        let k: &[u8; 8] = key_bytes.try_into().expect("length already checked");
+        let k: &[u8; 8] = key_bytes
+            .try_into()
+            .map_err(|_| KeyRejected::unspecified())?;
         let ks = Self::des_set_key(k)?;
         let zero = MaybeUninit::<DES_key_schedule>::zeroed();
         unsafe { Ok([ks, zero.assume_init(), zero.assume_init()]) }
@@ -191,8 +199,12 @@ impl SymmetricCipherKey {
         }
         // `as_chunks` is only stable since Rust 1.88.0, so use explicit slicing
         // instead to stay within the crate's MSRV.
-        let first_key: &[u8; 8] = key_bytes[0..8].try_into().expect("length already checked");
-        let second_key: &[u8; 8] = key_bytes[8..16].try_into().expect("length already checked");
+        let first_key: &[u8; 8] = key_bytes[0..8]
+            .try_into()
+            .map_err(|_| KeyRejected::unspecified())?;
+        let second_key: &[u8; 8] = key_bytes[8..16]
+            .try_into()
+            .map_err(|_| KeyRejected::unspecified())?;
 
         // SP 800-67 §3.1 requires K1 != K2 for 2-Key TDEA; if they are equal
         // the cipher degenerates to single-DES (56-bit effective security).
@@ -250,11 +262,15 @@ impl SymmetricCipherKey {
         }
         // `as_chunks` is only stable since Rust 1.88.0, so use explicit slicing
         // instead to stay within the crate's MSRV.
-        let first_key: &[u8; 8] = key_bytes[0..8].try_into().expect("length already checked");
-        let second_key: &[u8; 8] = key_bytes[8..16].try_into().expect("length already checked");
+        let first_key: &[u8; 8] = key_bytes[0..8]
+            .try_into()
+            .map_err(|_| KeyRejected::unspecified())?;
+        let second_key: &[u8; 8] = key_bytes[8..16]
+            .try_into()
+            .map_err(|_| KeyRejected::unspecified())?;
         let third_key: &[u8; 8] = key_bytes[16..24]
             .try_into()
-            .expect("length already checked");
+            .map_err(|_| KeyRejected::unspecified())?;
 
         // SP 800-67 §2 (Keying Option 1) requires K1, K2 and K3 to be
         // pairwise independent. We enforce that all three subkeys are distinct

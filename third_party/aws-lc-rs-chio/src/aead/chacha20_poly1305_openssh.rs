@@ -161,6 +161,8 @@ struct Key {
 }
 
 impl Key {
+    // CHIO-LINT openssh-key-halves: KEY_LEN is twice chacha::KEY_LEN; both halves have fixed, exact lengths.
+    #[allow(clippy::unwrap_used)]
     fn new(key_material: &[u8; KEY_LEN]) -> Key {
         // The first half becomes K_2 and the second half becomes K_1.
         let (k_2, k_1) = key_material.split_at(chacha::KEY_LEN);

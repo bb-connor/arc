@@ -51,7 +51,21 @@ def require_cpp_source_binding(text):
         raise AssertionError("registry must retain the qualified source commit")
 
 
+def require_vendor_lints(text):
+    for command in ("python3 scripts/tests/check-aws-lc-lints.test.py",
+                    "python3 scripts/check-aws-lc-lints.py"):
+        if command not in text.splitlines():
+            raise AssertionError("composite must run standalone Clippy and its negative controls")
+
+
 class PublishingBoundaryTests(unittest.TestCase):
+    def test_composite_requires_standalone_vendor_lint_gate(self):
+        text = (ROOT / "scripts/check-supply-chain.sh").read_text()
+        require_vendor_lints(text)
+        for name in ("scripts/check-aws-lc-lints.py", "scripts/tests/check-aws-lc-lints.test.py"):
+            with self.subTest(command=name), self.assertRaises(AssertionError):
+                require_vendor_lints(text.replace(f"python3 {name}", f"# python3 {name}"))
+
     def test_cpp_archive_and_ports_use_the_audited_source(self):
         text = (ROOT / ".github/workflows/release-cpp.yml").read_text()
         require_cpp_source_binding(text)

@@ -52,7 +52,7 @@ impl ConstPointer<'_, EVP_PKEY> {
             return Err(KeyRejected::wrong_algorithm());
         }
 
-        let bits: c_int = self.key_size_bits().try_into().unwrap();
+        let bits = unsafe { EVP_PKEY_bits(self.as_const_ptr()) };
         if bits < ED25519_MIN_BITS {
             return Err(KeyRejected::too_small());
         }
@@ -84,12 +84,16 @@ impl ConstPointer<'_, EVP_PKEY> {
         self.key_size_bits() / 8
     }
 
+    // CHIO-LINT pkey-bits: Bundled native bits methods return nonnegative sizes or zero; retain checked conversion.
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn key_size_bits(&self) -> usize {
         unsafe { EVP_PKEY_bits(self.as_const_ptr()) }
             .try_into()
             .unwrap()
     }
 
+    // CHIO-LINT pkey-size: Bundled native size methods return nonnegative sizes or zero; retain checked conversion.
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn signature_size_bytes(&self) -> usize {
         unsafe { EVP_PKEY_size(self.as_const_ptr()) }
             .try_into()
@@ -128,7 +132,7 @@ impl ConstPointer<'_, EVP_PKEY> {
     ) -> Result<Vec<u8>, Unspecified> {
         let key_size_bytes =
             TryInto::<usize>::try_into(unsafe { EVP_PKEY_bits(self.as_const_ptr()) })
-                .expect("fit in usize")
+                .map_err(|_| Unspecified)?
                 / 8;
         let mut cbb = LcCBB::new(key_size_bytes * 5);
         match version {
@@ -562,6 +566,8 @@ impl LcPtr<EVP_PKEY> {
 }
 
 impl Clone for LcPtr<EVP_PKEY> {
+    // CHIO-LINT pkey-clone: Existing owner is nonnull; refcount increment reconstructs the same pointer.
+    #[allow(clippy::expect_used)]
     fn clone(&self) -> Self {
         // EVP_PKEY_up_ref increments the refcount using AWS-LC's thread-safe refcount
         // implementation: lock-free `_Atomic` CAS on the C11-atomic build, `InterlockedIncrement`-

@@ -367,7 +367,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install Rust toolchain
         run: |
-          rustup toolchain install --profile minimal
+          rustup toolchain install --profile minimal --component clippy
           rustup show active-toolchain
       - name: Install cargo-vet
         run: cargo install cargo-vet --locked --version 0.10.2

@@ -1,9 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0 OR ISC
 
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+
 use std::env;
 
-fn main() {
+fn main() -> Result<(), env::VarError> {
     let has_mutually_exclusive_features = cfg!(feature = "non-fips") && cfg!(feature = "fips");
     assert!(
         !has_mutually_exclusive_features,
@@ -36,7 +38,7 @@ fn main() {
 
     if let Some(dev_test_only) = enable_dev_test_only {
         if dev_test_only {
-            let profile = env::var("PROFILE").unwrap();
+            let profile = env::var("PROFILE")?;
             if !profile.contains("dev") && !profile.contains("debug") && !profile.contains("test") {
                 println!("cargo:warning=### PROFILE: '{profile}' ###");
                 panic!("dev-tests-only feature only allowed for dev profile builds");
@@ -73,6 +75,7 @@ fn main() {
     }
 
     export_sys_vars(sys_crate);
+    Ok(())
 }
 
 fn export_sys_vars(sys_crate: &str) {

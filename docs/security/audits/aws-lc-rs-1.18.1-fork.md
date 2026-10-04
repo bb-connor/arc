@@ -76,6 +76,8 @@ separate dependency with its own retained audit and upstream source identity.
 | AES-128/192 native setup leaves unused integer fields untouched; safe Rust assumed a fully initialized AES_KEY | Both native backends, binding field definitions, and native Memcheck reproduction | Zero-initialize all six AES_KEY allocations before native setup; preserve native return checks |
 | DES weak/semi-weak parity variants and parity-distinct equal TDEA components were accepted | Retained failing registry regression, native key-validation contract | Normalize odd parity, reject every nonzero native key-setup result, compare effective keys ignoring parity |
 | Private diagnostic interpreted a whole zero-filled buffer as a single unchecked C string | Native termination contract and the Rust constructor's interior-NUL precondition | Use bounded safe `CStr::from_bytes_until_nul` |
+| Standalone fork did not inherit the workspace's unwrap/expect deny policy | Direct standalone Clippy failed, beginning in build.rs; library and backend-specific diagnostics measured separately | Add its own deny floor, propagate errors through existing fallible APIs, and enforce exact source-bound exceptions for retained compatibility contracts |
+| FIPS RSA predicate panicked on a non-RSA key despite returning a validation boolean | New exact test failed with `KeyRejected("WrongAlgorithm")` | Reject the key before native RSA validation; regression retained |
 
 The AES repair leaves the native algorithm's used schedule words unchanged. The
 new test reads the unused words of encryption and decryption schedules for both
@@ -92,6 +94,12 @@ The corrected native fork also passed 386 library tests with `legacy-des`, all
 three DES regressions, 36 doctests with one ignored, and 491 FIPS library tests.
 These source tests used the retained native x86_64 qualification worker; they
 do not constitute the later exact landing candidate's hosted/native qualification.
+
+The subsequent lint repair is documented in
+[the standalone policy review](aws-lc-rs-1.18.1-lint-review.md). Its local Linux
+aarch64 library campaigns passed 386 default/legacy tests and 492 FIPS tests,
+including the new wrong-algorithm regression. These are additional source-level
+results and do not replace exact landing CI or native foundation acceptance.
 
 ## Audit enforcement
 
@@ -117,6 +125,15 @@ verdict matrix and reduced Docker workspaces, the Cargo Vet audit graph, and the
 DES/AES regressions. Registry/path substitution, a second AWS-LC Rust copy, and
 features outside the reviewed deployment set are rejected. Cargo Vet by itself
 is only the upstream-review/transitive-audit portion of this combined gate.
+
+The composite also runs standalone library Clippy with both lints denied and a
+separate forced-warning measurement. The latter must match the reviewed exception
+inventory exactly: 37 default/legacy sites and 38 FIPS sites (39 distinct sites
+across 34 narrowly scoped items). Forced warnings alone cannot pass this gate.
+The authenticated source record binds the exception inventory as well as the
+fork bytes. Compiler-backed mutation controls reject new sites, including inside
+existing allowed functions and in legacy-only code. They also reject missing deny
+floors, changed allow scopes, and removed mandatory gate invocations.
 
 The unit mutation controls exercise changed, omitted, added and symlinked source,
 registry and alternate-path substitution, duplicate AWS-LC copies and unreviewed

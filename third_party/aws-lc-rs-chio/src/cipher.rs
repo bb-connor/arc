@@ -348,7 +348,10 @@ pub enum OperatingMode {
 }
 
 impl OperatingMode {
-    fn evp_cipher(&self, algorithm: &Algorithm) -> ConstPointer<'_, EVP_CIPHER> {
+    fn evp_cipher(
+        &self,
+        algorithm: &Algorithm,
+    ) -> Result<ConstPointer<'_, EVP_CIPHER>, Unspecified> {
         let alg = match (self, algorithm.id) {
             (OperatingMode::CBC, AlgorithmId::Aes128) => unsafe { EVP_aes_128_cbc() },
             (OperatingMode::CTR, AlgorithmId::Aes128) => unsafe { EVP_aes_128_ctr() },
@@ -399,7 +402,7 @@ impl OperatingMode {
                 unreachable!("DES does not support CTR or CFB128 modes")
             }
         };
-        unsafe { ConstPointer::new_static(alg).unwrap() }
+        unsafe { ConstPointer::new_static(alg).map_err(|()| Unspecified) }
     }
 }
 
@@ -766,6 +769,8 @@ impl Debug for UnboundCipherKey {
 }
 
 impl From<hkdf::Okm<'_, &'static Algorithm>> for UnboundCipherKey {
+    // CHIO-LINT cipher-from-okm: Preserve upstream infallible From; native derivation or key initialization failure panics.
+    #[allow(clippy::unwrap_used)]
     fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
         let mut key_bytes = [0; MAX_CIPHER_KEY_LEN];
         let key_bytes = &mut key_bytes[..okm.len().key_len];

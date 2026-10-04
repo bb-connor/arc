@@ -30,6 +30,14 @@ diagnostic uses a bounded safe C-string constructor. See the
 [source audit](../../docs/security/audits/aws-lc-rs-1.18.1-fork.md) for the
 reviewed boundaries, the Memcheck reproduction and remaining limitations.
 
+The standalone library and build script enforce Clippy's unwrap/expect denies.
+Fallible constructors propagate environment, native descriptor/length, parsing
+and key-validation errors. The FIPS RSA predicate rejects a non-RSA key without
+panicking. Existing upstream infallible compatibility methods and verified
+invariants retain narrowly identified exceptions. The mandatory lint gate checks
+their exact compiler spans and source hashes for default/legacy and FIPS library
+builds; the fork is not claimed panic-free.
+
 Five em dashes in upstream documentation and Rust documentation comments are
 normalized to hyphens for the repository text convention. They do not affect
 compiled behavior.
@@ -43,7 +51,8 @@ files present in the registry archive, excluding this provenance document.
 It is an ASCII JSON array of patch lines; decoding preserves the original UTF-8
 bytes, including removed upstream text. It adds the DES regression target and
 changes the crate manifest, DES key validation, AES initialization, the private
-error diagnostic and the five text-convention occurrences. The 71 test fixtures
+error diagnostic, standalone lint policy and fallible boundary repairs, and the
+five text-convention occurrences. The 71 test fixtures
 missing from the published archive are copied from the upstream commit above.
 Their checked-in hashes are in
 [CHIO-RESTORED-FIXTURES.sha256](CHIO-RESTORED-FIXTURES.sha256).
