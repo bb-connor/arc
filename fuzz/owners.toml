@@ -16,6 +16,14 @@
 crate = "chio-attest-verify"
 path  = "crates/trust/chio-attest-verify"
 
+[targets.response_authority_protocol]
+crate = "chio-control-plane"
+path  = "crates/platform/chio-control-plane"
+
+[targets.response_lifecycle]
+crate = "chio-quarantine"
+path  = "crates/security/chio-quarantine"
+
 [targets.jwt_vc_verify]
 crate = "chio-credentials"
 path  = "crates/trust/chio-credentials"

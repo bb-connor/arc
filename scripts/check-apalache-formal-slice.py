@@ -126,12 +126,15 @@ def check_post_admission_drop_guard() -> None:
     text = read("formal/apalache/PostAdmissionDropGuard.tla")
     config = read("formal/apalache/MCPostAdmissionDropGuard.cfg")
     next_body = body(text, "Next")
+    lifecycle_next = body(text, "LifecycleNext")
     admit = body(text, "Admit")
     admission_profiles = body(text, "AdmissionProfiles")
     active_child_shares = body(text, "ActiveChildShares")
     child_splits_bounded = body(text, "ChildSplitsBounded")
     pre_drop = body(text, "DropPreDispatch")
     post_drop = body(text, "DropPostDispatch")
+    pre_clock_failure = body(text, "DropPreDispatchConstructionFailed")
+    post_clock_failure = body(text, "DropPostDispatchConstructionFailed")
     server_error = body(text, "ServerErrorPostDispatch")
     resolve_returned = body(text, "ResolveReturnedOutput")
     resolve_post_drop = body(text, "ResolvePostDispatch")
@@ -144,10 +147,14 @@ def check_post_admission_drop_guard() -> None:
     safety = body(text, "SafetyInv")
 
     require(
-        "DropPreDispatch(i)" in next_body
-        and "ServerErrorPostDispatch(i)" in next_body
-        and "DropPostDispatch(i)" in next_body,
-        "Next must expose pre-dispatch, server-error, and drop actions",
+        "DropPreDispatch(i)" in lifecycle_next
+        and "ServerErrorPostDispatch(i)" in lifecycle_next
+        and "DropPostDispatch(i)" in lifecycle_next
+        and "LifecycleNext" in next_body
+        and "UNCHANGED parent_construction_failure" in next_body
+        and "DropPreDispatchConstructionFailed(i)" in next_body
+        and "DropPostDispatchConstructionFailed(i)" in next_body,
+        "Next must keep successful-construction actions distinct from explicit clock failures",
     )
     require(
         "resources \\in AdmissionProfilesFor(i)" in admit
@@ -183,13 +190,58 @@ def check_post_admission_drop_guard() -> None:
         "terminal actions must cover every armed non-terminal phase",
     )
     require(
-        'ParentAppendStates == {"not-attempted", "outcome-unknown", "committed"}'
+        'ParentAppendStates == {"not-attempted", "construction-failed", "outcome-unknown", "committed"}'
         in text
         and 'THEN {"outcome-unknown", "committed"}' in parent_append_outcomes
         and 'ELSE {"committed"}' in parent_append_outcomes
         and 'append_outcome = "committed"' in parent_persistence_outcomes
         and "ELSE BOOLEAN" in parent_persistence_outcomes,
-        "parent append must distinguish not-attempted, outcome-unknown, and committed",
+        "parent append must distinguish construction failure from attempted append outcomes",
+    )
+    for action, kind in (
+        (pre_clock_failure, "fault"),
+        (post_clock_failure, "cancel"),
+    ):
+        require(
+            'parent_append_state[i] = "not-attempted"' in action
+            and 'phase\' = [phase EXCEPT ![i] = "terminal_fault"]' in action
+            and f'terminal_kind\' = [terminal_kind EXCEPT ![i] = "{kind}"]' in action
+            and 'parent_append_state\' = [parent_append_state EXCEPT ![i] = "construction-failed"]' in action
+            and 'parent_construction_failure\' = [parent_construction_failure EXCEPT ![i] = "clock"]' in action
+            and "parent_append_attempts, parent_receipts, parent_kind_logged" in action
+            and "parent_append_attempts'" not in action
+            and "parent_receipts'" not in action
+            and "ParentAppendOutcomes" not in action,
+            "clock-failure events must record failure before an append without inventing receipt success",
+        )
+    require(
+        'phase[i] = "admitted"' in pre_clock_failure
+        and "failed # {}" in pre_clock_failure
+        and "failed \\subseteq admitted_resources[i]" in pre_clock_failure
+        and "ResolvePreDispatch(@, failed)" in pre_clock_failure
+        and 'phase[i] \\in {"dispatch_started", "streaming"}' in post_clock_failure
+        and "ResolvePostDispatch(@)" in post_clock_failure
+        and "child_logged'" in post_clock_failure
+        and "post_dispatch_outcome_unknown'" in post_clock_failure,
+        "construction failure must preserve cleanup ownership, child flushing and unknown-effect retention",
+    )
+    require(
+        'parent_construction_failure = [i \\in Invocations |-> "none"]' in body(text, "Init")
+        and 'parent_construction_failure[i] \\in {"none", "clock"}' in body(text, "DomainsOK")
+        and text.count("parent_construction_failure' =") == 2,
+        "construction failure must start absent and be recorded only by its two explicit events",
+    )
+    require(
+        '(parent_append_state[i] = "construction-failed") <=>' in terminal_receipt
+        and '(parent_construction_failure[i] = "clock")' in terminal_receipt
+        and 'parent_append_state[i] = "construction-failed" =>' in terminal_receipt
+        and 'terminal_kind[i] \\in {"fault", "cancel"}' in terminal_receipt
+        and "parent_append_attempts[i] = 0" in terminal_receipt
+        and "parent_receipts[i] = 0" in terminal_receipt
+        and 'Mutation = "omit-fault-receipt"' in pre_drop
+        and "parent_construction_failure'" not in pre_drop
+        and "parent_construction_failure'" not in post_drop,
+        "a missing receipt cannot acquire a construction-failure excuse on the successful path",
     )
     require(
         'ledger[i]["child"] \\notin {"none", "released"}' in active_child_shares
@@ -383,6 +435,8 @@ def check_negative_registry() -> None:
         "DropGuardChildOversubscriptionBroken",
         "DropGuardSkipInvocationReversalBroken",
         "DropGuardNoFaultReceiptBroken",
+        "DropGuardPreDispatchClockFailureWitness",
+        "DropGuardPostDispatchClockFailureWitness",
         "DropGuardReleaseOnIncompleteStreamBroken",
         "DropGuardNoRetainOnPostInvocationDenyBroken",
         "DropGuardReleaseOnPostDispatchAbortBroken",
@@ -423,6 +477,19 @@ def check_negative_registry() -> None:
         require(
             f'Mutation = "{mutation}"' in config,
             f"{stem} config must select only its calibrated mutation",
+        )
+
+    for phase in ("PreDispatch", "PostDispatch"):
+        stem = f"DropGuard{phase}ClockFailureWitness"
+        module = read(f"formal/apalache/_negative_tests/{stem}.tla")
+        config = read(f"formal/apalache/_negative_tests/MC{stem}.cfg")
+        entry = next(entry for entry in entries if Path(entry["spec"]).stem == stem)
+        require(
+            "EXTENDS PostAdmissionDropGuard" in module
+            and 'Mutation = "none"' in config
+            and entry["classification"] == "claim-witness"
+            and entry["falsifies"] not in body(read("formal/apalache/PostAdmissionDropGuard.tla"), "SafetyInv"),
+            f"{stem} must reject availability using unmutated semantics outside SafetyInv",
         )
 
     distributed_mutations = {

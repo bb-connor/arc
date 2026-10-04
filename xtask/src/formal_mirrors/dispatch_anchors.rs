@@ -11,6 +11,98 @@ struct RequiredSource {
     symbols: &'static [&'static str],
 }
 
+// These bodies were extracted from previously inline drift anchors. Requiring
+// the callers alone would silently discard the validation they still perform.
+const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs",
+        symbols: &[
+            "DispatchCredentialReservation::commit_approval_marker",
+            "DispatchCredentialReservation::commit_dpop_marker",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/preparation.rs",
+        symbols: &["PreparedDispatchCredentials::valid_until_unix_ms"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/tool_outcome.rs",
+        symbols: &[
+            "RawInvocationOutcomeV1::from_persisted_fields",
+            "RawInvocationOutcomeV1::from_canonical_bytes",
+        ],
+    },
+    RequiredSource {
+        path: "crates/security/chio-flow/src/engine.rs",
+        symbols: &[
+            "ResolvedFlowRequest::source_label",
+            "ResolvedFlowRequest::input_taint_transition",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs",
+        symbols: &["ChioKernel::frame_caller_return_context_with_native"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller/deadline.rs",
+        symbols: &[
+            "ChioKernel::freeze_caller_start_deadline",
+            "CallerReturnWire::valid_deadline_shape",
+            "CallerReturnWire::start_deadline",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
+        symbols: &["Record::validate_initialized", "load_inner", "load_initialized", "load_operation_inner"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/readback/portable.rs",
+        symbols: &["load_history_initialized"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/record.rs",
+        symbols: &["Record::validate_initialized"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs",
+        symbols: &["verify_capture_attachment_initialized"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+        symbols: &["Record::validate_initialized", "load_inner", "load_initialized"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
+        symbols: &["Record::validate_initialized", "load_inner", "load_initialized"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/declassification.rs",
+        symbols: &["expected_initialized"],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs",
+        symbols: &["classification_payload"],
+    },
+];
+
+const DROP_CONSTRUCTION_SOURCES: &[RequiredSource] = &[
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs",
+        symbols: &[
+            "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
+            "PostAdmissionDropGuard::drop",
+        ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/kernel/clock.rs",
+        symbols: &[
+            "read",
+            "ChioKernel::read_authority_time",
+            "ChioKernel::trusted_now_millis",
+        ],
+    },
+];
+
 const NATIVE_LIFECYCLE_SOURCES: &[RequiredSource] = &[
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/mod.rs",
@@ -354,7 +446,14 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "SqliteToolOutcomeStore::lookup_security_release",
             "initialize_tool_outcome_schema",
             "verify_tool_outcome_invariants",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs",
+        symbols: &[
+            "VerifiedProjection",
             "verify_outcome_projection",
+            "load_verified_projection",
         ],
     },
     RequiredSource {
@@ -448,11 +547,48 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs",
-        symbols: &["DispatchCredentialReservation::rollback_before_dispatch_with_disposition", "DispatchCredentialReservation::retain_after_external_authorization", "DispatchCredentialReservation::retention_disposition"],
+        symbols: &[
+            "DispatchCredentialReservation",
+            "DispatchCredentialReservation::rollback_before_dispatch",
+            "DispatchCredentialReservation::rollback_before_dispatch_with_disposition",
+            "DispatchCredentialReservation::retain_if_dropped",
+            "DispatchCredentialReservation::retain_after_external_authorization",
+            "DispatchCredentialReservation::retention_disposition",
+            "DispatchCredentialReservation::commit",
+            "DispatchCredentialReservation::drop",
+        ],
     },
     RequiredSource {
-        path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/legacy_nonce.rs",
-        symbols: &["LegacyExecutionNonce", "LegacyExecutionNonce::discard_unconsumed", "LegacyExecutionNonce::disposition", "DispatchCredentialReservation::reserve_legacy_execution_nonce_at_effect_boundary", "rejected"],
+        path: "crates/kernel/chio-kernel/src/execution_nonce.rs",
+        symbols: &["ExecutionNonceStore"],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/execution_nonce/store.rs",
+        symbols: &[
+            "InMemoryExecutionNonceStore",
+            "State",
+            "Entry",
+            "InMemoryExecutionNonceStore::reserve_signed",
+            "InMemoryExecutionNonceStore::reserve_until",
+            "InMemoryExecutionNonceStore::reserve_for_dispatch",
+            "InMemoryExecutionNonceStore::rollback_dispatch_reservation",
+            "InMemoryExecutionNonceStore::is_consumed",
+        ],
+    },
+    RequiredSource {
+        path: "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs",
+        symbols: &[
+            "SqliteExecutionNonceStore",
+            "RETENTION_GRACE_SECS",
+            "SqliteExecutionNonceStore::reserve_until",
+            "SqliteExecutionNonceStore::reserve_for_dispatch",
+            "SqliteExecutionNonceStore::try_reserve_signed_entry",
+            "SqliteExecutionNonceStore::try_reserve_entry_with_clock_policy",
+            "SqliteExecutionNonceStore::validate_observed_clock",
+            "record_execution_nonce_prune",
+            "SqliteExecutionNonceStore::rollback_dispatch_reservation",
+            "SqliteExecutionNonceStore::is_consumed",
+        ],
     },
 ];
 
@@ -610,9 +746,10 @@ const RUNTIME_OWNERSHIP_SOURCES: &[RequiredSource] = &[
             "RetainedRequestWire",
             "immutable_tool_request_hash",
             "immutable_tool_request_hash_with_profile",
-            "RetainedToolAdmissionRequestV1::from_admission_with_profile",
+            "RetainedToolAdmissionRequestV1::from_admission",
             "RetainedToolAdmissionRequestV1::from_canonical_bytes",
-            "RetainedToolAdmissionRequestV1::schema",
+            "RetainedToolAdmissionRequestV1::request_without_transient_credentials",
+            "SCHEMA",
             "RetainedToolAdmissionRequestV1::authority_profile",
             "RetainedToolAdmissionRequestV1::security_binding",
             "RetainedToolAdmissionRequestV1::native_security_authority_binding",
@@ -901,7 +1038,6 @@ const NATIVE_POLICY_EVIDENCE_SOURCES: &[RequiredSource] = &[
         path: "crates/platform/chio-control-plane/src/security/adapters/native_flow/policy.rs",
         symbols: &[
             "MAX_POLICY_BYTES",
-            "SCHEMA",
             "NativeFlowPolicyEvidence",
             "NativeFlowPolicyEvidence::canonical_bytes",
             "NativeFlowPolicyEvidence::digest",
@@ -1032,8 +1168,15 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
         symbols: &["SCHEMA", "PROJECTION", "MUTATION", "MAX_RECORD_BYTES", "sql", "require_operation", "projection_reference", "SqliteAdmissionOperationStore::load_native_dispatch_ledger"],
     },
     RequiredSource {
+        path: "crates/security/chio-security-types/src/flow.rs",
+        symbols: &[
+            "NATIVE_FLOW_DISPATCH_POLICY_SCHEMA",
+            "NATIVE_FLOW_DECLASSIFIED_DISPATCH_POLICY_SCHEMA",
+        ],
+    },
+    RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
-        symbols: &["POLICY_SCHEMA", "MAX_POLICY_BYTES", "Policy", "Inputs", "Decision", "required_option", "decode", "Policy::validate_binding", "Policy::validate_current", "Policy::validate_at"],
+        symbols: &["MAX_POLICY_BYTES", "Policy", "Inputs", "Decision", "required_option", "decode", "Policy::validate_binding", "Policy::validate_current", "Policy::validate_at"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/record.rs",
@@ -1163,7 +1306,7 @@ const NATIVE_USE_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs",
-        symbols: &["DECLASSIFIED_POLICY_SCHEMA", "Policy::validate_live_declassification", "Policy::validate_owned_declassification"],
+        symbols: &["Policy::validate_live_declassification", "Policy::validate_owned_declassification"],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/declassification.rs",
@@ -1176,6 +1319,14 @@ const NATIVE_USE_SOURCES: &[RequiredSource] = &[
 ];
 
 const REQUIRED_COVERAGE: &[(&str, &[RequiredSource])] = &[
+    (
+        "formal/apalache/PostAdmissionDropGuard.tla",
+        EXTRACTED_IMPLEMENTATION_SOURCES,
+    ),
+    (
+        "formal/apalache/PostAdmissionDropGuard.tla",
+        DROP_CONSTRUCTION_SOURCES,
+    ),
     (
         "formal/apalache/PostAdmissionDropGuard.tla",
         NATIVE_USE_SOURCES,
@@ -1324,6 +1475,146 @@ mod tests {
         let raw = std::fs::read_to_string(root.join(super::super::MANIFEST_PATH))
             .map_err(|error| error.to_string())?;
         validate(&super::super::parse_manifest(&raw)?)
+    }
+
+    #[test]
+    fn required_dispatch_anchors_resolve_production_symbols() -> Result<(), String> {
+        let root = crate::workspace_root().map_err(|error| error.to_string())?;
+        // A manifest and its coverage contract can drift together after a source
+        // deletion. Resolve every required symbol against the current Rust body.
+        for entry in entries() {
+            super::super::compute_entry(&entry, &root)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn standalone_nonce_ownership_and_reservation_body_edits_drift() -> Result<(), String> {
+        let root = crate::workspace_root().map_err(|error| error.to_string())?;
+        for (path, symbol, before, after) in [
+            (
+                "crates/kernel/chio-kernel/src/execution_nonce/store.rs",
+                "InMemoryExecutionNonceStore::reserve_signed",
+                "if retain_until <= now {",
+                "if retain_until < now {",
+            ),
+            (
+                "crates/kernel/chio-kernel/src/execution_nonce/store.rs",
+                "InMemoryExecutionNonceStore::rollback_dispatch_reservation",
+                "entry.reservation_id.as_deref() == Some(owner)",
+                "entry.reservation_id.is_some()",
+            ),
+            (
+                "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs",
+                "SqliteExecutionNonceStore::try_reserve_entry_with_clock_policy",
+                "if signed_expires_at <= updated_high_water {",
+                "if signed_expires_at < updated_high_water {",
+            ),
+            (
+                "crates/platform/chio-store-sqlite/src/execution_nonce_store.rs",
+                "SqliteExecutionNonceStore::rollback_dispatch_reservation",
+                "WHERE nonce_id = ?1 AND dispatch_reservation_id = ?2",
+                "WHERE nonce_id = ?1",
+            ),
+        ] {
+            let mut entry = entries()
+                .into_iter()
+                .find(|entry| entry.rust_source == path)
+                .ok_or_else(|| format!("standalone nonce implementation anchor missing: {path}"))?;
+            let source =
+                std::fs::read_to_string(root.join(path)).map_err(|error| error.to_string())?;
+            assert_eq!(
+                source.matches(before).count(),
+                1,
+                "mutation site: {path}::{symbol}"
+            );
+            let original = compute_from_source(&entry, &source)?;
+            entry.normalized_sha256 = original.normalized_sha256;
+            entry.symbol_sha256 = original
+                .symbols
+                .iter()
+                .map(|digest| RecordedSymbolDigest {
+                    symbol: digest.symbol.clone(),
+                    sha256: digest.sha256.clone(),
+                })
+                .collect();
+            let changed = compute_from_source(&entry, &source.replacen(before, after, 1))?;
+            let Err(error) = check_entries(&[entry], &[changed]) else {
+                panic!("standalone nonce implementation drift must reject: {path}::{symbol}");
+            };
+            assert!(
+                error.contains(&format!("changed symbol:  {symbol}")),
+                "{error}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn extracted_validators_and_drop_clock_failures_remain_drift_guarded() -> Result<(), String> {
+        let root = crate::workspace_root().map_err(|error| error.to_string())?;
+        for (path, symbol, before, after) in [
+            (
+                "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs",
+                "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
+                "trusted_now_millis().and_then(|now| {",
+                "trusted_now_millis().or_else(|_| Ok(UnixMillis::new(0))).and_then(|now| {",
+            ),
+            (
+                "crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs",
+                "PostAdmissionDropGuard::drop",
+                "trusted_now_millis().and_then(|now| {",
+                "trusted_now_millis().or_else(|_| Ok(UnixMillis::new(0))).and_then(|now| {",
+            ),
+            (
+                "crates/kernel/chio-kernel/src/kernel/clock.rs",
+                "read",
+                "Ok(fence.observe(clock.read()?)?.unix_millis())",
+                "Ok(UnixMillis::new(0))",
+            ),
+            (
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
+                "Record::validate_initialized",
+                "if self.authority != initialized.authority {",
+                "if false {",
+            ),
+            (
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
+                "Record::validate_initialized",
+                "if self.authority != initialized.authority {",
+                "if false {",
+            ),
+            (
+                "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
+                "Record::validate_initialized",
+                "if self.authority != initialized.authority {",
+                "if false {",
+            ),
+        ] {
+            let mut entry = entries()
+                .into_iter()
+                .find(|entry| entry.rust_source == path)
+                .ok_or_else(|| format!("implementation anchor missing: {path}"))?;
+            let source =
+                std::fs::read_to_string(root.join(path)).map_err(|error| error.to_string())?;
+            assert!(source.contains(before), "mutation site: {path}::{symbol}");
+            let original = compute_from_source(&entry, &source)?;
+            entry.normalized_sha256 = original.normalized_sha256;
+            entry.symbol_sha256 = original
+                .symbols
+                .iter()
+                .map(|digest| RecordedSymbolDigest {
+                    symbol: digest.symbol.clone(),
+                    sha256: digest.sha256.clone(),
+                })
+                .collect();
+            let changed = compute_from_source(&entry, &source.replace(before, after))?;
+            let Err(error) = check_entries(&[entry], &[changed]) else {
+                panic!("implementation drift must reject: {path}::{symbol}");
+            };
+            assert!(error.contains(&format!("changed symbol:  {symbol}")), "{error}");
+        }
+        Ok(())
     }
 
     #[test]

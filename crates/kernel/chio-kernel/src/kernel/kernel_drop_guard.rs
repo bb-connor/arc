@@ -154,16 +154,17 @@ impl<'a> PostAdmissionDropGuard<'a> {
 
     /// Mark that the tool-server dispatch await has been entered. After this
     /// point a dropped future may correspond to an executed side effect, so
-    /// the drop path must record a cancellation receipt and fail closed on
-    /// reservations.
+    /// the drop path attempts a cancellation receipt and fails closed on
+    /// reservations. Clock, construction or append failures emit an audit fault.
     pub(crate) fn mark_dispatch_started(&mut self) {
         self.dispatch_started = true;
     }
 
     /// Classify a normal error return after the tool completed but before its
     /// replay credentials could be committed. The guard remains armed so its
-    /// drop path records the executed-or-not outcome as a signed terminal
-    /// receipt instead of returning a raw error with no audit trail.
+    /// drop path attempts to record the executed-or-not outcome as a signed
+    /// terminal receipt. Failure to obtain trusted time, construct or append
+    /// that receipt emits an audit fault; signed evidence is not guaranteed.
     pub(crate) fn mark_dispatch_credential_commit_failed(&mut self) {
         self.post_dispatch_reason = POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON;
     }
@@ -226,10 +227,11 @@ impl<'a> PostAdmissionDropGuard<'a> {
     /// monetary hold, an invocation-only budget increment,
     /// runtime-admission reservations, and an admitted child/delegated
     /// capability budget share. A clean unwind records NO receipt
-    /// (the intended receipt-free exit). If ANY step fails, a signed fault
-    /// receipt is recorded so a stuck hold/reservation is on the
-    /// append-only log rather than silently burned. Best-effort from Drop:
-    /// each step is attempted independently and failures are collected.
+    /// (the intended receipt-free exit). If any step fails, a signed fault
+    /// receipt is attempted to identify the stuck hold/reservation. Cleanup and
+    /// receipt publication are best-effort from Drop: each cleanup step is
+    /// attempted independently, and clock, construction or append failure is
+    /// reported through an audit fault without claiming signed evidence.
     fn handle_pre_dispatch_drop(&self) {
         let mut faults: Vec<PreDispatchCleanupFault> = Vec::new();
 
@@ -385,7 +387,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
         }
 
         // 5. Fault receipt. Clean cleanup is receipt-free (the
-        //    intended design); any fault records a signed receipt.
+        //    intended design); any fault attempts a signed receipt.
         if !faults.is_empty() {
             self.record_pre_dispatch_cleanup_fault_receipt(&faults);
         }
@@ -417,8 +419,8 @@ impl<'a> PostAdmissionDropGuard<'a> {
     }
 
     /// Record a signed cancellation receipt documenting a pre-dispatch cleanup
-    /// fault. Best-effort from Drop: if even the receipt cannot be recorded,
-    /// log with the `audit_fault` field. The failing steps and the reserved
+    /// fault. Best-effort from Drop: clock, construction or append failure is
+    /// logged with the `audit_fault` field. The failing steps and the reserved
     /// lease/continuation ids (carried in the admission metadata) are folded
     /// into the receipt so an operator can locate the stuck hold.
     fn record_pre_dispatch_cleanup_fault_receipt(&self, faults: &[PreDispatchCleanupFault]) {
@@ -476,7 +478,7 @@ impl Drop for PostAdmissionDropGuard<'_> {
             // Pre-dispatch drop (or a panic unwinding before dispatch).
             // Nothing was written to the tool server, so no side effect is
             // possible: fully reverse every pre-execution mutation. A clean
-            // unwind records NO cancellation receipt; a cleanup fault records
+            // unwind records NO cancellation receipt; a cleanup fault attempts
             // a signed fault receipt (see `handle_pre_dispatch_drop`).
             self.handle_pre_dispatch_drop();
             return;
@@ -493,10 +495,10 @@ impl Drop for PostAdmissionDropGuard<'_> {
         // Post-dispatch drop. The tool-server invoke was in flight; a side
         // effect MAY have executed. Fail closed: retain the runtime-
         // admission reservations (releasing a single-use destructive lease
-        // here would license a replay) and ALWAYS record a cancellation
-        // receipt so the executed-or-not side effect is on the append-only
-        // log. The retained reservations are marked in the receipt metadata
-        // so the burned lease is auditable and operator-recoverable.
+        // here would license a replay) and attempt a cancellation receipt for
+        // the executed-or-not side effect. Clock, construction or append failure
+        // emits an audit fault and may leave no signed parent receipt. When
+        // published, receipt metadata identifies the retained reservations.
         let receipt_metadata = self.kernel.ambiguous_dispatch_receipt_metadata(
             self.budget_mutation,
             self.payment_authorization,
@@ -527,8 +529,10 @@ impl Drop for PostAdmissionDropGuard<'_> {
 
         // The dispatch commit landed but the return never did, so the operation
         // would stay non-terminal and reject every replay of this request id
-        // until the next startup sweep. Terminalizing here refuses if a durable
-        // outcome exists, so it cannot overwrite a return that did complete.
+        // until the next startup sweep. Terminalization is best-effort and
+        // samples trusted time again; repeated clock failure leaves admission
+        // unreconciled and emits an audit fault. It refuses if a durable outcome
+        // exists, so it cannot overwrite a return that did complete.
         if let Some(operation) = self.durable_operation {
             if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
                 self.kernel

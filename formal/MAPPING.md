@@ -37,6 +37,31 @@ or an abstraction anchor; TLA+ entries are abstraction anchors. The required
 when their normalized tokens drift. A hash bless records review; it is not an
 equivalence proof and does not establish a modeled property in Rust.
 
+The bounded Lean receipt model projects a checkpoint to its sequence and Merkle
+root. Checkpoint issuance now lives in `checkpoint/builders.rs`; source anchors
+include both `build_checkpoint` and the concrete frontier builder, its explicit
+`CheckpointSigningContext`, and the intermediate time-supplying entry points.
+These are abstraction anchors. The model does not prove issuance-clock fencing,
+canonical signing, predecessor checks or chain-frontier custody. Moving the
+anchors preserves source traceability without expanding the checkpoint theorem
+beyond its existing bounded projection.
+
+The monotone-log storage anchors follow `receipt_store/append.rs`, including
+the insert-status implementation behind its sequence-only wrapper. That path
+rejects conflicting duplicate receipt bytes and cost projections. These
+checks preserve append-only identity; SQL atomicity and strict timestamp
+ordering remain the registered model assumptions, not consequences of hashes.
+
+The drop-guard outcome-store projection anchor follows
+`tool_outcome_projection.rs`, including `load_verified_projection` behind its
+validation wrapper. The verified payload is reused only within the current
+read; outcome attachment, evaluation and release digests, commit-chain binding
+and resolved-output completeness are still checked. These are concrete readback
+boundaries, not modeled SQL recovery transitions or a proof of durable custody.
+Native policy schema literals are anchored at the shared
+`chio_security_types::flow` constants used by both the producer and storage
+validator; centralizing those unchanged v1/v2 literals adds no model state.
+
 For `RevocationPropagation` and `PostAdmissionDropGuard`, the mirror gate also
 requires the scoped ordinary and nested dispatch implementations, the production
 nested security-context entry, shared readiness helpers, credential reservation
@@ -53,24 +78,58 @@ preparation; successful preparation forces mutable-authority revalidation even
 when immediately ready. An acknowledged payment authorization independently
 forces full non-consuming revalidation. Readiness projects to stuttering in the
 revocation model and remains in `admitted` in the drop-guard model. Durable nonce
-ownership is delegated to the admission store, not consumed in the legacy replay
+ownership is delegated to the admission store, not consumed in the standalone replay
 store. Credential-store atomicity and cross-row crash recovery remain outside
 these abstractions.
 
 Credential preparation is now a separate non-consuming, kernel-bound value.
 It borrows the exact request and capability, validates the complete applicable
-credential set and queries nonce reservation support before replay writes.
-Consuming it revalidates the same artifacts and rejects changed reservation
-semantics; it does not accept replacement inputs or a different kernel.
+credential set before replay writes. Consuming it revalidates the same artifacts;
+it does not accept replacement inputs or a different kernel.
 Preparation does not change modeled revocation or armed-guard resource state.
-Actual acquisition uses the existing rollback-owned markers, legacy nonce
-deferral and effect-boundary retention. The required anchors include the
-prepared types, fresh validation, capability-query panic containment and
-acquisition implementation, not only forwarding wrappers. Local replay-store
-tests establish these concrete ordering boundaries. Neither the prepared value
-nor this anchor update proves durable credential custody, joined security-hook
-ownership, cross-store crash recovery or external-start authorization. No model
-transition, assumption or bound changed.
+Every standalone execution-nonce store now implements signed-expiry reservation,
+exact-owner rollback and consumption lookup. Acquisition records the reservation
+identity before the fallible store call, then attempts exact-owner cleanup on a
+pre-dispatch failure. Commitment disables later rollback, preserving replay
+custody after effects may have begun. There is no deferred legacy consumption
+path or optional reservation-support probe.
+
+The required anchors include the prepared types, fresh validation, callback
+panic containment, acquisition and commit/drop implementations, the
+`ExecutionNonceStore` contract, and the in-memory and SQLite reservation and
+rollback bodies. Both stores retain the signed window and refuse live-marker
+eviction; the SQLite reservation rechecks expiry after acquiring its writer
+transaction. Pre-effect rollback does not depend on the clock that caused
+denial. The existing owner, expiry, capacity, panic and rollback regressions
+are runtime evidence obligations for these decisions. Source hashes do not
+prove them. Standalone nonce markers, clocks and SQL transactions are outside
+the model's four-resource ledger. Neither the prepared value nor these anchors
+prove durable credential custody, joined security-hook ownership, cross-store
+crash recovery or external-start authorization. The nonce mapping does not add
+nonce states to the model or change its resource bound.
+
+The drop-guard model separately records `construction-failed` when an explicit
+failed-clock event prevents cancellation construction before any append call.
+That state has zero append attempts and zero receipts, with a terminal fault or
+cancellation and the same fail-closed resource disposition. Successful
+construction retains the existing one-attempt committed or outcome-unknown
+obligation; the `omit-fault-receipt` mutant cannot use a missing failure event to
+excuse an omitted append. The production anchors include both drop branches and
+the kernel's fallible trusted-clock reader. `ASSUME-OS-CLOCK` constrains reported
+time and supplies no availability guarantee. Other receipt-builder failures are
+outside this bounded extension. Durable admission reconciliation is also outside
+the model: the drop path samples the clock again before terminalization, and
+repeated failure can leave the admission unreconciled. Neither audit completeness
+nor operational recovery under unavailable clocks is established here.
+
+Extracted implementation bodies remain explicit drift anchors alongside their
+callers: raw outcome reconstruction, caller deadlines, credential deadlines,
+flow-label joining, and initialized native history readers and validators.
+Read-local initialization reuse must still check authority, canonical bytes,
+relational indexes, operation ownership and history binding. Ordered history
+checks the exact global commit after loading each event. These anchors preserve
+review coverage across the extraction; the drop-guard model does not prove the
+SQL, parser, caller-authentication or deadline implementation.
 
 The configured single-approval profile now acquires operation-owned custody at
 selected-grant admission before budget authorization. Credential reservation
@@ -287,8 +346,12 @@ The v4 retained admission request commits to explicit original runtime, approval
 and DPoP selections, including absent authorities and stable source generations.
 The store compares new claim intent with that record inside the operation lease
 transaction. A first native join also requires the profile. Original material
-is reloaded under the store fence for finalization; legacy bytes and historical
-custody remain readable rather than being backfilled. These are additional
+is reloaded under the store fence for finalization. The retained-request decoder
+requires the v4 schema and an explicit authority profile; it rejects earlier
+schemas, duplicate or unknown JSON fields and retained transient credentials.
+The constructor, fixed schema, credential-stripping helper and canonical decoder
+are source anchors. Historical custody never supplies authority for a new write.
+These are additional
 concrete preconditions and runtime evidence, not new abstract lease transitions.
 The profile codec, retained hash and kernel selection/recovery helpers are drift
 anchors, together with the coordinator begin path and its hash wrapper. A native
@@ -348,7 +411,7 @@ checked by `.github/workflows/apalache-temporal.yml` via `--temporal=`
 | Property                    | Source                                          | Rust path constrained                                                                                          | Assumption discharge                                                                          | One-line description                                                                                                            |
 | --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `NoAllowAfterRevoke`        | `formal/tla/RevocationPropagation.tla` (~L302) | `crates/kernel/chio-kernel/src/kernel/validation/revocation_trace.rs::ChioKernel::revoke_capability`, `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::check_revocation`, `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs::ChioKernel::evaluate_tool_call_async_with_session_context_scoped`, `crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs::ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped`, `crates/kernel/chio-kernel/src/kernel/credential_reservation/operation_owned.rs::ChioKernel::reserve_admitted_dispatch_credentials`, `DispatchCredentialReservation::requires_post_reservation_revalidation`, `crates/kernel/chio-kernel/src/kernel/dispatch.rs::ChioKernel::revalidate_immediately_before_dispatch`, `crates/kernel/chio-kernel/src/kernel/construction.rs::ChioKernel::lock_runtime_trace_transition`, `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt_with_federation`, `crates/kernel/chio-kernel-core/src/revocation_view.rs::RevocationSnapshot::is_revoked`, `RevocationView::is_revoked` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY for single-row commits; cross-row recovery is excluded. The model treats readiness waiting as stuttering and abstracts final non-consuming revalidation plus receipt append as one `Evaluate` transition. After an actual payment authorization, both production evaluation paths force mutable guard and runtime-hook revalidation even when readiness returned immediately. When a single-use dispatch credential is reserved, both paths run the same forced mutable-state boundary again before dispatch; credential-store atomicity, payment blocking, adapter rollback, and callback side effects are outside the model. The Rust append path rechecks revocation while holding the same transition lock used by `ChioKernel::revoke_capability`. Revocation writes covered by this claim are mediated through that kernel method; out-of-band mutation through a retained custom revocation-store handle cannot share the kernel lock and is outside the claim. Runtime trace qualification rejects an observed relevant revocation between recorded admission and append under ASSUME-TRACE-OBSERVER. | Every `allow` receipt was issued at a time when the issuing authority had not yet observed any revocation.                      |
-| `MonotoneLog`               | `formal/tla/RevocationPropagation.tla` (~L314) | `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt`, `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::SqliteReceiptStore::append_chio_receipt_returning_seq`, `crates/platform/chio-store-sqlite/src/receipt_store.rs::append_chio_receipt_tx` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY and ASSUME-OS-CLOCK; the storage anchors do not enforce strict timestamps | Per-authority receipt-log timestamps are strictly increasing under the model-clock abstraction; the storage path is append-only. |
+| `MonotoneLog`               | `formal/tla/RevocationPropagation.tla` (~L314) | `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt`, `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::SqliteReceiptStore::append_chio_receipt_returning_seq`, `crates/platform/chio-store-sqlite/src/receipt_store/append.rs::append_chio_receipt_tx`, `append_chio_receipt_tx_with_insert_status` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY and ASSUME-OS-CLOCK; the storage anchors do not enforce strict timestamps | Per-authority receipt-log timestamps are strictly increasing under the model-clock abstraction; the storage path is append-only. |
 | `AttenuationPreserving`     | `formal/tla/RevocationPropagation.tla` (~L326) | `crates/core/chio-core-types/src/capability/attenuation.rs::validate_delegation_chain`, `crates/core/chio-core-types/src/capability/scope.rs::ChioScope::is_subset_of`, `crates/kernel/chio-kernel-core/src/normalized.rs::NormalizedScope::is_subset_of`, `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::validate_delegation_admission` | n/a (structural; bounded by `DEPTH_MAX`) | `depth` stays within `0..DEPTH_MAX`; any cap in the `attenuated` state has been delegated at least once. |
 | `RevocationEventuallySeen`  | `formal/tla/RevocationPropagation.tla` (~L407) | `crates/trust/chio-federation/src/revocation_gossip.rs::RevocationGossipPushQueue::enqueue_signed_root`, `crates/trust/chio-federation/src/revocation_gossip.rs::RevocationGossipPushQueue::flush_batches_at`, `crates/trust/chio-federation/src/revocation_gossip.rs::RevocationCatchupResponse::validate_response`, `crates/trust/chio-federation/src/revocation_gossip.rs::respond_to_catchup` | Model-only `WF_vars(PropagateAny)`; `formal/assumptions.toml` ASSUME-NETWORK-TRANSPORT remains audited and does not guarantee delivery | Under the model fairness condition, every authority eventually catches up to an observed non-zero revocation epoch. |
 | `RevocationFreshness`       | `formal/tla/RevocationPropagation.tla` (~L344) | `crates/trust/chio-revocation-oracle/src/freshness.rs::FreshnessConfig`, `verify_fresh_epoch_root`, `crates/kernel/chio-kernel-core/src/revocation_view.rs::RevocationSnapshot`, `RevocationView::install_if_newer`, `RevocationView::is_revoked` | `formal/assumptions.toml` ASSUME-OS-CLOCK | Every recorded local revocation epoch is strictly less than the global clock; observed-epoch freshness fails closed. |
@@ -488,14 +551,16 @@ separate `.github/workflows/apalache-temporal.yml` workflow.
 
 | Property | Source | Rust path constrained | Assumption discharge | One-line description |
 | --- | --- | --- | --- | --- |
-| `MonotoneLogApalache` | `formal/apalache/MonotoneLogApalache.tla` | `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt`, `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::SqliteReceiptStore::append_chio_receipt_returning_seq`, `crates/platform/chio-store-sqlite/src/receipt_store.rs::append_chio_receipt_tx` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY and ASSUME-OS-CLOCK; the storage anchors do not enforce strict timestamps | Per-authority receipt timestamps are strictly increasing under the bounded model-clock abstraction. |
+| `MonotoneLogApalache` | `formal/apalache/MonotoneLogApalache.tla` | `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt`, `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs::SqliteReceiptStore::append_chio_receipt_returning_seq`, `crates/platform/chio-store-sqlite/src/receipt_store/append.rs::append_chio_receipt_tx`, `append_chio_receipt_tx_with_insert_status` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY and ASSUME-OS-CLOCK; the storage anchors do not enforce strict timestamps | Per-authority receipt timestamps are strictly increasing under the bounded model-clock abstraction. |
 | `RevocationCutCompleteness` | `formal/apalache/RevocationCutCompleteness.tla` | `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::check_revocation`, `crates/kernel/chio-kernel/src/kernel/delegation.rs::consult_revocation_view`, `crates/kernel/chio-kernel/src/kernel/delegation.rs::consult_revocation_view_at`, `chio_kernel_core::formal_core::revocation_lookup_denies`, `crates/kernel/chio-kernel-core/src/revocation_view.rs::RevocationSnapshot::is_revoked`, `RevocationView::is_revoked` | `formal/proof-manifest.toml` covered_rust_symbols `formal_core::revocation_lookup_denies` and `formal_core::revocation_snapshot_denies`; Lean theorem `revocation_is_cut` | A revoked capability removes dispatch eligibility for every transitive descendant in each authority view. Both lazy production lookup paths require the shared projected denial predicate. |
 | `DirectParentInClosure` | `formal/apalache/RevocationCutCompleteness.tla` | `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::validate_delegation_admission`, `crates/core/chio-core-types/src/capability/attenuation.rs::validate_delegation_chain`, `crates/platform/chio-store-sqlite/src/capability_lineage.rs::SqliteReceiptStore::get_delegation_chain` | n/a (bounded structural closure); production validates a linear parent chain rather than materializing a descendant set | Every non-root parent edge is represented in the parent's descendant closure, so the modeled transitive revocation cut cannot pass over a missing direct edge. |
 | `ReceiptBeforeAllow` | `formal/apalache/ReceiptBeforeAllow.tla` | `crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs::ChioKernel::build_allow_response_with_metadata_and_payee_binding`, `ChioKernel::build_execution_nonce_preflight_allow_response_with_metadata`, `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt_with_federation`, `ChioKernel::record_chio_receipt`, `chio_formal_diff_tests::counterexample::replay_receipt_before_allow` | Modeled ordering evidence; concrete cross-row crash recovery remains excluded. Execution-nonce preflight returns API `Verdict::Allow` with terminal `Incomplete` and signs `Decision::Incomplete`; a retained reservation may still return its reconciliation nonce after an append failure. It is a preflight boundary anchor, not a `PublishAllow` transition. | `PublishAllow` models only a completed tool-output allow backed by `Decision::Allow`, after the receipt-persistence call for the same single-use call identity and capability. The committed trace replays that ordering against the kernel. |
 | `AllowReceiptsBudgetChecked` | `formal/apalache/ReceiptBeforeAllow.tla` | `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::check_and_increment_budget`, `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs::ChioKernel::evaluate_tool_call_async_with_session_context_scoped`, `crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs::ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped`, `crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs::ChioKernel::build_allow_response_with_metadata_and_payee_binding`, `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt_with_federation` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY; the model gives every call a bounded identity and does not establish cross-store atomicity | Every persisted allow receipt carries a call identity and capability whose matching budget check completed before receipt construction on the modeled evaluation path. |
 | `KernelTransitionCancelSafe` | `formal/apalache/KernelTransitionCancelSafe.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard`, `PostAdmissionDropGuard::new`, `PostAdmissionDropGuard::mark_dispatch_started`, `PostAdmissionDropGuard::disarm`, `PostAdmissionDropGuard::handle_pre_dispatch_drop`, `PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt`, `PostAdmissionDropGuard::drop`, `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::reverse_pre_execution_budget_mutation` | Snapshot equality is by construction; the runtime reversal transition is not modeled; post-dispatch and fault cleanup paths are outside this model | The bounded clean pre-dispatch abstraction assumes unchanged budget and receipt snapshots; it does not prove that the Rust reversal restores them. |
 | `ReservationConservation` | `formal/apalache/PostAdmissionDropGuard.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::drop`, `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::retained_admission_receipt_metadata`, `ChioKernel::ambiguous_dispatch_receipt_metadata`, `crates/kernel/chio-kernel/src/budget_store.rs`, `crates/kernel/chio-runtime-core/src/admission.rs::RuntimeAdmissionReservationTracker`, `evaluate_runtime_admission_tracked`, `crates/kernel/chio-runtime-core/src/admission_hook.rs::ChioRuntimeAdmissionHook::release_reservations`, `ChioRuntimeAdmissionHook::release_reserved` | n/a (bounded structural model) | Counted reservation partition and shared active-child capacity at every bounded lifecycle state. `hold` is the kernel budget hold. A returned output reaches budget reconciliation and commits the modeled hold before its final allow, deny, or incomplete terminal. Payment-adapter authorization is outside `Resources`. For a server `Err` or dropped future, production retained-admission metadata preserves both the hold and that authorization. `lease` conservatively projects destructive, treaty, and swarm reservation identifiers. The named release functions are pre-dispatch drift anchors; the retained-admission metadata path and armed drop branch are the outcome-unknown post-dispatch anchors. A failed pre-dispatch release is retained or possibly stuck. The model's terminal retained hold projects to an outstanding concrete journal reservation because the store has no retain event. Exact per-identifier mutate-then-error ownership, payment-adapter state, and production ledger refinement remain unproved. The evidence join also names `verify_reservation_ledger_terminal_classification`, `verify_reservation_ledger_conservation`, `formal/lean4/Chio/Chio/Proofs/ReservationLedger.lean`, and `kernel/ledger_audit.rs` plus `tests/property_reservation_ledger.rs`. The classifier and scalar admission are linked; the concrete production ledger is not. |
-| `TerminalReceiptExactlyOne` | `formal/apalache/PostAdmissionDropGuard.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::disarm`, `PostAdmissionDropGuard::drop`, `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt_with_mode`, `ChioKernel::record_chio_receipt`, `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs::ChioKernel::finalize_tool_output_with_metadata_and_payee_binding` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY covers the store transaction, not acknowledgement certainty. An outcome-unknown append is modeled as zero or one durable receipt and is not retried. | A committed parent append has exactly one receipt, an outcome-unknown append has at most one, and a clean pre-dispatch unwind remains receipt-free. The normal path disarms the drop guard before terminal construction; the armed post-dispatch drop path makes one cancellation builder call. |
+| `TerminalReceiptExactlyOne` | `formal/apalache/PostAdmissionDropGuard.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::disarm`, `PostAdmissionDropGuard::drop`, `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs::ChioKernel::record_chio_receipt_with_mode`, `ChioKernel::record_chio_receipt`, `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs::ChioKernel::finalize_tool_output_with_metadata_and_payee_binding` | `formal/assumptions.toml` ASSUME-SQLITE-ATOMICITY covers the store transaction, not acknowledgement certainty. An outcome-unknown append is modeled as zero or one durable receipt and is not retried. | A committed parent append has exactly one receipt and one attempt; an outcome-unknown append has one attempt and at most one receipt. Clean pre-dispatch unwind remains receipt-free. A distinct failed-clock construction event records zero attempts and receipts with a terminal fault or cancellation. Successful construction still requires an append attempt. Other builder failures and durable admission recovery remain outside the invariant. |
+| `PreDispatchConstructionFailureUnreachable` | `formal/apalache/_negative_tests/DropGuardPreDispatchClockFailureWitness.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt` | Rejected availability claim; no successful clock read is assumed | The counterexample reaches failed cleanup with an explicit construction clock failure, zero append attempts and zero receipts. This property is deliberately absent from `SafetyInv`. |
+| `PostDispatchConstructionFailureUnreachable` | `formal/apalache/_negative_tests/DropGuardPostDispatchClockFailureWitness.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::drop` | Rejected availability claim; runtime recovery remains unqualified | The counterexample retains outcome-unknown post-dispatch resources while a failed clock prevents parent construction. No append, receipt or durable-terminalization success is claimed. This property is deliberately absent from `SafetyInv`. |
 | `ChildReceiptsFlushed` | `formal/apalache/PostAdmissionDropGuard.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::record_buffered_child_receipts`, `PostAdmissionDropGuard::flush_buffered_child_receipts_from_drop`, `crates/kernel/chio-kernel/src/kernel/dispatch.rs::ChioKernel::record_child_receipt`, `crates/kernel/chio-kernel/src/kernel/mod.rs::SessionNestedFlowBridge::complete_child_request_with_receipt` | Successful child-receipt append availability is assumed. Outcome-unknown durable presence and the failed-suffix branch are outside the invariant. | Under the availability assumption, every buffered child receipt is appended before its parent terminal receipt. The nested-flow bridge signs and buffers each completed child before returning its result. Rust retries only the not-attempted suffix; it removes the outcome-unknown child from the retry buffer and carries that signed receipt in cancellation metadata without claiming whether the append committed. |
 | `RetainedIffAborted` | `formal/apalache/PostAdmissionDropGuard.tla` | `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs::PostAdmissionDropGuard::drop`, `crates/kernel/chio-kernel/src/kernel/dispatch.rs::ChioKernel::mark_runtime_admission_reservations_retained_fail_closed`, `crates/kernel/chio-kernel/src/kernel/validation.rs::ChioKernel::retained_admission_receipt_metadata`, `ChioKernel::ambiguous_dispatch_receipt_metadata`, `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs::ChioKernel::evaluate_tool_call_async_with_session_context_scoped`, `crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs::ChioKernel::evaluate_tool_call_with_nested_flow_client_async_scoped`, `crates/kernel/chio-kernel/src/kernel/mod.rs::SessionNestedFlowBridge`, `crates/kernel/chio-kernel/src/kernel/credential_reservation.rs::DispatchCredentialReservation`, `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs`, `crates/kernel/chio-runtime-core/src/admission.rs::evaluate_runtime_admission_tracked`, `crates/kernel/chio-runtime-core/src/admission_hook.rs::ChioRuntimeAdmissionHook::release_reservations`, `ChioRuntimeAdmissionHook::release_reserved` | A pre-dispatch runtime-hook release error or panic is abstracted as a failed lease. Payment authorization is outside the four-resource model. Exact per-identifier disposition, dispatch-credential atomicity, payment-adapter state, and production ledger linkage are not established. | An admission lease remains retained after every non-allow post-dispatch terminal. A returned `Ok` output is known and reaches reconciliation, so its modeled hold commits even if finalization later produces deny or incomplete. A server `Err` or dropped future is outcome-unknown and retains the hold. The model records raw `url` separately from its incomplete receipt projection and quantifies nested bridge activity; both boolean values take the same post-dispatch retention transition, so URL cannot reach pre-dispatch cleanup. Other server errors may produce deny, incomplete, or cancel receipts. Only a kernel error before polling is classified as reversible pre-dispatch cleanup. Production retained-admission metadata leaves budget and payment exposure plus credential and runtime reservations fail closed on the unknown paths. |
 
@@ -752,6 +817,13 @@ records bounds, runtime trace generation and the temporal timeout disposition.
 Four registered `chio-security-types` Kani harnesses verify the actual pure
 clock/deadline/skew and terminal/rollback helpers. The Rust mutation history is
 exercised separately; no full Rust/TLA refinement is claimed.
+
+| Property | Source | Rust path constrained | Assumption discharge | One-line description |
+| --- | --- | --- | --- | --- |
+| `clock_fence_preserves_last_success_on_regression` | `crates/security/chio-security-types/src/kani_public_harnesses.rs` | `chio_security_types::clock::ClockFence::observe` | Pure supplied readings; clock availability and deployment accuracy are outside this harness | Full-width symbolic wall and monotonic readings reject regression without replacing the last successful observation. |
+| `authority_deadline_never_extends_on_retry` | `crates/security/chio-security-types/src/kani_public_harnesses.rs` | `chio_security_types::clock::AuthorityDeadline::for_timeout_ms`, `chio_security_types::clock::AuthorityDeadline::remaining_nanos` | Pure supplied readings; no scheduler or live-clock refinement | Successful remaining-time observations stay inside the originally fixed wall and monotonic deadlines; retries cannot extend the monotonic deadline. |
+| `future_skew_uses_checked_full_width_arithmetic` | `crates/security/chio-security-types/src/kani_public_harnesses.rs` | `chio_security_types::clock::validate_future_skew` | Arithmetic only | A full-width `u128` reference checks `u64` upper-bound overflow rejection and the future-skew comparison. |
+| `response_terminal_states_and_clean_rollback_are_closed` | `crates/security/chio-security-types/src/kani_public_harnesses.rs` | `chio_security_types::response_state::is_legal_response_transition`, `chio_security_types::response_state::rollback_effect_is_restored` | Pure finite enum and Boolean helpers; no durable lifecycle or external restoration proof | Terminal states have no legal outgoing edge, only rolling back can enter lifted, and an applied reversible effect requires an actual restoration flag. |
 
 `RevocationPropagationEpochQuotient` retains the original propagation actions,
 checks the pair projection and `PendingCoversLag`, and exhausts the declared

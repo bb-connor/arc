@@ -43,17 +43,27 @@
 (* persistence-failure branches are outside ChildReceiptsFlushed.            *)
 (*                                                                          *)
 (* Parent append acknowledgement is modeled independently from durable      *)
-(* presence: not-attempted, outcome-unknown, or committed. An unknown        *)
+(* presence: not-attempted, construction-failed, outcome-unknown, committed. *)
+(* A distinct failed-clock event before cancellation construction records   *)
+(* zero append attempts and zero receipts. It is a terminal fault, never a  *)
+(* successful receipt. Successful construction still requires one attempt. *)
+(* Other builder failures, signer availability and durable admission         *)
+(* reconciliation are not modeled. A second clock read precedes production  *)
+(* terminalization; repeated clock failure may leave admission unreconciled. *)
+(* The model makes no recovery or audit-completeness promise for that case. *)
+(* An unknown                                                              *)
 (* acknowledgement may mean zero or one durable parent receipt. Once an      *)
 (* attempt starts, terminal Drop handling does not append a second receipt.  *)
 (* TerminalReceiptExactlyOne therefore gives exactly one receipt under a     *)
 (* committed acknowledgement and at most one under an unknown outcome.       *)
 (* Pre-dispatch cleanup failure retains only the failed resources and       *)
-(* emits one fault receipt. A returned output reaches finalization after     *)
+(* attempts one fault append when construction succeeds.                     *)
+(* A returned output reaches finalization after                              *)
 (* budget reconciliation, so its hold is committed. A server error or       *)
 (* dropped future retains the hold because tool effects cannot be excluded.  *)
 (* A credential commit failure after a returned output keeps the guard armed *)
-(* and follows DropPostDispatch, with signed cancellation and retention.      *)
+(* and follows DropPostDispatch, with an attempted cancellation receipt and   *)
+(* retention.                                                              *)
 (* Payment-adapter authorization is outside this four-resource ledger.       *)
 (* Production retains it only for those outcome-unknown paths.               *)
 (* The aggregate lease conservatively projects destructive, treaty, and     *)
@@ -63,6 +73,11 @@
 (* abstraction.                                                             *)
 (* Operation-owned approval and DPoP claims retain that same boundary:      *)
 (* does not prove source migration, exact episode release or SQL recovery.  *)
+(* Standalone execution nonces use owned pre-effect reservations, not a     *)
+(* deferred consumption branch. Acquisition, exact-owner rollback, and      *)
+(* commit/drop retention are source anchors. Nonce markers are outside      *)
+(* Resources: this model does not prove their signed expiry, clock fencing, *)
+(* capacity, callback containment, SQL atomicity or rollback ownership.      *)
 (* Authenticated caller start, durable report waiting, native caller        *)
 (* release-only recovery and declassification-use history are outside this  *)
 (* live drop-guard abstraction. Source bindings record implementation       *)
@@ -148,7 +163,7 @@ Phases == {
 }
 TerminalKinds == {"none", "allow", "deny", "incomplete", "cancel", "fault", "unwound"}
 ParentReceiptKinds == {"allow", "deny", "incomplete", "cancel", "fault"}
-ParentAppendStates == {"not-attempted", "outcome-unknown", "committed"}
+ParentAppendStates == {"not-attempted", "construction-failed", "outcome-unknown", "committed"}
 ServerErrorKinds == {"deny", "incomplete", "cancel", "url"}
 RecordedServerErrorKinds == ServerErrorKinds \cup {"none"}
 Mutations == {
@@ -190,6 +205,8 @@ VARIABLES
     \* @type: Int -> Str;
     parent_append_state,
     \* @type: Int -> Str;
+    parent_construction_failure,
+    \* @type: Int -> Str;
     parent_kind_logged,
     \* @type: Int -> Bool;
     children_before_parent,
@@ -213,6 +230,7 @@ vars == <<
     parent_receipts,
     parent_append_attempts,
     parent_append_state,
+    parent_construction_failure,
     parent_kind_logged,
     children_before_parent,
     post_dispatch_outcome_unknown,
@@ -341,6 +359,7 @@ DomainsOK ==
         /\ parent_receipts[i] \in 0..1
         /\ parent_append_attempts[i] \in 0..1
         /\ parent_append_state[i] \in ParentAppendStates
+        /\ parent_construction_failure[i] \in {"none", "clock"}
         /\ parent_kind_logged[i] \in TerminalKinds
         /\ children_before_parent[i] \in BOOLEAN
         /\ post_dispatch_outcome_unknown[i] \in BOOLEAN
@@ -359,6 +378,7 @@ Init ==
     /\ parent_receipts = [i \in Invocations |-> 0]
     /\ parent_append_attempts = [i \in Invocations |-> 0]
     /\ parent_append_state = [i \in Invocations |-> "not-attempted"]
+    /\ parent_construction_failure = [i \in Invocations |-> "none"]
     /\ parent_kind_logged = [i \in Invocations |-> "none"]
     /\ children_before_parent = [i \in Invocations |-> TRUE]
     /\ post_dispatch_outcome_unknown = [i \in Invocations |-> FALSE]
@@ -592,7 +612,50 @@ DropPostDispatch(i) ==
                              server_error_kind,
                              nested_bridge_active_at_error >>
 
-Next ==
+(* These separate events represent a failed trusted clock read before the    *)
+(* cancellation builder is invoked. They never stand in for a successful     *)
+(* construction with an omitted append, or for an outcome-unknown append.    *)
+DropPreDispatchConstructionFailed(i) ==
+    /\ i = 1
+    /\ phase[i] = "admitted"
+    /\ parent_append_state[i] = "not-attempted"
+    /\ \E failed \in CleanupFailureSets(i) :
+        /\ failed # {}
+        /\ failed \subseteq admitted_resources[i]
+        /\ ledger' = [ledger EXCEPT ![i] = ResolvePreDispatch(@, failed)]
+        /\ unwind_failed' = [unwind_failed EXCEPT ![i] = failed]
+    /\ phase' = [phase EXCEPT ![i] = "terminal_fault"]
+    /\ terminal_kind' = [terminal_kind EXCEPT ![i] = "fault"]
+    /\ parent_append_state' = [parent_append_state EXCEPT ![i] = "construction-failed"]
+    /\ parent_construction_failure' = [parent_construction_failure EXCEPT ![i] = "clock"]
+    /\ UNCHANGED << admitted_resources, child_buf, child_total, child_logged,
+                     parent_append_attempts, parent_receipts, parent_kind_logged,
+                     children_before_parent, post_dispatch_outcome_unknown,
+                     server_error_kind, nested_bridge_active_at_error >>
+
+DropPostDispatchConstructionFailed(i) ==
+    /\ phase[i] \in {"dispatch_started", "streaming"}
+    /\ parent_append_state[i] = "not-attempted"
+    /\ LET flushed_count ==
+               IF Mutation = "discard-child-buffer"
+               THEN child_logged[i]
+               ELSE child_logged[i] + child_buf[i]
+       IN
+        /\ phase' = [phase EXCEPT ![i] = "terminal_fault"]
+        /\ ledger' = [ledger EXCEPT ![i] = ResolvePostDispatch(@)]
+        /\ child_buf' = [child_buf EXCEPT ![i] = 0]
+        /\ child_logged' = [child_logged EXCEPT ![i] = flushed_count]
+        /\ children_before_parent' = [children_before_parent EXCEPT ![i] =
+            flushed_count = child_total[i]]
+    /\ post_dispatch_outcome_unknown' = [post_dispatch_outcome_unknown EXCEPT ![i] = TRUE]
+    /\ terminal_kind' = [terminal_kind EXCEPT ![i] = "cancel"]
+    /\ parent_append_state' = [parent_append_state EXCEPT ![i] = "construction-failed"]
+    /\ parent_construction_failure' = [parent_construction_failure EXCEPT ![i] = "clock"]
+    /\ UNCHANGED << admitted_resources, unwind_failed, child_total,
+                     parent_append_attempts, parent_receipts, parent_kind_logged,
+                     server_error_kind, nested_bridge_active_at_error >>
+
+LifecycleNext ==
     \/ \E i \in Invocations : Admit(i)
     \/ \E i \in Invocations : StartDispatch(i)
     \/ \E i \in Invocations : StreamChunk(i)
@@ -602,6 +665,12 @@ Next ==
     \/ \E i \in Invocations : ServerErrorPostDispatch(i)
     \/ \E i \in Invocations : DropPreDispatch(i)
     \/ \E i \in Invocations : DropPostDispatch(i)
+
+Next ==
+    \/ /\ LifecycleNext
+       /\ UNCHANGED parent_construction_failure
+    \/ \E i \in Invocations : DropPreDispatchConstructionFailed(i)
+    \/ \E i \in Invocations : DropPostDispatchConstructionFailed(i)
 
 Spec ==
     /\ Init
@@ -620,6 +689,14 @@ TerminalReceiptExactlyOne ==
             /\ parent_append_attempts[i] = 0
             /\ parent_receipts[i] = 0
             /\ parent_kind_logged[i] = "none"
+        /\ (parent_append_state[i] = "construction-failed") <=>
+            (parent_construction_failure[i] = "clock")
+        /\ parent_append_state[i] = "construction-failed" =>
+            /\ phase[i] = "terminal_fault"
+            /\ terminal_kind[i] \in {"fault", "cancel"}
+            /\ parent_append_attempts[i] = 0
+            /\ parent_receipts[i] = 0
+            /\ parent_kind_logged[i] = "none"
         /\ parent_append_state[i] = "committed" =>
             /\ parent_append_attempts[i] = 1
             /\ parent_receipts[i] = 1
@@ -634,7 +711,7 @@ TerminalReceiptExactlyOne ==
         /\ terminal_kind[i] \in {"none", "unwound"} =>
             parent_append_state[i] = "not-attempted"
         /\ terminal_kind[i] \in ParentReceiptKinds =>
-            parent_append_state[i] \in {"outcome-unknown", "committed"}
+            parent_append_state[i] \in {"construction-failed", "outcome-unknown", "committed"}
 
 ChildReceiptsFlushed ==
     \A i \in Invocations :

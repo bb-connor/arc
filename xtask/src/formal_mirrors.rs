@@ -545,6 +545,17 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_manifest_anchors_resolve_production_symbols() -> Result<(), String> {
+        let root = crate::workspace_root().map_err(|error| error.to_string())?;
+        let raw = std::fs::read_to_string(root.join(super::MANIFEST_PATH))
+            .map_err(|error| error.to_string())?;
+        for entry in super::parse_manifest(&raw)? {
+            super::compute_entry(&entry, &root)?;
+        }
+        Ok(())
+    }
+
+    #[test]
     fn model_kind_and_relationship_must_agree() {
         let mut mirror = entry(&["allows"]);
         mirror.model_file = "formal/apalache/ReceiptBeforeAllow.tla".to_string();
