@@ -1336,7 +1336,7 @@ fn verify_revocation_foreign_keys(connection: &Connection) -> Result<(), Revocat
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
 mod connection_recovery;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 pub(crate) use connection_recovery::write_probe_revocation;
 
 #[cfg(test)]

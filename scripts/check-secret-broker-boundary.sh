@@ -157,6 +157,7 @@ EOF
 
   run_tests "broker isolation secret boundary" no "$(cat <<'EOF'
 linux_process::brokerd_process_governed_provisioning_keeps_seeded_secret_inside_broker
+linux_process::brokerd_sigterm_drains_workers_and_restarts_with_its_durable_state
 public_response_and_daemon_diagnostics_do_not_contain_seeded_credential
 EOF
 )" cargo test -p chio-secret-broker --test no_secret_crossing
