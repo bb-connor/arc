@@ -1134,9 +1134,13 @@ fn treaty_cross_boundary_admission_requires_quorum_evidence_for_quorum_cosign(
         denied.failure_code.as_deref(),
         Some("chio_treaty_missing_required_evidence")
     );
-    assert!(denied
-        .required_evidence
-        .contains(&"quorum_signature".to_string()));
+    assert_eq!(
+        denied.required_evidence,
+        vec![
+            "governance_receipt".to_string(),
+            "quorum_signature".to_string()
+        ]
+    );
     Ok(())
 }
 
@@ -1416,6 +1420,55 @@ fn every_two_signature_co_sign_mode_requires_the_invocation_record(
             accepted.accepted,
             "{mode} refused a call that presented the invocation record"
         );
+        assert_eq!(accepted.failure_code, None);
+        assert_eq!(
+            accepted.required_evidence,
+            vec![
+                "governance_receipt".to_string(),
+                "bilateral_invocation".to_string()
+            ]
+        );
     }
+    Ok(())
+}
+
+#[test]
+fn no_cosign_admission_requires_only_declared_evidence() -> Result<(), Box<dyn std::error::Error>> {
+    let mut action = treaty_action_class(
+        "receipt_backed",
+        false,
+        "totally_ordered",
+        vec!["governance_receipt"],
+    );
+    action.co_sign = "none".to_string();
+    let buyer = treaty_manifest("kernel.buyer", action.clone());
+    let vendor = treaty_manifest("kernel.vendor-b", action);
+    let mut treaty = treaty_scope();
+    treaty.ladder_manifest_sha256s = vec![
+        chio_runtime_core::governance_ladder_manifest_sha256(&buyer)?,
+        chio_runtime_core::governance_ladder_manifest_sha256(&vendor)?,
+    ];
+    let intersection = compute_ladder_intersection(&treaty, &[buyer, vendor], 1_800_000_010_000)?;
+    let accepted = evaluate_cross_boundary_admission(CrossBoundaryAdmissionInput {
+        treaty_scope: &treaty,
+        ladder_intersection: &intersection,
+        expected_ladder_intersection_sha256: Some(chio_runtime_core::ladder_intersection_sha256(
+            &intersection,
+        )?),
+        action_class_id: "workflow.destructive.vendor_call",
+        present_evidence: vec!["governance_receipt".to_string()],
+        verified_evidence: vec![CrossBoundaryEvidenceRef {
+            evidence_class: "governance_receipt".to_string(),
+            artifact_sha256: "d".repeat(64),
+            verified: true,
+        }],
+        now_unix_ms: 1_800_000_010_000,
+    })?;
+    assert!(accepted.accepted, "{:?}", accepted.failure_code);
+    assert_eq!(accepted.failure_code, None);
+    assert_eq!(
+        accepted.required_evidence,
+        vec!["governance_receipt".to_string()]
+    );
     Ok(())
 }

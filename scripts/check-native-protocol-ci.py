@@ -26,6 +26,30 @@ CPP_RUN = (
     "--test mcp_core_cpp_live --test tasks_cpp_live --test auth_cpp_live "
     "--test notifications_cpp_live --test nested_callbacks_cpp_live -- --nocapture"
 )
+SDK_NAME = "Run SDK parity"
+SDK_RUN = (
+    'CMAKE_PREFIX_PATH="$(./scripts/setup-drogon-test-deps.sh)"\n'
+    "export CMAKE_PREFIX_PATH\n"
+    "./scripts/check-sdk-parity.sh"
+)
+SDK_COMMANDS = (
+    "./scripts/check-bindings-parity.sh",
+    "./scripts/check-chio-py.sh",
+    "./scripts/check-chio-go.sh",
+    'CHIO_CPP_REQUIRE_CBINDGEN="${CHIO_CPP_REQUIRE_CBINDGEN:-0}" ./scripts/check-chio-cpp.sh',
+    "./scripts/check-chio-drogon.sh",
+    CPP_RUN.splitlines()[0],
+    "CHIO_CPP_LIVE_CONFORMANCE=1 " + CPP_RUN.splitlines()[1],
+)
+POSTGRES_NAME = "Exercise the public worker role and actual native process host"
+POSTGRES_RUN = (
+    'python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"\n'
+    '"$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/qualification"'
+)
+POSTGRES_CLAIM_NAME = "Lose a committed claim response and recover without redispatch"
+POSTGRES_CLAIM_RUN = (
+    '"$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"'
+)
 COMMON_ENV = {
     "CARGO_BUILD_JOBS": "1",
     "RUSTFLAGS": "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0",
@@ -98,7 +122,10 @@ def validate_consumer(
         )
 
 
-def validate(ci: dict, process: dict, action: dict, cpp: dict) -> None:
+def validate(
+    ci: dict, process: dict, action: dict, cpp: dict, sdk: dict, postgres: dict,
+    sdk_script: str,
+) -> None:
     checks = (
         "python3 scripts/check-native-protocol-ci.py",
         "python3 scripts/tests/check-native-protocol-ci.test.py",
@@ -163,6 +190,59 @@ def validate(ci: dict, process: dict, action: dict, cpp: dict) -> None:
         },
         "C++ target set must build the enforcing CLI and execute every live target",
     )
+    validate_consumer(
+        sdk, "sdk-parity", SDK_NAME, {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION}
+    )
+    _, step = named_step(sdk["jobs"]["sdk-parity"], SDK_NAME)
+    require(
+        {**step, "run": step.get("run", "").strip()}
+        == {"name": SDK_NAME, "run": SDK_RUN},
+        "SDK parity must execute the complete native consumer script",
+    )
+    # Bind the shell command sequence after the feature-matrix heredoc. An
+    # earlier Drogon build replaces the CLI, so the enforcing rebuild must
+    # happen afterward and immediately precede the five native test targets.
+    sections = sdk_script.split("\nEOF\n")
+    require(
+        sdk_script.startswith("#!/usr/bin/env bash\nset -euo pipefail\n")
+        and len(sections) == 2
+        and not any(variable in sdk_script for variable in NATIVE_ENV),
+        "SDK parity must retain failure propagation and qualified fixture authority",
+    )
+    commands = tuple(
+        line.strip()
+        for line in sections[1].split("\necho ", 1)[0].splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+    require(
+        commands == SDK_COMMANDS,
+        "SDK parity must preserve earlier checks, rebuild enforcement after Drogon and execute all live areas",
+    )
+    validate_consumer(
+        postgres, "native", POSTGRES_NAME,
+        {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION},
+    )
+    job = postgres["jobs"]["native"]
+    consumer_index, step = named_step(job, POSTGRES_NAME)
+    build_index, build = named_step(job, "Build the real gateway and kernel")
+    copy_index, copy = named_step(job, "Install the process package and create a dedicated TLS fixture")
+    require(
+        build_index < copy_index < consumer_index - 1
+        and "if" not in build and "continue-on-error" not in build
+        and "if" not in copy and "continue-on-error" not in copy
+        and build.get("run", "").strip().splitlines()[-1:] == [CPP_RUN.splitlines()[0]]
+        and 'cp target/debug/chio "$job_root/chio"' in copy.get("run", "").splitlines(),
+        "PostgreSQL enforcing CLI must be built before copying the consumer binary",
+    )
+    claim_index, claim = named_step(job, POSTGRES_CLAIM_NAME)
+    require(
+        {**step, "run": step.get("run", "").strip()}
+        == {"name": POSTGRES_NAME, "run": POSTGRES_RUN}
+        and claim_index == consumer_index + 1
+        and {**claim, "run": claim.get("run", "").strip()}
+        == {"name": POSTGRES_CLAIM_NAME, "run": POSTGRES_CLAIM_RUN},
+        "PostgreSQL qualification must execute both native consumers in order without authority overrides",
+    )
     digest = hashlib.sha256(
         json.dumps(action, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -178,8 +258,11 @@ def main() -> None:
         yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text()),
         yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
+        (ROOT / "scripts/check-sdk-parity.sh").read_text(),
     )
-    print("native protocol CI contract passed: two workspace lanes, four CLI and five C++ targets")
+    print("native protocol CI contract passed: workspace, CLI, C++, SDK parity and PostgreSQL consumers")
 
 
 if __name__ == "__main__":

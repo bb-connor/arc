@@ -1,0 +1,119 @@
+{
+  "targets": [
+    {
+      "target": "Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_process-9451acb153726719)",
+      "result": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/aggregate_family.rs (/home/connor/chio-pr1173-target/debug/deps/aggregate_family-97e07f3d3865c087)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/child_submission.rs (/home/connor/chio-pr1173-target/debug/deps/child_submission-0122567f8040a03d)",
+      "result": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/crash_recovery.rs (/home/connor/chio-pr1173-target/debug/deps/crash_recovery-311824c8515e459a)",
+      "result": "ok",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/cross_owner_recovery.rs (/home/connor/chio-pr1173-target/debug/deps/cross_owner_recovery-f1769f5235c711ca)",
+      "result": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/host_routes.rs (/home/connor/chio-pr1173-target/debug/deps/host_routes-d4f4c7926ae2c6d9)",
+      "result": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/mailbox_effect_boundary.rs (/home/connor/chio-pr1173-target/debug/deps/mailbox_effect_boundary-2f1174c7c05b50aa)",
+      "result": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/mailboxes.rs (/home/connor/chio-pr1173-target/debug/deps/mailboxes-2400546fe1917622)",
+      "result": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/nonce_recovery.rs (/home/connor/chio-pr1173-target/debug/deps/nonce_recovery-5955459c5fa0fc4a)",
+      "result": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/polyglot_workers.rs (/home/connor/chio-pr1173-target/debug/deps/polyglot_workers-bb583fe2a3a54067)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/processes.rs (/home/connor/chio-pr1173-target/debug/deps/processes-95754b21710497a8)",
+      "result": "ok",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/retry_eligibility.rs (/home/connor/chio-pr1173-target/debug/deps/retry_eligibility-6e996bfdf709b1e9)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/state_blobs.rs (/home/connor/chio-pr1173-target/debug/deps/state_blobs-6b5c457bbca00077)",
+      "result": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/threshold_recovery.rs (/home/connor/chio-pr1173-target/debug/deps/threshold_recovery-c4d4bd5f97c77c4b)",
+      "result": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Running tests/worker_protocol.rs (/home/connor/chio-pr1173-target/debug/deps/worker_protocol-a4848d4e19565752)",
+      "result": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "target": "Doc-tests chio_process",
+      "result": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "passed": 91,
+  "failed": 0,
+  "ignored": 0
+}

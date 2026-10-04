@@ -1,0 +1,12 @@
+{
+  "base_head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "files": {
+    "scripts/generate-programmable-sovereignty-artifact.py": "92a26cf81d432d196af122e3170b983f761dc0a6802960611410103812be65e6",
+    "scripts/tests/programmable-sovereignty-artifact.test.py": "387b5051bb5d458ca123fb3324043605f347e5bfeadc46eff5cb1abfb5f77e4a",
+    ".github/workflows/paper-artifact-check.yml": "248fab8e8472a83cc4745ca4bde61bd99622452e3f9d9902554bdd412a4b3e5f",
+    "docs/papers/programmable-sovereignty/HISTORICAL_VALIDATION.md": "f39774923085d06a18cc8c38a3264fe456b02c369c1719e08a01ffaee6113b65",
+    "docs/papers/programmable-sovereignty/supplementary/artifact-commit.txt": "ccb01720766313bf74a339aed312336e630636bb3d611ba16143f97b3361602e",
+    "docs/papers/programmable-sovereignty/supplementary/artifact-manifest.json": "68e68a954ca1f6bc162d336ee5b60df81ecc893c348805b9533caadacabcb5fa"
+  },
+  "source_set_sha256": "04f65799b2b040b9e79354cef2e87e08eb526445170887091f1abc9ff84cb4a9"
+}

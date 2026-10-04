@@ -10,6 +10,7 @@ on:
       - "formal/lean4/**"
       - "formal/diff-tests/**"
       - "scripts/generate-programmable-sovereignty-artifact.py"
+      - "scripts/tests/programmable-sovereignty-artifact.test.py"
       - "scripts/check-programmable-sovereignty-artifact.sh"
       - ".github/workflows/paper-artifact-check.yml"
   push:
@@ -22,6 +23,7 @@ on:
       - "formal/lean4/**"
       - "formal/diff-tests/**"
       - "scripts/generate-programmable-sovereignty-artifact.py"
+      - "scripts/tests/programmable-sovereignty-artifact.test.py"
       - "scripts/check-programmable-sovereignty-artifact.sh"
       - ".github/workflows/paper-artifact-check.yml"
   workflow_dispatch:
@@ -40,12 +42,16 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          # The check compares benchmark inputs against the pinned source
-          # commit and the producer commits recorded in the result files.
+          # Historical validation needs exact source, producer, and artifact
+          # assembly objects. It never substitutes the current checkout's HEAD.
           fetch-depth: 0
       - name: Install pdftotext
         uses: ./.github/actions/apt-install
         with:
           packages: poppler-utils
-      - name: Check the programmable-sovereignty artifact
-        run: python3 scripts/generate-programmable-sovereignty-artifact.py --check
+      - name: Test historical artifact validation and tamper rejection
+        run: python3 scripts/tests/programmable-sovereignty-artifact.test.py
+      - name: Validate the retained programmable-sovereignty artifact
+        # This checks the archived experiment, not current-source benchmarks.
+        # See docs/papers/programmable-sovereignty/HISTORICAL_VALIDATION.md.
+        run: python3 scripts/generate-programmable-sovereignty-artifact.py --check-historical

@@ -2,54 +2,54 @@
 running 37 tests
 test authority::tests::budget_exactly_at_limit_passes ... ok
 test authority::tests::budget_exceeded_during_execution ... ok
-test authority::tests::denied_step_deactivates_workflow ... ok
 test authority::tests::execution_ids_do_not_collide_within_a_single_second ... ok
 test authority::tests::execution_limit_denies_reuse_after_finalize ... ok
+test authority::tests::denied_step_deactivates_workflow ... ok
 test authority::tests::execution_limit_reserved_at_begin ... ok
-test authority::tests::execution_limit_tracks_completed_and_in_flight_executions ... ok
-test authority::tests::failed_step_finalized_late_preserves_step_failed_outcome ... ok
 test authority::tests::mismatched_budget_currency_fails_without_spending_units ... ok
 test authority::tests::missing_step_authorization_rejected ... ok
 test authority::tests::rapid_begin_calls_produce_distinct_ids_for_same_agent ... ok
 test authority::tests::record_step_on_inactive_workflow_errors ... ok
-test authority::tests::record_step_rejects_elapsed_time_limit ... ok
-test authority::tests::single_step_workflow ... ok
+test authority::tests::failed_step_finalized_late_preserves_step_failed_outcome ... ok
+test authority::tests::execution_limit_tracks_completed_and_in_flight_executions ... ok
 test authority::tests::step_budget_limit_is_enforced_when_recording_step_cost ... ok
+test authority::tests::record_step_rejects_elapsed_time_limit ... ok
 test authority::tests::step_failure_deactivates_workflow ... ok
+test authority::tests::single_step_workflow ... ok
 test authority::tests::step_order_enforcement ... ok
-test authority::tests::unauthorized_skill_rejected ... ok
 test authority::tests::unlimited_finalize_does_not_release_limited_reservation ... ok
+test authority::tests::unauthorized_skill_rejected ... ok
 test grant::tests::authorizes_step ... ok
+test grant::tests::strict_ordering ... ok
+test authority::tests::successful_workflow_execution ... ok
 test grant::tests::relaxed_ordering ... ok
 test grant::tests::skill_grant_roundtrip ... ok
-test grant::tests::strict_ordering ... ok
-test manifest::tests::first_step_inputs_are_not_validated ... ok
-test authority::tests::successful_workflow_execution ... ok
-test manifest::tests::tool_dependencies ... ok
 test manifest::tests::invalid_io_contracts ... ok
-test manifest::tests::manifest_roundtrip ... ok
+test manifest::tests::first_step_inputs_are_not_validated ... ok
 test manifest::tests::valid_io_contracts ... ok
 test receipt::tests::partial_failure_stats ... ok
+test manifest::tests::tool_dependencies ... ok
+test manifest::tests::manifest_roundtrip ... ok
 test receipt::tests::v1_receipt_serialization_omits_v2_fields_when_absent ... ok
-test receipt::tests::tampered_receipt_fails ... ok
-test receipt::tests::sign_and_verify_workflow_receipt ... ok
 test receipt::tests::unsupported_receipt_schema_fails_verification ... ok
+test receipt::tests::sign_and_verify_workflow_receipt ... ok
+test receipt::tests::tampered_receipt_fails ... ok
 test receipt::tests::workflow_outcome_serialization ... ok
 test receipt::tests::v2_step_linkage_fields_are_signed_by_kernel ... ok
 test receipt::tests::vendor_cosignatures_verify_required_signers ... ok
 
-test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
 
 
 running 16 tests
+test expiry_and_noncanonical_numeric_envelopes_reject ... ok
 test mutation_requires_current_holder_and_untampered_signature ... ok
 test dispatch_checks_subject_currency_ceiling_capability_and_arguments ... ok
-test expiry_and_noncanonical_numeric_envelopes_reject ... ok
 test predicates_validate_and_check_the_actual_json_result ... ok
 test allocator_namespace_survives_reopen_and_is_not_silently_recreated ... ok
 test provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id ... ok
-test neither_containers_nor_unqualified_receivers_can_execute ... ok
 test nested_holders_allocate_without_copying_parent_capacity ... ok
+test neither_containers_nor_unqualified_receivers_can_execute ... ok
 test provider_replacement_stops_at_dispatch_and_survives_reopen ... ok
 test replay_cannot_change_a_child_or_move_it_to_another_parent ... ok
 test selection_and_dispatch_cannot_race_into_different_providers ... ok
@@ -59,7 +59,7 @@ test subdivision_preserves_effect_readers_expiry_and_depth ... ok
 test signed_selection_cannot_cross_allocator_namespaces ... ok
 test signed_subdivision_cannot_cross_allocator_or_root_namespaces ... ok
 
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
 
 
 running 1 test

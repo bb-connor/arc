@@ -11,11 +11,6 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Checking tracing-subscriber v0.3.23
-    Checking chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-proof-parity)
-    Checking chio-attest-loopback v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-attest-loopback)
-    Checking chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-swarm-authority)
-    Checking chio-log-redact v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-log-redact)
     Checking chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
     Checking chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-finding-verifier)
     Checking chio-runtime-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-core)
@@ -24,4 +19,4 @@ help: Check that the patched package version and available features are compatib
     Checking chio-commerce-order v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-commerce-order)
     Checking chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
     Checking chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
-    Finished `dev` profile [unoptimized] target(s) in 1m 35s
+    Finished `dev` profile [unoptimized] target(s) in 45.86s

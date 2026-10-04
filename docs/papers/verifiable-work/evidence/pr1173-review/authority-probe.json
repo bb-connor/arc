@@ -1,0 +1,5 @@
+{
+  "status": 200,
+  "body": "{\"configured\":true,\"backend\":\"sqlite\",\"publicKey\":\"34c37bb7daa208bd8c9ec4180cf3c1b82ce8fdaf13f67a597ce7aebfd0757943\",\"generation\":1,\"rotatedAt\":1791092565,\"issuerState\":{\"publicKeyHex\":\"34c37bb7daa208bd8c9ec4180cf3c1b82ce8fdaf13f67a597ce7aebfd0757943\",\"generation\":1,\"rotatedAt\":1791092565,\"trustedKeys\":[{\"publicKeyHex\":\"34c37bb7daa208bd8c9ec4180cf3c1b82ce8fdaf13f67a597ce7aebfd0757943\",\"generation\":1,\"activatedAt\":1791092565}]},\"appliesToFutureSessionsOnly\":false,\"trustedPublicKeys\":[\"34c37bb7daa208bd8c9ec4180cf3c1b82ce8fdaf13f67a597ce7aebfd0757943\"]}",
+  "state_mode": "0o700"
+}

@@ -1,0 +1,89 @@
+[
+  {
+    "label": "survivor-federation",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-federation",
+      "--test",
+      "treaty"
+    ],
+    "log": "/tmp/chio-pr1173-survivor-federation.log",
+    "started": 1791095796.3491073,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791095932.9342868
+  },
+  {
+    "label": "survivor-runtime",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-runtime-core",
+      "--test",
+      "runtime_treaty",
+      "--test",
+      "runtime_treaty_binding_substitution",
+      "--test",
+      "runtime_agreement_context_scan"
+    ],
+    "log": "/tmp/chio-pr1173-survivor-runtime.log",
+    "started": 1791095932.9346533,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791095997.8068674
+  },
+  {
+    "label": "survivor-federation-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-federation",
+      "--test",
+      "treaty",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/tmp/chio-pr1173-survivor-federation-clippy.log",
+    "started": 1791095997.8072736,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791096134.6005986
+  },
+  {
+    "label": "source-format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "log": "/tmp/chio-pr1173-source-format.log",
+    "started": 1791096134.6009593,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791096167.4316285
+  },
+  {
+    "label": "native-final",
+    "command": [
+      "python3",
+      "-B",
+      "docs/papers/verifiable-work/tools/qualify_dynamic.py",
+      "--record"
+    ],
+    "log": "/tmp/chio-pr1173-native-final.log",
+    "started": 1791096167.4320385,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791097351.5022602
+  }
+]

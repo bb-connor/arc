@@ -108,10 +108,11 @@ fn mcp_serve_http_rejects_malformed_jsonrpc_body() {
         br#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25""#,
     );
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert!(response.headers().get("MCP-Session-Id").is_none());
     let body: Value = response.json().expect("parse malformed request response");
     assert_eq!(body["error"]["code"], -32700);
     assert_eq!(
         body["error"]["message"],
-        "urn:chio:error:attest:signed-json-invalid-input"
+        "urn:chio:error:attest:signed-json-invalid-shape"
     );
 }

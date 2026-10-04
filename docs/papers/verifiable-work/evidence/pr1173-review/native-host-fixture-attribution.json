@@ -1,0 +1,67 @@
+{
+  "base": "ecb44791501c2aba671de2a967d2506f039ab42e",
+  "head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "claim": "Source comparison only, no separate base execution.",
+  "files": [
+    {
+      "path": "crates/products/chio-cli/tests/mcp_auth_server.rs",
+      "base_equals_head": true,
+      "base_sha256": "31d87b7eed476d3c438aa0048d7e62352aa37c7fb251a43c863db24663a3a36f",
+      "head_sha256": "31d87b7eed476d3c438aa0048d7e62352aa37c7fb251a43c863db24663a3a36f"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/mcp_serve_http.rs",
+      "base_equals_head": true,
+      "base_sha256": "35d3450c9e0a5aeccae75c3efffce6e6dc4f84fd6df72c7bd8cc3a93b76632f7",
+      "head_sha256": "35d3450c9e0a5aeccae75c3efffce6e6dc4f84fd6df72c7bd8cc3a93b76632f7"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/mcp_serve_http/malformed_initialize.rs",
+      "base_equals_head": true,
+      "base_sha256": "0e868bc8c102dfeccf144082989f72d0f2f84c5ca7b679fd2f9865faf00163ae",
+      "head_sha256": "0e868bc8c102dfeccf144082989f72d0f2f84c5ca7b679fd2f9865faf00163ae"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/transport_identity.rs",
+      "base_equals_head": true,
+      "base_sha256": "6520d83dd764f4dcf90023d4616ae80396a45f1afda0b1365a5f5f59a82f8c54",
+      "head_sha256": "6520d83dd764f4dcf90023d4616ae80396a45f1afda0b1365a5f5f59a82f8c54"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/sender_constraint.rs",
+      "base_equals_head": true,
+      "base_sha256": "259c05936592094407642c2e57c38ee00022ade5371a7b9f7aa5c3e775acb0e8",
+      "head_sha256": "259c05936592094407642c2e57c38ee00022ade5371a7b9f7aa5c3e775acb0e8"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs",
+      "base_equals_head": true,
+      "base_sha256": "20e82af62769d6de54053a3b1f861b79e62ddf805e92e6da5078cdf7a02de953",
+      "head_sha256": "20e82af62769d6de54053a3b1f861b79e62ddf805e92e6da5078cdf7a02de953"
+    },
+    {
+      "path": "crates/protocol/chio-mcp-edge/src/ingress.rs",
+      "base_equals_head": true,
+      "base_sha256": "dbc1f60c21c3392fa4570131392e915bf4ab82fac081317ae2e910424e195f78",
+      "head_sha256": "dbc1f60c21c3392fa4570131392e915bf4ab82fac081317ae2e910424e195f78"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority.rs",
+      "base_equals_head": true,
+      "base_sha256": "38cb47185d2bc9a59a3066b6a5850964f2993afd8092fd0679c66ad9a18e10e0",
+      "head_sha256": "38cb47185d2bc9a59a3066b6a5850964f2993afd8092fd0679c66ad9a18e10e0"
+    },
+    {
+      "path": "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_authority/lifecycle.rs",
+      "base_equals_head": true,
+      "base_sha256": "8023d9223b9c351550091171aaaa408a256a4cfffa91055c12d650b212fda687",
+      "head_sha256": "8023d9223b9c351550091171aaaa408a256a4cfffa91055c12d650b212fda687"
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/validation/issuer_trust.rs",
+      "base_equals_head": true,
+      "base_sha256": "a4d814a62182a1762b7a66b0c0c9daf20068978e0dcb23e8b89a36d79a8a93f3",
+      "head_sha256": "a4d814a62182a1762b7a66b0c0c9daf20068978e0dcb23e8b89a36d79a8a93f3"
+    }
+  ]
+}

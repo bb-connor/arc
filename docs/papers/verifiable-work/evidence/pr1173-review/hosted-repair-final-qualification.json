@@ -1,0 +1,56 @@
+[
+  {
+    "label": "drogon-final",
+    "command": [
+      "bash",
+      "scripts/check-chio-drogon.sh"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-drogon-final.log",
+    "started": 1791094454.2336676,
+    "status": "complete",
+    "exit_code": 1,
+    "finished": 1791094772.1943803
+  },
+  {
+    "label": "native-http-compile",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--test",
+      "mcp_auth_server",
+      "--test",
+      "mcp_serve_http",
+      "--no-run"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-native-http-compile.log",
+    "started": 1791094772.1949255,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791095010.1128442
+  },
+  {
+    "label": "native-http-clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "chio-cli",
+      "--test",
+      "mcp_auth_server",
+      "--test",
+      "mcp_serve_http",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "log": "/tmp/chio-pr1173-hosted-repair-native-http-clippy.log",
+    "started": 1791095010.1136513,
+    "status": "complete",
+    "exit_code": 0,
+    "finished": 1791095244.437829
+  }
+]

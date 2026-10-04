@@ -1,0 +1,51 @@
+{
+  "base": "ecb44791501c2aba671de2a967d2506f039ab42e",
+  "pushed": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "base_executed": false,
+  "method": "Pinned source comparison plus local pushed-head crash reproduction and hosted pq compile failure",
+  "paths": [
+    {
+      "path": "crates/kernel/chio-process/tests/crash_recovery.rs",
+      "base_blob": "5bd86b9a7013168ddac000684fc0d11783dc31d5",
+      "pushed_blob": "5bd86b9a7013168ddac000684fc0d11783dc31d5",
+      "identical": true
+    },
+    {
+      "path": "crates/kernel/chio-process/tests/support/mod.rs",
+      "base_blob": "9215c29189f95215d66ed02e82e49f743e4b8268",
+      "pushed_blob": "9215c29189f95215d66ed02e82e49f743e4b8268",
+      "identical": true
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/governed_validation.rs",
+      "base_blob": "19e29ffc89413d5858f42ecfcb64967a935774a9",
+      "pushed_blob": "19e29ffc89413d5858f42ecfcb64967a935774a9",
+      "identical": true
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/governed_validation/tool_approval.rs",
+      "base_blob": "94c9c488ba836102e91f0913128e7bee50c21f85",
+      "pushed_blob": "94c9c488ba836102e91f0913128e7bee50c21f85",
+      "identical": true
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/tests.rs",
+      "base_blob": "f38f42f6234235b40afe012de4d7c41ccba0e56d",
+      "pushed_blob": "f38f42f6234235b40afe012de4d7c41ccba0e56d",
+      "identical": true
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/tests/durable_admission.rs",
+      "base_blob": "9f679d450d8bec312045053f7d4945054f757796",
+      "pushed_blob": "d87150ded15029355af026e679e86314079adcaf",
+      "identical": false
+    },
+    {
+      "path": "crates/kernel/chio-kernel/src/kernel/tests/threshold_issuance.rs",
+      "base_blob": "0d636083bca340ff74b6a4ba90662e73683bcd68",
+      "pushed_blob": "0d636083bca340ff74b6a4ba90662e73683bcd68",
+      "identical": true
+    }
+  ],
+  "pq_helper_note": "Base durable_admission.rs:1087 already has private DurableAdmissionCheckingServer; unchanged threshold_issuance.rs:348 uses it from sibling module. Pushed durable file changes add unrelated test state/fixtures, not helper visibility."
+}

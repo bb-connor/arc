@@ -39,6 +39,8 @@ const CORPUS_SMOKE_TARGETS: &[&str] = &[
     "openapi_ingest",
     "peers_lock_decode",
     "receipt_log_replay",
+    "response_authority_protocol",
+    "response_lifecycle",
     "rollback_anchor_slots",
     "underwriting_policy_input",
     "wasm_guard_escape",
@@ -344,6 +346,18 @@ fn bilateral_dsse_verify_smoke() {
 fn finding_worker_protocol_smoke() {
     use chio_fuzz::entries::finding_worker_protocol;
     assert_seed_floor("finding_worker_protocol", finding_worker_protocol);
+}
+
+#[test]
+fn response_authority_protocol_smoke() {
+    use chio_control_plane::security::response_authority_protocol;
+    assert_seed_floor("response_authority_protocol", response_authority_protocol);
+}
+
+#[test]
+fn response_lifecycle_smoke() {
+    use chio_quarantine::fuzz::response_lifecycle;
+    assert_seed_floor("response_lifecycle", response_lifecycle);
 }
 
 #[test]

@@ -337,3 +337,78 @@ fn swarm_context_deeper_than_the_scan_bound_is_refused() -> TestResult {
     assert_eq!(code, "invalid_chio_swarm_context");
     Ok(())
 }
+
+#[derive(Clone, Copy, Debug)]
+enum ContextNesting {
+    Objects,
+    Arrays,
+    Mixed,
+}
+
+fn context_with_nesting(
+    mut context: serde_json::Value,
+    deepest_container: usize,
+    nesting: ContextNesting,
+) -> serde_json::Value {
+    let mut nested = serde_json::json!({ "note": "harmless" });
+    // The full context is depth zero and sidecar is depth one. Each wrapper
+    // adds one container before the harmless leaf object.
+    for level in 1..deepest_container {
+        nested = match nesting {
+            ContextNesting::Objects => serde_json::json!({ "next": nested }),
+            ContextNesting::Arrays => serde_json::json!([nested]),
+            ContextNesting::Mixed if level % 2 == 0 => serde_json::json!({ "next": nested }),
+            ContextNesting::Mixed => serde_json::json!([nested]),
+        };
+    }
+    context["sidecar"] = nested;
+    context
+}
+
+#[test]
+fn agreement_context_at_depth_limit_reaches_receiver_owned_lookup() -> TestResult {
+    for nesting in [
+        ContextNesting::Objects,
+        ContextNesting::Arrays,
+        ContextNesting::Mixed,
+    ] {
+        for (context, expected) in [
+            (
+                serde_json::json!({ "chioAdmission": admission(), "chioTreaty": treaty() }),
+                "chio_treaty_missing_scope",
+            ),
+            (
+                serde_json::json!({ "chioAdmission": admission(), "chioSwarm": swarm() }),
+                "missing_chio_swarm_authority_bundle",
+            ),
+        ] {
+            let code = failure_code(context_with_nesting(context, 32, nesting))?;
+            assert_eq!(code, expected, "{nesting:?} at depth 32 must pass the scan");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn agreement_context_beyond_depth_limit_is_refused_for_every_container_shape() -> TestResult {
+    for nesting in [
+        ContextNesting::Objects,
+        ContextNesting::Arrays,
+        ContextNesting::Mixed,
+    ] {
+        for (context, expected) in [
+            (
+                serde_json::json!({ "chioAdmission": admission(), "chioTreaty": treaty() }),
+                "invalid_chio_treaty_context",
+            ),
+            (
+                serde_json::json!({ "chioAdmission": admission(), "chioSwarm": swarm() }),
+                "invalid_chio_swarm_context",
+            ),
+        ] {
+            let code = failure_code(context_with_nesting(context, 33, nesting))?;
+            assert_eq!(code, expected, "{nesting:?} at depth 33 must fail closed");
+        }
+    }
+    Ok(())
+}

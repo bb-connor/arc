@@ -51,7 +51,86 @@ The pinned ERC-8183 capture is stored as deterministic gzip. Its decompressed
 that pin, rejects invalid metadata and confined-path violations, and limits
 decompression before accepting the source.
 
+## Hosted integration follow-up
+
+The hosted run at `93a2552c3a6eb15ac2756129f199f5714390e794` exercised additional
+consumers after the security-base merge. Its failures remain historical evidence;
+the subsequent repairs do not change that run's result. Its terminal snapshot
+contains 47 successful, 23 failed, 10 skipped, and two cancelled jobs. Installed
+native consumer recovery passed, while its aggregate process gate correctly
+failed on the separate host-test and worker failures. Source comparisons in
+`test-integration-attribution.json`, `inherited-ci-inputs.json`, and the native
+HTTP fixture record distinguish inherited integration defects from session code.
+
+- Process crash recovery now configures an explicit approval roster and signs
+  the kernel-bound intent before the first dispatch. Reopening still loads the
+  original persisted request. Unbound intents, changed arguments, and unlisted
+  approvers deny before either effect log exists. All 91 process tests and
+  warning-denied Clippy passed.
+- The threshold suite reuses the existing admission-checking test server through
+  an explicit module import. Its exact inventory includes five already-existing
+  session-scope tests. The original 42-versus-47 inventory failure remains
+  recorded; corrected threshold, session-report, and receipt-isolation inventories
+  passed 47, 16, and 6 tests respectively, without removing any expected case.
+- SDK and PostgreSQL workflows prepare the existing enforcing host fixture.
+  SDK parity restores the enforcing CLI after the HTTP example build and before
+  all five native C++ consumers. Seventeen checker tests protect those sequences.
+  PostgreSQL's direct database connection and proxy subprocess still need an
+  approved native transport boundary; fixture preparation does not establish that
+  adapter's compatibility.
+- CLI signing fixtures use private files from their first write. The Drogon
+  example uses temporary private signing custody outside group-writable checkout
+  ancestors. Cleanup retains the sidecar receipt database and its WAL companions
+  after services stop, including after an assertion failure. A retention error
+  fails cleanup and preserves the private source for recovery. The sidecar
+  receives an explicit private signing seed, and both allowed requests carry
+  capabilities. The export reads the canonical receipt store, retains complete
+  signed kernel rows, and checks the HTTP projections against their response IDs
+  and exact POST bytes. The full
+  Drogon, proof-package, and runtime-policy gates passed. Initial failures from
+  unsafe checkout ancestry, missing signing custody, anonymous GET assumptions,
+  and the legacy receipt query remain retained alongside the corrected runs.
+- The verdict matrix issues a valid nonce, advances the shared injected clock,
+  and requires an actual expiry error. Its three targets passed 47 tests and
+  warning-denied Clippy. Standalone lockfiles follow the current local dependency
+  graph; retained registry versions and checksums are unchanged. Two stale vector
+  manifest entries were corrected without changing vector JSON; all 109 hashes
+  now match. Fuzz inventories retain all 34 targets, including the previously
+  omitted threshold target. Both response-security corpora now run through their
+  existing assertion-bearing drivers in the default smoke suite. The locked
+  fuzz replay passed all 38 tests (10 unit and 28 smoke tests).
+- Native HTTP fixtures authenticate their exact loopback proxy, refuse missing
+  and incorrect proxy credentials, and check malformed initialization before
+  session creation. Existing sessions also deny fresh admission after issuer-pin
+  drift. An explicitly repinned node first succeeds, then observes cross-node
+  revocation. An invocation marker checks that neither denial dispatches a tool.
+  These scenarios require the qualified Linux x86_64 fixture; local aarch64 source
+  review is not native runtime qualification. Both changed CLI test targets
+  compile and pass warning-denied Clippy on aarch64; their native execution
+  remains a supported-host CI requirement.
+- The older programmable-sovereignty artifact has an explicit historical
+  validation mode. It authenticates immutable measured-source and assembly
+  identities while checking the retained manuscript, results, and outputs. One
+  original aggregate-digest defect has a documented one-field erratum. Fifteen
+  tamper/provenance tests passed; strict current-source validation still rejects
+  the evolved checkout. No historical measurement was reassigned to new code.
+
+Independent automated reviews found no further P0/P1/P2 issue in the reviewed
+process, historical-artifact, workflow, lockfile, or native HTTP fixture repairs.
+These reviews do not supply missing supported-host execution or human approval.
+
 ## Evidence and limits
+
+`MUTATION-TRIAGE.md` records the exact hosted survivor review. No current-source
+security defect was established by the surviving mutations. The federation
+report is advisory; the runtime campaign was cancelled with three mutations
+unfinished. The retained archive preserves those outcomes and original diffs.
+Eleven added regressions and stronger existing assertions passed in four targets
+(88 tests total): exact verified evidence requirements, matching malformed
+receiver records with valid signatures, persisted unused continuation state after
+refusal, and exact object/array/mixed nesting limits. Production guard logic did
+not change in response to this triage.
+
 
 `logs.json` inventories retained diagnostic streams with uncompressed hashes.
 Initial failures and partial campaigns remain present. The HTTPS summary covers
@@ -60,7 +139,7 @@ loopback peers, denial cases, duplicate races, and revocation/cut recovery; it i
 not a performance benchmark or independent operation.
 
 The current source-bound native qualification is maintained at
-`docs/research/dynamic-delegation/evidence/qualification.json`. The final integrated run passed all 21 terminal commands against 37,214 source
+`docs/research/dynamic-delegation/evidence/qualification.json`. The final integrated run passed all 21 terminal commands against 37,217 source
 files and retained 48 output artifacts, including actual parent SIGKILL and
 stable child collection replay. Historical native inventories and benchmark
 results retain their original revisions. The six
@@ -113,3 +192,10 @@ release qualification of the complete workspace, or the whitepaper's open
 economic and foundational claims. `publish_ready` and `breakthrough_established`
 remain false. Exact-head hosted status must be read from the PR after the repair
 commit is pushed; local aarch64 checks cannot qualify the x86 enforcing fixture.
+
+Known foundation gates remain open: the genuine AWS-LC source audit required by
+Cargo Vet; reported Wasmtime and JavaScript dependency advisories; the Kani
+compiler's incompatibility with the current crate MSRV; and PostgreSQL adapter
+qualification under the native confinement profile. No audit exemption,
+containment relaxation, skipped required check, or unsupported production claim
+is introduced to make those gates appear green.

@@ -10,6 +10,11 @@ on:
       - "crates/kernel/chio-process/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "Cargo.lock"
       - ".github/workflows/postgres-job-swarm.yml"
   push:
@@ -22,6 +27,11 @@ on:
       - "crates/kernel/chio-process/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "Cargo.lock"
       - ".github/workflows/postgres-job-swarm.yml"
   workflow_dispatch:
@@ -48,7 +58,7 @@ jobs:
         run: rustup toolchain install --profile minimal --component clippy --component rustfmt
       - uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler
+          packages: protobuf-compiler musl-tools
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39
       - name: Build the real gateway and kernel
@@ -57,7 +67,7 @@ jobs:
           cargo test --locked -p chio-finding-market-store-postgres --lib
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
-          cargo build --locked -p chio-cli --bin chio
+          cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
       - name: Install the process package and create a dedicated TLS fixture
         run: |
           umask 077
@@ -71,6 +81,8 @@ jobs:
           uv pip install --python "$job_root/venv/bin/python" --no-deps "$job_root/wheels/chio_process-0.1.0-py3-none-any.whl"
           docker pull postgres:17.11
           python3 examples/postgres-job-swarm/postgres.py start --binary "$job_root/agent-jobs" --output "$job_root/database"
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
       - name: Exercise the public worker role and actual native process host
         run: |
           python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"

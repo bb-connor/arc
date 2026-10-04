@@ -359,7 +359,7 @@
   "source": {
     "cargoLockSha256": "0e94fe23e583b02587a683145c4477c689729a9a7b931543534b106502a47b40",
     "commit": "b13ceda988f299855aa86799c9c7cc3cabb1bbf7",
-    "contentSetSha256": "418d07c3038ca7e54d3b2f98ba5f2b7b9db66fe4df73d9a0f3ff85d7cf88e63a",
+    "contentSetSha256": "36fde2d95a83c18da60d28f8d98b398b70f4923735f2ffae7e55578d69afc54a",
     "snapshotMode": "recorded source commit plus self-contained content-addressed snapshot"
   },
   "sourceFiles": [

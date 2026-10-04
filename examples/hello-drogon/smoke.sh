@@ -7,9 +7,8 @@ source "${ROOT}/examples/_shared/hello-http-common.sh"
 
 ARTIFACT_ROOT="${EXAMPLE_ROOT}/.artifacts/$(date -u +"%Y%m%dT%H%M%SZ")"
 LOG_DIR="${ARTIFACT_ROOT}/logs"
-STATE_DIR="${ARTIFACT_ROOT}/state"
 BUILD_DIR="${ARTIFACT_ROOT}/build"
-mkdir -p "${LOG_DIR}" "${STATE_DIR}" "${BUILD_DIR}"
+mkdir -p "${LOG_DIR}" "${BUILD_DIR}"
 
 if ! command -v cmake >/dev/null 2>&1; then
   if [[ "${CHIO_DROGON_REQUIRE_DEPS:-0}" == "1" ]]; then
@@ -57,6 +56,9 @@ SIDECAR_PORT="$(pick_free_port)"
 CONTROL_URL="http://127.0.0.1:${TRUST_PORT}"
 APP_URL="http://127.0.0.1:${APP_PORT}"
 SIDECAR_URL="http://127.0.0.1:${SIDECAR_PORT}"
+# Checkout ancestors can be group-writable. Keep signing custody in a fresh
+# private directory; public receipt exports remain in the artifact directory.
+STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chio-hello-drogon-state.XXXXXX")"
 RECEIPT_STORE="${STATE_DIR}/sidecar-receipts.sqlite3"
 
 cleanup() {
@@ -67,9 +69,31 @@ cleanup() {
       wait "${pid}" >/dev/null 2>&1 || true
     fi
   done
+  # Keep signed evidence even when an assertion fails before the JSON export.
+  # Do not delete the source if any receipt file cannot be retained.
+  local receipt_file
+  for receipt_file in "${RECEIPT_STORE}" "${RECEIPT_STORE}-wal" "${RECEIPT_STORE}-shm"; do
+    if [[ -f "${receipt_file}" ]]; then
+      cp -- "${receipt_file}" "${ARTIFACT_ROOT}/" || return 1
+    fi
+  done
+  rm -rf -- "${STATE_DIR}"
   return "${code}"
 }
 trap cleanup EXIT
+
+SIDECAR_AUTHORITY_SEED="${STATE_DIR}/sidecar-authority.seed"
+python3 - "${SIDECAR_AUTHORITY_SEED}" <<'PY'
+import os
+import secrets
+import sys
+
+descriptor = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+    stream.write(secrets.token_hex(32) + "\n")
+    stream.flush()
+    os.fsync(stream.fileno())
+PY
 
 "${CHIO_BIN}" trust serve \
   --listen "127.0.0.1:${TRUST_PORT}" \
@@ -96,6 +120,7 @@ wait_for_http "${APP_URL}/healthz"
 (
   export CHIO_TRUSTED_ISSUER_KEY="${TRUSTED_ISSUER_KEY}"
   exec "${CHIO_BIN}" \
+    --authority-seed-file "${SIDECAR_AUTHORITY_SEED}" \
     --control-url "${CONTROL_URL}" \
     --control-token "${SERVICE_TOKEN}" \
     api protect \
@@ -108,7 +133,17 @@ SIDECAR_PID=$!
 
 wait_for_http "${SIDECAR_URL}/chio/health"
 
-curl -sS -D "${ARTIFACT_ROOT}/hello.headers" "${APP_URL}/hello" > "${ARTIFACT_ROOT}/hello.json"
+issue_demo_capability \
+  "${CONTROL_URL}" \
+  "${SERVICE_TOKEN}" \
+  "${ARTIFACT_ROOT}/capability.json" \
+  "authorize_http_request" \
+  "chio_http_authority"
+materialize_capability_token "${ARTIFACT_ROOT}/capability.json" "${ARTIFACT_ROOT}/capability.token"
+
+curl -sS -D "${ARTIFACT_ROOT}/hello.headers" \
+  -H "X-Chio-Capability: $(tr -d '\n' < "${ARTIFACT_ROOT}/capability.token")" \
+  "${APP_URL}/hello" > "${ARTIFACT_ROOT}/hello.json"
 
 python3 - "${ARTIFACT_ROOT}/hello.json" <<'PY'
 import json
@@ -137,14 +172,6 @@ assert body["error"] == "chio_access_denied", body
 assert body["message"], body
 assert body["receipt_id"], body
 PY
-
-issue_demo_capability \
-  "${CONTROL_URL}" \
-  "${SERVICE_TOKEN}" \
-  "${ARTIFACT_ROOT}/capability.json" \
-  "authorize_http_request" \
-  "chio_http_authority"
-materialize_capability_token "${ARTIFACT_ROOT}/capability.json" "${ARTIFACT_ROOT}/capability.token"
 
 ALLOW_PAYLOAD='{ "message" : "hello", "count" : 2 }'
 curl -sS -D "${ARTIFACT_ROOT}/allow.headers" \
@@ -225,9 +252,14 @@ expected_ids = {hello_receipt_id, deny_receipt_id, allow_receipt_id}
 assert "" not in expected_ids, {"expected_ids": sorted(expected_ids)}
 
 with sqlite3.connect(receipt_store) as db:
-    rows = db.execute("SELECT receipt_json FROM http_receipts ORDER BY rowid ASC").fetchall()
+    rows = db.execute("SELECT raw_json FROM chio_tool_receipts ORDER BY seq ASC").fetchall()
 
-records = [json.loads(row[0]) for row in rows]
+kernel_records = [json.loads(row[0]) for row in rows]
+records = [
+    record["metadata"]["chio_http_receipt_v1"]
+    for record in kernel_records
+    if "chio_http_receipt_v1" in record.get("metadata", {})
+]
 receipt_ids = {record["id"] for record in records}
 missing = expected_ids - receipt_ids
 assert not missing, {"missing": sorted(missing), "stored": sorted(receipt_ids)}
@@ -241,9 +273,9 @@ decisions = {
     ): record["id"]
     for record in records
 }
-assert ("GET", "/hello", "allow", 200) in decisions, decisions
-assert ("POST", "/echo", "deny", 403) in decisions, decisions
-assert ("POST", "/echo", "allow", 200) in decisions, decisions
+assert decisions.get(("GET", "/hello", "allow", 200)) == hello_receipt_id, decisions
+assert decisions.get(("POST", "/echo", "deny", 403)) == deny_receipt_id, decisions
+assert decisions.get(("POST", "/echo", "allow", 200)) == allow_receipt_id, decisions
 
 receipt = next((record for record in records if record.get("id") == allow_receipt_id), None)
 assert receipt is not None, f"missing allow receipt {allow_receipt_id}"
@@ -266,6 +298,10 @@ assert receipt["content_hash"] == content_hash, {
 
 output_path.write_text(
     "".join(json.dumps(record, separators=(",", ":")) + "\n" for record in records),
+    encoding="utf-8",
+)
+output_path.with_name("kernel-receipts.ndjson").write_text(
+    "".join(row[0] + "\n" for row in rows),
     encoding="utf-8",
 )
 summary_path.write_text(

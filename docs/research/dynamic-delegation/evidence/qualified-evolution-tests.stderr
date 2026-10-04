@@ -12,7 +12,6 @@ help: Check that the patched package version and available features are compatib
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
    Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
-   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-swarm-authority)
    Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-finding-verifier)
    Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-core)
    Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-transaction-passport)
@@ -20,7 +19,7 @@ help: Check that the patched package version and available features are compatib
    Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-commerce-order)
    Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
    Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
-    Finished `test` profile [unoptimized] target(s) in 2m 27s
+    Finished `test` profile [unoptimized] target(s) in 1m 03s
      Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_runtime_core-9643b6057495a655)
      Running tests/lease_boundaries.rs (/home/connor/chio-pr1173-target/debug/deps/lease_boundaries-d8ad5e2f831f8d85)
      Running tests/lease_write_fencing.rs (/home/connor/chio-pr1173-target/debug/deps/lease_write_fencing-23cf822ae179fa6c)

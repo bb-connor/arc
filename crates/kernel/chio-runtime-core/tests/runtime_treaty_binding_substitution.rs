@@ -58,14 +58,14 @@ use chio_runtime_core::{
     runtime_admission_bundle_sha256, runtime_peer_weights_sha256, tool_args_sha256,
     treaty_scope_sha256, BilateralInvocation, ChioRuntimeAdmissionHook, CrossKernelContinuation,
     LadderIntersection, ReceiptLineageBundle, ReceiptLineageStatement, RuntimeAdmissionBundle,
-    RuntimeAdmissionProfile, RuntimePeerWeight, RuntimePeerWeights, RuntimePheromoneAdvisory,
-    RuntimePheromonePolicy, RuntimePheromonePolicyRule, RuntimeRequestBinding,
-    RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundleV4, SqliteRuntimeOrchestrationStore,
-    TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA, CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA,
-    CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
-    CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
-    CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA, CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA,
-    CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
+    RuntimeAdmissionProfile, RuntimeAdmissionStore, RuntimePeerWeight, RuntimePeerWeights,
+    RuntimePheromoneAdvisory, RuntimePheromonePolicy, RuntimePheromonePolicyRule,
+    RuntimeRequestBinding, RuntimeTrustedVerifierKey, RuntimeVerifierTrustBundleV4,
+    SqliteRuntimeOrchestrationStore, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
+    CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA, CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA,
+    CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA, CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA,
+    CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA,
+    CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA, CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA,
 };
 use std::io;
 use support::treaty::{treaty_action_class, treaty_manifest, treaty_scope};
@@ -435,7 +435,11 @@ enum Evidence {
 #[derive(Clone, Copy)]
 enum PresentationState {
     MissingLease,
+    MismatchedLeaseRecordId,
     MissingGovernance,
+    InvalidGovernanceAlgorithm,
+    InvalidGovernanceDigest,
+    ForeignGovernanceKernel,
     RevokedLease,
     RevokedGovernance,
     ExpiredLease,
@@ -521,6 +525,21 @@ fn substitute_and_admit_with(
             "{label} dispatch count disagrees with its verdict: {:?}",
             decision.failure_code
         );
+    }
+
+    if matches!(evidence, Evidence::ReceiverRecords(_))
+        && !substituted.allowed
+        && !baseline_after.allowed
+    {
+        // Both requests share the invalid activation, so another denied
+        // request alone cannot prove that the continuation remained unused.
+        let observer = SqliteRuntimeOrchestrationStore::open(
+            directory.path().join("binding-substitution.sqlite3"),
+        )?;
+        observer.consume_treaty_continuation(
+            &fixture.continuation.continuation_id,
+            "receiver-record-denial-probe",
+        )?;
     }
 
     Ok(SubstitutionRun {
@@ -836,10 +855,32 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::erro
             policy_evaluation_summary: Some(allow_policy_evaluation_summary()),
             governance_receipt_ref: Some(GovernanceReceiptRef {
                 receipt_id: "gov-live-1".to_string(),
-                kernel_id: bilateral_invocation.signer_kernel_ids[1].clone(),
+                kernel_id: if matches!(
+                    evidence,
+                    Evidence::ReceiverRecords(PresentationState::ForeignGovernanceKernel)
+                ) {
+                    "kernel.outside-treaty".to_string()
+                } else {
+                    bilateral_invocation.signer_kernel_ids[1].clone()
+                },
                 digest: HashRecord {
-                    alg: "sha256".to_string(),
-                    value: "d".repeat(64),
+                    alg: if matches!(
+                        evidence,
+                        Evidence::ReceiverRecords(PresentationState::InvalidGovernanceAlgorithm)
+                    ) {
+                        "sha512"
+                    } else {
+                        "sha256"
+                    }
+                    .to_string(),
+                    value: if matches!(
+                        evidence,
+                        Evidence::ReceiverRecords(PresentationState::InvalidGovernanceDigest)
+                    ) {
+                        "not-a-digest".to_string()
+                    } else {
+                        "d".repeat(64)
+                    },
                 },
             }),
             consistency_anchor: Some("anchor-live".to_string()),
@@ -908,12 +949,16 @@ fn insert_treaty_artifacts(
     fixture: &TreatyFixture,
 ) -> TestResult {
     let (mut lease, mut governance) = treaty_presentation::records(&fixture.envelope)?;
+    let lease_lookup_id = lease.lease.lease_id.clone();
     let state = match fixture.evidence {
         Evidence::ReceiverRecords(state) => Some(state),
         _ => None,
     };
     let now = dispatch_target().now_unix_ms;
     match state {
+        Some(PresentationState::MismatchedLeaseRecordId) => {
+            lease.lease.lease_id = "lease-other-activation".to_string();
+        }
         Some(PresentationState::ScopedLeaseOnly) => {
             lease.lease.scope_digest = Some(HashRecord {
                 alg: "sha256".to_string(),
@@ -934,7 +979,7 @@ fn insert_treaty_artifacts(
         _ => {}
     }
     if !matches!(state, Some(PresentationState::MissingLease)) {
-        store.insert_treaty_runtime_artifact("capability_lease", &lease.lease.lease_id, &lease)?;
+        store.insert_treaty_runtime_artifact("capability_lease", &lease_lookup_id, &lease)?;
     }
     if !matches!(state, Some(PresentationState::MissingGovernance)) {
         store.insert_treaty_runtime_artifact(
@@ -1416,6 +1461,49 @@ fn matching_invalid_scope_algorithm_denies() -> TestResult {
 fn matching_invalid_scope_digest_denies() -> TestResult {
     let run = substitute_and_admit_with(
         Evidence::ReceiverRecords(PresentationState::InvalidScopeDigest),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn mismatched_lease_record_id_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::MismatchedLeaseRecordId),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+// The trusted test provisioner derives the record from the signed statement,
+// so these malformed references agree in both places. Rejection must depend
+// on the receiver's shape and treaty-membership checks, not reference drift.
+#[test]
+fn matching_invalid_governance_algorithm_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::InvalidGovernanceAlgorithm),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn matching_invalid_governance_digest_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::InvalidGovernanceDigest),
+        |_| {},
+    )?;
+    assert_receiver_record_denial(&run);
+    Ok(())
+}
+
+#[test]
+fn matching_foreign_governance_kernel_denies_before_dispatch_after_store_reopen() -> TestResult {
+    let run = substitute_and_admit_with(
+        Evidence::ReceiverRecords(PresentationState::ForeignGovernanceKernel),
         |_| {},
     )?;
     assert_receiver_record_denial(&run);

@@ -1,0 +1,100 @@
+   Compiling sha2 v0.10.9
+   Compiling aws-lc-rs v1.18.1
+   Compiling rustls v0.23.37
+   Compiling chio-metrics-spec v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-metrics-spec)
+   Compiling sha2 v0.11.0
+   Compiling chio-workflow-preflight v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-workflow-preflight)
+   Compiling scrypt v0.11.0
+   Compiling chio-security-types v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/security/chio-security-types)
+   Compiling rs_merkle v1.5.0
+   Compiling pkcs5 v0.7.1
+   Compiling pkcs8 v0.10.2
+   Compiling frost-ed25519 v3.0.0
+   Compiling oauth2 v5.0.0
+   Compiling ed25519 v2.2.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling sec1 v0.7.3
+   Compiling pkcs1 v0.7.5
+   Compiling elliptic-curve v0.13.8
+   Compiling rsa v0.9.10
+   Compiling scrypt v0.12.0
+   Compiling rustls-webpki v0.103.13
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling jsonwebtoken v10.4.0
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling chio-attest-verify v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-attest-verify)
+   Compiling chio-web3-bindings v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-web3-bindings)
+   Compiling chio-data-guards-redactors-default v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/guards/chio-data-guards/redactors/default)
+   Compiling openidconnect v4.0.1
+   Compiling chio-log-redact v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-log-redact)
+   Compiling chio-supervisor v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-supervisor)
+   Compiling chio-bounded v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-bounded)
+   Compiling bls12_381_plus v0.8.13
+   Compiling chio-sqlite-file-identity v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-sqlite-file-identity)
+   Compiling ascii v1.1.0
+   Compiling chunked_transfer v1.5.0
+   Compiling tiny_http v0.12.0
+   Compiling rustls-pemfile v2.2.0
+   Compiling affinidi-bbs v0.1.0
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling tough v0.22.0
+   Compiling ureq v2.12.1
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling oci-client v0.17.0
+   Compiling sigstore v0.14.0
+   Compiling chio-core-types v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-core-types)
+   Compiling chio-listing v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-listing)
+   Compiling chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-revocation-oracle)
+   Compiling chio-pheromone v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-pheromone)
+   Compiling chio-fincred v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-fincred)
+   Compiling chio-did v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-did)
+   Compiling chio-egress-contract v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-egress-contract)
+   Compiling chio-finding v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-finding)
+   Compiling chio-cage-plan v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/security/chio-cage-plan)
+   Compiling chio-lineage v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/observability/chio-lineage)
+   Compiling chio-fiscal v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-fiscal)
+   Compiling chio-governance v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-governance)
+   Compiling chio-weights v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-weights)
+   Compiling chio-custody-hw v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-custody-hw)
+   Compiling chio-kernel-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel-core)
+   Compiling chio-response-model v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-response-model)
+   Compiling chio-appraisal v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-appraisal)
+   Compiling chio-open-market v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-open-market)
+   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-swarm-authority)
+   Compiling chio-underwriting v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-underwriting)
+   Compiling chio-disclosure-lineage v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-disclosure-lineage)
+   Compiling chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-proof-parity)
+   Compiling chio-federation v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-federation)
+   Compiling chio-credit v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-credit)
+   Compiling chio-web3 v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-web3)
+   Compiling chio-market v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-market)
+   Compiling chio-autonomy v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-autonomy)
+   Compiling chio-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-core)
+   Compiling chio-workflow v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-workflow)
+   Compiling chio-manifest v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-manifest)
+   Compiling chio-settle v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-settle)
+   Compiling chio-link v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-link)
+   Compiling chio-tool-call-fabric v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-tool-call-fabric)
+   Compiling chio-selective-disclosure v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-selective-disclosure)
+   Compiling chio-attest-buyer-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-attest-buyer-core)
+   Compiling chio-federation-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-federation-authority)
+   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-finding-verifier)
+   Compiling chio-cross-protocol v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-cross-protocol)
+   Compiling chio-edge-metrics v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-edge-metrics)
+   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-core)
+   Compiling chio-a2a-adapter v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-a2a-adapter)
+   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-transaction-passport)
+   Compiling chio-mcp-edge v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-mcp-edge)
+   Compiling chio-a2a-edge v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/protocol/chio-a2a-edge)
+   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/examples/federated-work)
+    Finished `test` profile [unoptimized] target(s) in 3m 27s
+     Running unittests src/main.rs (/home/connor/chio-pr1173-target/debug/deps/chio_federated_work-619c2fd92268282d)

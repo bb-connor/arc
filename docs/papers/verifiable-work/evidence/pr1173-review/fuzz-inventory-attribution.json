@@ -1,0 +1,32 @@
+{
+  "ecb44791": {
+    "bins": 33,
+    "matrix": 32,
+    "missing_from_matrix": [
+      "frost_round2_envelope"
+    ],
+    "missing_from_owners": [
+      "response_authority_protocol",
+      "response_lifecycle"
+    ],
+    "missing_smoke_posture": [
+      "response_authority_protocol",
+      "response_lifecycle"
+    ]
+  },
+  "93a2552c3a": {
+    "bins": 34,
+    "matrix": 33,
+    "missing_from_matrix": [
+      "frost_round2_envelope"
+    ],
+    "missing_from_owners": [
+      "response_authority_protocol",
+      "response_lifecycle"
+    ],
+    "missing_smoke_posture": [
+      "response_authority_protocol",
+      "response_lifecycle"
+    ]
+  }
+}

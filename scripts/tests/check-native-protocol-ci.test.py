@@ -24,12 +24,17 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text()),
     yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
+    (ROOT / "scripts/check-sdk-parity.sh").read_text(),
 )
 CONSUMERS = (
     (0, "check", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
     (3, "conformance", CHECKER.CPP_NAME),
+    (4, "sdk-parity", "Run SDK parity"),
+    (5, "native", "Exercise the public worker role and actual native process host"),
 )
 
 
@@ -140,6 +145,97 @@ class NativeProtocolCiTests(unittest.TestCase):
         _, step = CHECKER.named_step(changed[3]["jobs"]["conformance"], CHECKER.CPP_NAME)
         step["env"]["CHIO_CPP_LIVE_CONFORMANCE"] = "0"
         self.rejected(changed, r"C\+\+ target set")
+
+    def test_sdk_parity_preserves_all_checks_and_enforcing_rebuild_order(self):
+        build = "cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio"
+        for removed in (
+            "./scripts/check-bindings-parity.sh",
+            "./scripts/check-chio-py.sh",
+            "./scripts/check-chio-go.sh",
+            "./scripts/check-chio-cpp.sh",
+            "./scripts/check-chio-drogon.sh",
+            build,
+            " --features real-linux-enforcement",
+            " --no-fail-fast",
+            "CHIO_CPP_LIVE_CONFORMANCE=1 ",
+            *(f" --test {area}_cpp_live" for area in (
+                "mcp_core", "tasks", "auth", "notifications", "nested_callbacks"
+            )),
+        ):
+            with self.subTest(removed=removed):
+                changed = list(copy.deepcopy(LIVE))
+                self.assertIn(removed, changed[6])
+                changed[6] = changed[6].replace(removed, "", 1)
+                self.rejected(changed, "SDK parity")
+        changed = list(copy.deepcopy(LIVE))
+        changed[6] = changed[6].replace(build + "\n", "", 1).replace(
+            "./scripts/check-chio-drogon.sh", build + "\n./scripts/check-chio-drogon.sh", 1
+        )
+        self.rejected(changed, "SDK parity")
+
+    def test_sdk_parity_cannot_override_authority_or_hide_failure(self):
+        for before, after in (
+            ("set -euo pipefail", "set +e"),
+            ("./scripts/check-chio-drogon.sh", "exit 0\n./scripts/check-chio-drogon.sh"),
+            ("./scripts/check-chio-drogon.sh", "unset CHIO_CAGE_INIT\n./scripts/check-chio-drogon.sh"),
+            ("./scripts/check-chio-drogon.sh", "export CHIO_CAGE_READ_PATHS_FILE=/tmp/broad\n./scripts/check-chio-drogon.sh"),
+        ):
+            with self.subTest(mutation=after):
+                changed = list(copy.deepcopy(LIVE))
+                changed[6] = changed[6].replace(before, after, 1)
+                self.rejected(changed, "SDK parity")
+        changed = copy.deepcopy(LIVE)
+        _, step = CHECKER.named_step(changed[4]["jobs"]["sdk-parity"], "Run SDK parity")
+        step["run"] = "true"
+        self.rejected(changed, "SDK parity")
+
+    def test_postgres_requires_enforcing_build_and_both_native_qualifications(self):
+        for removed in (" --features real-linux-enforcement", " --bin chio"):
+            with self.subTest(removed=removed):
+                changed = copy.deepcopy(LIVE)
+                _, step = CHECKER.named_step(changed[5]["jobs"]["native"], "Build the real gateway and kernel")
+                step["run"] = step["run"].replace(removed, "", 1)
+                self.rejected(changed, "PostgreSQL enforcing CLI")
+        for prefix in ("# ", "echo "):
+            with self.subTest(prefix=prefix):
+                changed = copy.deepcopy(LIVE)
+                _, step = CHECKER.named_step(changed[5]["jobs"]["native"], "Build the real gateway and kernel")
+                step["run"] = step["run"].replace(
+                    "cargo build --locked -p chio-cli", prefix + "cargo build --locked -p chio-cli", 1
+                )
+                self.rejected(changed, "PostgreSQL enforcing CLI")
+        for consumer, command in (
+            ("Exercise the public worker role and actual native process host", "examples/postgres-job-swarm/check_api.py"),
+            ("Exercise the public worker role and actual native process host", "examples/postgres-job-swarm/qualify.py"),
+            ("Lose a committed claim response and recover without redispatch", "examples/postgres-job-swarm/qualify_claim_loss.py"),
+        ):
+            with self.subTest(removed=command):
+                changed = copy.deepcopy(LIVE)
+                _, step = CHECKER.named_step(changed[5]["jobs"]["native"], consumer)
+                step["run"] = step["run"].replace(command, "missing.py", 1)
+                self.rejected(changed, "PostgreSQL qualification")
+        changed = copy.deepcopy(LIVE)
+        job = changed[5]["jobs"]["native"]
+        build, _ = CHECKER.named_step(job, "Build the real gateway and kernel")
+        prepare, _ = CHECKER.named_step(job, "Install the process package and create a dedicated TLS fixture")
+        job["steps"][build], job["steps"][prepare] = job["steps"][prepare], job["steps"][build]
+        self.rejected(changed, "PostgreSQL enforcing CLI")
+
+    def test_postgres_claim_loss_cannot_reorder_skip_or_override_authority(self):
+        for mutation in ("move", "skip", "soft_fail", "authority"):
+            with self.subTest(mutation=mutation):
+                changed = copy.deepcopy(LIVE)
+                job = changed[5]["jobs"]["native"]
+                index, step = CHECKER.named_step(job, "Lose a committed claim response and recover without redispatch")
+                if mutation == "move":
+                    job["steps"].insert(index, {"run": "unset CHIO_CAGE_INIT"})
+                elif mutation == "skip":
+                    step["if"] = False
+                elif mutation == "soft_fail":
+                    step["continue-on-error"] = True
+                else:
+                    step["env"] = {"CHIO_CAGE_EXECUTION_UID": "0"}
+                self.rejected(changed, "PostgreSQL qualification")
 
     def test_static_report_cannot_clear_runtime_before_protocol_targets(self):
         changed = copy.deepcopy(LIVE)

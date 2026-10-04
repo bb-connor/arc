@@ -1,0 +1,23 @@
+set -euo pipefail
+ulimit -c 0
+umask 022
+export RUST_TEST_THREADS=1
+bash scripts/run-exact-cargo-test-inventory.sh \
+  --label "Exact kernel session reports" --allow-filtered --expected \
+  kernel::tests::session_reports::report_binds_original_operation_and_exact_content_without_caller_authority \
+  kernel::tests::session_reports::report_tenant_is_explicit_session_snapshot_not_ambient_or_caller_metadata \
+  kernel::tests::session_reports::unknown_or_mismatched_session_cannot_mint_a_report \
+  kernel::tests::session_reports::repeated_failure_reports_have_distinct_signed_ids \
+  kernel::tests::session_reports::missing_required_receipt_store_cannot_return_a_report \
+  kernel::tests::session_reports::dead_writer_cannot_return_a_report \
+  kernel::tests::session_reports::append_failure_cannot_return_or_locally_mirror_a_report \
+  kernel::tests::session_reports::failed_signer_cannot_fall_back_to_an_independent_key \
+  kernel::tests::session_reports::report_refuses_classical_signer_below_boot_floor \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::normalized_conflict_preserves_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::nested_sync_conflict_preserves_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::nested_async_conflict_preserves_threshold_wait \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::failure_observation_preserves_pending_operation_and_approval_authority \
+  kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
+  kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
+  kernel::tests::settlement_routing::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
+  -- cargo test --locked -p chio-kernel --features pq --lib session_reports

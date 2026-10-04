@@ -23,6 +23,7 @@ PAPER_PREFIX = "docs/papers/programmable-sovereignty/"
 PAPER = REPO / PAPER_PREFIX
 SUPPLEMENTARY = PAPER / "supplementary"
 SOURCE_COMMIT_FILE = SUPPLEMENTARY / "source-commit.txt"
+ARTIFACT_COMMIT_FILE = SUPPLEMENTARY / "artifact-commit.txt"
 MANIFEST_FILE = SUPPLEMENTARY / "artifact-manifest.json"
 LEDGER_FILE = PAPER / "CLAIM_LEDGER.md"
 TITLE = "Receiver-Owned Bilateral Admission for Cross-Organization Agent Tool Calls"
@@ -41,6 +42,7 @@ BILATERAL_ENVIRONMENT = RESULT_PREFIX + "bilateral-admission-environment.json"
 SUSTAINED_SUMMARY = RESULT_PREFIX + "bilateral-admission-sustained-load.json"
 REPLAY_INLINE = RESULT_PREFIX + "replay-corpus-inline.tex"
 SUBMISSION_PDF = PAPER_PREFIX + "paper-usenix.pdf"
+GENERATOR_SCRIPT = "scripts/generate-programmable-sovereignty-artifact.py"
 
 CRITERION_CASES = [
     "receipt_sign",
@@ -316,7 +318,7 @@ BENCHMARK_INPUT_ROOTS = [
 BENCHMARK_INPUT_EXCLUDES = [
     "formal/lean4",
     "formal/theorem-inventory.json",
-    "scripts/generate-programmable-sovereignty-artifact.py",
+    GENERATOR_SCRIPT,
 ]
 
 CORPORA = {
@@ -383,7 +385,7 @@ SOURCE_FILES = [
     "scripts/check-chio-live-treaty-buyer-closure.sh",
     "scripts/check-chio-treaty-buyer-hero-loop.sh",
     "scripts/check-programmable-sovereignty-artifact.sh",
-    "scripts/generate-programmable-sovereignty-artifact.py",
+    GENERATOR_SCRIPT,
     PAPER_PREFIX + "supplementary/README.md",
     "spec/schemas/chio-federation/v1/"
     "treaty-runtime-negative-fixture-corpus.schema.json",
@@ -442,15 +444,24 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def file_bytes(relative: str) -> bytes:
+def file_bytes(relative: str, *, input_commit: str | None = None) -> bytes:
+    """Read measured inputs at the pin, but always read paper outputs on disk."""
+    if input_commit is not None and is_pinned_input(relative):
+        committed = git_show(input_commit, relative)
+        if committed is None:
+            fail(f"pinned commit does not contain required file: {relative}")
+        return committed
     path = REPO / relative
     if not path.is_file():
         fail(f"required file missing: {relative}")
     return path.read_bytes()
 
 
-def hash_entry(relative: str) -> dict[str, str]:
-    return {"path": relative, "sha256": sha256_bytes(file_bytes(relative))}
+def hash_entry(relative: str, *, input_commit: str | None = None) -> dict[str, str]:
+    return {
+        "path": relative,
+        "sha256": sha256_bytes(file_bytes(relative, input_commit=input_commit)),
+    }
 
 
 def git_output(*args: str) -> str:
@@ -623,6 +634,47 @@ def resolve_source_commit(
         return candidate
 
 
+def validate_historical_assembly(source_commit: str) -> str:
+    """Authenticate retained metadata at its separate artifact assembly commit.
+
+    The assembler is excluded from the measured input tree. Its recorded hash
+    identifies the code that built the artifact, not the later verifier we run.
+    The documented aggregate-digest erratum is the only permitted edit to the
+    original manifest. Full regeneration below independently checks that digest
+    against the current retained outputs and immutable source-file bytes.
+    """
+    if not ARTIFACT_COMMIT_FILE.is_file():
+        fail("historical validation requires supplementary/artifact-commit.txt")
+    artifact_commit = ARTIFACT_COMMIT_FILE.read_text().strip()
+    if re.fullmatch(r"[0-9a-f]{40}", artifact_commit) is None:
+        fail("artifact commit is not a full SHA")
+    if not git_commit_available(artifact_commit):
+        fail("artifact commit is not available in local repository history")
+    relative_pin = SOURCE_COMMIT_FILE.relative_to(REPO).as_posix()
+    if git_show(artifact_commit, relative_pin) != f"{source_commit}\n".encode():
+        fail("source-commit.txt differs from the artifact assembly")
+    relative_manifest = MANIFEST_FILE.relative_to(REPO).as_posix()
+    original_bytes = git_show(artifact_commit, relative_manifest)
+    if original_bytes is None:
+        fail("artifact assembly lacks artifact-manifest.json")
+    original = json.loads(original_bytes)
+    current = load_json(relative_manifest)
+    current_source = current.get("source")
+    corrected_digest = (
+        current_source.get("contentSetSha256") if isinstance(current_source, dict) else None
+    )
+    if (
+        not isinstance(corrected_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", corrected_digest) is None
+    ):
+        fail("artifact-manifest.json lacks a valid corrected contentSetSha256")
+    original["source"]["contentSetSha256"] = corrected_digest
+    expected = (json.dumps(original, indent=2, sort_keys=True) + "\n").encode()
+    if expected != file_bytes(relative_manifest):
+        fail("artifact-manifest.json differs from the artifact assembly")
+    return artifact_commit
+
+
 def snapshot_paths() -> list[str]:
     paths = [
         *SOURCE_FILES,
@@ -692,9 +744,9 @@ def toolchain_channel(text: str) -> str:
     return match.group(1)
 
 
-def load_json(relative: str) -> dict[str, Any]:
+def load_json(relative: str, *, input_commit: str | None = None) -> dict[str, Any]:
     try:
-        document = json.loads(file_bytes(relative))
+        document = json.loads(file_bytes(relative, input_commit=input_commit))
     except json.JSONDecodeError as error:
         fail(f"{relative} is not valid JSON: {error}")
     if not isinstance(document, dict):
@@ -816,6 +868,12 @@ def batch_mean_macros(
 
 
 def inline_macros(document: dict[str, Any]) -> list[tuple[str, str]]:
+    schema = document.get("schema")
+    if schema not in (
+        "chio.programmable-sovereignty.bilateral-admission-results.v2",
+        "chio.programmable-sovereignty.bilateral-admission-results.v3",
+    ):
+        fail(f"unsupported bilateral result schema: {schema!r}")
     environment = document["environment"]
     paths = document["paths"]
     components = component_index(document)
@@ -872,8 +930,14 @@ def inline_macros(document: dict[str, Any]) -> list[tuple[str, str]]:
             components["buyer_proof_package_verify"],
         ),
         ("PSSustainedSeconds", integer(sustained["seconds"])),
-        ("PSSustainedConcurrency", integer(sustained["concurrency"])),
-        ("PSSustainedBottleneck", sustained_bottleneck_phrase(sustained)),
+        *(
+            [
+                ("PSSustainedConcurrency", integer(sustained["concurrency"])),
+                ("PSSustainedBottleneck", sustained_bottleneck_phrase(sustained)),
+            ]
+            if schema == "chio.programmable-sovereignty.bilateral-admission-results.v3"
+            else []
+        ),
         ("PSSustainedCalls", integer(sustained["calls"])),
         ("PSSustainedCallsPerSecond", fixed(sustained["callsPerSecond"], 1)),
         ("PSSustainedDispatchCount", integer(sustained["dispatchCount"])),
@@ -1149,12 +1213,18 @@ def validate_inputs(
     source_commit: str,
     *,
     require_local_source_object: bool,
+    historical: bool = False,
 ) -> None:
     problems: list[str] = []
     missing: list[str] = []
+    input_commit = source_commit if historical else None
 
     def present(relative: str) -> bool:
-        if (REPO / relative).is_file():
+        if input_commit is not None and is_pinned_input(relative):
+            exists = git_show(input_commit, relative) is not None
+        else:
+            exists = (REPO / relative).is_file()
+        if exists:
             return True
         if relative not in missing:
             missing.append(relative)
@@ -1163,7 +1233,7 @@ def validate_inputs(
     for theorem in THEOREMS:
         if not present(theorem["path"]):
             continue
-        text = file_bytes(theorem["path"]).decode("utf-8")
+        text = file_bytes(theorem["path"], input_commit=input_commit).decode("utf-8")
         if re.search(
             rf"\btheorem\s+{re.escape(theorem['name'])}\b",
             text,
@@ -1175,7 +1245,7 @@ def validate_inputs(
     for symbol in IMPLEMENTATION_SYMBOLS:
         if not present(symbol["path"]):
             continue
-        text = file_bytes(symbol["path"]).decode("utf-8")
+        text = file_bytes(symbol["path"], input_commit=input_commit).decode("utf-8")
         if symbol["pattern"] not in text:
             problems.append(
                 f"symbol {symbol['name']} missing from {symbol['path']}"
@@ -1198,7 +1268,7 @@ def validate_inputs(
         for path in paths:
             present(path)
     if present(CORPORA["negative"][0]):
-        negative = load_json(CORPORA["negative"][0])
+        negative = load_json(CORPORA["negative"][0], input_commit=input_commit)
         cases = negative.get("cases", [])
         if len(cases) != 20:
             problems.append("bilateral negative corpus must contain exactly 20 cases")
@@ -1222,12 +1292,13 @@ def validate_inputs(
         problems.extend(validate_sustained_load(load_json(SUSTAINED_SUMMARY)))
     for relative in snapshot_paths():
         present(relative)
-    problems.extend(
-        validate_pinned_snapshot(
-            source_commit,
-            require_local_object=require_local_source_object,
+    if not historical:
+        problems.extend(
+            validate_pinned_snapshot(
+                source_commit,
+                require_local_object=require_local_source_object,
+            )
         )
-    )
     problems = [f"required file missing: {path}" for path in missing] + problems
     if not problems:
         problems.extend(consistency_problems())
@@ -1260,7 +1331,7 @@ def cargo_lock_sha256(source_commit: str) -> str:
     fail("cannot determine the Cargo.lock digest at the pinned commit")
 
 
-def pinned_rust_toolchain(*, check: bool) -> str:
+def pinned_rust_toolchain(*, check: bool, input_commit: str | None = None) -> str:
     environment = load_json(BILATERAL_ENVIRONMENT)
     recorded = environment.get("toolchainPin")
     if not isinstance(recorded, str) or not recorded:
@@ -1270,7 +1341,9 @@ def pinned_rust_toolchain(*, check: bool) -> str:
             f"{BILATERAL_ENVIRONMENT} rustc {environment.get('rustc')} is not "
             f"the pinned toolchain {recorded}"
         )
-    current = toolchain_channel(file_bytes("rust-toolchain.toml").decode())
+    current = toolchain_channel(
+        file_bytes("rust-toolchain.toml", input_commit=input_commit).decode()
+    )
     if current != recorded:
         if not check:
             fail(
@@ -1359,7 +1432,18 @@ import Chio.Treaty.ReceiptPredicate
     return text.encode()
 
 
-def lean_archive_bytes(snapshot_date: str) -> bytes:
+def lean_sources(relative: str, *, input_commit: str | None) -> list[Path]:
+    if input_commit is None:
+        return sorted((REPO / relative).rglob("*.lean"))
+    # Enumerate the immutable tree too: a new or removed working-tree model
+    # must not change the historical archive's membership.
+    paths = git_output(
+        "ls-tree", "-r", "-z", "--name-only", input_commit, "--", relative
+    ).split("\0")
+    return sorted(REPO / path for path in paths if path.endswith(".lean"))
+
+
+def lean_archive_bytes(snapshot_date: str, *, input_commit: str | None = None) -> bytes:
     project = REPO / "formal/lean4/Chio"
     generated_project_files = {
         project / "Chio.lean",
@@ -1370,7 +1454,7 @@ def lean_archive_bytes(snapshot_date: str) -> bytes:
         project / "lake-manifest.json",
         *sorted(
             path
-            for path in project.rglob("*.lean")
+            for path in lean_sources("formal/lean4/Chio", input_commit=input_commit)
             if ".lake" not in path.relative_to(project).parts
             and path not in generated_project_files
         ),
@@ -1383,11 +1467,11 @@ def lean_archive_bytes(snapshot_date: str) -> bytes:
         vendor / "VENDOR.toml",
         vendor / "Aeneas.lean",
         vendor / "AeneasMeta.lean",
-        *sorted((vendor / "Aeneas").rglob("*.lean")),
-        *sorted((vendor / "AeneasMeta").rglob("*.lean")),
+        *lean_sources("formal/lean4/vendor/aeneas/Aeneas", input_commit=input_commit),
+        *lean_sources("formal/lean4/vendor/aeneas/AeneasMeta", input_commit=input_commit),
     ]
     for path in [*project_files, *vendor_files]:
-        if not path.is_file():
+        if input_commit is None and not path.is_file():
             fail(f"Lean archive input missing: {path.relative_to(REPO)}")
 
     output = io.BytesIO()
@@ -1429,14 +1513,14 @@ def lean_archive_bytes(snapshot_date: str) -> bytes:
                 *[
                     (
                         "chio-lean/" + path.relative_to(project).as_posix(),
-                        path.read_bytes(),
+                        file_bytes(path.relative_to(REPO).as_posix(), input_commit=input_commit),
                     )
                     for path in project_files
                 ],
                 *[
                     (
                         "vendor/aeneas/" + path.relative_to(vendor).as_posix(),
-                        path.read_bytes(),
+                        file_bytes(path.relative_to(REPO).as_posix(), input_commit=input_commit),
                     )
                     for path in vendor_files
                 ],
@@ -1464,20 +1548,31 @@ def manifest_bytes(
     *,
     snapshot_date: str,
     rust_toolchain: str,
+    historical: bool = False,
+    artifact_commit: str | None = None,
 ) -> bytes:
-    source_hashes = [hash_entry(path) for path in SOURCE_FILES]
+    input_commit = source_commit if historical else None
+    source_hashes = [
+        hash_entry(
+            path,
+            input_commit=(
+                artifact_commit if historical and path == GENERATOR_SCRIPT else input_commit
+            ),
+        )
+        for path in SOURCE_FILES
+    ]
     benchmark_entries: list[dict[str, Any]] = []
     for benchmark in BENCHMARKS:
         benchmark_entries.append(
             {
                 "id": benchmark["id"],
-                "script": hash_entry(benchmark["script"]),
+                "script": hash_entry(benchmark["script"], input_commit=input_commit),
                 "results": [hash_entry(path) for path in benchmark["results"]],
                 "claimClass": "experimentally_measured",
             }
         )
     corpus_entries = {
-        kind: [hash_entry(path) for path in paths]
+        kind: [hash_entry(path, input_commit=input_commit) for path in paths]
         for kind, paths in CORPORA.items()
     }
     supplementary_entries = [
@@ -1544,7 +1639,7 @@ def manifest_bytes(
         "toolchains": {
             "rust": rust_toolchain,
             "lean": file_bytes(
-                "formal/lean4/Chio/lean-toolchain"
+                "formal/lean4/Chio/lean-toolchain", input_commit=input_commit
             ).decode().strip(),
             "tex": "TeX Live 2023 or compatible pdflatex and BibTeX",
         },
@@ -1611,10 +1706,19 @@ def load_result_document(path: str) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
+    check_mode = parser.add_mutually_exclusive_group()
+    check_mode.add_argument(
         "--check",
         action="store_true",
         help="validate generated files without modifying them",
+    )
+    check_mode.add_argument(
+        "--check-historical",
+        action="store_true",
+        help=(
+            "validate current retained paper outputs against immutable measured "
+            "inputs; requires the pinned source and producer Git objects"
+        ),
     )
     parser.add_argument(
         "--source-commit",
@@ -1649,6 +1753,15 @@ def main() -> int:
         help="rewrite the claim ledger's generated measurements from a result document",
     )
     args = parser.parse_args()
+    if args.check_historical:
+        if any(value is not None for value in (
+            args.source_commit, args.benchmark_input_digest,
+            args.benchmark_input_paths, args.render_inline,
+            args.render_measurements, args.write_measurements,
+        )):
+            parser.error("--check-historical cannot be combined with generation or helper options")
+        if not SOURCE_COMMIT_FILE.is_file():
+            fail("historical validation requires supplementary/source-commit.txt")
 
     if args.benchmark_input_paths is not None:
         print("\n".join(benchmark_input_paths(args.benchmark_input_paths)))
@@ -1675,16 +1788,22 @@ def main() -> int:
             )
         )
         return 0
+    artifact_commit = (
+        validate_historical_assembly(source_commit) if args.check_historical else None
+    )
     source_commit_bytes = f"{source_commit}\n".encode()
     validate_inputs(
         source_commit,
         require_local_source_object=not args.check,
+        historical=args.check_historical,
     )
     snapshot_date = generated_at(source_commit)
-    rust_toolchain = pinned_rust_toolchain(check=args.check)
+    checking = args.check or args.check_historical
+    input_commit = source_commit if args.check_historical else None
+    rust_toolchain = pinned_rust_toolchain(check=checking, input_commit=input_commit)
     proof_bytes = proof_manifest_bytes(snapshot_date)
     inventory_bytes = theorem_inventory_bytes(snapshot_date)
-    archive_bytes = lean_archive_bytes(snapshot_date)
+    archive_bytes = lean_archive_bytes(snapshot_date, input_commit=input_commit)
     manifest = manifest_bytes(
         proof_bytes,
         inventory_bytes,
@@ -1693,6 +1812,8 @@ def main() -> int:
         source_commit_bytes,
         snapshot_date=snapshot_date,
         rust_toolchain=rust_toolchain,
+        historical=args.check_historical,
+        artifact_commit=artifact_commit,
     )
     outputs = [
         (SOURCE_COMMIT_FILE, source_commit_bytes),
@@ -1701,11 +1822,15 @@ def main() -> int:
         (SUPPLEMENTARY / "lean-source.tar.gz", archive_bytes),
         (MANIFEST_FILE, manifest),
     ]
-    if args.check:
+    if checking:
         problems = stale_outputs(outputs)
         if problems:
             fail("\n  ".join(["the artifact is stale:", *problems]))
-        print("programmable sovereignty artifact is current")
+        if args.check_historical:
+            print(f"programmable sovereignty historical artifact is valid at source {source_commit}")
+            print("current-source benchmark qualification is not established by this check")
+        else:
+            print("programmable sovereignty artifact is current")
     else:
         for path, data in outputs:
             write_output(path, data)

@@ -13,8 +13,13 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 cargo test -p chio-federation-authority
-cargo run -p chio-three-vendor-example --bin generate-chio-three-vendor-fixtures -- \
-  --authority-input-package "$PACKAGE_FIXTURE" "$tmpdir/input"
+# Generate the signing input privately from its first write. The authority
+# reader intentionally rejects seed material created with public permissions.
+(
+  umask 077
+  cargo run --locked -p chio-three-vendor-example --bin generate-chio-three-vendor-fixtures -- \
+    --authority-input-package "$PACKAGE_FIXTURE" "$tmpdir/input"
+)
 
 validate_schema() {
   local schema="$1"

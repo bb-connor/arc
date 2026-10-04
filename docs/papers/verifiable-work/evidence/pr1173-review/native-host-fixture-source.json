@@ -1,0 +1,18 @@
+{
+  "head": "93a2552c3a6eb15ac2756129f199f5714390e794",
+  "files": [
+    {
+      "path": "crates/products/chio-cli/tests/mcp_auth_server.rs",
+      "sha256": "75ef48174dfa82d81761e485db77109739bafd965fe181c1318a4582cf0d6877"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/mcp_serve_http.rs",
+      "sha256": "bebb34045350aab6da3cb52d743c54626fe501aa5517df4c602790204ad42b7a"
+    },
+    {
+      "path": "crates/products/chio-cli/tests/mcp_serve_http/malformed_initialize.rs",
+      "sha256": "29f494f146cee0e9d8dec50814aed6174c53b9f2c9e0914abe666a04871609e0"
+    }
+  ],
+  "hash_set_sha256": "c4b62e8040aea0c9380da8cd32b48b63b1438c39de6ab53d23ca5e0ed21c0083"
+}

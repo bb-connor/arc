@@ -372,6 +372,288 @@
       "observed_result": "passed",
       "bytes": 189,
       "sha256": "10853c6765c5dffa842d3942f83f794dc52f59db8ad30f08f54191801e33f74d"
+    },
+    {
+      "log": "process-crash-red.log.gz",
+      "observed_result": "failed-at-original-crash-approval-fixture",
+      "bytes": 1448,
+      "sha256": "e67abb0632f2474a55dcfb8a3aeec1bcd1c687ce049b78c2bfb137ebefc85d60"
+    },
+    {
+      "log": "process-crash-green.log.gz",
+      "observed_result": "passed-11",
+      "bytes": 3011,
+      "sha256": "bcaf5c6cd51c4f73606237848f638a3364066c82774f58addb45436ac38bd672"
+    },
+    {
+      "log": "process-all-tests.log.gz",
+      "observed_result": "passed-91-top-level-tests",
+      "bytes": 141350,
+      "sha256": "cb21d61597e4b30d0713c005c528c8a79b623cc058e789186b6a25084f7de2b4"
+    },
+    {
+      "log": "process-clippy-qualification.log.gz",
+      "observed_result": "passed",
+      "bytes": 2990,
+      "sha256": "af1671a51cd961c83923b8e31986ccdbc710f21556ed68bf85fc7ebc1ea89f94"
+    },
+    {
+      "log": "threshold-issuance-qualification.log.gz",
+      "observed_result": "failed-exact-inventory-42-versus-47",
+      "bytes": 27201,
+      "sha256": "9a2f0bf0c6040d0c68ab03ec3c907b3f9c52efeb9be7bfa82abeb3faf9cb3eb2"
+    },
+    {
+      "log": "threshold-issuance-qualification-fixed.log.gz",
+      "observed_result": "passed-exact-inventory-47",
+      "bytes": 14698,
+      "sha256": "d4aad5090abb400dc7527180742234be8080f31fc60245e4808c5a3aa086c04c"
+    },
+    {
+      "log": "session-reports-qualification.log.gz",
+      "observed_result": "passed-exact-inventory-16",
+      "bytes": 7291,
+      "sha256": "90e4134772c75d16f10230245a0efd3d4f2fe3e389fc60e3c4fc334b5e4bca5f"
+    },
+    {
+      "log": "receipt-isolation-qualification.log.gz",
+      "observed_result": "passed-exact-inventory-6",
+      "bytes": 5077,
+      "sha256": "9b83c14746f8e70f21ff7844cfeab5363a80458886bc55b24774c73f4f8cb646"
+    },
+    {
+      "log": "native-consumers-red.log.gz",
+      "observed_result": "failed-new-consumer-mutation-controls",
+      "bytes": 28591,
+      "sha256": "639f57b6952e9bba96f1016f9ac571fa3054259a1e417d673dbbc453a960bcd9"
+    },
+    {
+      "log": "native-consumers-green.log.gz",
+      "observed_result": "passed-17",
+      "bytes": 116,
+      "sha256": "d16a4933ecacc1bd2d10aa26b7aadd1225b22840f51aefff55a4770fb8a8745b"
+    },
+    {
+      "log": "sovereignty-tests-final.log.gz",
+      "observed_result": "passed-15",
+      "bytes": 115,
+      "sha256": "37bc0479a8fa8f8763af2b1f6cd914e0d5ea20c0221d9267ef9066a651bc65c8"
+    },
+    {
+      "log": "sovereignty-historical-final.log.gz",
+      "observed_result": "passed-historical-integrity-only",
+      "bytes": 470,
+      "sha256": "5ecce2ec8402737e7caf60608dc3864a1a2879bb36d688c0133bc4320a89df06"
+    },
+    {
+      "log": "sovereignty-strict-final.log.gz",
+      "observed_result": "expected-failure-current-source-drift",
+      "bytes": 1461,
+      "sha256": "f34e4c859e4bb4592da3cd0e10e51f61f2a2d02ea77e83fc14f748ab2e64ffe8"
+    },
+    {
+      "log": "hosted-repair-verdict-matrix.log.gz",
+      "observed_result": "passed-three-targets-47-tests",
+      "bytes": 27966,
+      "sha256": "5a20f9f4220ec93000c293263bc06658a24c57e90828e9be563968ef36f9d723"
+    },
+    {
+      "log": "hosted-repair-verdict-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 21543,
+      "sha256": "32f6e75b5c55e177d68b21e4594d21f9c242f59184a260dec207f56daa00c55b"
+    },
+    {
+      "log": "hosted-repair-trust.log.gz",
+      "observed_result": "passed",
+      "bytes": 91,
+      "sha256": "b4f8f7c80228924d40dd90980096d9e7a74f8d500039760959dfbaa23f4c2d2d"
+    },
+    {
+      "log": "hosted-repair-wire.log.gz",
+      "observed_result": "passed",
+      "bytes": 189,
+      "sha256": "10853c6765c5dffa842d3942f83f794dc52f59db8ad30f08f54191801e33f74d"
+    },
+    {
+      "log": "hosted-repair-fmt-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "hosted-repair-drogon.log.gz",
+      "observed_result": "failed-unsafe-checkout-ancestor",
+      "bytes": 32313,
+      "sha256": "199ff0c1bc633891e27c935db5273683d2f19ce58d601152418e7a7add31b9ed"
+    },
+    {
+      "log": "hosted-repair-proof-package.log.gz",
+      "observed_result": "passed",
+      "bytes": 74984,
+      "sha256": "711b6c920fa10cbc42c0c01016d0835118032816100e9727ac680d55a16f812b"
+    },
+    {
+      "log": "drogon-retention-red.log.gz",
+      "observed_result": "failed-receipt-retention-regression-before-fix",
+      "bytes": 111,
+      "sha256": "81a851a155d8a519a1ca2207c1d5df0dd21de375c4d61e308535b3ada6e31561"
+    },
+    {
+      "log": "drogon-retention-green.log.gz",
+      "observed_result": "passed-receipt-retention-and-error-regressions",
+      "bytes": 145,
+      "sha256": "aefbb5aae13162b9dcecf07d2303614b327a2818a3a28cb039aaf56703d1e4a6"
+    },
+    {
+      "log": "control-dispatch-marker-check.log.gz",
+      "observed_result": "passed-test-mock-instrumentation-only",
+      "bytes": 242,
+      "sha256": "9dd333bd03a531b0317bfafd28b387af4f7f86485f93a490ee4454d5101fa519"
+    },
+    {
+      "log": "native-host-fixture-hygiene.log.gz",
+      "observed_result": "passed",
+      "bytes": 52279,
+      "sha256": "76b33c5585a7d9f6279099c61c8245f939409a8c8c66c55843b38b7f2213cbc5"
+    },
+    {
+      "log": "hosted-repair-runtime-policy.log.gz",
+      "observed_result": "passed",
+      "bytes": 109654,
+      "sha256": "ac3abe7e9945f4eb47876fcfa6acd25b05c03ccea97e95c99c9b6f0ff2c4f26a"
+    },
+    {
+      "log": "hosted-repair-fuzz-corpus.log.gz",
+      "observed_result": "failed-three-target-inventory-mismatches",
+      "bytes": 37753,
+      "sha256": "1f6520c6db75dcfe39775aa46d3600452aa8a40e185c02e99ab555138ba6a996"
+    },
+    {
+      "log": "hosted-repair-drogon-final.log.gz",
+      "observed_result": "failed-missing-sidecar-signing-custody",
+      "bytes": 15695,
+      "sha256": "cf3abf42799c5f053df4a001f4a56fc3a9710c6df4d73a5beb850de12e687211"
+    },
+    {
+      "log": "drogon-runtime-probe-1.log.gz",
+      "observed_result": "failed-anonymous-route-assumption",
+      "bytes": 263,
+      "sha256": "2bce2702a17a9c2d3e6fee11ddb4c46337f53347d93dfcccc2e0d2b7b3c39a63"
+    },
+    {
+      "log": "drogon-runtime-probe-2.log.gz",
+      "observed_result": "failed-legacy-receipt-table-query",
+      "bytes": 129,
+      "sha256": "e441047e69ad7a90e0889087ba7e945a5ac2b57a30f8d063f6646d2d18ed6ff5"
+    },
+    {
+      "log": "drogon-runtime-probe-3.log.gz",
+      "observed_result": "passed-runtime-tail-only",
+      "bytes": 375,
+      "sha256": "543d2473e260880bdc768c2f3157bef05c8efc0e5ab14215d77ec17be4e5fcbe"
+    },
+    {
+      "log": "drogon-seed-source-probe.log.gz",
+      "observed_result": "passed",
+      "bytes": 157,
+      "sha256": "7fcace5029b4905331ec1a22a961ec4dd57eeec937ac5b2702d3daa0878ceeba"
+    },
+    {
+      "log": "drogon-seed-review-regression.log.gz",
+      "observed_result": "passed",
+      "bytes": 145,
+      "sha256": "aefbb5aae13162b9dcecf07d2303614b327a2818a3a28cb039aaf56703d1e4a6"
+    },
+    {
+      "log": "hosted-repair-native-http-compile.log.gz",
+      "observed_result": "passed-compile-only",
+      "bytes": 8712,
+      "sha256": "905463b406d6b257cd98314b1820eaf524e59dfd3b145681c7bce38d0651f7a3"
+    },
+    {
+      "log": "hosted-repair-native-http-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 18274,
+      "sha256": "6d3a19766ebcac4b986492426e28c66ad3c4e68874bbc6fc006bc335bb93faf4"
+    },
+    {
+      "log": "drogon-projection-export-review.log.gz",
+      "observed_result": "passed-real-store-and-negative-controls",
+      "bytes": 311,
+      "sha256": "0752fb2602e7ee7af5fec1f23f1b8f25010f09a306d6ebf1e00fa1ef2fc47f18"
+    },
+    {
+      "log": "hosted-repair-drogon-complete.log.gz",
+      "observed_result": "passed-complete-gate",
+      "bytes": 8705,
+      "sha256": "3151b5aa8e43bc5ed8987705626538aeb466c33b57da496b2255287b6ac495d2"
+    },
+    {
+      "log": "hosted-repair-fuzz-corpus-complete.log.gz",
+      "observed_result": "passed-38-tests",
+      "bytes": 21226,
+      "sha256": "e7addf03ddfc17058239d4a783a85c5d5565af7d0ed9c2e3e10d427fee39b991"
+    },
+    {
+      "log": "survivor-regression-hygiene.log.gz",
+      "observed_result": "passed",
+      "bytes": 52279,
+      "sha256": "76b33c5585a7d9f6279099c61c8245f939409a8c8c66c55843b38b7f2213cbc5"
+    },
+    {
+      "log": "fuzz-inventory-source-green.log.gz",
+      "observed_result": "passed-static-check",
+      "bytes": 303,
+      "sha256": "55bc7db3245caa07a1871f63502757b0855056bf8530b762e9ea0b85f40c5a6a"
+    },
+    {
+      "log": "fuzz-inventory-static-green.log.gz",
+      "observed_result": "passed-static-check",
+      "bytes": 48,
+      "sha256": "a0cd8909eb60259cd18410bc80511911d706c3a512d4a13a2f33d525da4d71b7"
+    },
+    {
+      "log": "fuzz-metadata-green.log.gz",
+      "observed_result": "passed-static-check",
+      "bytes": 64,
+      "sha256": "0915f5be300c853fd7d69c9229c17826b11a0eaf9be38cacf4025642a504e0b6"
+    },
+    {
+      "log": "fuzz-selection-green.log.gz",
+      "observed_result": "passed-static-check",
+      "bytes": 138,
+      "sha256": "2cc1bc66f4b9e604ff074cfa270251dbcea27d889d87451589ae2b43b3443b3f"
+    },
+    {
+      "log": "survivor-federation.log.gz",
+      "observed_result": "passed",
+      "bytes": 8362,
+      "sha256": "f217c4dfedd245f10051f8ee5340fbc2d78f85013bd4da8c7bd3b69fd0e19452"
+    },
+    {
+      "log": "survivor-runtime.log.gz",
+      "observed_result": "passed",
+      "bytes": 10077,
+      "sha256": "b957e4f89baf722998eb85ea1223317807eb92f2d9e713dac0c2dcf16a685473"
+    },
+    {
+      "log": "survivor-federation-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 9942,
+      "sha256": "1c2131b51420867d7661b65cac27be45c18abe5e8326b91acb67cf5c9afddfa6"
+    },
+    {
+      "log": "source-format.log.gz",
+      "observed_result": "passed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "native-final.log.gz",
+      "observed_result": "passed-21-source-bound-commands",
+      "bytes": 539,
+      "sha256": "cc76a42abea311b159567346728065317cf08b1d1ba7fb8e415975b2f99b6ea6"
     }
   ]
 }
