@@ -1,5 +1,10 @@
 # Security Roadmap Assurance Closeout Plan
 
+> **October 4 landing order:** Follow the [authoritative landing ledger](../../security/landing-ledger.md).
+> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
+> foundation. Status and evidence below retain their original source boundaries;
+> they do not authorize another implementation batch or establish a main merge.
+
 > **For agentic workers:** Use superpowers:executing-plans. Preserve the existing single-agent execution instruction and one Cargo owner per checkout. Complete each implementation packet with its owning regressions before starting the next.
 
 **Goal:** Finish the remaining security implementation and qualify one supported developer-preview candidate with explicit evidence for authorization, confinement, recovery and truthful receipts.

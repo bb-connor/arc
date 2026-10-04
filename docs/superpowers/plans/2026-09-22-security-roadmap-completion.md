@@ -1,5 +1,10 @@
 # Security Roadmap Completion Implementation Plan
 
+> **October 4 landing order:** Follow the [authoritative landing ledger](../../security/landing-ledger.md).
+> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
+> foundation. Status and evidence below retain their original source boundaries;
+> they do not authorize another implementation batch or establish a main merge.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to execute the work packets below. Preserve the existing single-agent execution instruction. Checkboxes track remaining work; retained evidence is identified separately.
 
 **Goal:** Finish the combined security/process foundation, complete M5-M10 developer-preview acceptance and the handoff's delivery integration, then satisfy M11's separately authorized operational acceptance.
