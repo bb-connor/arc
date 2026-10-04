@@ -12,7 +12,7 @@
 //! claims.
 
 use chio_appraisal::{
-    verify_runtime_attestation_record, SignedRuntimeAttestationAppraisalReport,
+    verify_signed_runtime_attestation_record, SignedRuntimeAttestationAppraisalReport,
     RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA,
 };
 use chio_core_types::canonical_json_bytes;
@@ -1597,8 +1597,9 @@ fn evaluate_runtime_assurance(
             "runtime-appraisal time is outside the signed attestation window",
         );
     }
-    let verified = match verify_runtime_attestation_record(
-        &attestation.body,
+    let verified = match verify_signed_runtime_attestation_record(
+        attestation,
+        &attestation_authority.key,
         Some(policy),
         trust.trusted_time,
     ) {

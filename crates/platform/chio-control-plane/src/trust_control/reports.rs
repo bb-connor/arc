@@ -1,8 +1,16 @@
 use super::*;
+use chio_appraisal::{
+    verify_runtime_attestation_record, RuntimeAttestationAppraisal,
+    RuntimeAttestationAppraisalReasonCode, RuntimeAttestationNormalizedClaimConfidence,
+};
 use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 
 pub type SignedComptrollerSurfaceReport = SignedExportEnvelope<ComptrollerSurfaceReport>;
+
+#[cfg(test)]
+#[path = "reports/attestation_authentication_tests.rs"]
+mod attestation_authentication_tests;
 
 #[derive(Default)]
 pub(crate) struct ResolvedBudgetGrant {
@@ -146,35 +154,41 @@ fn build_runtime_attestation_appraisal_report(
 ) -> Result<RuntimeAttestationAppraisalReport, Response> {
     let clock_now = unix_timestamp_now()
         .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
-    let appraisal = derive_runtime_attestation_appraisal(evidence)
+    let observed = derive_runtime_attestation_appraisal(evidence)
         .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))?;
     let generated_at = clock_now;
     let trust_policy =
         runtime_assurance_policy.and_then(|policy| policy.attestation_trust_policy.as_ref());
-    let policy_outcome = match trust_policy {
-        Some(policy) => {
-            match evidence.resolve_effective_runtime_assurance(Some(policy), generated_at) {
-                Ok(resolved) => RuntimeAttestationPolicyOutcome {
-                    trust_policy_configured: true,
-                    accepted: true,
-                    effective_tier: resolved.effective_tier,
-                    reason: None,
-                },
-                Err(error) => RuntimeAttestationPolicyOutcome {
-                    trust_policy_configured: true,
-                    accepted: false,
-                    effective_tier: RuntimeAssuranceTier::None,
-                    reason: Some(error.to_string()),
-                },
-            }
+    let policy_outcome =
+        match verify_runtime_attestation_record(evidence, trust_policy, generated_at) {
+            Ok(record) => record.policy_outcome,
+            Err(error) => RuntimeAttestationPolicyOutcome {
+                trust_policy_configured: trust_policy
+                    .is_some_and(|policy| !policy.rules.is_empty()),
+                accepted: false,
+                effective_tier: RuntimeAssuranceTier::None,
+                reason: Some(error.to_string()),
+            },
+        };
+
+    // Export signing authenticates this observation, not the caller's evidence.
+    // Preserve normalized values without endorsing them in either report format.
+    let mut appraisal = RuntimeAttestationAppraisal::rejected(
+        observed.adapter,
+        observed.verifier_family,
+        evidence,
+        observed.normalized_assertions,
+        observed.vendor_claims,
+        vec![RuntimeAttestationAppraisalReasonCode::PolicyRejected],
+    );
+    for claim in &mut appraisal.normalized_claims {
+        claim.confidence = RuntimeAttestationNormalizedClaimConfidence::Derived;
+    }
+    if let Some(artifact) = appraisal.artifact.as_mut() {
+        for claim in &mut artifact.claims.normalized_claims {
+            claim.confidence = RuntimeAttestationNormalizedClaimConfidence::Derived;
         }
-        None => RuntimeAttestationPolicyOutcome {
-            trust_policy_configured: false,
-            accepted: true,
-            effective_tier: evidence.tier,
-            reason: None,
-        },
-    };
+    }
 
     Ok(RuntimeAttestationAppraisalReport {
         schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),

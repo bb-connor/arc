@@ -1,5 +1,8 @@
 use super::*;
 use chio_test_support::prelude::*;
+
+#[path = "tests/attestation_authentication.rs"]
+mod attestation_authentication;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -781,30 +784,16 @@ fn runtime_assurance_policy_denies_raw_attestation_without_local_trust_boundary(
 }
 
 #[test]
-fn issuance_verification_returns_canonical_subject_and_provenance() {
+fn issuance_verification_rejects_matching_claims_without_authentication() {
     let policy = test_trusted_runtime_assurance_policy();
-    let verified = verify_runtime_attestation_for_issuance(
+    let error = verify_runtime_attestation_for_issuance(
         Some(&test_azure_runtime_attestation()),
         Some(&policy),
         unix_now(),
     )
-    .test_expect("trusted attestation should verify")
-    .test_expect("verified record should be returned when runtime policy is present");
-
-    assert!(verified.is_locally_accepted());
-    assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::Verified);
-    assert_eq!(
-        verified.provenance.canonical_verifier,
-        "https://maa.contoso.test"
-    );
-    assert_eq!(verified.matched_trust_rule(), Some("azure-contoso"));
-    assert_eq!(
-        verified
-            .workload_identity()
-            .test_expect("trusted attestation should bind a workload identity")
-            .trust_domain,
-        "chio"
-    );
+    .test_expect_err("matching caller claims must not produce verified provenance");
+    assert!(matches!(error, KernelError::CapabilityIssuanceDenied(_)));
+    assert!(error.to_string().contains("authenticated"), "{error}");
 }
 
 #[test]
@@ -896,7 +885,7 @@ fn workload_identity_validation_denies_conflicting_attestation_without_policy() 
 }
 
 #[test]
-fn runtime_assurance_policy_rebinds_trusted_attestation_to_verified_tier() {
+fn runtime_assurance_policy_denies_unsigned_azure_attestation() {
     let authority = wrap_capability_authority(
         Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
@@ -929,23 +918,16 @@ fn runtime_assurance_policy_rebinds_trusted_attestation_to_verified_tier() {
         prompt_grants: Vec::new(),
     };
 
-    let capability = authority
+    let error = authority
         .issue_capability_with_attestation(
             &subject_kp.public_key(),
             requested_scope,
             120,
             Some(test_azure_runtime_attestation()),
         )
-        .test_expect("trusted attestation should unlock verified tier");
-
-    assert!(
-        capability.scope.grants[0]
-            .constraints
-            .contains(&Constraint::MinimumRuntimeAssurance(
-                RuntimeAssuranceTier::Verified
-            )),
-        "issued capability should bind the verified runtime assurance tier"
-    );
+        .test_expect_err("unsigned claims cannot unlock the verified tier");
+    assert!(matches!(error, KernelError::CapabilityIssuanceDenied(_)));
+    assert!(error.to_string().contains("authenticated"), "{error}");
 }
 
 #[test]
@@ -999,7 +981,7 @@ fn runtime_assurance_policy_denies_untrusted_attestation_when_verifier_rules_exi
 }
 
 #[test]
-fn runtime_assurance_policy_rebinds_google_attestation_to_verified_tier() {
+fn runtime_assurance_policy_denies_unsigned_google_attestation() {
     let authority = wrap_capability_authority(
         Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
             Keypair::generate(),
@@ -1032,23 +1014,16 @@ fn runtime_assurance_policy_rebinds_google_attestation_to_verified_tier() {
         prompt_grants: Vec::new(),
     };
 
-    let capability = authority
+    let error = authority
         .issue_capability_with_attestation(
             &subject_kp.public_key(),
             requested_scope,
             120,
             Some(test_google_runtime_attestation()),
         )
-        .test_expect("trusted google appraisal should unlock verified tier");
-
-    assert!(
-        capability.scope.grants[0]
-            .constraints
-            .contains(&Constraint::MinimumRuntimeAssurance(
-                RuntimeAssuranceTier::Verified
-            )),
-        "issued capability should bind the verified runtime assurance tier"
-    );
+        .test_expect_err("unsigned claims cannot unlock the verified tier");
+    assert!(matches!(error, KernelError::CapabilityIssuanceDenied(_)));
+    assert!(error.to_string().contains("authenticated"), "{error}");
 }
 
 #[path = "tests/aggregate.rs"]

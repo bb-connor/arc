@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 
 use chio_appraisal::{
-    verify_runtime_attestation_record, RuntimeAttestationAppraisalReport,
+    verify_signed_runtime_attestation_record, RuntimeAttestationAppraisalReport,
     SignedRuntimeAttestationAppraisalReport, AZURE_MAA_ATTESTATION_SCHEMA,
     RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA,
 };
@@ -719,7 +719,13 @@ fn runtime_fixture(effective_tier: RuntimeAssuranceTier) -> Result<RuntimeFixtur
             required_assertions: BTreeMap::new(),
         }],
     };
-    let verified = verify_runtime_attestation_record(&evidence, Some(&policy), 1_750_000_000)?;
+    let signed_evidence = SignedExportEnvelope::sign(evidence.clone(), &attestation_authority)?;
+    let verified = verify_signed_runtime_attestation_record(
+        &signed_evidence,
+        &attestation_authority.public_key(),
+        Some(&policy),
+        1_750_000_000,
+    )?;
     let runtime_metadata = RuntimeAssuranceReceiptMetadata {
         schema: verified.evidence_schema().to_string(),
         verifier_family: Some(verified.verifier_family()),
@@ -1934,10 +1940,14 @@ fn runtime_assurance_rejects_empty_policy_and_unrelated_signed_evidence() -> Tes
     // into the producing receipts.
     let mut replacement_evidence = fx.attestation.body.clone();
     replacement_evidence.evidence_sha256 = "1".repeat(64);
-    let replacement_record =
-        verify_runtime_attestation_record(&replacement_evidence, Some(&fx.policy), 1_750_000_000)?;
     let replacement_attestation =
         SignedExportEnvelope::sign(replacement_evidence, &fx.attestation_authority)?;
+    let replacement_record = verify_signed_runtime_attestation_record(
+        &replacement_attestation,
+        &fx.attestation_authority.public_key(),
+        Some(&fx.policy),
+        1_750_000_000,
+    )?;
     let replacement_appraisal = SignedExportEnvelope::sign(
         RuntimeAttestationAppraisalReport {
             schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),

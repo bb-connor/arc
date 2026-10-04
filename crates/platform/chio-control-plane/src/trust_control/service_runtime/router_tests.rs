@@ -9,6 +9,9 @@ use std::time::Duration;
 #[path = "ingress_tests.rs"]
 mod ingress_tests;
 
+#[path = "attestation_authentication_tests.rs"]
+mod attestation_authentication_tests;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         transport: Default::default(),

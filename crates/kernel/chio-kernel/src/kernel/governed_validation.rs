@@ -235,9 +235,9 @@ impl ChioKernel {
                 // communication, financial, model-routing, and
                 // memory-governance constraints do not contribute
                 // governed-transaction requirements. Their enforcement is
-                // wired into request_matching.rs (argument-level checks)
-                // and downstream data/content guards (SQL parsing, result
-                // shaping, HITL replay). This arm is exhaustive with no
+                // wired into request_matching.rs (argument-level checks).
+                // Unsupported domain constraints are rejected by scope
+                // validation before admission or grant selection. This arm is exhaustive with no
                 // `_` catch-all: a new Constraint variant must choose
                 // explicitly here rather than be silently dropped from
                 // governance requirements.
@@ -1202,7 +1202,7 @@ impl ChioKernel {
         Ok(())
     }
 
-    fn validate_governed_autonomy(
+    pub(super) fn validate_governed_autonomy(
         &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
