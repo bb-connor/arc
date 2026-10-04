@@ -2370,6 +2370,37 @@ exec "$real" "$@"
             raise AssertionError("detached Cargo process quiescence was not verified")
 
 
+def trusted_failure_diagnostic_tests() -> None:
+    broker = mock.Mock()
+    broker.wait.return_value = 0
+    verifier = mock.Mock()
+    payload = b"DISCARDED-PREFIX" + b"x" * 9000 + b"failure detail\n\x1b[31m\x00"
+    with (
+        mock.patch.object(Path, "exists", return_value=True),
+        mock.patch.object(ENTRYPOINT.subprocess, "Popen", side_effect=[broker, verifier]),
+        mock.patch.object(
+            ENTRYPOINT, "collect_bounded_process", return_value=(17, payload)
+        ),
+        mock.patch.object(ENTRYPOINT, "quiesce_verifier_namespace") as quiesce,
+        mock.patch.object(ENTRYPOINT, "stop_broker") as stop,
+    ):
+        try:
+            ENTRYPOINT.run_trusted_bounded(["/usr/bin/python3", "/trusted/checker"], 60)
+        except ENTRYPOINT.EntrypointError as error:
+            diagnostic = str(error)
+        else:
+            raise AssertionError("failed verifier was accepted")
+        quiesce.assert_called_once_with()
+        stop.assert_called_once()
+        broker.wait.assert_called_once_with(timeout=300)
+    if "failure detail" not in diagnostic or "status 17" not in diagnostic:
+        raise AssertionError("failed verifier lost its bounded diagnostic")
+    if "DISCARDED-PREFIX" in diagnostic or len(diagnostic) > 33_000:
+        raise AssertionError("failed verifier diagnostic exceeds its tail bound")
+    if any(character in diagnostic for character in ("\n", "\x1b", "\x00")):
+        raise AssertionError("failed verifier emitted unescaped terminal controls")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--docker", action="store_true")
@@ -2388,6 +2419,7 @@ def main() -> int:
     immutable_workspace_tests()
     entrypoint_repository_inventory_tests()
     fake_docker_main_tests()
+    trusted_failure_diagnostic_tests()
     if args.docker:
         image = args.image or os.environ.get("CHIO_SECURITY_EXECUTION_IMAGE", "")
         if not BOUNDARY.IMAGE_PATTERN.fullmatch(image):

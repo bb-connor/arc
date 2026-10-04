@@ -1950,7 +1950,8 @@ def run_trusted_bounded(
         raise EntrypointError("candidate command broker failed closed")
     if return_code != 0:
         raise EntrypointError(
-            f"trusted verifier failed with status {return_code}: {command[0]}"
+            f"trusted verifier failed with status {return_code}: {command[0]}; "
+            f"output tail: {output[-8192:]!r}"
         )
     return output
 
