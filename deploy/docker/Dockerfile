@@ -3,11 +3,11 @@
 # stages. Base images are digest-pinned to match Dockerfile.sidecar /
 # Dockerfile.tee; bump the digests in lockstep with those files.
 
-ARG RUST_VERSION=1.94.1
+ARG RUST_VERSION=1.95.0
 ARG ALPINE_VERSION=3.22
 ARG NODE_VERSION=22
 
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS rust-builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS rust-builder
 RUN apk add --no-cache build-base cmake openssl-dev pkgconf
 WORKDIR /workspace
 
@@ -27,30 +27,14 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
  && cargo build --profile docker-release --locked -p chio-cli --bin chio \
  && cp target/docker-release/chio /chio
 
-FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7 AS proof-room-builder
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION}@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS proof-room-builder
 WORKDIR /workspace
 
 COPY deploy/docker/proof-room-workspace/Cargo.toml ./Cargo.toml
 COPY deploy/docker/proof-room-workspace/Cargo.lock ./Cargo.lock
-COPY crates/core/chio-core-types ./crates/core/chio-core-types
-COPY crates/economy/chio-appraisal ./crates/economy/chio-appraisal
-COPY crates/economy/chio-credit ./crates/economy/chio-credit
-COPY crates/economy/chio-underwriting ./crates/economy/chio-underwriting
-COPY crates/economy/chio-web3 ./crates/economy/chio-web3
-COPY crates/kernel/chio-runtime-proof-parity ./crates/kernel/chio-runtime-proof-parity
-COPY crates/kernel/chio-swarm-authority ./crates/kernel/chio-swarm-authority
-COPY crates/platform/chio-agent-web-interop ./crates/platform/chio-agent-web-interop
-COPY crates/platform/chio-commerce-order ./crates/platform/chio-commerce-order
-COPY crates/platform/chio-enterprise-export ./crates/platform/chio-enterprise-export
-COPY crates/platform/chio-risk-comptroller ./crates/platform/chio-risk-comptroller
-COPY crates/platform/chio-transaction-passport ./crates/platform/chio-transaction-passport
-COPY crates/platform/chio-trust-market-context ./crates/platform/chio-trust-market-context
-COPY crates/platform/chio-workflow-preflight ./crates/platform/chio-workflow-preflight
-COPY crates/trust/chio-disclosure-lineage ./crates/trust/chio-disclosure-lineage
-COPY crates/tooling/chio-spec-codegen ./crates/tooling/chio-spec-codegen
-COPY crates/tooling/chio-test-support ./crates/tooling/chio-test-support
-COPY crates/products/proof_fixture_build.rs ./crates/products/proof_fixture_build.rs
-COPY crates/products/chio-proof-room ./crates/products/chio-proof-room
+COPY third_party ./third_party
+# The selected member retains its complete workspace path dependency closure.
+COPY crates ./crates
 COPY spec/schemas/chio-proof-room ./spec/schemas/chio-proof-room
 COPY spec/schemas/chio-runtime ./spec/schemas/chio-runtime
 COPY spec/schemas/chio-transaction ./spec/schemas/chio-transaction

@@ -1,6 +1,9 @@
 
 # cargo-vet audits file
 
+[criteria.aws-lc-upstream-reviewed]
+description = "The entire published AWS-LC Rust wrapper source has been security-reviewed with known findings recorded. This criterion does not imply safe-to-run or safe-to-deploy and must never authorize the published package. Chio separately requires an exact repaired-fork source audit, authenticated reconstruction and Cargo source/feature enforcement before deployment."
+
 [[audits.alloy]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -337,6 +340,12 @@ criteria = "safe-to-deploy"
 version = "0.14.2"
 notes = "Exact-source audit of registry archive SHA-256 03367707e92796b190a4207d4d39b0a4271d574503d2969c2b0cfbf5c87658ee. All 1,965 bundled AWS-LC files and 42 Rust/build-wrapper files match upstream commit c4fde5c4cce80cab4cd475695ca9580268a6baef; the only native difference, go.mod, is the exact deterministic rewrite in the upstream publish script. Reviewed archive member safety, build and system-library selection, compiler and bindgen invocation, generated bindings, FFI ownership boundary, startup FIPS-mode probe, whole-archive retention, and ambient process/network capabilities. Native Linux tests passed through aws-lc-rs' 490-test FIPS suite, and controlled C and Rust constructor tests proved failure before main when FIPS mode is absent and success when present. Approved for the locked workspace role; platform-specific system-library selection remains fail-closed."
 
+[[audits.aws-lc-rs]]
+who = "Chio Codex-assisted source review"
+criteria = "aws-lc-upstream-reviewed"
+version = "1.18.1"
+notes = "Registry SHA-256 b281d307588d634de920874890732659e2e7672f72b5e10e81badc1a8a83621e; upstream commit 22e629d5c46276497a24ee3e575be4315940e7cb. Joined review covers production Rust APIs, FFI ownership, native capacities, initialization, parser and algorithm binding, concurrency/refcounts, build capabilities and feature selection. Found DES parity validation defects, six AES_KEY partial-initialization sites (confirmed by native Memcheck) and a private unsafe CStr violation. The registry bytes are NOT safe-to-deploy certified. Corrections, actual coverage and limitations are in docs/security/audits/aws-lc-rs-1.18.1-fork.md and its independent source review. Only the separately identified and enforced corrected fork is accepted for Chio deployment."
+
 [[audits.aws-lc-sys]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -510,6 +519,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.4.2"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.cpp_demangle]]
+who = "Chio Codex-assisted source review"
+criteria = "safe-to-deploy"
+delta = "0.4.5 -> 0.5.1"
+notes = "Conditional delta audit extending the retained 0.4.5 exemption; this is not a full source certificate or removal of baseline audit debt. Both 22-file archives were authenticated (0.4.5 SHA-256 f2bb79cb74d735044c972aae58ed0aaa9a837e85b01106a54c39e42e97f62253; 0.5.1 0667304c32ea56cb4cd6d2d7c0cfe9a2f8041229db8c033af7f8d69492429def). Reviewed every changed hunk in all 12 changed files and parser/formatter, recursion, ownership, UTF-8, build and dependency context. No introduced unsafe operation, privileged I/O, unchecked access or recursive bypass found. Fallible formatting replaces Display; new expression branches retain bounded input progress and existing depth/error handling. Unchanged layout assumptions and parser resource concerns remain explicitly unqualified in docs/security/audits/cpp-demangle-0.4.5-to-0.5.1.md. No runtime stress-probe result is claimed."
 
 [[audits.crossbeam-channel]]
 who = "Chio supply-chain reviewer"

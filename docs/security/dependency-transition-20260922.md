@@ -13,6 +13,8 @@ workflow definitions. Neither change authorizes a new source or publisher.
 | rustls-webpki | 0.103.15 | Compatible patched certificate verifier |
 | der | 0.8.2 | Replace yanked 0.8.0 |
 | aws-lc-rs | 1.18.1 plus the documented Chio patch | rustls dependency update with retained DES key validation |
+| Wasmtime | 48.0.5 | RUSTSEC-2026-0316 and RUSTSEC-2026-0327 repairs |
+| Rust workspace and builders | 1.95.0 | Patched Wasmtime's minimum supported Rust version |
 | js-yaml | 4.3.2 | GHSA-2883-xcg3-v3hh repair |
 | vitest and @vitest/mocker | 4.1.11 | GHSA-82fw-gwwq-j7x9 repair |
 | sharp | 0.35.4 | GHSA-rgj7-g3m4-5g8c repair |
@@ -26,10 +28,16 @@ hashes and the vector normalization. Root and generated Docker manifests retain
 the same source patch; affected Docker builders copy the vendor directory.
 The native sys crates have exact-source audits. Cargo Vet's earlier success
 missed this local Rust fork because it treated a path dependency as first-party.
-The corrected policy now requires an audit of the published 1.18.1 base and
-fails closed until that audit is completed. Cargo Vet cannot authenticate the
-fork delta, which requires separate review against the tracked patch. No new
-exemption or unsupported certification was added. The upstream cipher file has
+The completed source review found six unsafe partial AES-key initialization
+sites and a private unsafe C-string conversion in the published wrapper, in
+addition to the DES parity defects. The fork repairs all of them. The published
+archive is explicitly not certified safe to deploy. Its non-implying review
+criterion is only one part of the mandatory combined supply-chain gate: exact
+fork audit and source inventory, authenticated archive reconstruction, Cargo
+source/feature resolution, native/transitive deployment audits, and regressions.
+See the [source audit](audits/aws-lc-rs-1.18.1-fork.md). Both required Cargo Vet
+jobs and release qualification call `scripts/check-supply-chain.sh`.
+No new exemption or unsupported certification was added. The upstream cipher file has
 an exact-size, expiring source-hygiene allowance; other file limits remain
 enforced.
 
@@ -50,8 +58,16 @@ The first hosted run exposed inherited JavaScript advisories and missing vendor
 source classification. A later current-head CVE run exposed Elysia 1.4.28 in
 the adapter's separate nested lock; its package, nested lock and workspace lock
 now select 1.4.29. Those failures remain in PR #1168's history.
-The corrected `cargo vet check --locked` reports `aws-lc-rs:1.18.1` missing
-`safe-to-deploy`; that is an open security gate, not a passing check.
+The earlier missing-AWS-LC audit failure remains retained. The October 4 source
+repair passed native Memcheck (original: 48 uninitialized-value errors; repaired:
+zero), 386 library tests with DES enabled, three DES regressions, 36 doctests
+(one ignored), and 491 FIPS tests on both the earlier Rust 1.94.1 harness and
+the candidate's Rust 1.95.0 toolchain. The patched Wasmtime passed 151 library
+tests and 27 escape tests; advisories pass. The source gate validates all six
+deployment workspace resolutions and eight source/policy mutation tests.
+The inherited cpp_demangle exemption remains debt: its genuine 0.4.5-to-0.5.1
+delta review preserves baseline acceptance and does not claim a complete audit.
+Exact-head hosted checks and independent PR review remain required before merge.
 
 Review the vendor provenance, dependency/audit closure, container inputs, SDK
 compatibility and qualification documentation as separate slices. Require terminal

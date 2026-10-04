@@ -392,7 +392,7 @@ unsafe fn dump_error() {
     let func = ERR_GET_FUNC(err);
     let mut buffer = [0u8; 256];
     ERR_error_string(err, buffer.as_mut_ptr().cast());
-    let error_msg = CStr::from_bytes_with_nul_unchecked(&buffer);
+    let error_msg = CStr::from_bytes_until_nul(&buffer);
     eprintln!("Raw Error -- {error_msg:?}\nErr: {err}, Lib: {lib}, Reason: {reason}, Func: {func}");
 }
 

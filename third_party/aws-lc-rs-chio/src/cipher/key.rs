@@ -89,8 +89,10 @@ impl Drop for SymmetricCipherKey {
 
 impl SymmetricCipherKey {
     fn aes(key_bytes: &[u8]) -> Result<(AES_KEY, AES_KEY), Unspecified> {
-        let mut enc_key = MaybeUninit::<AES_KEY>::uninit();
-        let mut dec_key = MaybeUninit::<AES_KEY>::uninit();
+        // Native AES setup leaves unused schedule words untouched. Initialize
+        // every integer field before converting the aggregate into a Rust value.
+        let mut enc_key = MaybeUninit::<AES_KEY>::zeroed();
+        let mut dec_key = MaybeUninit::<AES_KEY>::zeroed();
         #[allow(clippy::cast_possible_truncation)]
         if unsafe {
             0 != AES_set_encrypt_key(
@@ -314,6 +316,20 @@ mod tests {
     use crate::cipher::block::{Block, BLOCK_LEN};
     use crate::cipher::key::SymmetricCipherKey;
     use crate::test::from_hex;
+
+    // AES-128 and AES-192 native setup need not write the entire AES_KEY.
+    // Run this test under Memcheck as well: assuming initialization before
+    // reading the unused integer fields is itself undefined behavior.
+    #[test]
+    fn aes_schedules_initialize_unused_words() -> Result<(), crate::error::Unspecified> {
+        for (bytes, used_words) in [(16, 44), (24, 52)] {
+            let key = [0u8; 32];
+            let (enc, dec) = SymmetricCipherKey::aes(&key[..bytes])?;
+            assert!(enc.rd_key[used_words..].iter().all(|word| *word == 0));
+            assert!(dec.rd_key[used_words..].iter().all(|word| *word == 0));
+        }
+        Ok(())
+    }
 
     #[test]
     fn test_encrypt_block_aes_128() {

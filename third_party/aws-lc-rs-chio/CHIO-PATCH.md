@@ -1,4 +1,4 @@
-# Chio AWS-LC Rust DES repair
+# Chio AWS-LC Rust source repairs
 
 Source: aws-lc-rs 1.18.1 registry archive, SHA-256
 `b281d307588d634de920874890732659e2e7672f72b5e10e81badc1a8a83621e`.
@@ -20,7 +20,15 @@ The repair normalizes every DES key to odd parity before calling
 components after masking their parity bits. The regression target covers weak
 and semi-weak parity variants and parity-distinct equal TDEA components. It
 fails against the registry release and passes against this fork on native
-Linux x86_64. The complete default and FIPS library test suites also pass.
+Linux x86_64. Native library, DES regression and FIPS tests are recorded in the source audit report below.
+
+The fork also initializes every integer field in native AES key schedules before
+constructing Rust values. Native AES-128/192 setup leaves unused words untouched;
+the registry wrapper unsafely assumed that all fields had been initialized. All
+six cipher and key-wrap allocation sites now start zeroed. The private error
+diagnostic uses a bounded safe C-string constructor. See the
+[source audit](../../docs/security/audits/aws-lc-rs-1.18.1-fork.md) for the
+reviewed boundaries, the Memcheck reproduction and remaining limitations.
 
 Five em dashes in upstream documentation and Rust documentation comments are
 normalized to hyphens for the repository text convention. They do not affect
@@ -30,10 +38,12 @@ Eight upstream test-vector files also have CRLF endings, trailing whitespace
 or trailing blank lines normalized for the repository diff check. The test
 parser already ignores these differences; vector keys and values are unchanged.
 
-The tracked [CHIO-PATCH.patch](CHIO-PATCH.patch) is the complete change to
+The tracked [CHIO-PATCH.patch.json](CHIO-PATCH.patch.json) is the complete change to
 files present in the registry archive, excluding this provenance document.
-It adds the DES regression target and changes the crate manifest, DES key
-validation, and the five text-convention occurrences. The 71 test fixtures
+It is an ASCII JSON array of patch lines; decoding preserves the original UTF-8
+bytes, including removed upstream text. It adds the DES regression target and
+changes the crate manifest, DES key validation, AES initialization, the private
+error diagnostic and the five text-convention occurrences. The 71 test fixtures
 missing from the published archive are copied from the upstream commit above.
 Their checked-in hashes are in
 [CHIO-RESTORED-FIXTURES.sha256](CHIO-RESTORED-FIXTURES.sha256).
@@ -42,7 +52,8 @@ other fixture bytes match the upstream commit. These fixtures are test data,
 not production source.
 
 To independently reconstruct the fork, extract the verified registry archive,
-apply `CHIO-PATCH.patch` from the extracted crate root, and copy the fixture
+decode `CHIO-PATCH.patch.json` and apply the result from the extracted crate root,
+then copy the fixture
 paths named in `CHIO-RESTORED-FIXTURES.sha256` from the upstream commit's
 `aws-lc-rs/` directory. Normalize the following eight files with
 `perl -0777 -pi -e 's/\r\n/\n/g; s/[ \t]+(?=\n)//g; s/\n+\z/\n/'`:
@@ -60,12 +71,24 @@ tests/data/rsa_pss_verify_tests.txt
 
 Run `sha256sum -c CHIO-RESTORED-FIXTURES.sha256` from the reconstructed
 crate root. Then compare every file with this checked-in directory, excluding
-`CHIO-PATCH.md`, `CHIO-PATCH.patch`, and
+`CHIO-PATCH.md`, `CHIO-PATCH.patch.json`, and
 `CHIO-RESTORED-FIXTURES.sha256`, which are review metadata. The regression
 was observed to fail against the published crate and pass against this fork
 with separate Cargo target directories; the commands below exercise the fork.
 
-This patch is not a certification of the entire dependency.
+Cargo Vet records the published source review without certifying that known-
+flawed archive as safe to deploy. Deployment qualification additionally requires
+`bash scripts/check-supply-chain.sh`: an exact fork inventory, complete archive
+reconstruction, actual Cargo source/feature resolution, the native/transitive
+`safe-to-deploy` audits, and the DES/AES regressions. A patch file alone does not
+certify the dependency.
+
+Decode the tracked patch with:
+
+```sh
+python3 -c 'import json,sys; sys.stdout.write("".join(json.load(open(sys.argv[1]))))' \
+  /path/to/CHIO-PATCH.patch.json | git apply -
+```
 
 ```sh
 cargo test --locked --manifest-path third_party/aws-lc-rs-chio/Cargo.toml

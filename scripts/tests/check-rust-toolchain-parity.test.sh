@@ -31,22 +31,22 @@ python3 "${checker}"
 copy_fixture
 python3 "${checker}" --repo-root "${fixture_root}"
 
-sed -i 's/ARG RUST_VERSION=1\.94\.1/ARG RUST_VERSION=1.93/' \
+sed -i 's/ARG RUST_VERSION=[0-9.]*/ARG RUST_VERSION=1.0.0/' \
   "${fixture_root}/deploy/docker/Dockerfile.sidecar"
 expect_rejection "a stale production Rust version"
 
 copy_fixture
-sed -i '0,/rust-version = "1\.94"/s//rust-version = "1.93"/' \
+sed -i '0,/rust-version = "[0-9.]*"/s//rust-version = "1.0"/' \
   "${fixture_root}/deploy/docker/chio-workspace/Cargo.toml"
 expect_rejection "a stale generated workspace MSRV"
 
 copy_fixture
-sed -i '0,/sha256:797631f9/s//sha256:897631f9/' \
+sed -i '0,/@sha256:[a-f0-9]*/s//@sha256:0000000000000000000000000000000000000000000000000000000000000000/' \
   "${fixture_root}/deploy/docker/Dockerfile.sidecar"
 expect_rejection "a divergent Alpine builder digest"
 
 copy_fixture
-sed -i 's/@sha256:cf9dd0ec73e75f827fe59123fff9dc65af1a1c8363c3c31ee8d7f8ad0b6a5fb2//' \
+sed -i 's/@sha256:[a-f0-9]*//' \
   "${fixture_root}/deploy/sidecar/Dockerfile"
 expect_rejection "an unpinned production Rust builder"
 

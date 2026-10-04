@@ -11,6 +11,10 @@ on:
       - "crates/**/Cargo.toml"
       - "supply-chain/**"
       - "third_party/aws-lc-rs-chio/**"
+      - "scripts/check-aws-lc-fork.py"
+      - "scripts/check-supply-chain.sh"
+      - "scripts/tests/check-aws-lc-fork.test.py"
+      - "docs/security/audits/**"
       - ".github/workflows/cargo-vet.yml"
   pull_request:
     paths:
@@ -19,6 +23,10 @@ on:
       - "crates/**/Cargo.toml"
       - "supply-chain/**"
       - "third_party/aws-lc-rs-chio/**"
+      - "scripts/check-aws-lc-fork.py"
+      - "scripts/check-supply-chain.sh"
+      - "scripts/tests/check-aws-lc-fork.test.py"
+      - "docs/security/audits/**"
       - ".github/workflows/cargo-vet.yml"
 
 permissions:
@@ -34,7 +42,7 @@ jobs:
   cargo-vet:
     name: cargo-vet (locked supply-chain audit)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
@@ -125,8 +133,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
-      - name: cargo vet --locked
+      - name: Verify source-bound fork and locked supply-chain audits
         shell: bash
         run: |
           set -euo pipefail
-          cargo vet --locked
+          bash scripts/check-supply-chain.sh
