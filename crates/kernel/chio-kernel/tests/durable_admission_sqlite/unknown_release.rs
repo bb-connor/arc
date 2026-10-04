@@ -3,6 +3,16 @@ use chio_kernel::payment::*;
 
 #[test]
 fn mutual_release_recovers_without_rewriting_unknown_work() -> Result<(), Box<dyn Error>> {
+    mutual_release_fixture(false)
+}
+
+#[test]
+fn mutual_release_cannot_revive_expired_consent_with_a_backdated_decision(
+) -> Result<(), Box<dyn Error>> {
+    mutual_release_fixture(true)
+}
+
+fn mutual_release_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     let temp = tempfile::tempdir()?;
     secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
@@ -14,7 +24,11 @@ fn mutual_release_recovers_without_rewriting_unknown_work() -> Result<(), Box<dy
     let calls = Arc::new(PaymentCalls::default());
     let invocations = Arc::new(AtomicU64::new(0));
     let (id, cap) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &locks,
+            chio_test_support::clock::clock(),
+        )?;
         let operations = Arc::new(authority.admission_operation_store());
         let mut kernel = ChioKernel::new(kernel_config(receiver.clone()));
         kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
@@ -41,7 +55,11 @@ fn mutual_release_recovers_without_rewriting_unknown_work() -> Result<(), Box<dy
         (operations[0].binding().operation_id().clone(), cap)
     };
     let (consent, incident_bytes, original_bytes) = {
-        let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &database,
+            &locks,
+            chio_test_support::clock::clock(),
+        )?;
         let operations = Arc::new(authority.admission_operation_store());
         let fence = authority.mutation_fence();
         let mut kernel = ChioKernel::new(kernel_config(receiver.clone()));
@@ -103,6 +121,35 @@ fn mutual_release_recovers_without_rewriting_unknown_work() -> Result<(), Box<dy
         assert!(runtime.resolve(&policy, &consent, at - 1).is_err());
         assert!(runtime.resolve(&policy, &consent, at + 60_000).is_err());
         assert_eq!(calls.releases.load(Ordering::SeqCst), 0);
+        if expired_only {
+            let expires = consent.proposal.body.expires_at_unix_ms;
+            let _expired_clock = chio_test_support::clock::scope_unix_secs((expires + 1000) / 1000);
+            let expired = runtime
+                .resolve(&policy, &consent, expires - 1000)
+                .err()
+                .ok_or("backdated decision revived expired release consent")?;
+            assert!(expired.to_string().contains("release terms"), "{expired}");
+            assert!(operations
+                .load_unknown_release(id.as_str(), &fence)?
+                .is_none());
+            assert_eq!(calls.releases.load(Ordering::SeqCst), 0);
+            assert_eq!(calls.captures.load(Ordering::SeqCst), 0);
+            assert_eq!(invocations.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                canonical_json_bytes(&operations.unknown_release_source(id.as_str(), &fence)?.1)?,
+                original_bytes
+            );
+            let connection = rusqlite::Connection::open(&database)?;
+            assert_eq!(
+                connection.query_row(
+                    "SELECT COUNT(*) FROM budget_mutation_events WHERE kind='reconcile_spend'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )?,
+                0
+            );
+            return Ok(());
+        }
         calls.fail_next_release.store(true, Ordering::SeqCst);
         assert!(runtime.resolve(&policy, &consent, at).is_err());
         let pending = operations

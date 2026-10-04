@@ -14,7 +14,7 @@ pub(super) fn verify_treaty_dsse_evidence<S: RuntimeAdmissionStore>(
     review: &TreatyEvidenceReview<'_>,
     lineage_bundle: Option<&(ReceiptLineageBundle, String)>,
     invocation: Option<&BilateralInvocation>,
-) -> Result<(), ChioRuntimeError> {
+) -> Result<PresentationWindow, ChioRuntimeError> {
     let Ok((statement, _)) = envelope.decode_statement() else {
         return rejected(
             "chio_treaty_unverified_required_evidence",
@@ -183,7 +183,7 @@ pub(super) fn verify_treaty_dsse_evidence<S: RuntimeAdmissionStore>(
             );
         }
     }
-    Ok(())
+    Ok(window)
 }
 
 /// The records this receiver requires to have resolved for the counterparty a

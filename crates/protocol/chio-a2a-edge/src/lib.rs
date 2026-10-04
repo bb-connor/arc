@@ -21,7 +21,8 @@
 //! ## Modules
 //!
 //! The implementation is split into focused source fragments that share this
-//! crate-root module scope (via `include!`):
+//! crate-root module scope (via `include!`), plus private configuration, conversion
+//! and v1 protocol modules:
 //!
 //! - `error`: the [`A2aEdgeError`] type and receipt-write accounting helpers.
 //! - `config`: the [`A2aEdgeConfig`] published in the Agent Card.
@@ -80,13 +81,21 @@ pub mod otel;
 // visibility resolve as if the fragments were inlined here.
 
 include!("error.rs");
-include!("config.rs");
+mod config;
+pub use config::A2aEdgeConfig;
 include!("types.rs");
 include!("bridge.rs");
-include!("conversion.rs");
+mod conversion;
+#[cfg(test)]
+use conversion::result_to_parts;
+use conversion::{
+    build_a2a_source_envelope, cancelled_task_metadata, ensure_chio_metadata,
+    extract_arguments_from_message, pending_task_metadata, task_response_from_orchestrated,
+};
 include!("edge.rs");
 include!("jsonrpc.rs");
-include!("v1.rs");
+mod v1;
+use v1::V1OutputMode;
 include!("tests/all.rs");
 
 #[cfg(test)]

@@ -1175,6 +1175,11 @@ files = ["crates/tooling/chio-conformance/src/peers.rs"]
 first_seen = "e299888892"
 
 [[schema]]
+value = "chio.contractual-capture-waiver.v1"
+files = ["crates/kernel/chio-kernel/src/payment/contractual_resolution.rs"]
+first_seen = "946e9f1cc7"
+
+[[schema]]
 value = "chio.cost-metadata.v1"
 files = ["crates/economy/chio-metering/src/cost.rs"]
 first_seen = "11e573d2d7"
@@ -1540,6 +1545,16 @@ files = ["crates/kernel/chio-kernel/src/evidence_export.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.execution-evidence-projection.v1"
+files = ["crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs"]
+first_seen = "bc8ca82e00"
+
+[[schema]]
+value = "chio.execution_evidence.v1"
+files = ["crates/core/chio-core-types/src/receipt/execution_evidence.rs"]
+first_seen = "bc8ca82e00"
+
+[[schema]]
 value = "chio.execution_nonce.v1"
 files = ["crates/kernel/chio-kernel/src/execution_nonce.rs"]
 first_seen = "11e573d2d7"
@@ -1548,6 +1563,66 @@ first_seen = "11e573d2d7"
 value = "chio.execution_nonce.v2"
 files = ["crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs"]
 first_seen = "2cb85b1cb9"
+
+[[schema]]
+value = "chio.experiment.federated-pair-clock.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "884fd7894d"
+
+[[schema]]
+value = "chio.experiment.federated-pair-control.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "aec4409984"
+
+[[schema]]
+value = "chio.experiment.federated-pair-directory-trust.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "aec4409984"
+
+[[schema]]
+value = "chio.experiment.federated-pair-epoch-rate.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "aec4409984"
+
+[[schema]]
+value = "chio.experiment.federated-pair-public.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "aec4409984"
+
+[[schema]]
+value = "chio.experiment.federated-pair-revoked-subjects.v2"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "bec4c83fe0"
+
+[[schema]]
+value = "chio.experiment.federated-pair-secrets.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "aec4409984"
+
+[[schema]]
+value = "chio.experiment.federated-pair-treaty.v1"
+files = ["crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs"]
+first_seen = "aec4409984"
+
+[[schema]]
+value = "chio.experimental.native-funded-decision.v2"
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+first_seen = "df2e7ef0ed"
+
+[[schema]]
+value = "chio.experimental.native-funded-dependency.v1"
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+first_seen = "df2e7ef0ed"
+
+[[schema]]
+value = "chio.experimental.native-funded-submission.v1"
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+first_seen = "df2e7ef0ed"
+
+[[schema]]
+value = "chio.experimental.native-funded-w0-agreement.v2"
+files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+first_seen = "df2e7ef0ed"
 
 [[schema]]
 value = "chio.extension-inventory.v1"
@@ -4260,6 +4335,11 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.pre_settlement_execution.v1"
+files = ["crates/core/chio-core-types/src/receipt/execution_evidence.rs"]
+first_seen = "bc8ca82e00"
+
+[[schema]]
 value = "chio.process.abi.v3"
 files = ["crates/kernel/chio-process/src/lib.rs"]
 first_seen = "95f04d5d74"
@@ -4738,6 +4818,11 @@ first_seen = "bb358ba692"
 value = "chio.runtime.admission-store.v1"
 files = ["crates/kernel/chio-runtime-core/src/schema.rs"]
 first_seen = "bb358ba692"
+
+[[schema]]
+value = "chio.runtime.artifact-outcome.experimental.v1"
+files = ["crates/kernel/chio-runtime-core/src/outcome_continuation.rs"]
+first_seen = "ec9189e79c"
 
 [[schema]]
 value = "chio.runtime.artifact-retention-plan.v1"
@@ -5360,6 +5445,16 @@ files = ["crates/economy/chio-underwriting/src/lib.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.unknown-payment-release-receipt.v1"
+files = ["crates/kernel/chio-kernel/src/payment/unknown_release.rs"]
+first_seen = "ec9189e79c"
+
+[[schema]]
+value = "chio.unknown-payment-release.v1"
+files = ["crates/kernel/chio-kernel/src/payment/unknown_release.rs"]
+first_seen = "ec9189e79c"
+
+[[schema]]
 value = "chio.verdict-matrix.manifest.v1"
 files = ["crates/tooling/chio-conformance/verdict_matrix/src/lib.rs"]
 first_seen = "4221ec5d89"
@@ -5468,6 +5563,26 @@ first_seen = "11e573d2d7"
 value = "chio.weights.lineage-anchor/v1"
 files = ["crates/trust/chio-weights/src/lineage.rs"]
 first_seen = "15d154f6c9"
+
+[[schema]]
+value = "chio.work-dispatch-permit.v2"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "8cca48fb2a"
+
+[[schema]]
+value = "chio.work-offer.v2"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "8cca48fb2a"
+
+[[schema]]
+value = "chio.work-selection.v2"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "8cca48fb2a"
+
+[[schema]]
+value = "chio.work-subdivision.v2"
+files = ["crates/platform/chio-workflow/src/delegation/types.rs"]
+first_seen = "8cca48fb2a"
 
 [[schema]]
 value = "chio.workflow-receipt.v1"

@@ -74,6 +74,20 @@ def transport_denials(binary, root):
         original = (root / "buyer/connection.json").read_bytes()
         enrollment = json.loads((root / "enrollment.json").read_text())
         denials = []
+        bounded_tls = ssl.create_default_context(cafile=root / "provider/tls-cert.pem")
+        for label, headers in (
+            ("oversized-single-header", "X-Fill: " + "a" * 8193 + "\r\n"),
+            ("oversized-aggregate-headers", ("X-Fill: " + "a" * 80 + "\r\n") * 200),
+        ):
+            with socket.create_connection(("127.0.0.1", urlsplit(case.url).port), timeout=5) as stream:
+                with bounded_tls.wrap_socket(stream, server_hostname="127.0.0.1") as channel:
+                    try:
+                        channel.sendall(("POST /rpc HTTP/1.1\r\nHost: localhost\r\n" + headers
+                                         + "Content-Length: 2\r\nConnection: close\r\n\r\n{}").encode())
+                        assert not channel.recv(128), "oversized headers reached the HTTP backend"
+                    except (ConnectionResetError, BrokenPipeError, ssl.SSLEOFError):
+                        pass
+            denials.append({"case": label, "rejected": True})
         combined = root / "provider/combined.pem"
         combined.write_bytes((root / "provider/tls-cert.pem").read_bytes() + (root / "provider/tls-key.pem").read_bytes())
         result = case.invoke("provider", "enrollment", "/state", case.keys["buyer"], case.url, "/state/combined.pem")

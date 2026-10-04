@@ -14,7 +14,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 
 mod bank;
@@ -24,7 +24,7 @@ pub fn key(n: u8) -> Keypair {
     Keypair::from_seed(&[n; 32])
 }
 pub fn now() -> Result<u64> {
-    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
+    Ok(chio_test_support::clock::clock().unix_millis()?.as_secs())
 }
 pub fn slot(id: &str, holder: u8, units: u64, depth: u16) -> Result<WorkSlot> {
     Ok(WorkSlot {
@@ -136,7 +136,11 @@ pub fn open_with_layout(
         )
     } else {
         (
-            SqliteAuthorityStore::open_serving(&db, dir.join("locks"))?,
+            SqliteAuthorityStore::open_serving_with_clock(
+                &db,
+                dir.join("locks"),
+                chio_test_support::clock::clock(),
+            )?,
             unconfigured(receiver),
         )
     };
@@ -340,7 +344,7 @@ pub fn seal(store: &DelegationStore, request: &mut ToolCallRequest, ceiling: u64
 }
 
 pub fn unconfigured(receiver: u8) -> ChioKernel {
-    ChioKernel::new(configuration(receiver))
+    ChioKernel::new_with_clock(configuration(receiver), chio_test_support::clock::clock())
 }
 fn configuration(receiver: u8) -> KernelConfig {
     KernelConfig {

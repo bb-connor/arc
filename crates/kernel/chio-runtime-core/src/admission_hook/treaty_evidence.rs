@@ -138,6 +138,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
 
     let mut present_evidence = Vec::new();
     let mut verified_evidence = Vec::new();
+    let mut dsse_presentation_window = None;
     let mut bilateral_invocation_sha256 = None;
     if let Some((continuation, continuation_sha256)) = continuation.as_ref() {
         verify_continuation_evidence(
@@ -194,7 +195,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                 continuation,
                 now_unix_ms,
             };
-            verify_treaty_dsse_evidence(
+            dsse_presentation_window = Some(verify_treaty_dsse_evidence(
                 store,
                 envelope,
                 &treaty_evidence,
@@ -202,7 +203,7 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                 bilateral_invocation
                     .as_ref()
                     .map(|(invocation, _)| invocation),
-            )?;
+            )?);
             if let Some(invocation_sha256) = bilateral_invocation_sha256.as_ref() {
                 verified_evidence.push(CrossBoundaryEvidenceRef {
                     evidence_class: "bilateral_invocation".to_string(),
@@ -257,6 +258,11 @@ pub(super) fn verify_treaty_reference_from_store<S: RuntimeAdmissionStore>(
                 .map(|(artifact, _)| artifact.expires_at_unix_ms)
                 .into_iter()
                 .chain(federation_treaty_material.as_ref().map(|(_, until)| *until))
+                .chain(
+                    dsse_presentation_window
+                        .as_ref()
+                        .map(|window| window.not_after_unix_ms()),
+                )
                 .chain([
                     treaty_scope.expires_at_unix_ms,
                     ladder_intersection.expires_at_unix_ms,

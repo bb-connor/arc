@@ -29,7 +29,10 @@ impl QualifiedExecutionEvidenceV1 {
     }
 }
 impl QualifiedExecutionEvidenceV1 {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Qualification binds the retained records from each independent authority"
+    )]
     pub(crate) fn qualify(
         operation: &AdmissionOperationV1,
         retained: &crate::admission_operation::RetainedToolAdmissionRequestV1,
@@ -105,7 +108,10 @@ impl ExecutionEvidenceRecordV1 {
         }
         Ok(receipt)
     }
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Revalidation compares every independently retained execution and payment record"
+    )]
     pub fn validate_against(
         &self,
         operation: &AdmissionOperationV1,

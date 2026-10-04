@@ -365,6 +365,9 @@ fn excessive_row_capture_aborts_the_complete_owned_join() -> TestResult {
     connection.remove_function("native_test_capture_attempt", 0)?;
     native::verify_coverage(&connection)?;
     drop(connection);
+    // The 4,096-row rollback probe can outlast the real lease on a busy host.
+    // Acquire current custody before proving the same operation can still join.
+    let lease = claim(&fixture, &operation, "native-operation", now_ms());
     fixture.store.join_security_participant_flow(
         &operation,
         &lease,

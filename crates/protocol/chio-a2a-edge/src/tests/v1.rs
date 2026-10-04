@@ -72,7 +72,8 @@ fn v1_rejects_unsupported_or_ambiguous_semantics_before_task_retention() {
     cases.push(tenant);
     for request in cases {
         let response = edge
-            .handle_jsonrpc(request.clone(), &kernel, &execution)
+            .handle_jsonrpc(&serde_json::to_vec(&request.clone()).test_unwrap(), &kernel, &execution)
+            .test_unwrap()
             .into_value()
             .test_unwrap();
         assert_eq!(response["error"]["code"], -32602, "{request}: {response}");
@@ -88,7 +89,8 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
     let kernel = ChioKernel::new(config);
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let started = edge
-        .handle_jsonrpc(v1_request(), &kernel, &owner)
+        .handle_jsonrpc(&serde_json::to_vec(&v1_request()).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
         .into_value()
         .test_unwrap();
     let task_id = started["result"]["task"]["id"].as_str().test_unwrap();
@@ -96,7 +98,8 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
         let request =
             json!({"jsonrpc": "2.0", "id": 2, "method": method, "params": {"id": task_id}});
         let denied = edge
-            .handle_jsonrpc(request, &kernel, &other)
+            .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &other)
+            .test_unwrap()
             .into_value()
             .test_unwrap();
         assert!(denied.get("error").is_some());
@@ -105,19 +108,22 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
     let cancel =
         json!({"jsonrpc": "2.0", "id": 3, "method": "CancelTask", "params": {"id": task_id}});
     let response = edge
-        .handle_jsonrpc(cancel.clone(), &kernel, &owner)
+        .handle_jsonrpc(&serde_json::to_vec(&cancel.clone()).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
         .into_value()
         .test_unwrap();
     assert_eq!(response["result"]["status"]["state"], "TASK_STATE_CANCELED");
     assert_eq!(
-        edge.handle_jsonrpc(cancel, &kernel, &owner)
+        edge.handle_jsonrpc(&serde_json::to_vec(&cancel).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
             .into_value()
             .test_unwrap(),
         response
     );
     let get = json!({"jsonrpc": "2.0", "id": 4, "method": "GetTask", "params": {"id": task_id}});
     assert_eq!(
-        edge.handle_jsonrpc(get, &kernel, &owner)
+        edge.handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
             .into_value()
             .test_unwrap()["result"],
         response["result"]
@@ -143,20 +149,23 @@ fn v1_restart_never_rebinds_an_old_task_identifier() {
     let start = || ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let mut first = start();
     let previous = first
-        .handle_jsonrpc(v1_request(), &kernel, &owner)
+        .handle_jsonrpc(&serde_json::to_vec(&v1_request()).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
         .into_value()
         .test_unwrap();
     let old_id = previous["result"]["task"]["id"].as_str().test_unwrap();
     drop(first);
     let mut restarted = start();
     let next = restarted
-        .handle_jsonrpc(v1_request(), &kernel, &owner)
+        .handle_jsonrpc(&serde_json::to_vec(&v1_request()).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
         .into_value()
         .test_unwrap();
     assert_ne!(next["result"]["task"]["id"], old_id);
     let get = json!({"jsonrpc": "2.0", "id": 2, "method": "GetTask", "params": {"id": old_id}});
     let response = restarted
-        .handle_jsonrpc(get, &kernel, &owner)
+        .handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
         .into_value()
         .test_unwrap();
     assert!(response.get("error").is_some());
@@ -176,7 +185,8 @@ fn v1_output_negotiation_is_retained_when_polling() {
     let mut request = v1_request();
     request["params"]["configuration"] = json!({"acceptedOutputModes": ["text/plain"]});
     let result = edge
-        .handle_jsonrpc(request, &kernel, &owner)
+        .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
         .into_value()
         .test_unwrap();
     let task = &result["result"]["task"];
@@ -185,7 +195,8 @@ fn v1_output_negotiation_is_retained_when_polling() {
     assert!(task["artifacts"][0]["parts"][0].get("data").is_none());
     let get = json!({"jsonrpc": "2.0", "id": 2, "method": "GetTask", "params": {"id": task["id"]}});
     assert_eq!(
-        edge.handle_jsonrpc(get, &kernel, &owner)
+        edge.handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
+            .test_unwrap()
             .into_value()
             .test_unwrap()["result"],
         *task

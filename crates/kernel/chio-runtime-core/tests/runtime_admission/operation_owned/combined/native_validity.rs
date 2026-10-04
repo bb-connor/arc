@@ -143,6 +143,44 @@ fn native_runtime_deadline_includes_the_verified_bilateral_capability_lease() ->
 
 struct SharedHook(Arc<Hook>);
 
+#[test]
+fn native_runtime_deadline_includes_other_participants_governance() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
+    const UNTIL: u64 = NOW + 5_000;
+    let fixture = CombinedFixture::new()?;
+    let mut governance = fixture
+        .inner
+        .source
+        .treaty_governance_receipt("gov-live-1")?
+        .ok_or("governance receipt")?;
+    governance.valid_until_unix_ms = UNTIL;
+    // Provision a shorter receiver-owned governance window before any admission.
+    // The signed receipt identity stays fixed; this is the owner's local validity.
+    let connection =
+        rusqlite::Connection::open(fixture.inner._directory.path().join("runtime.sqlite3"))?;
+    assert_eq!(connection.execute(
+        "UPDATE runtime_treaty_artifacts SET raw_json=?1, artifact_sha256=?2 WHERE evidence_kind='governance_receipt' AND evidence_id='gov-live-1'",
+        rusqlite::params![serde_json::to_string(&governance)?, canonical_test_hash(&governance)?],
+    )?, 1);
+    let hook = Arc::new(fixture.hook()?);
+    let kernel = fixture.kernel(SharedHook(hook.clone()))?;
+    let response = kernel.evaluate_tool_call_blocking_with_metadata(
+        &fixture.inner.request,
+        Some(swarm_route_metadata()),
+    )?;
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    let (source, intent) = physical_input(&fixture.inner)?;
+    let validity = hook.revalidate_operation_owned_for_native_capture(
+        &revalidation_input(&fixture.inner, &response),
+        &source,
+        &intent,
+    )?;
+    assert_eq!(validity.valid_until_unix_ms(), UNTIL);
+    validity.validate_at(UNTIL - 1)?;
+    assert!(validity.validate_at(UNTIL).is_err());
+    Ok(())
+}
+
 impl RuntimeAdmissionHook for SharedHook {
     fn name(&self) -> &str {
         self.0.name()

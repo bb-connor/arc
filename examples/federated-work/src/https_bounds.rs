@@ -14,6 +14,7 @@ fn length(raw: &[u8], limit: usize) -> Result<usize> {
     if !first.ends_with(" HTTP/1.1") || first.bytes().any(|b| b.is_ascii_control()) {
         return Err("unsupported HTTP request version".into());
     }
+    let is_get = first.starts_with("GET ");
     let mut size = None;
     let mut close = false;
     for line in lines {
@@ -28,7 +29,12 @@ fn length(raw: &[u8], limit: usize) -> Result<usize> {
         match name.to_ascii_lowercase().as_str() {
             "content-length" => {
                 let length: usize = value.parse()?;
-                if size.is_some() || length == 0 || length > limit || length.to_string() != value {
+                if size.is_some()
+                    || length > limit
+                    || length.to_string() != value
+                    || (is_get && length != 0)
+                    || (!is_get && length == 0)
+                {
                     return Err("invalid bounded HTTP length".into());
                 }
                 size = Some(length);
@@ -48,7 +54,11 @@ fn length(raw: &[u8], limit: usize) -> Result<usize> {
     if !close {
         return Err("bounded HTTP requires connection close".into());
     }
-    size.ok_or_else(|| "missing bounded HTTP length".into())
+    if is_get {
+        Ok(size.unwrap_or(0))
+    } else {
+        size.ok_or_else(|| "missing bounded HTTP length".into())
+    }
 }
 
 pub(crate) async fn read(reader: &mut (impl AsyncRead + Unpin), limit: usize) -> Result<Vec<u8>> {
@@ -116,6 +126,34 @@ mod tests {
             assert_eq!(read(&mut input, 2).await?, first);
             assert_eq!(input, first);
             assert!(read(&mut &first[..first.len() - 1], 2).await.is_err());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn discovery_and_rpc_are_bounded_before_backend_parsing() -> Result<()> {
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        runtime.block_on(async {
+            for content_length in ["", "Content-Length: 0\r\n"] {
+                let card = format!("GET /.well-known/agent-card.json HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n{content_length}\r\n");
+                assert_eq!(read(&mut card.as_bytes(), 16).await?, card.as_bytes());
+            }
+            for headers in [
+                format!("X-Fill: {}\r\n", "a".repeat(MAX_HEADERS)),
+                "X-Fill: a\r\n".repeat(MAX_HEADERS / 8),
+            ] {
+                let raw = format!("POST /rpc HTTP/1.1\r\n{headers}Content-Length: 2\r\nConnection: close\r\n\r\n{{}}");
+                let mut input = raw.as_bytes();
+                let error = read(&mut input, 16).await.err().ok_or("oversized headers accepted")?;
+                assert_eq!(error.to_string(), "HTTP headers exceed bound");
+                assert_eq!(input.len(), raw.len() - MAX_HEADERS);
+            }
+            for raw in [
+                "GET / HTTP/1.1\r\nConnection: close\r\nContent-Length: 1\r\n\r\na",
+                "POST /rpc HTTP/1.1\r\nConnection: close\r\n\r\n",
+            ] {
+                assert!(read(&mut raw.as_bytes(), 16).await.is_err());
+            }
             Ok(())
         })
     }

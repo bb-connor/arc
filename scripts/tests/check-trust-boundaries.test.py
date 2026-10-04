@@ -324,5 +324,14 @@ class ContractScopeCalibration(unittest.TestCase):
                 self.assertEqual(rows[0]["checked"], expected)
 
 
+# Keep the finite retained-reader mutations in the existing CI entry point.
+WITNESS_SPEC = importlib.util.spec_from_file_location(
+    "reader_witness_calibration", Path(__file__).with_name("check-trust-boundaries-witnesses.test.py")
+)
+witness_tests = importlib.util.module_from_spec(WITNESS_SPEC)
+WITNESS_SPEC.loader.exec_module(witness_tests)
+ReaderWitnessCalibration = witness_tests.ReaderWitnessCalibration
+
+
 if __name__ == "__main__":
     unittest.main()

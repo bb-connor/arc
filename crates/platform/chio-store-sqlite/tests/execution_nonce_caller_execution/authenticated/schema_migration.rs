@@ -1,4 +1,4 @@
-//! An actual authenticated wait must survive the native v34 to v35 upgrade.
+//! An actual authenticated wait must survive the native v34 to current upgrade.
 use super::*;
 use chio_store_sqlite::caller_execution_ledger::SqliteCallerExecutionLedger;
 use rusqlite::{types::Value, Connection};
@@ -41,7 +41,7 @@ fn v34_waiting_report_migrates_without_replacing_custody_or_renewing_authority()
             .ok_or("nonce")?
             .expires_at(),
     )?);
-    let _clock = chio_kernel::scope_fixed_runtime_for_current_thread(expires + 1, []);
+    let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     // Recovery records an authenticated wait before constructing the exact old
     // catalog. No fabricated operation, caller frame or report is inserted.
     drop(fixture.open()?);
@@ -49,6 +49,7 @@ fn v34_waiting_report_migrates_without_replacing_custody_or_renewing_authority()
     let connection = Connection::open(fixture.database())?;
     connection.execute_batch(
         "DROP TABLE unknown_payment_release_records;
+         DROP TABLE capture_waiver_records;
          UPDATE chio_store_schema_versions SET version=34 WHERE store_key='admission_operation';",
     )?;
     let tables = [

@@ -55,6 +55,7 @@ n0-future = "0.3"
 arc-swap = "1.9"
 
 [dev-dependencies]
+chio-test-support = { workspace = true }
 tokio = { workspace = true }
 # The two-process federated-call example runs a real receiver kernel: the kernel
 # itself, the runtime admission hook and its treaty artifacts, and the durable

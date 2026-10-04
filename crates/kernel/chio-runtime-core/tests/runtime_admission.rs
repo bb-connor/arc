@@ -157,10 +157,8 @@ fn bundle() -> RuntimeAdmissionBundle {
     }
 }
 
-include!("runtime_admission/fault_cases.rs");
-
-#[path = "runtime_admission/preparation.rs"]
-mod preparation;
+#[path = "runtime_admission/fault_cases.rs"]
+mod fault_cases;
 
 #[path = "runtime_admission/operation_owned.rs"]
 #[cfg(unix)]

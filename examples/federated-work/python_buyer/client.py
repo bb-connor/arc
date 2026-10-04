@@ -180,7 +180,7 @@ class Transport:
         if self.socket_path is not None:
             connection = UnixHttpsConnection(self.host, self.port, self.tls, self.socket_path)
         try:
-            connection.request(method, path, body, headers or {})
+            connection.request(method, path, body, {**(headers or {}), "Connection": "close"})
             response = connection.getresponse()
             p.require(response.status == 200, "HTTP response was not successful; redirects are forbidden")
             return p.load_json(response.read(p.MAX_JSON + 1))

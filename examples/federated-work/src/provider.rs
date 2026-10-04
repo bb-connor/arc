@@ -448,7 +448,7 @@ fn serve_transport(
     )?;
     let require_sender_constraint = https.is_some();
     let (server, origin, _tls_runtime) = if let Some(config) = https {
-        let listener = crate::https::listen(state, config)?;
+        let listener = crate::https::listen_bounded(state, config, 256 * 1024)?;
         (listener.server, listener.origin, Some(listener.runtime))
     } else {
         let server = Server::http(("127.0.0.1", port))?;

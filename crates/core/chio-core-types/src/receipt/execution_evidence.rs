@@ -241,7 +241,11 @@ pub fn verify_pre_settlement_execution_receipt(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "Tests fail immediately when deterministic signed fixtures cannot be constructed"
+)]
 mod tests {
     use super::*;
     use crate::crypto::Keypair;

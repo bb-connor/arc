@@ -8,15 +8,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core_types::capability::attenuation::validate_attenuation;
 use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey};
 use chio_kernel::{
-    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolCallResponse,
-    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ChioKernel, Clock, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
+    ToolCallResponse, ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_runtime_core::outcome_continuation::{
     ArtifactOutcome, OutcomeEffectArguments, OutcomeEffectRequest, OutcomeEffectRule,
@@ -30,12 +29,6 @@ type DemoResult<T> = Result<T, Box<dyn Error>>;
 
 #[path = "outcome_artifact_workflow/verify.rs"]
 mod verify;
-
-fn now_ms() -> DemoResult<u64> {
-    Ok(u64::try_from(
-        SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
-    )?)
-}
 
 fn kernel_error(error: impl std::fmt::Display) -> KernelError {
     KernelError::ToolServerError(error.to_string())
@@ -81,6 +74,7 @@ struct ContractVerifier {
     key: Keypair,
     rule: OutcomeEffectRule,
     contract: ScopeContract,
+    clock: Arc<dyn Clock>,
 }
 
 #[async_trait::async_trait]
@@ -116,7 +110,7 @@ impl ToolServerConnection for ContractVerifier {
                 contract_sha256: self.rule.contract_sha256.clone(),
                 artifact_sha256: sha256_hex(bytes),
                 passed: self.contract.accepts(bytes),
-                verified_at_unix_ms: now_ms().map_err(kernel_error)?,
+                verified_at_unix_ms: self.clock.unix_millis().map_err(kernel_error)?.get(),
             },
             &self.key,
         )
@@ -131,6 +125,7 @@ struct ApprovedArtifactPublisher {
     root: PathBuf,
     store: Arc<SqliteRuntimeOrchestrationStore>,
     effects: Arc<AtomicU64>,
+    clock: Arc<dyn Clock>,
 }
 
 #[async_trait::async_trait]
@@ -154,7 +149,7 @@ impl ToolServerConnection for ApprovedArtifactPublisher {
                 &request,
                 self.server_id(),
                 tool,
-                now_ms().map_err(kernel_error)?,
+                self.clock.unix_millis().map_err(kernel_error)?.get(),
             )
             .map_err(kernel_error)?;
         // Preview validates the fixed-length hex digest before using it as a
@@ -180,7 +175,7 @@ impl ToolServerConnection for ApprovedArtifactPublisher {
                 self.server_id(),
                 tool,
                 "kernel-publish-dispatch",
-                now_ms().map_err(kernel_error)?,
+                self.clock.unix_millis().map_err(kernel_error)?.get(),
             )
             .map_err(kernel_error)?;
         self.effects.fetch_add(1, Ordering::SeqCst);
@@ -219,25 +214,28 @@ impl ToolServerConnection for ApprovedArtifactPublisher {
     }
 }
 
-fn kernel(key: Keypair, receipts: &Path) -> DemoResult<ChioKernel> {
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: key,
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"outcome-artifact-local-experiment"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-    });
+fn kernel(key: Keypair, receipts: &Path, clock: Arc<dyn Clock>) -> DemoResult<ChioKernel> {
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: key,
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 5,
+            policy_hash: sha256_hex(b"outcome-artifact-local-experiment"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+        },
+        clock,
+    );
     let store = chio_store_sqlite::SqliteReceiptStore::open(receipts)?;
     store.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
     kernel.set_receipt_store_handle(Arc::new(store))?;
@@ -322,7 +320,8 @@ fn run(root: &Path) -> DemoResult<Value> {
         ceiling: expected.clone(),
         required: expected.clone(),
     };
-    let now = now_ms()?;
+    let clock = chio_test_support::clock::clock();
+    let now = clock.unix_millis()?.get();
     let rule = OutcomeEffectRule {
         slot: OutcomeEffectSlot {
             receiver_id: publisher_key.public_key().to_hex(),
@@ -340,11 +339,17 @@ fn run(root: &Path) -> DemoResult<Value> {
     };
     save(root, "owner-contract.json", &contract)?;
     save(root, "receiver-rule.json", &rule)?;
-    let mut verifier = kernel(verifier_key.clone(), &root.join("verifier-receipts.db"))?;
+    let mut verifier = kernel(
+        verifier_key.clone(),
+        &root.join("verifier-receipts.db"),
+        clock.clone(),
+    )?;
+    let verifier_clock = verifier.authority_clock();
     verifier.register_tool_server(Box::new(ContractVerifier {
         key: verifier_key,
         rule: rule.clone(),
         contract,
+        clock: verifier_clock,
     }));
     let broad = canonical_json_bytes(&tool_scope("*", "*"))?;
     let repaired = canonical_json_bytes(&expected)?;
@@ -381,11 +386,17 @@ fn run(root: &Path) -> DemoResult<Value> {
             root.join("publisher-state.db"),
         )?);
         store.activate_outcome_effect(&rule)?;
-        let mut receiver = kernel(publisher_key.clone(), &root.join("publisher-receipts.db"))?;
+        let mut receiver = kernel(
+            publisher_key.clone(),
+            &root.join("publisher-receipts.db"),
+            clock.clone(),
+        )?;
+        let receiver_clock = receiver.authority_clock();
         receiver.register_tool_server(Box::new(ApprovedArtifactPublisher {
             root: root.into(),
             store,
             effects: effects.clone(),
+            clock: receiver_clock,
         }));
         Ok(receiver)
     };

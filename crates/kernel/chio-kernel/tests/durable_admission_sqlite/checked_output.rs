@@ -1,7 +1,7 @@
 use super::*;
 use chio_kernel::{Guard, GuardContext, GuardDecision, ToolServerOutput};
 
-struct Checker(Arc<AtomicBool>);
+struct Checker(Arc<AtomicBool>, Arc<AtomicBool>);
 impl Guard for Checker {
     fn name(&self) -> &str {
         "sqlite-checked-output"
@@ -10,14 +10,16 @@ impl Guard for Checker {
         Ok(GuardDecision::allow())
     }
     fn output_rejection_is_zero_charge(&self, _: &GuardContext<'_>) -> bool {
-        true
+        !self.1.load(Ordering::SeqCst)
     }
     fn validate_output_before_release(
         &self,
         _: &GuardContext<'_>,
         _: &ToolServerOutput,
     ) -> Result<(), KernelError> {
-        if self.0.load(Ordering::SeqCst) {
+        if self.1.load(Ordering::SeqCst) {
+            Err(KernelError::GuardDenied("output authority expired".into()))
+        } else if self.0.load(Ordering::SeqCst) {
             Ok(())
         } else {
             Err(KernelError::GuardDenied("bad delivered result".into()))
@@ -28,6 +30,16 @@ impl Guard for Checker {
 #[test]
 fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_capture(
 ) -> Result<(), Box<dyn Error>> {
+    recover_checked_output_denial(false)
+}
+
+#[test]
+fn retained_zero_charge_denial_recovers_after_output_authority_expires(
+) -> Result<(), Box<dyn Error>> {
+    recover_checked_output_denial(true)
+}
+
+fn recover_checked_output_denial(expire_authority: bool) -> Result<(), Box<dyn Error>> {
     for interrupt_release in [false, true] {
         let temp = tempfile::tempdir()?;
         secure_directory(temp.path())?;
@@ -42,6 +54,7 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
             .fail_next_release
             .store(interrupt_release, Ordering::SeqCst);
         let allow = Arc::new(AtomicBool::new(false));
+        let expired = Arc::new(AtomicBool::new(false));
         let (request, original) = {
             let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
             let operations = Arc::new(authority.admission_operation_store());
@@ -54,7 +67,7 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
             kernel.register_tool_server(Box::new(PaidMutationServer {
                 invocations: invocations.clone(),
             }));
-            kernel.add_guard(Box::new(Checker(allow.clone())));
+            kernel.add_guard(Box::new(Checker(allow.clone(), expired.clone())));
             kernel.set_durable_admission_store(
                 operations.clone(),
                 Arc::new(authority.tool_outcome_store()),
@@ -106,6 +119,7 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
         };
         // A later permissive checker must not change a durably resolved denial.
         allow.store(true, Ordering::SeqCst);
+        expired.store(expire_authority, Ordering::SeqCst);
         let authority = SqliteAuthorityStore::open_serving(&database, &locks)?;
         let operations = Arc::new(authority.admission_operation_store());
         let mut kernel = ChioKernel::new(kernel_config(key));
@@ -117,7 +131,7 @@ fn checked_output_denial_recovers_before_and_after_release_without_becoming_a_ca
         kernel.register_tool_server(Box::new(PaidMutationServer {
             invocations: invocations.clone(),
         }));
-        kernel.add_guard(Box::new(Checker(allow)));
+        kernel.add_guard(Box::new(Checker(allow, expired)));
         kernel.set_durable_admission_store(
             operations.clone(),
             Arc::new(authority.tool_outcome_store()),
@@ -170,7 +184,10 @@ fn checked_output_contract_rejects_final_payment_before_authorization() -> Resul
         calls: calls.clone(),
     }));
     kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
-    kernel.add_guard(Box::new(Checker(Arc::new(AtomicBool::new(false)))));
+    kernel.add_guard(Box::new(Checker(
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+    )));
     kernel.register_tool_server(Box::new(PaidMutationServer {
         invocations: invocations.clone(),
     }));

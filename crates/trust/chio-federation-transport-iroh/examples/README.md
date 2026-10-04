@@ -110,29 +110,31 @@ Two limits to state plainly rather than paper over.
 **The revocation lane carries a root, not a leaf set.** `SignedEpochRoot` carries
 an epoch, a root hash, a leaf count, and an issue time; it does not carry the
 revoked subjects, and adding them would change a wire type every existing
-consumer depends on. `RevocationViewSink` therefore bridges the root and its
-freshness faithfully: that alone is enough for the cut measurement, because the
-receiver's kernel denies every delegated call once the installed snapshot ages
-past its freshness window. To name a revoked capability the example adds a
-separate origin-signed announcement on the experiment lane, gated on the epoch
-that carries it. That announcement is experiment-only; a deployment would pull
-inclusion proofs against the signed root instead.
+consumer depends on. This example sends a separate origin-signed announcement
+of the complete, sorted subject set and exact root before every heartbeat. Its
+receiver reconstructs the root hash and leaf count and accepts the root only
+when every field matches the announcement. Missing, conflicting, or reordered
+deliveries cannot refresh the receiver's snapshot. A restarted receiver requires
+a new complete announcement. Failed announcements suppress that heartbeat.
 
-**The consuming kernel reads its clock in whole seconds.** `consult_revocation_view`
-compares the installed snapshot against a whole-second clock while its staleness
-bound is 500 ms, so the only snapshot that satisfies it for a full second is one
-stamped at that second's boundary. Org A therefore stamps each root at the second
-it publishes in and aligns its ticker so a root lands immediately after every
-boundary. A short prefix of each second is still covered only by the previous
-second's root, which the kernel reads as stale; the driver classifies those
-denials separately, counts them, and never measures them.
+The control file can clear revocations between experimental trials. Each trial
+therefore reconstructs a fresh complete set and corresponding root; it does not
+model an append-only production revocation authority. The announcement uses the
+experiment-only v2 schema. Historical measurements pinned to v1 retain their
+original source and do not qualify this repaired delivery path.
 
-**Org A signs bytes it does not parse.** Both co-sign profiles hand Org A opaque
-bytes with Org B's signature over them, which is the shipped lane's contract. The
-receiver assembles the per-call treaty evidence and asks Org A for the second
-signature; a co-signature is therefore evidence that Org A was reachable, held
-its key, and agreed to sign for this peer, not that Org A evaluated the call.
-This is the same assumption the negative corpus records as PS-A-01.
+**Freshness uses millisecond authority time.** `consult_revocation_view` enforces
+a 500 ms staleness bound against the kernel's injected clock. Org A stamps the
+actual publication time without rounding to a whole second. Network delay or
+clock skew can still exhaust that bound; the driver records those denials
+separately from admitted-call latency.
+
+**Co-signing does not independently evaluate the remote call.** Org A checks
+the authenticated peer, signature, and reconstructed preimage for the permitted
+co-signing profile. The receiver still assembles the per-call treaty evidence.
+A co-signature establishes Org A's participation under that profile; the remote
+application policy and execution remain the receiver's responsibility. The
+negative corpus records that remaining trust assumption as PS-A-01.
 
 ### What the negative corpus reaches over the wire
 

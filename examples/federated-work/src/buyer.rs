@@ -304,7 +304,7 @@ pub fn snapshot(state: &Path) -> Result<Value> {
     let available: i64 =
         db.query_row("SELECT available FROM account WHERE id=1", [], |r| r.get(0))?;
     let (reservations, reserved): (i64, i64) = db.query_row(
-        "SELECT COUNT(*),COALESCE(SUM(CASE WHEN e.job IS NULL THEN r.amount ELSE 0 END),0) FROM reservations r LEFT JOIN expenses e ON r.job=e.job",
+        "SELECT COUNT(*),COALESCE(SUM(CASE WHEN e.job IS NULL AND z.job IS NULL THEN r.amount ELSE 0 END),0) FROM reservations r LEFT JOIN expenses e ON r.job=e.job LEFT JOIN released_reservations z ON r.job=z.job",
         [],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;

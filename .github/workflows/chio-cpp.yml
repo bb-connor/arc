@@ -4,6 +4,11 @@ on:
   push:
     paths:
       - ".github/workflows/chio-cpp.yml"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "crates/sdk/chio-bindings-ffi/**"
       - "crates/sdk/chio-cpp-kernel-ffi/**"
       - "crates/tooling/chio-conformance/**"
@@ -23,6 +28,11 @@ on:
   pull_request:
     paths:
       - ".github/workflows/chio-cpp.yml"
+      - ".github/actions/enforced-native-fixture/**"
+      - "scripts/check-native-protocol-ci.py"
+      - "scripts/tests/check-native-protocol-ci.test.py"
+      - "scripts/prepare-enforced-native-fixture.py"
+      - "scripts/prepare-native-python-runtime.py"
       - "crates/sdk/chio-bindings-ffi/**"
       - "crates/sdk/chio-cpp-kernel-ffi/**"
       - "crates/tooling/chio-conformance/**"
@@ -116,16 +126,15 @@ jobs:
       - name: Install dependencies
         uses: ./.github/actions/apt-install
         with:
-          packages: build-essential cmake libcurl4-openssl-dev python3
+          packages: build-essential cmake libcurl4-openssl-dev python3 protobuf-compiler musl-tools pkg-config libssl-dev
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
       - name: Run live C++ conformance areas
         env:
           CHIO_CPP_LIVE_CONFORMANCE: "1"
         run: |
-          cargo test -p chio-conformance --test mcp_core_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test tasks_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test auth_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test notifications_cpp_live -- --nocapture
-          cargo test -p chio-conformance --test nested_callbacks_cpp_live -- --nocapture
+          cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
+          cargo test --locked -p chio-conformance --no-fail-fast --test mcp_core_cpp_live --test tasks_cpp_live --test auth_cpp_live --test notifications_cpp_live --test nested_callbacks_cpp_live -- --nocapture
 
   hardening:
     name: Sanitizers and leaks

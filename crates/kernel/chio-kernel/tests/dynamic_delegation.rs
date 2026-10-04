@@ -171,6 +171,39 @@ fn installation_requires_durable_native_custody() {
 }
 
 #[test]
+fn expired_delegation_cannot_block_replay_of_a_durable_rejection() -> Result {
+    let dir = tempfile::tempdir()?;
+    let store = DelegationStore::open(dir.path().join("allocation.db"))?;
+    let mut contract = slot("leaf", 2, 60, 2)?;
+    // Expire only the work permit; the caller's separate capability stays live.
+    contract.contract.expires_at = now()? + 120;
+    let expires = contract.contract.expires_at;
+    store.create_root(contract)?;
+    let (kernel, calls) =
+        open_with_clock(dir.path(), 3, true, Some(chio_test_support::clock::clock()))?;
+    let mut call = request(&kernel, "leaf", 2, "rejected-before-expiry", 20)?;
+    choose(&store, &call, 2, 3, 0, 20)?;
+    seal(&store, &mut call, 20)?;
+    let denied = kernel.evaluate_tool_call_blocking(&call)?;
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert!(denied.output.is_none());
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    drop(kernel);
+    let _expired = chio_test_support::clock::scope_unix_secs(expires + 1);
+    let (kernel, replay_calls) =
+        open_with_clock(dir.path(), 3, true, Some(chio_test_support::clock::clock()))?;
+    let replay = kernel.evaluate_tool_call_blocking(&call)?;
+    assert_eq!(replay.verdict, Verdict::Deny);
+    assert!(replay.output.is_none());
+    assert_eq!(
+        serde_json::to_value(&replay.receipt)?,
+        serde_json::to_value(&denied.receipt)?
+    );
+    assert_eq!(replay_calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
 fn work_expiry_uses_the_receivers_configured_authority_clock() -> Result {
     let dir = tempfile::tempdir()?;
     let store = DelegationStore::open(dir.path().join("allocation.db"))?;

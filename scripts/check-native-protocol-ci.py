@@ -19,6 +19,13 @@ PROTOCOL_RUN = (
     "--no-fail-fast --test mcp_auth_server --test mcp_serve "
     "--test mcp_serve_http --test conformance_cli"
 )
+CPP_NAME = "Run live C++ conformance areas"
+CPP_RUN = (
+    "cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio\n"
+    "cargo test --locked -p chio-conformance --no-fail-fast "
+    "--test mcp_core_cpp_live --test tasks_cpp_live --test auth_cpp_live "
+    "--test notifications_cpp_live --test nested_callbacks_cpp_live -- --nocapture"
+)
 COMMON_ENV = {
     "CARGO_BUILD_JOBS": "1",
     "RUSTFLAGS": "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0",
@@ -91,7 +98,7 @@ def validate_consumer(
         )
 
 
-def validate(ci: dict, process: dict, action: dict) -> None:
+def validate(ci: dict, process: dict, action: dict, cpp: dict) -> None:
     checks = (
         "python3 scripts/check-native-protocol-ci.py",
         "python3 scripts/tests/check-native-protocol-ci.test.py",
@@ -141,6 +148,21 @@ def validate(ci: dict, process: dict, action: dict) -> None:
         process["jobs"]["host-tests"], "Native MCP and worker recovery under enforced authority"
     )
     require(index < report_index, "native protocol targets must precede static report setup")
+    validate_consumer(
+        cpp,
+        "conformance",
+        CPP_NAME,
+        {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION},
+    )
+    _, step = named_step(cpp["jobs"]["conformance"], CPP_NAME)
+    require(
+        {**step, "run": step.get("run", "").strip()} == {
+            "name": CPP_NAME,
+            "env": {"CHIO_CPP_LIVE_CONFORMANCE": "1"},
+            "run": CPP_RUN,
+        },
+        "C++ target set must build the enforcing CLI and execute every live target",
+    )
     digest = hashlib.sha256(
         json.dumps(action, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -155,8 +177,9 @@ def main() -> None:
         yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text()),
         yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
     )
-    print("native protocol CI contract passed: two workspace lanes and four native targets")
+    print("native protocol CI contract passed: two workspace lanes, four CLI and five C++ targets")
 
 
 if __name__ == "__main__":

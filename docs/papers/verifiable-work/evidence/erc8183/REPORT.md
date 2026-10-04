@@ -46,3 +46,8 @@ Run `python3 reproduce.py --forge /path/to/forge --label rerun` from this artifa
 Earlier failures remain recorded: an x86-64 binary on ARM64, a command-wrapper argument-order error, an expectation placed before the Chio test helper's read call, and a Foundry config filename rejection. The final reproduction command exited 0 after these harness/tooling corrections. Contract source was never changed to obtain a pass. The compact archive was also extracted to a different directory and its reproduction script passed the same 76 upstream and 20 comparison tests (`logs/portable-reproduction.log`, exit 0).
 
 This is local bytecode evidence with synthetic work commitments and a mock token, not a security audit, live deployment, chain-finality test, independent-operator trial, or demonstration of substantive work verification. No wall-clock or gas superiority is claimed. Any defensible Chio contribution must be narrower, such as a specified portable artifact profile and its independently verified interoperability, rather than claiming that funded jobs, evaluator-gated settlement, or surviving child payments were absent from prior art.
+
+The upstream specification is retained byte-for-byte in `provenance/erc-8183.md.gz`.
+Use `gzip -dc provenance/erc-8183.md.gz` to extract it. The specification pin is
+the SHA-256 of the decompressed bytes; `SHA256SUMS` identifies the compressed
+representation. The artifact checker verifies both against the upstream source pin.

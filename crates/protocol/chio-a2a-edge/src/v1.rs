@@ -1,3 +1,5 @@
+use super::*;
+
 // A2A 1.0 JSON-RPC projection onto the existing kernel task lifecycle.
 // Request metadata remains input, never an execution authority.
 
@@ -56,7 +58,7 @@ struct V1TaskRequest {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum V1OutputMode {
+pub(super) enum V1OutputMode {
     Json,
     Text,
 }
@@ -242,7 +244,7 @@ impl ChioA2aEdge {
         Ok(if wrap { json!({"task": value}) } else { value })
     }
 
-    fn handle_v1_jsonrpc(
+    pub(super) fn handle_v1_jsonrpc(
         &mut self,
         id: Value,
         method: &str,

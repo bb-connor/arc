@@ -184,8 +184,12 @@ impl QualifiedUnknownPaymentReleaseStore for SqliteAdmissionOperationStore {
         let transaction = self
             .begin_write(&mut connection, Some(fence))
             .map_err(error)?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)
-            .map_err(error)?;
+        let authority_now = schema::authority_validation_time(
+            &transaction,
+            trusted_now_unix_ms,
+            &self.serving_owner,
+        )
+        .map_err(error)?;
         let id = &request.proposal.body.operation_id;
         if let Some(existing) = load_record(&transaction, id)? {
             if unknown_release_digest(existing.request())? != unknown_release_digest(request)?
@@ -198,7 +202,12 @@ impl QualifiedUnknownPaymentReleaseStore for SqliteAdmissionOperationStore {
             return Ok(existing);
         }
         let (operation, original) = source(&transaction, id)?;
-        let verified = request.qualify(policy, &operation, &original, trusted_now_unix_ms)?;
+        // The serialized decision must also lie in the consent window. A
+        // current owner clock cannot legitimize a decision before issuance.
+        if trusted_now_unix_ms < request.proposal.body.issued_at_unix_ms {
+            return Err(error("release decision precedes consent issuance"));
+        }
+        let verified = request.qualify(policy, &operation, &original, authority_now)?;
         let record = UnknownPaymentReleaseRecordV1::accepted(verified, fence.clone())?;
         let hold = original
             .hold_id
@@ -249,8 +258,12 @@ impl QualifiedUnknownPaymentReleaseStore for SqliteAdmissionOperationStore {
         let transaction = self
             .begin_write(&mut connection, Some(fence))
             .map_err(error)?;
-        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)
-            .map_err(error)?;
+        let authority_now = schema::authority_validation_time(
+            &transaction,
+            trusted_now_unix_ms,
+            &self.serving_owner,
+        )
+        .map_err(error)?;
         let current = load_record(&transaction, operation_id)?
             .ok_or_else(|| error("release intent is absent"))?;
         if unknown_release_digest(current.request())? != request_digest {
@@ -262,8 +275,7 @@ impl QualifiedUnknownPaymentReleaseStore for SqliteAdmissionOperationStore {
             }
             return Ok(current);
         }
-        let completed =
-            current.complete(transaction_id.into(), trusted_now_unix_ms, fence.clone())?;
+        let completed = current.complete(transaction_id.into(), authority_now, fence.clone())?;
         append_record(self, &transaction, &completed)?;
         self.commit_write(transaction).map_err(error)?;
         self.sync_after_write(&connection).map_err(error)?;

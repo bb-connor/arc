@@ -378,14 +378,27 @@ impl ChioKernel {
         raw: &RawInvocationOutcomeV1,
         matched_grant_index: usize,
         plan: &DurablePostReturnPlan,
+        retained_outcome: &ToolOutcomeRecordV1,
     ) -> Result<DurableEvaluatedOutput, KernelError> {
-        let raw_guard_rejected = self.check_guarded_output(
-            request,
-            matched_grant_index,
-            &invocation_output_to_server_output(raw.output()),
-            false,
-            true,
-        )?;
+        // A resolved contractual denial already authorizes zero-charge settlement.
+        // It releases no output, so expired output authority must not prevent
+        // recovery of that obligation. Frozen transforms and all retained result,
+        // decision and settlement bindings are still checked by the caller.
+        let retained_denial = retained_outcome
+            .resolved_output_ref()
+            .map(|(output, _)| {
+                retained_checked_output_denial(retained_outcome, output.digest().as_str())
+            })
+            .transpose()?
+            .unwrap_or(false);
+        let raw_guard_rejected = retained_denial
+            || self.check_guarded_output(
+                request,
+                matched_grant_index,
+                &invocation_output_to_server_output(raw.output()),
+                false,
+                true,
+            )?;
         let materialized = self.apply_stream_limit_snapshot(
             invocation_output_to_server_output(raw.output()),
             Duration::from_millis(raw.elapsed_millis()),
@@ -423,8 +436,14 @@ impl ChioKernel {
                     .to_owned(),
             ));
         }
-        let released_guard_rejected =
-            self.check_guarded_output(request, matched_grant_index, &handling.output, true, true)?;
+        let released_guard_rejected = retained_denial
+            || self.check_guarded_output(
+                request,
+                matched_grant_index,
+                &handling.output,
+                true,
+                true,
+            )?;
         let (output, transformed_incomplete_reason) =
             Self::terminal_tool_call_output(handling.output);
         let incomplete_reason = materialized_incomplete_reason.or(transformed_incomplete_reason);
@@ -499,6 +518,7 @@ impl ChioKernel {
             &tool_return.raw,
             matched_grant_index,
             &plan,
+            &tool_return.outcome,
         )?;
         let expected_chunks = match (&output, &incomplete_reason) {
             (ToolCallOutput::Stream(stream), None) => Some(stream.chunk_count()),
@@ -1019,6 +1039,7 @@ impl ChioKernel {
             &tool_return.raw,
             matched_grant_index,
             &plan,
+            &tool_return.outcome,
         )?;
         let _post_invocation_evidence_scope =
             scope_post_invocation_guard_evidence(post_invocation_evidence);

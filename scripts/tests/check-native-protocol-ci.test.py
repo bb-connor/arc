@@ -23,15 +23,26 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text()),
     yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
 )
 CONSUMERS = (
     (0, "check", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
+    (3, "conformance", CHECKER.CPP_NAME),
 )
 
 
 class NativeProtocolCiTests(unittest.TestCase):
+    def test_cpp_conformance_requires_qualified_native_fixture(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text())
+        CHECKER.validate_consumer(
+            workflow,
+            "conformance",
+            "Run live C++ conformance areas",
+            {"name": CHECKER.FIXTURE_NAME, "uses": CHECKER.FIXTURE_ACTION},
+        )
+
     def rejected(self, documents, expected):
         with self.assertRaisesRegex(CHECKER.ContractError, expected):
             CHECKER.validate(*documents)
@@ -110,6 +121,25 @@ class NativeProtocolCiTests(unittest.TestCase):
                 self.assertIn(text, step["run"])
                 step["run"] = step["run"].replace(text, " ", 1)
                 self.rejected(changed, "target set must execute every required target")
+
+    def test_cpp_cannot_skip_live_tests_or_build_a_non_enforcing_cli(self):
+        for removed in (
+            " --features real-linux-enforcement",
+            " --no-fail-fast",
+            *(f" --test {area}_cpp_live" for area in (
+                "mcp_core", "tasks", "auth", "notifications", "nested_callbacks"
+            )),
+        ):
+            with self.subTest(removed=removed):
+                changed = copy.deepcopy(LIVE)
+                _, step = CHECKER.named_step(changed[3]["jobs"]["conformance"], CHECKER.CPP_NAME)
+                self.assertIn(removed, step["run"])
+                step["run"] = step["run"].replace(removed, "", 1)
+                self.rejected(changed, r"C\+\+ target set")
+        changed = copy.deepcopy(LIVE)
+        _, step = CHECKER.named_step(changed[3]["jobs"]["conformance"], CHECKER.CPP_NAME)
+        step["env"]["CHIO_CPP_LIVE_CONFORMANCE"] = "0"
+        self.rejected(changed, r"C\+\+ target set")
 
     def test_static_report_cannot_clear_runtime_before_protocol_targets(self):
         changed = copy.deepcopy(LIVE)

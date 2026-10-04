@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 from provenance import HISTORICAL_SOURCE, EVIDENCE, verify_revision_files, verify_qualification
+from upstream_capture import verify_capture
 
 PAPER = Path(__file__).resolve().parents[1]
 ROOT = PAPER.parents[2]
@@ -136,6 +137,10 @@ def main():
     sources = json.loads((PAPER/'sources.json').read_text())['sources']
     if any(s['status']!='retrieved' or not s.get('sha256') for s in sources):
         errors.append('source retrieval incomplete')
+    upstream = PAPER/'evidence/erc8183'
+    spec = json.loads((upstream/'provenance/spec.json').read_text())
+    source = next((item for item in sources if item['id'] == 'erc8183'), {})
+    errors.extend(verify_capture(upstream, spec, source))
     texfiles=[PAPER/'paper.tex',*(PAPER/'sections').glob('*.tex')]
     tex='\n'.join(x.read_text() for x in texfiles)
     bib=(PAPER/'bib.bib').read_text()

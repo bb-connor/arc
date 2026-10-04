@@ -1,0 +1,203 @@
+{
+  "scope": "Retained local and historical diagnostic streams from PR1173 review. Failed and partial campaigns are preserved; later selected reruns do not relabel them. Current source qualification is recorded separately under docs/research/dynamic-delegation/evidence/qualification.json.",
+  "logs": [
+    {
+      "log": "native-schema-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 42198,
+      "sha256": "a2ce7bd2dc06fb1b7c099dede037c2bd34c9216b3c290f76c4c428e72f771e39"
+    },
+    {
+      "log": "native-schema-green.log.gz",
+      "observed_result": "failed",
+      "bytes": 21284,
+      "sha256": "e571e01ef54f77b343dd6d9ba2351032014bae09091af2598b073868c3793fbc"
+    },
+    {
+      "log": "native-schema-green-2.log.gz",
+      "observed_result": "passed",
+      "bytes": 17842,
+      "sha256": "dcdb1087f8dfad02d8556130bc407e783ea98919a24d4f53481dd3ed5205d3eb"
+    },
+    {
+      "log": "durable-green-2.log.gz",
+      "observed_result": "partial",
+      "bytes": 17352,
+      "sha256": "6744260ef3c247f83db4ffb1750cd0e54e3bd685e328f93b976d154ae6326481"
+    },
+    {
+      "log": "allow-live-guard.log.gz",
+      "observed_result": "passed",
+      "bytes": 2130,
+      "sha256": "99bab04ee5947b01d7bddef5a1234cb321998b120f75d3c383ac233062ced3fe"
+    },
+    {
+      "log": "caller-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 5360,
+      "sha256": "0ad8aa5c86d5fd6955690fddb4e9afce9187c4448674fb9140fde2b59788df8d"
+    },
+    {
+      "log": "delegation-clock-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 2613,
+      "sha256": "75efdce1f18def4bab5fb39df02cd760cdcbba046ebc9b15798b1cf7f5419534"
+    },
+    {
+      "log": "governance-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 3727,
+      "sha256": "8ce96af9e028588a99615d84f44d9948490d0e0e4a004ee36c266a076dbe4f2a"
+    },
+    {
+      "log": "runtime-module-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 16943,
+      "sha256": "e6be943e11ff7e8b3cc41d98e767e8d7f2ab2b100efc27a8bd90cc0aacd7831c"
+    },
+    {
+      "log": "https-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 21827,
+      "sha256": "8db03733fa222a88f29cc305d8deaff3d1f892f48de833fcff8cdcce6964db1f"
+    },
+    {
+      "log": "https-smoke.log.gz",
+      "observed_result": "passed",
+      "bytes": 6247,
+      "sha256": "922ceee1b95160dad2e73cc590872604e732e172bba4c0df315cc3e829479720"
+    },
+    {
+      "log": "federated-tests.log.gz",
+      "observed_result": "passed-with-opt-in-skips",
+      "bytes": 11664,
+      "sha256": "228ae9dd4e5cbc3ec4f55a89698fe751fa69e11b24eb5ca336677b23215f81f8"
+    },
+    {
+      "log": "snapshot-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 1220,
+      "sha256": "53a19271593d0bcdcdac9b8e2fa6cef7e27f6b36ea9de9d80979fcaa82b816fb"
+    },
+    {
+      "log": "comparator-red-3.log.gz",
+      "observed_result": "failed",
+      "bytes": 5036,
+      "sha256": "3dee71f7cf57e9e5df26fabdca4d7845c98e9234ca2939d11911f7daeedcfbd9"
+    },
+    {
+      "log": "comparator-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 2242,
+      "sha256": "dd382c49ffbabbbdf9703a28757e698cb4486cfd56d1b94fcb3b16a7ec61e2a5"
+    },
+    {
+      "log": "revocation-snapshot-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 21881,
+      "sha256": "a222e535b082bf0cbace21276d59ec51134343f6fea815c0b2f2dae8f5971a93"
+    },
+    {
+      "log": "federation-network.log.gz",
+      "observed_result": "failed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "federation-network-2.log.gz",
+      "observed_result": "passed-debug-smoke",
+      "bytes": 93,
+      "sha256": "9ed6eb3fe009762cf2d786d155afd4cb8f2bba51500a1b942695e426e27efd67"
+    },
+    {
+      "log": "federation-example-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 2690,
+      "sha256": "440c742bf0fef50f413ee11a7c6c72673ed1b6a3250d2143652cf2847c905315"
+    },
+    {
+      "log": "a2a-tests-green.log.gz",
+      "observed_result": "failed",
+      "bytes": 18681,
+      "sha256": "d9521720a79f9be86887b053355eeab29f71460c1b92db2c25d90b4e12c122ed"
+    },
+    {
+      "log": "paper-tests-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 114,
+      "sha256": "bbb41fefd00779a2a02c901f9b810f451d68168b79de6a04e6097dfbb1a2be15"
+    },
+    {
+      "log": "funding-tests-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 138,
+      "sha256": "aaa5f7a3b566ff0f686c530262913695de1c04305afd79520672b0986973449c"
+    },
+    {
+      "log": "python-buyer-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 129,
+      "sha256": "ea4da2158363475594d55c671be094c3b407e0fb7586e334325d0a50da8f9c7b"
+    },
+    {
+      "log": "funding-model-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 118,
+      "sha256": "f62b3561054989e69b6dabf2d85e6a87437b630fbbb812dcfb911dbd6d6b59e0"
+    },
+    {
+      "log": "model-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 2045,
+      "sha256": "be4c36ba5f84c2cd6e9ab3644b6ab1be956b312185578bb2e32afede337f5255"
+    },
+    {
+      "log": "hosted-failure.log.gz",
+      "observed_result": "failed-historical-head",
+      "bytes": 230638,
+      "sha256": "749486f1ac9c4058728688cfb93304b554c6a563bfbb663a503a446b50b89ad0"
+    },
+    {
+      "log": "chain-opt-in.log.gz",
+      "observed_result": "passed",
+      "bytes": 12148,
+      "sha256": "28f7127dca2046ab0e3b4ec7b24ee076b30c6b0faccdab9765178e7c200fea3e"
+    },
+    {
+      "log": "clippy-final-2.log.gz",
+      "observed_result": "passed",
+      "bytes": 2426,
+      "sha256": "769a227e6ad2ea5445b55900c6aeab45934ce61c6c9325a58d19149181499f9a"
+    },
+    {
+      "log": "a2a-tests-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 9626,
+      "sha256": "fb1747f04a58ad58ada8dd6e9b6bd6d3fa18d5af22213d83f23a45dc26260d8c"
+    },
+    {
+      "log": "global-chain-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 5138,
+      "sha256": "cbf85da42a6d24c19fd0d75203984b3f93250106beff44ca4fcd18a22e7e40fd"
+    },
+    {
+      "log": "schema-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 2257,
+      "sha256": "ff4225dfac02e1d9b6ccc7a61f87d794c2dec6aa101469064417d6c6d2373a02"
+    },
+    {
+      "log": "contract-tests.log.gz",
+      "observed_result": "failed-148-passed-25-fixture-environment-failures",
+      "bytes": 70948,
+      "sha256": "6eb19a69131da21cb58486a4d8286ac89456e2a7fda97a3cc45dd7d1ae191829"
+    },
+    {
+      "log": "funded-fit-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 1450,
+      "sha256": "c24172aeaa3abe2b07ead97e9d4bff0c0eae130cba1be1844c75f5d1ab90a438"
+    }
+  ]
+}

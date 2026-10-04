@@ -99,8 +99,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
 
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::governance::GovernedTransactionIntent;
@@ -161,8 +159,6 @@ use chio_federation_transport_iroh::lanes::limits::AcceptLimiter;
 use chio_federation_transport_iroh::lanes::limits::AcceptPhase;
 use chio_federation_transport_iroh::lanes::revocation::push_batch_over_iroh;
 use chio_federation_transport_iroh::lanes::revocation::RevocationHandler;
-use chio_federation_transport_iroh::lanes::revocation::RevocationViewSink;
-use chio_federation_transport_iroh::lanes::revocation::RevokedSubjectSource;
 use chio_federation_transport_iroh::lanes::revocation::ALPN_REVOCATION_ROOT;
 use chio_kernel::ChioKernel;
 use chio_kernel::KernelConfig;
@@ -267,7 +263,19 @@ const PUBLIC_SCHEMA: &str = "chio.experiment.federated-pair-public.v1";
 const TREATY_SCHEMA: &str = "chio.experiment.federated-pair-treaty.v1";
 const TRUST_SCHEMA: &str = "chio.experiment.federated-pair-directory-trust.v1";
 const CONTROL_SCHEMA: &str = "chio.experiment.federated-pair-control.v1";
-const REVOKED_SUBJECTS_SCHEMA: &str = "chio.experiment.federated-pair-revoked-subjects.v1";
+const REVOKED_SUBJECTS_SCHEMA: &str = "chio.experiment.federated-pair-revoked-subjects.v2";
+
+#[path = "federated_call_pair/revocation.rs"]
+mod revocation;
+use revocation::{materialized_root, OriginPublishedSubjects, OriginRevocationSink};
+
+#[cfg(test)]
+#[path = "federated_call_pair/revocation_tests.rs"]
+mod revocation_tests;
+
+#[cfg(test)]
+#[path = "federated_call_pair/admission_wrapper_tests.rs"]
+mod admission_wrapper_tests;
 const EPOCH_RATE_SCHEMA: &str = "chio.experiment.federated-pair-epoch-rate.v1";
 const CLOCK_SCHEMA: &str = "chio.experiment.federated-pair-clock.v1";
 
@@ -554,9 +562,7 @@ fn decode_seed(hex: &str) -> Result<[u8; 32], BoxError> {
 }
 
 fn now_unix_ms() -> Result<u64, BoxError> {
-    Ok(u64::try_from(
-        SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis(),
-    )?)
+    Ok(chio_test_support::clock::clock().unix_millis()?.get())
 }
 
 // ---------------------------------------------------------------------------
@@ -868,7 +874,7 @@ struct ReceiverStats {
 /// `SignedEpochRoot` carries a root hash and a leaf count, never the leaves, so
 /// the revocation lane alone cannot tell the receiver WHICH capability an epoch
 /// revoked. This frame is the experiment's stand-in for the inclusion proofs a
-/// deployment would pull: it is origin-signed and epoch-bound, but it rides the
+/// deployment would pull: it is origin-signed and bound to the complete root, but it rides the
 /// experiment lane, not a shipped one.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -882,8 +888,8 @@ struct SignedRevokedSubjects {
 struct RevokedSubjectsBody {
     schema: String,
     origin_kernel_id: String,
-    /// The first epoch at which `subjects` is the revoked set.
-    epoch: u64,
+    /// Exact root reconstructed from this complete, sorted unique subject set.
+    root: EpochRoot,
     subjects: Vec<String>,
 }
 
@@ -1553,23 +1559,11 @@ fn ladder_manifest(
 // ---------------------------------------------------------------------------
 
 /// Sleep to the next wall-clock multiple of `tick`, and return the arrival time.
-///
-/// Alignment matters: a root is only fresh to the consuming kernel for the whole
-/// second it is stamped with, so one tick has to land immediately after each
-/// second boundary rather than at an arbitrary offset. A wake that lands just
-/// short of a boundary waits out the remainder instead of stamping the second
-/// that is about to end.
 async fn sleep_to_next_tick(tick: Duration) -> Result<u64, BoxError> {
     let tick_ms = u64::try_from(tick.as_millis())?.max(1);
     let now = now_unix_ms()?;
     tokio::time::sleep(Duration::from_millis(tick_ms - (now % tick_ms))).await;
-    let now = now_unix_ms()?;
-    let into_second = now % 1_000;
-    if into_second >= 990 {
-        tokio::time::sleep(Duration::from_millis(1_000 - into_second)).await;
-        return now_unix_ms();
-    }
-    Ok(now)
+    now_unix_ms()
 }
 
 /// Run Org A: the two co-sign handlers the receiver's kernel calls back into,
@@ -1659,9 +1653,7 @@ async fn run_origin(args: &Args) -> Result<(), BoxError> {
     );
 
     let epoch_rate_path = args.optional("epoch-rate-out").map(PathBuf::from);
-    let mut oracle = InMemoryRevocationOracle::new();
     let mut epoch: u64 = 0;
-    let mut published: BTreeSet<String> = BTreeSet::new();
     let mut cut_logged = false;
     // The control document the origin is currently acting on. A control file that
     // cannot be read, or that carries a schema this binary does not know, leaves it
@@ -1684,50 +1676,6 @@ async fn run_origin(args: &Args) -> Result<(), BoxError> {
             }
         }
 
-        // A newly revoked capability enters the oracle (changing the root it
-        // publishes) and is announced to the receiver before the epoch that
-        // carries it, so the receiver never holds a root it cannot interpret.
-        let revoked: BTreeSet<String> = control.revoked_capability_ids.iter().cloned().collect();
-        if revoked != published {
-            for capability_id in revoked.difference(&published) {
-                // A capability revoked in an earlier cycle is already a leaf; the
-                // oracle keeps it forever, so re-revoking it is a no-op rather than
-                // an error.
-                let key = RevocationKey::new(capability_id.clone(), EpochNonce::new(0));
-                if !oracle.contains(&key) {
-                    oracle.insert(key, now_unix_ms()?)?;
-                }
-            }
-            let body = RevokedSubjectsBody {
-                schema: REVOKED_SUBJECTS_SCHEMA.to_string(),
-                origin_kernel_id: origin_id.clone(),
-                epoch: epoch.saturating_add(1),
-                subjects: revoked.iter().cloned().collect(),
-            };
-            let (signature, _) = passport.sign_canonical(&body)?;
-            let announcement =
-                ExperimentRequest::RevokedSubjects(SignedRevokedSubjects { body, signature });
-            // Bounded by the tick: the epoch clock is Org A's own and must not be
-            // serialized behind a slow or absent receiver. An announcement that does
-            // not land inside one tick is retried on the next one.
-            match tokio::time::timeout(
-                tick,
-                experiment_exchange(&endpoint, receiver_experiment.clone(), &announcement),
-            )
-            .await
-            {
-                Ok(Ok(ExperimentReply::Accepted)) => published = revoked,
-                Ok(Ok(other)) => println!("receiver refused the revoked-subject frame: {other:?}"),
-                Ok(Err(error)) => {
-                    println!("revoked-subject frame did not reach the receiver: {error}")
-                }
-                Err(_elapsed) => println!(
-                    "revoked-subject frame did not reach the receiver within one {}ms tick",
-                    tick.as_millis()
-                ),
-            }
-        }
-
         if control.cut {
             if !cut_logged {
                 println!("origin stopped publishing epoch roots at epoch {epoch}");
@@ -1738,21 +1686,45 @@ async fn run_origin(args: &Args) -> Result<(), BoxError> {
         }
         cut_logged = false;
 
-        // A heartbeat root: the epoch advances on every tick so the receiver's
-        // snapshot stays inside its freshness window, and the root hash is
-        // whatever the oracle currently commits to.
-        epoch = epoch.saturating_add(1);
-        let current = oracle.epoch_root();
-        // The consuming kernel reads its clock in whole seconds and rejects a
-        // snapshot issued in its future, so a root is stamped at the second it is
-        // published in rather than at the millisecond. See the example README.
-        let issued_at_unix_ms = published_at - (published_at % 1_000);
-        let root = EpochRoot {
-            epoch,
-            root_hash: current.root_hash,
-            leaf_count: current.leaf_count,
-            issued_at_unix_ms,
+        // Every heartbeat first materializes its complete root at the receiver,
+        // including an empty set. A restarted receiver cannot reuse lost leaves.
+        epoch = epoch.checked_add(1).ok_or("revocation epoch exhausted")?;
+        let revoked: Vec<String> = control
+            .revoked_capability_ids
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let root = materialized_root(epoch, published_at, &revoked)?;
+        let body = RevokedSubjectsBody {
+            schema: REVOKED_SUBJECTS_SCHEMA.into(),
+            origin_kernel_id: origin_id.clone(),
+            root: root.clone(),
+            subjects: revoked,
         };
+        let (signature, _) = passport.sign_canonical(&body)?;
+        let announcement =
+            ExperimentRequest::RevokedSubjects(SignedRevokedSubjects { body, signature });
+        let announced = match tokio::time::timeout(
+            tick,
+            experiment_exchange(&endpoint, receiver_experiment.clone(), &announcement),
+        )
+        .await
+        {
+            Ok(Ok(ExperimentReply::Accepted)) => true,
+            outcome => {
+                println!("revocation epoch {epoch} was not materialized: {outcome:?}");
+                false
+            }
+        };
+        if !announced {
+            clock.interrupt();
+            if let Some(path) = epoch_rate_path.as_deref() {
+                clock.publish_report(path, epoch, tick)?;
+            }
+            continue;
+        }
         let signed = SignedEpochRoot::sign(root, &signer)?;
         let batch = RevocationGossipBatch {
             schema: REVOCATION_ROOT_GOSSIP_BATCH_SCHEMA.to_string(),
@@ -1772,7 +1744,7 @@ async fn run_origin(args: &Args) -> Result<(), BoxError> {
         )
         .await
         {
-            Ok(Ok(_response)) => true,
+            Ok(Ok(response)) => revocation::accepted_epoch(&response, epoch),
             Ok(Err(error)) => {
                 if epoch.is_multiple_of(40) {
                     println!("epoch {epoch} did not reach {receiver_id}: {error}");
@@ -2124,6 +2096,33 @@ impl TimingAdmissionStore {
 }
 
 impl RuntimeAdmissionStore for TimingAdmissionStore {
+    fn verify_operation_owned_replay_source(
+        &self,
+        expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.verify_operation_owned_replay_source(expected)
+        })
+    }
+
+    fn treaty_capability_lease(
+        &self,
+        lease_id: &str,
+    ) -> Result<Option<chio_runtime_core::RuntimeTreatyLeaseRecord>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.treaty_capability_lease(lease_id)
+        })
+    }
+
+    fn treaty_governance_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<chio_runtime_core::RuntimeTreatyGovernanceRecord>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.treaty_governance_receipt(receipt_id)
+        })
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
@@ -2149,6 +2148,16 @@ impl RuntimeAdmissionStore for TimingAdmissionStore {
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         self.timed(PhaseLedger::record_store_resolve, |store| {
             store.swarm_authority_bundle(task_graph_id)
+        })
+    }
+
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.timed(PhaseLedger::record_store_resolve, |store| {
+            store.swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
         })
     }
 
@@ -2228,6 +2237,16 @@ impl RuntimeAdmissionStore for TimingAdmissionStore {
     ) -> Result<(), ChioRuntimeError> {
         self.timed(PhaseLedger::record_trust_floor, |store| {
             store.record_runtime_trust_floor(entry)
+        })
+    }
+
+    fn validate_and_record_runtime_trust_floor(
+        &self,
+        entry: RuntimeTrustFloorEntry,
+        previous_hash_sha256: Option<&str>,
+    ) -> Result<(), ChioRuntimeError> {
+        self.timed(PhaseLedger::record_trust_floor, |store| {
+            store.validate_and_record_runtime_trust_floor(entry, previous_hash_sha256)
         })
     }
 }
@@ -3373,39 +3392,6 @@ impl ToolServerConnection for CountingToolServer {
     }
 }
 
-/// The revoked leaf set Org A announced, gated on the epoch that carries it.
-#[derive(Debug, Default)]
-struct OriginPublishedSubjects {
-    inner: Mutex<(u64, BTreeSet<RevocationViewSubject>)>,
-}
-
-impl OriginPublishedSubjects {
-    /// Monotone install: a replayed or older announcement is ignored.
-    fn install(&self, epoch: u64, subjects: BTreeSet<RevocationViewSubject>) {
-        let mut guard = match self.inner.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        if epoch >= guard.0 {
-            *guard = (epoch, subjects);
-        }
-    }
-}
-
-impl RevokedSubjectSource for OriginPublishedSubjects {
-    fn revoked_at(&self, root: &EpochRoot) -> BTreeSet<RevocationViewSubject> {
-        let guard = match self.inner.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        if root.epoch >= guard.0 {
-            guard.1.clone()
-        } else {
-            BTreeSet::new()
-        }
-    }
-}
-
 /// Catch-up is out of scope for this experiment: Org A publishes a fresh root
 /// every tick, so a receiver that misses one denies until the next arrives
 /// rather than asking for the gap.
@@ -3856,15 +3842,8 @@ impl Receiver {
         if !self.origin_passport.verify(&bytes, &frame.signature) {
             return Err("the revoked-subject frame is not signed by the origin passport".into());
         }
-        self.subjects.install(
-            frame.body.epoch,
-            frame
-                .body
-                .subjects
-                .iter()
-                .map(|subject| RevocationViewSubject::new(subject.clone()))
-                .collect(),
-        );
+        self.subjects
+            .install(&frame.body.root, &frame.body.subjects)?;
         Ok(())
     }
 }
@@ -4229,7 +4208,12 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
     fs::create_dir_all(&authority_locks)?;
     restrict_directory_to_owner(&authority_locks)?;
     SqliteAuthorityStore::provision(&authority_path, &authority_locks)?;
-    let authority = SqliteAuthorityStore::open_serving(&authority_path, &authority_locks)?;
+    let clock = chio_test_support::clock::clock();
+    let authority = SqliteAuthorityStore::open_serving_with_clock(
+        &authority_path,
+        &authority_locks,
+        clock.clone(),
+    )?;
 
     // Org A is pinned from the handshake envelope it published, verified against
     // the passport key the directory already binds. Request-borne trust is never
@@ -4283,25 +4267,28 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
         address_book(&origin_id, origin_addr),
     ));
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: local_keypair.clone(),
-        ca_public_keys: vec![treaty.ca_public_key.clone()],
-        max_delegation_depth: 5,
-        // Durable admission requires a canonical SHA-256 policy hash, not a label.
-        policy_hash: sha256_hex(format!("policy:{receiver_id}").as_bytes()),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: false,
-        allow_ephemeral_revocation_store: false,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    })
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair: local_keypair.clone(),
+            ca_public_keys: vec![treaty.ca_public_key.clone()],
+            max_delegation_depth: 5,
+            // Durable admission requires a canonical SHA-256 policy hash, not a label.
+            policy_hash: sha256_hex(format!("policy:{receiver_id}").as_bytes()),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            allow_ephemeral_receipt_log: false,
+            allow_ephemeral_revocation_store: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+        },
+        clock,
+    )
     .with_federation_peers(vec![peer]);
     kernel.set_federation_local_kernel_id(&receiver_id);
     kernel.set_federation_cosigner(Arc::clone(&cosigner) as Arc<_>);
@@ -4377,10 +4364,7 @@ async fn run_receiver(args: &Args) -> Result<(), BoxError> {
         treaty,
     });
 
-    let sink = Arc::new(
-        RevocationViewSink::new(Arc::clone(&view))
-            .with_subject_source(Arc::clone(&subjects) as Arc<dyn RevokedSubjectSource>),
-    );
+    let sink = Arc::new(OriginRevocationSink::new(view.clone(), subjects));
     let _router = Router::builder(endpoint)
         .accept(
             ALPN_REVOCATION_ROOT,

@@ -113,6 +113,7 @@ pub const DENIAL_CODES: &[(&str, u32)] = &[
     ("signer.not_distinct", 13),
     ("token.not_yet_valid", 14),
     ("token.expired", 14),
+    ("token.window_invalid", 15),
     ("token.window_too_long", 15),
     ("token.audience_mismatch", 16),
     ("token.actor_mismatch", 17),
@@ -131,6 +132,7 @@ pub const DENIAL_CODES: &[(&str, u32)] = &[
     ("policy.no_rule", 27),
     ("policy.assurance_insufficient", 28),
     ("policy.amount_over_ceiling", 29),
+    ("policy.amount_invalid", 29),
     ("policy.approval_missing", 30),
 ];
 
@@ -540,10 +542,16 @@ impl ComposedReceiver<'_> {
 
         // Step 15. How long a window the issuer may open. Only the hardened
         // wiring bounds it, against a constant the receiver holds.
-        if self.profile == BaselineProfile::Hardened
-            && claims.exp.saturating_sub(claims.iat) > MAX_TOKEN_WINDOW_SECONDS
-        {
-            return Ok(Some(denial("token.window_too_long", 15)));
+        if self.profile == BaselineProfile::Hardened {
+            let Some(window) = claims.exp.checked_sub(claims.iat) else {
+                return Ok(Some(denial("token.window_invalid", 15)));
+            };
+            if claims.iat > now_seconds || window == 0 {
+                return Ok(Some(denial("token.window_invalid", 15)));
+            }
+            if window > MAX_TOKEN_WINDOW_SECONDS {
+                return Ok(Some(denial("token.window_too_long", 15)));
+            }
         }
 
         // Step 16. Audience. Both wirings require the credential to have been
@@ -696,12 +704,14 @@ impl ComposedReceiver<'_> {
         if assurance != rule.required_assurance {
             return Ok(Some(denial("policy.assurance_insufficient", 28)));
         }
-        let amount = tool_call
+        let Some(amount) = tool_call
             .params
             .arguments
             .get("amount_minor")
             .and_then(Value::as_u64)
-            .unwrap_or(0);
+        else {
+            return Ok(Some(denial("policy.amount_invalid", 29)));
+        };
         if amount > rule.max_amount_minor || amount > agreement.max_amount_minor {
             return Ok(Some(denial("policy.amount_over_ceiling", 29)));
         }

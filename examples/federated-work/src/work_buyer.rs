@@ -211,6 +211,7 @@ mod tests {
             let result = (|| -> Result<()> {
                 let mut db = buyer::open(&root)?;
                 db.execute("UPDATE account SET available=900 WHERE id=1", [])?;
+                db.execute("INSERT INTO reservations(job,amount) VALUES('job',100)", [])?;
                 db.execute(
                     "INSERT INTO work_jobs(job,request,state) VALUES('job','{}','attempted')",
                     [],
@@ -246,6 +247,10 @@ mod tests {
                     (available, expenses, releases),
                     if rejected { (1000, 0, 1) } else { (900, 1, 0) }
                 );
+                let snapshot = buyer::snapshot(&root)?;
+                assert_eq!(snapshot["reserved"], 0);
+                assert_eq!(snapshot["available"], available);
+                assert_eq!(snapshot["spent"], if rejected { 0 } else { 100 });
                 Ok(())
             })();
             fs::remove_dir_all(&root)?;

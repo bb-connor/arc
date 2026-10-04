@@ -160,9 +160,7 @@ impl AdmissionScalingFixture {
             .with_runtime_pheromone_policy(policy.policy, policy.peer_weights)
             .with_fixed_now_unix_ms(NOW_UNIX_MS);
         let tool_invocations = Arc::new(AtomicU64::new(0));
-        let peer_now_unix_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs();
+        let peer_now_unix_secs = NOW_UNIX_MS / 1_000;
         let trust = KernelTrustExchange::new(LOCAL_KERNEL_ID, local_keypair.clone())
             .with_trusted_peer(ORIGIN_KERNEL_ID, origin_keypair.public_key());
         let peer_envelope = PeerHandshakeEnvelope::sign(
@@ -173,7 +171,11 @@ impl AdmissionScalingFixture {
             &origin_keypair,
         )?;
         let peer = trust.accept_envelope(&peer_envelope, ORIGIN_KERNEL_ID, peer_now_unix_secs)?;
-        let mut kernel = ChioKernel::new(config).with_federation_peers(vec![peer]);
+        let clock = Arc::new(chio_security_types::clock::FixedClock::from_millis(
+            NOW_UNIX_MS,
+        ));
+        let mut kernel =
+            ChioKernel::new_with_clock(config, clock).with_federation_peers(vec![peer]);
         kernel.set_federation_local_kernel_id(LOCAL_KERNEL_ID);
         kernel.set_federation_cosigner(Arc::new(InProcessCoSigner::new(
             ORIGIN_KERNEL_ID,

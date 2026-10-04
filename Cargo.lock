@@ -3751,6 +3751,7 @@ dependencies = [
  "chio-settle",
  "chio-store-sqlite",
  "chio-swarm-authority",
+ "chio-test-support",
  "iroh",
  "iroh-blobs",
  "iroh-gossip",
