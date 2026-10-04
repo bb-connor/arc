@@ -1912,7 +1912,9 @@ def run_trusted_bounded(
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    deadline = time.monotonic() + 30
+    # Cache materialization allows 300 seconds and execution probes allow 60.
+    # Include bounded setup overhead without exceeding the operation budget.
+    deadline = time.monotonic() + min(timeout_seconds, 420)
     while not socket_path.exists():
         if broker.poll() is not None or time.monotonic() >= deadline:
             abandon_broker(broker, socket_path, gate_root)

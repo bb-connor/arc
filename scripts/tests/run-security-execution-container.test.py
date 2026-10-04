@@ -94,6 +94,42 @@ def assert_rejected(label: str, callback) -> None:
     )
 
 
+def broker_startup_deadline_tests() -> None:
+    def observe(ready_at: int, timeout: int) -> tuple[bytes | None, float, int]:
+        elapsed = [0.0]
+        broker = mock.Mock()
+        broker.poll.return_value = None
+        broker.wait.return_value = 0
+        verifier = mock.Mock()
+
+        def sleep(_duration: float) -> None:
+            elapsed[0] += 1.0
+
+        with (
+            mock.patch.object(ENTRYPOINT.subprocess, "Popen", side_effect=[broker, verifier]),
+            mock.patch.object(ENTRYPOINT.time, "monotonic", side_effect=lambda: elapsed[0]),
+            mock.patch.object(ENTRYPOINT.time, "sleep", side_effect=sleep),
+            mock.patch.object(ENTRYPOINT.Path, "exists", side_effect=lambda: elapsed[0] >= ready_at),
+            mock.patch.object(ENTRYPOINT, "collect_bounded_process", return_value=(0, b"completed")),
+            mock.patch.object(ENTRYPOINT, "quiesce_verifier_namespace"),
+            mock.patch.object(ENTRYPOINT, "stop_broker"),
+            mock.patch.object(ENTRYPOINT, "abandon_broker") as abandon,
+        ):
+            try:
+                result = ENTRYPOINT.run_trusted_bounded(["/trusted/gate"], timeout)
+                return result, elapsed[0], abandon.call_count
+            except ENTRYPOINT.EntrypointError:
+                return None, elapsed[0], abandon.call_count
+
+    # Cache setup is allowed to take longer than the former 30-second poll.
+    if observe(65, 600) != (b"completed", 65.0, 0):
+        raise AssertionError("broker refused bounded cold-cache startup")
+    if observe(65, 10) != (None, 10.0, 1):
+        raise AssertionError("broker startup exceeded the shorter operation budget")
+    if observe(900, 600) != (None, 420.0, 1):
+        raise AssertionError("broker startup lost its fixed readiness ceiling")
+
+
 def candidate_helper_environment_tests() -> None:
     helpers = {
         "CHIO_BROKER_MCP_TOOL": "/target/artifacts/broker-helper-target/x86_64-unknown-linux-musl/debug/chio-broker-mcp",
@@ -2425,6 +2461,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    broker_startup_deadline_tests()
     candidate_helper_environment_tests()
     run([sys.executable, os.fspath(ROOT / "scripts/tests/check-broker-helper-lifetime.test.py")], cwd=ROOT)
     static_contract_tests()
