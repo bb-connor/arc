@@ -373,6 +373,19 @@ name = "wit-bindgen"
 name = "wit-parser"
 
 [[bans.skip]]
+# last-checked = 2026-10-04. zed_extension_api 0.7 uses wit-bindgen 0.41
+# and its 0.227 component ABI; patched Wasmtime 48 uses 0.254. These build
+# tools belong to separate editor-extension and runtime dependency graphs.
+# Remove when Zed's supported extension API adopts the runtime's tool family.
+name = "wit-component"
+version = "=0.227.1"
+
+[[bans.skip]]
+# Same Zed component-tooling closure as the exact wit-component entry above.
+name = "wasm-metadata"
+version = "=0.227.1"
+
+[[bans.skip]]
 name = "axum"
 
 [[bans.skip]]

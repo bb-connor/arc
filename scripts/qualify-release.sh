@@ -41,6 +41,7 @@ if [[ -n "${GITHUB_SHA:-}" && "${GITHUB_SHA}" != "${candidate_sha}" ]]; then
 fi
 
 # ci-workspace is the fast regression gate.
+bash scripts/check-supply-chain.sh
 ./scripts/ci-workspace.sh
 rm -rf \
   "${conformance_root}" \

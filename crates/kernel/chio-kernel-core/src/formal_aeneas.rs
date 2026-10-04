@@ -153,7 +153,12 @@ pub struct InclusionStep {
     pub next_size: u64,
 }
 
-#[allow(clippy::manual_is_multiple_of, clippy::needless_bool)] // Aeneas scalar subset.
+// Preserve the scalar match/if shape consumed by the generated Aeneas proof.
+#[allow(
+    clippy::manual_is_multiple_of,
+    clippy::needless_bool,
+    clippy::collapsible_match
+)]
 pub fn inclusion_step(index: u64, size: u64) -> InclusionStep {
     let sibling_on_left = index % 2 != 0;
     let right_sibling_exists = match index.checked_add(1) {
