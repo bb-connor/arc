@@ -77,6 +77,7 @@ def main():
     parser.add_argument("--base-url", help="Explicit trusted HTTPS or loopback HTTP origin")
     parser.add_argument("--timeout", type=float, default=30)
     args = parser.parse_args()
+    expected_status = 201 if args.action == "submit" else 200
     try:
         operator = private_operator(args.operator_file)
         base = origin(args.base_url, operator)
@@ -101,8 +102,9 @@ def main():
         descriptor = os.open(args.output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, "w") as output:
             try:
-                result = request_json(base, route, operator, data, args.timeout)
-                result["httpStatus"] = 200
+                result = request_json(
+                    base, route, operator, data, args.timeout, expected_status=expected_status
+                )
             except OperatorError as error:
                 result = {**error.record(), "retry": "never-automatic"}
                 if args.action != "show":
@@ -131,7 +133,7 @@ def main():
                 }
             )
         )
-        return int(result.get("httpStatus") != 200 or result.get("ok") is False)
+        return int(result.get("httpStatus") != expected_status or result.get("ok") is False)
     except (OperatorError, OSError) as error:
         record = (
             error.record()

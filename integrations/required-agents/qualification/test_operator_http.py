@@ -91,7 +91,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "toolCallParams": {"_meta": {"approval": "decision"}},
             }
         payload = owner.payload if owner.payload is not None else json.dumps(result).encode()
-        self.send_response(owner.status)
+        status = owner.status
+        if status is None:
+            status = 201 if self.command == "POST" and route == "/admin/approvals" else 200
+        self.send_response(status)
         self.send_header("Content-Type", owner.content_type)
         self.send_header("Content-Length", str(len(payload)))
         if owner.location:
@@ -106,7 +109,7 @@ class Fixture:
         self.requests = []
         self.revoked = False
         self.mode = "normal"
-        self.status = 200
+        self.status = None
         self.payload = None
         self.location = None
         self.content_type = "application/json"
@@ -235,10 +238,14 @@ class OperatorCommandsTest(unittest.TestCase):
 
     def test_approval_actions_preserve_exact_payload_and_private_artifact(self):
         for action in ("submit", "show", "approve", "deny"):
+            self.output.unlink(missing_ok=True)
             with self.subTest(action=action):
                 result = self.command(action, approval=True)
                 self.assertEqual(result.returncode, 0)
                 saved = json.loads(self.output.read_text())
+                expected_status = 201 if action == "submit" else 200
+                self.assertEqual(saved["httpStatus"], expected_status)
+                self.assertEqual(json.loads(result.stdout)["httpStatus"], expected_status)
                 self.assertEqual(saved["toolCallParams"], {"_meta": {"approval": "decision"}})
                 self.assertEqual(self.output.stat().st_mode & 0o777, 0o600)
                 request = self.server.requests[-1]
@@ -254,6 +261,93 @@ class OperatorCommandsTest(unittest.TestCase):
                     )
                     self.assertEqual(request["path"], "/admin/approvals/approval-test/decision")
                 self.output.unlink()
+
+    def test_approval_submit_preserves_created_status_and_approval_id(self):
+        self.server.payload = json.dumps(
+            {
+                "status": "pending",
+                "record": {"id": "approval-test"},
+                "httpStatus": 599,
+            }
+        ).encode()
+        result = self.command("submit", approval=True)
+        self.assertEqual(result.returncode, 0)
+        public = json.loads(result.stdout)
+        saved = json.loads(self.output.read_text())
+        self.assertEqual(public["httpStatus"], 201)
+        self.assertEqual(saved["httpStatus"], 201)
+        self.assertEqual(public["approvalId"], "approval-test")
+        self.assertEqual(saved["record"]["id"], "approval-test")
+        self.assertEqual(public["status"], "pending")
+        self.assertEqual(len(self.server.requests), 1)
+        self.assertEqual(self.server.requests[0]["method"], "POST")
+        self.assertEqual(self.server.requests[0]["path"], "/admin/approvals")
+
+    def test_approval_rejects_success_status_for_the_wrong_action_without_retry(self):
+        for action, status in (
+            ("submit", 200),
+            ("submit", 202),
+            ("show", 201),
+            ("approve", 201),
+            ("deny", 201),
+        ):
+            self.output.unlink(missing_ok=True)
+            with self.subTest(action=action, status=status):
+                self.server.status = status
+                before = len(self.server.requests)
+                result = self.command(action, approval=True)
+                self.assertEqual(result.returncode, 1)
+                saved = json.loads(self.output.read_text())
+                self.assertEqual(saved["httpStatus"], status)
+                self.assertEqual(saved["error"], "unexpected_http_status")
+                self.assertEqual(saved["retry"], "never-automatic")
+                if action != "show":
+                    self.assertEqual(saved["outcome"], "unknown")
+                self.assertEqual(len(self.server.requests), before + 1)
+
+    def test_capability_mutation_does_not_accept_created_or_retry(self):
+        self.server.status = 201
+        result = self.command("revoke")
+        self.assertEqual(result.returncode, 1)
+        error = json.loads(result.stderr)
+        self.assertEqual(error["httpStatus"], 201)
+        self.assertEqual(error["error"], "unexpected_http_status")
+        self.assertEqual(error["outcome"], "unknown")
+        self.assertEqual(error["retry"], "never-automatic")
+        self.assertEqual(len(self.server.requests), 1)
+
+    def test_lost_submit_response_retains_unknown_artifact_without_retry(self):
+        self.server.mode = "drop"
+        result = self.command("submit", approval=True)
+        self.assertEqual(result.returncode, 1)
+        saved = self.output.read_bytes()
+        error = json.loads(saved)
+        self.assertEqual(error["error"], "transport_failed")
+        self.assertEqual(error["outcome"], "unknown")
+        self.assertEqual(error["retry"], "never-automatic")
+        self.assertEqual(len(self.server.requests), 1)
+        self.assertEqual(self.command("submit", approval=True).returncode, 1)
+        self.assertEqual(self.output.read_bytes(), saved)
+        self.assertEqual(len(self.server.requests), 1)
+
+    def test_created_submit_still_requires_bounded_json_response_without_retry(self):
+        for payload, kind, error in (
+            (b"{", "application/json", "invalid_json_object"),
+            (b"{}", "text/plain", "response_is_not_json"),
+            (b" " * 1_048_577, "application/json", "response_too_large"),
+        ):
+            self.output.unlink(missing_ok=True)
+            with self.subTest(kind=kind, error=error):
+                self.server.payload, self.server.content_type = payload, kind
+                before = len(self.server.requests)
+                result = self.command("submit", approval=True)
+                self.assertEqual(result.returncode, 1)
+                saved = json.loads(self.output.read_text())
+                self.assertEqual(saved["error"], error)
+                self.assertEqual(saved.get("httpStatus"), 201)
+                self.assertEqual(saved["outcome"], "unknown")
+                self.assertEqual(saved["retry"], "never-automatic")
+                self.assertEqual(len(self.server.requests), before + 1)
 
     def test_decision_requires_operator_signed_token_before_network(self):
         for action in ("approve", "deny"):

@@ -73,6 +73,23 @@ findings and three trusted-definition obligations bring the current inventory to
 1,324 records from 49 source documents. These include the standalone lint boundary,
 FIPS wrong-key regression, duplicate inventory, cipher module size, late-label
 publication, conditional CI-history failure and bounded App issuance hardening.
+The live retirement audit adds seven previously unmapped PR threads, bringing the
+inventory to 1,331 records. They cover repository command framing, offline report
+compatibility, preserved adaptive timeout provenance, macOS temporary paths,
+release provenance ordering, six-host acceptance and the HTTP 201 approval client.
+Their repairs and acceptance remain explicit; presence in the ledger is not closure.
+The HTTP 201 client repair is committed at
+`05b16402964e7288a80ed367d82b0ec88b2708eb`: final focused fixtures and independent
+source review pass. Its foundation integration, native/hosted acceptance and
+original thread disposition remain pending.
+Three subsequent #1168 review threads and the exact serialized-patch-context
+scanner repair bring the inventory to 1,335 records from the same 49 source
+documents. The checker-context failure was reproduced and repaired; the reported
+OpenSSL startup failure was not reproduced in the original static executable.
+Explicit linkage hardening passed the real pinned native rebuild and a
+read-only scratch-container runtime check. All three new threads are reconciled;
+terminal exact-commit hosted checks and protected merge remain required. These
+results are separate from full quickstart image or publication qualification.
 
 The October 4 reconciliation assigns the 197 named October 1 findings by their
 included owners: 126 foundation obligations and 71 bounded follow-ups. Of the
@@ -92,6 +109,13 @@ historical evidence and remaining acceptance stay intact.
 
 Later hardening and product-evidence slices receive a PR only when an active
 slot becomes available. Their source remains in the preserved reference.
+
+Foundation source reconciliation may proceed locally while prerequisite CI runs.
+Projection, hosted qualification and landing still require the actual merged
+prerequisite main history. Local preparation does not add #1160 to the active
+queue. The composition preserves the audited fork byte for byte and resolves
+shared manifests by retaining the foundation source closure with the repaired
+dependency floors; an uncommitted merge is not a qualified candidate.
 
 ### Task 1: Establish and validate the authoritative ledger
 
