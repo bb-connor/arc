@@ -77,5 +77,5 @@ The execution record assigns final severity and records refuted candidates.
   Retain the failed broad run and match every failed test to a passing rerun.
 - [x] Resolve reviewer findings, record lower-priority and unqualified boundaries.
 - [x] Correct the current queue to exclude the withdrawn Mercury follow-on.
-- [ ] Archive review/commands, commit and push, verify exact remote head and clean
+- [x] Archive review/commands, commit and push, verify exact remote head and clean
   tracked state. Stop before new roadmap feature work.

@@ -41,7 +41,7 @@
   },
   "independent_review": "one completed reviewer with follow-ups; two other attempts incomplete",
   "source_gates": "passed; historical baseline debt unchanged; only changed receipt SQL explicitly reconciled",
-  "publication_status": "source commit and remote verification recorded in delivery follow-up",
+  "publication_status": "source commit pushed and exact remote head verified; documentation-only follow-up records delivery",
   "hosted_ci_qualified": false,
   "whole_workspace_audit": false,
   "million_receipt_campaign": false,
@@ -54,5 +54,6 @@
     "EV15 alert signer admission",
     "EV6/EV8/EV17 session certificates",
     "authenticated historical cursor assignments and pagination across adversarial mutations"
-  ]
+  ],
+  "source_commit": "5a14e0f3b8ea8b93cb0e50b65847de477b9e8cdd"
 }

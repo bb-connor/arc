@@ -31,5 +31,6 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody.rs": "73942afd6cd1d6657bf2e350e356c6428aa66d4a74d6783bdd99d3be4ba283ca",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/tests/clock_custody/dispatch.rs": "68fbe4884653a1db2bac1ab74796f4c2716a59b8eec1f636c476bd69ed789ec0",
     "docs/security/trust-boundary-inventory.json": "57abab5f3150e15b5b0837814c32d587e15fe50e6d86da483582434793c99826"
-  }
+  },
+  "source_commit": "5a14e0f3b8ea8b93cb0e50b65847de477b9e8cdd"
 }

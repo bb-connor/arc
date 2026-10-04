@@ -23,6 +23,10 @@ published through other refs; they were not force-pushed. Untracked historical
 
 The publication manifest and terminal commands are retained with this review's
 [evidence](artifacts/2026-10-03-security-p0-p1-review/README.md).
+The repairs were committed and pushed as `5a14e0f3b8ea8b93cb0e50b65847de477b9e8cdd`.
+The remote branch matched that exact source commit and the tracked worktree was
+clean. A documentation-only follow-up records delivery; no merge or deployment
+was performed.
 
 ## Findings and repairs
 

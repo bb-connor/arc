@@ -75,7 +75,8 @@ source, tests, lockfile and trust-contract bytes independently of report edits.
 
 `commands.json` indexes the records. `qualification.json` states the acceptance
 boundary. `publication-preflight.json` retains the refreshed origin reachability
-of all 28 selected security tips. Unrelated experiments and preexisting
+of all 28 selected security tips. `publication.json` records the successful
+source push, exact remote match and clean tracked state. Unrelated experiments and preexisting
 untracked `output/` evidence are outside the publication set.
 
 `run-command.py` retains the runner. It used Rust/Cargo 1.94.1 on Linux aarch64,
