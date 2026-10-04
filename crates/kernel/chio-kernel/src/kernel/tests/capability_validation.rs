@@ -1888,3 +1888,93 @@ fn kernel_error_report_includes_request_cancel_context() {
     assert_eq!(report.context["reason"], "operator cancelled");
     assert!(report.suggested_fix.contains("cancelled request ID"));
 }
+struct AdmissionTestClock(std::sync::atomic::AtomicU64);
+
+impl chio_security_types::clock::Clock for AdmissionTestClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        use chio_security_types::clock::{ClockError, ClockReading, MonotonicInstant, UnixMillis};
+        let milliseconds = self.0.load(Ordering::SeqCst);
+        if milliseconds == 0 {
+            return Err(ClockError::Unavailable);
+        }
+        Ok(ClockReading::new(
+            UnixMillis::new(milliseconds),
+            MonotonicInstant::from_nanos(milliseconds * 1_000_000),
+        ))
+    }
+}
+
+fn admission_clock_fixture(
+    clock: Arc<AdmissionTestClock>,
+) -> Result<(ChioKernel, CapabilityToken), Box<dyn std::error::Error>> {
+    let config = make_config();
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "pre-admit-owned-clock".into(),
+            issuer: config.keypair.public_key(),
+            subject: make_keypair().public_key(),
+            scope: ChioScope::default(),
+            issued_at: 100,
+            expires_at: 110,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &config.keypair,
+    )?;
+    Ok((ChioKernel::new_with_clock(config, clock), token))
+}
+
+#[test]
+fn pre_admit_clock_accepts_before_exact_expiry() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) =
+        admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(109_999))))?;
+    kernel.verify_capability_full_pre_admit(&token, None, 109)?;
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_rejects_fresh_exact_expiry() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) =
+        admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(110_000))))?;
+    let result = kernel.verify_capability_full_pre_admit(&token, None, 109);
+    assert!(matches!(result, Err(reason) if reason.contains("expired")));
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_retains_later_caller_floor() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) =
+        admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(109_000))))?;
+    let result = kernel.verify_capability_full_pre_admit(&token, None, 110);
+    assert!(matches!(result, Err(reason) if reason.contains("expired")));
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_preserves_unavailable_cause() -> Result<(), Box<dyn std::error::Error>> {
+    let (kernel, token) = admission_clock_fixture(Arc::new(AdmissionTestClock(AtomicU64::new(0))))?;
+    assert_eq!(
+        kernel.verify_capability_full_pre_admit(&token, None, 109),
+        Err(KernelError::Clock(chio_security_types::clock::ClockError::Unavailable).to_string()),
+    );
+    Ok(())
+}
+
+#[test]
+fn pre_admit_clock_preserves_regression_cause() -> Result<(), Box<dyn std::error::Error>> {
+    let clock = Arc::new(AdmissionTestClock(AtomicU64::new(109_000)));
+    let (kernel, token) = admission_clock_fixture(clock.clone())?;
+    assert_eq!(kernel.read_authority_time()?.get(), 109_000);
+    clock.0.store(108_000, Ordering::SeqCst);
+    assert_eq!(
+        kernel.verify_capability_full_pre_admit(&token, None, 109),
+        Err(
+            KernelError::Clock(chio_security_types::clock::ClockError::WallClockRegression)
+                .to_string()
+        ),
+    );
+    Ok(())
+}

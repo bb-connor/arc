@@ -71,7 +71,14 @@ impl RemoteCapabilityAuthority {
                 "remote issuer lifecycle cache is unavailable".into(),
             )
         })?;
-        if cache.permits(issuer, Some(issued_at), now.max(observed)) {
+        // Refresh and cache contention can cross a retirement deadline. Sample
+        // under the final cache lock, retaining every earlier time floor.
+        let after_refresh = self.clock.unix_millis()?.as_secs();
+        if cache.permits(
+            issuer,
+            Some(issued_at),
+            now.max(observed).max(after_refresh),
+        ) {
             Ok(())
         } else {
             Err(KernelError::UntrustedIssuer)

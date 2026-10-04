@@ -327,12 +327,19 @@ impl ChioKernel {
     ) -> Result<(), String> {
         self.check_capability_issuer_lifecycle(cap, now)?;
         let trusted = self.trusted_issuer_keys();
-        let clock = chio_kernel_core::FixedClock::new(now);
         let peer_profile = self.capability_negotiation_for_remote(remote_kernel_id, now)?;
         let trust_resolver = self.capability_trust_root_resolver_snapshot();
         let mut budgets = chio_kernel_core::NoopBudgetRegistry;
         let direct_root = self.negotiated_capability_root(cap, &peer_profile)?;
         let ancestors = self.signed_capability_ancestors(cap)?;
+        // Authority and signed-lineage lookups may block past token expiry.
+        // Observe the owned fence only after those lookups, never below the
+        // caller's admission floor, and retain a clock refusal's exact cause.
+        let fresh_now = self
+            .read_authority_time()
+            .map_err(|error| KernelError::Clock(error).to_string())?
+            .as_secs();
+        let clock = chio_kernel_core::FixedClock::new(now.max(fresh_now));
 
         chio_kernel_core::verify_capability_full_with_evidence(
             cap,

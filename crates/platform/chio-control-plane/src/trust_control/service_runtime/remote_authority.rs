@@ -1,6 +1,10 @@
 #[path = "remote_authority/lifecycle.rs"]
 mod lifecycle;
 
+#[cfg(test)]
+#[path = "remote_authority/clock_tests.rs"]
+mod clock_tests;
+
 use super::client::build_client;
 use super::*;
 
@@ -261,7 +265,11 @@ impl CapabilityAuthority for RemoteCapabilityAuthority {
         let Ok(cache) = self.cache.lock() else {
             return Vec::new();
         };
-        cache.live_keys(now.as_secs())
+        // Both refresh and a fresh-cache lock wait may outlive an issuer.
+        let Ok(after_refresh) = self.clock.unix_millis() else {
+            return Vec::new();
+        };
+        cache.live_keys(now.as_secs().max(after_refresh.as_secs()))
     }
 
     fn check_issuer_lifecycle(
