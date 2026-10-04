@@ -20,7 +20,37 @@ workflow blobs match the reviewed prerequisite. This preparation still requires
 the actual protected #1167 main merge and the final caller binding to that merge.
 #1160 remains local preparation and has not been projected or landed.
 
-The current inventory contains **1,351 requirement records**. Native startup
+The current inventory contains **1,353 requirement records**. Commit
+`dfb7543f40` adds five negative response-mode controls. Each detects deletion of
+its production guard; restored source passes 39 focused tests with none ignored,
+formatting and both owning crates' all-target Clippy. RP1 remains partial:
+SQLite outbox invariants, authority-daemon mode checks and its distinct rejection
+code still need their own controls and final candidate acceptance.
+
+Two native-runner defects are repaired in source. Commit `875c5ba6d5` keeps the
+five broker helpers in the fixed candidate-owned artifact target for their gate,
+so the next command's ordinary Cargo cleanup cannot erase them. Its shell
+regression fails before repair and passes afterward, and the complete
+CI-contract suite passes in 556.170 seconds. Commit `80516260bc` permits bounded
+broker readiness up to the smaller of 420 seconds and the operation budget;
+cache setup already allowed 300 seconds plus execution probes. The delayed
+readiness, shorter deadline and fixed ceiling controls pass, as does the full
+CI-contract suite in 561.131 seconds. Process quiescence and the outer host
+execution deadline remain unchanged. Fresh native image execution and final
+independent review are still required.
+
+A separate direct Linux cage run at `7c6bf2c8fd` passes all 82 tests, 29 real
+probes and ten helper mutations with zero ignored. The initial driver parse
+failure ran no native tests and is retained separately. The second native
+mutation scenario, broker destination rebinding, also records a passing baseline
+and one caught mutant; its command logs were removed by normal gate cleanup
+before retention, so only its outcome and case bytes are retained. The complete
+35-campaign refresh remains running and does not qualify later source.
+The [response and runner bundle](audits/foundation-response-runner-controls-20261004.json.gz)
+retains these bounded observations, failed fixtures and a zero-test invocation
+without converting them into final foundation acceptance.
+
+Native startup
 repairs include source modes, exact bind-mount identity independent of Docker's
 array order, bounded escaped verifier diagnostics, and constrained normalization
 of valid Cargo-mutants Rust module paths. The latter passes eight boundary
@@ -76,8 +106,10 @@ validator, corrected OCI index/manifest/config/layer verification, real restore
 and explicit removal records separately.
 
 Ruling: use the existing container CPU quota for candidate compilation while
-keeping one mutation and one broker command active at a time. Retain complete
-state disposal between commands. Higher compilation memory may fail within the
+keeping one mutation and one broker command active at a time. Dispose of Cargo
+home, ordinary target and temporary state between commands. Candidate-owned
+helper artifacts live only within their gate and are cleared at its boundaries.
+Higher compilation memory may fail within the
 unchanged 12 GiB limit; native duration and memory acceptance remain open.
 
 Ruling: #1167's non-required controller run rejected the historical configured
