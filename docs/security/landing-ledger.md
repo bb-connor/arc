@@ -118,9 +118,9 @@ stderr. SF6 now links its explicit numeric decision. Preparatory packet 1 and 2
 reviews and unsuccessful campaigns are in the
 [review evidence bundle](audits/foundation-review-reconciliation-20261004.json.gz).
 The HTTP/portable binding and post-refresh authority-time repairs are now
-committed and independently source-reviewed. Aggregate MCP bounds, secret-output
-growth and final qualification remain pending. No prerequisite or foundation
-merge is claimed.
+committed and independently source-reviewed. The later MCP and secret-output
+repairs are recorded below; final qualification remains pending. No prerequisite
+or foundation merge is claimed.
 
 All six preparatory source packets now have retained reports and 148 linked
 requirement assessments (including reviewed follow-ups). The
@@ -148,6 +148,23 @@ It also preserves the completed length-8 model result, scope review and archive
 retrieval evidence. A fresh isolated Git fetch and anonymous HTTPS download both
 retrieved the 14,764 evidence files selected for externalization with matching
 bytes. Retrieval proves availability, not the truth of historical evidence.
+
+MCP aggregate ingress and stderr containment is committed at `ea7b65b9b5`.
+The final component run passed 144 unit tests and one integration test, with
+strict lint and independent review. Shared admission counts wire bytes, JSON
+nodes and decoded text before authoritative allocation; fixed stderr fragments
+bound newline-free child output. These accounting limits do not claim an exact
+process memory ceiling. Both the original failures and the later diagnostic
+lock regression remain retained.
+
+Canonical secret output now uses one checked, fixed allocation at `fffe1bdc33`.
+The source review and 91 focused tests passed, along with a no-default build
+and final strict lint. The original output-growth failure and the intermediate
+test-fixture lint failure remain separate records. The same commit corrects
+two unqualified FIPS Rustdoc claims and one test-only sorting lint. The
+[memory-boundary evidence bundle](audits/foundation-memory-boundaries-20261004.json.gz)
+retains the input snapshots, command logs and independent reviews. The inventory
+remains 1,343 records; composed foundation acceptance is still open.
 
 ## Active queue
 
