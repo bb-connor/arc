@@ -26,11 +26,27 @@ fn selection() -> AdmissionAuthoritySelectionV1 {
 fn require_missing_custody_denial(
     selection: AdmissionAuthoritySelectionV1,
     family: &str,
+    approval_required: bool,
     dpop_required: bool,
 ) -> TestResult {
     let profile = AdmissionAuthorityProfileV1::new(selection)?;
-    let (kernel, admission, _, now) =
-        super::fixture::caller_admission_with_profile(Some(&profile), dpop_required)?;
+    let (kernel, admission, _, now) = super::fixture::caller_admission_with_profile(
+        Some(&profile),
+        approval_required,
+        dpop_required,
+    )?;
+    assert_eq!(
+        admission
+            .operation
+            .binding()
+            .participant_requirements()
+            .approval,
+        approval_required,
+    );
+    let original = admission.original_retained_request().ok_or("original")?;
+    original.validate_binding(admission.operation.binding())?;
+    assert!(original.request_for_revalidation().approval_token.is_none());
+    assert_eq!(original.matching_grants_require_dpop(), dpop_required);
     let error = match kernel.read_caller_participant_custody(&admission, 0, now) {
         Ok(_) => {
             return Err(
@@ -57,17 +73,146 @@ fn caller_snapshot_rejects_missing_selected_runtime_custody() -> TestResult {
         identifier("runtime")?,
         identifier("runtime-generation")?,
     ));
-    require_missing_custody_denial(selected, "runtime", false)
+    require_missing_custody_denial(selected, "runtime", false, false)
 }
 
 #[test]
-fn caller_snapshot_allows_configured_but_unused_approval_authority() -> TestResult {
+fn caller_snapshot_rejects_missing_required_approval_custody() -> TestResult {
+    require_missing_custody_denial(approval_selection()?, "approval", true, false)
+}
+
+#[test]
+fn caller_snapshot_accepts_threshold_and_unused_cumulative_approval_custody() -> TestResult {
+    use super::fixture::{caller_admission_with_approval, Approval};
+    let profile = AdmissionAuthorityProfileV1::new(approval_selection()?)?;
+    for approval in [
+        Approval::Threshold,
+        Approval::CumulativeThreshold,
+        Approval::CumulativeUnused,
+    ] {
+        let (kernel, admission, _, now) =
+            caller_admission_with_approval(Some(&profile), approval, false)?;
+        let original = admission.original_retained_request().ok_or("original")?;
+        original.validate_binding(admission.operation.binding())?;
+        assert!(
+            admission
+                .operation
+                .binding()
+                .participant_requirements()
+                .approval
+        );
+        assert!(original.request_for_revalidation().approval_token.is_none());
+        assert!(original
+            .request_for_revalidation()
+            .approval_tokens
+            .is_empty());
+        let custody = kernel.read_caller_participant_custody(&admission, 0, now)?;
+        assert_eq!(
+            serde_json::to_value(custody)?,
+            serde_json::json!({
+                "runtime": null, "approval": null, "dpop": null,
+            }),
+            "{approval:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn caller_single_approval_missing_all_custody_artifacts_is_rejected() -> TestResult {
+    let profile = AdmissionAuthorityProfileV1::new(approval_selection()?)?;
+    let (kernel, mut admission, _, now) =
+        super::fixture::caller_admission_with_profile(Some(&profile), true, false)?;
+    // The single-token producer does not reserve a threshold approval set.
+    assert!(admission.operation.threshold_proposal_hash().is_none());
+    assert!(admission.operation.approval_set_hash().is_none());
+    assert!(admission
+        .operation
+        .governed_approval_ledger_digest()
+        .is_none());
+    admission.operation = super::fixture::advance(
+        admission.operation,
+        vec![],
+        AdmissionOperationState::CapturePending,
+        now,
+    )?;
+    let error = kernel
+        .read_caller_participant_custody(&admission, 0, now)
+        .err()
+        .ok_or("missing singular custody accepted")?;
+    assert!(error
+        .to_string()
+        .contains("omitted its selected approval authority"));
+    Ok(())
+}
+
+#[test]
+fn cumulative_custody_requirement_ignores_unselected_grants_and_survives_retention() -> TestResult {
+    use super::fixture::{caller_admission_with_approval, Approval};
+    let (kernel, admission, mut request, _) =
+        caller_admission_with_approval(None, Approval::Single, false)?;
+    let original = admission.original_retained_request().ok_or("original")?;
+    let mut body = request.capability.body();
+    let mut unrelated = body.scope.grants[0].clone();
+    unrelated.tool_name = "unselected-cumulative-tool".into();
+    unrelated.constraints = vec![
+        chio_core::capability::scope::Constraint::RequireCumulativeApprovalAbove {
+            threshold: chio_core::capability::scope::MonetaryAmount {
+                units: 100,
+                currency: "USD".into(),
+            },
+            approval_budget_id: "unselected-budget".into(),
+            approval_budget_epoch: 1,
+            cumulative_approval_root_binding: None,
+        },
+    ];
+    body.scope.grants.push(unrelated);
+    request.capability =
+        chio_core::capability::token::CapabilityToken::sign(body, &kernel.config.keypair)?;
+    let matching = resolve_required_matching_grants(
+        &request.capability,
+        &request.tool_name,
+        &request.server_id,
+        &request.arguments,
+        None,
+    )?;
+    let retained = RetainedToolAdmissionRequestV1::from_admission(
+        &request,
+        &matching,
+        &[],
+        None,
+        original.authority_profile(),
+    )?;
+    retained.validate_request_material(&request)?;
+    let restored =
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?;
+    assert!(!restored.matching_grants_require_cumulative_approval());
+    let (_, cumulative, _, _) =
+        caller_admission_with_approval(None, Approval::CumulativeUnused, false)?;
+    let retained = cumulative
+        .original_retained_request()
+        .ok_or("cumulative original")?;
+    assert!(
+        RetainedToolAdmissionRequestV1::from_canonical_bytes(retained.canonical_bytes())?
+            .matching_grants_require_cumulative_approval()
+    );
+    Ok(())
+}
+
+fn approval_selection() -> TestResult<AdmissionAuthoritySelectionV1> {
     let mut selected = selection();
     selected.approval = Some(GovernedApprovalAuthorityBindingV1::new(
         identifier("approval")?,
         identifier("approval-generation")?,
     ));
-    require_absent_custody(Some(&AdmissionAuthorityProfileV1::new(selected)?))
+    Ok(selected)
+}
+
+#[test]
+fn caller_snapshot_allows_configured_but_unused_approval_authority() -> TestResult {
+    require_absent_custody(Some(&AdmissionAuthorityProfileV1::new(
+        approval_selection()?,
+    )?))
 }
 
 fn dpop_selection() -> TestResult<AdmissionAuthoritySelectionV1> {
@@ -84,7 +229,7 @@ fn dpop_selection() -> TestResult<AdmissionAuthoritySelectionV1> {
 
 #[test]
 fn caller_snapshot_rejects_missing_required_dpop_custody() -> TestResult {
-    require_missing_custody_denial(dpop_selection()?, "DPoP", true)
+    require_missing_custody_denial(dpop_selection()?, "DPoP", false, true)
 }
 
 #[test]
@@ -94,7 +239,7 @@ fn caller_snapshot_allows_configured_but_unused_dpop_authority() -> TestResult {
 
 fn require_absent_custody(profile: Option<&AdmissionAuthorityProfileV1>) -> TestResult {
     let (kernel, admission, _, now) =
-        super::fixture::caller_admission_with_profile(profile, false)?;
+        super::fixture::caller_admission_with_profile(profile, false, false)?;
     let snapshot = kernel.read_caller_participant_custody(&admission, 0, now)?;
     assert_eq!(
         serde_json::to_value(snapshot)?,

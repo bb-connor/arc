@@ -16,7 +16,7 @@
       "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": "artifact-manifest.json",
-      "result": "The revised 19-page PDF, bibliography, source references and artifact hashes agree. The architecture revision changes no native implementation, formal program, experiment or comparison tool. The 21 qualified native commands, six opt-in chain regressions and historical F1 source pin retain their original scope; initial failures and default-suite skips remain recorded."
+      "result": "The 19-page PDF, bibliography, source references and artifact hashes agree. The integrated PR review candidate has fresh source-bound evidence for all 21 native qualification commands, including parent loss and child collection replay. Targeted review regressions, six separately executed opt-in chain tests, and historical F1 source pins retain their declared scopes. Initial failures, interrupted campaigns and default-suite skips remain recorded."
     },
     {
       "id": "funded-security-integration",

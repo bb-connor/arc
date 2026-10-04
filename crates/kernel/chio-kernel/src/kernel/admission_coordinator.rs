@@ -1440,7 +1440,18 @@ impl ChioKernel {
             let proposal_matches =
                 admission.operation.threshold_proposal_hash() == Some(&proposal_hash);
             let set_matches = admission.operation.approval_set_hash() == Some(&approval_set_hash);
-            if proposal_matches && set_matches {
+            // Older reservations retained only the two hashes. Preserve exact
+            // replay without backfilling or reinterpreting their commitments.
+            let body_matches = admission
+                .operation
+                .threshold_proposal()
+                .is_none_or(|proposal| {
+                    verified
+                        .threshold_replay
+                        .as_ref()
+                        .is_some_and(|replay| replay.proposal() == proposal)
+                });
+            if proposal_matches && set_matches && body_matches {
                 return Ok(());
             }
             return Err(KernelError::DurableAdmission(
@@ -1466,10 +1477,19 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let attachments = vec![
+        let mut attachments = vec![
             AdmissionAttachment::ThresholdProposalHash(proposal_hash),
             AdmissionAttachment::ApprovalSetHash(approval_set_hash),
         ];
+        if let Some(replay) = verified.threshold_replay.as_ref() {
+            // Freeze the verified approval kind for caller custody. Previously
+            // a configured single-approval owner rejected threshold callers
+            // before a caller frame could commit. Existing affected Ready
+            // reservations keep their fail-closed expiry/compensation path.
+            attachments.push(AdmissionAttachment::ThresholdProposal(Box::new(
+                replay.proposal().clone(),
+            )));
+        }
         admission.operation = if let Some(replay) = verified.threshold_replay.as_ref() {
             let expires_at_unix_ms = trusted_now_unix_ms
                 .checked_add(RECOVERY_LEASE_DURATION_MS)

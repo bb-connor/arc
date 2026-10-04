@@ -1,0 +1,43 @@
+warning: patch `cmpv2 v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/cmpv2-chio)` was not used in the crate graph
+warning: patch `crmf v0.2.0 (/tmp/chio-verifiable-work-paper/third_party/crmf-chio)` was not used in the crate graph
+warning: patch `ignore v0.4.32 (/tmp/chio-verifiable-work-paper/third_party/ignore-chio)` was not used in the crate graph
+warning: patch `nono v0.53.0 (/tmp/chio-verifiable-work-paper/third_party/nono-upstream-chio)` was not used in the crate graph
+warning: patch `regress v0.11.1 (/tmp/chio-verifiable-work-paper/third_party/regress-chio)` was not used in the crate graph
+warning: patch `sigstore-crypto v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-crypto-chio)` was not used in the crate graph
+warning: patch `sigstore-merkle v0.6.6 (/tmp/chio-verifiable-work-paper/third_party/sigstore-merkle-chio)` was not used in the crate graph
+warning: patch `sigstore-trust-root v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-trust-root-chio)` was not used in the crate graph
+warning: patch `sigstore-verify v0.6.3 (/tmp/chio-verifiable-work-paper/third_party/sigstore-verify-chio)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+   Compiling chio-kernel v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-kernel)
+   Compiling chio-finding-verifier v0.1.0 (/tmp/chio-verifiable-work-paper/crates/trust/chio-finding-verifier)
+   Compiling chio-transaction-passport v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-transaction-passport)
+   Compiling chio-risk-comptroller v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-risk-comptroller)
+   Compiling chio-commerce-order v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-commerce-order)
+   Compiling chio-agent-web-interop v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-agent-web-interop)
+   Compiling chio-store-sqlite v0.1.0 (/tmp/chio-verifiable-work-paper/crates/platform/chio-store-sqlite)
+   Compiling chio-runtime-core v0.1.0 (/tmp/chio-verifiable-work-paper/crates/kernel/chio-runtime-core)
+    Finished `test` profile [unoptimized] target(s) in 3m 58s
+     Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_runtime_core-38195e24b8a8917b)
+     Running tests/lease_boundaries.rs (/tmp/chio-paper-target/debug/deps/lease_boundaries-f9fd172fd95771f7)
+     Running tests/outcome_continuation.rs (/tmp/chio-paper-target/debug/deps/outcome_continuation-24fc3777b21daa36)
+     Running tests/runtime_admission.rs (/tmp/chio-paper-target/debug/deps/runtime_admission-e346642040ed5a45)
+     Running tests/runtime_agreement_context_scan.rs (/tmp/chio-paper-target/debug/deps/runtime_agreement_context_scan-c9d7510e26963eaf)
+     Running tests/runtime_buyer_review.rs (/tmp/chio-paper-target/debug/deps/runtime_buyer_review-b7e8c78d7f28d15f)
+     Running tests/runtime_kernel_hook.rs (/tmp/chio-paper-target/debug/deps/runtime_kernel_hook-bfdc4fcc4587b660)
+     Running tests/runtime_ops.rs (/tmp/chio-paper-target/debug/deps/runtime_ops-d81c500610d4a552)
+     Running tests/runtime_ops_provider_health.rs (/tmp/chio-paper-target/debug/deps/runtime_ops_provider_health-ed31261fa7d4cfc2)
+     Running tests/runtime_orchestration.rs (/tmp/chio-paper-target/debug/deps/runtime_orchestration-db5757507782bbe7)
+     Running tests/runtime_pheromone_policy.rs (/tmp/chio-paper-target/debug/deps/runtime_pheromone_policy-bab87fd672795f29)
+     Running tests/runtime_store.rs (/tmp/chio-paper-target/debug/deps/runtime_store-c3724664f3dbb0d0)
+     Running tests/runtime_treaty.rs (/tmp/chio-paper-target/debug/deps/runtime_treaty-b89b65ac02bee1b1)
+     Running tests/runtime_treaty_binding_substitution.rs (/tmp/chio-paper-target/debug/deps/runtime_treaty_binding_substitution-6d217d381a3033c9)
+     Running tests/runtime_treaty_continuation_reopen.rs (/tmp/chio-paper-target/debug/deps/runtime_treaty_continuation_reopen-aaec0fa1a7a47c39)
+     Running tests/runtime_treaty_predicate_substitution.rs (/tmp/chio-paper-target/debug/deps/runtime_treaty_predicate_substitution-1fedf0e923552841)
+     Running tests/runtime_trust.rs (/tmp/chio-paper-target/debug/deps/runtime_trust-0289df60327b175d)
+     Running unittests src/lib.rs (/tmp/chio-paper-target/debug/deps/chio_swarm_authority-3c249e89b0fe985a)
+     Running tests/swarm_authority_stage0.rs (/tmp/chio-paper-target/debug/deps/swarm_authority_stage0-303f1b39701a4d6a)
+   Doc-tests chio_runtime_core
+   Doc-tests chio_swarm_authority

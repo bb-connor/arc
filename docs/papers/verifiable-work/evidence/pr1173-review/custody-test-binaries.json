@@ -1,0 +1,12 @@
+{
+  "chio_store_sqlite": {
+    "source": "/home/connor/chio-pr1173-target/debug/deps/chio_store_sqlite-0a139a0288e85aac",
+    "immutable_copy": "/tmp/chio-pr1173-custody-binaries/chio-store-sqlite",
+    "sha256": "77389aabfdf743fbe9aa12274bfc588c614e92ff184d1c5285213b5f9f70fe2d"
+  },
+  "chio_kernel": {
+    "source": "/home/connor/chio-pr1173-target/debug/deps/chio_kernel-faecc0b05b9b420b",
+    "immutable_copy": "/tmp/chio-pr1173-custody-binaries/chio-kernel",
+    "sha256": "1ac9e267c11ab6959f8706d2b51fc955d763c6e8fd88500a051f2cc292006f95"
+  }
+}

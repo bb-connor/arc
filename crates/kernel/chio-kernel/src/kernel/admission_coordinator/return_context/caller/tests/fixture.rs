@@ -11,11 +11,15 @@ use crate::admission_operation::{
 use crate::execution_nonce::ExecutionNonceConfig;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 
+#[path = "approval.rs"]
+mod approval;
+pub(super) use approval::Approval;
+
 fn identifier(field: &'static str, value: impl Into<String>) -> TestResult<AdmissionIdentifier> {
     Ok(AdmissionIdentifier::try_new(field, value.into())?)
 }
 
-fn advance(
+pub(super) fn advance(
     operation: AdmissionOperationV1,
     attachments: Vec<AdmissionAttachment>,
     state: AdmissionOperationState,
@@ -49,7 +53,7 @@ fn advance(
 }
 
 pub(super) fn fixture() -> TestResult<Fixture> {
-    let (kernel, admission, request, now) = caller_admission_with_profile(None, false)?;
+    let (kernel, admission, request, now) = caller_admission_with_profile(None, false, false)?;
     let nonce = request.execution_nonce.clone().ok_or("caller nonce")?;
     let frozen = kernel.freeze_durable_tool_return_context(
         &admission,
@@ -80,10 +84,27 @@ pub(super) fn fixture() -> TestResult<Fixture> {
 
 pub(super) fn caller_admission_with_profile(
     profile: Option<&AdmissionAuthorityProfileV1>,
+    approval_required: bool,
+    dpop_required: bool,
+) -> TestResult<(ChioKernel, DurableToolAdmission, ToolCallRequest, u64)> {
+    caller_admission_with_approval(
+        profile,
+        if approval_required {
+            Approval::Single
+        } else {
+            Approval::None
+        },
+        dpop_required,
+    )
+}
+
+pub(super) fn caller_admission_with_approval(
+    profile: Option<&AdmissionAuthorityProfileV1>,
+    approval: Approval,
     dpop_required: bool,
 ) -> TestResult<(ChioKernel, DurableToolAdmission, ToolCallRequest, u64)> {
     let key = chio_core::Keypair::generate();
-    let kernel = ChioKernel::new_with_clock(
+    let mut kernel = ChioKernel::new_with_clock(
         KernelConfig {
             keypair: key.clone(),
             ca_public_keys: vec![key.public_key()],
@@ -112,7 +133,7 @@ pub(super) fn caller_admission_with_profile(
                 server_id: "caller-context-server".into(),
                 tool_name: "mutate".into(),
                 operations: vec![Operation::Invoke],
-                constraints: vec![],
+                constraints: approval.constraints(),
                 max_invocations: Some(1),
                 max_cost_per_invocation: None,
                 max_total_cost: None,
@@ -127,6 +148,7 @@ pub(super) fn caller_admission_with_profile(
         "tool_name": "mutate", "server_id": "caller-context-server",
         "agent_id": subject.to_hex(), "arguments": {"protected_input": "private-request-input"}
     }))?;
+    let approval_replay = approval.configure(&mut kernel, &mut request, &key)?;
     let matching = resolve_required_matching_grants(
         &request.capability,
         &request.tool_name,
@@ -168,6 +190,7 @@ pub(super) fn caller_admission_with_profile(
             AdmissionParticipantRequirements {
                 broker_attempt: true,
                 budget_capture: true,
+                approval: approval.required(),
                 execution_nonce: true,
                 ..AdmissionParticipantRequirements::NONE
             },
@@ -198,7 +221,7 @@ pub(super) fn caller_admission_with_profile(
             operation.binding().operation_id().as_str()
         ),
     )?;
-    for (state, attachments) in [
+    let mut stages = vec![
         (
             AdmissionOperationState::Prepared,
             vec![AdmissionAttachment::ExecutionNonceIssuanceDigest(
@@ -213,6 +236,24 @@ pub(super) fn caller_admission_with_profile(
             AdmissionOperationState::BudgetAuthorized,
             vec![AdmissionAttachment::BudgetHoldId(hold)],
         ),
+    ];
+    if let Some(replay) = approval_replay {
+        stages.push((
+            AdmissionOperationState::ApprovalReserved,
+            vec![
+                AdmissionAttachment::ThresholdProposalHash(AdmissionDigest::try_new(
+                    "proposal",
+                    replay.proposal().artifact_digest()?,
+                )?),
+                AdmissionAttachment::ApprovalSetHash(AdmissionDigest::try_new(
+                    "approval",
+                    replay.verified_set().approval_set_hash()?,
+                )?),
+                AdmissionAttachment::ThresholdProposal(Box::new(replay.proposal().clone())),
+            ],
+        ));
+    }
+    stages.extend([
         (
             AdmissionOperationState::ReadyToDispatch,
             vec![AdmissionAttachment::ExecutionNonceId(
@@ -220,7 +261,8 @@ pub(super) fn caller_admission_with_profile(
             )],
         ),
         (AdmissionOperationState::CapturePending, vec![]),
-    ] {
+    ]);
+    for (state, attachments) in stages {
         operation = advance(operation, attachments, state, now)?;
     }
     request.execution_nonce = Some(nonce.signed_nonce().clone());

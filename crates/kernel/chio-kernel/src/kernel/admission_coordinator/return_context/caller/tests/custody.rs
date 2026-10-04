@@ -12,7 +12,6 @@ fn caller_custody_rejects_each_selected_family_without_its_physical_ledger() -> 
     };
     use crate::dpop::authority::{DpopReplayAuthorityInputV1, DpopReplayAuthorityV1};
     for selected in 0_u8..8 {
-        let mut fixture = fixture()?;
         let id = |value: &str| AdmissionIdentifier::try_new("test", value.to_owned());
         let runtime = selected & 1 != 0;
         let approval = selected & 2 != 0;
@@ -50,31 +49,20 @@ fn caller_custody_rejects_each_selected_family_without_its_physical_ledger() -> 
                 None
             },
         })?;
-        let request = fixture
-            .admission
-            .original_retained_request()
-            .ok_or("original")?
-            .request_for_revalidation()
-            .clone();
-        let matching = resolve_required_matching_grants(
-            &request.capability,
-            &request.tool_name,
-            &request.server_id,
-            &request.arguments,
-            request.model_metadata.as_ref(),
-        )?;
-        fixture.admission.retained_request = Some(RetainedToolAdmissionRequestV1::from_admission(
-            &request,
-            &matching,
-            &[],
-            None,
-            &profile,
-        )?);
-        let result = fixture.kernel.read_caller_participant_custody(
-            &fixture.admission,
-            0,
-            current_unix_timestamp_ms(),
+        let (kernel, admission, _, now) =
+            super::fixture::caller_admission_with_profile(Some(&profile), approval, dpop)?;
+        assert_eq!(
+            admission
+                .operation
+                .binding()
+                .participant_requirements()
+                .approval,
+            approval,
         );
+        let original = admission.original_retained_request().ok_or("original")?;
+        original.validate_binding(admission.operation.binding())?;
+        assert_eq!(original.matching_grants_require_dpop(), dpop);
+        let result = kernel.read_caller_participant_custody(&admission, 0, now);
         if selected == 0 {
             let custody = result?;
             assert_eq!(

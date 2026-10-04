@@ -50,6 +50,85 @@ fn assert_unchanged(fixture: &Fixture, operation: &AdmissionOperationV1, before:
 }
 
 #[test]
+fn threshold_reservation_retains_typed_proposal_and_preserves_legacy_commands() {
+    for typed in [false, true] {
+        let fixture = fixture();
+        let now = now_ms();
+        let operation = prepared(&fixture, now);
+        let reservation = reservation(now / 1_000);
+        let make_command = |operation: &AdmissionOperationV1| {
+            let base = reservation_command(&fixture, operation, &reservation, now);
+            let mut attachments = base.attachments().to_vec();
+            if typed {
+                attachments.push(AdmissionAttachment::ThresholdProposal(Box::new(
+                    reservation.proposal().clone(),
+                )));
+            }
+            AdmissionOperationCommand::new(
+                base.operation_id().clone(),
+                base.expected_version(),
+                base.recovery_lease().clone(),
+                attachments,
+                base.next_state(),
+                None,
+                None,
+            )
+            .expect("typed proposal command")
+        };
+        let retained = fixture
+            .store
+            .reserve_threshold_approval_and_commit_admission(
+                &make_command(&operation),
+                &reservation,
+                now,
+            )
+            .expect("threshold reservation")
+            .into_operation();
+        assert_eq!(
+            retained.threshold_proposal(),
+            typed.then_some(reservation.proposal())
+        );
+        let retry = make_command(&retained);
+        let before = counts(&fixture);
+        fixture
+            .store
+            .reserve_threshold_approval_and_commit_admission(&retry, &reservation, now)
+            .expect("exact threshold replay");
+        assert_unchanged(&fixture, &retained, before);
+    }
+}
+
+#[test]
+fn threshold_reservation_rejects_a_different_typed_proposal_atomically() {
+    let fixture = fixture();
+    let now = now_ms();
+    let operation = prepared(&fixture, now);
+    let packet = reservation(now / 1_000);
+    let different = reservation(now / 1_000 + 1);
+    let base = reservation_command(&fixture, &operation, &packet, now);
+    let mut attachments = base.attachments().to_vec();
+    attachments.push(AdmissionAttachment::ThresholdProposal(Box::new(
+        different.proposal().clone(),
+    )));
+    let command = AdmissionOperationCommand::new(
+        base.operation_id().clone(),
+        base.expected_version(),
+        base.recovery_lease().clone(),
+        attachments,
+        base.next_state(),
+        None,
+        None,
+    )
+    .expect("different proposal command");
+    let before = counts(&fixture);
+    assert!(fixture
+        .store
+        .reserve_threshold_approval_and_commit_admission(&command, &packet, now)
+        .is_err());
+    assert_unchanged(&fixture, &operation, before);
+}
+
+#[test]
 fn threshold_reservation_rejects_foreign_participant_attachments_atomically() {
     for extra in [
         AdmissionAttachment::ExecutionNonceId(identifier("nonce_id", "unreserved-nonce")),

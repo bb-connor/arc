@@ -311,6 +311,10 @@ fn approval_authority_cannot_replace_receiver_owned_capability() -> Result {
     let mut body = req.capability.body();
     body.issuer = key(2).public_key();
     req.capability = chio_core::capability::token::CapabilityToken::sign(body, &key(2))?;
+    assert!(
+        child.bind_tool_approval_intent(&req).is_err(),
+        "approval issuer acquired the receiver's capability authority"
+    );
     let response = child.evaluate_tool_call_blocking(&req)?;
     assert_eq!(
         response.verdict,

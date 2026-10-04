@@ -1,0 +1,6 @@
+{
+  "source_revision": "88eb4695b563462ed46cb05d0836c41617256a4a",
+  "binary": "/home/connor/chio-pr1173-run-binaries/store-before-approval",
+  "sha256": "a5ee18d051ea949627cd64a58bfe96ee26ccf7a1ba5a2b20ec0724fe5eb378ee",
+  "reason": "Preserved original running test binary after concurrent rebuild unlinked its current_exe path; child-process failures will be rerun from this stable path."
+}

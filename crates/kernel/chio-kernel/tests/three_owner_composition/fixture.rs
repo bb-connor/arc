@@ -234,7 +234,7 @@ pub fn open(root: &Path, role: u8, cut: &str, bad_parent: bool) -> Result<ChioKe
     let authority = SqliteAuthorityStore::open_serving(&db, &locks)?;
     let config = KernelConfig {
         keypair: key(role),
-        ca_public_keys: vec![key(approver(role)).public_key()],
+        ca_public_keys: vec![key(role).public_key()],
         max_delegation_depth: 5,
         policy_hash: sha256_hex(b"three-owner-composition-v1"),
         allow_sampling: false,
@@ -251,6 +251,10 @@ pub fn open(root: &Path, role: u8, cut: &str, bad_parent: bool) -> Result<ChioKe
         deadlines: HotPathDeadlineConfig::default(),
     };
     let mut kernel = ChioKernel::new(config);
+    kernel.set_governed_approval_policy(
+        "composition".into(),
+        vec![key(approver(role)).public_key()],
+    )?;
     kernel.require_durable_request_retention();
     let receipts = SqliteReceiptStore::open(dir.join("receipts.db"))?;
     receipts.wait_for_writer_ready(Duration::from_secs(30))?;
@@ -344,21 +348,7 @@ pub fn request(kernel: &ChioKernel, role: u8, arguments: Value) -> Result<ToolCa
         },
     };
     let request_id = format!("original-owner-{role}");
-    let token = GovernedApprovalToken::sign(
-        GovernedApprovalTokenBody {
-            id: format!("approval-{role}"),
-            approver: key(approver(role)).public_key(),
-            subject: cap.subject.clone(),
-            governed_intent_hash: intent.binding_hash()?,
-            request_id: request_id.clone(),
-            threshold_proposal_hash: None,
-            issued_at: cap.issued_at,
-            expires_at: cap.expires_at,
-            decision: GovernedApprovalDecision::Approved,
-        },
-        &key(approver(role)),
-    )?;
-    Ok(ToolCallRequest {
+    let mut request = ToolCallRequest {
         request_id,
         agent_id: cap.subject.to_hex(),
         capability: cap,
@@ -368,14 +358,31 @@ pub fn request(kernel: &ChioKernel, role: u8, arguments: Value) -> Result<ToolCa
         dpop_proof: None,
         execution_nonce: None,
         governed_intent: Some(intent),
-        approval_token: Some(token),
+        approval_token: None,
         approval_tokens: vec![],
         threshold_approval_proposal: None,
         supplemental_authorization: None,
         model_metadata: None,
         federated_origin_kernel_id: None,
         declassification_grant: None,
-    })
+    };
+    let intent = kernel.bind_tool_approval_intent(&request)?;
+    request.approval_token = Some(GovernedApprovalToken::sign(
+        GovernedApprovalTokenBody {
+            id: format!("approval-{role}"),
+            approver: key(approver(role)).public_key(),
+            subject: request.capability.subject.clone(),
+            governed_intent_hash: intent.binding_hash()?,
+            request_id: request.request_id.clone(),
+            threshold_proposal_hash: None,
+            issued_at: request.capability.issued_at,
+            expires_at: request.capability.expires_at,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &key(approver(role)),
+    )?);
+    request.governed_intent = Some(intent);
+    Ok(request)
 }
 
 pub fn evaluate(kernel: &ChioKernel, request: &ToolCallRequest) -> Result<ToolCallResponse> {

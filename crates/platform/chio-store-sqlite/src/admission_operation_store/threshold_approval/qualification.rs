@@ -16,8 +16,19 @@ pub(super) fn qualify_command(
         .verified_set()
         .approval_set_hash()
         .map_err(|error| invariant(error.to_string()))?;
+    // Legacy commands carried the two hashes; new commands also freeze the
+    // exact verified proposal. Neither shape may smuggle another participant.
+    let shape_matches = command.attachments().len() == 2
+        || (command.attachments().len() == 3
+            && command.attachments().iter().any(|attachment| {
+                matches!(
+                    attachment,
+                    AdmissionAttachment::ThresholdProposal(proposal)
+                        if proposal.as_ref() == reservation.proposal()
+                )
+            }));
     if command.next_state() != Some(AdmissionOperationState::ApprovalReserved)
-        || command.attachments().len() != 2
+        || !shape_matches
         || command.terminal_replay().is_some()
         || command.last_error().is_some()
         || !command.attachments().iter().any(|attachment| {
@@ -68,6 +79,14 @@ pub(super) fn verify_exact_replay(
     trusted_now_unix_ms: u64,
 ) -> Result<(), AdmissionOperationStoreError> {
     let proposal = reservation.proposal();
+    if operation
+        .threshold_proposal()
+        .is_some_and(|retained| retained != proposal)
+    {
+        return Err(invariant(
+            "threshold replay changed its retained typed proposal",
+        ));
+    }
     let body = &proposal.body;
     let proposal_json =
         canonical_json_bytes(proposal).map_err(|error| invariant(error.to_string()))?;

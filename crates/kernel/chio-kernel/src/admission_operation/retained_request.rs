@@ -338,6 +338,21 @@ impl RetainedToolAdmissionRequestV1 {
         })
     }
 
+    /// Original cumulative profile, not a fresh approval decision. Admission
+    /// rejects disagreement among matching grants; unrelated grants cannot
+    /// exempt the selected operation from single-approval custody.
+    pub(crate) fn matching_grants_require_cumulative_approval(&self) -> bool {
+        !self.wire.matching_grant_indices.is_empty()
+            && self.wire.matching_grant_indices.iter().all(|index| {
+                self.retained_matching_grant(*index).is_some_and(|grant| {
+                    grant.constraints.iter().any(|constraint| matches!(
+                        constraint,
+                        chio_core::capability::scope::Constraint::RequireCumulativeApprovalAbove { .. }
+                    ))
+                })
+            })
+    }
+
     /// Check immutable request equality using the original grant selection and
     /// post-return plan. Transient credentials are intentionally not replayed or
     /// compared here. This is a binding check, not fresh execution authority.
