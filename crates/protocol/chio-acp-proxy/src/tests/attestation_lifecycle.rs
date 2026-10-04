@@ -637,3 +637,87 @@ fn terminal_kill_with_mismatched_parameter_hash_fails_closed() {
         other => panic!("expected Block for cross-session replay, got {:?}", other),
     }
 }
+
+#[test]
+fn checker_failure_cannot_reuse_a_prior_tool_authorization(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (method, payload) in [
+        (
+            "fs/read_text_file",
+            json!({"path": "/home/user/project/src/lib.rs"}),
+        ),
+        (
+            "fs/write_text_file",
+            json!({"path": "/home/user/project/src/lib.rs", "content": "new"}),
+        ),
+        (
+            "terminal/create",
+            json!({"command": "cargo", "args": ["test"]}),
+        ),
+        ("terminal/kill", json!({"terminalId": "call"})),
+        ("terminal/release", json!({"terminalId": "call"})),
+    ] {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let verdict =
+            RecordingChecker::allow_with_receipt(requests.clone(), "cap", "receipt", "request")
+                .verdict;
+        // Once the valid verdict is consumed, the checker becomes unavailable.
+        let checker = SequencedChecker::new(requests, vec![verdict]);
+        let config = AcpProxyConfig::new("echo", "deadbeef")
+            .with_allowed_path_prefix("/home/user/project")
+            .with_allowed_command("cargo");
+        let interceptor = MessageInterceptor::with_kernel(
+            config,
+            None,
+            Some(Box::new(checker)),
+            AcpAttestationMode::BestEffort,
+            AcpClock::default(),
+        );
+        let mut params = payload;
+        params["sessionId"] = json!("session");
+        // Lifecycle operations also support the terminal ID as their binding.
+        if !matches!(method, "terminal/kill" | "terminal/release") {
+            params["toolCallId"] = json!("call");
+        }
+        params["capabilityToken"] = json!("signed-capability-json");
+        let message = json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params});
+        assert!(
+            matches!(
+                interceptor.intercept_value(Direction::AgentToClient, &message)?,
+                InterceptResult::Forward(_)
+            ),
+            "{method}"
+        );
+        let update = json!({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "session", "update": {"toolCallId": "call", "title": "Tool call", "kind": "read", "status": "running"}}});
+        let InterceptResult::ForwardWithReceipt(_, live) =
+            interceptor.intercept_value(Direction::AgentToClient, &update)?
+        else {
+            return Err("missing positive-control receipt".into());
+        };
+        assert_eq!(
+            live.enforcement_mode,
+            Some(AcpEnforcementMode::CryptographicallyEnforced),
+            "{method}"
+        );
+        assert!(
+            matches!(
+                interceptor.intercept_value(Direction::AgentToClient, &message),
+                Err(AcpProxyError::Capability(_))
+            ),
+            "{method}"
+        );
+        let InterceptResult::ForwardWithReceipt(_, refused) =
+            interceptor.intercept_value(Direction::AgentToClient, &update)?
+        else {
+            return Err("missing post-refusal receipt".into());
+        };
+        assert_eq!(
+            refused.enforcement_mode,
+            Some(AcpEnforcementMode::AuditOnly),
+            "{method}"
+        );
+        assert_eq!(refused.capability_id, None, "{method}");
+        assert_eq!(refused.authorization_receipt_id, None, "{method}");
+    }
+    Ok(())
+}

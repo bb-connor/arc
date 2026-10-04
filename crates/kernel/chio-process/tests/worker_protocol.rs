@@ -2,6 +2,9 @@
 
 mod support;
 
+#[path = "worker_protocol/authority_clock.rs"]
+mod authority_clock;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 

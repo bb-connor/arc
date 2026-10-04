@@ -674,6 +674,12 @@ impl MessageInterceptor {
         id: Option<&Value>,
         request: AcpCapabilityRequest,
     ) -> CapabilityGate {
+        // A repeated tool identity needs fresh authorization. Retire its old
+        // context before the fallible check so neither an error nor a denial
+        // can lend that authority to a later session/update.
+        if let Some(tool_call_id) = request.tool_call_id.as_deref() {
+            self.clear_tool_capability_context(&request.session_id, tool_call_id);
+        }
         let Some(checker) = self.capability_checker.as_ref() else {
             return CapabilityGate::Skip;
         };

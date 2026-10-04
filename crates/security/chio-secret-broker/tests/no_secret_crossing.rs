@@ -341,15 +341,25 @@ mod linux_process {
             "tenantScope": "tenant-production"
         }))
         .test_expect("ordinary tool frame");
-        let mut wrong_endpoint = std::os::unix::net::UnixStream::connect(&audit_socket)
-            .test_expect("connect privileged audit socket");
-        write_bounded_frame(&mut wrong_endpoint, &ordinary_tool_frame)
-            .test_expect("write ordinary operation to audit socket");
-        assert!(read_bounded_frame(&mut wrong_endpoint).is_err());
-        assert!(child
-            .try_wait()
-            .test_expect("brokerd status after rejected audit frame")
-            .is_none());
+        for invalid_frame in [
+            ordinary_tool_frame.as_slice(),
+            b"{",
+            b"{\"schema\":1,\"schema\":2}",
+            b"\xff",
+        ] {
+            let mut wrong_endpoint = std::os::unix::net::UnixStream::connect(&audit_socket)
+                .test_expect("connect privileged audit socket");
+            wrong_endpoint
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .test_expect("audit response timeout");
+            write_bounded_frame(&mut wrong_endpoint, invalid_frame)
+                .test_expect("write invalid audit frame");
+            assert!(read_bounded_frame(&mut wrong_endpoint).is_err());
+            assert!(child
+                .try_wait()
+                .test_expect("brokerd status after rejected audit frame")
+                .is_none());
+        }
 
         let credential = CredentialRef {
             provider: "generic-https".to_string(),
@@ -392,10 +402,34 @@ mod linux_process {
             payload: payload.into(),
         })
         .test_expect("request frame");
-        let mut stream =
-            std::os::unix::net::UnixStream::connect(&broker_socket).test_expect("connect brokerd");
-        write_bounded_frame(&mut stream, &frame).test_expect("write request");
-        let response_frame = read_bounded_frame(&mut stream).test_expect("read response");
+        let response = (|| -> Result<Vec<u8>> {
+            let mut stream =
+                std::os::unix::net::UnixStream::connect(&broker_socket).map_err(|error| {
+                    BrokerError::InvalidRequest(format!("connect brokerd: {error}"))
+                })?;
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .test_expect("broker response timeout");
+            write_bounded_frame(&mut stream, &frame)?;
+            read_bounded_frame(&mut stream)
+        })();
+        let response_frame = match response {
+            Ok(frame) => frame,
+            Err(error) => {
+                let _ = child.kill();
+                let output = child
+                    .wait_with_output()
+                    .test_expect("failed brokerd output");
+                for bytes in [&output.stdout, &output.stderr] {
+                    assert!(!bytes.windows(canary.len()).any(|window| window == canary));
+                }
+                panic!(
+                    "read response: {error}; brokerd status: {}; diagnostic: {}",
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+        };
         let response: IpcResponse =
             serde_json::from_slice(&response_frame).test_expect("response envelope");
         assert!(response.accepted);

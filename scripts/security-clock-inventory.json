@@ -35,7 +35,6 @@
     "crates/kernel/chio-kernel/tests/retention.rs::unique_db_path": 1,
     "crates/kernel/chio-process/src/mailboxes/mod.rs::now_ms": 1,
     "crates/kernel/chio-process/src/store/children.rs::caller": 1,
-    "crates/kernel/chio-process/src/worker.rs::now": 1,
     "crates/kernel/chio-process/tests/mailbox_effect_boundary.rs::mailbox_claims_do_not_fence_independent_resource_mutations": 1,
     "crates/kernel/chio-process/tests/nonce_recovery.rs::strict_nonce_subprocess": 1,
     "crates/kernel/chio-process/tests/worker_protocol.rs::expired_credential_rejects_even_inspection": 1,

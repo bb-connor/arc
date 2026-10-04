@@ -514,7 +514,7 @@ async fn security_binding_projection_refuses_without_upstream_effects() {
         url,
     );
     let issuer = &state.signer_keypair;
-    let now = chrono::Utc::now().timestamp() as u64;
+    let now = state.clock.seconds().test_unwrap();
     let binding = CapabilitySecurityBinding {
         schema: CAPABILITY_SECURITY_BINDING_SCHEMA.into(),
         tenant_id: "tenant-a".into(),

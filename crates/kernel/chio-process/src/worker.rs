@@ -4,7 +4,6 @@
 //! Workers cannot select an issuer, credential, endpoint or administrative action.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 
@@ -151,7 +150,7 @@ impl WorkerService {
                 process_id,
                 &sha256_hex(secret.as_bytes()),
                 expires_at,
-                now()?,
+                self.authority_now()?,
             )
         })?;
         Ok(WorkerCredential(secret))
@@ -173,8 +172,20 @@ impl WorkerService {
             return Err(ProcessError::Unauthenticated);
         }
         self.runtime.with_store(|store| {
-            store.authenticate_worker(&sha256_hex(credential.as_bytes()), now()?)
+            store.authenticate_worker(&sha256_hex(credential.as_bytes()), self.authority_now()?)
         })
+    }
+
+    fn authority_now(&self) -> Result<u64, ProcessError> {
+        // Sample after acquiring the process store, using the same source and
+        // regression fence as kernel admission. Clock errors never grant
+        // authority or release stored state through the worker protocol.
+        let now = self
+            .runtime
+            .authority_clock()
+            .unix_millis()
+            .map_err(chio_kernel::KernelError::from)?;
+        Ok(now.as_secs())
     }
 
     async fn execute(&self, frame: &[u8]) -> Result<Value, ProcessError> {
@@ -324,13 +335,6 @@ impl WorkerService {
         bytes.0.push(b'\n');
         bytes.0
     }
-}
-
-fn now() -> Result<u64, ProcessError> {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .map_err(|_| ProcessError::Configuration("system time precedes Unix epoch"))
 }
 
 fn error_code(error: &ProcessError) -> &'static str {
