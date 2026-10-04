@@ -6,6 +6,7 @@ cd "$(dirname "$0")/../.."
 test -x scripts/check-security-adversarial-evidence.sh
 bash -n scripts/check-security-adversarial-evidence.sh
 python3 -m py_compile scripts/check-security-adversarial-evidence.py
+python3 scripts/tests/check-cargo-mutants-source-paths.test.py
 
 if enterprise_promotion_output="$(
   CHIO_ENTERPRISE_SECURITY_RUNNER=1 \
@@ -2048,6 +2049,20 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
         inventory_paths[:] = [
             "crates/fixture-package/src/../src/lib.rs"
         ]
+        normalized_inventory = checker.cargo_mutants_source_inventory(
+            promotion_root,
+            source_validation_packages["fixture-package"],
+            "fixture-package",
+            checker.CargoMutantsSourceInventory(
+                executable=host_tool, version_checked=True
+            ),
+        )
+        if normalized_inventory != frozenset({"crates/fixture-package/src/lib.rs"}):
+            raise AssertionError("in-package Rust module parent was not normalized")
+
+        inventory_paths[:] = [
+            "crates/fixture-package/src/../../other-package/src/lib.rs"
+        ]
         try:
             checker.cargo_mutants_source_inventory(
                 promotion_root,
@@ -2058,12 +2073,12 @@ with tempfile.TemporaryDirectory(prefix="chio-adversarial-evidence-selftest-") a
                 ),
             )
         except checker.EvidenceError as error:
-            if "invalid repository-relative path" not in str(error):
+            if "module source escaped its Cargo package" not in str(error):
                 raise AssertionError(
-                    f"unexpected noncanonical inventory rejection: {error}"
+                    f"unexpected escaping inventory rejection: {error}"
                 ) from error
         else:
-            raise AssertionError("noncanonical cargo-mutants source path was accepted")
+            raise AssertionError("escaping cargo-mutants source path was accepted")
 
         inventory_paths[:] = [
             "crates/fixture-package/src/cover.rs\n"

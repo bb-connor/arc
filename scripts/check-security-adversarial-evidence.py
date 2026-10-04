@@ -3655,6 +3655,46 @@ def require_cargo_mutants_version(
     return observed_identity
 
 
+def cargo_mutants_source_path(
+    root: Path, package_prefix: PurePosixPath, value: str, label: str
+) -> str:
+    """Normalize Rust module parents only within a real, non-aliased package."""
+    parsed = PurePosixPath(value)
+    if ".." not in parsed.parts:
+        return canonical_repository_path(value, label)
+    if (
+        parsed.is_absolute()
+        or value != parsed.as_posix()
+        or "\\" in value
+        or any(not character.isprintable() for character in value)
+    ):
+        raise EvidenceError(f"{label}: invalid module source path")
+    prefix = package_prefix.parts
+    if parsed.parts[: len(prefix)] != prefix:
+        raise EvidenceError(f"{label}: module source escaped its Cargo package")
+    components: list[str] = []
+    try:
+        for index, component in enumerate(parsed.parts):
+            if component == "..":
+                if len(components) <= len(prefix):
+                    raise EvidenceError(f"{label}: module source escaped its Cargo package")
+                components.pop()
+                continue
+            components.append(component)
+            if index < len(parsed.parts) - 1:
+                metadata = root.joinpath(*components).lstat()
+                if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode):
+                    raise EvidenceError(f"{label}: module parent is not a no-follow directory")
+        path = canonical_repository_path("/".join(components), label)
+        safe_rust_path(path, label)
+        source = lexical_path_below_root(root, root / path, label)
+        if not stat.S_ISREG(source.lstat().st_mode):
+            raise EvidenceError(f"{label}: module source is not a regular file")
+    except OSError as error:
+        raise EvidenceError(f"{label}: module source is unavailable") from error
+    return path
+
+
 def cargo_mutants_source_inventory(
     root: Path,
     package_dir: Path,
@@ -3718,7 +3758,7 @@ def cargo_mutants_source_inventory(
         raw_path = entry["path"]
         if not isinstance(raw_path, str):
             raise EvidenceError(f"{label}: source inventory path is not a string")
-        path = canonical_repository_path(raw_path, label)
+        path = cargo_mutants_source_path(root, package_prefix, raw_path, label)
         safe_rust_path(path, label)
         parsed = PurePosixPath(path)
         if package_prefix != parsed and package_prefix not in parsed.parents:
