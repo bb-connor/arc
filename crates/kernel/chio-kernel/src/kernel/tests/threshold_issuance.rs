@@ -72,7 +72,7 @@ impl Fixture {
                 cumulative_approval_root_binding: None,
             });
         request.capability = CapabilityToken::sign(body, &kernel.config.keypair)?;
-        request.governed_intent = Some(GovernedTransactionIntent {
+        let mut intent = GovernedTransactionIntent {
             id: "threshold-issuance-intent".into(),
             server_id: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
@@ -88,7 +88,16 @@ impl Fixture {
             autonomy: None,
             context: None,
             body: Default::default(),
-        });
+        };
+        crate::approval::ToolApprovalContext::bind(
+            &mut intent,
+            &request.capability,
+            &request.arguments,
+            &request.request_id,
+            kernel.policy_hash(),
+            "threshold-issuance-test",
+        )?;
+        request.governed_intent = Some(intent);
         Ok(Self {
             kernel,
             request,

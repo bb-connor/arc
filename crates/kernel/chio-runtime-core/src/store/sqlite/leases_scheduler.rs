@@ -148,6 +148,23 @@ fn acquire_run_lease_tx(
 }
 
 impl SqliteRuntimeOrchestrationStore {
+    /// Acquire fresh writer ownership using time observed under the write lock.
+    pub fn acquire_current_run_lease(
+        &self,
+        run_id: &str,
+        owner_id: &str,
+        ttl_ms: u64,
+    ) -> Result<RuntimeRunLease, ChioRuntimeError> {
+        let mut connection = self.lock_connection()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(sqlite_error)?;
+        let now = self.clock.unix_millis()?.get();
+        let lease = acquire_run_lease_tx(&transaction, run_id, owner_id, now, ttl_ms)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(lease)
+    }
+
     pub fn acquire_run_lease(
         &self,
         run_id: &str,

@@ -1,0 +1,2287 @@
+{
+  "schema": "chio.security-qualification.v1",
+  "base_commit": "491f585e9013dcb6335589c82d00ac219efbf0a6",
+  "source_commit": "d7a33ba9341b78458cd639df352ad5618d31e38c",
+  "branch": "packet/3-retention-accounting",
+  "scope": "AC2/AC3 named clock owners and source gate, SF1/CA2 checked decoding contracts, hosted consumer prerequisites. Remaining clock debt and framework ingress are not closed.",
+  "archive_id": "2026-10-02-clock-contract-consumer-closure",
+  "host": {
+    "os": "Linux",
+    "arch": "aarch64",
+    "rustc": "1.94.1",
+    "cargo_build_jobs": 4,
+    "incremental": false,
+    "cargo_graphs": "serialized"
+  },
+  "source_manifest": {
+    "paths": 115,
+    "sha256": "6588461e6bc0d02f1f8013dfeba871a52d8f8e43b69f8fe22c20d380edd99ede",
+    "note": "Changed source/config/contracts verified byte-for-byte against this commit; reports/plans excluded. Raw manifest and logs remain in the external evidence archive."
+  },
+  "acceptance_runs": [
+    "owner-clippy-v4",
+    "sqlite-fixture-clippy",
+    "fixture-format-check",
+    "sqlite-clock-owner-recheck",
+    "sqlite-native-clock-owner-recheck",
+    "sqlite-egress-fixtures",
+    "sqlite-tool-outcome-fixtures",
+    "sqlite-dead-letter-fixtures",
+    "kernel-owner-suite",
+    "control-fixture-clippy",
+    "control-authority-fixtures-v2",
+    "keyring-owner-suite",
+    "cli-host-clock-suite-v2",
+    "cli-process-host-suite",
+    "workspace-format-final",
+    "cli-format-reviewed",
+    "cli-clock-format-final",
+    "control-fixture-format",
+    "rust-hygiene-fixtures",
+    "clock-source-fixture-cleanup",
+    "clock-calibration-reviewed",
+    "clock-snapshot-reviewed",
+    "decode-calibration-v3",
+    "trust-source-final-fixtures",
+    "consumer-executable-exports-split",
+    "consumer-ruff-green",
+    "consumer-ruff-check-resolved",
+    "native-protocol-ci-split",
+    "native-protocol-calibration-split",
+    "review-slices-ci-split",
+    "consumer-download-layout-green",
+    "consumer-layout-actionlint",
+    "consumer-layout-ruff"
+  ],
+  "red_runs": [
+    "kernel-clock-red-mode",
+    "sqlite-injected-callback-red",
+    "sqlite-revocation-floor-red",
+    "sqlite-replication-clock-red",
+    "sqlite-capture-sql-clock-red",
+    "reputation-owner-red",
+    "remote-preflight-red",
+    "clock-escaped-sql-red",
+    "clock-gate-red",
+    "decode-red-initial",
+    "decode-red-lookalike-call",
+    "decode-red-scope",
+    "decode-red-support-owner",
+    "consumer-ci-red",
+    "consumer-ruff-red",
+    "consumer-job-split-red",
+    "consumer-download-layout-red"
+  ],
+  "qualification_failure_runs": [
+    "sqlite-owner-suite",
+    "sqlite-dead-letter-diagnostic",
+    "sqlite-tool-outcome-diagnostic",
+    "control-plane-owner-suite",
+    "control-federation-diagnostic",
+    "control-provider-diagnostic",
+    "control-authority-fixtures",
+    "cli-host-clock-suite",
+    "consumer-split-actionlint",
+    "consumer-split-ruff"
+  ],
+  "rust_tests": {
+    "passed": 1681,
+    "failed": 0,
+    "ignored": 0
+  },
+  "review": {
+    "critical": 0,
+    "important": 3,
+    "minor": 1,
+    "sha256": "2fe834174a3bc36ac34a7cff1895e4528b800db8da593a8bb4337b765009bd7a",
+    "disposition": "Root fixed the original three findings with RED/GREEN evidence. The same reviewer later found a CI artifact layout mistake; RED/GREEN controls cover its repair. Review bounds are recorded separately."
+  },
+  "clock_scope": {
+    "base_observations": 471,
+    "newly_visible_at_base": 317,
+    "remaining_debt": 436,
+    "pinned_native_compositions": 38,
+    "note": "Includes fixtures; not production defect counts."
+  },
+  "decoder_scope": {
+    "constructors": 468,
+    "baseline_files": 45,
+    "tenant_tables": 85,
+    "sql_principal_contracts": 170,
+    "note": "Lexical source tripwires, not semantic or framework-extractor proof."
+  },
+  "hosted": {
+    "run": 37043188904,
+    "url": "https://github.com/bb-connor/arc/actions/runs/37043188904",
+    "source_commit": "d7a33ba9341b78458cd639df352ad5618d31e38c",
+    "status": "completed",
+    "conclusion": "success",
+    "disposition": "Exact-source workflow for the corrected consumer job layout. Only a terminal success establishes scoped hosted acceptance.",
+    "metadata_sha256": "79abf57a0bc5f0f24c2269c304e50f7ae67a4ed3083a7053c6f1839660060b1d",
+    "jobs": [
+      {
+        "id": 110958076216,
+        "name": "Prepared native consumer binaries",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "50ab163f185fb79b5ce59eaa68845baf5f2d31b16d9ee04f4825316d99061077",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Rust toolchain",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run ./.github/actions/apt-install",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Build optimized enforcing CLI",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Build prepared native broker consumers",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Package prepared native binaries",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Preserve prepared native binaries",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Build prepared native broker consumers",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 110958076439,
+        "name": "Native host and protocol tests",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "2307d3ead2b92397fca527c8774f6831c00007fed37efaa38b14dbdd79608b8b",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Rust toolchain",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run ./.github/actions/apt-install",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Python integration style",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Default kernel and worker dependency boundary",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "CLI host and ordinary worker coverage",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Qualify enforcing host and prepare native consumer fixture",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Native protocol targets under enforced authority",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Native MCP and worker recovery under enforced authority",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Preserve native host qualification evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 110958076560,
+        "name": "Authenticated Python and JavaScript workers",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "ea1c70e415fca9c75378872766f1454d479e05cb7cfaa9adf4aa08a79373ff17",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Rust toolchain",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run ./.github/actions/apt-install",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Client framing and lossless receipts",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Process protocol and host crash recovery",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "LangGraph application recovery",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "LangGraph 0.6 compatibility",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep graph recovery evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 110958078229,
+        "name": "Optimized native session and shared-resource dispatch",
+        "status": "completed",
+        "conclusion": "skipped",
+        "log_sha256": null,
+        "steps": []
+      },
+      {
+        "id": 110976962669,
+        "name": "Installed native consumer recovery",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "707409285881ca514a2a388483bb194598e691f4dad8d68cea9f6a3e409563e4",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Install Rust toolchain",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run ./.github/actions/apt-install",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Python integration style",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Download prepared native binaries",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Verify and install prepared native binaries",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Qualify enforcing host and prepare native consumer fixture",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Preserve installed consumer host qualification evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed mini-SWE-agent recovery through Chio and Docker",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed coding session with explicit operator provisioning",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep mini-SWE-agent recovery evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Repository review through the public process host",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed Python and Node packages outside the checkout",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Shared-resource recovery through the public host",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep nonsecret shared-resource recovery evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Offline adaptive review with installed SDKs",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Installed AI SDK 6 and 7 with native tool and model recovery",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Research swarm benchmark against a local-callback baseline",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep the research swarm benchmark evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep installed AI SDK process packages and evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep the offline adaptive review kit and evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep qualified process starter and evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Keep repository review evidence",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 110993518274,
+        "name": "MCP process host and enforced native recovery",
+        "status": "completed",
+        "conclusion": "success",
+        "log_sha256": "29375df5f1673f922af2da2efcdac6156b97f0c5995db5955e1dcb6bac0bc475",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Require every process qualification result",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 11247665677,
+        "name": "chio-review-kit-Linux-X64",
+        "sha256": "d01ec40d9245e0ebdd19e87876a87d572cf019d1c4832edd91f7d37ca39ff56d"
+      },
+      {
+        "id": 11247545722,
+        "name": "mini-swe-process-recovery",
+        "sha256": "a1ed0f7c40cc97336ea2af7c35183f348ae3de2049a847d68f75bdd407ded6da"
+      },
+      {
+        "id": 11247523332,
+        "name": "repository-review-recovery",
+        "sha256": "bd9883731503b7da99a54ea0920a2380ec305e082898401ebf604e4d49181dcd"
+      },
+      {
+        "id": 11247523278,
+        "name": "ai-sdk-benchmark-Linux-X64",
+        "sha256": "71f0e0363feae1535c233d51fffbc0bb5e84b56e9dc0ca60af5d92ee0482c948"
+      },
+      {
+        "id": 11247398556,
+        "name": "ai-sdk-process-Linux-X64",
+        "sha256": "009ef7769273d96cbb4b27d295a934b21fed8cd2843ce258e952af24f6f37f8b"
+      },
+      {
+        "id": 11247068992,
+        "name": "chio-process-starter-Linux-X64",
+        "sha256": "d01e30bcd2deb20eb6ef2a604a147ac5e4484ce0fdae188cfa40a40606593d2b"
+      },
+      {
+        "id": 11246628505,
+        "name": "shared-resource-recovery",
+        "sha256": "0bae66d77869d99eb4ab4bf872dc5bbf7a871ca6fbd59712bdcfa2c5bcaf6d00"
+      },
+      {
+        "id": 11245877481,
+        "name": "installed-consumer-host-qualification",
+        "sha256": "32595efff1a011fbab4f68320a5e0b8ca1b70bfc9afe456568a4ca888695c2f7"
+      },
+      {
+        "id": 11245622967,
+        "name": "native-consumer-binaries-d7a33ba9341b78458cd639df352ad5618d31e38c-1",
+        "sha256": "3d491266d519e16756402e0979fe9e169bb0ac31e1c8df70a2d95fc7cba50832"
+      },
+      {
+        "id": 11244882285,
+        "name": "native-consumer-host-qualification",
+        "sha256": "348fb886ba5f8884376b61051efd8efb07764f5dcd27fcc285625e0fb1e6f67b"
+      },
+      {
+        "id": 11243411602,
+        "name": "langgraph-process-recovery",
+        "sha256": "23d6e2c8a6ab15f2ccf2665362417836a3e16b3ef4c59deaec16d8770cfcfb2c"
+      }
+    ]
+  },
+  "hosted_history": [
+    {
+      "run": 37031065118,
+      "url": "https://github.com/bb-connor/arc/actions/runs/37031065118",
+      "source_commit": "604549fb854741201483f3eda7792209c0cc3c23",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "disposition": "Cancelled at the unchanged 90-minute host-job limit. Broker setup and several native consumer profiles passed; later consumer steps were skipped. Not whole-workflow acceptance.",
+      "metadata_sha256": "3f82797980d0df5e4c5d98a6a1e2617abd82a9641322493f8bf47b4ad25e2750",
+      "jobs": [
+        {
+          "id": 110917715249,
+          "name": "MCP process host and enforced native recovery",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "log_sha256": "71479b2fc059c1471c8e8e54cbb8c227f6e18717102eec4852dc7dcb5d30dab3",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install Rust toolchain",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run ./.github/actions/apt-install",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Python integration style",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Default kernel and worker dependency boundary",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "CLI host and ordinary worker coverage",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Qualify enforcing host and prepare native consumer fixture",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Native protocol targets under enforced authority",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Native MCP and worker recovery under enforced authority",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Preserve native host qualification evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build optimized enforcing CLI",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build prepared native broker consumers",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Installed mini-SWE-agent recovery through Chio and Docker",
+              "status": "completed",
+              "conclusion": "cancelled"
+            },
+            {
+              "name": "Installed coding session with explicit operator provisioning",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Keep mini-SWE-agent recovery evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Repository review through the public process host",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Installed Python and Node packages outside the checkout",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Shared-resource recovery through the public host",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Keep nonsecret shared-resource recovery evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Offline adaptive review with installed SDKs",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Installed AI SDK 6 and 7 with native tool and model recovery",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Research swarm benchmark against a local-callback baseline",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Keep the research swarm benchmark evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep installed AI SDK process packages and evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep the offline adaptive review kit and evidence",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Keep qualified process starter and evidence",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Keep repository review evidence",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Build prepared native broker consumers",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 110917715511,
+          "name": "Authenticated Python and JavaScript workers",
+          "status": "completed",
+          "conclusion": "success",
+          "log_sha256": "318209291722606d11e693be9a1571bc637aa2d063b76096ac316e95f85c490a",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install Rust toolchain",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run ./.github/actions/apt-install",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Client framing and lossless receipts",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Process protocol and host crash recovery",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "LangGraph application recovery",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "LangGraph 0.6 compatibility",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Keep graph recovery evidence",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 110917716836,
+          "name": "Optimized native session and shared-resource dispatch",
+          "status": "completed",
+          "conclusion": "skipped",
+          "log_sha256": null,
+          "steps": []
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 11241952782,
+          "name": "mini-swe-process-recovery",
+          "sha256": "5dcaba21da9d739016b102c4433fe8d70ae2b0735e844a70a48053b3b5d214b0"
+        },
+        {
+          "id": 11239270614,
+          "name": "native-consumer-host-qualification",
+          "sha256": "f27ac9de96373cf0f429cba958d163f6fcd09bf4687c01f78f315de4d1361b16"
+        },
+        {
+          "id": 11237541736,
+          "name": "langgraph-process-recovery",
+          "sha256": "7c700bf330f976d6bcd49511e01f1da0bea286f1203f3e068296c4ba66de95d9"
+        }
+      ]
+    },
+    {
+      "run": 37042343075,
+      "url": "https://github.com/bb-connor/arc/actions/runs/37042343075",
+      "source_commit": "9a7892297669ad3c8cb86290dcd2fa192a1dcf99",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "disposition": "Deliberately cancelled early after review found the artifact download layout mistake. Required aggregate correctly failed cancelled dependencies. Not acceptance.",
+      "metadata_sha256": "a3d7e2cc9ba48c462750295f7c2ff268235e7fadae7cb770c110064208852092",
+      "jobs": [
+        {
+          "id": 110955270364,
+          "name": "Native host and protocol tests",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "log_sha256": "172db98e9ddaaf84eff08878a6db7348df533080bfe35e391f0218a119c12412",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install Rust toolchain",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run ./.github/actions/apt-install",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Python integration style",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Default kernel and worker dependency boundary",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "CLI host and ordinary worker coverage",
+              "status": "completed",
+              "conclusion": "cancelled"
+            },
+            {
+              "name": "Qualify enforcing host and prepare native consumer fixture",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Native protocol targets under enforced authority",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Native MCP and worker recovery under enforced authority",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Preserve native host qualification evidence",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 110955270694,
+          "name": "Prepared native consumer binaries",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "log_sha256": "8ebf81d5fdeae557254a297964a642029d1b37921e30ae8108d86b6fc279810e",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install Rust toolchain",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run ./.github/actions/apt-install",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Build optimized enforcing CLI",
+              "status": "completed",
+              "conclusion": "cancelled"
+            },
+            {
+              "name": "Build prepared native broker consumers",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Package prepared native binaries",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Preserve prepared native binaries",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 110955270859,
+          "name": "Authenticated Python and JavaScript workers",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "log_sha256": "8bc914eaa2c9f837ac6b4125000dd3d1ffc9edf755cc405a0e942d5e6350013c",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Install Rust toolchain",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run ./.github/actions/apt-install",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Client framing and lossless receipts",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Process protocol and host crash recovery",
+              "status": "completed",
+              "conclusion": "cancelled"
+            },
+            {
+              "name": "LangGraph application recovery",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "LangGraph 0.6 compatibility",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Keep graph recovery evidence",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+              "status": "completed",
+              "conclusion": "skipped"
+            },
+            {
+              "name": "Post Run actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        },
+        {
+          "id": 110955272102,
+          "name": "Optimized native session and shared-resource dispatch",
+          "status": "completed",
+          "conclusion": "skipped",
+          "log_sha256": null,
+          "steps": []
+        },
+        {
+          "id": 110957715757,
+          "name": "Installed native consumer recovery",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "log_sha256": null,
+          "steps": []
+        },
+        {
+          "id": 110957722333,
+          "name": "MCP process host and enforced native recovery",
+          "status": "completed",
+          "conclusion": "failure",
+          "log_sha256": "61d95ddd84fc071a58fb79a09309ca0747cf1ae3f87ed4eb3174fe1f4202c185",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success"
+            },
+            {
+              "name": "Require every process qualification result",
+              "status": "completed",
+              "conclusion": "failure"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success"
+            }
+          ]
+        }
+      ],
+      "artifacts": []
+    }
+  ],
+  "non_acceptance": {
+    "control-plane-owner-suite": "Interrupted with SIGINT after two reproducible stale JSON error assertions and substantial unrelated native capture coverage. Repaired selected authority/federation owner suite is acceptance; broad run is not passing.",
+    "sqlite-owner-suite": "Full run: 1910 passed, 4 failed, 3 pre-existing ignored. Typed-error and time-dependent fixtures repaired; selected affected owner groups are acceptance. Original full run remains failed.",
+    "review-slices": "Vacuous before commit; replaced by committed candidate check.",
+    "consumer-ruff-check-final": "Tool spawn failed because Ruff was absent from PATH; resolved venv command is acceptance.",
+    "intermediate_runs": "All compilation failures, fixture repairs, RED attempts and superseded checks retained externally; none is acceptance."
+  },
+  "runs": {
+    "owner-clippy-v4": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "-p",
+        "chio-store-sqlite",
+        "-p",
+        "chio-control-plane",
+        "-p",
+        "chio-keyring",
+        "-p",
+        "chio-process",
+        "-p",
+        "chio-cli",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e36206031af6b673ea62593b2159ed93047b35c78ed084969c1de0a4b81f3455"
+    },
+    "sqlite-fixture-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "--tests",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "3edfcd162fe70a9504bb23af75538bce0fd2d698ac62dc8a1c3d6ba3178d8ad9"
+    },
+    "fixture-format-check": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/faults.rs",
+        "crates/platform/chio-store-sqlite/src/admission_operation_store_tests/security_participant_state/egress/portable.rs",
+        "crates/platform/chio-store-sqlite/src/dead_letters.rs",
+        "crates/platform/chio-store-sqlite/src/tool_outcome_store_tests.rs"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "sqlite-clock-owner-recheck": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "injected_clock"
+      ],
+      "exit_code": 0,
+      "log_sha256": "f1cd34e3f20b7d4f6d7e2c1cc7e9ab63977e633c46688db4b320021078ebd297",
+      "rust_tests": {
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "sqlite-native-clock-owner-recheck": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "clock_consumer_tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "b2d1d6174fcb82dfe450eb06de7d9e61b742a73f6c2f5e8cd413deeb16dd181d",
+      "rust_tests": {
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "sqlite-egress-fixtures": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "security_participant_state::egress::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "604f2497e2a0a21c10d7fb00df8d0cc49006f8fe94b31ec73020e1f81f6e0049",
+      "rust_tests": {
+        "passed": 27,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "sqlite-tool-outcome-fixtures": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "tool_outcome_store::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "cd55c7b774e061edfc8c678f7bdad6a88423aac01d04623776ef89612631f0b9",
+      "rust_tests": {
+        "passed": 18,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "sqlite-dead-letter-fixtures": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "dead_letters::tests::"
+      ],
+      "exit_code": 0,
+      "log_sha256": "f8e6466ec0fe131439d4a0d0a9f40897612af30bf8bcfa97157f8f581aa3e4c1",
+      "rust_tests": {
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "kernel-owner-suite": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "log_sha256": "6fc239a77ac8050755b5ba50ae7c6d4ce88c5f61ad0308855073ab95c8ee8a31",
+      "rust_tests": {
+        "passed": 1495,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "control-fixture-clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "58d1e741c838c68c0232349632ab50722a66eef8875a871b84484d394e3c7511"
+    },
+    "control-authority-fixtures-v2": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--",
+        "issuance::",
+        "enterprise_federation::",
+        "durable_admission::",
+        "keyring_runtime::",
+        "remote_authority::",
+        "tests::build_kernel_",
+        "tests::configure_receipt_store",
+        "tests::durable_admission_runtime",
+        "tests::existing_authority_loader",
+        "tests::web3_evidence"
+      ],
+      "exit_code": 0,
+      "log_sha256": "da26bc2eee52629b74e09eb7975dd748aa114d7eea108293f261329a5638f2f2",
+      "rust_tests": {
+        "passed": 85,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "keyring-owner-suite": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-keyring",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "log_sha256": "2aa0b8693d634526d2e175dac3fea44f5504e9094ac3cfcfb1e3ab6ee6f1dc83",
+      "rust_tests": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "cli-host-clock-suite-v2": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "host_authority_uses_injected_epoch",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "log_sha256": "fbb74073384966d0128acea433c5fb4cdfa00c3d376ced3388ee4493502beef6",
+      "rust_tests": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "cli-process-host-suite": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--test",
+        "process_host"
+      ],
+      "exit_code": 0,
+      "log_sha256": "a926902f515db0e8383fbc18d1de8bcc1f54bf8d35e776df91071199dcf88f8f",
+      "rust_tests": {
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    "workspace-format-final": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cli-format-reviewed": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/products/chio-cli/src/cli/process_host.rs"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cli-clock-format-final": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/products/chio-cli/src/cli/process_host/state_clock_tests.rs"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "control-fixture-format": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "crates/platform/chio-control-plane/src/enterprise_federation.rs"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "rust-hygiene-fixtures": {
+      "command": [
+        "python3",
+        "scripts/check-rust-file-hygiene.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c94b400bf74e0fe8f644fbcced677e76a9c41e9d2a02c0c74e9a53199938f174"
+    },
+    "clock-source-fixture-cleanup": {
+      "command": [
+        "python3",
+        "scripts/check-security-clocks.py",
+        "--ratchet"
+      ],
+      "exit_code": 0,
+      "log_sha256": "01062717c965825bf36798e4a4ff8a8bcf9706f7ceb16af784d03fa3db9c0e44"
+    },
+    "clock-calibration-reviewed": {
+      "command": [
+        "python3",
+        "scripts/tests/check-security-clocks.test.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "5ea3d4ca18a1754f5eb1fa0738fd0c13d19484491496de20abcdef1c27c0d563",
+      "python_tests": 10
+    },
+    "clock-snapshot-reviewed": {
+      "command": [
+        "cmp",
+        "docs/security/clock-scope-evidence-2026-10-02.json",
+        "/home/connor/chio-security-evidence/2026-10-02-clock-contract-consumer-closure/clock-scope-review-reproduced.json"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "decode-calibration-v3": {
+      "command": [
+        "python3",
+        "scripts/tests/check-trust-boundaries.test.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "6a9d4e2a495d0d549e06c8adfb14c7cdc1883e76600a69b451f9fb58debdc05a",
+      "python_tests": 35
+    },
+    "trust-source-final-fixtures": {
+      "command": [
+        "python3",
+        "scripts/check-trust-boundaries.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "469cc7d38b45d8871b614fa115ed5fbf4adcd879e83ed30de4f3f887c4bf92b4"
+    },
+    "consumer-executable-exports-split": {
+      "command": [
+        "python3",
+        "scripts/tests/check-process-ci-inventory.test.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "d13bd68c0e7f20c9f33aabe0fee5395e45fd956ca0cde3cc23a962e7e527a58a"
+    },
+    "consumer-ruff-green": {
+      "command": [
+        "sdks/python/chio-langgraph/.venv/bin/ruff",
+        "format",
+        "--check",
+        "--config",
+        "sdks/python/chio-langgraph/pyproject.toml",
+        "--config",
+        "line-length=88",
+        "crates/products/chio-cli/tests/process_host/runner.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "fd2299c9f1c6dc869070883e281051bfe93aacf66c1a3b0069f45b4aa410ca50"
+    },
+    "consumer-ruff-check-resolved": {
+      "command": [
+        "sdks/python/chio-langgraph/.venv/bin/ruff",
+        "check",
+        "--config",
+        "sdks/python/chio-mini-swe/pyproject.toml",
+        "crates/products/chio-cli/tests/process_host/runner.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "native-protocol-ci-split": {
+      "command": [
+        "python3",
+        "scripts/check-native-protocol-ci.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "06d3dc89861a14cdfb0b9460d4ecb52334bd9f130ab20f3b3ecffab33af37293"
+    },
+    "native-protocol-calibration-split": {
+      "command": [
+        "python3",
+        "scripts/tests/check-native-protocol-ci.test.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "a2f57519f4f72409c2619dfc44fc440a877c7551da90722d6f2905dd70749eb4",
+      "python_tests": 11
+    },
+    "review-slices-ci-split": {
+      "command": [
+        "python3",
+        "scripts/check-review-slices.py",
+        "--base-ref",
+        "491f585e9013dcb6335589c82d00ac219efbf0a6"
+      ],
+      "exit_code": 0,
+      "log_sha256": "b40c67b658ba73fa7c129a18c9603033b5ab554531ec6e744b0ac07dc6d20668"
+    },
+    "consumer-download-layout-green": {
+      "command": [
+        "python3",
+        "scripts/tests/process-consumer-jobs.test.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "d8e5236c891229a58ac35a3e14f8b366cd854b0969ab074d7e2f70650d8fac84",
+      "python_tests": 3
+    },
+    "consumer-layout-actionlint": {
+      "command": [
+        "actionlint",
+        ".github/workflows/process-workers.yml"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "consumer-layout-ruff": {
+      "command": [
+        "sdks/python/chio-langgraph/.venv/bin/ruff",
+        "check",
+        "--isolated",
+        "--select",
+        "E,F,I,UP,B",
+        "--ignore",
+        "E501",
+        "scripts/tests/process-consumer-jobs.test.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "kernel-clock-red-mode": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-kernel",
+        "--lib",
+        "aggregate_family_issuance_uses_kernel_time_at_both_epoch_extremes"
+      ],
+      "exit_code": 101,
+      "log_sha256": "3d4f79cc87bb1106017031c7016378699100c18a4efde7a3bdb2916188c889c9",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "sqlite-injected-callback-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "sqlite_injected_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "f9debffaa2a570355f491ebaeb67564910ae3cb29aa150bc166257aac7d5e72c",
+      "rust_tests": {
+        "passed": 8,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "sqlite-revocation-floor-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "sqlite_revocation_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "e47e0d55cfbe349ff37fb1efb944499a2504eec96e7260b17785412338acee66",
+      "rust_tests": {
+        "passed": 4,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "sqlite-replication-clock-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "sqlite_injected_revocation_replication_clock_denies_replay_and_delta",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "0d0a790c85e86c96c1fd5168780c154c7f6a1dc9af8d695ae2e219fd0d37de5e",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "sqlite-capture-sql-clock-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib",
+        "sqlite_injected_budget_capture_",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "9675a48e63f8c0321905e324475b058db2d8e0b47a332592e8a0f0b268bf058c",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 2,
+        "ignored": 0
+      }
+    },
+    "reputation-owner-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "injected_reputation_time_cannot_decay_denials_into_authority",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "7b1ddb26a2dd6f14f464e77823b4f7967909e77ff391e4287616515905ef20c5",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "remote-preflight-red": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "unavailable_clock_prevents_remote_issuance_rpc",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "06a46900ffdf79e2e3cbd195761c8e0e494f3276be5f182aba818ef6af001498",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "clock-escaped-sql-red": {
+      "command": [
+        "python3",
+        "scripts/tests/check-security-clocks.test.py",
+        "ClockGateTests.test_database_time_cannot_bypass_the_owner_clock"
+      ],
+      "exit_code": 1,
+      "log_sha256": "9091c1b45e65fc275521b21fb67a986131cf1db242dd0b6a6d2f3b6fdfc5a30f",
+      "python_tests": 1
+    },
+    "clock-gate-red": {
+      "command": [
+        "python3",
+        "scripts/tests/check-security-clocks.test.py"
+      ],
+      "exit_code": 1,
+      "log_sha256": "8e525d5cdc71865887195a3cf2268c77fb58c64c348736179c840ed74b1ae77c",
+      "python_tests": 5
+    },
+    "decode-red-initial": {
+      "command": [
+        "python3",
+        "scripts/tests/check-trust-boundaries.test.py",
+        "BoundaryGateCalibration.test_signed_and_canonical_readers_cannot_downgrade_to_document",
+        "BoundaryGateCalibration.test_inventory_only_promotion_of_all_raw_baselines_is_rejected",
+        "-v"
+      ],
+      "exit_code": 1,
+      "log_sha256": "dc875fe27eb43a9839fa934f659b5c8f24b6be18ce5b7282d065a8870ff6705b",
+      "python_tests": 2
+    },
+    "decode-red-lookalike-call": {
+      "command": [
+        "python3",
+        "scripts/tests/check-trust-boundaries.test.py",
+        "ContractScopeCalibration.test_unrelated_owner_and_nested_helper_do_not_supply_reader_evidence",
+        "-v"
+      ],
+      "exit_code": 1,
+      "log_sha256": "b665d4ee29f8e8e737c946fb79dac647b1b6469545f6bf3df8adb2841ac03459",
+      "python_tests": 1
+    },
+    "decode-red-scope": {
+      "command": [
+        "python3",
+        "scripts/tests/check-trust-boundaries.test.py",
+        "ContractScopeCalibration",
+        "-v"
+      ],
+      "exit_code": 1,
+      "log_sha256": "f93772b38b5b3a9f853cd4994c720f127e525c3bbc091c64f855eb69e108571d",
+      "python_tests": 7
+    },
+    "decode-red-support-owner": {
+      "command": [
+        "python3",
+        "scripts/tests/check-trust-boundaries.test.py",
+        "ContractScopeCalibration.test_typed_field_evidence_requires_the_named_supporting_type",
+        "-v"
+      ],
+      "exit_code": 1,
+      "log_sha256": "e2e4ee592ab07f7057ff2610d0953847b72bd617f87bbd089d509c853e5ac3c6",
+      "python_tests": 1
+    },
+    "consumer-ci-red": {
+      "command": [
+        "python3",
+        "scripts/tests/check-process-ci-inventory.test.py"
+      ],
+      "exit_code": 1,
+      "log_sha256": "5972a55e824cf8e257f9479f2fbd39db8b7ef0dc75e19c8ebf11eef45b4cfb1a"
+    },
+    "consumer-ruff-red": {
+      "command": [
+        "sdks/python/chio-langgraph/.venv/bin/ruff",
+        "format",
+        "--check",
+        "--config",
+        "sdks/python/chio-langgraph/pyproject.toml",
+        "--config",
+        "line-length=88",
+        "crates/products/chio-cli/tests/process_host/runner.py"
+      ],
+      "exit_code": 1,
+      "log_sha256": "aa641253cce87c1fb2146be1065a4f173cd4a16450bd11cf840e304e3c5fcc16"
+    },
+    "consumer-job-split-red": {
+      "command": [
+        "python3",
+        "scripts/tests/process-consumer-jobs.test.py"
+      ],
+      "exit_code": 1,
+      "log_sha256": "e007e2d6638b405b77e9f839fc6b9675b7eda8ffe28fb6605344b476c0a101f0",
+      "python_tests": 3
+    },
+    "consumer-download-layout-red": {
+      "command": [
+        "python3",
+        "scripts/tests/process-consumer-jobs.test.py"
+      ],
+      "exit_code": 1,
+      "log_sha256": "2f63b90c9dc569ca8a5174e1fea367fe1c8909918322d0bf764bdae4feba844a",
+      "python_tests": 3
+    },
+    "sqlite-owner-suite": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-store-sqlite",
+        "--lib"
+      ],
+      "exit_code": 101,
+      "log_sha256": "740576738d7b3ef9d2c94e424899c37aa10893ce09634d6cddc7092a8315c47f",
+      "rust_tests": {
+        "passed": 1911,
+        "failed": 4,
+        "ignored": 3
+      }
+    },
+    "sqlite-dead-letter-diagnostic": {
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-167bbd1eadfca80a",
+        "dead_letters::tests::unbounded_v1_body_fails_closed",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "8c21bb5a788b19e41b0082b2e4444231a8c15c2361846fded87872b55301f51f",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "sqlite-tool-outcome-diagnostic": {
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-167bbd1eadfca80a",
+        "tool_outcome_store::tests::claimed_tool_return_and_post_return_begin_are_one_durable_write_each",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "852bbb5e6e04414c76acb28402a19b211ed7ab23117514d4d8ce36ec73611e90",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "control-plane-owner-suite": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib"
+      ],
+      "exit_code": 101,
+      "log_sha256": "70086e49563250ee2ed0ebc9fc633c6d0658ec070ba2f878752c4a533c682b71"
+    },
+    "control-federation-diagnostic": {
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-365faa12b43e7e32",
+        "enterprise_federation::tests::certification_discovery_network_local_failures_use_cli_domains",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "846d4d27bb4a8e6a4d8eea4eeceb2b1563c50f68c6ed6ae61059df419ee17960",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "control-provider-diagnostic": {
+      "command": [
+        "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-365faa12b43e7e32",
+        "enterprise_federation::tests::enterprise_provider_registry_local_failures_use_cli_domains",
+        "--exact",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "2921a11eaa2ea1a11cd51c641847dfc7d55539228e766a0f47e1d1a8a7c30a2b",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "control-authority-fixtures": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-control-plane",
+        "--lib",
+        "--",
+        "issuance::",
+        "enterprise_federation::",
+        "durable_admission::",
+        "keyring_runtime::",
+        "remote_authority::",
+        "tests::build_kernel_",
+        "tests::configure_receipt_store",
+        "tests::durable_admission_runtime",
+        "tests::existing_authority_loader",
+        "tests::web3_evidence",
+        "--fail-fast"
+      ],
+      "exit_code": 101,
+      "log_sha256": "d046e88efc1a05eebf8c0e75c9d0655306778cfcc410af64d01a79cc12d177f8"
+    },
+    "cli-host-clock-suite": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "chio-cli",
+        "--bin",
+        "chio",
+        "host_authority_uses_injected_epoch",
+        "--",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "log_sha256": "59bc6f785675d7b07ab54a92ed88e55a19d8c5866e595c5d703772da19d10f0a",
+      "rust_tests": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    "consumer-split-actionlint": {
+      "command": [
+        "actionlint",
+        "-color",
+        ".github/workflows/process-workers.yml",
+        ".github/workflows/ci.yml"
+      ],
+      "exit_code": 1,
+      "log_sha256": "0d556584c15ff4d49e67e00d3b97211a5d09b8e160e1045dd43ee2e342c33ad7"
+    },
+    "consumer-split-ruff": {
+      "command": [
+        "sdks/python/chio-langgraph/.venv/bin/ruff",
+        "check",
+        "--isolated",
+        "--select",
+        "E,F,I,UP,B",
+        "--ignore",
+        "E501",
+        "scripts/tests/process-consumer-jobs.test.py"
+      ],
+      "exit_code": 1,
+      "log_sha256": "d840fe83b32616a04953f004216de2750088f43578207478e7416cc5db0bfb66"
+    }
+  }
+}

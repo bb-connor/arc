@@ -1,0 +1,79 @@
+{
+  "timestamp_utc": "2026-10-02T19:47:02.522549+00:00",
+  "source_base": "6cf283c4b9e36485a98275ba6798052b01a5a9d0",
+  "branch": "packet/3-retention-accounting",
+  "candidate_state": "uncommitted working-tree RL1 changes; root owns source commit and push",
+  "policy": {
+    "repository": "bb-connor/arc",
+    "oidc_issuer": "https://token.actions.githubusercontent.com",
+    "cosign_version": "v2.4.1",
+    "identity_match": "literal exact workflow and complete consumer-selected tag"
+  },
+  "files": {
+    "docs/install/VERIFY.md": "2f7e72c1f8c16ac6cdc3e90deb2b52725ca6fda71f38cabe668099c3f336d2aa",
+    "docs/install/PUBLISHING.md": "e82a060b9ff719d77fbab4eb9efafcf6ebf23c49c7991a8a97e76f5ce23e7d83",
+    "scripts/verify-release-identity.py": "b66927b0fc97fc8f4941d2c3af21ff045310ca53161c09b5a27c49c902d9da51",
+    "scripts/tests/release-identity.test.py": "8748be21a65517ee0758472ca7bcd40dd9587a881e3f64d01cbaae2873cc5498",
+    ".github/workflows/release-binaries.yml": "e9871e45e34df0b383ddee519e7bd67518fee4ef60728377e08d10dc45bc3958",
+    ".github/workflows/release-pypi.yml": "78a8b6880978aa73b823ab025aac0dba0ddfa13aa49fafa1c9eee0deea8f472f",
+    ".github/workflows/release-npm.yml": "d245b07d1c63ba25ff94e8f0dbe70ab3e88042de11f340ad7882c2e1fa67ba66",
+    ".github/workflows/release-identity-check.yml": "a3cdbd06d2a3290914a815fb2f68bcdcdc82c8d17acaa394476a8750d18962d0",
+    "docs/install/README.md": "1c87540bd38c554b57ad9cbf39c37585ab1f4a39a327257a84ddf250e9e0cc4c",
+    "docs/install/BINARY_DISTRIBUTION.md": "c0818f6c7bf86ad71487031d9792359fee9555b97fd4a4abe29dc629bc7a5e8c",
+    "docs/install/homebrew.md": "61e10b1d924479671188237583b9e478a531c7e568571bbe9344b766d0a6e391"
+  },
+  "verification": {
+    "red": "red.log: 7 tests, 14 expected failures before implementation",
+    "current_local_fixtures": "final-fixtures-2.log: 9 tests passed, 7.409 seconds",
+    "prior_local_fixture_passes": [
+      "green-1.log",
+      "green-2.log",
+      "green-3.log",
+      "final-fixtures.log"
+    ],
+    "provenance": "provenance-regressions.log: 13 tests passed",
+    "macos_portability": "macos-regressions.log: 16 tests passed",
+    "pypi_matrix": "pypi-matrix.log: passed",
+    "npm_matrix": "npm-matrix.log: passed",
+    "workflow_lint": "actionlint-2.log: actionlint v1.7.12 passed all four changed/new release workflows",
+    "preserved_tool_failure": "actionlint-1.log: v1.7.7 lacks macos-15-intel support and reports a TARBALL false positive; current v1.7.12 passes with no suppression",
+    "consumer_doc_red": "consumer-doc-red.log: stale planned binary mirror example failed before repair"
+  },
+  "limits": [
+    "Fixture CA and signatures are generated locally; test adapter supplies only local CA and skips public SCT/Rekor checks. No real GitHub OIDC/Fulcio/Rekor acceptance is established.",
+    "Production verifier leaves public Sigstore chain, SCT and Rekor enabled and exposes no repository override or skip flags.",
+    "Hosted workflow checks have not run on these changes.",
+    "No release published; no operator accounts registered; no registry publisher/environment configuration changed.",
+    "No claims about current availability of historical GitHub owner account names.",
+    "New release-identity-check.yml is hidden by an existing local workflows/ exclude rule and must be force-added by root."
+  ],
+  "commands": [
+    "RL1_COSIGN=/tmp/claude-1000/-home-connor-backbay-arc/5a6085ca-b1b5-421d-ab6e-06ad8f896370/scratchpad/cosign RL1_TEST_EVIDENCE_DIR=/home/connor/chio-security-evidence/2026-10-02-identity-authority-release-closure/rl1/final-fixtures-2 python3 scripts/tests/release-identity.test.py",
+    "python3 scripts/tests/release-provenance.test.py",
+    "python3 scripts/tests/macos-release-portability.test.py",
+    "bash scripts/tests/release-pypi-package-matrix.test.sh",
+    "bash scripts/tests/release-npm-package-matrix.test.sh",
+    "/home/connor/chio-security-evidence/2026-10-02-identity-authority-release-closure/rl1/tools/actionlint .github/workflows/release-binaries.yml .github/workflows/release-pypi.yml .github/workflows/release-npm.yml .github/workflows/release-identity-check.yml",
+    "git diff --check"
+  ],
+  "tools": {
+    "cosign": {
+      "path": "/tmp/claude-1000/-home-connor-backbay-arc/5a6085ca-b1b5-421d-ab6e-06ad8f896370/scratchpad/cosign",
+      "sha256": "3b2e2e3854d0356c45fe6607047526ccd04742d20bd44afb5be91fa2a6e7cb4a",
+      "version": {
+        "gitVersion": "v2.4.1",
+        "gitCommit": "9a4cfe1aae777984c07ce373d97a65428bbff734",
+        "gitTreeState": "clean",
+        "buildDate": "2024-10-03T17:01:50Z",
+        "goVersion": "go1.22.7",
+        "compiler": "gc",
+        "platform": "linux/arm64"
+      }
+    },
+    "actionlint": {
+      "path": "/home/connor/chio-security-evidence/2026-10-02-identity-authority-release-closure/rl1/tools/actionlint",
+      "sha256": "ac0323433c2853ec3fb978c611430c5b3dc5d43c58d1a1ec031b00ab572beb60",
+      "version": "v1.7.12"
+    }
+  }
+}

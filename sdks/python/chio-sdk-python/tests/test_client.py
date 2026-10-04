@@ -39,6 +39,8 @@ from chio_sdk.models import (
 # ---------------------------------------------------------------------------
 
 BASE = "http://127.0.0.1:9090"
+# RFC 8032 Ed25519 public key, test vector 1. No private material is transmitted.
+CALLER_PUBLIC_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
 
 
 def _make_token_dict() -> dict:
@@ -222,8 +224,10 @@ class TestHealth:
 class TestCreateCapability:
     @respx.mock
     async def test_create(self) -> None:
-        respx.post(f"{BASE}/v1/capabilities").mock(
-            return_value=httpx.Response(200, json=_make_token_dict())
+        response_token = _make_token_dict()
+        response_token["subject"] = CALLER_PUBLIC_KEY
+        route = respx.post(f"{BASE}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=response_token)
         )
         async with ChioClient(BASE) as client:
             scope = ChioScope(
@@ -235,9 +239,59 @@ class TestCreateCapability:
                     )
                 ]
             )
-            token = await client.create_capability(subject="bb", scope=scope)
+            token = await client.create_capability(subject=CALLER_PUBLIC_KEY, scope=scope)
             assert isinstance(token, CapabilityToken)
             assert token.id == "tok-1"
+            assert "authorization" not in route.calls[0].request.headers
+            assert token.subject == CALLER_PUBLIC_KEY
+            assert json.loads(route.calls[0].request.content)["subject"] == CALLER_PUBLIC_KEY
+
+    @respx.mock
+    async def test_control_token_is_sent_only_on_mint(self, caplog: pytest.LogCaptureFixture) -> None:
+        control_token = "operator-mint-control-token"
+        caplog.set_level("DEBUG")
+        response_token = _make_token_dict()
+        response_token["subject"] = CALLER_PUBLIC_KEY
+        minted = respx.post(f"{BASE}/v1/capabilities").mock(
+            return_value=httpx.Response(200, json=response_token)
+        )
+        health = respx.get(f"{BASE}/chio/health").mock(
+            return_value=httpx.Response(200, json={"status": "healthy"})
+        )
+        evaluated = respx.post(f"{BASE}/v1/evaluate").mock(
+            return_value=httpx.Response(200, json={"status": "deny"})
+        )
+        async with ChioClient(BASE, control_token=control_token) as client:
+            assert control_token not in repr(client)
+            token = await client.create_capability(subject=CALLER_PUBLIC_KEY, scope=ChioScope())
+            assert token.subject == CALLER_PUBLIC_KEY
+            await client.health()
+            result = await client.evaluate_tool_call_mediated(
+                capability=response_token, tool_server="s", tool_name="t", parameters={}
+            )
+            assert result["status"] == "deny"
+        assert minted.calls[0].request.headers["authorization"] == f"Bearer {control_token}"
+        assert "authorization" not in health.calls[0].request.headers
+        assert "authorization" not in evaluated.calls[0].request.headers
+        for route in [minted, health, evaluated]:
+            assert control_token.encode() not in route.calls[0].request.content
+        assert control_token not in caplog.text
+
+    @respx.mock
+    @pytest.mark.parametrize("subject", ["job/default/demo", "bb", "", " "])
+    async def test_rejected_subject_is_not_replaced_or_retried(self, subject: str) -> None:
+        route = respx.post(f"{BASE}/v1/capabilities").mock(
+            return_value=httpx.Response(400, json={
+                "error": "chio_bad_request",
+                "message": "subject must be a valid public key",
+            })
+        )
+        async with ChioClient(BASE) as client:
+            with pytest.raises(ChioError) as error:
+                await client.create_capability(subject=subject, scope=ChioScope())
+        assert error.value.code == "HTTP_400"
+        assert route.call_count == 1
+        assert json.loads(route.calls[0].request.content)["subject"] == subject
 
 
 class TestValidateCapability:

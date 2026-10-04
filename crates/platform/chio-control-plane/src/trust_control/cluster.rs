@@ -1,8 +1,8 @@
 use super::report_rendering::{
-    authority_snapshot_from_view, authority_snapshot_view, budget_cursor_view,
-    json_response_with_leader_visibility, json_response_with_leader_visibility_and_budget_commit,
-    revocation_cursor_from_view, revocation_cursor_view, stored_child_receipt_views,
-    stored_lineage_views, stored_tool_receipt_views,
+    budget_cursor_view, json_response_with_leader_visibility,
+    json_response_with_leader_visibility_and_budget_commit, revocation_cursor_from_view,
+    revocation_cursor_view, stored_child_receipt_views, stored_lineage_views,
+    stored_tool_receipt_views,
 };
 use super::report_validation::{
     normalize_cluster_config_url, normalize_cluster_url, validate_cluster_peer_auth,
@@ -64,6 +64,7 @@ pub(crate) use deltas::{
     budget_write_progress_closed_outcome, budget_write_quorum_commit_view,
     collect_budget_mutation_event_views_after_seq, finalize_peer_sync_round,
     import_budget_delta_response, notify_cluster_progress, peer_was_demoted, route_pull,
+    sync_peer_authority,
 };
 
 // Non-test: peer_was_demoted (in deltas) reads peer health via with_peer_state.

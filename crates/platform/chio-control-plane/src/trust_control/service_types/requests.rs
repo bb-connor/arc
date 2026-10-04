@@ -8,6 +8,9 @@ pub struct TrustAuthorityStatus {
     pub public_key: Option<String>,
     pub generation: Option<u64>,
     pub rotated_at: Option<u64>,
+    /// Public lifecycle metadata from the authoritative status transaction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer_state: Option<chio_kernel::AuthoritySnapshot>,
     pub applies_to_future_sessions_only: bool,
     #[serde(default)]
     pub trusted_public_keys: Vec<String>,

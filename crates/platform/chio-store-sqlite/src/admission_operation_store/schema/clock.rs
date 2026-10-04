@@ -32,7 +32,7 @@ pub(in crate::admission_operation_store) fn authority_validation_time(
     Ok(decision_time.max(observed))
 }
 
-pub(in crate::admission_operation_store) fn observe_authority_time(
+pub(crate) fn observe_authority_time(
     transaction: &Transaction<'_>,
     owner: &SqliteServingOwner,
 ) -> Result<u64, AdmissionOperationStoreError> {

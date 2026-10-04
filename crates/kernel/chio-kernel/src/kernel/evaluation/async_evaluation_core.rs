@@ -20,6 +20,7 @@ impl ChioKernel {
             dispatch: dispatch_mode,
         } = disposition;
         self.validate_security_invocation_context_binding(request, security_context, session_id)?;
+        self.validate_session_threshold_intent(request, session_id)?;
         // Resolve tenant_id from the session's enterprise identity context
         // (if any) and install it for the remainder of this evaluation so
         // every receipt `build_and_sign_receipt` signs picks up the tag.

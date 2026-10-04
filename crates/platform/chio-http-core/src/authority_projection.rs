@@ -50,6 +50,10 @@ pub(crate) fn capability_binding(
     input: &HttpAuthorityInput<'_>,
     caller_identity_hash: &str,
 ) -> CapabilityBinding {
+    // A synthetic tool identity cannot reopen an unregistered route.
+    if input.policy == HttpAuthorityPolicy::DenyAll {
+        return request_field_capability_binding(input);
+    }
     match chio_tools_path_identity(input.path) {
         ChioToolsPathIdentity::Identity {
             server_id,

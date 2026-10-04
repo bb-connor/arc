@@ -312,7 +312,7 @@ impl ChioReceipt {
         if outcome.public_key != body.kernel_key
             || outcome.algorithm != expected_algorithm
             || outcome.signature.algorithm() != expected_algorithm
-            || !body.kernel_key.verify(&bytes, &outcome.signature)
+            || !body.kernel_key.verify_strict(&bytes, &outcome.signature)
         {
             return Err(Error::InvalidSignature(
                 "receipt backend returned a mismatched signing identity".to_string(),
@@ -503,7 +503,7 @@ impl ChioReceipt {
         let signing_body =
             ChioReceiptSigningBody::from_body_and_bbs(&body, self.bbs_signature.as_ref());
         self.kernel_key
-            .verify_canonical(&signing_body, &self.signature)
+            .verify_canonical_strict(&signing_body, &self.signature)
     }
 
     /// Verify the receipt signature and enforce the configured crypto floor.

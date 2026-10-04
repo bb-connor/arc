@@ -172,6 +172,7 @@ async def _maybe_submit_for_approval(
     *,
     tool_name: str,
     tool_server: str,
+    kernel_tool_name: str,
     command: str,
     tool_args: dict[str, Any],
     policy_check: str = "shell",
@@ -195,6 +196,15 @@ async def _maybe_submit_for_approval(
         # rejection.
         return
 
+    capability = handle.signed_capability
+    if not isinstance(capability, dict):
+        from chio_sdk.errors import ChioValidationError
+
+        raise ChioValidationError(
+            "a full signed capability is required for approval; mint it with "
+            "the operator CLI or inject the retained token into RuntimeHandle"
+        )
+
     summary = command if len(command) <= 200 else command[:200] + "..."
     triggered_by = [
         "shell.requires_approval"
@@ -203,8 +213,10 @@ async def _maybe_submit_for_approval(
     ]
     try:
         approval_id = await client.submit_for_approval(
+            capability=capability,
             capability_id=cap_id,
-            tool_name=tool_name,
+            requested_by=capability.get("subject"),
+            tool_name=kernel_tool_name,
             tool_args=tool_args,
             tool_server=tool_server,
             ttl_seconds=3600,
@@ -234,11 +246,11 @@ def _requires_approval_envelope(signal: _RequiresApprovalSignal) -> str:
         "tool_name": signal.tool_name,
         "tool_server": signal.tool_server,
         "hint": (
-            f"Use `/chio approve {signal.approval_id}` in this session "
-            "or `hermes chio approvals respond "
-            f"{signal.approval_id} --approve` from another shell. "
-            "After approval, retry the original tool call (auto-resume "
-            "is v0.3 work)."
+            "Review the pending intent and obtain an externally signed decision. "
+            "Use `hermes chio approvals respond "
+            f"{signal.approval_id} --approve --signed-token-file decision.json`. "
+            "Hermes does not resume approved calls; execution requires the "
+            "configured durable caller protocol and this exact approval ID."
         ),
     }
     if signal.expires_at is not None:
@@ -536,8 +548,9 @@ def _factory_shell_run(handle: RuntimeHandle) -> ToolHandler:
             handle,
             tool_name="chio_shell_run",
             tool_server="shell",
+            kernel_tool_name="run_command",
             command=command,
-            tool_args={"command": command},
+            tool_args={"command": command, "approved": False},
         )
         # `approved=False` hard-coded: the sidecar holds approval, and an
         # `approved=True` would be rejected anyway because `approved` is not
@@ -786,6 +799,7 @@ def _factory_git_run(handle: RuntimeHandle) -> ToolHandler:
             handle,
             tool_name="chio_git_run",
             tool_server="git",
+            kernel_tool_name="run",
             command=command,
             tool_args={"command": command},
             policy_check="git",

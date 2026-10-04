@@ -69,6 +69,7 @@ fn aggregate_issuance_persists_the_actual_signed_family_root(
         300,
         &key.public_key(),
         2,
+        chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
     )?;
     let stored = SqliteReceiptStore::open(&receipt_db)?
         .get_capability_snapshot(&root.id)?

@@ -50,6 +50,16 @@ pub(crate) async fn spawn_reserved_hold_reaper(state: &Arc<ProxyState>) {
     *state.reaper_handle.lock().await = Some(handle);
 }
 
+/// Abort the owned async maintenance task even when the serving future is cancelled.
+struct ReaperOwner(Option<tokio::task::JoinHandle<()>>);
+impl Drop for ReaperOwner {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            handle.abort();
+        }
+    }
+}
+
 /// Extra window the drain holds open beyond the upstream hop ceiling so a hop
 /// that trips its own deadline still has time to record its receipt before the
 /// forced drain closes the connection.
@@ -126,194 +136,13 @@ fn revocation_sibling_path(receipt_path: &str) -> String {
     }
 }
 
-/// Stored receipts for inspection and querying.
+#[cfg(test)]
 pub(crate) struct ReceiptLog {
     pub(crate) receipts: Vec<HttpReceipt>,
 }
-
-/// Stored Chio receipts for tool-call sidecar aliases.
+#[cfg(test)]
 pub(crate) struct ToolReceiptLog {
     pub(crate) receipts: Vec<ChioReceipt>,
-}
-
-/// Reserved primary key the readiness probe writes and immediately rolls back,
-/// so exercising the receipt write path never leaves a durable row.
-const RECEIPT_READINESS_PROBE_ID: &str = "__chio_readiness_probe__";
-
-pub(crate) struct SqliteReceiptStore {
-    connection: Connection,
-}
-
-impl SqliteReceiptStore {
-    pub(crate) fn open(path: &str) -> Result<Self, ProtectError> {
-        let connection = Connection::open(path)
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        // `chio api protect` co-locates the approval store, the kernel receipt
-        // store, and this HTTP receipt table in one SQLite file. The kernel
-        // receipt store runs that file in WAL mode with a busy timeout; a writer
-        // on the same file without a busy timeout turns a lock another writer
-        // holds for a moment into an immediate SQLITE_BUSY error, so this
-        // connection matches the same durability and timeout pragmas.
-        connection
-            .execute_batch(
-                "
-                PRAGMA journal_mode = WAL;
-                PRAGMA synchronous = FULL;
-                PRAGMA busy_timeout = 5000;
-                PRAGMA foreign_keys = ON;
-                ",
-            )
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        connection
-            .execute_batch(
-                "
-                CREATE TABLE IF NOT EXISTS http_receipts (
-                    id TEXT PRIMARY KEY,
-                    receipt_json TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS tool_receipts (
-                    id TEXT PRIMARY KEY,
-                    receipt_json TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS revoked_capabilities (
-                    capability_id TEXT PRIMARY KEY
-                );
-                ",
-            )
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        Ok(Self { connection })
-    }
-
-    /// Reachability check of the receipt write path, for the readiness probe.
-    /// A bare `SELECT 1` answers even when the receipt tables have been dropped or
-    /// the database has gone read-only or full, so it would keep an instance in
-    /// rotation while every append fails after an already-allowed upstream call.
-    /// This exercises the real receipt tables and the write path inside a
-    /// transaction that is always rolled back: a dropped table, a read-only mount,
-    /// or a full disk fails readiness, and no probe row is ever persisted.
-    pub(crate) fn is_reachable(&self) -> bool {
-        self.probe_receipt_write_path().is_ok()
-    }
-
-    fn probe_receipt_write_path(&self) -> Result<(), rusqlite::Error> {
-        let tx = self.connection.unchecked_transaction()?;
-        tx.execute(
-            "INSERT OR REPLACE INTO http_receipts (id, receipt_json) VALUES (?1, ?2)",
-            params![RECEIPT_READINESS_PROBE_ID, "{}"],
-        )?;
-        tx.execute(
-            "INSERT OR REPLACE INTO tool_receipts (id, receipt_json) VALUES (?1, ?2)",
-            params![RECEIPT_READINESS_PROBE_ID, "{}"],
-        )?;
-        tx.rollback()
-    }
-
-    pub(crate) fn load_receipts(&self) -> Result<Vec<HttpReceipt>, ProtectError> {
-        let mut statement = self
-            .connection
-            .prepare("SELECT CASE WHEN typeof(receipt_json) = 'text' AND length(CAST(receipt_json AS BLOB)) <= ?1 THEN receipt_json ELSE NULL END FROM http_receipts ORDER BY rowid ASC")
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        let rows = statement
-            .query_map([input::MAX_RECEIPT_BYTES as i64], |row| {
-                row.get::<_, String>(0)
-            })
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-
-        let mut receipts = Vec::new();
-        for row in rows {
-            let receipt_json =
-                row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-            let receipt: HttpReceipt =
-                input::decode(receipt_json.as_bytes(), input::MAX_RECEIPT_BYTES)?;
-            receipts.push(receipt);
-        }
-        Ok(receipts)
-    }
-
-    pub(crate) fn load_tool_receipts(&self) -> Result<Vec<ChioReceipt>, ProtectError> {
-        let mut statement = self
-            .connection
-            .prepare("SELECT CASE WHEN typeof(receipt_json) = 'text' AND length(CAST(receipt_json AS BLOB)) <= ?1 THEN receipt_json ELSE NULL END FROM tool_receipts ORDER BY rowid ASC")
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        let rows = statement
-            .query_map([input::MAX_RECEIPT_BYTES as i64], |row| {
-                row.get::<_, String>(0)
-            })
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-
-        let mut receipts = Vec::new();
-        for row in rows {
-            let receipt_json =
-                row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-            let receipt: ChioReceipt =
-                input::decode(receipt_json.as_bytes(), input::MAX_RECEIPT_BYTES)?;
-            receipts.push(receipt);
-        }
-        Ok(receipts)
-    }
-
-    pub(crate) fn append(&mut self, receipt: &HttpReceipt) -> Result<(), ProtectError> {
-        let receipt_json = serde_json::to_string(receipt)
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        chio_core_types::canonical::UntrustedJsonText::from_wire(
-            receipt_json.as_bytes(),
-            input::MAX_RECEIPT_BYTES,
-        )?;
-        self.connection
-            .execute(
-                "INSERT OR REPLACE INTO http_receipts (id, receipt_json) VALUES (?1, ?2)",
-                params![receipt.id, receipt_json],
-            )
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        Ok(())
-    }
-
-    pub(crate) fn append_tool_receipt(
-        &mut self,
-        receipt: &ChioReceipt,
-    ) -> Result<(), ProtectError> {
-        let receipt_json = serde_json::to_string(receipt)
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        chio_core_types::canonical::UntrustedJsonText::from_wire(
-            receipt_json.as_bytes(),
-            input::MAX_RECEIPT_BYTES,
-        )?;
-        self.connection
-            .execute(
-                "INSERT OR REPLACE INTO tool_receipts (id, receipt_json) VALUES (?1, ?2)",
-                params![receipt.id, receipt_json],
-            )
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        Ok(())
-    }
-
-    pub(crate) fn load_revoked_capability_ids(&self) -> Result<HashSet<String>, ProtectError> {
-        let mut statement = self
-            .connection
-            .prepare("SELECT capability_id FROM revoked_capabilities ORDER BY rowid ASC")
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        let rows = statement
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-
-        let mut capability_ids = HashSet::new();
-        for row in rows {
-            let capability_id =
-                row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-            capability_ids.insert(capability_id);
-        }
-        Ok(capability_ids)
-    }
-
-    pub(crate) fn revoke_capability(&mut self, capability_id: &str) -> Result<(), ProtectError> {
-        self.connection
-            .execute(
-                "INSERT OR REPLACE INTO revoked_capabilities (capability_id) VALUES (?1)",
-                params![capability_id],
-            )
-            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-        Ok(())
-    }
 }
 
 /// Shared proxy state.
@@ -325,7 +154,10 @@ pub(crate) struct ProxyState {
     pub(crate) http_client: reqwest::Client,
     pub(crate) egress_contract: HttpEgressContract,
     pub(crate) approval_admin: ApprovalAdmin,
+    pub(crate) approval_config: Option<super::approval_authority::ProtectApprovalConfig>,
+    #[cfg(test)]
     pub(crate) receipt_log: Mutex<ReceiptLog>,
+    #[cfg(test)]
     pub(crate) tool_receipt_log: Mutex<ToolReceiptLog>,
     pub(crate) receipt_store: Option<Mutex<SqliteReceiptStore>>,
     /// Revocation store shared with the embedded kernel. With a receipt database
@@ -482,19 +314,16 @@ impl ProtectProxy {
         self
     }
 
-    async fn load_spec_content(&self) -> Result<String, ProtectError> {
-        if let Some(spec_content) = &self.config.spec_content {
-            return Ok(spec_content.clone());
-        }
-        if let Some(spec_path) = &self.config.spec_path {
-            return load_spec_from_file(spec_path);
-        }
-        discover_spec(&self.config.upstream).await
+    async fn load_spec_content(&self) -> Result<spec_authority::LoadedSpec, ProtectError> {
+        spec_authority::load(&self.config).await
     }
 
     /// Build the route table from the OpenAPI spec.
     /// Parses the spec directly to preserve path and method information.
-    fn build_routes(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
+    pub(super) fn build_routes(
+        spec_content: &str,
+        pinned: bool,
+    ) -> Result<Vec<RouteEntry>, ProtectError> {
         let spec = chio_openapi::OpenApiSpec::parse(spec_content)?;
         let mut routes = Vec::new();
 
@@ -511,7 +340,12 @@ impl ProtectProxy {
                     _ => continue,
                 };
 
-                let extensions = ChioExtensions::from_operation(&operation.raw)?;
+                let mut extensions = ChioExtensions::from_operation(&operation.raw)?;
+                // An upstream may tighten its classification, but cannot remove
+                // side effects without the operator pinning these exact bytes.
+                if !pinned && extensions.side_effects == Some(false) {
+                    extensions.side_effects = None;
+                }
                 let policy = DefaultPolicy::for_method_with_extensions(method, &extensions);
                 routes.push(RouteEntry {
                     pattern: path.clone(),
@@ -542,6 +376,13 @@ impl ProtectProxy {
     where
         F: FnOnce(SocketAddr),
     {
+        let listen: SocketAddr = self.config.listen_addr.parse().map_err(|error| {
+            ProtectError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        })?;
+        let transport =
+            chio_control_plane::server_transport::prepare(&self.config.transport, listen)
+                .map_err(std::io::Error::other)?;
+        spec_authority::validate_source(&self.config)?;
         validate_sidecar_control_token(self.config.sidecar_control_token.as_deref())
             .map_err(|error| ProtectError::Config(error.to_string()))?;
         // Durable-by-default: a missing receipt store means in-memory receipts
@@ -577,16 +418,19 @@ impl ProtectProxy {
                 .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         }
 
+        let retention_config = self
+            .config
+            .receipt_retention
+            .as_ref()
+            .map(|policy| policy.validate(durable_receipt_db))
+            .transpose()?;
+        let keypair = super::evidence::load_signer(&self.config, durable_receipt_db.is_some())?;
+
         let spec_content = self.load_spec_content().await?;
-        let routes = Self::build_routes(&spec_content)?;
+        let routes = Self::build_routes(spec_content.content(), spec_content.is_pinned())?;
         let route_count = routes.len();
 
-        let keypair = match &self.config.signer_seed_hex {
-            Some(seed_hex) => Keypair::from_seed_hex(seed_hex)
-                .map_err(|error| ProtectError::Config(error.to_string()))?,
-            None => Keypair::generate(),
-        };
-        let policy_hash = chio_core_types::sha256_hex(spec_content.as_bytes());
+        let policy_hash = spec_content.policy_hash(self.config.allow_anonymous_reads)?;
 
         // Open the durable receipt store first so it owns the shared sidecar
         // file's provenance anchor; the approval store then co-locates onto that
@@ -594,7 +438,7 @@ impl ProtectProxy {
         // foreign approval database: it carries no receipt anchor, so the receipt
         // store refuses it here instead of adopting it and commingling receipt
         // tables into another store's file.
-        let durable_receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>> =
+        let durable_receipt_store: Option<Arc<chio_store_sqlite::SqliteReceiptStore>> =
             match durable_receipt_db {
                 Some(path) => Some(Arc::new(
                     chio_store_sqlite::SqliteReceiptStore::open(path)
@@ -657,7 +501,7 @@ impl ProtectProxy {
         let clock = clock::ProxyClock::default();
         let durable_admission = match durable_receipt_db {
             Some(path) => Some(open_durable_admission(path, Arc::new(clock.clone()))?),
-            None if self.caller_executor.is_some() => {
+            None if self.caller_executor.is_some() || self.config.approval.is_some() => {
                 return Err(ProtectError::Config(
                     "authenticated caller execution requires a durable budget authority".into(),
                 ));
@@ -668,45 +512,29 @@ impl ProtectProxy {
         let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
             routes,
             keypair.clone(),
-            policy_hash,
+            policy_hash.clone(),
             Arc::clone(&approval_store),
             self.config.trusted_capability_issuers.clone(),
-            durable_receipt_store,
+            durable_receipt_store
+                .clone()
+                .map(|store| store as Arc<dyn chio_kernel::ReceiptStore>),
             revocation_store.clone(),
             durable_admission.clone(),
             self.config.allow_ephemeral_receipts,
             Arc::new(clock.clone()),
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
+        let evaluator = evaluator.with_anonymous_reads(self.config.allow_anonymous_reads);
         let receipt_backend = evaluator.receipt_backend();
         let revocation_backend = evaluator.revocation_backend();
 
-        let (receipt_log, tool_receipt_log, receipt_store, mut revoked_capability_ids) =
-            if let Some(path) = &self.config.receipt_db {
-                let store = SqliteReceiptStore::open(path)?;
-                let receipts = store.load_receipts()?;
-                let tool_receipts = store.load_tool_receipts()?;
-                let revoked_capability_ids = store.load_revoked_capability_ids()?;
-                (
-                    ReceiptLog { receipts },
-                    ToolReceiptLog {
-                        receipts: tool_receipts,
-                    },
-                    Some(Mutex::new(store)),
-                    revoked_capability_ids,
-                )
-            } else {
-                (
-                    ReceiptLog {
-                        receipts: Vec::new(),
-                    },
-                    ToolReceiptLog {
-                        receipts: Vec::new(),
-                    },
-                    None,
-                    HashSet::new(),
-                )
-            };
+        let receipt_store = durable_receipt_store
+            .as_ref()
+            .map(|store| Mutex::new(SqliteReceiptStore::from_shared(Arc::clone(store))));
+        let mut revoked_capability_ids = match &receipt_store {
+            Some(store) => store.lock().await.load_revoked_capability_ids()?,
+            None => HashSet::new(),
+        };
 
         // Enforce operator revocations recorded through the durable revocation
         // store that `chio trust revoke --revocation-db <path>` writes. Merging
@@ -742,7 +570,19 @@ impl ProtectProxy {
                 .as_ref()
                 .map(|configured| configured.hold_capable)
                 .unwrap_or(false);
-        let budget_store = configured_budget_store.map(|configured| configured.store);
+        let budget_store = if self.config.approval.is_some() {
+            Some(
+                durable_admission
+                    .as_ref()
+                    .ok_or_else(|| {
+                        ProtectError::Config("approval authority requires durable admission".into())
+                    })?
+                    .budget_store
+                    .clone(),
+            )
+        } else {
+            configured_budget_store.map(|configured| configured.store)
+        };
 
         // Automatic reconcile/reverse of open holds requires the durable receipt
         // log (ADR-0013) to build the realized-spend arbitration map. Without
@@ -782,13 +622,43 @@ impl ProtectProxy {
                 let mut kernel = build_mediation_kernel(
                     &keypair,
                     Arc::clone(store),
-                    &trusted_capability_issuers,
+                    super::mediated::MediationPolicy {
+                        issuers: &trusted_capability_issuers,
+                        hash: Some(&policy_hash),
+                        receipt_store: durable_receipt_store
+                            .clone()
+                            .map(|store| store as Arc<dyn chio_kernel::ReceiptStore>),
+                    },
                     Vec::new(),
                     payment_adapter,
                     durable_admission,
                     Arc::new(clock.clone()),
                 )?;
+                if let Some(store) = revocation_store.as_ref() {
+                    for capability_id in &revoked_capability_ids {
+                        store
+                            .revoke(capability_id)
+                            .map_err(|error| ProtectError::Config(error.to_string()))?;
+                    }
+                    kernel.set_revocation_store_handle(Arc::clone(store));
+                }
+                if let Some(approval) = &self.config.approval {
+                    super::approval_authority::configure(&mut kernel, approval)?;
+                }
+                let authenticated_caller =
+                    self.caller_executor.is_some() || self.config.approval.is_some();
                 if let Some(executor) = self.caller_executor {
+                    if self
+                        .config
+                        .approval
+                        .as_ref()
+                        .is_some_and(|approval| approval.caller_executor != executor)
+                    {
+                        return Err(ProtectError::Config(
+                            "caller executor conflicts with approval authority configuration"
+                                .into(),
+                        ));
+                    }
                     if !kernel.has_durable_admission_store() {
                         return Err(ProtectError::Config(
                             "authenticated caller execution requires durable admission".into(),
@@ -797,25 +667,15 @@ impl ProtectProxy {
                     kernel
                         .set_caller_executor(executor)
                         .map_err(|error| ProtectError::Config(error.to_string()))?;
-                    if let Some(store) = revocation_store.as_ref() {
-                        // Include the configured startup revocation database in
-                        // the kernel's ancestor walk, not only the sidecar's
-                        // leaf lookup. A report cannot bypass a revoked parent
-                        // after owner restart. Revocations remain monotone.
-                        for capability_id in &revoked_capability_ids {
-                            store
-                                .revoke(capability_id)
-                                .map_err(|error| ProtectError::Config(error.to_string()))?;
-                        }
-                        kernel.set_revocation_store_handle(Arc::clone(store));
-                    }
+                }
+                if authenticated_caller {
                     kernel
                         .reconcile_durable_admission_startup()
                         .map_err(|error| ProtectError::Config(error.to_string()))?;
                 }
                 Some(Mutex::new(kernel))
             }
-            None if self.caller_executor.is_some() => {
+            None if self.caller_executor.is_some() || self.config.approval.is_some() => {
                 return Err(ProtectError::Config(
                     "authenticated caller execution requires a durable budget authority".into(),
                 ));
@@ -830,14 +690,21 @@ impl ProtectProxy {
             upstream: self.config.upstream.clone(),
             http_client,
             egress_contract,
+            approval_config: self.config.approval.clone(),
             approval_admin: match threshold_collector {
                 Some(collector) => {
                     ApprovalAdmin::with_threshold_collector(approval_store, collector)
                 }
                 None => ApprovalAdmin::new(approval_store),
             },
-            receipt_log: Mutex::new(receipt_log),
-            tool_receipt_log: Mutex::new(tool_receipt_log),
+            #[cfg(test)]
+            receipt_log: Mutex::new(ReceiptLog {
+                receipts: Vec::new(),
+            }),
+            #[cfg(test)]
+            tool_receipt_log: Mutex::new(ToolReceiptLog {
+                receipts: Vec::new(),
+            }),
             receipt_store,
             revocation_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
@@ -856,20 +723,11 @@ impl ProtectProxy {
             revocation_backend,
         });
 
-        // Release expired, unreconciled reserved budget holds on an interval so a
-        // caller that authorizes but never reconciles does not permanently burn
-        // budget. The reaper's JoinHandle is retained on the shared state and
-        // aborted once the server stops accepting (below), bounding the task's
-        // lifetime to the server's.
-        spawn_reserved_hold_reaper(&state).await;
-
         let app = build_app(Arc::clone(&state));
 
-        let listener = tokio::net::TcpListener::bind(&self.config.listen_addr)
-            .await
-            .map_err(|e| {
-                ProtectError::Config(format!("cannot bind {}: {e}", self.config.listen_addr))
-            })?;
+        let listener = transport.bind(listen).await.map_err(|e| {
+            ProtectError::Config(format!("cannot bind {}: {e}", self.config.listen_addr))
+        })?;
 
         let local_addr = listener.local_addr().map_err(|error| {
             ProtectError::Config(format!("cannot resolve bound address: {error}"))
@@ -884,6 +742,14 @@ impl ProtectProxy {
             route_count, self.config.upstream, local_addr
         );
 
+        let retention_maintenance = match (durable_receipt_store.as_ref(), retention_config) {
+            (Some(store), Some(config)) => {
+                Some(super::retention::start_maintenance(store.clone(), config)?)
+            }
+            _ => None,
+        };
+        spawn_reserved_hold_reaper(&state).await;
+        let reaper_owner = ReaperOwner(state.reaper_handle.lock().await.take());
         observer(local_addr);
 
         // No generic request timeout: every proxied call writes its receipt
@@ -913,25 +779,33 @@ impl ProtectProxy {
         )
         .with_graceful_shutdown(controller.signalled());
 
-        // Every proxied call writes its receipt synchronously inside the request
-        // handler, so completing the in-flight requests during the drain is the
-        // whole durability guarantee: there is nothing queued to flush afterward.
+        // Drain handlers first, stop rotation, then flush all accepted receipt
+        // writes and checkpoint work before reporting shutdown complete.
+        let flush_store = durable_receipt_store.clone();
         let serve_result = run_until_drained(
             server,
             controller.subscribe(),
             hygiene.drain_timeout,
-            async { Ok::<(), String>(()) },
+            async move {
+                drop(reaper_owner);
+                drop(retention_maintenance);
+                if let Some(store) = flush_store {
+                    tokio::task::spawn_blocking(move || {
+                        chio_kernel::ReceiptStore::flush_receipt_writes_with_timeout(
+                            store.as_ref(),
+                            Duration::from_secs(5),
+                        )
+                    })
+                    .await
+                    .map_err(|error| error.to_string())?
+                    .map_err(|error| error.to_string())?;
+                }
+                Ok::<(), String>(())
+            },
         )
         .await
         .map(|_outcome| ())
         .map_err(protect_serve_error);
-
-        // The reaper holds a clone of the shared state; abort it now the server
-        // has stopped so the task does not outlive the serving lifetime (a
-        // dropped JoinHandle would only detach it, leaving it running).
-        if let Some(handle) = state.reaper_handle.lock().await.take() {
-            handle.abort();
-        }
 
         serve_result?;
 
@@ -940,25 +814,271 @@ impl ProtectProxy {
 
     /// Build routes from spec content for testing.
     pub fn routes_from_spec(spec_content: &str) -> Result<Vec<RouteEntry>, ProtectError> {
-        Self::build_routes(spec_content)
+        Self::build_routes(spec_content, false)
     }
 }
 
 #[cfg(test)]
 mod proxy_builder_tests {
     use super::*;
+    use chio_test_support::prelude::*;
+
+    #[tokio::test]
+    async fn protect_transport_denies_public_plaintext_before_spec_or_store_work(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("must-not-exist.db");
+        let mut config = minimal_config();
+        config.listen_addr = "0.0.0.0:0".into();
+        config.receipt_db = Some(database.to_string_lossy().into_owned());
+        config.spec_path = Some("missing-spec.yaml".into());
+        config.spec_content = None;
+        let result = ProtectProxy::new(config)
+            .run_with_observer(|_| panic!("unsafe listener published"))
+            .await;
+        assert!(result
+            .err()
+            .ok_or("unsafe listener started")?
+            .to_string()
+            .contains("non-loopback"));
+        assert!(!database.exists());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn protect_transport_serves_over_tls() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
+        let cert = directory.path().join("cert.pem");
+        let key = directory.path().join("key.pem");
+        std::fs::write(&cert, identity.cert.pem())?;
+        std::fs::write(&key, identity.key_pair.serialize_pem())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
+        }
+        let mut config = minimal_config();
+        config.spec_content =
+            Some("openapi: 3.1.0\ninfo: {title: TLS, version: '1'}\npaths: {}\n".into());
+        config.transport = chio_http_serve::ServerTransportConfig {
+            tls_cert: Some(cert),
+            tls_key: Some(key),
+            allow_plaintext: false,
+        };
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(ProtectProxy::new(config).run_with_observer(|address| {
+            let _ = sender.send(address);
+        }));
+        let address = tokio::time::timeout(std::time::Duration::from_secs(5), receiver).await??;
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .add_root_certificate(reqwest::Certificate::from_pem(
+                identity.cert.pem().as_bytes(),
+            )?)
+            .build()?;
+        let response = client
+            .get(format!("https://localhost:{}/chio/live", address.port()))
+            .send()
+            .await?;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        server.abort();
+        let _ = server.await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn evidence_durable_start_refuses_missing_custody_before_spec_or_store() {
+        let directory = tempfile::tempdir().test_unwrap();
+        let path = directory.path().join("must-not-exist.db");
+        let mut config = minimal_config();
+        config.receipt_db = Some(path.to_string_lossy().into_owned());
+        config.spec_content = None;
+        config.spec_path = Some("missing-spec.yaml".into());
+        let error = ProtectProxy::new(config).run().await.test_unwrap_err();
+        assert!(
+            error.to_string().contains("private signing custody"),
+            "{error}"
+        );
+        assert!(!path.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn evidence_custody_is_existing_private_and_stable() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().test_unwrap();
+        let path = directory.path().join("signer.seed");
+        let mut config = minimal_config();
+        config.signer_seed_file = Some(path.clone());
+        assert!(super::super::evidence::load_signer(&config, true).is_err());
+        assert!(!path.exists());
+        let key = Keypair::generate();
+        std::fs::write(&path, key.seed_hex()).test_unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).test_unwrap();
+        let first = super::super::evidence::load_signer(&config, true).test_unwrap();
+        let second = super::super::evidence::load_signer(&config, true).test_unwrap();
+        assert_eq!(first.public_key(), key.public_key());
+        assert_eq!(second.public_key(), key.public_key());
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).test_unwrap();
+        assert!(super::super::evidence::load_signer(&config, true).is_err());
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).test_unwrap();
+        let link = directory.path().join("alias.seed");
+        std::os::unix::fs::symlink(&path, &link).test_unwrap();
+        config.signer_seed_file = Some(link);
+        assert!(super::super::evidence::load_signer(&config, true).is_err());
+        config.signer_seed_file = Some(path.clone());
+        std::fs::hard_link(&path, directory.path().join("hard.seed")).test_unwrap();
+        assert!(super::super::evidence::load_signer(&config, true).is_err());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn evidence_startup_ignores_oversized_legacy_receipts_and_preserves_revocations(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("receipts.db");
+        let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
+        let raw = rusqlite::Connection::open(&database)?;
+        raw.execute_batch("CREATE TABLE http_receipts (raw_json TEXT); INSERT INTO http_receipts VALUES (zeroblob(2000000)); CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY); INSERT INTO revoked_capabilities VALUES ('legacy-revoked');")?;
+        assert_eq!(
+            canonical.legacy_revoked_capability_ids()?,
+            vec!["legacy-revoked"]
+        );
+        drop(raw);
+        drop(canonical);
+        let key = Keypair::generate();
+        let seed = directory.path().join("signer.seed");
+        std::fs::write(&seed, key.seed_hex())?;
+        std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600))?;
+        let mut config = minimal_config();
+        config.receipt_db = Some(database.to_string_lossy().into_owned());
+        config.signer_seed_file = Some(seed);
+        config.sidecar_control_token = Some("evidence-test-control".into());
+        config.spec_content =
+            Some("openapi: 3.0.3\ninfo:\n  title: Evidence\n  version: 1.0.0\npaths: {}\n".into());
+        let (ready, address) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(ProtectProxy::new(config).run_with_observer(move |address| {
+            let _ = ready.send(address);
+        }));
+        let address = tokio::time::timeout(Duration::from_secs(10), address).await??;
+        let response = reqwest::Client::new().post(format!("http://{address}/v1/receipts"))
+            .bearer_auth("evidence-test-control")
+            .json(&serde_json::json!({"job_name":"legacy-restart", "namespace":"operator", "job_uid":"one", "outcome":"succeeded", "steps":[]}))
+            .send().await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        task.abort();
+        let _ = task.await;
+        let reopened = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
+        let receipts = reopened
+            .query_receipts(&chio_kernel::ReceiptQuery::default().local_operator_admin())?;
+        assert_eq!(receipts.total_count, 1);
+        assert_eq!(receipts.receipts[0].receipt.kernel_key, key.public_key());
+        assert_eq!(
+            reopened.legacy_revoked_capability_ids()?,
+            vec!["legacy-revoked"]
+        );
+        let error = reopened
+            .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())
+            .test_unwrap_err();
+        assert!(error.to_string().contains("legacy mutable receipt history"));
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn receipt_retention_runs_from_the_actual_proxy_serving_lifetime(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("receipts.db");
+        let archive = directory.path().join("archive.db");
+        let fixture = super::super::tests::test_state(Vec::new(), "http://127.0.0.1:1".into());
+        let receipt = build_manual_receipt(
+            &fixture,
+            "aged".into(),
+            "/denied".into(),
+            HttpMethod::Post,
+            "caller".into(),
+            None,
+            Verdict::deny("policy", "test"),
+            403,
+            100,
+            chio_core_types::sha256_hex(b"request"),
+            None,
+            None,
+            "test",
+        )?;
+        let store = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
+        store.append_chio_receipt_returning_seq(
+            &receipt.to_chio_receipt_with_keypair(&fixture.signer_keypair)?,
+        )?;
+        let bytes = store.receipts_canonical_bytes_range(1, 1)?;
+        let checkpoint = chio_kernel::checkpoint::build_checkpoint(
+            1,
+            1,
+            1,
+            &bytes.into_iter().map(|(_, b)| b).collect::<Vec<_>>(),
+            &fixture.signer_keypair,
+        )?;
+        store.store_checkpoint(&checkpoint)?;
+        let seed = directory.path().join("signer.seed");
+        std::fs::write(&seed, fixture.signer_keypair.seed_hex())?;
+        std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600))?;
+        let mut config = minimal_config();
+        config.receipt_db = Some(database.to_string_lossy().into_owned());
+        config.signer_seed_file = Some(seed);
+        config.receipt_retention = Some(super::super::ProtectRetentionConfig {
+            retention_days: 1,
+            archive_path: archive.clone(),
+            check_interval_secs: 1,
+        });
+        config.spec_content =
+            Some("openapi: 3.0.3\ninfo:\n  title: Evidence\n  version: 1.0.0\npaths: {}\n".into());
+        let (ready, address) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(ProtectProxy::new(config).run_with_observer(move |address| {
+            let _ = ready.send(address);
+        }));
+        let _address = tokio::time::timeout(Duration::from_secs(10), address).await??;
+        let query = chio_kernel::ReceiptQuery::default().local_operator_admin();
+        tokio::time::timeout(Duration::from_secs(8), async {
+            while store.query_live_receipts(&query)?.total_count != 0 {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+            Ok::<_, chio_kernel::ReceiptStoreError>(())
+        })
+        .await??;
+        assert!(archive.is_file());
+        let bundle =
+            store.build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
+        assert_eq!(bundle.tool_receipts.len(), 1);
+        assert_eq!(bundle.inclusion_proofs.len(), 1);
+        task.abort();
+        let _ = task.await;
+        drop(store);
+        let reopened = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
+        assert_eq!(reopened.query_receipts(&query)?.total_count, 1);
+        Ok(())
+    }
 
     fn minimal_config() -> ProtectConfig {
         ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: Some("{}".to_string()),
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: None,
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: None,
             allow_ephemeral_receipts: true,
             sidecar_control_token: None,
+            receipt_retention: None,
+            signer_seed_file: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            approval: None,
             control_url: None,
             control_token: None,
             budget_db: None,
@@ -1027,15 +1147,21 @@ mod windows_authority_tests {
         let observer_called = AtomicBool::new(false);
 
         let result = ProtectProxy::new(ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".to_string(),
             spec_content: None,
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: Some(missing_spec.to_string_lossy().into_owned()),
             listen_addr: "127.0.0.1:0".to_string(),
             receipt_db: Some(receipt_database_string),
             allow_ephemeral_receipts: false,
             sidecar_control_token: None,
+            receipt_retention: None,
+            signer_seed_file: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            approval: None,
             control_url: None,
             control_token: None,
             budget_db: None,
@@ -1122,30 +1248,26 @@ mod durability_tests {
     }
 
     #[test]
-    fn http_receipt_store_open_configures_wal_and_a_busy_timeout() {
+    fn shared_evidence_store_uses_wal_and_a_healthy_writer() {
         let mut path = std::env::temp_dir();
         path.push(format!("chio-http-receipts-{}.db", uuid::Uuid::now_v7()));
         let path_str = path.to_string_lossy().into_owned();
 
         let store = SqliteReceiptStore::open(&path_str).test_unwrap();
 
-        let busy_timeout: i64 = store
-            .connection
-            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
-            .test_unwrap();
+        // Flush acknowledges actor initialization before checking steady readiness.
+        store.core.flush_receipt_writes().test_unwrap();
         assert!(
-            busy_timeout >= 5000,
-            "the http receipt writer must share the receipt store busy timeout, got {busy_timeout}"
+            store.is_reachable(),
+            "shared receipt writer must be healthy"
         );
-
-        let journal_mode: String = store
-            .connection
+        let reader = rusqlite::Connection::open(&path).test_unwrap();
+        let journal_mode: String = reader
             .query_row("PRAGMA journal_mode", [], |row| row.get(0))
             .test_unwrap();
-        assert!(
-            journal_mode.eq_ignore_ascii_case("wal"),
-            "the http receipt writer must run in WAL mode, got {journal_mode}"
-        );
+        assert!(journal_mode.eq_ignore_ascii_case("wal"));
+        drop(reader);
+        drop(store);
 
         let _ = std::fs::remove_file(&path);
     }
@@ -1217,33 +1339,5 @@ mod reservation_boundary_tests {
         assert_eq!(window.claim("id", 100).map(|_| ()), Ok(()));
         assert_eq!(window.claim("another", 99), Err(RequestIdClaimError::Time));
         assert_eq!(window.claim("id", 100), Err(RequestIdClaimError::Reused));
-    }
-
-    #[test]
-    fn stored_receipts_reject_original_duplicates_and_oversized_rows() {
-        let store = SqliteReceiptStore::open(":memory:").unwrap();
-        store
-            .connection
-            .execute(
-                "INSERT INTO http_receipts VALUES ('duplicate', ?1)",
-                [r#"{"private-marker":1,"private-marker":2}"#],
-            )
-            .unwrap();
-        assert!(matches!(store.load_receipts(), Err(ProtectError::Input(_))));
-        store
-            .connection
-            .execute("DELETE FROM http_receipts", [])
-            .unwrap();
-        store
-            .connection
-            .execute(
-                "INSERT INTO http_receipts VALUES ('oversized', ?1)",
-                ["x".repeat(input::MAX_RECEIPT_BYTES + 1)],
-            )
-            .unwrap();
-        assert!(matches!(
-            store.load_receipts(),
-            Err(ProtectError::ReceiptStore(_))
-        ));
     }
 }

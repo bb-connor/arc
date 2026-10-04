@@ -12,6 +12,7 @@ mod health_summaries;
 mod leases_scheduler;
 mod outcome_continuation;
 mod replay_source;
+mod run_write_fence;
 mod runs_steps;
 mod schema_migrations;
 mod swarm_authority_bundles;

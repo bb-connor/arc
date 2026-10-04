@@ -143,6 +143,7 @@ pub(super) fn evaluate(
         request.agent_id.clone(),
     );
     let operation = chio_core::session::ToolCallOperation {
+        dpop_proof: None,
         capability: request.capability.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

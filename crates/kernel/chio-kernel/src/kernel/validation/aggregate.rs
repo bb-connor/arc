@@ -28,6 +28,8 @@ impl ChioKernel {
             ));
         }
         crate::ensure_capability_issuance_supported(&scope)?;
+        // Refuse a clock fault before invoking an authority that may persist issuance.
+        self.read_authority_time()?;
         let capability = self.capability_authority.issue_aggregate_family_root(
             subject,
             scope.clone(),
@@ -41,6 +43,7 @@ impl ChioKernel {
             ttl_seconds,
             &self.capability_authority.authority_public_key(),
             max_invocations,
+            self.read_authority_time()?,
         )?;
         self.record_observed_capability_snapshot(&capability)?;
         Ok(capability)

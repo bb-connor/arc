@@ -1,5 +1,47 @@
 use super::*;
 
+impl ReceiptCommitWriterHealth {
+    fn new(clock: crate::store_clock::StoreClock) -> Self {
+        Self {
+            clock,
+            accepted_total: AtomicU64::new(0),
+            committed_total: AtomicU64::new(0),
+            failed_total: AtomicU64::new(0),
+            saturated_total: AtomicU64::new(0),
+            inflight: AtomicU64::new(0),
+            timed_out_inflight: AtomicU64::new(0),
+            timed_out_total: AtomicU64::new(0),
+            queue_depth: AtomicU64::new(0),
+            last_commit_unix_ms: AtomicU64::new(0),
+            first_accept_unix_ms: AtomicU64::new(0),
+            backlog_started_unix_ms: AtomicU64::new(0),
+            last_error: Mutex::new(None),
+            retention_error: Mutex::new(None),
+            head_checkpoint_seq: AtomicU64::new(0),
+            head_checkpointed_entry_seq: AtomicU64::new(0),
+            head_claim_log_count: AtomicU64::new(0),
+            head_claim_log_max_seq: AtomicU64::new(0),
+            // Fail closed until the actor thread seeds a verified head. The head
+            // is seeded asynchronously after construction, so starting open would
+            // let a corrupt or still-attaching store pass the pre-dispatch gate
+            // and run a tool before the first append could reject. The seed path
+            // clears this the moment it succeeds.
+            head_poisoned: AtomicBool::new(true),
+            critical_write_poisoned: AtomicBool::new(false),
+            accounting_poisoned: AtomicBool::new(false),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Default for ReceiptCommitWriterHealth {
+    fn default() -> Self {
+        Self::new(crate::store_clock::StoreClock::new(Arc::new(
+            chio_security_types::clock::SystemClock,
+        )))
+    }
+}
+
 #[derive(Clone, Copy)]
 enum CommandKind {
     Write,
@@ -126,7 +168,7 @@ impl WriterCommandPermit {
             };
             let _ = self.health.add_counter(counter, 1, name);
             if committed {
-                match current_unix_ms() {
+                match self.health.clock.unix_millis().map(|time| time.get()) {
                     Ok(now) => self.health.last_commit_unix_ms.store(now, Ordering::SeqCst),
                     Err(error) => {
                         self.health.accounting_error(error.code());
@@ -205,13 +247,14 @@ impl ReceiptCommitSender {
     }
 }
 
-pub(super) fn receipt_commit_channel() -> (ReceiptCommitSender, mpsc::Receiver<QueuedWriterCommand>)
-{
+pub(super) fn receipt_commit_channel_with_clock(
+    clock: crate::store_clock::StoreClock,
+) -> (ReceiptCommitSender, mpsc::Receiver<QueuedWriterCommand>) {
     let (sender, receiver) = mpsc::sync_channel(RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY);
     (
         ReceiptCommitSender {
             sender,
-            health: Arc::new(ReceiptCommitWriterHealth::default()),
+            health: Arc::new(ReceiptCommitWriterHealth::new(clock)),
         },
         receiver,
     )
@@ -253,4 +296,12 @@ impl WriterHandle {
     ) -> Result<(), ReceiptStoreError> {
         enqueue_for_worker(&self.sender, &self.worker, command)
     }
+}
+
+#[cfg(test)]
+pub(super) fn receipt_commit_channel() -> (ReceiptCommitSender, mpsc::Receiver<QueuedWriterCommand>)
+{
+    receipt_commit_channel_with_clock(crate::store_clock::StoreClock::new(Arc::new(
+        chio_security_types::clock::SystemClock,
+    )))
 }

@@ -215,22 +215,36 @@ pub fn serve_stdio() -> HelloA2aResult<()> {
     serve_reader(stdin.lock(), stdout.lock())
 }
 
-pub fn serve_reader<R, W>(reader: R, mut writer: W) -> HelloA2aResult<()>
+pub fn serve_reader<R, W>(mut reader: R, mut writer: W) -> HelloA2aResult<()>
 where
     R: BufRead,
     W: Write,
 {
     let mut state = build_demo_state()?;
 
-    for line in reader.lines() {
-        let line = line?;
-        if line.trim().is_empty() {
+    // Bound allocation before parsing or skipping whitespace. The extra byte
+    // distinguishes an exact-size EOF frame from a truncated oversized frame.
+    const MAX_FRAME_BYTES: usize = 1024 * 1024;
+    loop {
+        let mut frame = Vec::new();
+        let count = std::io::Read::take(&mut reader, MAX_FRAME_BYTES as u64 + 1)
+            .read_until(b'\n', &mut frame)?;
+        if count == 0 {
+            break;
+        }
+        if count > MAX_FRAME_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "JSON-RPC frame exceeds its byte limit",
+            )
+            .into());
+        }
+        if frame.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
-        let message: Value = serde_json::from_str(&line)?;
         let response = state
             .edge
-            .handle_jsonrpc(message, &state.kernel, &state.execution);
+            .handle_jsonrpc(&frame, &state.kernel, &state.execution)?;
         if let Some(response) = response.as_value() {
             serde_json::to_writer(&mut writer, response)?;
             writeln!(&mut writer)?;
@@ -268,6 +282,13 @@ mod tests {
     use chio_kernel::{KernelError, ToolServerConnection};
     use serde_json::{json, Value};
     use std::io::Cursor;
+
+    #[test]
+    fn inbound_authority_example_bounds_frames_before_whitespace_or_json() {
+        let mut output = Vec::new();
+        assert!(serve_reader(Cursor::new(vec![b' '; 1024 * 1024 + 1]), &mut output).is_err());
+        assert!(output.is_empty());
+    }
 
     fn send_message_frame(id: u64) -> Value {
         json!({
@@ -322,10 +343,11 @@ mod tests {
     fn direct_jsonrpc_send_stream_and_task_get_carry_receipts() -> HelloA2aResult<()> {
         let mut state = build_demo_state()?;
 
-        let send_response =
-            state
-                .edge
-                .handle_jsonrpc(send_message_frame(1), &state.kernel, &state.execution);
+        let send_response = state.edge.handle_jsonrpc(
+            &serde_json::to_vec(&send_message_frame(1))?,
+            &state.kernel,
+            &state.execution,
+        )?;
         assert_eq!(send_response["result"]["status"], "completed");
         assert_eq!(
             send_response["result"]["metadata"]["chio"]["authorityPath"],
@@ -335,10 +357,11 @@ mod tests {
             .as_str()
             .is_some_and(|receipt_id| !receipt_id.is_empty()));
 
-        let stream_response =
-            state
-                .edge
-                .handle_jsonrpc(stream_message_frame(2), &state.kernel, &state.execution);
+        let stream_response = state.edge.handle_jsonrpc(
+            &serde_json::to_vec(&stream_message_frame(2))?,
+            &state.kernel,
+            &state.execution,
+        )?;
         assert_eq!(stream_response["result"]["status"], "working");
         assert_eq!(
             stream_response["result"]["metadata"]["chio"]["receiptPending"],
@@ -349,15 +372,15 @@ mod tests {
             .ok_or_else(|| KernelError::ToolServerError("missing stream task id".to_string()))?;
 
         let task_response = state.edge.handle_jsonrpc(
-            json!({
+            &serde_json::to_vec(&json!({
                 "jsonrpc": "2.0",
                 "id": 3,
                 "method": "task/get",
                 "params": { "taskId": task_id }
-            }),
+            }))?,
             &state.kernel,
             &state.execution,
-        );
+        )?;
         assert_eq!(task_response["result"]["status"], "completed");
         assert!(task_response["result"]["metadata"]["chio"]["receiptId"]
             .as_str()

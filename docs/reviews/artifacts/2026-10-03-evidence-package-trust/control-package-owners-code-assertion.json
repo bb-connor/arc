@@ -1,0 +1,10 @@
+{
+  "command": [
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-6fe8d5ba7f503f63",
+    "evidence_export::",
+    "--test-threads=2"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 0.33,
+  "log_sha256": "c5249e47e38fde939b087d54a037b0003685ef386d57cec992d13e3d641a85ac"
+}

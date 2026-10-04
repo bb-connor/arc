@@ -142,27 +142,23 @@ pub struct HttpReceiptBody {
 
 impl HttpReceiptBody {
     fn validate_authority_semantics(&self) -> chio_core_types::Result<()> {
-        if self.receipt_kind != ReceiptKind::MediatedDecision {
-            return Err(chio_core_types::Error::CanonicalJson(
-                "HTTP receipts must be mediated_decision receipts".to_string(),
-            ));
+        let mediated = self.receipt_kind == ReceiptKind::MediatedDecision
+            && self.boundary_class == BoundaryClass::Prevent
+            && self.observation_outcome.is_none()
+            && self.trust_level == TrustLevel::Mediated;
+        let observation = self.receipt_kind == ReceiptKind::AdvisoryEvaluation
+            && self.boundary_class == BoundaryClass::AdvisoryOnly
+            && self.observation_outcome == Some(ObservationOutcome::Observed)
+            && self.trust_level == TrustLevel::Advisory
+            && self.tool_origin == ToolOrigin::HostExecutedUnmediated
+            && matches!(self.verdict, Verdict::Incomplete { .. });
+        if mediated || observation {
+            Ok(())
+        } else {
+            Err(chio_core_types::Error::CanonicalJson(
+                "HTTP receipts must be mediated_decision receipts or non-authorizing operator observations".into(),
+            ))
         }
-        if self.boundary_class != BoundaryClass::Prevent {
-            return Err(chio_core_types::Error::CanonicalJson(
-                "HTTP receipts must use the prevent boundary class".to_string(),
-            ));
-        }
-        if self.observation_outcome.is_some() {
-            return Err(chio_core_types::Error::CanonicalJson(
-                "mediated HTTP receipts must not carry observation_outcome".to_string(),
-            ));
-        }
-        if self.trust_level != TrustLevel::Mediated {
-            return Err(chio_core_types::Error::CanonicalJson(
-                "HTTP receipts must use mediated trust level".to_string(),
-            ));
-        }
-        Ok(())
     }
 }
 
@@ -297,7 +293,8 @@ impl HttpReceipt {
             tool_server: "http".to_string(),
             tool_name: format!("{} {}", self.method, self.route_pattern),
             action,
-            decision: Some(self.verdict.to_decision()),
+            decision: (self.receipt_kind == ReceiptKind::MediatedDecision)
+                .then(|| self.verdict.to_decision()),
             receipt_kind: self.receipt_kind,
             boundary_class: self.boundary_class,
             observation_outcome: self.observation_outcome,
@@ -320,7 +317,23 @@ impl HttpReceipt {
         &self,
         keypair: &Keypair,
     ) -> chio_core_types::Result<chio_core_types::receipt::body::ChioReceipt> {
+        if !self.verify_signature()? || keypair.public_key() != self.kernel_key {
+            return Err(chio_core_types::Error::InvalidSignature(
+                "HTTP evidence projection requires an authentic receipt and its matching signer"
+                    .into(),
+            ));
+        }
         let mut chio_body = self.chio_receipt_body()?;
+        let mut metadata = match chio_body.metadata.take() {
+            Some(Value::Object(metadata)) => metadata,
+            Some(value) => Map::from_iter([("original_metadata".into(), value)]),
+            None => Map::new(),
+        };
+        // Retain the complete signed source, including caller/session identity,
+        // HTTP status and its original signature. A projection cannot silently
+        // discard fields that distinguish an observation from authorization.
+        metadata.insert("chio_http_receipt_v1".into(), serde_json::to_value(self)?);
+        chio_body.metadata = Some(Value::Object(metadata));
         let canonical = canonical_json_bytes(&chio_body)?;
         chio_body.content_hash = sha256_hex(&canonical);
         chio_core_types::receipt::body::ChioReceipt::sign(chio_body, keypair)
@@ -615,5 +628,69 @@ mod tests {
         receipt.metadata = Some(http_status_metadata_final(Some("decision-001")));
 
         assert!(!receipt.verify_signature().test_unwrap());
+    }
+
+    #[test]
+    fn evidence_projection_retains_the_complete_signed_http_record() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.session_id = Some("retained-session".into());
+        body.caller_identity_hash = "caller-commitment".into();
+        body.response_status = 207;
+        let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
+        let projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
+        let original = &projected.metadata.as_ref().test_unwrap()["chio_http_receipt_v1"];
+        assert_eq!(original, &serde_json::to_value(&receipt).test_unwrap());
+        assert!(projected.verify_signature().test_unwrap());
+        assert!(projected.action.verify_hash().test_unwrap());
+    }
+
+    #[test]
+    fn evidence_projection_refuses_a_tampered_http_record() {
+        let kp = test_keypair();
+        let mut receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        assert!(matches!(
+            receipt.to_chio_receipt_with_keypair(&Keypair::generate()),
+            Err(chio_core_types::Error::InvalidSignature(_))
+        ));
+        receipt.response_status = 418;
+        assert!(matches!(
+            receipt.to_chio_receipt_with_keypair(&kp),
+            Err(chio_core_types::Error::InvalidSignature(_))
+        ));
+    }
+
+    #[test]
+    fn observation_projection_cannot_mint_an_authorization_decision() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.receipt_kind = ReceiptKind::AdvisoryEvaluation;
+        body.boundary_class = BoundaryClass::AdvisoryOnly;
+        body.observation_outcome = Some(ObservationOutcome::Observed);
+        body.trust_level = TrustLevel::Advisory;
+        body.tool_origin = ToolOrigin::HostExecutedUnmediated;
+        body.verdict = Verdict::Incomplete {
+            reason: "reported by operator".into(),
+        };
+        let observation = HttpReceipt::sign(body.clone(), &kp).test_unwrap();
+        assert!(observation.verify_signature().test_unwrap());
+        assert!(!observation.is_authorized());
+        let projection = observation.to_chio_receipt_with_keypair(&kp).test_unwrap();
+        assert_eq!(projection.receipt_kind, ReceiptKind::AdvisoryEvaluation);
+        assert_eq!(projection.decision, None);
+        assert!(!projection.is_allowed());
+        for drift in 0..4 {
+            let mut changed = body.clone();
+            match drift {
+                0 => changed.verdict = Verdict::Allow,
+                1 => changed.trust_level = TrustLevel::Mediated,
+                2 => changed.boundary_class = BoundaryClass::Prevent,
+                _ => changed.tool_origin = ToolOrigin::CallerExecuted,
+            }
+            assert!(matches!(
+                HttpReceipt::sign(changed, &kp),
+                Err(chio_core_types::Error::CanonicalJson(_))
+            ));
+        }
     }
 }

@@ -790,18 +790,31 @@ impl KeyLogState {
         self.signing_epoch
     }
 
-    /// Keys whose historical verification window is established by the
-    /// witnessed activation log. Revoked, retired, and merely pending keys are
-    /// deliberately excluded.
+    /// Without a current time only active keys can grant live authority.
     #[must_use]
     pub fn witnessed_verification_keys(&self) -> Vec<KeyRecord> {
         self.keys
             .values()
+            .filter(|record| record.status == KeyStatus::Active)
+            .cloned()
+            .collect()
+    }
+
+    /// Current live authority, separate from time-anchored historical evidence.
+    /// Verification deadlines are exclusive and cannot be omitted on old keys.
+    #[must_use]
+    pub fn witnessed_verification_keys_at(&self, now: u64) -> Vec<KeyRecord> {
+        self.keys
+            .values()
             .filter(|record| {
-                matches!(
-                    record.status,
-                    KeyStatus::Active | KeyStatus::VerificationOnly
-                )
+                now >= record.activated_at
+                    && match record.status {
+                        KeyStatus::Active => true,
+                        KeyStatus::VerificationOnly => {
+                            record.verify_until.is_some_and(|until| now < until)
+                        }
+                        KeyStatus::Pending | KeyStatus::Retired | KeyStatus::Revoked => false,
+                    }
             })
             .cloned()
             .collect()

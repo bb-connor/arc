@@ -8,10 +8,7 @@ use chio_core::capability::token::CapabilityToken;
 use chio_core::PublicKey;
 
 use crate::admission_operation::{AdmissionOperationState, AdmissionOperationV1};
-use crate::kernel::{
-    read_unix_timestamp, read_unix_timestamp_ms, ChioKernel, DurableToolAdmission,
-    VerifiedApprovalReservation,
-};
+use crate::kernel::{ChioKernel, DurableToolAdmission, VerifiedApprovalReservation};
 use crate::{KernelError, ToolCallRequest};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -139,11 +136,8 @@ impl ChioKernel {
         &self,
         request: &GovernedActiveResponseRequest,
     ) -> Result<GovernedActiveResponseAdmission, KernelError> {
-        self.admit_governed_active_response_at(
-            request,
-            read_unix_timestamp()?,
-            read_unix_timestamp_ms()?,
-        )
+        let now = self.read_authority_time()?;
+        self.admit_governed_active_response_at(request, now.as_secs(), now.get())
     }
 
     pub(crate) fn admit_governed_active_response_at(
@@ -252,7 +246,10 @@ impl ChioKernel {
         &self,
         admission: &mut GovernedActiveResponseAdmission,
     ) -> Result<GovernedActiveResponseDispatchCommit, KernelError> {
-        self.commit_governed_active_response_dispatch_at(admission, read_unix_timestamp_ms()?)
+        self.commit_governed_active_response_dispatch_at(
+            admission,
+            self.read_authority_time()?.get(),
+        )
     }
 
     pub(crate) fn commit_governed_active_response_dispatch_at(
@@ -274,7 +271,7 @@ impl ChioKernel {
         self.compensate_durable_admission_before_dispatch(
             admission.admission.operation(),
             serde_json::json!({"cause": "active-response-cancelled"}),
-            read_unix_timestamp_ms()?,
+            self.read_authority_time()?.get(),
             None,
         )
     }

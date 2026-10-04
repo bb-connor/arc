@@ -428,9 +428,6 @@ pub(crate) fn liability_claim_workflow_matches_query(
         && policy_number_matches
 }
 
-pub(crate) fn unix_now() -> Result<u64, ReceiptStoreError> {
-    Ok(
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs(),
-    )
+pub(crate) fn unix_now(clock: &crate::store_clock::StoreClock) -> Result<u64, ReceiptStoreError> {
+    Ok(clock.unix_millis()?.as_secs())
 }

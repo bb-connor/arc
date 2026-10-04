@@ -73,8 +73,6 @@ pub use metrics::{
 
 mod error;
 use error::record_receipt_write_bridge_error;
-#[cfg(test)]
-use error::record_receipt_write_error;
 pub use error::AcpEdgeError;
 include!("config.rs");
 include!("types.rs");

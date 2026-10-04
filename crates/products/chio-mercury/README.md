@@ -48,6 +48,7 @@ fixtures:
 
 ```sh
 mercury proof export \
+  --trusted-kernel-pubkey "$CHIO_KERNEL_PUBKEY" \
   --input evidence-package/ \
   --bundle-manifest bundle-manifest.json \
   --output proof-package.json

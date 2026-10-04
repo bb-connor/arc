@@ -42,7 +42,7 @@ pub struct SqliteApprovalStore {
 /// Approval-store schema revision. Bump on every schema-affecting change.
 // Revision 3 adds authenticated request-route bindings to collector records.
 // Existing unbound records are retained but require explicit trusted migration.
-const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 3;
+const APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 4;
 /// Stable key under which this store records its schema revision in the shared
 /// keyed metadata table. Distinct from the co-located receipt store's key so the
 /// two track their revisions independently in the one sidecar file.
@@ -274,6 +274,12 @@ impl SqliteApprovalStore {
             CREATE INDEX IF NOT EXISTS idx_chio_hitl_resolved_counts
                 ON chio_hitl_resolved(subject_id, policy_id, outcome);
 
+            CREATE TABLE IF NOT EXISTS chio_hitl_decision_artifacts (
+                approval_id TEXT PRIMARY KEY REFERENCES chio_hitl_resolved(approval_id),
+                request_json TEXT NOT NULL,
+                token_json TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
                 token_id TEXT NOT NULL,
                 parameter_hash TEXT NOT NULL,
@@ -409,7 +415,9 @@ impl SqliteApprovalStore {
 }
 
 fn serialize_payload(request: &ApprovalRequest) -> Result<String, ApprovalStoreError> {
-    serde_json::to_string(request).map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
+    let bytes = chio_core::canonical_json_bytes(request)
+        .map_err(|error| ApprovalStoreError::Serialization(error.to_string()))?;
+    String::from_utf8(bytes).map_err(|error| ApprovalStoreError::Serialization(error.to_string()))
 }
 
 fn deserialize_payload(raw: &str) -> Result<ApprovalRequest, ApprovalStoreError> {
@@ -553,22 +561,41 @@ impl ApprovalStore for SqliteApprovalStore {
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
         let tx = conn
-            .transaction()
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|e| ApprovalStoreError::Backend(format!("begin tx: {e}")))?;
 
         // Pull pending record inside the tx to avoid TOCTOU races.
-        let pending: Option<(String, String)> = tx
+        let pending: Option<(String, String, String)> = tx
             .query_row(
-                "SELECT policy_id, parameter_hash FROM chio_hitl_pending WHERE approval_id = ?1",
+                "SELECT policy_id, parameter_hash, CASE WHEN typeof(payload) = 'text' AND length(CAST(payload AS BLOB)) <= 1048576 THEN payload ELSE NULL END FROM chio_hitl_pending WHERE approval_id = ?1",
                 params![id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
             )
             .optional()
             .map_err(|e| ApprovalStoreError::Backend(format!("select: {e}")))?;
-        let (policy_id, parameter_hash) = match pending {
+        let (policy_id, parameter_hash, request_json) = match pending {
             Some(p) => p,
             None => return Err(ApprovalStoreError::NotFound(id.to_string())),
         };
+
+        let pending_request = deserialize_payload(&request_json)?;
+        let approval_token = chio_kernel::ApprovalToken::from_decision(decision);
+        let verified = approval_token
+            .verify_against(&pending_request, decision.received_at)
+            .map_err(|error| ApprovalStoreError::Invalid(error.to_string()))?;
+        let approved = matches!(
+            verified,
+            chio_core::capability::governance::GovernedApprovalDecision::Approved
+        );
+        if approved != (decision.outcome == ApprovalOutcome::Approved) {
+            return Err(ApprovalStoreError::Invalid(
+                "signed decision disagrees with resolution".into(),
+            ));
+        }
+        let token_json = chio_core::canonical_json_bytes(&decision.token)
+            .map_err(|error| ApprovalStoreError::Serialization(error.to_string()))?;
+        let token_json = String::from_utf8(token_json)
+            .map_err(|error| ApprovalStoreError::Serialization(error.to_string()))?;
 
         // Replay guard: the bound token must not already be consumed.
         let already: Option<i64> = tx
@@ -622,6 +649,11 @@ impl ApprovalStore for SqliteApprovalStore {
             params![decision.token.id, parameter_hash, crate::integer::checked::<_, i64>(decision.received_at)?],
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("insert consumed: {e}")))?;
+
+        tx.execute(
+            "INSERT INTO chio_hitl_decision_artifacts (approval_id, request_json, token_json) VALUES (?1, ?2, ?3)",
+            params![id, request_json, token_json],
+        ).map_err(|error| ApprovalStoreError::Backend(format!("retain decision artifacts: {error}")))?;
 
         tx.execute(
             "DELETE FROM chio_hitl_pending WHERE approval_id = ?1",
@@ -728,7 +760,26 @@ impl ApprovalStore for SqliteApprovalStore {
                         )))
                     }
                 };
+                let artifacts: Option<(String, String)> = conn.query_row(
+                    "SELECT CASE WHEN length(CAST(request_json AS BLOB)) <= 1048576 THEN request_json ELSE NULL END, CASE WHEN length(CAST(token_json AS BLOB)) <= 1048576 THEN token_json ELSE NULL END FROM chio_hitl_decision_artifacts WHERE approval_id = ?1",
+                    params![id], |row| Ok((row.get(0)?, row.get(1)?)),
+                ).optional().map_err(|error| ApprovalStoreError::Backend(format!("load decision artifacts: {error}")))?;
+                let (request, token) = match artifacts {
+                    Some((request, token)) => (
+                        Some(deserialize_payload(&request)?),
+                        Some(
+                            chio_core::canonical::UntrustedJsonText::from_wire(
+                                token.as_bytes(),
+                                1024 * 1024,
+                            )
+                            .and_then(|input| input.decode_signed())?,
+                        ),
+                    ),
+                    None => (None, None),
+                };
                 Ok(Some(ResolvedApproval {
+                    request,
+                    token,
                     approval_id,
                     outcome,
                     resolved_at: u64::try_from(resolved_at.max(0)).unwrap_or_default(),
@@ -1044,6 +1095,10 @@ fn transition_approval_reservation(
         .map_err(|e| ApprovalStoreError::Backend(format!("commit reservation transition: {e}")))?;
     Ok(transitioned)
 }
+
+#[cfg(test)]
+#[path = "approval_store/decision_tests.rs"]
+mod decision_tests;
 
 #[cfg(test)]
 #[allow(

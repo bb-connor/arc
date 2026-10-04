@@ -9,6 +9,8 @@ use chio_appraisal::VerifiedRuntimeAttestationRecord;
 
 use super::*;
 
+#[path = "governed_validation/tool_approval.rs"]
+mod tool_approval;
 #[path = "governed_validation/verified_outcome.rs"]
 mod verified_outcome;
 
@@ -26,7 +28,9 @@ impl ChioKernel {
             parameters_hash,
         }) = request.governed_intent.as_ref().map(|intent| &intent.body)
         else {
-            return Ok(());
+            return Err(KernelError::GovernedTransactionDenied(
+                "bound tool invocation is required for tool approval".to_string(),
+            ));
         };
         if capability_id.is_empty() || capability_id != &cap.id {
             return Err(KernelError::GovernedTransactionDenied(
@@ -281,18 +285,7 @@ impl ChioKernel {
         // path), so ECDSA approvals are validated through aws-lc-rs when the
         // `chio-core-types/fips` feature is enabled without any kernel-side
         // algorithm plumbing.
-        let kernel_pk = self.config.keypair.public_key();
-        let mut trusted = self.config.ca_public_keys.clone();
-        for authority_pk in self.capability_authority.trusted_public_keys() {
-            if !trusted.contains(&authority_pk) {
-                trusted.push(authority_pk);
-            }
-        }
-        if !trusted.contains(&kernel_pk) {
-            trusted.push(kernel_pk);
-        }
-
-        for pk in &trusted {
+        for pk in &self.governed_approvers {
             if *pk == approval_token.approver {
                 return match approval_token.verify_signature() {
                     Ok(true) => Ok(()),
@@ -302,7 +295,7 @@ impl ChioKernel {
             }
         }
 
-        Err("approval signer public key not found among trusted authorities".to_string())
+        Err("approval signer is not in configured roster".to_string())
     }
 
     fn trusted_governance_authorities(&self) -> Vec<chio_core::PublicKey> {
@@ -396,6 +389,7 @@ impl ChioKernel {
         now: u64,
     ) -> Result<(), KernelError> {
         Self::validate_bound_tool_invocation(request, cap)?;
+        self.validate_tool_approval_context(request, cap)?;
         let token_lifetime = approval_token
             .expires_at
             .checked_sub(approval_token.issued_at)
@@ -538,7 +532,12 @@ impl ChioKernel {
             ThresholdApprovalVerificationInput,
         };
 
-        Self::validate_bound_tool_invocation(request, cap)?;
+        if !matches!(
+            request.governed_intent.as_ref().map(|intent| &intent.body),
+            Some(chio_core::capability::governance::GovernedTransactionIntentBody::ActiveResponsePlan(_))
+        ) {
+            Self::validate_bound_tool_invocation(request, cap)?;
+        }
         const MAX_APPROVAL_TOKENS: usize =
             chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
         if request.approval_tokens.is_empty() || request.approval_tokens.len() > MAX_APPROVAL_TOKENS
@@ -1277,7 +1276,12 @@ impl ChioKernel {
         grant: &ToolGrant,
         context: GovernedValidationContext<'_>,
     ) -> Result<Option<ValidatedGovernedAdmission>, KernelError> {
-        Self::validate_bound_tool_invocation(request, cap)?;
+        if matches!(
+            request.governed_intent.as_ref().map(|intent| &intent.body),
+            Some(chio_core::capability::governance::GovernedTransactionIntentBody::BoundToolInvocation { .. })
+        ) {
+            Self::validate_bound_tool_invocation(request, cap)?;
+        }
         let GovernedValidationContext {
             parent_context,
             now,
@@ -1489,6 +1493,10 @@ impl ChioKernel {
             .map(|threshold_units| requested_units >= threshold_units)
             .unwrap_or(false)
             || economy_value_requires_payee;
+
+        if approval_required || !request.approval_tokens.is_empty() {
+            Self::validate_bound_tool_invocation(request, cap)?;
+        }
 
         if request.approval_token.is_some() && !request.approval_tokens.is_empty() {
             return Err(KernelError::GovernedTransactionDenied(

@@ -8,9 +8,10 @@ pub fn cmd_mercury_proof_export(
     input: &Path,
     output: &Path,
     bundle_manifest_paths: &[PathBuf],
+    trusted_kernel_keys: &[String],
     json_output: bool,
 ) -> Result<(), CliError> {
-    let package = build_proof_package(input, bundle_manifest_paths)?;
+    let package = build_proof_package(input, bundle_manifest_paths, trusted_kernel_keys)?;
     package
         .verify(unix_now())
         .map_err(|error| CliError::Other(error.to_string()))?;

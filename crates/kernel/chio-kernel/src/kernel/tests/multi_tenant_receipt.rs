@@ -53,6 +53,7 @@ fn session_tenant_id_is_stamped_on_tool_call_receipt() {
     let context =
         make_operation_context(&session_id, "req-tenant", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -133,6 +134,7 @@ fn session_without_tenant_id_produces_untagged_receipt() {
     let context =
         make_operation_context(&session_id, "req-notenant", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -202,6 +204,7 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
             audience: Some("chio-mcp".to_string()),
             scopes: vec!["mcp:invoke".to_string()],
             federated_claims: OAuthBearerFederatedClaims {
+                sender_public_key: None,
                 tenant_id: Some("tenant-fed".to_string()),
                 ..OAuthBearerFederatedClaims::default()
             },
@@ -218,6 +221,7 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
 
     let context = make_operation_context(&session_id, "req-fed", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),

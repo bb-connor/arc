@@ -208,8 +208,8 @@ pub(crate) use runtime_replay::{
 };
 use schema::{coordinator_lease_id_for_epoch, recovery_claim_digest, verify_latest_commit};
 pub(crate) use schema::{
-    initialize_admission_operation_schema, validate_trusted_time, verify_active_owner,
-    verify_admission_operation_invariants, verify_trusted_time,
+    initialize_admission_operation_schema, observe_authority_time, validate_trusted_time,
+    verify_active_owner, verify_admission_operation_invariants, verify_trusted_time,
 };
 pub(crate) use security_participant_migration::{
     security_participant_projection_reference, verify_security_participant_migration_coverage,

@@ -72,6 +72,40 @@ impl<R: BufRead> AcpFrameReader<R> {
     }
 }
 
+pub(crate) fn encode(value: &serde_json::Value) -> Result<Vec<u8>, AcpProxyError> {
+    struct Bounded {
+        bytes: Vec<u8>,
+        oversized: bool,
+    }
+    impl std::io::Write for Bounded {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if bytes.len() > MAX_ACP_MESSAGE_BYTES - self.bytes.len() {
+                self.oversized = true;
+                return Err(std::io::Error::other("ACP frame limit"));
+            }
+            self.bytes.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut writer = Bounded {
+        bytes: Vec::new(),
+        oversized: false,
+    };
+    let result = serde_json::to_writer(&mut writer, value);
+    if writer.oversized {
+        return Err(UntrustedJsonError::TooLarge {
+            bytes: MAX_ACP_MESSAGE_BYTES + 1,
+            bound: MAX_ACP_MESSAGE_BYTES,
+        }
+        .into());
+    }
+    result.map_err(UntrustedJsonError::Decode)?;
+    Ok(writer.bytes)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -121,38 +155,4 @@ mod tests {
             Err(AcpProxyError::TruncatedFrame)
         ));
     }
-}
-
-pub(crate) fn encode(value: &serde_json::Value) -> Result<Vec<u8>, AcpProxyError> {
-    struct Bounded {
-        bytes: Vec<u8>,
-        oversized: bool,
-    }
-    impl std::io::Write for Bounded {
-        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-            if bytes.len() > MAX_ACP_MESSAGE_BYTES - self.bytes.len() {
-                self.oversized = true;
-                return Err(std::io::Error::other("ACP frame limit"));
-            }
-            self.bytes.extend_from_slice(bytes);
-            Ok(bytes.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-    let mut writer = Bounded {
-        bytes: Vec::new(),
-        oversized: false,
-    };
-    let result = serde_json::to_writer(&mut writer, value);
-    if writer.oversized {
-        return Err(UntrustedJsonError::TooLarge {
-            bytes: MAX_ACP_MESSAGE_BYTES + 1,
-            bound: MAX_ACP_MESSAGE_BYTES,
-        }
-        .into());
-    }
-    result.map_err(UntrustedJsonError::Decode)?;
-    Ok(writer.bytes)
 }

@@ -31,6 +31,9 @@ pub struct ToolCallOperation {
     pub supplemental_authorization: Option<OpaqueSupplementalAuthorization>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_nonce: Option<serde_json::Value>,
+    /// Subject-signed invocation proof, verified by the kernel before dispatch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_proof: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model_metadata: Option<ModelMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

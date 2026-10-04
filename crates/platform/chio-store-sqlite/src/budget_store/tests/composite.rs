@@ -1593,3 +1593,6 @@ fn millisecond_shaped_supplemental_expiry_is_rejected() {
 
     let _ = fs::remove_dir_all(path);
 }
+
+#[path = "composite/injected_clock.rs"]
+mod injected_clock;

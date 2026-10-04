@@ -12,6 +12,9 @@ use crate::KernelError;
 use chio_security_types::ports::{IsolationEpochId, LineageId, SessionId, TenantId};
 use chio_security_types::PrincipalId;
 
+pub mod lifecycle;
+pub mod replication;
+
 mod aggregate;
 pub use aggregate::validate_issued_aggregate_family_root_response;
 
@@ -101,8 +104,9 @@ pub fn validate_issued_capability_response(
     requested_scope: &ChioScope,
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<(), KernelError> {
-    let now = capability_authority_now_unix_secs(&SystemClock)?;
+    let now = now.as_secs();
     validate_issued_capability_response_at(
         capability,
         requested_subject,
@@ -114,7 +118,7 @@ pub fn validate_issued_capability_response(
     )
 }
 
-/// Validate a security-bound authority response against the current wall clock.
+/// Validate a security-bound authority response against the supplied authority time.
 pub fn validate_issued_capability_response_with_binding(
     capability: &CapabilityToken,
     requested_subject: &PublicKey,
@@ -122,8 +126,9 @@ pub fn validate_issued_capability_response_with_binding(
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
     expected_security_binding: Option<&CapabilitySecurityBinding>,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<(), KernelError> {
-    let now = capability_authority_now_unix_secs(&SystemClock)?;
+    let now = now.as_secs();
     validate_issued_capability_response_with_binding_at(
         capability,
         requested_subject,
@@ -304,6 +309,17 @@ pub trait CapabilityAuthority: Send + Sync {
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
         vec![self.authority_public_key()]
+    }
+
+    /// Enforce managed issuer lifetimes in addition to the kernel trust-set check.
+    /// Unknown static pins may be handled by kernel configuration; this hook never grants trust.
+    fn check_issuer_lifecycle(
+        &self,
+        _issuer: &PublicKey,
+        _issued_at: u64,
+        _now: u64,
+    ) -> Result<(), KernelError> {
+        Ok(())
     }
 
     fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {
@@ -897,6 +913,9 @@ mod tests {
                     &requested_scope,
                     60,
                     &issuer.public_key(),
+                    chio_security_types::clock::UnixMillis::new(
+                        chio_test_support::clock::unix_millis()
+                    ),
                 ),
                 Err(KernelError::CapabilityIssuanceFailed(_))
             ));
@@ -936,6 +955,9 @@ mod tests {
                     &scope,
                     60,
                     &issuer.public_key(),
+                    chio_security_types::clock::UnixMillis::new(
+                        chio_test_support::clock::unix_millis()
+                    ),
                 ),
                 Err(KernelError::CapabilityIssuanceFailed(_))
             ));
@@ -969,6 +991,7 @@ mod tests {
                 &aggregate_scope,
                 60,
                 &issuer.public_key(),
+                chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
             ),
             Err(KernelError::CapabilityIssuanceDenied(_))
         ));
@@ -1122,20 +1145,25 @@ mod tests {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthorityStatus {
+    pub issuer_state: AuthoritySnapshot,
     pub public_key: PublicKey,
     pub generation: u64,
     pub rotated_at: u64,
     pub trusted_public_keys: Vec<PublicKey>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AuthorityTrustedKeySnapshot {
     pub public_key_hex: String,
     pub generation: u64,
     pub activated_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lifecycle: Option<lifecycle::AuthorityKeyLifecycle>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthoritySnapshot {
     pub public_key_hex: String,
     pub generation: u64,
@@ -1145,6 +1173,8 @@ pub struct AuthoritySnapshot {
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthorityStoreError {
+    #[error(transparent)]
+    SignedJson(#[from] chio_core::canonical::UntrustedJsonError),
     #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("sqlite error: {0}")]

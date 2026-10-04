@@ -1,0 +1,12 @@
+{
+  "command": [
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio-28240525c472faf7",
+    "types_cli::cli_env_tests",
+    "runtime_local_error_domain_tests",
+    "cli_entrypoint_parsing_tests",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 0.32,
+  "log_sha256": "789e5e70bba7ae1369a3976427f657341a25d70672fc22c4743cf8e5a9213894"
+}

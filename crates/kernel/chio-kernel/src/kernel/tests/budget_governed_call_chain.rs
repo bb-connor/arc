@@ -11,13 +11,20 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
         .unwrap();
 
     let request_id = "req-governed-allow";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-allow",
         "cost-srv",
         "compute",
         "settle approved invoice",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
@@ -98,6 +105,13 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
         12,
         "USD",
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -177,6 +191,13 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         8,
         "USD",
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -238,6 +259,13 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
         "chain-ops-1",
         "req-parent-1",
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -1305,6 +1333,13 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
         "USD",
     );
     intent.call_chain = Some(make_governed_call_chain_context("chain-ops-2", request_id));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -1362,6 +1397,13 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
     let mut call_chain = make_governed_call_chain_context("chain-ops-3", "req-parent-3");
     call_chain.chain_id.clear();
     intent.call_chain = Some(call_chain);
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-1001" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -1431,6 +1473,13 @@ fn governed_call_chain_evidence_store_error_consumes_no_budget() {
         "chain-store-error",
         "req-parent-store-error",
     ));
+    bind_test_tool_approval(
+        &mut kernel,
+        &cap,
+        &serde_json::json!({ "invoice_id": "inv-store-error" }),
+        request_id,
+        &mut intent,
+    );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
         &agent_kp.public_key(),
@@ -1691,13 +1740,20 @@ fn missing_approval_replay_store_denies_before_dispatch_and_reverses_monetary_ad
     let capability =
         kernel.issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3_600)?;
     let request_id = "req-governed-missing-replay-store";
-    let intent = make_governed_intent(
+    let mut intent = make_governed_intent(
         "intent-governed-missing-replay-store",
         "cost-srv",
         "compute",
         "execute governed compute",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &capability,
+        &serde_json::json!({ "work": "governed" }),
+        request_id,
+        &mut intent,
     );
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,

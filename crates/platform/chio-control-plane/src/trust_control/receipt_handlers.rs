@@ -406,14 +406,17 @@ pub(crate) async fn handle_evidence_import(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    if let Err(error) =
+        evidence_export::validate_import_package_data(&request.package, &request.verification)
+    {
+        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+    }
     match forward_post_to_leader(&state, EVIDENCE_IMPORT_PATH, &request).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
-    if let Err(error) = evidence_export::validate_import_package_data(&request.package) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
+
     let share_import = match evidence_export::build_federated_share_import(&request.package) {
         Ok(share) => share,
         Err(error) => {

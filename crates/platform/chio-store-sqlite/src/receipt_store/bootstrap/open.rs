@@ -308,7 +308,25 @@ fn settlement_schema_manifest(
 
 impl SqliteReceiptStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config(path, crate::SqlitePoolConfig::default())
+        Self::open_with_clock(path, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_options_and_clock(path, crate::SqliteStoreOptions::default(), clock)
+    }
+
+    pub fn open_existing_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_existing_with_options_and_clock(
+            path,
+            crate::SqliteStoreOptions::default(),
+            clock,
+        )
     }
 
     /// Wait until the commit actor has seeded its durable head before a host
@@ -363,14 +381,38 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, true, None)
+        Self::open_with_options_and_clock(
+            path,
+            options,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_with_options_and_clock(
+        path: impl AsRef<Path>,
+        options: crate::SqliteStoreOptions,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config_and_flags(path, options, true, None, clock)
     }
 
     pub fn open_existing_with_options(
         path: impl AsRef<Path>,
         options: crate::SqliteStoreOptions,
     ) -> Result<Self, ReceiptStoreError> {
-        Self::open_with_pool_config_and_flags(path, options, false, None)
+        Self::open_existing_with_options_and_clock(
+            path,
+            options,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_existing_with_options_and_clock(
+        path: impl AsRef<Path>,
+        options: crate::SqliteStoreOptions,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
+        Self::open_with_pool_config_and_flags(path, options, false, None, clock)
     }
 
     /// Open a receipt store that may be bound to a qualified finding-pool
@@ -380,11 +422,24 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         rollback_anchor_root: impl AsRef<Path>,
     ) -> Result<Self, ReceiptStoreError> {
+        Self::open_for_finding_pool_with_clock(
+            path,
+            rollback_anchor_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_for_finding_pool_with_clock(
+        path: impl AsRef<Path>,
+        rollback_anchor_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
         Self::open_with_pool_config_and_flags(
             path,
             crate::SqliteStoreOptions::default(),
             true,
             Some(rollback_anchor_root.as_ref()),
+            clock,
         )
     }
 
@@ -395,11 +450,24 @@ impl SqliteReceiptStore {
         path: impl AsRef<Path>,
         rollback_anchor_root: impl AsRef<Path>,
     ) -> Result<Self, ReceiptStoreError> {
+        Self::open_existing_for_finding_pool_with_clock(
+            path,
+            rollback_anchor_root,
+            Arc::new(chio_security_types::clock::SystemClock),
+        )
+    }
+
+    pub fn open_existing_for_finding_pool_with_clock(
+        path: impl AsRef<Path>,
+        rollback_anchor_root: impl AsRef<Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> Result<Self, ReceiptStoreError> {
         Self::open_with_pool_config_and_flags(
             path,
             crate::SqliteStoreOptions::default(),
             false,
             Some(rollback_anchor_root.as_ref()),
+            clock,
         )
     }
 
@@ -408,7 +476,9 @@ impl SqliteReceiptStore {
         options: crate::SqliteStoreOptions,
         create_if_missing: bool,
         rollback_anchor_root: Option<&Path>,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, ReceiptStoreError> {
+        let clock = crate::store_clock::StoreClock::new(clock);
         let path = path.as_ref();
         if rollback_anchor_root.is_some() {
             let Some(path_text) = path.to_str() else {
@@ -512,8 +582,10 @@ impl SqliteReceiptStore {
             )?;
 
             return Ok(Self {
+                clock: clock.clone(),
                 receipt_commit_actor: ReceiptCommitActor::start(
                     writer_pool,
+                    clock.clone(),
                     options.incremental_verification,
                     rollback_anchor.clone(),
                     receipt_sink_qualification.clone(),
@@ -1429,8 +1501,10 @@ impl SqliteReceiptStore {
         )?;
 
         Ok(Self {
+            clock: clock.clone(),
             receipt_commit_actor: ReceiptCommitActor::start(
                 writer_pool,
+                clock.clone(),
                 options.incremental_verification,
                 rollback_anchor.clone(),
                 receipt_sink_qualification.clone(),

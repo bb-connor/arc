@@ -115,6 +115,7 @@ pub(crate) struct ClusterPeerClientAuth {
 }
 
 pub(crate) struct RemoteCapabilityAuthority {
+    pub(crate) clock: Arc<dyn chio_security_types::clock::Clock>,
     pub(crate) client: TrustControlClient,
     pub(crate) cache: Mutex<AuthorityKeyCache>,
     pub(crate) refresh_lock: Mutex<()>,
@@ -123,6 +124,7 @@ pub(crate) struct RemoteCapabilityAuthority {
 }
 
 pub(crate) struct AuthorityKeyCache {
+    pub(crate) issuer_state: Option<chio_kernel::AuthoritySnapshot>,
     pub(crate) current: Option<PublicKey>,
     pub(crate) trusted: Vec<PublicKey>,
     pub(crate) generation: Option<u64>,

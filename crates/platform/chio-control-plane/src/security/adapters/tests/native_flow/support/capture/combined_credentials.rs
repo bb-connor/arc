@@ -144,6 +144,8 @@ impl Fixture {
         )?;
         self.kernel
             .set_operation_owned_governed_approval_source(binding, source)?;
+        self.request.governed_intent = Some(self.kernel.bind_tool_approval_intent(&self.request)?);
+        let approver = native_approval_keypair();
         let intent = self
             .request
             .governed_intent
@@ -153,7 +155,7 @@ impl Fixture {
         self.request.approval_token = Some(GovernedApprovalToken::sign(
             GovernedApprovalTokenBody {
                 id: format!("approval-{}", self.request.request_id),
-                approver: self.signer.public_key(),
+                approver: approver.public_key(),
                 subject: self.request.capability.subject.clone(),
                 governed_intent_hash: intent.binding_hash()?,
                 request_id: self.request.request_id.clone(),
@@ -162,7 +164,7 @@ impl Fixture {
                 expires_at: now + 120,
                 decision: GovernedApprovalDecision::Approved,
             },
-            &self.signer,
+            &approver,
         )?);
         Ok(())
     }

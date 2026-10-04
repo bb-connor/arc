@@ -101,6 +101,7 @@ impl Fixture {
             approver,
             stats: SessionStats::default(),
             message: AgentMessage::ToolCallRequest {
+                dpop_proof: None,
                 id: "pending-request".into(),
                 capability_token: Box::new(capability),
                 server_id: "pending-server".into(),
@@ -303,6 +304,83 @@ fn pending_approval_projection_rejects_execution_authority() -> TestResult {
     response.execution_nonce = Some(Box::new(SignedExecutionNonce { nonce, signature }));
     assert!(tool_response_messages("pending-request".into(), response).is_err());
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn ap23_stdio_host_binds_pending_intent_before_collecting_votes() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let AgentMessage::ToolCallRequest {
+        id,
+        capability_token,
+        params,
+        governed_intent: Some(intent),
+        ..
+    } = &fixture.message
+    else {
+        return Err("fixture tool intent missing".into());
+    };
+    let original_hash = intent.binding_hash()?;
+    let mut expected = intent.as_ref().clone();
+    let scope = chio_core::sha256_hex(&chio_core::canonical_json_bytes(&serde_json::json!({
+        "schema": "chio.session-threshold-approval.v1",
+        "session_id": fixture.session_id.as_str(),
+        "tenant_id": null,
+    }))?);
+    chio_kernel::approval::ToolApprovalContext::bind(
+        &mut expected,
+        capability_token,
+        params,
+        id,
+        fixture.kernel.policy_hash(),
+        &scope,
+    )?;
+    expected
+        .context
+        .as_mut()
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("bound context missing")?
+        .insert(
+            "chio_session_threshold".into(),
+            "chio.session-threshold-approval.v1".into(),
+        );
+    let KernelMessage::ToolCallResponse {
+        result: ToolCallResult::PendingApproval { proposal },
+        ..
+    } = fixture.send()?
+    else {
+        return Err("pending response missing".into());
+    };
+    assert!(proposal.verify_signature()?);
+    assert_ne!(proposal.body.governed_intent_hash, original_hash);
+    assert_eq!(proposal.body.governed_intent_hash, expected.binding_hash()?);
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    fixture.approve(*proposal)?;
+    let original = fixture.message.clone();
+    if let AgentMessage::ToolCallRequest {
+        governed_intent, ..
+    } = &mut fixture.message
+    {
+        *governed_intent = Some(Box::new(expected));
+    }
+    let (context, operation) =
+        normalize_agent_message(&fixture.message, &fixture.session_id, &fixture.agent_id);
+    assert!(matches!(
+        fixture.kernel.evaluate_session_operation(&context, &operation),
+        Err(chio_kernel::KernelError::Session(
+            chio_kernel::session::SessionError::ThresholdApprovalRetryMismatch { request_id }
+        )) if request_id.as_str() == "pending-request"
+    ));
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+    fixture.message = original;
+    assert!(matches!(
+        fixture.send()?,
+        KernelMessage::ToolCallResponse {
+            result: ToolCallResult::Ok { .. },
+            ..
+        }
+    ));
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
     Ok(())
 }
 

@@ -78,6 +78,7 @@ flowchart LR
 | `src/redaction.rs` | `redact_for_operator_log`, wrapping `chio-log-redact`, applied to every error surfaced to tracing. |
 | `src/ocsf.rs` | `receipt_to_ocsf` / `siem_event_to_ocsf`: stateless mapping to OCSF 1.3.0 Authorization events (class_uid 3002). |
 | `src/alerting.rs` | `AlertSeverity`, `derive_severity`, `AlertBackend`, `PagerDutyBackend`, `OpsGenieBackend`, `AlertingExporter`: severity-gated paging overlay. |
+| `src/alerting/projection.rs` | Automatic paging projection: receipt ID, timestamp and hashes for correlation; raw arguments, denial reasons, evidence and metadata stay out of notifications. This is an unsigned reference, not a signed receipt. |
 | `src/exporters/mod.rs` | Shared HTTPS-scheme enforcement (`require_https_endpoint`) used by every network exporter. |
 | `src/exporters/splunk.rs` | `SplunkHecExporter`: newline-delimited JSON to Splunk HEC; classifies HEC's 200-with-embedded-error responses. |
 | `src/exporters/elastic.rs` | `ElasticsearchExporter`: NDJSON `_bulk` API; detects per-item partial failure inside a 200 response. |

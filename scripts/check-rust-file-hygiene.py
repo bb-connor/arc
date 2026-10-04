@@ -168,7 +168,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/products/chio-mercury/tests/cli.rs": allow(
         "2026-12-31",
         "existing oversized Mercury CLI integration suite; capped to current size until split",
-        max_lines=3_183,
+        max_lines=3_124,
     ),
     "crates/products/chio-cli/tests/trust_cluster.rs": allow(
         "2026-12-31",
@@ -311,11 +311,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-11-30",
         "web3 settlement proof surface; capped to current size until split",
         max_lines=2_053,
-    ),
-    "crates/products/chio-wall/src/commands.rs": allow(
-        "2026-11-30",
-        "wall command surface; capped to current size until split",
-        max_lines=2_048,
     ),
     "crates/platform/chio-http-session/src/lib.rs": allow(
         "2026-10-31",

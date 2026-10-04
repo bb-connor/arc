@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rusqlite::{params, Connection, TransactionBehavior};
 use serde::Serialize;
@@ -14,6 +13,7 @@ use super::plan::{FailurePolicy, Plan, Worker};
 use crate::CliError;
 
 pub(super) struct Journal<'a> {
+    clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
     db: Connection,
     directory: &'a chio_control_plane::PreparedPrivateDirectory,
     plan: &'a Plan,
@@ -212,6 +212,7 @@ impl<'a> Journal<'a> {
         }
         tx.commit().map_err(error)?;
         let journal = Self {
+            clock: host.kernel.authority_clock(),
             db,
             directory,
             plan,
@@ -254,12 +255,7 @@ impl<'a> Journal<'a> {
         let status = RunStatus {
             schema: RUN_SCHEMA.to_owned(),
             run_id: self.run_id.clone(),
-            observed_at_ms: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_err(error)?
-                .as_millis()
-                .try_into()
-                .map_err(error)?,
+            observed_at_ms: self.clock.unix_millis().map_err(error)?.get(),
             plan_binding: self.binding.clone(),
             max_parallel: self.plan.max_parallel,
             workers,

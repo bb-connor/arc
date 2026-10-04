@@ -114,6 +114,7 @@ use bootstrap::*;
 pub(crate) use bootstrap::{receipt_pool_connection, verify_rollback, ReceiptSinkQualification};
 
 pub struct SqliteReceiptStore {
+    clock: crate::store_clock::StoreClock,
     pub(crate) pool: Pool<SqliteConnectionManager>,
     receipt_commit_actor: ReceiptCommitActor,
     pub(crate) rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
@@ -236,6 +237,7 @@ impl ReceiptCommitWorker {
 }
 
 struct ReceiptCommitWriterHealth {
+    clock: crate::store_clock::StoreClock,
     accepted_total: AtomicU64,
     committed_total: AtomicU64,
     failed_total: AtomicU64,
@@ -286,38 +288,6 @@ struct ReceiptCommitWriterHealth {
     accounting_poisoned: AtomicBool,
 }
 
-impl Default for ReceiptCommitWriterHealth {
-    fn default() -> Self {
-        Self {
-            accepted_total: AtomicU64::new(0),
-            committed_total: AtomicU64::new(0),
-            failed_total: AtomicU64::new(0),
-            saturated_total: AtomicU64::new(0),
-            inflight: AtomicU64::new(0),
-            timed_out_inflight: AtomicU64::new(0),
-            timed_out_total: AtomicU64::new(0),
-            queue_depth: AtomicU64::new(0),
-            last_commit_unix_ms: AtomicU64::new(0),
-            first_accept_unix_ms: AtomicU64::new(0),
-            backlog_started_unix_ms: AtomicU64::new(0),
-            last_error: Mutex::new(None),
-            retention_error: Mutex::new(None),
-            head_checkpoint_seq: AtomicU64::new(0),
-            head_checkpointed_entry_seq: AtomicU64::new(0),
-            head_claim_log_count: AtomicU64::new(0),
-            head_claim_log_max_seq: AtomicU64::new(0),
-            // Fail closed until the actor thread seeds a verified head. The head
-            // is seeded asynchronously after construction, so starting open would
-            // let a corrupt or still-attaching store pass the pre-dispatch gate
-            // and run a tool before the first append could reject. The seed path
-            // clears this the moment it succeeds.
-            head_poisoned: AtomicBool::new(true),
-            critical_write_poisoned: AtomicBool::new(false),
-            accounting_poisoned: AtomicBool::new(false),
-        }
-    }
-}
-
 impl ReceiptCommitWriterHealth {
     /// Record accept-time liveness anchors. `first_accept_unix_ms` is set once,
     /// for operator display. `backlog_started_unix_ms` is (re)stamped whenever an
@@ -328,7 +298,7 @@ impl ReceiptCommitWriterHealth {
     /// first commit is still caught, while a writer resuming after an idle period
     /// is measured from the fresh work rather than a stale last commit.
     fn note_accept(&self, previous_inflight: u64) -> Result<(), ReceiptStoreError> {
-        let now = current_unix_ms()?;
+        let now = self.clock.unix_millis()?.get();
         let _ =
             self.first_accept_unix_ms
                 .compare_exchange(0, now, Ordering::SeqCst, Ordering::SeqCst);
@@ -613,11 +583,12 @@ impl ReceiptCommitCommand {
 impl ReceiptCommitActor {
     fn start(
         pool: Pool<SqliteConnectionManager>,
+        clock: crate::store_clock::StoreClock,
         incremental_verification: bool,
         rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
         sink_qualification: Option<Arc<ReceiptSinkQualification>>,
     ) -> Self {
-        let (sender, receiver) = receipt_commit_channel();
+        let (sender, receiver) = receipt_commit_channel_with_clock(clock);
         let health = Arc::clone(&sender.health);
         let actor_health = Arc::clone(&health);
         let thread_id = Arc::new(OnceLock::new());
@@ -1602,7 +1573,8 @@ fn handle_non_append_command(
                             }
                         })
                     }
-                    .and_then(|()| verify_rollback(&connection, rollback_anchor, appends_receipts));
+                    .and_then(|()| verify_rollback(&connection, rollback_anchor, appends_receipts))
+                    .and_then(|()| health.clock.unix_millis().map(|_| ()).map_err(Into::into));
                     if let Err(error) = pre_check {
                         let (respond, _) = job.reject(error);
                         // Decrement before the response reaches the caller.
@@ -1863,6 +1835,7 @@ fn handle_non_append_command(
                     &config,
                     verified_ceiling,
                     rollback_anchor,
+                    &health.clock,
                 )
             }))
             .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)));
@@ -2023,7 +1996,11 @@ fn handle_non_append_command(
             // make it unusable on exactly the store it exists to fix.
             let outcome =
                 receipt_pool_connection(pool, sink_qualification).and_then(|mut connection| {
-                    evidence_retention::retention_repair_on_writer(&mut connection, &archive_path)
+                    evidence_retention::retention_repair_on_writer(
+                        &mut connection,
+                        &archive_path,
+                        &health.clock,
+                    )
                 });
             if outcome.is_ok() {
                 // Reseed the head so this same store instance is appendable
@@ -2123,7 +2100,14 @@ fn build_due_checkpoints_and_record(
     // A committed or peer-adopted checkpoint can advance the verified head
     // before a later panic drops its frontier. Record `last_error` and rebuild.
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        build_due_checkpoints(pool, head, signer, rollback_anchor, sink_qualification)
+        build_due_checkpoints(
+            pool,
+            head,
+            signer,
+            rollback_anchor,
+            sink_qualification,
+            &health.clock,
+        )
     }))
     .unwrap_or_else(|payload| Err(receipt_writer_job_panic_error(&payload)));
     match result {
@@ -2154,6 +2138,7 @@ fn build_due_checkpoints(
     signer: &BackgroundCheckpointSigner,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
     sink_qualification: Option<&ReceiptSinkQualification>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<bool, ReceiptStoreError> {
     if signer.max_batch == 0 {
         return Ok(false); // ADR-0008: batch_size 0 disables checkpointing
@@ -2174,7 +2159,7 @@ fn build_due_checkpoints(
     // append.
     verify_head_against_latest_checkpoint(&connection, head)?;
     let refreshed = head.checkpoint_seq() > checkpoint_seq_before_refresh;
-    maybe_build_checkpoint(&mut connection, head, signer, rollback_anchor)
+    maybe_build_checkpoint(&mut connection, head, signer, rollback_anchor, clock)
         .map(|advanced| refreshed || advanced)
 }
 
@@ -2189,6 +2174,7 @@ fn maybe_build_checkpoint(
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<bool, ReceiptStoreError> {
     if signer.max_batch == 0 {
         return Ok(false);
@@ -2219,7 +2205,7 @@ fn maybe_build_checkpoint(
         Some(frontier) => frontier,
         None => {
             let (frontier, cache_advanced) =
-                build_checkpoint_after_frontier_cache_miss(connection, head, signer)?;
+                build_checkpoint_after_frontier_cache_miss(connection, head, signer, clock)?;
             advanced = cache_advanced;
             frontier
         }
@@ -2257,12 +2243,15 @@ fn maybe_build_checkpoint(
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
         // O(b) Merkle build over the batch, plus O(log n) over the chain
         // frontier; the predecessor digest comes from the cached head.
-        let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_chain_frontier(
+        let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_chain_frontier_at(
             checkpoint_seq,
             start_seq,
             end_seq,
             &receipt_bytes,
-            &signer.keypair,
+            chio_kernel::checkpoint::CheckpointSigningContext {
+                keypair: &signer.keypair,
+                issued_at: clock.unix_millis()?,
+            },
             head.latest_checkpoint.as_ref(),
             &chain_frontier,
         )
@@ -2360,14 +2349,20 @@ fn commit_receipt_batch_with_completions(
 ) -> Option<ReceiptStoreError> {
     let batch_outcome = match head_state {
         WriterHeadState::Verified(head) => {
-            match append_receipt_batch(
-                pool,
-                head,
-                qualification.incremental_verification,
-                qualification.rollback_anchor,
-                qualification.sink_qualification,
-                &requests,
-            ) {
+            match health
+                .clock
+                .unix_millis()
+                .map_err(ReceiptStoreError::from)
+                .and_then(|_| {
+                    append_receipt_batch(
+                        pool,
+                        head,
+                        qualification.incremental_verification,
+                        qualification.rollback_anchor,
+                        qualification.sink_qualification,
+                        &requests,
+                    )
+                }) {
                 Ok(results) => {
                     health.store_head_snapshot(head);
                     Ok(results)
@@ -2422,6 +2417,7 @@ fn commit_receipt_batch_with_completions(
     flush_error
 }
 
+#[cfg(test)]
 fn current_unix_ms() -> Result<u64, chio_security_types::clock::ClockError> {
     chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)
         .map(|value| value.get())
@@ -3314,6 +3310,9 @@ mod append;
 mod bootstrap;
 use append::{append_chio_receipt_tx, append_chio_receipt_tx_with_insert_status};
 mod chaos_test_hooks;
+#[path = "receipt_store/retained_read.rs"]
+pub(crate) mod retained_read;
+
 #[path = "receipt_store/evidence_retention.rs"]
 mod evidence_retention;
 #[path = "receipt_store/liability_claims.rs"]
@@ -3480,7 +3479,7 @@ impl SqliteReceiptStore {
     /// assessed against the operator-configured `stall_threshold`. See
     /// [`classify_writer_liveness`] for the transition rules.
     pub fn writer_liveness(&self, stall_threshold: Duration) -> chio_kernel::ReceiptWriterLiveness {
-        let Ok(now) = current_unix_ms() else {
+        let Ok(now) = self.clock.unix_millis().map(|time| time.get()) else {
             return chio_kernel::ReceiptWriterLiveness::Wedged;
         };
         let Ok(threshold) = u64::try_from(stall_threshold.as_millis()) else {
@@ -3919,9 +3918,10 @@ impl SqliteReceiptStore {
         keypair: &Keypair,
     ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
         let keypair = keypair.clone();
+        let clock = self.clock.clone();
         let anchor = self.rollback_anchor.clone();
         self.writer_handle().run_write(move |connection| {
-            create_checkpoint_anchored(connection, max_batch, &keypair, anchor.as_deref())
+            create_checkpoint_anchored(connection, max_batch, &keypair, anchor.as_deref(), &clock)
         })
     }
 

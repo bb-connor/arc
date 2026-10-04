@@ -1,37 +1,5 @@
 use super::*;
 
-pub(super) fn verify_manifest_file_hashes(
-    input_dir: &Path,
-    manifest: &EvidenceExportManifest,
-) -> Result<(), CliError> {
-    let mut seen = BTreeSet::new();
-    for file in &manifest.files {
-        if !seen.insert(file.path.as_str()) {
-            return Err(CliError::attest_error(format!(
-                "duplicate file entry in evidence manifest: {}",
-                file.path
-            )));
-        }
-        let relative = safe_relative_path(&file.path)?;
-        let bytes = fs::read(input_dir.join(relative))?;
-        let actual_hash = sha256_hex(&bytes);
-        let actual_bytes = crate::integer::count(bytes.len());
-        if actual_hash != file.sha256 {
-            return Err(CliError::attest_error(format!(
-                "evidence package file hash mismatch for {}",
-                file.path
-            )));
-        }
-        if actual_bytes != file.bytes {
-            return Err(CliError::attest_error(format!(
-                "evidence package byte length mismatch for {}",
-                file.path
-            )));
-        }
-    }
-    Ok(())
-}
-
 pub(super) fn verify_query_scope(
     query: &EvidenceExportQuery,
     tool_receipts: &[EvidenceToolReceiptRecord],
@@ -315,8 +283,7 @@ pub(super) fn verify_transparency_claim_boundary(
         return Ok(());
     };
     expected.validate().map_err(CliError::attest_error)?;
-    let actual =
-        build_evidence_transparency_claims(bundle, transparency, expected.trust_anchor.as_deref());
+    let actual = build_evidence_transparency_claims(bundle, transparency, None);
     if expected != &actual {
         return Err(CliError::attest_error(
             "evidence package transparency claim boundary does not match the exported data"
@@ -350,6 +317,11 @@ pub(super) fn verify_inclusion_proofs(
                     proof.receipt_seq
                 ))
             })?;
+        if receipt.kernel_key != checkpoint.body.kernel_key {
+            return Err(CliError::attest_error(
+                "receipt signer does not match its checkpoint signer".to_owned(),
+            ));
+        }
         if proof.merkle_root != checkpoint.body.merkle_root {
             return Err(CliError::attest_error(format!(
                 "inclusion proof root mismatch for receipt seq {}",
@@ -527,7 +499,9 @@ pub(super) fn verify_federation_policy_attachment(
     let Some(expected_policy) = &manifest.federation_policy else {
         return Ok(());
     };
-    let policy = read_federation_policy(&input_dir.join(federation_policy_relative_path()))?;
+    let policy: FederationPolicyDocument =
+        read_json_file(input_dir, federation_policy_relative_path())?;
+    verify_federation_policy(&policy)?;
     let actual_metadata = federation_policy_metadata(&policy);
     if &actual_metadata != expected_policy {
         return Err(CliError::attest_error(
@@ -553,7 +527,11 @@ pub(super) fn verify_federation_policy_attachment(
 
 pub(crate) fn validate_import_package_data(
     package: &EvidenceImportPackage,
+    verification: &EvidenceVerificationPolicy,
 ) -> Result<(), CliError> {
+    envelope::verify_manifest(&package.envelope, &package.manifest, verification)?;
+    envelope::verify_payload(package)?;
+    verification.verify_bundle_signers(&package.bundle)?;
     if !is_supported_evidence_export_manifest_schema(&package.manifest.schema) {
         return Err(CliError::attest_error(format!(
             "unsupported evidence manifest schema: expected {}, got {}",
@@ -570,6 +548,7 @@ pub(crate) fn validate_import_package_data(
         .query
         .validate_read_boundary()
         .map_err(|error| CliError::attest_error(error.to_string()))?;
+    package_io::verify_inventory(&package.manifest)?;
     verify_manifest_counts(
         &package.manifest,
         &package.bundle.tool_receipts,
@@ -623,6 +602,7 @@ pub(crate) fn validate_import_package_data(
         })?,
         None => validate_checkpoint_transparency_summary(&package.bundle.checkpoints)?,
     };
+    verification.claims(&package.bundle, &transparency)?;
     verify_transparency_claim_boundary(
         package.manifest.claim_boundary.as_ref(),
         &package.bundle,
@@ -634,6 +614,33 @@ pub(crate) fn validate_import_package_data(
         &package.bundle.inclusion_proofs,
         package.manifest.counts.uncheckpointed_receipts,
     )?;
+    let proved: BTreeSet<u64> = package
+        .bundle
+        .inclusion_proofs
+        .iter()
+        .map(|proof| proof.receipt_seq)
+        .collect();
+    let expected: BTreeSet<(u64, &str)> = package
+        .bundle
+        .tool_receipts
+        .iter()
+        .filter(|record| !proved.contains(&record.seq))
+        .map(|record| (record.seq, record.receipt.id.as_str()))
+        .collect();
+    let actual: BTreeSet<(u64, &str)> = package
+        .bundle
+        .uncheckpointed_receipts
+        .iter()
+        .map(|record| (record.seq, record.receipt_id.as_str()))
+        .collect();
+    if actual != expected
+        || actual.len() != package.bundle.uncheckpointed_receipts.len()
+        || crate::integer::count(actual.len()) != package.manifest.counts.uncheckpointed_receipts
+    {
+        return Err(CliError::attest_error(
+            "uncheckpointed receipt inventory does not match proof coverage".to_owned(),
+        ));
+    }
     verify_query_scope(
         &package.bundle.query,
         &package.bundle.tool_receipts,
@@ -642,126 +649,6 @@ pub(crate) fn validate_import_package_data(
         &lineage_by_capability,
     )?;
     Ok(())
-}
-
-pub(super) fn load_verified_evidence_package(
-    input: &Path,
-) -> Result<EvidenceImportPackage, CliError> {
-    ensure_existing_dir(input, "evidence package")?;
-
-    let manifest: EvidenceExportManifest = read_json_file(input, "manifest.json")?;
-    if !is_supported_evidence_export_manifest_schema(&manifest.schema) {
-        return Err(CliError::attest_error(format!(
-            "unsupported evidence manifest schema: expected {}, got {}",
-            EVIDENCE_EXPORT_MANIFEST_SCHEMA, manifest.schema
-        )));
-    }
-
-    verify_manifest_file_hashes(input, &manifest)?;
-    let query: EvidenceExportQuery = read_json_file(input, "query.json")?;
-    if query != manifest.query {
-        return Err(CliError::attest_error(
-            "query.json does not match the evidence manifest query".to_string(),
-        ));
-    }
-
-    let tool_receipts: Vec<EvidenceToolReceiptRecord> = read_ndjson_file(input, "receipts.ndjson")?;
-    let child_receipts: Vec<EvidenceChildReceiptRecord> =
-        read_ndjson_file(input, "child-receipts.ndjson")?;
-    let checkpoints: Vec<KernelCheckpoint> = read_ndjson_file(input, "checkpoints.ndjson")?;
-    let checkpoint_publications: Vec<CheckpointPublication> =
-        read_optional_ndjson_file(input, "checkpoint-publications.ndjson")?;
-    let checkpoint_witnesses: Vec<CheckpointWitness> =
-        read_optional_ndjson_file(input, "checkpoint-witnesses.ndjson")?;
-    let checkpoint_consistency_proofs: Vec<CheckpointConsistencyProof> =
-        read_optional_ndjson_file(input, "checkpoint-consistency-proofs.ndjson")?;
-    let checkpoint_equivocations: Vec<CheckpointEquivocation> =
-        read_optional_ndjson_file(input, "checkpoint-equivocations.ndjson")?;
-    let capability_lineage: Vec<CapabilitySnapshot> =
-        read_ndjson_file(input, "capability-lineage.ndjson")?;
-    let inclusion_proofs: Vec<ReceiptInclusionProof> =
-        read_ndjson_file(input, "inclusion-proofs.ndjson")?;
-    let retention: EvidenceRetentionMetadata = read_json_file(input, "retention.json")?;
-
-    verify_manifest_counts(
-        &manifest,
-        &tool_receipts,
-        &child_receipts,
-        &checkpoints,
-        &capability_lineage,
-        &inclusion_proofs,
-    )?;
-    verify_disclosure_notice(&manifest)?;
-    verify_policy_attachment(input, &manifest)?;
-    verify_federation_policy_attachment(input, &manifest)?;
-
-    let lineage_by_capability = verify_lineage(&capability_lineage)?;
-    verify_query_scope(
-        &query,
-        &tool_receipts,
-        &child_receipts,
-        manifest.child_receipt_scope,
-        &lineage_by_capability,
-    )?;
-    let tool_receipts_by_seq = verify_tool_receipts(&tool_receipts)?;
-    verify_child_receipts(&child_receipts)?;
-    let checkpoints_by_seq = verify_checkpoints(&checkpoints)?;
-    let child_receipt_scope = manifest.child_receipt_scope;
-    let transparency = verify_checkpoint_transparency_records(
-        &checkpoints,
-        &checkpoint_publications,
-        &checkpoint_witnesses,
-        &checkpoint_consistency_proofs,
-        &checkpoint_equivocations,
-    )?;
-    verify_inclusion_proofs(
-        &tool_receipts_by_seq,
-        &checkpoints_by_seq,
-        &inclusion_proofs,
-        manifest.counts.uncheckpointed_receipts,
-    )?;
-    let bundle = EvidenceExportBundle {
-        query,
-        tool_receipts,
-        child_receipts,
-        child_receipt_scope,
-        checkpoints,
-        capability_lineage,
-        inclusion_proofs,
-        uncheckpointed_receipts: Vec::new(),
-        retention,
-    };
-    verify_transparency_claim_boundary(manifest.claim_boundary.as_ref(), &bundle, &transparency)?;
-
-    let federation_policy = if manifest.federation_policy.is_some() {
-        Some(read_federation_policy(
-            &input.join(federation_policy_relative_path()),
-        )?)
-    } else {
-        None
-    };
-    let package = EvidenceImportPackage {
-        manifest,
-        bundle,
-        transparency: Some(transparency),
-        federation_policy,
-    };
-    validate_import_package_data(&package)?;
-    Ok(package)
-}
-
-pub fn load_verified_evidence_package_summary(
-    input: &Path,
-) -> Result<VerifiedEvidencePackage, CliError> {
-    let package = load_verified_evidence_package(input)?;
-    let manifest_hash = sha256_hex(&canonical_json_bytes(&package.manifest)?);
-    Ok(VerifiedEvidencePackage {
-        bundle: package.bundle,
-        transparency: package.transparency,
-        manifest_schema: package.manifest.schema,
-        exported_at: package.manifest.exported_at,
-        manifest_hash,
-    })
 }
 
 pub(crate) fn build_federated_share_import(

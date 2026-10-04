@@ -275,16 +275,15 @@ evaluation: current capability revocation, policy, proposal and vote checks and
 operation-owned replay reservation still run before dispatch. A terminal response
 completes the original lineage; terminal session retries remain rejected.
 
-This is live-session bookkeeping, not a collector context resolver, proof of
-authenticated submitter identity, or durable session reconstruction. It stores
-digests, not the original authenticated request. The default sidecar collector
-still lacks its production context source. The CLI stdio response projection also
-still maps pending approval to a policy-denied result without delivering the
-proposal body. Those integration boundaries remain open.
+The continuation owner retains the exact host-bound intent beside those digests.
+The CLI stdio response carries the signed pending proposal and accepts the original
+request with its collected votes on retry. Live continuation does not supply a
+collector context resolver or reconstruct a session after restart. The default
+sidecar threshold collector still lacks its production request-context source.
 
-Durable admission currently rejects every configured execution-nonce profile
-because it lacks an atomic nonce participant. The session tests assert that
-restriction; they do not qualify threshold-plus-nonce composition. Cancellation,
+The session test composition rejects configured execution-nonce profiles because
+its store lacks an atomic nonce participant. These tests do not qualify
+threshold-plus-nonce composition. Cancellation,
 session shutdown and process restart do not by themselves prove release of a
 pending cumulative hold. Operation-owned expiry, cancellation and recovery must
 provide their own durable release evidence. No whole-process crash or dropped
@@ -306,7 +305,7 @@ launch requirements are tracked in [the launch ledger](launch-plan.md).
 
 ## Compliance and product-truth review (October 1, 2026)
 
-The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against approval semantics:
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Findings recorded at that reviewed revision:
 
 - **AP2, Medium.** Only `serve-http` builds `BoundToolInvocation` intents; unbound intents are still
   accepted with an approval, API protect signs a caller-supplied `parameter_hash`, and no evaluation
@@ -315,3 +314,60 @@ The [compliance and product-truth review](../reviews/2026-10-01-compliance-produ
   authority or kernel key may sign an approval; `approve_above_currency`, `timeout_seconds`,
   `on_timeout` and `approve_when` are parsed but not enforced while the canonical example presents them.
 - **KG4, Medium.** `RequireDualApproval` never matches, so grants carrying it always deny.
+
+
+## Execution-bound ordinary approvals (October 2 implementation)
+
+Session threshold proposals now bind a legacy tool intent at the trusted host
+before the initial proposal is created. The binding includes the original
+arguments, full capability digest, request and policy, and a canonical scope
+digest containing both the owned session ID and optional authenticated tenant.
+The existing continuation owner retains
+that exact intent with the original wire-request digest. Retries may add signed
+votes; they cannot change the wire request or cause the host to construct a new
+approved intent. This applies to stdio and both nested-flow session entrypoints.
+It preserves the existing live-session continuation contract; restart cannot
+recreate missing original continuation authority from a proposal alone.
+Fresh presentations of session-created artifacts must match the current owned
+session and authenticated tenant scope, including the current request, policy,
+capability and arguments. Raw tool entrypoints reject these artifacts without
+owned session context. Binding does not grant authority or require approvers for
+a call below its cumulative threshold. Required approvals still resolve their
+explicit policy-owned roster before proposal creation or execution.
+
+The AP2/AP3 implementation separates an ordinary approver roster from capability
+issuers and receipt signers. Tool approvals require a `BoundToolInvocation` in
+every kernel path, including callers outside HTTP. Its signed intent commits the
+canonical arguments, complete capability, request ID, tenant and current policy.
+The host builds that binding; clients cannot supply a trusted parameter digest.
+
+API protect accepts full signed capabilities at submission, checks `requested_by`
+against the capability subject, and retains the original request and a separately
+signed approver token when the decision resolves. The evaluate route consumes
+that retained decision through the existing operation-owned replay authority and
+authenticated caller-execution protocol. An explicit deployment config pins the
+roster, tenant, previously activated replay source and executor. See the
+[API-protect contract](../../crates/products/chio-api-protect/README.md#execution-bound-approvals)
+for the wire sequence and CLI configuration.
+
+Approval-store schema revision 4 adds signed decision artifacts beside resolved
+ordinary records. Existing records without an original intent and token stay
+audit-only. Resolution is immutable. There is no separate per-token revocation
+route; current capability/ancestor revocation and signer retirement withdraw
+approval authority at fresh admission and dispatch. Expiry and current tenant and
+policy bindings are checked again there. This is separate from threshold
+collection, whose trusted roster and original-request resolver remain required.
+
+Policy loading rejects ordinary `approve_above_currency`, `timeout_seconds`,
+`on_timeout` and `approve_when` fields because this path cannot enforce them.
+Nested threshold-collector timeouts retain their existing enforced behavior.
+Unsupported dual-approval policy configuration is rejected; direct capabilities
+carrying `RequireDualApproval` continue to deny. This batch does not add a second
+dual-approval execution path.
+
+AP2/AP3 have local source acceptance in the
+[issuer and approval execution record](../reviews/2026-10-02-issuer-lifecycle-approval-authority-execution.md),
+including actual API/MCP redemption, retained session scope and native credential
+controls. The October 1 review remains a historical snapshot. Hermes execution
+resume and the old Docker approval workflow remain unavailable; hosted, whole-process
+crash and launch qualification remain separate.

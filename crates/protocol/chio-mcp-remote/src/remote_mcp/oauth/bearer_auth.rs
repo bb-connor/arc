@@ -13,14 +13,15 @@ impl ProtectedResourceMetadata {
     }
 }
 
-pub(super) async fn authenticate_session_request(
-    headers: &HeaderMap,
+pub(super) async fn authenticate_session_request<'a>(
+    headers: impl Into<SenderRequest<'a>>,
     auth_mode: &RemoteAuthMode,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
     expected_method: &str,
     expected_target: &str,
 ) -> Result<SessionAuthContext, Response> {
-    let token = extract_bearer_token(headers, protected_resource_metadata)?;
+    let headers = headers.into();
+    let token = extract_bearer_token(&headers, protected_resource_metadata)?;
     let origin = headers
         .get(ORIGIN)
         .and_then(|value| value.to_str().ok())
@@ -37,7 +38,7 @@ pub(super) async fn authenticate_session_request(
                 ));
             }
             Ok(build_static_bearer_session_auth_context(
-                headers,
+                &headers,
                 expected_token.as_ref(),
             ))
         }
@@ -356,15 +357,16 @@ pub(super) fn build_static_bearer_session_auth_context(
 }
 
 impl JwtBearerVerifier {
-    pub(super) fn authenticate_token(
+    pub(super) fn authenticate_token<'a>(
         &self,
         token: &str,
-        headers: &HeaderMap,
+        headers: impl Into<SenderRequest<'a>>,
         origin: Option<String>,
         protected_resource_metadata: Option<&ProtectedResourceMetadata>,
         expected_method: &str,
         expected_target: &str,
     ) -> Result<SessionAuthContext, Response> {
+        let headers = headers.into();
         let (header, claims, signed_input, signature) =
             decode_jwt_parts(token, protected_resource_metadata)?;
         let alg = JwtSignatureAlgorithm::from_header(&header, protected_resource_metadata)?;
@@ -466,6 +468,12 @@ impl JwtBearerVerifier {
                 })?;
             }
         }
+        sender_constraint::validate_attestation_context(&claims).map_err(|error| {
+            input::with_source(
+                unauthorized_bearer_response(&error.to_string(), protected_resource_metadata),
+                error,
+            )
+        })?;
         SenderConstraintVerifier::new(
             &self.clock,
             &self.sender_dpop_nonce_store,
@@ -491,7 +499,16 @@ impl JwtBearerVerifier {
             protected_resource_metadata,
             self.provider_profile,
         )?);
-        let federated_claims = build_federated_claims(&claims, self.provider_profile);
+        let federated_claims =
+            build_federated_claims(&claims, self.provider_profile).map_err(|error| {
+                input::with_source(
+                    unauthorized_bearer_response(
+                        "invalid authenticated sender key",
+                        protected_resource_metadata,
+                    ),
+                    error,
+                )
+            })?;
         let matched_provider = matched_bearer_enterprise_provider(
             self.enterprise_provider_registry.as_deref(),
             claims.iss.as_deref().or(self.issuer.as_deref()),
@@ -536,7 +553,7 @@ impl JwtBearerVerifier {
 
 pub(super) struct IntrospectionSessionAuthInput<'a> {
     pub(super) token: &'a str,
-    pub(super) headers: &'a HeaderMap,
+    pub(super) headers: SenderRequest<'a>,
     pub(super) introspection: OAuthIntrospectionResponse,
     pub(super) origin: Option<String>,
     pub(super) protected_resource_metadata: Option<&'a ProtectedResourceMetadata>,
@@ -545,15 +562,16 @@ pub(super) struct IntrospectionSessionAuthInput<'a> {
 }
 
 impl IntrospectionBearerVerifier {
-    pub(super) async fn authenticate_token(
+    pub(super) async fn authenticate_token<'a>(
         &self,
         token: &str,
-        headers: &HeaderMap,
+        headers: impl Into<SenderRequest<'a>>,
         origin: Option<String>,
         protected_resource_metadata: Option<&ProtectedResourceMetadata>,
         expected_method: &str,
         expected_target: &str,
     ) -> Result<SessionAuthContext, Response> {
+        let headers = headers.into();
         let mut request = self
             .client
             .post(self.introspection_url.clone())
@@ -722,6 +740,12 @@ impl IntrospectionBearerVerifier {
                 })?;
             }
         }
+        sender_constraint::validate_attestation_context(&claims).map_err(|error| {
+            input::with_source(
+                unauthorized_bearer_response(&error.to_string(), input.protected_resource_metadata),
+                error,
+            )
+        })?;
         SenderConstraintVerifier::new(
             &self.clock,
             &self.sender_dpop_nonce_store,
@@ -747,7 +771,16 @@ impl IntrospectionBearerVerifier {
             input.protected_resource_metadata,
             self.provider_profile,
         )?);
-        let federated_claims = build_federated_claims(&claims, self.provider_profile);
+        let federated_claims =
+            build_federated_claims(&claims, self.provider_profile).map_err(|error| {
+                input::with_source(
+                    unauthorized_bearer_response(
+                        "invalid authenticated sender key",
+                        input.protected_resource_metadata,
+                    ),
+                    error,
+                )
+            })?;
         let matched_provider = matched_bearer_enterprise_provider(
             self.enterprise_provider_registry.as_deref(),
             claims.iss.as_deref().or(self.issuer.as_deref()),

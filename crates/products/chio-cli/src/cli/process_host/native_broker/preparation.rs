@@ -53,6 +53,7 @@ impl PreparationConfig {
 }
 
 struct Route {
+    clock: Arc<dyn Clock>,
     quota: BrokerQuotaVerifierConfig,
     config: PreparationConfig,
     signer: Arc<Ed25519Backend>,
@@ -64,7 +65,7 @@ pub(crate) struct Preparer {
 }
 
 impl Preparer {
-    pub fn new(config: &Config) -> Result<Self, CliError> {
+    pub fn new(config: &Config, clock: Arc<dyn Clock>) -> Result<Self, CliError> {
         let mut routes = BTreeMap::new();
         // A change anywhere in the host's authority invalidates preparation
         // recovery, including removing a sibling route or changing its peer.
@@ -79,6 +80,7 @@ impl Preparer {
             routes.insert(
                 (route.quota.server_id.clone(), route.quota.tool_name.clone()),
                 Route {
+                    clock: clock.clone(),
                     quota: route.quota.clone(),
                     config: preparation.clone(),
                     signer,
@@ -146,11 +148,11 @@ impl Route {
         body: Vec<u8>,
     ) -> Result<Value, ProcessError> {
         use chio_core_types::capability::scope::Operation;
-        let now = chio_security_types::clock::Clock::unix_millis(
-            &chio_security_types::clock::SystemClock,
-        )
-        .map_err(|error| ProcessError::Preparation(Box::new(error)))?
-        .as_secs();
+        let now = self
+            .clock
+            .unix_millis()
+            .map_err(|error| ProcessError::Preparation(Box::new(error)))?
+            .as_secs();
         if now < parent.issued_at
             || now >= parent.expires_at
             || !parent.scope.grants.iter().any(|grant| {

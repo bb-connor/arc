@@ -69,11 +69,41 @@ admin API.
 
 Hosted operator approval uses `POST /admin/approvals`,
 `GET /admin/approvals/{id}`, and `POST /admin/approvals/{id}/decision`.
-It requires durable admission/session state and a distinct operator credential.
-These routes never dispatch a tool; approved artifacts enter the ordinary
-kernel `tools/call` path with a capability and canonical-argument binding.
+It requires durable admission/session state, a distinct operator credential and
+an explicit `RemoteServeHttpConfig.approval` configuration. The public
+`RemoteApprovalConfig::load` reader accepts a bounded JSON document naming the
+tenant, allowed approver public keys, replay-source path and already-activated
+replay-authority binding. Startup does not provision or activate that source.
+Changing this authority configuration changes the runtime fingerprint, so an
+incompatible persisted session cannot resume under an old approval roster.
+
+Submit an exact session capability, request ID, tool and argument object to create
+a pending record. The returned intent binds the complete capability, canonical
+arguments, exact installed kernel policy hash and configured tenant. An operator
+from the configured roster signs a `GovernedApprovalToken` over the returned
+intent hash, subject and request ID, with token ID `<record.id>-decision` and an
+expiry no later than the pending record. Send it as `{"token": <signed token>}` to
+the decision endpoint. Plain `{"decision":"approved"}` requests are rejected.
+The operator's original signature remains in the record and returned execution
+parameters; the server's receipt key signs only the local record's integrity.
+
+These routes never dispatch a tool. At the shared session ingress, an ordinary
+signed approval must exactly match the retained Approved record for this call.
+Pending, Denied, expired, missing, altered or ambiguous artifacts refuse before
+the edge worker can reserve or dispatch work. The gate revalidates the retained
+signature, session, current policy, capability, intent, arguments and lifetime.
+It applies equally to HTTP and native session callers. Independent policy-owned
+threshold collections keep their separate kernel approval protocol.
+
+Accepted artifacts enter the ordinary kernel `tools/call` path, which revalidates
+current capability/approver authority, exact binding and durable single-use
+ownership before native server execution. MCP uses server execution and does not
+configure API-protect's caller executor.
+Records from the former unsigned-decision contract cannot issue new authority;
+submit a new request after the explicit authority configuration is installed.
+
 See the [operator procedure](../../../integrations/required-agents/qualification/APPROVALS.md)
-and real resource qualification runner for recovery and outcome semantics.
+for deployment, signing and recovery.
 
 `cargo test -p chio-mcp-remote`
 
@@ -95,3 +125,9 @@ OIDC discovery URLs are denied before any connection is attempted.
   instance runs per session.
 - `chio-control-plane` - authority keypair management, policy loading, and
   store configuration.
+
+## Listener transport
+
+See the [shared HTTP transport guide](../../../docs/security/http-transport.md) for
+TLS identity files, explicit plaintext policy, client endpoint rules and revocation
+response semantics.

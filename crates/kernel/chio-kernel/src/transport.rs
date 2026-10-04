@@ -235,6 +235,7 @@ mod tests {
     fn transport_agent_message_roundtrip() {
         let kp = Keypair::generate();
         let msg = AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: "req-001".to_string(),
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),

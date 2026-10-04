@@ -640,16 +640,17 @@ pub(crate) fn route_pull(
     }
 }
 
-fn sync_peer_authority(
+pub(crate) fn sync_peer_authority(
     state: &TrustServiceState,
     client: &TrustControlClient,
 ) -> Result<(), CliError> {
     let Some(path) = state.config.authority_db_path.as_deref() else {
         return Ok(());
     };
-    let authority = SqliteCapabilityAuthority::open(path)?;
-    let snapshot = authority_snapshot_from_view(client.authority_snapshot()?);
-    authority.apply_snapshot(&snapshot)?;
+    let authority =
+        SqliteCapabilityAuthority::open_with_clock(path, state.finding_challenge_clock.clone())?;
+    let snapshot = client.authority_snapshot()?;
+    authority.apply_signed_snapshot(&snapshot)?;
     Ok(())
 }
 

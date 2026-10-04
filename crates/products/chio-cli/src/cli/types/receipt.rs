@@ -205,6 +205,9 @@ pub(crate) enum EvidenceCommands {
         /// Output directory for the evidence package. Must not already contain files.
         #[arg(long)]
         output: PathBuf,
+        /// Existing private kernel seed file used to sign the complete export.
+        #[arg(long)]
+        kernel_seed_file: PathBuf,
         /// Filter tool receipts by capability ID.
         #[arg(long)]
         capability: Option<String>,
@@ -238,12 +241,24 @@ pub(crate) enum EvidenceCommands {
         /// Input directory containing a previously exported evidence package.
         #[arg(long)]
         input: PathBuf,
+        /// Independently trusted kernel public key. Repeat to allow key rotation.
+        #[arg(long, required = true)]
+        trusted_kernel_pubkey: Vec<String>,
+        /// Independently obtained complete checkpoint publication anchor binding.
+        #[arg(long)]
+        trusted_anchor_file: Option<PathBuf>,
     },
     /// Import a verified bilateral evidence package for later federated delegation.
     Import {
         /// Input directory containing a previously exported evidence package.
         #[arg(long)]
         input: PathBuf,
+        /// Independently trusted kernel public key. Repeat to allow key rotation.
+        #[arg(long, required = true)]
+        trusted_kernel_pubkey: Vec<String>,
+        /// Independently obtained complete checkpoint publication anchor binding.
+        #[arg(long)]
+        trusted_anchor_file: Option<PathBuf>,
     },
     /// Create a signed bilateral receipt-sharing policy document.
     FederationPolicy {

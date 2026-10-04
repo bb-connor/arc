@@ -22,13 +22,9 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
             continue;
         }
 
-        return chio_core::canonical::UntrustedJsonText::from_wire(
-            trimmed.as_bytes(),
-            MAX_STDIO_MCP_FRAME_BYTES,
-        )?
-        .decode_document()
-        .map(Some)
-        .map_err(Into::into);
+        return crate::decode_mcp_request(trimmed.as_bytes(), MAX_STDIO_MCP_FRAME_BYTES)
+            .map(Some)
+            .map_err(Into::into);
     }
 }
 

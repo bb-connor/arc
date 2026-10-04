@@ -1513,15 +1513,20 @@ mod underwriting_and_support_tests {
 
     #[test]
     fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
-        let source_path = unique_temp_path("chio-behavioral-feed-source", "sqlite");
-        let follower_path = unique_temp_path("chio-behavioral-feed-follower", "sqlite");
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let source_path = directory.path().join("source.sqlite3");
+        let follower_path = directory.path().join("follower.sqlite3");
         let source = SqliteCapabilityAuthority::open(&source_path).test_unwrap();
         let follower = SqliteCapabilityAuthority::open(&follower_path).test_unwrap();
         let follower_local_key = follower.local_keypair().test_unwrap();
 
+        let anchor = source
+            .initialize_replication("local-custody-test")
+            .test_unwrap();
+        follower.pin_replication_anchor(&anchor).test_unwrap();
         source.rotate().test_unwrap();
-        let snapshot = source.snapshot().test_unwrap();
-        assert!(follower.apply_snapshot(&snapshot).test_unwrap());
+        let snapshot = source.signed_snapshot().test_unwrap();
+        assert!(follower.apply_signed_snapshot(&snapshot).test_unwrap());
         assert!(follower.current_keypair().is_err());
 
         let signing_key =
@@ -1578,6 +1583,7 @@ mod underwriting_and_support_tests {
 
     fn minimal_trust_service_config() -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_unwrap(),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),

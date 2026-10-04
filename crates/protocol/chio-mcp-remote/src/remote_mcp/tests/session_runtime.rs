@@ -165,3 +165,88 @@ fn remote_session_factory_rejects_admission_sidecar_aliases() {
         .contains("durable admission database must not alias receipt database"));
     let _ = std::fs::remove_dir_all(directory);
 }
+
+#[test]
+fn inbound_authority_factory_binds_caller_key_and_rejects_unbound_proof_policy() {
+    #[derive(Debug)]
+    struct ReadTransport;
+
+    impl McpTransport for ReadTransport {
+        fn list_tools(&self) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, AdapterError> {
+            Ok(vec![chio_mcp_adapter::edge::McpToolInfo {
+                name: "read".into(),
+                title: None,
+                description: Some("Read".into()),
+                input_schema: json!({"type": "object"}),
+                output_schema: None,
+                annotations: Some(json!({"readOnlyHint": true, "destructiveHint": false})),
+                execution: None,
+            }])
+        }
+
+        fn call_tool(
+            &self,
+            tool_name: &str,
+            arguments: Value,
+        ) -> Result<chio_mcp_adapter::edge::McpToolResult, AdapterError> {
+            TestSessionTransport.call_tool(tool_name, arguments)
+        }
+    }
+
+    let directory = private_remote_admission_directory("sender-bootstrap");
+    let mut config = test_remote_config();
+    config.policy_path = directory.join("policy.yaml");
+    std::fs::write(
+        &config.policy_path,
+        "hushspec: '0.1.0'\nrules:\n  tool_access:\n    default: block\n    allow: ['*']\n    dpop_required: true\n",
+    )
+    .unwrap();
+    config.test_transport = Some(Arc::new(ReadTransport));
+    config.session_db_path = Some(directory.join("sessions.sqlite3"));
+    config.receipt_db_path = Some(directory.join("receipts.sqlite3"));
+    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
+    configure_signed_manifest(&mut config, &directory);
+    let factory = RemoteSessionFactory::new(config.clone()).unwrap();
+    let auth = SessionAuthContext::streamable_http_static_bearer("unbound", "token", None);
+    let error = factory.spawn_session(auth).err().unwrap();
+    assert!(
+        error.to_string().contains("authenticated Chio sender key"),
+        "{error:?}"
+    );
+    let sender = Keypair::generate();
+    let auth = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
+        chio_core::OAuthBearerSessionAuthInput {
+            principal: Some("verified-sender".into()),
+            issuer: Some("https://issuer.example".into()),
+            subject: Some("sender".into()),
+            audience: None,
+            scopes: vec![],
+            federated_claims: OAuthBearerFederatedClaims {
+                sender_public_key: Some(sender.public_key()),
+                ..Default::default()
+            },
+            enterprise_identity: None,
+            token_fingerprint: Some("fingerprint".into()),
+            origin: None,
+        },
+    );
+    let session = factory.spawn_session(auth.clone()).unwrap();
+    assert_eq!(session.agent_id, sender.public_key().to_hex());
+    assert!(!session.issued_capabilities.is_empty());
+    for cap in &session.issued_capabilities {
+        assert_eq!(cap.subject, sender.public_key());
+        assert!(cap
+            .scope
+            .grants
+            .iter()
+            .all(|grant| grant.dpop_required == Some(true)));
+    }
+    assert_eq!(
+        expected_resume_agent_id(&config, &auth).unwrap(),
+        Some(session.agent_id.clone())
+    );
+    session.shutdown_upstream_transport().unwrap();
+    drop(session);
+    drop(factory);
+    std::fs::remove_dir_all(directory).unwrap();
+}

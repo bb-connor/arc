@@ -41,6 +41,40 @@ Proxy and mediated evaluation still enforce their own capability and kernel
 checks; this change does not turn a control credential into an agent capability.
 The attenuation endpoint still refuses to act as the parent subject's signer.
 
+## Caller-owned capability subjects
+
+Both `POST /v1/capabilities/mint` and `POST /v1/capabilities` require a caller-owned
+public `subject` key in the kernel crypto wire format. The default Ed25519
+representation is 64 hexadecimal characters. The canonical `scopes` request and
+the SDK's structured `scope` alias share one strict `PublicKey` parser. Missing,
+blank, non-key labels, malformed encodings and weak Ed25519 keys reject with
+HTTP 400 before signing or store mutation. Whitespace is not normalized into a key.
+This minting boundary supports strong Ed25519 subject keys only. P-256, P-384
+and hybrid key encodings reject rather than relying on their encoding parsers
+as proof that their public-key material is valid.
+
+The issuer signs the capability with the sidecar authority key and preserves the
+caller's public subject. Its private key stays with the caller. Public request
+metadata, including `job_uid`, may contribute to deterministic capability IDs;
+it never becomes a subject signing seed. A control bearer authorizes issuance,
+not possession of the subject signer. The Python operator client accepts
+`ChioClient(control_token=...)` and attaches it only to capability minting,
+without installing a default transport header or sending it on health/evaluation
+requests. Agents must not receive the operator bearer.
+
+Use a structured scope grant with `dpop_required: true` to require a proof signed
+by that subject on `/v1/evaluate`. An honest caller proof can reserve the call;
+the former SHA-256(subject, 0, job_uid) seed, an unrelated key and a stolen token
+without a caller proof cannot. Canonical shorthand scope grants do not enable
+DPoP and retain their existing bearer behavior.
+
+Deployments using job or role labels as subjects must provision caller signing
+keys and send their public keys. Existing tokens keep their signed subject;
+revoke affected tokens and remint after provisioning a real caller identity.
+The Kubernetes controller reads `chio.world/subject-public-key` and refuses
+missing or malformed Ed25519 hex before Job authority mutation or minting.
+This does not supply private-key custody for workloads.
+
 ## Control credential containment
 
 The upstream proxy rejects a request when any original header value contains the
@@ -87,7 +121,9 @@ path and public health checks; privileged control requests remain unavailable.
 Distribute the token only to trusted operator/controller and reconciliation
 components. Do not give it to agents or untrusted tool subprocesses, reuse an
 agent credential, or forward it upstream. Protect nonlocal transport with the
-deployment's authenticated TLS boundary. The shared credential grants broad
+deployment's authenticated TLS boundary. The [shared listener profile](http-transport.md)
+now refuses non-loopback plaintext without explicit operator opt-in and offers
+paired certificate/key flags. The shared credential grants broad
 sidecar control access. It is not per-user identity, tenant isolation, scoped
 operator RBAC, DPoP, or the enterprise broker's request proof.
 
@@ -120,10 +156,14 @@ confinement, cross-tenant authorization, throughput, or hosted qualification.
 
 The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings against this authority boundary:
 
-- **AP1, High.** `derive_sidecar_subject_key` (`crates/products/chio-api-protect/src/proxy/sidecar.rs:1206-1216`)
-  seeds the subject keypair from SHA-256(subject, 0, job_uid); with the SDK's subject contract the
-  private key is computable from public values, contradicting this boundary's rule that the sidecar
-  must not hold or derive the subject key. The subject must be a caller-supplied public key.
+- **AP1, High, source repair.** Both mint paths now preserve the caller public
+  key and reject labels through their shared parser. The production-router
+  `proxy::mediated::tests::subject_identity` controls reproduce the former seed
+  attack before the repair and cover caller proof success, derived/wrong key
+  rejection, stolen-token rejection and invalid-subject denial without store
+  mutation. The [execution record](../reviews/2026-10-02-identity-authority-release-closure-execution.md)
+  records the accepted router, SDK and lint results. Deployed token replacement
+  remains an operator action.
 - **AP4, Medium.** Unmatched routes and `x-chio-side-effects: false` operations are session-allowed
   without a capability, and the spec deciding this is discovered from the protected upstream.
 - **AP7, Medium.** The "Migration and limits" deferral of TLS leaves every listener plain HTTP; the

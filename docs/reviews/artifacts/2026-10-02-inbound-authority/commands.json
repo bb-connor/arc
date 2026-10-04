@@ -1,0 +1,1307 @@
+[
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 2.81,
+    "log_sha256": "727694f8a42417d36966158ead2e48c7cbd1b94692dcd593a685f5b5311148e7",
+    "label": "ap4-first-green",
+    "retained_log": "ap4-first-green.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 32.68,
+    "log_sha256": "1db5cb5cf751170a0625789a9b9fa53b0a3084d1221acf28a6d2b08fad28763e",
+    "label": "ap4-focused",
+    "retained_log": "ap4-focused.log.gz",
+    "test_results": [
+      "test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 234 filtered out; finished in 0.27s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 53.48,
+    "log_sha256": "89e02cfd9a48029484ac0229eff04ffde2fefdd6030e684e2dd1344f41fec085",
+    "label": "ap4-owner-final",
+    "retained_log": "ap4-owner-final.log.gz",
+    "test_results": [
+      "test result: ok. 239 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.73s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 53.58,
+    "log_sha256": "b74e020036d2bde1b7709bd49f543859ca1f47b226d7767d51eb0d6d3bfc93bd",
+    "label": "ap4-owner-first",
+    "retained_log": "ap4-owner-first.log.gz",
+    "test_results": [
+      "test result: FAILED. 220 passed; 19 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.38s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 58.65,
+    "log_sha256": "0b358919394bfb9aa387ce8febfefcc9f5ce99f1213224c4da30d87e60fb5082",
+    "label": "ap4-owner-second",
+    "retained_log": "ap4-owner-second.log.gz",
+    "test_results": [
+      "test result: FAILED. 238 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.90s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 165.26,
+    "log_sha256": "503c3933d9c9812b6e2ef1e69ef671bc2839267dd8191466448266f81d5a66ec",
+    "label": "ap4-red",
+    "retained_log": "ap4-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 234 filtered out; finished in 0.12s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 109.34,
+    "log_sha256": "341090982e5b92a0581e08d4bf1fbc8880c9b71584e58efedebdbea7f870352f",
+    "label": "ap5-composition-red",
+    "retained_log": "ap5-composition-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1209 filtered out; finished in 0.16s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-cli",
+      "--tests"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 78.53,
+    "log_sha256": "07c26c3dd617d2c71d314cdfbf5c754a159c2ad0fb369cd47ce79d97f90da7e2",
+    "label": "ap5-first-check",
+    "retained_log": "ap5-first-check.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 89.54,
+    "log_sha256": "d090bdd4466db65940ca9c474bb4135c3b76060d6330e71c9c3d0ef4de421637",
+    "label": "ap5-http-red",
+    "retained_log": "ap5-http-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 234 filtered out; finished in 0.30s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-kernel",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 153.41,
+    "log_sha256": "6c613d07f4a1b65f63a408af1860ac7477476462a5f96025ad53bb9dab5c6a52",
+    "label": "ap5-kernel-red",
+    "retained_log": "ap5-kernel-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1504 filtered out; finished in 0.07s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-mcp-edge",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 51.23,
+    "log_sha256": "c5780b013c3eca32b6695ad1c9729bf2b9ac01eee19c3706bf3dd062435bcc0e",
+    "label": "ap5-mcp-red",
+    "retained_log": "ap5-mcp-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.07s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-policy",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 64.47,
+    "log_sha256": "660b11dd0e576fb7b20f10c3b796b18d656ab0c3d52a515246098111fb475b34",
+    "label": "ap5-policy-red",
+    "retained_log": "ap5-policy-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.01s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-mcp-remote",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 167.23,
+    "log_sha256": "4050f3f6ef65a6f888584c448cf876a39c3799132f9ef3f449193cfced6fdefc",
+    "label": "ap6-claims-red",
+    "retained_log": "ap6-claims-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.05s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 27.74,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "label": "formatting-final",
+    "retained_log": "formatting-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 26.45,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "label": "formatting-qualified",
+    "retained_log": "formatting-qualified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 26.56,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "label": "formatting-verified",
+    "retained_log": "formatting-verified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 28.11,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "label": "formatting",
+    "retained_log": "formatting.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "/tmp/check-inbound-cli.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 2.51,
+    "log_sha256": "4eb7f42cea977ecc27387103decae66ce7c5cad45dd4dabcf30349ea412919af",
+    "label": "inbound-cli-direct-final",
+    "retained_log": "inbound-cli-direct-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/code_agent_preset-f8087e3386711953"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.19,
+    "log_sha256": "0aa5d889dbb9f378ac6abcb3a3e4ddd1cb3b84a8ba3c6ced50ad7fadadcfa192",
+    "label": "inbound-cli-preset-final",
+    "retained_log": "inbound-cli-preset-final.log.gz",
+    "test_results": [
+      "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.19s"
+    ]
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio-1fe6676623dff16a",
+      "session_cli::tests"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 31.53,
+    "log_sha256": "a00038fcbdbfabbd2dc779c9a378f2d01a7da85d3c9b351f86d99b36f0ef5dfc",
+    "label": "inbound-cli-session-final",
+    "retained_log": "inbound-cli-session-final.log.gz",
+    "test_results": [
+      "test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 690 filtered out; finished in 31.48s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-cli",
+      "--bin",
+      "chio",
+      "--test",
+      "code_agent_preset",
+      "inbound_authority",
+      "--no-fail-fast",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 372.26,
+    "log_sha256": "3774d8660182b7438efed480f6fbc6aa2f840bc68f1e6c3a02977d1ec7fa6f1b",
+    "label": "inbound-cli-verified",
+    "retained_log": "inbound-cli-verified.log.gz",
+    "test_results": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 731 filtered out; finished in 0.22s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 2.44s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-core-types",
+      "-p",
+      "chio-kernel",
+      "--lib",
+      "--bin",
+      "chio",
+      "--test",
+      "code_agent_preset",
+      "--test",
+      "wire_protocol_schema",
+      "inbound_authority",
+      "--no-fail-fast",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 172.48,
+    "log_sha256": "ef335c768d053a76c79b0bc01d749390228b5b8032dd04f771b242ca74835479",
+    "label": "inbound-cli-wire-final",
+    "retained_log": "inbound-cli-wire-final.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 2.39s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 432 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.94s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1504 filtered out; finished in 0.09s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-core-types",
+      "--bin",
+      "chio",
+      "--test",
+      "code_agent_preset",
+      "--test",
+      "wire_protocol_schema",
+      "inbound_authority",
+      "--no-fail-fast",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 256.74,
+    "log_sha256": "49e3a9a63558fbcbc02cf0d7d88535361cbe97f263c43fd78a89d9c4f7ebd573",
+    "label": "inbound-cli-wire-first",
+    "retained_log": "inbound-cli-wire-first.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_edge-208c54843e6a9741"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.45,
+    "log_sha256": "4e81f6863552ee39b4a87fe4335c0d7dc385ec0e903cc08287b77baab5acc62b",
+    "label": "inbound-edge-final",
+    "retained_log": "inbound-edge-final.log.gz",
+    "test_results": [
+      "test result: ok. 133 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "hello-a2a",
+      "-p",
+      "hello-acp",
+      "-p",
+      "hello-mcp",
+      "--lib",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 10.23,
+    "log_sha256": "9c8bacb08e35dbd5e519dbe3f98b987c79b4d8d53bb3f4e10b20260b1b11687c",
+    "label": "inbound-examples-final",
+    "retained_log": "inbound-examples-final.log.gz",
+    "test_results": [
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+      "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "hello-a2a",
+      "-p",
+      "hello-acp",
+      "-p",
+      "hello-mcp",
+      "--lib",
+      "--no-fail-fast"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 115.31,
+    "log_sha256": "4ec7006679907b8d6d95668b2f7b9b5b4fcb73a40880e10e9cd8d1b9ec9f216f",
+    "label": "inbound-examples-red",
+    "retained_log": "inbound-examples-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+      "test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+      "test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-mcp-remote",
+      "--lib",
+      "inbound_authority_factory",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 246.36,
+    "log_sha256": "84f144e63ee81ae2196217ec89d712bebae9f11532d1f27265c27efe49de22a0",
+    "label": "inbound-factory-final",
+    "retained_log": "inbound-factory-final.log.gz",
+    "test_results": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 3.04s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-mcp-remote",
+      "--tests"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 55.81,
+    "log_sha256": "c25ea78e103088c4abe3c7b1a341aa7c69b772cb8e17ce0b43a83baa1c8f96c2",
+    "label": "inbound-first-check",
+    "retained_log": "inbound-first-check.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-http-core",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-core-types",
+      "--lib",
+      "--no-fail-fast",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 229.77,
+    "log_sha256": "68733ba3d75fd336d83b3e4e32ce1ab95f08133e0a9a9f3643ddf98d346f4d4d",
+    "label": "inbound-focused-corrections",
+    "retained_log": "inbound-focused-corrections.log.gz",
+    "test_results": [
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 234 filtered out; finished in 0.28s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1209 filtered out; finished in 0.16s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 432 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 102 filtered out; finished in 0.00s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1504 filtered out; finished in 0.08s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.09s",
+      "test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 118 filtered out; finished in 1.57s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.02s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-control-plane",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 265.23,
+    "log_sha256": "6154f718508cb6fa2e8b66ff84fd45736082a54ab2aef12637186838649a598d",
+    "label": "inbound-focused-first",
+    "retained_log": "inbound-focused-first.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-mcp-remote",
+      "--tests"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 48.44,
+    "log_sha256": "97509eddc5266ac34be527fdd467319ecb0607d47e881dcab32c0dd94f495f93",
+    "label": "inbound-fourth-check",
+    "retained_log": "inbound-fourth-check.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-core-types",
+      "-p",
+      "chio-conformance",
+      "--test",
+      "protocol_primitives_generated",
+      "--test",
+      "security_generated_vectors",
+      "--test",
+      "ssrf_external_guard_api_protect_dispatch",
+      "--no-fail-fast"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 254.98,
+    "log_sha256": "32b774cbeff92cff369eb052b3afb0c0741e441dca9c08c1c56bbdec125d1de8",
+    "label": "inbound-generated-conformance-final",
+    "retained_log": "inbound-generated-conformance-final.log.gz",
+    "test_results": [
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+      "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.49s"
+    ]
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-69e3f9459f5fbd5a"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 11.61,
+    "log_sha256": "7c4e4b105ef852cba749cc69b56bbabc0d13bfc1241dfe80b076e9d830b8a987",
+    "label": "inbound-kernel-final",
+    "retained_log": "inbound-kernel-final.log.gz",
+    "test_results": [
+      "test result: ok. 1506 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.54s"
+    ]
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-6a5d91d6f2b21197"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 12.63,
+    "log_sha256": "aa19420601a0c3a08d18213f4da4fbc13962e8faabcfa9142cac0a9101f19afb",
+    "label": "inbound-kernel-organized-final",
+    "retained_log": "inbound-kernel-organized-final.log.gz",
+    "test_results": [
+      "test result: ok. 1506 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.60s"
+    ]
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-c377478f770036e4",
+      "security::adapters::tests::native_flow::support::capture::combined_credentials::nested",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 229.46,
+    "log_sha256": "7f876d1a53e11e83347f717885623523ae9799b9c564b18442c080cbe162910d",
+    "label": "inbound-nested-final",
+    "retained_log": "inbound-nested-final.log.gz",
+    "test_results": [
+      "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1205 filtered out; finished in 229.40s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-http-core",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-core-types",
+      "--lib",
+      "--no-fail-fast"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 5.01,
+    "log_sha256": "1c5018fa969f6193d7dd4580968da7c1277a29e37d08131c20c395eff5d11519",
+    "label": "inbound-owner-first",
+    "retained_log": "inbound-owner-first.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-http-core",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-core-types",
+      "--lib",
+      "--no-fail-fast"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 1128.22,
+    "log_sha256": "137d72065cd72a2a2a63ec692644a25073b69d406a7b129da98cb59760c4255a",
+    "label": "inbound-owner-second",
+    "retained_log": "inbound-owner-second.log.gz",
+    "test_results": [
+      "test result: ok. 243 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.63s",
+      "test result: ok. 432 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s",
+      "test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.16s",
+      "test result: ok. 1505 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.98s",
+      "test result: FAILED. 131 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s",
+      "test result: FAILED. 124 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.64s",
+      "test result: ok. 197 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s"
+    ]
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_remote-91539c7b2f25d0ae"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 54.52,
+    "log_sha256": "56f924c0f3e392501522ebb5114d467cfd55167beaa3e65614a16d36bea0672f",
+    "label": "inbound-remote-final",
+    "retained_log": "inbound-remote-final.log.gz",
+    "test_results": [
+      "test result: ok. 125 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 54.42s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-mcp-remote",
+      "--tests"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 50.1,
+    "log_sha256": "0b98da2c91af55f557dfae2967ff3809ab7873c39a693cbf8ab7b12b6ebe89ed",
+    "label": "inbound-second-check",
+    "retained_log": "inbound-second-check.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-cli",
+      "-p",
+      "chio-mcp-remote",
+      "--tests"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 30.77,
+    "log_sha256": "9a8a260622a1683e12da8bf10c3e346b9f6d60a4ea01a6f3f82d68eed9ba8215",
+    "label": "inbound-third-check",
+    "retained_log": "inbound-third-check.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/wire_protocol_schema-99b30669408cafb7"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.34,
+    "log_sha256": "a782e727039da2a31c08e5c380f4ec03a389b1b444f08230b586ca52d8c4c335",
+    "label": "inbound-wire-owner-final",
+    "retained_log": "inbound-wire-owner-final.log.gz",
+    "test_results": [
+      "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.33s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--keep-going",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 254.18,
+    "log_sha256": "c97716f32adc9d1de1f9db8cd8d0647f85a74679934a46a855b6db6404834fc9",
+    "label": "inbound-workspace-clippy-final",
+    "retained_log": "inbound-workspace-clippy-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 283.53,
+    "log_sha256": "4d8a7a85f89decfdf66296469cd08ffbb6353fe2c7113e34d2d918bec614dfc5",
+    "label": "inbound-workspace-clippy-first",
+    "retained_log": "inbound-workspace-clippy-first.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 9.07,
+    "log_sha256": "fc6b2b8a16b6899b8ca9ab4f250194c1ab02238d76330e3c2e74acdbfd392081",
+    "label": "inbound-workspace-clippy-second",
+    "retained_log": "inbound-workspace-clippy-second.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--keep-going",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 88.15,
+    "log_sha256": "80af89f8b80d7c1ed3e57d22e729a301218f6aec308a30e10e0b5871ccbd265d",
+    "label": "inbound-workspace-clippy-verified",
+    "retained_log": "inbound-workspace-clippy-verified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/check-trust-boundaries-ingress.test.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 7.74,
+    "log_sha256": "5e45eac7de98cbc9108e9b2ff79ec75b350c5201073b2cca00cdca236941cdf2",
+    "label": "ingress-gate-negative",
+    "retained_log": "ingress-gate-negative.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-c377478f770036e4",
+      "public_nested_native_capture_retains_runtime_approval_and_dpop_for_local_and_egress",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 3.38,
+    "log_sha256": "e419822e89783ffa2ebf241ead5587b6aa97445db9e04191cfa3eff0285d5aa7",
+    "label": "nested-control-diagnostic",
+    "retained_log": "nested-control-diagnostic.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1209 filtered out; finished in 3.37s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-mcp-remote",
+      "--lib",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 100.46,
+    "log_sha256": "095d73525944c6c04fa7dc019c969570171ef820187c25420bb5d457d6ee2ea3",
+    "label": "review-controls-red",
+    "retained_log": "review-controls-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 234 filtered out; finished in 0.31s"
+    ]
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "-p",
+      "chio-mcp-remote",
+      "-p",
+      "chio-mcp-edge",
+      "-p",
+      "chio-policy",
+      "-p",
+      "chio-kernel",
+      "-p",
+      "chio-http-core",
+      "-p",
+      "chio-control-plane",
+      "-p",
+      "chio-core-types",
+      "--lib",
+      "--no-fail-fast",
+      "inbound_authority",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 289.82,
+    "log_sha256": "70b33c1ef3f2f2e0cec76be3cb7197b7a036e02c754770878470de194a0a159d",
+    "label": "review-fixes-first",
+    "retained_log": "review-fixes-first.log.gz",
+    "test_results": [
+      "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 234 filtered out; finished in 0.34s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1209 filtered out; finished in 0.18s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 432 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 102 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1504 filtered out; finished in 0.13s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 131 filtered out; finished in 0.12s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.08s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.02s"
+    ]
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_remote-7c1831c9fe0de94f",
+      "inbound_authority_remote_subject_is_the_authenticated_sender_key",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 0.11,
+    "log_sha256": "a0903c3498725dd14c079833439fed5cefbb1563a86e9ecf8d02c503c4462d83",
+    "label": "review-subject-red",
+    "retained_log": "review-subject-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 123 filtered out; finished in 0.09s"
+    ]
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-rust-file-hygiene.py"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 11.8,
+    "log_sha256": "8f27c03f4edeb29277c586ade8853b35f1876880ce2d66f682136015bc20d9bd",
+    "label": "rust-hygiene-final",
+    "retained_log": "rust-hygiene-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-rust-file-hygiene.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.93,
+    "log_sha256": "175b3077beb3dc349f184712af8aea705292e51a6b9e1adf01d7677e3ca23962",
+    "label": "rust-hygiene-qualified",
+    "retained_log": "rust-hygiene-qualified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-rust-file-hygiene.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 7.32,
+    "log_sha256": "f7ad047b01d91f4cf4cf64b254ee6a63ff01f6fedbeedcde6c6338b587e9034c",
+    "label": "rust-hygiene-verified",
+    "retained_log": "rust-hygiene-verified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-rust-file-hygiene.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 4.48,
+    "log_sha256": "f7ad047b01d91f4cf4cf64b254ee6a63ff01f6fedbeedcde6c6338b587e9034c",
+    "label": "rust-hygiene",
+    "retained_log": "rust-hygiene.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/check-chio-schema-registry.sh"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.48,
+    "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+    "label": "schema-registry-final",
+    "retained_log": "schema-registry-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/check-chio-schema-registry.sh"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.19,
+    "log_sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553",
+    "label": "schema-registry",
+    "retained_log": "schema-registry.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-security-clocks.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 30.9,
+    "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993",
+    "label": "security-clocks-final",
+    "retained_log": "security-clocks-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-security-clocks.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 26.59,
+    "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993",
+    "label": "security-clocks-verified",
+    "retained_log": "security-clocks-verified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-security-clocks.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 26.88,
+    "log_sha256": "08d775030cd2e3e0b28152d79d2744a76c1b6e9f244616ea2391e3a04e612993",
+    "label": "security-clocks",
+    "retained_log": "security-clocks.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-security-wire-vectors.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 7.04,
+    "log_sha256": "d7e078ac42109dc972c684dc2a9f0bd82df8d30f154b52571cf30f3589bb964e",
+    "label": "security-wire-vectors-final",
+    "retained_log": "security-wire-vectors-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-security-wire-vectors.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 6.09,
+    "log_sha256": "d7e078ac42109dc972c684dc2a9f0bd82df8d30f154b52571cf30f3589bb964e",
+    "label": "security-wire-vectors",
+    "retained_log": "security-wire-vectors.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "-p",
+      "chio-api-protect",
+      "--lib",
+      "inbound_authority_threshold_readers",
+      "--",
+      "--nocapture"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 221.26,
+    "log_sha256": "8200687c8496fd0c643289fc0834dafa25453949b96f6ab3a8781e22ff99d685",
+    "label": "threshold-red",
+    "retained_log": "threshold-red.log.gz",
+    "test_results": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 240 filtered out; finished in 0.13s"
+    ]
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/ci/check-trust-boundaries.py"
+    ],
+    "exit_code": 2,
+    "elapsed_seconds": 0.03,
+    "log_sha256": "6d84d7e466f7770aba64b291f9d57240f9425813d32eb323b8fbbef33b1419c1",
+    "label": "trust-boundaries-final",
+    "retained_log": "trust-boundaries-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-trust-boundaries.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 93.24,
+    "log_sha256": "78250f7445b6d0d66e73c2d6a8cc22552796ecc79d6d33125915505b689761af",
+    "label": "trust-boundaries-qualified",
+    "retained_log": "trust-boundaries-qualified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-trust-boundaries.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 90.81,
+    "log_sha256": "78250f7445b6d0d66e73c2d6a8cc22552796ecc79d6d33125915505b689761af",
+    "label": "trust-boundaries-release-local",
+    "retained_log": "trust-boundaries-release-local.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-trust-boundaries.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 106.64,
+    "log_sha256": "78250f7445b6d0d66e73c2d6a8cc22552796ecc79d6d33125915505b689761af",
+    "label": "trust-boundaries-verified",
+    "retained_log": "trust-boundaries-verified.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-trust-boundaries.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 95.05,
+    "log_sha256": "78250f7445b6d0d66e73c2d6a8cc22552796ecc79d6d33125915505b689761af",
+    "label": "trust-boundaries",
+    "retained_log": "trust-boundaries.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/check-trust-boundaries.test.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 436.24,
+    "log_sha256": "0947bdd5baf66d0c32aea3a1b53f93e171e4e2a731529c504955ef9a0c871ddd",
+    "label": "trust-gate-negative",
+    "retained_log": "trust-gate-negative.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "/home/connor/chio-security-target-6d-final/debug/xtask",
+      "codegen",
+      "rust",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 8.52,
+    "log_sha256": "7a8a2e5de22efd3b457248e151db348add3a21c8194d92b0c219655d1ea7c908",
+    "label": "wire-codegen-final",
+    "retained_log": "wire-codegen-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-wire-schemas.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 12.36,
+    "log_sha256": "63bbfb9e6a73ca08df3f882d08d05905c7b0f9af3689e49ea85b1f7a016bfb2c",
+    "label": "wire-identifiers-final",
+    "retained_log": "wire-identifiers-final.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-wire-schemas.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 9.2,
+    "log_sha256": "63bbfb9e6a73ca08df3f882d08d05905c7b0f9af3689e49ea85b1f7a016bfb2c",
+    "label": "wire-identifiers",
+    "retained_log": "wire-identifiers.log.gz",
+    "test_results": []
+  },
+  {
+    "command": [
+      "cargo",
+      "xtask",
+      "codegen",
+      "rust"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 44.18,
+    "log_sha256": "0dce12e2236a67404ced6e449a64c7d3192df49456a8623cfdfbedbd73ff1c0f",
+    "label": "wire-regeneration",
+    "retained_log": "wire-regeneration.log.gz",
+    "test_results": []
+  }
+]

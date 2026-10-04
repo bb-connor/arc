@@ -37,7 +37,14 @@ def _load_cache() -> list[dict[str, Any]]:
     if not path.exists():
         return []
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        from chio_hermes.approval_inputs import _unique_object
+
+        limit = 1024 * 1024
+        with path.open("rb") as stream:
+            raw = stream.read(limit + 1)
+        if len(raw) > limit:
+            raise ValueError("capability cache exceeds 1 MiB")
+        data = json.loads(raw, object_pairs_hook=_unique_object)
     except Exception as exc:  # noqa: BLE001
         print(
             f"[chio-hermes] failed to read capability cache: {exc}",
@@ -50,16 +57,13 @@ def _load_cache() -> list[dict[str, Any]]:
 
 
 def _save_cache(entries: list[dict[str, Any]]) -> None:
-    # Capability ids are bearer credentials; write tempfile + chmod 0600
+    # The cache retains signed credentials; write tempfile + chmod 0600
     # + os.replace so a concurrent issue (race F15) cannot leave a torn
     # or world-readable file. Parent forced to 0700 on creation.
     path = _cache_path()
     parent = path.parent
     parent.mkdir(parents=True, exist_ok=True)
-    try:
-        os.chmod(parent, 0o700)
-    except OSError:
-        pass
+    os.chmod(parent, 0o700)
     serialised = json.dumps(entries, sort_keys=True, indent=2) + "\n"
     fd, tmp_name = tempfile.mkstemp(
         prefix=".chio-cap-",
@@ -70,10 +74,7 @@ def _save_cache(entries: list[dict[str, Any]]) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(serialised)
-        try:
-            os.chmod(tmp_path, 0o600)
-        except OSError:
-            pass
+        os.chmod(tmp_path, 0o600)
         os.replace(tmp_path, path)
     except Exception:
         try:
@@ -81,11 +82,6 @@ def _save_cache(entries: list[dict[str, Any]]) -> None:
         except OSError:
             pass
         raise
-    # Re-chmod in case os.replace crossed a filesystem boundary.
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
 
 
 def setup(parser: argparse.ArgumentParser) -> None:
@@ -164,9 +160,13 @@ def setup(parser: argparse.ArgumentParser) -> None:
     )
     respond = approvals_sub.add_parser(
         "respond",
-        help="Approve or deny a pending approval (operator-respond shortcut).",
+        help="Submit an externally signed approval decision.",
     )
     respond.add_argument("approval_id", help="Approval id to resolve.")
+    respond.add_argument(
+        "--signed-token-file", required=True,
+        help="JSON decision token signed by a configured approver over the pending intent.",
+    )
     verdict_group = respond.add_mutually_exclusive_group(required=True)
     verdict_group.add_argument(
         "--approve",
@@ -226,6 +226,9 @@ def _do_issue(args: argparse.Namespace) -> int:
 
     async def _run() -> Any:
         client_kwargs: dict[str, Any] = {"timeout": args.timeout}
+        control_token = os.environ.get("CHIO_SIDECAR_CONTROL_TOKEN")
+        if control_token:
+            client_kwargs["control_token"] = control_token
         if sidecar_url:
             client_kwargs["base_url"] = sidecar_url
         client = ChioClient(**client_kwargs)
@@ -262,13 +265,16 @@ def _do_issue(args: argparse.Namespace) -> int:
         "expires_at": expires_at,
         "revoked": False,
     }
+    signed_capability = token.model_dump(mode="json") if hasattr(token, "model_dump") else token
+    if isinstance(signed_capability, dict) and signed_capability.get("signature"):
+        entry["signed_capability"] = signed_capability
 
     cache = _load_cache()
     cache.append(entry)
     _save_cache(cache)
 
     if args.json:
-        print(json.dumps(entry, sort_keys=True, indent=2))
+        print(json.dumps(_public_cache_entry(entry), sort_keys=True, indent=2))
     else:
         print(f"capability issued: {cap_id}")
         print(f"  subject:       {args.subject}")
@@ -281,12 +287,16 @@ def _do_issue(args: argparse.Namespace) -> int:
     return 0
 
 
+def _public_cache_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in entry.items() if key != "signed_capability"}
+
+
 def _do_list(args: argparse.Namespace) -> int:
     cache = _load_cache()
     if args.active_only:
         cache = [entry for entry in cache if not entry.get("revoked")]
     if args.json:
-        print(json.dumps(cache, sort_keys=True, indent=2))
+        print(json.dumps([_public_cache_entry(entry) for entry in cache], sort_keys=True, indent=2))
         return 0
     if not cache:
         print("no cached capabilities found")
@@ -371,6 +381,9 @@ def _approvals_client(args: argparse.Namespace) -> Any:
 
     sidecar_url = args.sidecar_url or os.environ.get("CHIO_SIDECAR_URL")
     client_kwargs: dict[str, Any] = {"timeout": args.timeout}
+    control_token = os.environ.get("CHIO_SIDECAR_CONTROL_TOKEN")
+    if control_token:
+        client_kwargs["control_token"] = control_token
     if sidecar_url:
         client_kwargs["base_url"] = sidecar_url
     return ChioClient(**client_kwargs)
@@ -426,6 +439,13 @@ def _do_approvals_list(args: argparse.Namespace) -> int:
 
 def _do_approvals_respond(args: argparse.Namespace) -> int:
     try:
+        from chio_hermes.approval_inputs import read_signed_token
+
+        token = read_signed_token(args.signed_token_file)
+    except (AttributeError, OSError, ValueError) as exc:
+        print(f"error: externally signed decision token required: {exc}", file=sys.stderr)
+        return 2
+    try:
         client = _approvals_client(args)
     except Exception as exc:  # noqa: BLE001
         print(f"error: chio-sdk-python is not importable: {exc}", file=sys.stderr)
@@ -434,7 +454,7 @@ def _do_approvals_respond(args: argparse.Namespace) -> int:
     async def _run() -> Any:
         try:
             return await client.respond_approval(
-                args.approval_id, args.verdict, args.reason
+                args.approval_id, args.verdict, args.reason, signed_token=token
             )
         finally:
             try:
@@ -464,7 +484,7 @@ def _do_approvals_respond(args: argparse.Namespace) -> int:
     if args.reason:
         print(f"  reason: {args.reason}")
     print(
-        "Retry the original tool call to proceed (auto-resume is v0.3 work)."
+        "Hermes execution resume is unavailable; use the configured durable caller protocol."
     )
     return 0
 

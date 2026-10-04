@@ -13,14 +13,12 @@ use axum::routing::{any, get, post};
 use axum::Json;
 use axum::Router;
 use chio_http_serve::{CappedPeerAddr, MaxConnListener};
-use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use chio_core_types::capability::{
-    governance::{GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody},
+    governance::GovernedApprovalToken,
     scope::{ChioScope, Operation, PromptGrant, ResourceGrant, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
@@ -50,7 +48,11 @@ use chio_store_sqlite::SqliteApprovalStore;
 
 use crate::error::ProtectError;
 use crate::evaluator::{DurableAdmissionStores, RequestEvaluator, RouteEntry};
-use crate::spec_discovery::{default_upstream_egress_contract, discover_spec, load_spec_from_file};
+use crate::spec_discovery::default_upstream_egress_contract;
+
+#[path = "proxy/approval_authority.rs"]
+mod approval_authority;
+pub use approval_authority::ProtectApprovalConfig;
 
 #[path = "proxy/approval.rs"]
 mod approval;
@@ -64,6 +66,12 @@ mod config;
 mod control;
 #[path = "proxy/decision.rs"]
 mod decision;
+#[path = "proxy/evidence.rs"]
+mod evidence;
+mod retention;
+use evidence::SqliteReceiptStore;
+pub use retention::ProtectRetentionConfig;
+
 #[path = "proxy/errors.rs"]
 mod errors;
 #[path = "proxy/http.rs"]
@@ -82,6 +90,8 @@ mod router;
 mod scope_subset;
 #[path = "proxy/sidecar.rs"]
 mod sidecar;
+#[path = "proxy/spec_authority.rs"]
+mod spec_authority;
 #[path = "proxy/state.rs"]
 mod state;
 use request_ids::*;

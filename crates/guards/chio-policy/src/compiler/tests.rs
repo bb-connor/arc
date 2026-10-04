@@ -987,3 +987,127 @@ fn jailbreak_oversize_threshold_clamped() {
     let cfg = jailbreak_config_from(&jb).unwrap();
     assert!(cfg.threshold <= 1.0 + f32::EPSILON);
 }
+
+#[test]
+fn ap23_unsupported_approval_policy_fields_fail_loading() {
+    for field in [
+        "approve_above_currency: USD",
+        "timeout_seconds: 300",
+        "on_timeout: deny",
+    ] {
+        let yaml = format!("hushspec: '0.1.0'\nrules:\n  human_in_loop:\n    require_confirmation: [shell.*]\n    {field}\n");
+        let error = match HushSpec::parse(&yaml) {
+            Ok(_) => panic!("unenforced field loaded: {field}"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported approval policy field: no execution enforcement"),
+            "{error}"
+        );
+    }
+    let yaml = "hushspec: '0.1.0'\nextensions:\n  chio:\n    human_in_loop:\n      approve_when: [high_risk]\n";
+    let error = match HushSpec::parse(yaml) {
+        Ok(_) => panic!("unenforced approve_when loaded"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("unsupported approval policy field: no execution enforcement"),
+        "{error}"
+    );
+}
+
+#[test]
+fn ap23_dual_approval_policy_is_rejected_at_loading() {
+    let yaml = "hushspec: '0.1.0'\nrules:\n  human_in_loop:\n    require_dual_approval: true\n";
+    let error = match HushSpec::parse(yaml) {
+        Ok(_) => panic!("unsupported dual approval policy loaded"),
+        Err(error) => error,
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("unknown field `require_dual_approval`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn inbound_authority_dpop_requirement_survives_scope_compilation() {
+    for policy in [
+        "default: block\n    allow: ['read_file']",
+        "default: allow",
+        "default: allow\n    max_args_size: 1024",
+    ] {
+        let spec = HushSpec::parse(&format!(
+            "hushspec: '0.1.0'\nrules:\n  tool_access:\n    dpop_required: true\n    {policy}\n"
+        ))
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        assert_eq!(compiled.default_scope.grants[0].dpop_required, Some(true));
+        let serialized = serde_json::to_value(&spec).unwrap();
+        assert_eq!(serialized["rules"]["tool_access"]["dpop_required"], true);
+    }
+}
+
+#[test]
+fn inbound_authority_policy_inheritance_keeps_proof_requirement() {
+    let base =
+        HushSpec::parse("hushspec: '0.1.0'\nrules:\n  tool_access:\n    dpop_required: true\n")
+            .unwrap();
+    let child = HushSpec::parse(
+        "hushspec: '0.1.0'\nrules:\n  tool_access:\n    allow: [read]\n    default: block\n",
+    )
+    .unwrap();
+    let merged = crate::merge::merge(&base, &child);
+    let compiled = compile_policy(&merged).unwrap();
+    assert_eq!(compiled.default_scope.grants.len(), 1);
+    assert_eq!(compiled.default_scope.grants[0].dpop_required, Some(true));
+    assert!(compiled
+        .guard_names
+        .iter()
+        .any(|name| name == "sender-proof"));
+    let action = crate::evaluate::EvaluationAction {
+        action_type: "tool_call".into(),
+        target: Some("read".into()),
+        ..Default::default()
+    };
+    assert_eq!(
+        crate::evaluate::evaluate(&merged, &action).decision,
+        crate::evaluate::Decision::Deny
+    );
+}
+
+#[test]
+fn inbound_authority_operator_proof_policy_refuses_external_bearer_grants() {
+    use chio_kernel::Guard;
+    let key = chio_core::crypto::Keypair::generate();
+    let scope:chio_core::capability::scope::ChioScope=serde_json::from_value(serde_json::json!({"grants":[{"server_id":"srv","tool_name":"read","operations":["invoke"]}]})).unwrap();
+    let capability = chio_core::capability::token::CapabilityToken::sign(
+        chio_core::capability::token::CapabilityTokenBody {
+            id: "external-bearer".into(),
+            issuer: key.public_key(),
+            subject: key.public_key(),
+            scope: scope.clone(),
+            issued_at: 10,
+            expires_at: 100,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &key,
+    )
+    .unwrap();
+    let request: chio_kernel::ToolCallRequest = serde_json::from_value(
+        serde_json::json!({"request_id":"policy-proof","capability":capability,
+        "tool_name":"read","server_id":"srv","agent_id":key.public_key().to_hex(),"arguments":{}}),
+    )
+    .unwrap();
+    let decision = super::sender_proof::SenderProofGuard
+        .evaluate(&chio_kernel::GuardContext::new(&request, &scope))
+        .unwrap();
+    assert_eq!(decision.verdict, chio_kernel::Verdict::Deny);
+}

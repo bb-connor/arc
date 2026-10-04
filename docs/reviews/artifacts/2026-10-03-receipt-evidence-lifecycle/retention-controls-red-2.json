@@ -1,0 +1,24 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "-p",
+    "chio-api-protect",
+    "-p",
+    "chio-http-core",
+    "-p",
+    "chio-store-sqlite",
+    "-p",
+    "chio-cli",
+    "--lib",
+    "--bins",
+    "--locked",
+    "--no-fail-fast",
+    "retention_",
+    "--",
+    "--test-threads=2"
+  ],
+  "exit_code": 101,
+  "elapsed_seconds": 239.93,
+  "log_sha256": "be7632803dd6cc8357be50c5757ff401c6312e213ff210eb53f57b74bc0b05d6"
+}

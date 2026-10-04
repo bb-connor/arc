@@ -28,9 +28,17 @@ fn load_enterprise_provider_registry(
     Ok(Some(Arc::new(registry)))
 }
 
-async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError> {
-    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {
+    let transport = chio_control_plane::server_transport::prepare(&config.transport, config.listen)?;
+    let tls = transport.is_tls();
+    if let Some(proxy) = &config.trusted_proxy {
+        proxy.validate_separation(&config)?;
+    }
+    let listener = transport.bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
+    if tls && config.public_base_url.is_none() {
+        config.public_base_url = Some(format!("https://{local_addr}"));
+    }
     let enterprise_provider_registry = load_enterprise_provider_registry(
         config.enterprise_providers_file.as_deref(),
         "remote_mcp",
@@ -136,14 +144,19 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         )
         .route(LOCAL_TOKEN_PATH, post(handle_token_endpoint))
         .route(LOCAL_JWKS_PATH, get(handle_local_jwks))
-        .with_state(state);
+        .with_state(state)
+        .layer(axum::middleware::from_fn_with_state(
+            config.trusted_proxy.clone(),
+            transport_identity::authenticate_proxy,
+        ));
 
     info!(
         listen_addr = %local_addr,
         endpoint = %MCP_ENDPOINT_PATH,
         "serving remote MCP edge"
     );
-    eprintln!("remote MCP edge listening on http://{local_addr}{MCP_ENDPOINT_PATH}");
+    let scheme = if tls { "https" } else { "http" };
+    eprintln!("remote MCP edge listening on {scheme}://{local_addr}{MCP_ENDPOINT_PATH}");
 
     // The generic per-request timeout is left off here. The edge's GET and POST
     // routes return Server-Sent Event streams that stay open indefinitely while a
@@ -254,7 +267,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     let (request_auth_context, session_credential) =
         match remote_mcp_session_credentials::authenticate_request(
             &state,
-            request.headers(),
+            SenderRequest::from_request(&request),
             "POST",
             &expected_target,
         )
@@ -270,19 +283,21 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         return response;
     }
 
+    let transport = request.extensions().get::<TransportIdentity>().cloned();
     let (headers, body) = match read_limited_mcp_post_body(request).await {
         Ok(body) => body,
         Err(response) => return response,
     };
-    let message: Value = match input::document(&body, MCP_MAX_POST_BODY_BYTES) {
-        Ok(message) => message,
-        Err(error) => {
-            return input::with_source(
-                jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
-                error,
-            );
-        }
-    };
+    let message: Value =
+        match chio_mcp_adapter::edge::decode_mcp_request(&body, MCP_MAX_POST_BODY_BYTES) {
+            Ok(message) => message,
+            Err(error) => {
+                return input::with_source(
+                    jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
+                    error,
+                );
+            }
+        };
 
     if let Some(credential) = session_credential.as_ref() {
         if let Err(response) = credential.validate_message(&message) {
@@ -351,7 +366,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             // response stream. It grants no access to unrelated session events.
             if let Err(response) = remote_mcp_session_credentials::authenticate_request(
                 &state,
-                &headers,
+                SenderRequest::from_extension(&headers, transport.as_ref()),
                 "POST",
                 &expected_target,
             )
@@ -360,7 +375,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 return response;
             }
             if let Err(error) = session.send(message) {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return remote_session_send_error(error);
             }
             return response_with_mode(
                 StatusCode::ACCEPTED.into_response(),
@@ -370,7 +385,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         let mut event_rx = session.subscribe();
         let stream_lock = session.active_request_stream.clone().try_lock_owned().ok();
         if let Err(error) = session.send(message) {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return remote_session_send_error(error);
         }
         let Some(stream_lock) = stream_lock else {
             return response_with_mode(
@@ -413,7 +428,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     if session_credential.is_some() {
         if let Err(response) = remote_mcp_session_credentials::authenticate_request(
             &state,
-            &headers,
+            SenderRequest::from_extension(&headers, transport.as_ref()),
             "POST",
             &expected_target,
         )
@@ -449,7 +464,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     };
     if let Err(error) = session.send(message) {
         drop(stream_lock);
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        return remote_session_send_error(error);
     }
 
     let session_for_stream = session.clone();
@@ -550,7 +565,7 @@ async fn handle_initialize_post(
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send(message) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        return remote_session_send_error(error);
     }
 
     let mut buffered_events = Vec::new();
@@ -719,7 +734,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         .to_string();
     let request_auth_context = match remote_mcp_session_credentials::authenticate_request(
         &state,
-        request.headers(),
+        SenderRequest::from_request(&request),
         "GET",
         &expected_target,
     )
@@ -926,6 +941,7 @@ async fn handle_authorization_approval(
 async fn handle_token_endpoint(
     State(state): State<RemoteAppState>,
     headers: HeaderMap,
+    transport: Option<axum::Extension<TransportIdentity>>,
     Form(form): Form<TokenRequestForm>,
 ) -> Response {
     let Some(auth_server) = state.local_auth_server.as_deref() else {
@@ -934,7 +950,10 @@ async fn handle_token_endpoint(
             "local authorization server is not configured for this edge",
         );
     };
-    match auth_server.exchange_token(&headers, form) {
+    match auth_server.exchange_token(
+        SenderRequest::from_extension(&headers, transport.as_ref().map(|identity| &identity.0)),
+        form,
+    ) {
         Ok(token_response) => Json(token_response).into_response(),
         Err(response) => response,
     }
@@ -962,7 +981,7 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
         .to_string();
     let request_auth_context = match remote_mcp_session_credentials::authenticate_request(
         &state,
-        request.headers(),
+        SenderRequest::from_request(&request),
         "DELETE",
         &expected_target,
     )
@@ -1324,5 +1343,14 @@ mod http_service_tests {
         assert!(!null_declaration.supports_elicitation);
         assert!(!null_declaration.elicitation_form);
         assert!(!null_declaration.elicitation_url);
+    }
+}
+
+fn remote_session_send_error(error: CliError) -> Response {
+    match error {
+        CliError::Kernel(chio_kernel::KernelError::GovernedTransactionDenied(message)) => {
+            jsonrpc_http_error(StatusCode::FORBIDDEN, -32003, &message)
+        }
+        other => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &other.to_string()),
     }
 }

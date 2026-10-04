@@ -47,6 +47,7 @@ impl Fixture {
             session_id,
             agent_id,
             message: AgentMessage::ToolCallRequest {
+                dpop_proof: None,
                 id: "failure-receipt-request".into(),
                 capability_token: Box::new(capability),
                 server_id: "failure-server".into(),

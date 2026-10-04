@@ -211,6 +211,24 @@ mod cli_env_tests {
             .unwrap_or_else(|_| panic!("parse thread must not panic"))
     }
 
+    #[test]
+    fn receipt_retention_cli_accepts_explicit_policy_on_both_launchers() {
+        for prefix in [vec!["chio", "start"], vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"]] {
+            let mut argv = prefix;
+            argv.extend(["--receipt-retention-days", "7", "--receipt-archive", "/tmp/receipts-archive.db", "--receipt-retention-interval-secs", "60"]);
+            assert!(parse_cli(argv).is_ok(), "explicit retention arguments must parse");
+        }
+    }
+
+    #[test]
+    fn receipt_retention_cli_rejects_partial_and_zero_policy() {
+        for args in [vec!["--receipt-retention-days", "7"], vec!["--receipt-archive", "/tmp/a"], vec!["--receipt-retention-interval-secs", "60"], vec!["--receipt-retention-days", "0", "--receipt-archive", "/tmp/a", "--receipt-retention-interval-secs", "60"]] {
+            let mut argv = vec!["chio", "start"];
+            argv.extend(args);
+            assert!(parse_cli(argv).is_err());
+        }
+    }
+
     fn env_lock() -> MutexGuard<'static, ()> {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| Mutex::new(()))
@@ -497,6 +515,10 @@ pub(crate) enum Commands {
     },
     /// Spawn an agent subprocess and enforce policy via the kernel.
     Run {
+        /// Public key held by the agent. Required when policy requires invocation proofs.
+        #[arg(long)]
+        agent_public_key: Option<String>,
+
         /// Path to the policy YAML file.
         #[arg(long)]
         policy: PathBuf,
@@ -805,6 +827,8 @@ pub(crate) enum Commands {
     /// deployments that need `--upstream`, `--spec`, and persistent
     /// stores.
     Start {
+        #[command(flatten)]
+        transport: ServerTransportArgs,
         /// Address to listen on. Defaults to `127.0.0.1:9090` to
         /// match `chio-sdk-python`'s `ChioClient.DEFAULT_BASE_URL`.
         /// Pass `127.0.0.1:0` to bind an ephemeral port; the bound
@@ -815,6 +839,8 @@ pub(crate) enum Commands {
         /// Optional SQLite receipt store path for a durable audit log.
         #[arg(long = "receipt-store")]
         receipt_store: Option<PathBuf>,
+        #[command(flatten)]
+        receipt_retention: ReceiptRetentionArgs,
 
         /// Permit in-memory receipts, whose audit evidence is lost on every
         /// restart. Required to boot without `--receipt-store`. For local
@@ -1082,4 +1108,23 @@ pub(crate) enum CertCommands {
         #[arg(long)]
         certificate: PathBuf,
     },
+}
+
+#[derive(clap::Args)]
+pub(crate) struct ServerTransportArgs {
+    /// PEM certificate chain for the public TLS listener.
+    #[arg(long, requires = "tls_key", conflicts_with = "allow_plaintext")]
+    tls_cert: Option<PathBuf>,
+    /// Existing owner-only PEM private key matching the certificate.
+    #[arg(long, requires = "tls_cert", conflicts_with = "allow_plaintext")]
+    tls_key: Option<PathBuf>,
+    /// Explicitly permit plaintext outside loopback, for a protected proxy network.
+    #[arg(long)]
+    allow_plaintext: bool,
+}
+
+impl From<ServerTransportArgs> for chio_http_serve::ServerTransportConfig {
+    fn from(args: ServerTransportArgs) -> Self {
+        Self { tls_cert: args.tls_cert, tls_key: args.tls_key, allow_plaintext: args.allow_plaintext }
+    }
 }

@@ -267,6 +267,7 @@ fn nested_child_before_url_elicitation_is_terminal_and_consumes_nonce(
         &agent_keypair.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
@@ -368,6 +369,7 @@ fn nested_notification_before_url_elicitation_is_terminal_without_child_receipt(
         &agent_keypair.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: request.server_id,
         tool_name: request.tool_name,
@@ -439,6 +441,7 @@ fn nested_url_elicitation_surfaces_cancellation_receipt_failure(
         &agent_keypair.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: request.server_id,
         tool_name: request.tool_name,
@@ -587,6 +590,7 @@ fn nested_flow_revalidates_after_credential_reservation() -> Result<(), Box<dyn 
         &agent_keypair.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

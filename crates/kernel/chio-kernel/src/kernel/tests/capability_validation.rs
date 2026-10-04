@@ -1,4 +1,41 @@
 use super::*;
+
+#[test]
+fn kg2_receipt_key_cannot_issue_after_distinct_authority_configuration(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_config());
+    let effects = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(SideEffectServer::new(
+        "srv-a",
+        vec!["read_file"],
+        effects.clone(),
+    )));
+    let subject = make_keypair();
+    let capability = make_capability(
+        &kernel,
+        &subject,
+        make_scope(vec![make_grant("srv-a", "read_file")]),
+        300,
+    );
+    kernel.set_capability_authority(Box::new(LocalCapabilityAuthority::new(make_keypair())));
+    let response = kernel.evaluate_tool_call_blocking(&make_request(
+        "receipt-key-is-not-issuer",
+        &capability,
+        "read_file",
+        "srv-a",
+    ))?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.output.is_none());
+    assert_eq!(effects.load(Ordering::SeqCst), 0);
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("not found among trusted")
+            || reason.contains("not a trusted CA")));
+    assert!(response.receipt.verify_signature()?);
+    Ok(())
+}
+
 #[test]
 fn kernel_rejects_classical_capability_under_pq_required_floor() {
     let keypair = make_keypair();
@@ -738,7 +775,7 @@ fn kernel_reports_capability_issuer_trust() {
     )));
 
     assert!(kernel.capability_issuer_is_trusted(&authority_keypair.public_key()));
-    assert!(kernel.capability_issuer_is_trusted(&kernel.public_key()));
+    assert!(!kernel.capability_issuer_is_trusted(&kernel.public_key()));
     assert!(!kernel.capability_issuer_is_trusted(&untrusted_keypair.public_key()));
 }
 

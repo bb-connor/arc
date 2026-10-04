@@ -654,7 +654,7 @@ pub use weights_binding::{evaluate_weights_binding, WeightsBindingError, Weights
 mod kernel;
 
 #[cfg(not(loom))]
-pub(crate) use kernel::{read_unix_timestamp, MatchingGrant, ReceiptContent};
+pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 
 #[cfg(not(loom))]
 pub use kernel::{

@@ -139,6 +139,10 @@ type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
 pub struct RemoteServeHttpConfig {
     pub clock: RemoteClock,
     pub listen: SocketAddr,
+    /// Listener confidentiality and explicit plaintext policy.
+    pub transport: chio_http_serve::ServerTransportConfig,
+    /// Explicit authenticated proxy trust for TLS and attestation binding evidence.
+    pub trusted_proxy: Option<TrustedProxyConfig>,
     pub auth_token: Option<String>,
     pub auth_jwt_public_key: Option<String>,
     pub auth_jwt_discovery_url: Option<String>,
@@ -152,6 +156,8 @@ pub struct RemoteServeHttpConfig {
     pub auth_jwt_issuer: Option<String>,
     pub auth_jwt_audience: Option<String>,
     pub admin_token: Option<String>,
+    /// Explicit operator principals and activated native approval replay custody.
+    pub approval: Option<RemoteApprovalConfig>,
     pub control_url: Option<String>,
     pub control_token: Option<String>,
     /// Dedicated trust-control bearer used only for remote capability issuance.
@@ -624,6 +630,7 @@ struct RemoteSession {
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
+    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: AtomicU64,
@@ -664,6 +671,7 @@ struct RemoteSessionInit {
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
+    approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
     resume_hmac_keyring: Option<Arc<RemoteSessionHmacKeyring>>,
     resume_generation: u64,
@@ -825,7 +833,10 @@ struct AuthorizationCodeGrant {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(
+    rename_all = "camelCase",
+    try_from = "sender_constraint::ConfirmationWire"
+)]
 struct ChioSenderConstraintClaims {
     #[serde(
         default,
@@ -914,7 +925,10 @@ struct JwtClaims {
     authorization_details: Option<Value>,
     #[serde(default)]
     chio_transaction_context: Option<Value>,
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "sender_constraint::deserialize_confirmation"
+    )]
     cnf: Option<ChioSenderConstraintClaims>,
     #[serde(default)]
     exp: Option<u64>,

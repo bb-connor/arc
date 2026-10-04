@@ -20,6 +20,9 @@ use chio_kernel::{
 
 use chio_test_support::prelude::*;
 
+#[path = "tests/package_trust.rs"]
+mod package_trust;
+
 fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
     match err {
         CliError::Chio(chio) => {
@@ -69,7 +72,10 @@ fn output_path_nonempty_directory_uses_cli_domain() {
 }
 
 fn sample_receipt() -> ChioReceipt {
-    let keypair = Keypair::generate();
+    sample_receipt_with_key(&Keypair::generate())
+}
+
+fn sample_receipt_with_key(keypair: &Keypair) -> ChioReceipt {
     ChioReceipt::sign(
         ChioReceiptBody {
             id: "receipt-export-1".to_string(),
@@ -95,7 +101,7 @@ fn sample_receipt() -> ChioReceipt {
             kernel_key: keypair.public_key(),
             bbs_projection_version: None,
         },
-        &keypair,
+        keypair,
     )
     .test_unwrap()
 }
@@ -164,10 +170,18 @@ fn sample_hybrid_child_receipt() -> ChildRequestReceipt {
     .test_unwrap()
 }
 
+fn package_keypair() -> Keypair {
+    Keypair::from_seed(&[72; 32])
+}
+
+fn package_policy() -> EvidenceVerificationPolicy {
+    EvidenceVerificationPolicy::new(vec![package_keypair().public_key()], None).test_unwrap()
+}
+
 fn sample_bundle() -> EvidenceExportBundle {
-    let receipt = sample_receipt();
+    let checkpoint_keypair = package_keypair();
+    let receipt = sample_receipt_with_key(&checkpoint_keypair);
     let canonical = canonical_json_bytes(&receipt).test_unwrap();
-    let checkpoint_keypair = Keypair::generate();
     let checkpoint = build_checkpoint(
         1,
         1,
@@ -557,13 +571,15 @@ fn signed_federation_policy_rejects_unbound_read_boundary() {
 fn import_package_requires_explicit_read_boundary() {
     let bundle = sample_bundle();
     let manifest = manifest_for_bundle(&bundle);
+    let envelope = envelope::sign(&manifest, &bundle, None, None, &package_keypair()).test_unwrap();
     let package = EvidenceImportPackage {
         manifest,
         bundle,
         transparency: None,
         federation_policy: None,
+        envelope,
     };
-    let error = validate_import_package_data(&package).test_unwrap_err();
+    let error = validate_import_package_data(&package, &package_policy()).test_unwrap_err();
 
     assert!(error.to_string().contains("read boundary"));
 }
@@ -681,7 +697,7 @@ fn transparency_claim_boundary_validation_uses_attest_domain() {
 }
 
 #[test]
-fn anchored_transparency_claims_verify_when_publications_carry_valid_bindings() {
+fn self_declared_anchor_does_not_qualify_manifest_claims() {
     let bundle = sample_bundle();
     let checkpoint = bundle.checkpoints.first().cloned().test_unwrap();
     let mut transparency =
@@ -714,8 +730,9 @@ fn anchored_transparency_claims_verify_when_publications_carry_valid_bindings() 
         &transparency.equivocations,
     )
     .test_unwrap();
-    verify_transparency_claim_boundary(Some(&anchored_claims), &bundle, &transparency)
-        .test_unwrap();
+    let error = verify_transparency_claim_boundary(Some(&anchored_claims), &bundle, &transparency)
+        .test_unwrap_err();
+    assert!(error.to_string().contains("claim boundary"));
 }
 
 #[test]

@@ -3,10 +3,9 @@ mod authority;
 mod reputation;
 mod scope;
 mod types;
-mod util;
 
-pub use self::authority::wrap_capability_authority;
 pub(crate) use self::authority::wrap_capability_authority_with_deferred_lineage;
+pub use self::authority::{wrap_capability_authority, wrap_capability_authority_with_clock};
 pub use self::reputation::{
     build_local_reputation_corpus, build_local_reputation_corpus_with_read_context,
 };
@@ -22,7 +21,7 @@ pub(crate) use self::reputation::{
 #[cfg(test)]
 use self::attestation::verify_runtime_attestation_for_issuance;
 #[cfg(test)]
-use self::util::unix_now;
+use chio_test_support::clock::unix_seconds as unix_now;
 
 #[cfg(test)]
 mod tests;

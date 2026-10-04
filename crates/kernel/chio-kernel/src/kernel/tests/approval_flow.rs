@@ -175,7 +175,10 @@ pub(super) fn hitl_sign_token(
 fn bound_tool_invocation_fixture() -> (ChioKernel, ToolGrant, ToolCallRequest, u64) {
     let config = make_config();
     let approver = config.keypair.clone();
-    let kernel = make_kernel(config);
+    let mut kernel = make_kernel(config);
+    assert!(kernel
+        .set_governed_approval_policy("test-tenant".into(), vec![approver.public_key()])
+        .is_ok());
     let subject = CoreKeypair::generate();
     let mut grant = make_grant("srv-a", "read_file");
     grant
@@ -201,6 +204,15 @@ fn bound_tool_invocation_fixture() -> (ChioKernel, ToolGrant, ToolCallRequest, u
         capability_id: capability.id.clone(),
         parameters_hash: chio_core::sha256(&canonical_json_bytes(&request.arguments).unwrap()),
     };
+    assert!(crate::approval::ToolApprovalContext::bind(
+        &mut intent,
+        &capability,
+        &request.arguments,
+        &request.request_id,
+        &kernel.config.policy_hash,
+        "test-tenant"
+    )
+    .is_ok());
     request.approval_token = Some(make_governed_approval_token(
         &approver,
         &capability.subject,
@@ -212,8 +224,15 @@ fn bound_tool_invocation_fixture() -> (ChioKernel, ToolGrant, ToolCallRequest, u
 }
 
 #[test]
-fn bound_tool_invocation_accepts_approved_canonical_arguments() {
+fn bound_tool_invocation_accepts_approved_canonical_arguments(
+) -> Result<(), Box<dyn std::error::Error>> {
     let (kernel, grant, mut request, now) = bound_tool_invocation_fixture();
+    let bound = kernel.bind_tool_approval_intent(&request)?;
+    let serialized = serde_json::to_value(&bound)?;
+    assert_eq!(
+        serialized["context"]["chio_tool_approval"]["schema"],
+        "chio.tool-approval-context.v1"
+    );
     // Object member order does not change the RFC 8785 parameter binding.
     request.arguments =
         serde_json::from_str(r#"{"options":{"limit":10},"path":"/workspace/approved.txt"}"#)
@@ -234,6 +253,7 @@ fn bound_tool_invocation_accepts_approved_canonical_arguments() {
         .validate_governed_approval_for_dispatch_non_consuming(&request, &request.capability, now,)
         .unwrap()
         .is_some());
+    Ok(())
 }
 
 #[test]
@@ -376,7 +396,8 @@ fn bound_tool_invocation_rejects_mutation_before_approval_checks() {
 }
 
 #[test]
-fn threshold_approval_set_is_policy_bound_and_order_independent() {
+fn threshold_approval_set_is_policy_bound_and_order_independent(
+) -> Result<(), Box<dyn std::error::Error>> {
     let policy_hash = sha256_hex(b"threshold-policy");
     let policy_authority = CoreKeypair::generate();
     let approver_a = CoreKeypair::generate();
@@ -430,7 +451,12 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         call_chain: None,
         autonomy: None,
         context: None,
-        body: Default::default(),
+        body: GovernedTransactionIntentBody::BoundToolInvocation {
+            capability_id: cap.id.clone(),
+            parameters_hash: chio_core::sha256(&canonical_json_bytes(
+                &serde_json::json!({"path": "/app/src/main.rs"}),
+            )?),
+        },
     };
     let intent_hash = intent.binding_hash().unwrap();
     let now = current_unix_timestamp();
@@ -534,6 +560,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent() {
         .validate_threshold_approval_set(&extended, &cap, &intent_hash, now)
         .unwrap_err();
     assert!(error.to_string().contains("active policy"));
+    Ok(())
 }
 
 #[test]
@@ -1316,5 +1343,86 @@ fn governed_approval_token_binds_every_authorization_field_and_time_window(
         "unexpected expiry result: {expired:?}"
     );
 
+    Ok(())
+}
+
+#[test]
+fn ap23_unbound_tool_approval_denies_before_dispatch() -> Result<(), Box<dyn std::error::Error>> {
+    let (mut kernel, _, mut request, _) = bound_tool_invocation_fixture();
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(
+        super::dispatch_credentials::CountingDispatchServer {
+            id: request.server_id.clone(),
+            tool: request.tool_name.clone(),
+            invocations: invocations.clone(),
+        },
+    ));
+    let intent = request
+        .governed_intent
+        .as_mut()
+        .ok_or("missing fixture intent")?;
+    intent.body = GovernedTransactionIntentBody::ToolInvocation;
+    request.approval_token = Some(make_governed_approval_token(
+        &kernel.config.keypair,
+        &request.capability.subject,
+        intent,
+        &request.request_id,
+    ));
+    let result = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(result.verdict, Verdict::Deny);
+    assert!(
+        result
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("bound tool invocation is required")),
+        "{:?}",
+        result.reason
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn ap23_receipt_signer_has_no_implicit_approval_authority() -> Result<(), Box<dyn std::error::Error>>
+{
+    let (mut kernel, _, request, _) = bound_tool_invocation_fixture();
+    let invocations = std::sync::Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(
+        super::dispatch_credentials::CountingDispatchServer {
+            id: request.server_id.clone(),
+            tool: request.tool_name.clone(),
+            invocations: invocations.clone(),
+        },
+    ));
+    kernel.set_governed_approval_policy("test-tenant".into(), Vec::new())?;
+    let result = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(result.verdict, Verdict::Deny);
+    assert!(
+        result
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("approval signer is not in configured roster")),
+        "{:?}",
+        result.reason
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[test]
+fn ap23_roster_rejects_duplicate_and_weak_principals() -> Result<(), Box<dyn std::error::Error>> {
+    let mut kernel = make_kernel(make_config());
+    let key = CoreKeypair::generate().public_key();
+    let duplicate = kernel.set_governed_approval_policy("tenant".into(), vec![key.clone(), key]);
+    assert!(
+        matches!(duplicate, Err(KernelError::GovernedTransactionDenied(ref reason)) if reason == "approval roster contains duplicate principals")
+    );
+    let weak = chio_core::PublicKey::from_hex(
+        "0100000000000000000000000000000000000000000000000000000000000000",
+    )?;
+    let invalid = kernel.set_governed_approval_policy("tenant".into(), vec![weak]);
+    assert!(
+        matches!(invalid, Err(KernelError::GovernedTransactionDenied(ref reason)) if reason == "approval roster contains a weak signing key")
+    );
     Ok(())
 }

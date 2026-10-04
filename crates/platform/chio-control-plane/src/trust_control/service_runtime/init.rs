@@ -55,6 +55,7 @@ async fn serve_async_inner(
     >,
 ) -> Result<(), CliError> {
     config.validate()?;
+    let transport = crate::server_transport::prepare(&config.transport, config.listen)?;
     let authority_keyring_seed_path = config
         .authority_keyring_config_path
         .as_ref()
@@ -125,7 +126,7 @@ async fn serve_async_inner(
         joint_authority_store.as_ref(),
         config.fiscal_runtime.as_ref(),
     )?;
-    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    let listener = transport.bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
     let budget_store = config
         .budget_db_path
@@ -329,8 +330,84 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::time::Duration;
 
+    #[tokio::test]
+    async fn trust_transport_denies_public_plaintext_before_store_creation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("must-not-exist.db");
+        let mut config = test_config(database.clone());
+        config.listen = "0.0.0.0:0".parse()?;
+        let error = super::serve_async(config, None, None, None, None, None, None)
+            .await
+            .err()
+            .ok_or("unsafe listener started")?;
+        assert!(error.to_string().contains("non-loopback"));
+        assert!(!database.exists());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn trust_transport_serves_authenticated_requests_over_tls(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
+        let cert = directory.path().join("cert.pem");
+        let key = directory.path().join("key.pem");
+        std::fs::write(&cert, identity.cert.pem())?;
+        std::fs::write(&key, identity.key_pair.serialize_pem())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
+        }
+        let reservation = std::net::TcpListener::bind("127.0.0.1:0")?;
+        let address = reservation.local_addr()?;
+        drop(reservation);
+        let mut config = test_config(directory.path().join("unused.db"));
+        config.joint_authority_db_path = None;
+        config.revocation_db_path = Some(directory.path().join("revocations.db"));
+        config.listen = address;
+        config.transport = chio_http_serve::ServerTransportConfig {
+            tls_cert: Some(cert),
+            tls_key: Some(key),
+            allow_plaintext: false,
+        };
+        let server = tokio::spawn(super::serve_async(
+            config, None, None, None, None, None, None,
+        ));
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .add_root_certificate(reqwest::Certificate::from_pem(
+                identity.cert.pem().as_bytes(),
+            )?)
+            .build()?;
+        let response = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                if let Ok(response) = client
+                    .get(format!(
+                        "https://localhost:{}{}",
+                        address.port(),
+                        super::REVOCATIONS_PATH
+                    ))
+                    .bearer_auth("service-token")
+                    .send()
+                    .await
+                {
+                    break response;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await?;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        server.abort();
+        let _ = server.await;
+        Ok(())
+    }
+
     fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0"
                 .parse()
                 .unwrap_or_else(|error| panic!("fixed loopback address must parse: {error}")),
@@ -480,6 +557,7 @@ mod windows_authority_tests {
         let database = state_parent.join("joint-authority.sqlite3");
         let lock_root = crate::durable_admission_lock_root(&database)?;
         let config = TrustServiceConfig {
+            transport: Default::default(),
             listen: SocketAddr::from(([127, 0, 0, 1], 0)),
             service_token: "service-token".to_string(),
             tenant_read_tokens: BTreeMap::new(),

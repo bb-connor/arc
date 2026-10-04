@@ -1,0 +1,59 @@
+{
+  "review_base": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
+  "source_manifest": "source-hashes.json",
+  "source_branch": "packet/3-retention-accounting",
+  "accepted_findings": [
+    "RV1",
+    "RV2",
+    "RV3",
+    "RV4",
+    "RV5 (EV1 paging only)"
+  ],
+  "p0_found": false,
+  "local_repair_qualification": "accepted with preserved failed campaigns and corrected fixture reruns",
+  "initial_broad_libraries": {
+    "exit_code": 101,
+    "api_protect": {
+      "passed": 255,
+      "failed": 0,
+      "ignored": 0
+    },
+    "mcp_remote": {
+      "passed": 126,
+      "failed": 7,
+      "ignored": 0
+    },
+    "store_sqlite": {
+      "passed": 1930,
+      "failed": 15,
+      "ignored": 3
+    }
+  },
+  "failed_test_reconciliation": "failure-reconciliation.json",
+  "completed_reruns": {
+    "mcp_remote": 133,
+    "siem_including_doc_test": 155,
+    "retention_export": 20,
+    "approval_dpop_custody": 32,
+    "budget_library": 146,
+    "schema_library": 15,
+    "threshold_lifecycle_integration": 10
+  },
+  "independent_review": "one completed reviewer with follow-ups; two other attempts incomplete",
+  "source_gates": "passed; historical baseline debt unchanged; only changed receipt SQL explicitly reconciled",
+  "publication_status": "source commit pushed and exact remote head verified; documentation-only follow-up records delivery",
+  "hosted_ci_qualified": false,
+  "whole_workspace_audit": false,
+  "million_receipt_campaign": false,
+  "merged": false,
+  "released": false,
+  "operationally_accepted": false,
+  "open_boundaries": [
+    "EV1 beyond automatic paging",
+    "EV2 admission retention",
+    "EV15 alert signer admission",
+    "EV6/EV8/EV17 session certificates",
+    "authenticated historical cursor assignments and pagination across adversarial mutations"
+  ],
+  "source_commit": "5a14e0f3b8ea8b93cb0e50b65847de477b9e8cdd"
+}

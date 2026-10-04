@@ -99,7 +99,7 @@ def validate(ci: dict, process: dict, action: dict) -> None:
     )
     _, structural = named_step(ci["jobs"]["check"], "Workspace structural gates")
     _, process_gate = named_step(
-        process["jobs"]["host"], "Default kernel and worker dependency boundary"
+        process["jobs"]["host-tests"], "Default kernel and worker dependency boundary"
     )
     for command in checks:
         require(
@@ -123,12 +123,12 @@ def validate(ci: dict, process: dict, action: dict) -> None:
         )
     validate_consumer(
         process,
-        "host",
+        "host-tests",
         PROTOCOL_NAME,
         {"name": FIXTURE_NAME, "id": "native_fixture", "uses": FIXTURE_ACTION},
         "${{ github.event_name != 'workflow_dispatch' || !inputs.optimized_comparison }}",
     )
-    index, step = named_step(process["jobs"]["host"], PROTOCOL_NAME)
+    index, step = named_step(process["jobs"]["host-tests"], PROTOCOL_NAME)
     require(
         {**step, "run": step.get("run", "").strip()} == {
             "name": PROTOCOL_NAME,
@@ -138,7 +138,7 @@ def validate(ci: dict, process: dict, action: dict) -> None:
         "native protocol target set must execute every required target with enforcement",
     )
     report_index, _ = named_step(
-        process["jobs"]["host"], "Native MCP and worker recovery under enforced authority"
+        process["jobs"]["host-tests"], "Native MCP and worker recovery under enforced authority"
     )
     require(index < report_index, "native protocol targets must precede static report setup")
     digest = hashlib.sha256(

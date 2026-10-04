@@ -1660,6 +1660,108 @@ pub mod agent_tool_call_request {
     ///      },
     ///      "additionalProperties": false
     ///    },
+    ///    "dpop_proof": {
+    ///      "title": "Chio invocation proof of possession",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "body",
+    ///        "signature"
+    ///      ],
+    ///      "properties": {
+    ///        "body": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "action_hash",
+    ///            "agent_key",
+    ///            "capability_id",
+    ///            "issued_at",
+    ///            "nonce",
+    ///            "schema",
+    ///            "tool_name",
+    ///            "tool_server"
+    ///          ],
+    ///          "properties": {
+    ///            "action_hash": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "agent_key": {
+    ///              "type": "string",
+    ///              "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///            },
+    ///            "capability_id": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "issued_at": {
+    ///              "type": "integer",
+    ///              "maximum": 1.8446744073709552e+19,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "nonce": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "replay_authority": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "destination_store_uuid",
+    ///                "dpop_authority_id",
+    ///                "expectation_id",
+    ///                "max_clock_skew_secs",
+    ///                "proof_ttl_secs"
+    ///              ],
+    ///              "properties": {
+    ///                "destination_store_uuid": {
+    ///                  "type": "string",
+    ///                  "format": "uuid"
+    ///                },
+    ///                "dpop_authority_id": {
+    ///                  "type": "string",
+    ///                  "maxLength": 512,
+    ///                  "minLength": 1
+    ///                },
+    ///                "expectation_id": {
+    ///                  "type": "string",
+    ///                  "pattern": "^[0-9a-f]{64}$"
+    ///                },
+    ///                "max_clock_skew_secs": {
+    ///                  "type": "integer",
+    ///                  "maximum": 300.0,
+    ///                  "minimum": 0.0
+    ///                },
+    ///                "proof_ttl_secs": {
+    ///                  "type": "integer",
+    ///                  "maximum": 3600.0,
+    ///                  "minimum": 1.0
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "schema": {
+    ///              "enum": [
+    ///                "chio.dpop_proof.v1",
+    ///                "chio.dpop_proof.v2"
+    ///              ]
+    ///            },
+    ///            "tool_name": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            },
+    ///            "tool_server": {
+    ///              "type": "string",
+    ///              "minLength": 1
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "signature": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
     ///    "execution_nonce": {
     ///      "title": "Chio signed execution nonce",
     ///      "type": "object",
@@ -2061,6 +2163,8 @@ pub mod agent_tool_call_request {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub approval_tokens: ::std::vec::Vec<ChioGovernedApprovalToken>,
         pub capability_token: ChioCapabilityToken,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub dpop_proof: ::std::option::Option<ChioInvocationProofOfPossession>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub execution_nonce: ::std::option::Option<ChioSignedExecutionNonce>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
@@ -6002,6 +6106,1128 @@ pub mod agent_tool_call_request {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for ChioGovernedTransactionIntentToolName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossession`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Chio invocation proof of possession",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "body",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "body": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "action_hash",
+    ///        "agent_key",
+    ///        "capability_id",
+    ///        "issued_at",
+    ///        "nonce",
+    ///        "schema",
+    ///        "tool_name",
+    ///        "tool_server"
+    ///      ],
+    ///      "properties": {
+    ///        "action_hash": {
+    ///          "type": "string",
+    ///          "pattern": "^[0-9a-f]{64}$"
+    ///        },
+    ///        "agent_key": {
+    ///          "type": "string",
+    ///          "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///        },
+    ///        "capability_id": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "issued_at": {
+    ///          "type": "integer",
+    ///          "maximum": 1.8446744073709552e+19,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "nonce": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "replay_authority": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "destination_store_uuid",
+    ///            "dpop_authority_id",
+    ///            "expectation_id",
+    ///            "max_clock_skew_secs",
+    ///            "proof_ttl_secs"
+    ///          ],
+    ///          "properties": {
+    ///            "destination_store_uuid": {
+    ///              "type": "string",
+    ///              "format": "uuid"
+    ///            },
+    ///            "dpop_authority_id": {
+    ///              "type": "string",
+    ///              "maxLength": 512,
+    ///              "minLength": 1
+    ///            },
+    ///            "expectation_id": {
+    ///              "type": "string",
+    ///              "pattern": "^[0-9a-f]{64}$"
+    ///            },
+    ///            "max_clock_skew_secs": {
+    ///              "type": "integer",
+    ///              "maximum": 300.0,
+    ///              "minimum": 0.0
+    ///            },
+    ///            "proof_ttl_secs": {
+    ///              "type": "integer",
+    ///              "maximum": 3600.0,
+    ///              "minimum": 1.0
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "schema": {
+    ///          "enum": [
+    ///            "chio.dpop_proof.v1",
+    ///            "chio.dpop_proof.v2"
+    ///          ]
+    ///        },
+    ///        "tool_name": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        },
+    ///        "tool_server": {
+    ///          "type": "string",
+    ///          "minLength": 1
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "signature": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioInvocationProofOfPossession {
+        pub body: ChioInvocationProofOfPossessionBody,
+        pub signature: ChioInvocationProofOfPossessionSignature,
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossession> for ChioInvocationProofOfPossession {
+        fn from(value: &ChioInvocationProofOfPossession) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action_hash",
+    ///    "agent_key",
+    ///    "capability_id",
+    ///    "issued_at",
+    ///    "nonce",
+    ///    "schema",
+    ///    "tool_name",
+    ///    "tool_server"
+    ///  ],
+    ///  "properties": {
+    ///    "action_hash": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "agent_key": {
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "capability_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "issued_at": {
+    ///      "type": "integer",
+    ///      "maximum": 1.8446744073709552e+19,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "nonce": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "replay_authority": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "destination_store_uuid",
+    ///        "dpop_authority_id",
+    ///        "expectation_id",
+    ///        "max_clock_skew_secs",
+    ///        "proof_ttl_secs"
+    ///      ],
+    ///      "properties": {
+    ///        "destination_store_uuid": {
+    ///          "type": "string",
+    ///          "format": "uuid"
+    ///        },
+    ///        "dpop_authority_id": {
+    ///          "type": "string",
+    ///          "maxLength": 512,
+    ///          "minLength": 1
+    ///        },
+    ///        "expectation_id": {
+    ///          "type": "string",
+    ///          "pattern": "^[0-9a-f]{64}$"
+    ///        },
+    ///        "max_clock_skew_secs": {
+    ///          "type": "integer",
+    ///          "maximum": 300.0,
+    ///          "minimum": 0.0
+    ///        },
+    ///        "proof_ttl_secs": {
+    ///          "type": "integer",
+    ///          "maximum": 3600.0,
+    ///          "minimum": 1.0
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "schema": {
+    ///      "enum": [
+    ///        "chio.dpop_proof.v1",
+    ///        "chio.dpop_proof.v2"
+    ///      ]
+    ///    },
+    ///    "tool_name": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "tool_server": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioInvocationProofOfPossessionBody {
+        pub action_hash: ChioInvocationProofOfPossessionBodyActionHash,
+        pub agent_key: ChioInvocationProofOfPossessionBodyAgentKey,
+        pub capability_id: ChioInvocationProofOfPossessionBodyCapabilityId,
+        pub issued_at: u64,
+        pub nonce: ChioInvocationProofOfPossessionBodyNonce,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub replay_authority:
+            ::std::option::Option<ChioInvocationProofOfPossessionBodyReplayAuthority>,
+        pub schema: ChioInvocationProofOfPossessionBodySchema,
+        pub tool_name: ChioInvocationProofOfPossessionBodyToolName,
+        pub tool_server: ChioInvocationProofOfPossessionBodyToolServer,
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBody>
+        for ChioInvocationProofOfPossessionBody
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBody) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyActionHash`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyActionHash(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyActionHash {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyActionHash> for ::std::string::String {
+        fn from(value: ChioInvocationProofOfPossessionBodyActionHash) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyActionHash>
+        for ChioInvocationProofOfPossessionBodyActionHash
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyActionHash) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyActionHash {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodyActionHash {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyActionHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyActionHash
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionBodyActionHash {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyAgentKey`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyAgentKey(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyAgentKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyAgentKey> for ::std::string::String {
+        fn from(value: ChioInvocationProofOfPossessionBodyAgentKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyAgentKey>
+        for ChioInvocationProofOfPossessionBodyAgentKey
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyAgentKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyAgentKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodyAgentKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyAgentKey
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyAgentKey
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionBodyAgentKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyCapabilityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyCapabilityId(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyCapabilityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyCapabilityId>
+        for ::std::string::String
+    {
+        fn from(value: ChioInvocationProofOfPossessionBodyCapabilityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyCapabilityId>
+        for ChioInvocationProofOfPossessionBodyCapabilityId
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyCapabilityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyCapabilityId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodyCapabilityId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyCapabilityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyCapabilityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionBodyCapabilityId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyNonce`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyNonce(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyNonce {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyNonce> for ::std::string::String {
+        fn from(value: ChioInvocationProofOfPossessionBodyNonce) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyNonce>
+        for ChioInvocationProofOfPossessionBodyNonce
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyNonce) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyNonce {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodyNonce {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioInvocationProofOfPossessionBodyNonce {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioInvocationProofOfPossessionBodyNonce {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionBodyNonce {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyReplayAuthority`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "destination_store_uuid",
+    ///    "dpop_authority_id",
+    ///    "expectation_id",
+    ///    "max_clock_skew_secs",
+    ///    "proof_ttl_secs"
+    ///  ],
+    ///  "properties": {
+    ///    "destination_store_uuid": {
+    ///      "type": "string",
+    ///      "format": "uuid"
+    ///    },
+    ///    "dpop_authority_id": {
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1
+    ///    },
+    ///    "expectation_id": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "max_clock_skew_secs": {
+    ///      "type": "integer",
+    ///      "maximum": 300.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "proof_ttl_secs": {
+    ///      "type": "integer",
+    ///      "maximum": 3600.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioInvocationProofOfPossessionBodyReplayAuthority {
+        pub destination_store_uuid: ::uuid::Uuid,
+        pub dpop_authority_id: ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId,
+        pub expectation_id: ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId,
+        pub max_clock_skew_secs: i64,
+        pub proof_ttl_secs: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyReplayAuthority>
+        for ChioInvocationProofOfPossessionBodyReplayAuthority
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyReplayAuthority) -> Self {
+            value.clone()
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId>
+        for ::std::string::String
+    {
+        fn from(value: ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityDpopAuthorityId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId(
+        ::std::string::String,
+    );
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId>
+        for ::std::string::String
+    {
+        fn from(value: ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de>
+        for ChioInvocationProofOfPossessionBodyReplayAuthorityExpectationId
+    {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodySchema`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "chio.dpop_proof.v1",
+    ///    "chio.dpop_proof.v2"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioInvocationProofOfPossessionBodySchema {
+        #[serde(rename = "chio.dpop_proof.v1")]
+        ChioDpopProofV1,
+        #[serde(rename = "chio.dpop_proof.v2")]
+        ChioDpopProofV2,
+    }
+    impl ::std::convert::From<&Self> for ChioInvocationProofOfPossessionBodySchema {
+        fn from(value: &ChioInvocationProofOfPossessionBodySchema) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioInvocationProofOfPossessionBodySchema {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ChioDpopProofV1 => f.write_str("chio.dpop_proof.v1"),
+                Self::ChioDpopProofV2 => f.write_str("chio.dpop_proof.v2"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodySchema {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "chio.dpop_proof.v1" => Ok(Self::ChioDpopProofV1),
+                "chio.dpop_proof.v2" => Ok(Self::ChioDpopProofV2),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodySchema {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioInvocationProofOfPossessionBodySchema {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioInvocationProofOfPossessionBodySchema {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyToolName`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyToolName(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyToolName {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyToolName> for ::std::string::String {
+        fn from(value: ChioInvocationProofOfPossessionBodyToolName) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyToolName>
+        for ChioInvocationProofOfPossessionBodyToolName
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyToolName) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyToolName {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodyToolName {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyToolName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyToolName
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionBodyToolName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionBodyToolServer`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionBodyToolServer(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionBodyToolServer {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionBodyToolServer> for ::std::string::String {
+        fn from(value: ChioInvocationProofOfPossessionBodyToolServer) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionBodyToolServer>
+        for ChioInvocationProofOfPossessionBodyToolServer
+    {
+        fn from(value: &ChioInvocationProofOfPossessionBodyToolServer) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionBodyToolServer {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionBodyToolServer {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioInvocationProofOfPossessionBodyToolServer
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioInvocationProofOfPossessionBodyToolServer
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionBodyToolServer {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioInvocationProofOfPossessionSignature`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioInvocationProofOfPossessionSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioInvocationProofOfPossessionSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioInvocationProofOfPossessionSignature> for ::std::string::String {
+        fn from(value: ChioInvocationProofOfPossessionSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioInvocationProofOfPossessionSignature>
+        for ChioInvocationProofOfPossessionSignature
+    {
+        fn from(value: &ChioInvocationProofOfPossessionSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioInvocationProofOfPossessionSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioInvocationProofOfPossessionSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioInvocationProofOfPossessionSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioInvocationProofOfPossessionSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioInvocationProofOfPossessionSignature {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,

@@ -80,6 +80,7 @@ fn ordinary_and_nested_fallback_retire_the_denied_grants_runtime_episode() -> Te
                 request.agent_id.clone(),
             );
             let operation = ToolCallOperation {
+                dpop_proof: None,
                 capability: request.capability.clone(),
                 server_id: request.server_id.clone(),
                 tool_name: request.tool_name.clone(),

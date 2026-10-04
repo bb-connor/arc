@@ -105,17 +105,23 @@ pub(crate) fn load_revocation_db_ids(
 /// authorized and captured before the reserve-for-caller path mints a nonce.
 /// When `None` the kernel carries no adapter, so the governed prepayment gate
 /// denies `MustPrepay` fail-closed: only a configured adapter enables it.
+pub(crate) struct MediationPolicy<'a> {
+    pub issuers: &'a [PublicKey],
+    pub hash: Option<&'a str>,
+    pub receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>>,
+}
+
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
     budget_store: Arc<dyn BudgetStore>,
-    trusted_capability_issuers: &[PublicKey],
+    policy: MediationPolicy<'_>,
     tool_servers: Vec<Box<dyn ToolServerConnection>>,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     durable_admission: Option<DurableAdmissionStores>,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<ChioKernel, ProtectError> {
     let mut ca_public_keys = vec![signer.public_key()];
-    for issuer in trusted_capability_issuers {
+    for issuer in policy.issuers {
         if !ca_public_keys.contains(issuer) {
             ca_public_keys.push(issuer.clone());
         }
@@ -127,7 +133,10 @@ pub(crate) fn build_mediation_kernel(
             max_delegation_depth: 5,
             // Durable admission binds every operation to a canonical SHA-256 policy
             // digest, so the mediation policy is named by its digest.
-            policy_hash: chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1"),
+            policy_hash: policy
+                .hash
+                .map(str::to_owned)
+                .unwrap_or_else(|| chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1")),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -140,7 +149,7 @@ pub(crate) fn build_mediation_kernel(
             // hold reconciled by the recovery sweep. The ephemeral log has no sweep, so
             // any hold retained on this non-durable kernel is surfaced instead by
             // chio_ambiguous_dispatch_retained_hold_total{reconciliation="none"}.
-            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_receipt_log: policy.receipt_store.is_none(),
             // Revocation is enforced sidecar-side over the durable revoked set (the
             // revoked-ancestor walk below); this kernel's internal store is
             // intentionally empty, so its durability gate must not deny mediation.
@@ -152,6 +161,11 @@ pub(crate) fn build_mediation_kernel(
         },
         clock.clone(),
     );
+    if let Some(store) = policy.receipt_store {
+        kernel
+            .set_receipt_store_handle(store)
+            .map_err(|error| ProtectError::Config(error.to_string()))?;
+    }
     match durable_admission {
         Some(durable) => {
             // Durable operations, their preflight holds and their executable
@@ -232,11 +246,8 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     parameters: serde_json::Value,
     #[serde(default)]
     agent_id: Option<String>,
-    /// Optional caller-chosen request identifier. When present it is forwarded
-    /// verbatim so the caller can bind a governed approval token to this exact
-    /// request (the kernel requires `approval_token.request_id == request_id`).
-    /// When absent the sidecar mints one; that is fine for capabilities that do
-    /// not carry an approval-gated governed intent.
+    /// Optional caller request identity. With approval_id it must equal that
+    /// server-owned identity; otherwise the sidecar generates one when omitted.
     #[serde(default)]
     request_id: Option<String>,
     /// Optional governed transaction intent bound to this invocation. Forwarded
@@ -244,10 +255,12 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// can be authorized instead of denied.
     #[serde(default)]
     governed_intent: Option<GovernedTransactionIntent>,
-    /// Optional approval token authorizing this governed invocation, forwarded
-    /// alongside `governed_intent` so an approval-gated grant can be authorized.
+    /// Legacy direct token field, rejected in favor of a retained approval_id.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
+    /// Server-assigned identifier of a retained, signed approval.
+    #[serde(default)]
+    approval_id: Option<String>,
     /// Reserved threshold approval fields. The mediated product does not yet
     /// configure a threshold policy resolver, so either field is rejected at the
     /// HTTP boundary instead of being advertised as an unusable kernel feature.
@@ -289,6 +302,12 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             Ok(parsed) => parsed,
             Err(error) => return input::rejected(error),
         };
+    if parsed.approval_token.is_some()
+        || (parsed.approval_id.is_some() && parsed.governed_intent.is_some())
+    {
+        return sidecar_bad_request("use approval_id to redeem the retained server-built approval")
+            .into_response();
+    }
     if parsed.supplemental_authorization.is_some() {
         return sidecar_bad_request(
             "supplemental_authorization is unavailable: no supplemental verifier is configured",
@@ -407,6 +426,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         .unwrap_or_else(|| parsed.capability.subject.to_hex());
     let request_id = parsed
         .request_id
+        .clone()
+        .or_else(|| parsed.approval_id.clone())
         .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
     // Durable reuse guard that survives a restart, which the in-memory window
     // below cannot: after a restart the window is empty, but a reservation opened
@@ -519,7 +540,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             );
         }
     };
-    let kernel_request = ToolCallRequest {
+    let mut kernel_request = ToolCallRequest {
         request_id: request_id.clone(),
         capability: parsed.capability,
         tool_name: parsed.tool_name,
@@ -539,6 +560,18 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         federated_origin_kernel_id: None,
         declassification_grant: None,
     };
+    if let Some(approval_id) = parsed.approval_id.as_deref() {
+        if let Err(error) =
+            super::approval::redeem_approval(&state, &kernel, &mut kernel_request, approval_id)
+        {
+            state
+                .minted_request_ids
+                .lock()
+                .await
+                .release(&request_claim);
+            return approval_error_response(error);
+        }
+    }
     // Reservation on the shared, process-lifetime kernel: verify +
     // reserve the budget hold (kept open) + mint a fresh execution nonce. The
     // reserve-for-caller path never dispatches, so it does not require the
@@ -590,18 +623,12 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             .retain_until(&request_claim, nonce.nonce.expires_at);
     }
     drop(kernel);
-    if let Err(error) = record_tool_receipt(&state, &response.receipt).await {
-        // The reserve receipt persisted here is a local audit entry, not the
-        // authoritative record. When the reserve SUCCEEDED (Verdict::Allow with a
-        // minted nonce) the reservation is durable in the budget store and the
-        // caller holds the signed nonce, which reconciles at /v1/reconcile (that
-        // route persists its own authoritative receipt). Any governed MustPrepay
-        // prepayment was already captured to back this exact reservation. Tearing
-        // the reservation down here would refund nothing on the prepaid path (direct
-        // financial loss) and strand the caller without the nonce it paid for, so
-        // return the nonce and log the persistence failure, mirroring the accepted
-        // /v1/reconcile behavior. A denied or pending verdict placed no hold and
-        // minted no nonce, so its unpersisted receipt still fails closed.
+    // Kernel delivery is idempotent on the shared sink. An irreversible reserve
+    // may return its signed nonce after an append failure; retry persistence and
+    // report that outcome without discarding the caller's only recovery evidence.
+    let persistence = record_kernel_receipt(&state, &response.receipt).await;
+    let evidence_persisted = state.receipt_store.is_some() && persistence.is_ok();
+    if let Err(error) = persistence {
         if !matches!(
             (&response.verdict, response.execution_nonce.as_deref()),
             (chio_kernel::Verdict::Allow, Some(_))
@@ -628,6 +655,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         StatusCode::OK,
         axum::Json(serde_json::json!({
             "status": status_str,
+            "evidence_persisted": evidence_persisted,
             "protocol": "chio.caller-delivery.v1",
             "execution_authorized": false,
             "start_required": matches!(response.verdict, chio_kernel::Verdict::Allow),
@@ -740,18 +768,18 @@ pub(crate) async fn sidecar_reconcile_handler(
                 .into_response();
         }
     };
-    // Kernel reconciliation has already produced the authoritative receipt.
-    // Failure of this separate sidecar receipt copy cannot undo settlement.
-    // Legacy replay cannot recover the receipt; durable completion retains its
-    // own replay evidence. In either profile, return the signed receipt even
-    // when this secondary write fails so the caller can retain its evidence.
-    if let Err(error) = record_tool_receipt(&state, &reconciled.receipt).await {
+    // A completed settlement cannot be undone. Preserve its signed result even
+    // if retrying the shared evidence append fails, and expose persistence truthfully.
+    let persistence = record_kernel_receipt(&state, &reconciled.receipt).await;
+    let evidence_persisted = state.receipt_store.is_some() && persistence.is_ok();
+    if let Err(error) = persistence {
         warn!("reconcile settled but receipt persistence failed; returning authoritative receipt to caller: {error}");
     }
     (
         StatusCode::OK,
         axum::Json(serde_json::json!({
             "status": "reconciled",
+            "evidence_persisted": evidence_persisted,
             "receipt": reconciled.receipt,
         })),
     )

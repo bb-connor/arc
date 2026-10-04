@@ -97,6 +97,7 @@ fn tool_access_rule_strategy() -> impl Strategy<Value = ToolAccessRule> {
     )
         .prop_map(
             |(enabled, allow, block, require_confirmation, default)| ToolAccessRule {
+                dpop_required: None,
                 enabled,
                 allow,
                 block,
@@ -370,6 +371,7 @@ fn record_decision_target(
 /// semantics.
 fn chain_step_spec(blocks: &[String], warns: &[String]) -> HushSpec {
     let rule = ToolAccessRule {
+        dpop_required: None,
         enabled: true,
         allow: Vec::new(),
         block: blocks.to_vec(),
@@ -402,6 +404,7 @@ fn chain_step_spec(blocks: &[String], warns: &[String]) -> HushSpec {
 fn decision_emitting_spec(decision: Decision, target: &str) -> HushSpec {
     let rule = match decision {
         Decision::Allow => ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: vec![target.to_string()],
             block: Vec::new(),
@@ -414,6 +417,7 @@ fn decision_emitting_spec(decision: Decision, target: &str) -> HushSpec {
             prefer_workload_identity: None,
         },
         Decision::Warn => ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: Vec::new(),
             block: Vec::new(),
@@ -426,6 +430,7 @@ fn decision_emitting_spec(decision: Decision, target: &str) -> HushSpec {
             prefer_workload_identity: None,
         },
         Decision::Deny => ToolAccessRule {
+            dpop_required: None,
             enabled: true,
             allow: Vec::new(),
             block: vec![target.to_string()],

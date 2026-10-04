@@ -678,6 +678,9 @@ pub struct ChioKernel {
     /// `(subject_id, request_id, governed_intent_hash)`.
     pub(super) approval_replay_store:
         Option<Box<dyn crate::governed_approval_replay::GovernedApprovalReplayStore>>,
+    /// Explicit ordinary approval authority, independent of issuance and receipts.
+    pub(super) governed_approvers: Vec<chio_core::PublicKey>,
+    pub(super) governed_approval_tenant: Option<String>,
     pub(super) governed_approval_authority:
         Option<super::admission_coordinator::GovernedApprovalAuthority>,
     pub(super) threshold_approval_requirement_resolver:

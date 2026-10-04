@@ -1,5 +1,33 @@
 # Compliance and product-truth review, October 1, 2026
 
+**October 2 follow-up:** AP1, KG1 and RL1 now have implemented, locally verified
+source repairs in the [identity and authority execution record](2026-10-02-identity-authority-release-closure-execution.md).
+The historical findings and counts below remain the October 1 snapshot. This
+follow-up does not establish deployed migration, hosted keyless signing, release
+publication or closure of the other findings. KG2/KG3 and AP2/AP3 now have
+bounded local source acceptance in the
+[issuer and approval execution record](2026-10-02-issuer-lifecycle-approval-authority-execution.md).
+Linux custody, explicit provisioning and unavailable legacy workflows are stated
+there. AC4 protected writes and scoped CA3 ingress now have local acceptance in
+the [lease and ingress record](2026-10-02-lease-fencing-framework-ingress-execution.md).
+AP4-AP6 and the two threshold-reader gaps are implemented in the
+[inbound authority record](2026-10-02-inbound-authority-execution.md), with local
+qualification tracked there. Bearer compatibility, volatile replay, unsupported
+origin-specific proof policy and trusted-proxy deployment remain explicit limits.
+AP7 shared TLS/control-client transport and AP8 truthful revocation are implemented
+in the [October 3 execution record](2026-10-03-transport-revocation-execution.md),
+which owns their local qualification and review boundaries. The next continuation
+implements AP9/AP10 receipt integrity, AP11 history removal, authenticated retained
+reads and API/start retention. Its source qualification and publication boundary
+are tracked in the [receipt lifecycle record](2026-10-03-receipt-evidence-lifecycle-execution.md).
+The [authenticated package record](2026-10-03-evidence-package-trust-execution.md)
+owns the subsequent EV6 package-signing/key-pinning work, EV7 external anchor
+acceptance for Chio evidence packages, EV12 strict signatures and EV13
+receipt/checkpoint signer binding. The separate Mercury proof-package verifier
+still needs independent anchor trust. Other EV5 launchers, independent child inclusion proofs and the EV6 empty
+certificate-bundle defect remain open.
+The findings and counts below retain their historical meaning.
+
 A compliance-documentation review of `main` (`f5566d9a76`) on September 30 and October 1 checked
 every compliance, security and supply-chain claim in the repository against the code, the CI
 history and the published artifacts. It produced a replacement compliance guidance set on the

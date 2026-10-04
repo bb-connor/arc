@@ -61,6 +61,7 @@ fn session_tool_call_uses_context_authority_and_final_security_fence() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),

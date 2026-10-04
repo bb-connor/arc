@@ -187,19 +187,34 @@ pub fn serve_stdio() -> HelloMcpResult<()> {
     serve_reader(stdin.lock(), stdout.lock())
 }
 
-pub fn serve_reader<R, W>(reader: R, mut writer: W) -> HelloMcpResult<()>
+pub fn serve_reader<R, W>(mut reader: R, mut writer: W) -> HelloMcpResult<()>
 where
     R: BufRead,
     W: Write,
 {
     let mut edge = make_edge()?;
 
-    for line in reader.lines() {
-        let line = line?;
-        if line.trim().is_empty() {
+    // Bound allocation before parsing or skipping whitespace. The extra byte
+    // distinguishes an exact-size EOF frame from a truncated oversized frame.
+    const MAX_FRAME_BYTES: usize = 1024 * 1024;
+    loop {
+        let mut frame = Vec::new();
+        let count = std::io::Read::take(&mut reader, MAX_FRAME_BYTES as u64 + 1)
+            .read_until(b'\n', &mut frame)?;
+        if count == 0 {
+            break;
+        }
+        if count > MAX_FRAME_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "JSON-RPC frame exceeds its byte limit",
+            )
+            .into());
+        }
+        if frame.iter().all(u8::is_ascii_whitespace) {
             continue;
         }
-        let message: Value = serde_json::from_str(&line)?;
+        let message = chio_mcp_edge::decode_mcp_request(&frame, MAX_FRAME_BYTES)?;
         if let Some(response) = edge.handle_jsonrpc(message) {
             serde_json::to_writer(&mut writer, &response)?;
             writeln!(&mut writer)?;
@@ -286,6 +301,13 @@ mod tests {
     use chio_kernel::{KernelError, ToolServerConnection};
     use serde_json::{json, Value};
     use std::io::Cursor;
+
+    #[test]
+    fn inbound_authority_example_bounds_frames_before_whitespace_or_json() {
+        let mut output = Vec::new();
+        assert!(serve_reader(Cursor::new(vec![b' '; 1024 * 1024 + 1]), &mut output).is_err());
+        assert!(output.is_empty());
+    }
 
     fn initialize_edge(edge: &mut chio_mcp_edge::ChioMcpEdge) -> HelloMcpResult<()> {
         let initialize = edge
@@ -385,6 +407,14 @@ mod tests {
         assert_eq!(responses[1]["id"], 2);
         assert_eq!(responses[1]["result"]["tools"][0]["name"], TOOL_NAME);
         Ok(())
+    }
+
+    #[test]
+    fn inbound_authority_example_rejects_original_duplicate_fields() {
+        let input = r#"{"jsonrpc":"2.0","id":1,"id":2,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"reader","version":"1"}}}"#;
+        let mut output = Vec::new();
+        assert!(serve_reader(Cursor::new(format!("{input}\n")), &mut output).is_err());
+        assert!(output.is_empty());
     }
 
     #[test]

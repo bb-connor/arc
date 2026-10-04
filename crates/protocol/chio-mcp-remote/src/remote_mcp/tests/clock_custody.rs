@@ -1,6 +1,9 @@
 use super::*;
 use chio_security_types::clock::{ClockReading, MonotonicInstant};
 
+#[path = "clock_custody/dispatch.rs"]
+mod dispatch;
+
 struct TestClock(StdMutex<Result<ClockReading, ClockError>>);
 impl Clock for TestClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
@@ -31,7 +34,7 @@ fn clock_fault_and_rollback_retain_authorization_code_until_successful_exchange(
     for fault in [Err(ClockError::Unavailable), reading(999_000, 1)] {
         *source.0.lock().unwrap() = fault;
         let response = server
-            .exchange_authorization_code(&HeaderMap::new(), token_form(&code))
+            .exchange_authorization_code((&HeaderMap::new()).into(), token_form(&code))
             .unwrap_err();
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert!(response.extensions().get::<Arc<ClockError>>().is_some());
@@ -39,12 +42,12 @@ fn clock_fault_and_rollback_retain_authorization_code_until_successful_exchange(
     }
     *source.0.lock().unwrap() = reading(1_000_000, 1);
     assert!(server
-        .exchange_authorization_code(&HeaderMap::new(), token_form(&code))
+        .exchange_authorization_code((&HeaderMap::new()).into(), token_form(&code))
         .is_ok());
     assert!(!server.codes.lock().unwrap().contains_key(&code));
     assert_eq!(
         server
-            .exchange_authorization_code(&HeaderMap::new(), token_form(&code))
+            .exchange_authorization_code((&HeaderMap::new()).into(), token_form(&code))
             .unwrap_err()
             .status(),
         StatusCode::BAD_REQUEST
@@ -59,7 +62,7 @@ fn authorization_code_expires_at_monotonic_deadline_with_frozen_wall_time() {
     *source.0.lock().unwrap() = reading(1_000_000, server.code_ttl_secs * 1_000_000_000);
     assert_eq!(
         server
-            .exchange_authorization_code(&HeaderMap::new(), token_form(&code))
+            .exchange_authorization_code((&HeaderMap::new()).into(), token_form(&code))
             .unwrap_err()
             .status(),
         StatusCode::BAD_REQUEST
@@ -74,7 +77,7 @@ fn concurrent_exchange_consumes_one_grant_once() {
             .map(|_| {
                 scope.spawn(|| {
                     server
-                        .exchange_authorization_code(&HeaderMap::new(), token_form(&code))
+                        .exchange_authorization_code((&HeaderMap::new()).into(), token_form(&code))
                         .is_ok()
                 })
             })
@@ -125,6 +128,7 @@ fn session_init(clock: RemoteClock) -> RemoteSessionInit {
         retained_notification_events: Arc::new(StdMutex::new(VecDeque::new())),
         next_event_id: Arc::new(AtomicU64::new(0)),
         session_db_path: None,
+        approval_redemption: None,
         session_store_lease: None,
         resume_hmac_keyring: None,
         resume_generation: 0,

@@ -70,8 +70,9 @@ fn validate_identity_provider_url(url: &Url, field_name: &str) -> Result<(), Cli
 }
 
 fn parse_identity_provider_url(value: &str, field_name: &str) -> Result<Url, CliError> {
-    let url = Url::parse(value)
-        .map_err(|error| CliError::cli_other_error(format!("{field_name} is not a valid URL: {error}")))?;
+    let url = Url::parse(value).map_err(|error| {
+        CliError::cli_other_error(format!("{field_name} is not a valid URL: {error}"))
+    })?;
     validate_identity_provider_url(&url, field_name)?;
     Ok(url)
 }
@@ -129,7 +130,9 @@ async fn fetch_identity_provider_json<T: DeserializeOwned>(
             ))
         })?;
     let request = client.get(url.as_str()).build().map_err(|error| {
-        CliError::cli_other_error(format!("failed to build {field_name} request `{url}`: {error}"))
+        CliError::cli_other_error(format!(
+            "failed to build {field_name} request `{url}`: {error}"
+        ))
     })?;
     let response = send_with_contract(contract, &client, request)
         .await
@@ -320,12 +323,9 @@ async fn resolve_discovered_identity_provider(
         return Ok(None);
     };
     let egress_contract = config.egress_contract.as_ref();
-    let document: OidcDiscoveryDocument = fetch_identity_provider_json(
-        &discovery_url,
-        "--auth-jwt-discovery-url",
-        egress_contract,
-    )
-    .await?;
+    let document: OidcDiscoveryDocument =
+        fetch_identity_provider_json(&discovery_url, "--auth-jwt-discovery-url", egress_contract)
+            .await?;
     let issuer_url = parse_identity_provider_url(&document.issuer, "discovered OIDC issuer")?;
     let issuer = canonicalize_federated_issuer(issuer_url.as_str());
     if let Some(expected_issuer) = config.auth_jwt_issuer.as_deref() {
@@ -356,12 +356,7 @@ async fn resolve_discovered_identity_provider(
                     .to_string(),
             )
         })?;
-        Some(resolve_jwks_key_set(
-            jwks_uri,
-            "discovered OIDC jwks_uri",
-            egress_contract,
-        )
-        .await?)
+        Some(resolve_jwks_key_set(jwks_uri, "discovered OIDC jwks_uri", egress_contract).await?)
     } else {
         None
     };
@@ -433,8 +428,15 @@ fn build_federated_principal(
 fn build_federated_claims(
     claims: &JwtClaims,
     _provider_profile: JwtProviderProfile,
-) -> OAuthBearerFederatedClaims {
-    OAuthBearerFederatedClaims {
+) -> Result<OAuthBearerFederatedClaims, chio_core::Error> {
+    let sender_public_key = claims
+        .cnf
+        .as_ref()
+        .and_then(|confirmation| confirmation.chio_sender_key.as_deref())
+        .map(PublicKey::from_hex)
+        .transpose()?;
+    Ok(OAuthBearerFederatedClaims {
+        sender_public_key,
         client_id: claims
             .client_id
             .clone()
@@ -448,7 +450,7 @@ fn build_federated_claims(
             .or_else(|| claims.organization_id.clone()),
         groups: normalize_claim_list(&claims.groups),
         roles: normalize_claim_list(&claims.roles),
-    }
+    })
 }
 
 fn matched_bearer_enterprise_provider<'a>(

@@ -22,7 +22,8 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         keypair.clone(),
         "test-policy".to_string(),
         Arc::clone(&approval_store),
-    );
+    )
+    .with_anonymous_reads(true);
     evaluator.enable_strict_execution_nonce_for_tests();
     let egress_contract = default_upstream_egress_contract(&upstream).test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
@@ -37,6 +38,7 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         http_client,
         egress_contract,
         approval_admin: ApprovalAdmin::new(approval_store),
+        approval_config: None,
         receipt_log: Mutex::new(ReceiptLog {
             receipts: Vec::new(),
         }),

@@ -1096,6 +1096,7 @@ mod tests {
         TrustServiceState {
             finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
             config: TrustServiceConfig {
+                transport: Default::default(),
                 listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
                 service_token: "service-secret".to_string(),
                 tenant_read_tokens: BTreeMap::new(),

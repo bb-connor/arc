@@ -16,12 +16,19 @@ fn no_charge_mustprepay_dispatch(nested: bool, unsafe_financial_dispatch: bool) 
     kernel.set_governed_approval_replay_store(Box::new(
         InMemoryGovernedApprovalReplayStore::new(8).expect("positive replay store test capacities"),
     ));
-    let intent = make_mustprepay_intent(
+    let mut intent = make_mustprepay_intent(
         "no-charge-mustprepay-intent",
         "durable-server",
         "mutate",
         100,
         "USD",
+    );
+    bind_test_tool_approval(
+        &mut kernel,
+        &request.capability,
+        &request.arguments,
+        &request.request_id,
+        &mut intent,
     );
     request.approval_token = Some(make_governed_approval_token(
         &kernel.config.keypair,

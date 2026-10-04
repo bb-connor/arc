@@ -231,7 +231,6 @@ rules:
   human_in_loop:
     enabled: true
     approve_above: 15000
-    approve_above_currency: "USD"
 "#;
     let spec = HushSpec::parse(yaml).expect("parse hushspec");
     let compiled = compile_policy(&spec).expect("compile should succeed");

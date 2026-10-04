@@ -506,6 +506,7 @@ fn debit_at_with_policy_and_authority_and_tenant(
                         audience: Some("chio-mcp".to_owned()),
                         scopes: vec!["mcp:invoke".to_owned()],
                         federated_claims: OAuthBearerFederatedClaims {
+                            sender_public_key: None,
                             tenant_id: Some(tenant_id.to_owned()),
                             ..OAuthBearerFederatedClaims::default()
                         },

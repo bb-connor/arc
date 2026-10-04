@@ -456,6 +456,8 @@ impl SqliteExecutionNonceStore {
     /// Deliberately lower a latched clock high-water after the host clock has
     /// been corrected. The exact old value is a compare-and-swap guard, and
     /// recovery never deletes retained nonce rows.
+    /// Standalone native composition entry. Services sharing an authority clock
+    /// must use `recover_clock_high_water_with_clock` instead.
     pub fn recover_clock_high_water(
         path: impl AsRef<Path>,
         expected_high_water: i64,

@@ -574,6 +574,9 @@ pub fn frost_coordinator_router(
         .route(FROST_COORDINATOR_SHARE_PATH, post(handle_share))
         .route(FROST_COORDINATOR_COMPLETE_PATH, post(handle_complete))
         .route(FROST_COORDINATOR_CANCEL_PATH, post(handle_cancel))
+        .route_layer(axum::middleware::from_fn(
+            super::super::json_ingress::validate,
+        ))
         .layer(DefaultBodyLimit::max(MAX_HTTP_BODY_BYTES))
         .with_state(FrostCoordinatorHttpState {
             control,

@@ -577,6 +577,8 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
             .expect("secure remote session HMAC keyring");
     }
     RemoteServeHttpConfig {
+        transport: Default::default(),
+        trusted_proxy: None,
         clock: Default::default(),
         listen,
         auth_token: None,
@@ -592,6 +594,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         auth_jwt_issuer: None,
         auth_jwt_audience: None,
         admin_token: None,
+        approval: None,
         control_url: None,
         control_token: None,
         remote_authority_workload_token: None,

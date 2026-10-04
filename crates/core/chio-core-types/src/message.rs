@@ -138,6 +138,9 @@ pub enum AgentMessage {
         /// Kernel-issued nonce from a strict execution preflight for this request.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         execution_nonce: Option<Box<SignedExecutionNonce>>,
+        /// Subject-signed invocation proof, verified by the kernel before dispatch.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dpop_proof: Option<Box<serde_json::Value>>,
     },
     /// Request a listing of the agent's current capabilities.
     ListCapabilities,
@@ -397,6 +400,7 @@ mod tests {
         threshold_approval_proposal: Option<Box<ThresholdApprovalProposal>>,
     ) -> AgentMessage {
         AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: "req-001".to_string(),
             capability_token: Box::new(make_token(kp)),
             server_id: "srv".to_string(),
@@ -471,6 +475,7 @@ mod tests {
     fn agent_message_tool_call_serde_roundtrip() {
         let kp = Keypair::generate();
         let msg = AgentMessage::ToolCallRequest {
+            dpop_proof: None,
             id: "req-001".to_string(),
             capability_token: Box::new(make_token(&kp)),
             server_id: "srv".to_string(),

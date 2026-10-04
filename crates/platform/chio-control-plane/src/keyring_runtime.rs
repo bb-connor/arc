@@ -27,6 +27,7 @@ use crate::CliError;
 
 #[derive(Clone)]
 pub struct KeyringRuntimeComposition {
+    clock: Arc<dyn Clock>,
     router: Arc<chio_keyring::KeyringSigningRouter>,
     store: Arc<chio_keyring::SqliteKeyLogStore>,
     independent_services: Arc<chio_keyring::IndependentKeyLogServices>,
@@ -228,7 +229,12 @@ impl KeyringRuntimeComposition {
             ));
         }
         let witnessed_verification_keys = state
-            .witnessed_verification_keys()
+            .witnessed_verification_keys_at(
+                self.clock
+                    .unix_millis()
+                    .map_err(|error| CliError::cli_other_error(error.to_string()))?
+                    .get(),
+            )
             .into_iter()
             .map(|record| record.public_key)
             .collect();
@@ -399,7 +405,8 @@ impl KeyringRuntimeComposition {
                     )
                 })?;
             let policy = self.store.policy_clone();
-            let issued_at = SystemClock
+            let issued_at = self
+                .clock
                 .unix_millis()
                 .map_err(|error| CliError::cli_other_error(error.to_string()))?
                 .get();
@@ -836,6 +843,18 @@ pub fn load_keyring_runtime_composition(
     kernel_kp: &Keypair,
     config_path: &Path,
 ) -> Result<KeyringRuntimeComposition, CliError> {
+    load_keyring_runtime_composition_with_clock(kernel_kp, config_path, Arc::new(SystemClock))
+}
+
+/// Compose key authority and its durable log with the caller-owned clock.
+pub fn load_keyring_runtime_composition_with_clock(
+    kernel_kp: &Keypair,
+    config_path: &Path,
+    clock: Arc<dyn Clock>,
+) -> Result<KeyringRuntimeComposition, CliError> {
+    clock
+        .read()
+        .map_err(|cause| CliError::cli_other_error(cause.to_string()))?;
     let config_bytes = fs::read(config_path)?;
     let config: KeyringRuntimeConfig = serde_yml::from_slice(&config_bytes)?;
     if config.schema != "chio.keyring.runtime-config.v1" {
@@ -931,9 +950,10 @@ pub fn load_keyring_runtime_composition(
         })
         .collect::<Result<BTreeMap<_, _>, CliError>>()?;
     let store = Arc::new(
-        chio_keyring::SqliteKeyLogStore::open_existing(
+        chio_keyring::SqliteKeyLogStore::open_existing_with_clock(
             &config.database_path,
             key_log_policy.clone(),
+            clock.clone(),
         )
         .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
@@ -1038,6 +1058,7 @@ pub fn load_keyring_runtime_composition(
         .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
     let composition = KeyringRuntimeComposition {
+        clock,
         router,
         store,
         independent_services,
@@ -1201,9 +1222,27 @@ pub fn load_keyring_runtime_from_authority_seed(
     active_seed_path: &Path,
     receipt_store: Arc<dyn chio_kernel::ReceiptStore>,
 ) -> Result<(Keypair, KeyringRuntimeComposition), CliError> {
+    load_keyring_runtime_from_authority_seed_with_clock(
+        config_path,
+        active_seed_path,
+        receipt_store,
+        Arc::new(SystemClock),
+    )
+}
+
+/// Resume the retained authority using the same clock as its embedding host.
+pub fn load_keyring_runtime_from_authority_seed_with_clock(
+    config_path: &Path,
+    active_seed_path: &Path,
+    receipt_store: Arc<dyn chio_kernel::ReceiptStore>,
+    clock: Arc<dyn Clock>,
+) -> Result<(Keypair, KeyringRuntimeComposition), CliError> {
+    clock
+        .read()
+        .map_err(|cause| CliError::cli_other_error(cause.to_string()))?;
     let (active, active_identity) =
         load_existing_authority_keypair_with_identity(active_seed_path)?;
-    match load_keyring_runtime_composition(&active, config_path) {
+    match load_keyring_runtime_composition_with_clock(&active, config_path, clock.clone()) {
         Ok(composition) => {
             composition.attach_receipt_store(Arc::clone(&receipt_store))?;
             cleanup_completed_authority_seed_handoff(active_seed_path, &active, &composition)?;
@@ -1229,7 +1268,7 @@ pub fn load_keyring_runtime_from_authority_seed(
                     None => return Err(active_error),
                 };
             handoff.validate_keypair(&recovered)?;
-            match load_keyring_runtime_composition(&recovered, config_path) {
+            match load_keyring_runtime_composition_with_clock(&recovered, config_path, clock) {
                 Ok(composition) => {
                     composition.attach_receipt_store(receipt_store)?;
                     composition.require_key_log_verification()?;

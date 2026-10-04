@@ -6,12 +6,16 @@ use dashmap::mapref::entry::Entry;
 use rand::rngs::OsRng;
 use rand::RngCore;
 
-use crate::session::{SessionAnchorSnapshot, SessionRequestStart};
+use crate::session::{PendingThresholdApproval, SessionAnchorSnapshot, SessionRequestStart};
+use chio_core::capability::governance::GovernedTransactionIntent;
 
 use super::*;
 
 #[path = "session_ops/threshold_continuation.rs"]
 mod threshold_continuation;
+
+#[path = "session_ops/threshold_binding.rs"]
+mod threshold_binding;
 
 #[path = "session_ops/reports.rs"]
 mod reports;
@@ -42,6 +46,19 @@ fn map_session_persist_error(error: SessionPersistError<KernelError>) -> KernelE
         SessionPersistError::Session(error) => KernelError::Session(error),
         SessionPersistError::Persist(error) => error,
     }
+}
+
+fn parse_tool_call_operation_dpop(
+    operation: &ToolCallOperation,
+) -> Result<Option<crate::dpop::DpopProof>, KernelError> {
+    operation
+        .dpop_proof
+        .as_ref()
+        .map(|value| {
+            serde_json::from_value(value.clone()).map_err(crate::dpop::DpopError::Malformed)
+        })
+        .transpose()
+        .map_err(Into::into)
 }
 
 fn parse_tool_call_operation_execution_nonce(
@@ -419,9 +436,9 @@ impl ChioKernel {
         context: &OperationContext,
         operation: &ToolCallOperation,
         execution_nonce: Option<&crate::execution_nonce::SignedExecutionNonce>,
-    ) -> Result<(), KernelError> {
-        if self.resume_pending_threshold_request(context, operation)? {
-            return Ok(());
+    ) -> Result<Option<PendingThresholdApproval>, KernelError> {
+        if let Some(retained) = self.resume_pending_threshold_request(context, operation)? {
+            return Ok(Some(retained));
         }
         if let Some(nonce) = execution_nonce
             .filter(|nonce| nonce.nonce.bound_to.request_id == context.request_id.as_str())
@@ -445,10 +462,11 @@ impl ChioKernel {
                 Ok(false)
             })?;
             if resumed {
-                return Ok(());
+                return Ok(None);
             }
         }
-        self.begin_session_request(context, OperationKind::ToolCall, true)
+        self.begin_session_request(context, OperationKind::ToolCall, true)?;
+        Ok(None)
     }
 
     fn finish_session_tool_request(
@@ -456,10 +474,11 @@ impl ChioKernel {
         context: &OperationContext,
         operation: Option<&ToolCallOperation>,
         response: Option<&ToolCallResponse>,
+        bound_intent: Option<&GovernedTransactionIntent>,
         terminal_state: OperationTerminalState,
     ) -> Result<(), KernelError> {
         if let (Some(operation), Some(response)) = (operation, response) {
-            if self.retain_pending_threshold_request(context, operation, response)? {
+            if self.retain_pending_threshold_request(context, operation, response, bound_intent)? {
                 return Ok(());
             }
         }
@@ -732,6 +751,10 @@ impl ChioKernel {
                 | SessionOperation::GetPrompt(_)
                 | SessionOperation::Complete(_)
         );
+        let parsed_dpop_proof = match operation {
+            SessionOperation::ToolCall(call) => parse_tool_call_operation_dpop(call)?,
+            _ => None,
+        };
         let parsed_tool_call_execution_nonce = match operation {
             SessionOperation::ToolCall(tool_call) => {
                 parse_tool_call_operation_execution_nonce(tool_call)?
@@ -739,9 +762,11 @@ impl ChioKernel {
             _ => None,
         };
 
+        let mut retained_threshold = None;
+        let mut bound_threshold_intent = None;
         if should_track_inflight {
             if let SessionOperation::ToolCall(tool_call) = operation {
-                self.begin_or_resume_tool_request(
+                retained_threshold = self.begin_or_resume_tool_request(
                     context,
                     tool_call,
                     parsed_tool_call_execution_nonce.as_ref(),
@@ -759,14 +784,14 @@ impl ChioKernel {
 
         let evaluation = match operation {
             SessionOperation::ToolCall(tool_call) => {
-                let request = ToolCallRequest {
+                let mut request = ToolCallRequest {
                     request_id: context.request_id.to_string(),
                     capability: tool_call.capability.clone(),
                     tool_name: tool_call.tool_name.clone(),
                     server_id: tool_call.server_id.clone(),
                     agent_id: context.agent_id.clone(),
                     arguments: tool_call.arguments.clone(),
-                    dpop_proof: None,
+                    dpop_proof: parsed_dpop_proof,
                     execution_nonce: parsed_tool_call_execution_nonce,
                     governed_intent: tool_call.governed_intent.clone(),
                     approval_token: tool_call.approval_token.clone(),
@@ -777,22 +802,26 @@ impl ChioKernel {
                     federated_origin_kernel_id: None,
                     declassification_grant: None,
                 };
-                let session_roots =
-                    self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
-                let security_context =
-                    self.resolve_security_invocation_context(context, tool_call)?;
+                self.prepare_session_threshold_intent(context, &mut request, retained_threshold)
+                    .and_then(|()| {
+                        bound_threshold_intent = request.governed_intent.clone();
+                        let session_roots = self
+                            .session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
+                        let security_context =
+                            self.resolve_security_invocation_context(context, tool_call)?;
 
-                // Pass the session_id so the evaluate path can resolve
-                // tenant_id from session.auth_context for every receipt
-                // signed during this tool call.
-                self.evaluate_tool_call_sync_with_session_and_security_context(
-                    &request,
-                    Some(session_roots.as_slice()),
-                    tool_call.extra_metadata.clone(),
-                    Some(&context.session_id),
-                    security_context.as_ref(),
-                )
-                .map(SessionOperationResponse::ToolCall)
+                        // Pass the session_id so the evaluate path can resolve
+                        // tenant_id from session.auth_context for every receipt
+                        // signed during this tool call.
+                        self.evaluate_tool_call_sync_with_session_and_security_context(
+                            &request,
+                            Some(session_roots.as_slice()),
+                            tool_call.extra_metadata.clone(),
+                            Some(&context.session_id),
+                            security_context.as_ref(),
+                        )
+                        .map(SessionOperationResponse::ToolCall)
+                    })
             }
             SessionOperation::CreateMessage(_) => Err(KernelError::Internal(
                 "sampling/createMessage must be evaluated by an MCP edge with a client transport"
@@ -858,7 +887,13 @@ impl ChioKernel {
                 SessionOperation::ToolCall(tool_call) => Some(tool_call.as_ref()),
                 _ => None,
             };
-            self.finish_session_tool_request(context, tool_call, response, terminal_state)?;
+            self.finish_session_tool_request(
+                context,
+                tool_call,
+                response,
+                bound_threshold_intent.as_ref(),
+                terminal_state,
+            )?;
         }
 
         evaluation

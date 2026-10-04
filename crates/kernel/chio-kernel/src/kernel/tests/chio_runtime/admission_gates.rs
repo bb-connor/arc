@@ -407,6 +407,7 @@ fn session_tool_call_preserves_chio_swarm_runtime_context() -> Result<(), Box<dy
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-chio-runtime".to_string(),
         tool_name: "destructive_update".to_string(),
@@ -592,6 +593,7 @@ fn chio_runtime_admission_hook_receives_nested_flow_route_metadata_before_dispat
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-chio-runtime".to_string(),
         tool_name: "destructive_update".to_string(),

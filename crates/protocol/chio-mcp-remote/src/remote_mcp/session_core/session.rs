@@ -46,6 +46,7 @@ impl RemoteSession {
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
             session_db_path: init.session_db_path,
+            approval_redemption: init.approval_redemption,
             session_store_lease: init.session_store_lease,
             resume_hmac_keyring: init.resume_hmac_keyring,
             resume_generation: AtomicU64::new(init.resume_generation),
@@ -56,6 +57,28 @@ impl RemoteSession {
     }
 
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
+        remote_mcp_approvals::validate_redemption(self, &message)?;
+        // Redemption can inspect lifecycle itself. Take the lock afterward and
+        // retain it through enqueue, serializing with drain/terminal transitions.
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        match lifecycle.state {
+            RemoteSessionState::Ready => {
+                lifecycle
+                    .deadline
+                    .as_mut()
+                    .ok_or(ClockError::InvalidWindow)?
+                    .remaining(self.clock.read()?)?;
+            }
+            RemoteSessionState::Initializing
+                if message.get("method").and_then(Value::as_str) == Some("initialize")
+                    && message.get("id").is_some() => {}
+            _ => {
+                return Err(chio_kernel::KernelError::GovernedTransactionDenied(
+                    "remote MCP session does not admit this message in its current state".into(),
+                )
+                .into())
+            }
+        }
         self.input_tx.send(message).map_err(|_| {
             CliError::cli_other_error("remote MCP session worker is unavailable".to_string())
         })

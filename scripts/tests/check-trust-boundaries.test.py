@@ -40,6 +40,88 @@ class BoundaryGateCalibration(unittest.TestCase):
     def test_current_sources_match(self):
         self.assertEqual(self.errors(), [])
 
+    def test_signed_and_canonical_readers_cannot_downgrade_to_document(self):
+        for path, method in [
+            (gate.STORE + "/receipt_store/support/signed_readback.rs", "decode_signed"),
+            (gate.STORE + "/receipt_store/support/receipt_verify.rs", "decode_signed"),
+            ("crates/security/chio-keyring/src/lib.rs", "decode_canonical"),
+        ]:
+            with self.subTest(path=path):
+                self.assertIn("." + method + "(", self.files[path])
+                errors = self.errors(path, lambda text: text.replace("." + method + "(", ".decode_document(", 1))
+                self.assertTrue(any("decoding contract" in error for error in errors), errors)
+
+    def test_real_mixed_owner_swap_is_rejected_with_identical_method_counts(self):
+        path = "crates/products/chio-api-protect/src/proxy/input.rs"
+        def swap(text):
+            changed = text.replace(".decode_signed()", ".SWAP()", 1).replace(".decode_document()", ".decode_signed()", 1).replace(".SWAP()", ".decode_document()", 1)
+            for method in ("decode_signed", "decode_document"):
+                self.assertEqual(changed.count(method), text.count(method))
+            return changed
+        self.assertTrue(any("decoding contract" in error for error in self.errors(path, swap)))
+
+    def test_inventory_only_promotion_of_all_raw_baselines_is_rejected(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        promoted = []
+        for path, contract in catalog["decoder_file_contracts"].items():
+            if contract["kind"] == "raw-input-baseline":
+                promoted.append(path)
+                contract.update(kind="reviewed-bounded-input", contract="reviewed")
+        self.assertTrue(promoted)
+        with patch.object(self, "catalog", catalog):
+            errors = self.errors()
+        for path in promoted:
+            self.assertTrue(any("reader evidence" in error and path in error for error in errors), path)
+
+    def test_inventory_only_promotion_cannot_copy_an_unrelated_reader(self):
+        catalog = json.loads(json.dumps(self.catalog))
+        reviewed = next(row for row in catalog["decoder_file_contracts"].values() if row.get("readers"))
+        for path, row in catalog["decoder_file_contracts"].items():
+            if row["kind"] == "raw-input-baseline":
+                row.update(kind="reviewed-bounded-input", contract="reviewed", readers=reviewed["readers"])
+                catalog["reviewed_product_readers"][path] = {"contract": "reviewed"}
+                catalog["signed_input_files"].append(path)
+        # Supply all the census metadata too, as in CA2's stronger mutation.
+        with patch.object(gate, "sources", return_value=iter(self.files.items())):
+            scan = gate.scan(ROOT, catalog)[0]
+        catalog["raw_decoders"] = scan["raw_decoders"]
+        catalog["raw_decoder_contracts"] = {site: "reviewed" for site in scan["raw_decoders"]}
+        with patch.object(self, "catalog", catalog):
+            errors = self.errors()
+        self.assertTrue(any("reader evidence" in error for error in errors), errors)
+        self.assertFalse(any("raw_decoders changed" in error for error in errors), errors)
+
+    def test_named_reader_and_api_evidence_must_exist_in_that_owner(self):
+        path = "crates/core/chio-core-types/src/canonical/signed_json.rs"
+        for field, bogus in [("reader", "not_a_reader"), ("apis", ["nonexistent_bounded_api"]), ("apis", ["UntrustedJsonText::from_wire#1::decode_signed"])]:
+            with self.subTest(field=field, bogus=bogus):
+                catalog = json.loads(json.dumps(self.catalog))
+                row = catalog["decoder_file_contracts"][path]["readers"][0]
+                row[field] = bogus
+                with patch.object(self, "catalog", catalog):
+                    errors = self.errors()
+                self.assertTrue(any("reader evidence" in error and path in error for error in errors), errors)
+
+    def test_raw_reader_loses_evidence_when_actual_preflight_is_removed(self):
+        for path, call in [
+            ("crates/core/chio-core-types/src/canonical/signed_json.rs", "validate_number_tokens(input)?;"),
+            ("crates/security/chio-quarantine/src/correlation.rs", "validate_stored_body(partial)?;"),
+        ]:
+            with self.subTest(path=path):
+                self.assertIn(call, self.files[path])
+                errors = self.errors(path, lambda text: text.replace(call, "", 1))
+                self.assertTrue(any("reader evidence" in error and path in error for error in errors), errors)
+
+    def test_checkpoint_typed_evidence_requires_its_closed_source_shape(self):
+        path = "crates/kernel/chio-kernel/src/checkpoint.rs"
+        errors = self.errors(path, lambda text: text.replace("pub checkpoint_seq: u64,", "pub checkpoint_seq: serde_json::Value,", 1))
+        self.assertTrue(any("reader evidence" in error and "checkpoint_validate.rs" in error for error in errors), errors)
+
+    def test_unsigned_document_and_typed_projection_contracts_remain_supported(self):
+        self.assertTrue(any(site.endswith("::decode_document") for site in self.catalog["decoding_contracts"]))
+        path = "crates/products/chio-api-protect/src/proxy/input.rs"
+        self.assertEqual(self.errors(path, lambda text: text + '\n// let sample = "input.decode_signed()";\n'), [])
+
     def test_reviewed_authority_owner_cannot_be_unregistered(self):
         catalog = json.loads(json.dumps(self.catalog))
         path = next(iter(catalog["reviewed_authority_owners"]))
@@ -142,6 +224,104 @@ class BoundaryGateCalibration(unittest.TestCase):
         masked = gate.without_test_items(text)
         self.assertNotIn("helper", masked)
         self.assertIn("fn production() { leak(); }", masked)
+
+
+class ContractScopeCalibration(unittest.TestCase):
+    def contracts(self, source):
+        return gate._contracts.decoding_contracts(gate._lexer.blank_rust_noise(source))
+
+    def evidence(self, source, path="crates/synthetic/src/reader.rs"):
+        code = gate._lexer.blank_rust_noise(source)
+        return gate._contracts.reader_evidence(path, code, list(gate.json_decoders(code)), code)
+
+    def test_import_and_local_aliases_keep_the_actual_contract(self):
+        source = """
+            use chio_core_types::canonical::{UntrustedJsonText as Original};
+            fn read(bytes: &[u8]) {
+                let text = Original::from_wire(bytes, 64)?;
+                let alias = text;
+                alias.decode_signed()
+            }
+        """
+        self.assertEqual(self.contracts(source), (("read::from_wire#1::decode_signed",), ()))
+        self.assertEqual(self.contracts(source.replace("alias.decode_signed", "alias.decode_document")),
+                         (("read::from_wire#1::decode_document",), ()))
+
+    def test_type_alias_and_closure_pin_external_contract(self):
+        source = """
+            type Original<'a> = chio_core_types::canonical::UntrustedJsonText<'a>;
+            fn read(bytes: &[u8]) {
+                Original::from_wire(bytes, 64).and_then(|text| text.decode_external::<Value>())
+            }
+        """
+        self.assertEqual(self.contracts(source), (("read::from_wire#1::decode_external",), ()))
+
+    def test_same_count_method_swap_changes_each_constructor(self):
+        source = """fn read(a: &[u8], b: &[u8]) {
+            UntrustedJsonText::from_wire(a, 64)?.decode_signed();
+            UntrustedJsonText::from_wire(b, 64)?.decode_document();
+        }"""
+        self.assertEqual(self.contracts(source)[0], (
+            "read::from_wire#1::decode_signed", "read::from_wire#2::decode_document",
+        ))
+        swapped = source.replace("decode_signed", "SWAP").replace("decode_document", "decode_signed").replace("SWAP", "decode_document")
+        self.assertEqual(self.contracts(swapped)[0], (
+            "read::from_wire#1::decode_document", "read::from_wire#2::decode_signed",
+        ))
+
+    def test_unrelated_receiver_nested_function_and_noise_do_not_supply_contract(self):
+        source = '''fn read(bytes: &[u8]) {
+            let text = UntrustedJsonText::from_wire(bytes, 64)?;
+            // text.decode_canonical();
+            let example = r#"text.decode_external()"#;
+            fn helper() { text.decode_signed(); }
+            other.decode_signed();
+            text.decode_document()
+        }'''
+        self.assertEqual(self.contracts(source), (("read::from_wire#1::decode_document",), ()))
+
+    def test_unresolved_receiver_cannot_be_recorded_as_a_signed_contract(self):
+        source = "fn read(bytes: &[u8]) { let text = UntrustedJsonText::from_wire(bytes, 64)?; other.decode_signed(); }"
+        self.assertTrue(self.contracts(source)[1])
+
+    def test_unrelated_owner_and_nested_helper_do_not_supply_reader_evidence(self):
+        for source in [
+            "fn read(s: &str) { serde_json::from_str(s) } fn checked(b: &[u8]) { UntrustedJsonText::from_wire(b, 64)?.decode_signed() }",
+            "fn read(s: &str) { fn checked(b: &[u8]) { UntrustedJsonText::from_wire(b, 64)?.decode_signed() } serde_json::from_str(s) }",
+            'fn read(s: &str) { let fake = "UntrustedJsonText::from_wire(s, 64)?.decode_signed()"; serde_json::from_str(s) }',
+            "fn read(s: &str) { unrelated::read_file_bounded(); serde_json::from_str(s) }",
+            "fn read_file_bounded() {} fn read(s: &str) { read_file_bounded(); serde_json::from_str(s) }",
+        ]:
+            with self.subTest(source=source):
+                self.assertFalse(self.evidence(source)[0]["checked"])
+
+    def test_intrinsic_projection_and_typed_deserializer_remain_typed_claims(self):
+        self.assertEqual(self.evidence("fn project(value: Value) { serde_json::from_value(value) }")[0]["apis"], ["serde_json::from_value"])
+        evidence = self.evidence("fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<[u8; 32], D::Error> { Hash::deserialize(d) }")
+        self.assertTrue(evidence[0]["checked"], evidence)
+
+    def test_grouping_repeated_typed_callbacks_checks_every_body(self):
+        source = """
+            impl A { fn deserialize<'de, D: Deserializer<'de>>(d: D) { String::deserialize(d) } }
+            impl B { fn deserialize<'de, D: Deserializer<'de>>(d: D) { String::deserialize(d) } }
+        """
+        evidence = self.evidence(source)
+        self.assertEqual(evidence[0]["instances"], 2)
+        changed = source.replace("String::deserialize(d)", "serde_json::from_str(input)", 1)
+        self.assertTrue(any(not row["checked"] for row in self.evidence(changed)))
+
+    def test_typed_field_evidence_requires_the_named_supporting_type(self):
+        code = "fn validate_effect_plan_binding(effect: &PlannedResponseEffect) { serde_json::from_slice(effect.canonical_contribution.as_bytes()) }"
+        for declaration, expected in [
+            ("pub struct PlannedResponseEffect { pub canonical_contribution: CanonicalBody, }", True),
+            ("pub struct PlannedResponseEffect { pub canonical_contribution: Value, } pub struct Unrelated { pub canonical_contribution: CanonicalBody, }", False),
+        ]:
+            with self.subTest(declaration=declaration):
+                rows = gate._contracts.reader_evidence(
+                    "crates/core/chio-response-model/src/state.rs", code, list(gate.json_decoders(code)), code,
+                    {gate._contracts._rules.EFFECT: declaration},
+                )
+                self.assertEqual(rows[0]["checked"], expected)
 
 
 if __name__ == "__main__":

@@ -11,6 +11,8 @@ mod fiscal_handlers;
 mod fiscal_runtime;
 #[path = "trust_control/frost.rs"]
 pub mod frost;
+#[path = "trust_control/json_ingress.rs"]
+mod json_ingress;
 #[path = "trust_control/health.rs"]
 mod trust_control_health;
 
@@ -131,7 +133,7 @@ use chio_kernel::{
     GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
 };
 use chio_kernel::{
-    AuthoritySnapshot, AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
+    AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
     BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReceiptRow,
     BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore,
     BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport, BudgetUtilizationRow,

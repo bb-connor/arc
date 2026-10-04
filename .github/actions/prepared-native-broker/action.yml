@@ -3,11 +3,18 @@ description: Build host adapters, the static caged proxy and qualification servi
 runs:
   using: composite
   steps:
+    - name: Install the native broker C toolchain
+      uses: ./.github/actions/apt-install
+      with:
+        packages: musl-tools
     - name: Build bounded native broker transports
       shell: bash
       run: |
         set -euo pipefail
         umask 022
+        test "$(uname -s):$(uname -m)" = "Linux:x86_64"
+        command -v x86_64-linux-musl-gcc
+        rustup target add x86_64-unknown-linux-musl
         cargo build --locked --profile docker-release -p chio-secret-broker --bin chio-docker-adapter --bin chio-repository-adapter
         cargo build --locked --target x86_64-unknown-linux-musl -p chio-secret-broker --bin chio-broker-mcp
         cargo test --locked --profile docker-release -p chio-secret-broker --features real-linux-enforcement --lib --no-run --message-format=json > "$RUNNER_TEMP/consumer-helper.jsonl"
@@ -18,12 +25,17 @@ runs:
         if len(binaries) != 1:
             raise SystemExit("Expected one native broker service helper")
         target = pathlib.Path(os.environ.get("CARGO_TARGET_DIR", "target")).resolve()
-        with open(sys.argv[2], "a") as stream:
-            for key, value in {
+        executables = {
                 "CHIO_BROKER_TEST_BINARY": binaries[0],
                 "CHIO_BROKER_MCP_TOOL": target / "x86_64-unknown-linux-musl/debug/chio-broker-mcp",
                 "CHIO_DOCKER_ADAPTER": target / "docker-release/chio-docker-adapter",
                 "CHIO_REPOSITORY_ADAPTER": target / "docker-release/chio-repository-adapter",
-            }.items():
+        }
+        for key, value in executables.items():
+            path = pathlib.Path(value)
+            if not path.is_file() or not os.access(path, os.X_OK):
+                raise SystemExit(f"Missing executable for {key}: {path}")
+        with open(sys.argv[2], "a") as stream:
+            for key, value in executables.items():
                 stream.write(f"{key}={value}\n")
         PY

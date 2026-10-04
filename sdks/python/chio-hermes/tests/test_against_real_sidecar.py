@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -38,6 +39,7 @@ from typing import Any
 import pytest
 
 INTEGRATION_FLAG = "CHIO_INTEGRATION"
+_SIDECAR_CONTROL_TOKEN = secrets.token_urlsafe(32)
 
 pytestmark = pytest.mark.skipif(
     os.environ.get(INTEGRATION_FLAG) != "1",
@@ -113,6 +115,7 @@ def live_sidecar(chio_binary: Path) -> Iterator[str]:
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,
+        env={**os.environ, "CHIO_SIDECAR_CONTROL_TOKEN": _SIDECAR_CONTROL_TOKEN},
     )
 
     base_url: str | None = None
@@ -175,15 +178,16 @@ def test_mint_capability_via_sdk_path(live_sidecar: str) -> None:
     from chio_sdk.models import ChioScope
 
     async def go() -> Any:
-        async with ChioClient(base_url=live_sidecar) as client:
+        async with ChioClient(base_url=live_sidecar, control_token=_SIDECAR_CONTROL_TOKEN) as client:
             return await client.create_capability(
-                subject="abcd1234abcd1234abcd1234abcd1234",
+                subject="d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
                 scope=ChioScope(),
                 ttl_seconds=600,
             )
 
     token = _async_run(go())
     assert token.id.startswith("sidecar-")
+    assert token.subject == "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
     assert token.signature
     assert token.issuer
     assert token.expires_at > token.issued_at
@@ -194,9 +198,9 @@ def _mint_capability_id(base_url: str) -> str:
     from chio_sdk.models import ChioScope
 
     async def go() -> str:
-        async with ChioClient(base_url=base_url) as client:
+        async with ChioClient(base_url=base_url, control_token=_SIDECAR_CONTROL_TOKEN) as client:
             token = await client.create_capability(
-                subject="abcd1234abcd1234abcd1234abcd1234",
+                subject="d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
                 scope=ChioScope(),
                 ttl_seconds=600,
             )

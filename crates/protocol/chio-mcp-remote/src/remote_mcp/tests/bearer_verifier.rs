@@ -474,7 +474,7 @@ fn introspection_bearer_verifier_accepts_active_token_with_resource_claim() {
     let auth_context = verifier
         .session_auth_context_from_introspection(super::IntrospectionSessionAuthInput {
             token: "opaque-token",
-            headers: &empty_header_map(),
+            headers: (&empty_header_map()).into(),
             introspection: OAuthIntrospectionResponse {
                 active: true,
                 token_type: Some("Bearer".to_string()),
@@ -569,7 +569,7 @@ fn introspection_bearer_verifier_rejects_inactive_token() {
     let error = verifier
         .session_auth_context_from_introspection(super::IntrospectionSessionAuthInput {
             token: "opaque-token",
-            headers: &empty_header_map(),
+            headers: (&empty_header_map()).into(),
             introspection: OAuthIntrospectionResponse {
                 active: false,
                 token_type: Some("Bearer".to_string()),
@@ -620,4 +620,99 @@ fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> String {
     let signature = keypair.sign(signing_input.as_bytes()).to_bytes();
     let signature = URL_SAFE_NO_PAD.encode(signature);
     format!("{signing_input}.{signature}")
+}
+
+fn inbound_sender_verifier(key: &Keypair) -> JwtBearerVerifier {
+    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+    JwtBearerVerifier {
+        clock: RemoteClock::default(),
+        key_source: JwtVerificationKeySource::Static(key.public_key()),
+        issuer: Some("https://issuer.example".into()),
+        audience: Some("chio-mcp".into()),
+        required_scopes: vec![],
+        provider_profile: JwtProviderProfile::Generic,
+        enterprise_provider_registry: None,
+        sender_dpop_nonce_store,
+        sender_dpop_config,
+    }
+}
+
+#[test]
+fn inbound_authority_jwt_unknown_empty_or_null_confirmation_never_becomes_bearer() {
+    let key = Keypair::generate();
+    let verifier = inbound_sender_verifier(&key);
+    let outcomes = [json!({"jkt":"unverified-thumbprint"}), json!({"unknown":"ignored"}),
+        json!({}), Value::Null, json!({"chioSenderKey":null}), json!({"x5t#S256":""})]
+        .into_iter().map(|cnf| {
+            let token = sign_jwt(&key, &json!({"iss":"https://issuer.example", "aud":"chio-mcp", "sub":"sender", "exp":unix_now()+300, "cnf":cnf}));
+            match verifier.authenticate_token(&token, &HeaderMap::new(), None, None, "POST", "chio-mcp") {
+                Ok(_) => StatusCode::OK,
+                Err(response) => response.status(),
+            }
+        }).collect::<Vec<_>>();
+    assert_eq!(outcomes, vec![StatusCode::UNAUTHORIZED; 6]);
+}
+
+#[test]
+fn inbound_authority_jwt_caller_headers_cannot_claim_transport_identity() {
+    let key = Keypair::generate();
+    let verifier = inbound_sender_verifier(&key);
+    let thumbprint = "a".repeat(64);
+    let token = sign_jwt(
+        &key,
+        &json!({"iss":"https://issuer.example", "aud":"chio-mcp", "sub":"sender", "exp":unix_now()+300, "cnf":{"x5t#S256":thumbprint}}),
+    );
+    let headers = HeaderMap::from_iter([
+        (
+            HeaderName::from_static(CHIO_MTLS_THUMBPRINT_HEADER),
+            HeaderValue::from_str(&thumbprint).unwrap(),
+        ),
+        (
+            HeaderName::from_static("x-forwarded-for"),
+            HeaderValue::from_static("127.0.0.1"),
+        ),
+    ]);
+    let result = verifier.authenticate_token(&token, &headers, None, None, "POST", "chio-mcp");
+    let status = match result {
+        Ok(_) => StatusCode::OK,
+        Err(response) => response.status(),
+    };
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[test]
+fn inbound_authority_remote_subject_is_the_authenticated_sender_key() {
+    let issuer = Keypair::generate();
+    let sender = Keypair::generate();
+    let verifier = inbound_sender_verifier(&issuer);
+    let now = verifier.clock.seconds().unwrap();
+    let token = sign_jwt(
+        &issuer,
+        &json!({"iss":"https://issuer.example","aud":"chio-mcp","sub":"sender","exp":now+300,"jti":"subject-bootstrap","cnf":{"chioSenderKey":sender.public_key().to_hex()}}),
+    );
+    let proof = DpopProof::sign(
+        chio_kernel::dpop::DpopProofBody {
+            schema: chio_kernel::DPOP_SCHEMA.into(),
+            replay_authority: None,
+            capability_id: "subject-bootstrap".into(),
+            tool_server: "chio-mcp".into(),
+            tool_name: "POST".into(),
+            action_hash: sha256_hex(HTTP_DPOP_ACTION_HASH_EMPTY),
+            nonce: "subject-proof".into(),
+            issued_at: now,
+            agent_key: sender.public_key(),
+        },
+        &sender,
+    )
+    .unwrap();
+    let headers = HeaderMap::from_iter([(
+        HeaderName::from_static(DPOP_HEADER),
+        HeaderValue::from_str(&URL_SAFE_NO_PAD.encode(serde_json::to_vec(&proof).unwrap()))
+            .unwrap(),
+    )]);
+    let auth = verifier
+        .authenticate_token(&token, &headers, None, None, "POST", "chio-mcp")
+        .unwrap();
+    let subject = derive_session_agent_public_key(&test_remote_config(), &auth, true).unwrap();
+    assert_eq!(subject, sender.public_key());
 }

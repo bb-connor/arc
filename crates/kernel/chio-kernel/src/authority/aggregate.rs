@@ -14,8 +14,9 @@ pub fn validate_issued_aggregate_family_root_response(
     requested_ttl_seconds: u64,
     current_issuer: &PublicKey,
     max_invocations: u32,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<(), KernelError> {
-    let now = capability_authority_now_unix_secs(&SystemClock)?;
+    let now = now.as_secs();
     validate_issued_response_at(
         capability,
         requested_subject,
@@ -96,19 +97,21 @@ mod tests {
                 300,
                 &key.public_key(),
                 limit,
+                chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
             )
         };
         validate(&root, 2)?;
         assert!(validate(&root, 1).is_err());
         assert!(validate(&root, 3).is_err());
-        assert!(validate_issued_capability_response(
+        assert!(matches!(validate_issued_capability_response(
             &root,
             &subject,
             &scope,
             300,
             &key.public_key(),
-        )
-        .is_err());
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
+        ), Err(KernelError::CapabilityIssuanceDenied(message))
+            if message == "aggregate invocation capability issuance requires atomic composite admission enforcement"));
         let plain = authority.issue_capability(&subject, scope.clone(), 300)?;
         assert!(validate(&plain, 2).is_err());
         let mut changed = root.clone();
@@ -127,15 +130,17 @@ mod tests {
             .max_invocations = 3;
         changed.signature = key.sign_canonical(&changed.signing_body())?.0;
         assert!(validate(&changed, 2).is_err());
-        assert!(validate_issued_aggregate_family_root_response(
+        assert!(matches!(validate_issued_aggregate_family_root_response(
             &root,
             &subject,
             &scope,
             1,
             &key.public_key(),
             2,
-        )
-        .is_err());
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
+        ), Err(KernelError::CapabilityIssuanceFailed(message))
+            if message.starts_with("issued capability wall-clock expiry ")
+                && message.contains("exceeds allowed maximum")));
         Ok(())
     }
 
@@ -156,6 +161,7 @@ mod tests {
             300,
             &key.public_key(),
             2,
+            chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         )?;
         Ok(())
     }

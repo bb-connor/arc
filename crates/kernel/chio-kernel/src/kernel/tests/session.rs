@@ -389,6 +389,7 @@ fn session_operation_tool_call_tracks_and_clears_inflight() {
 
     let context = make_operation_context(&session_id, "req-1", &agent_kp.public_key().to_hex());
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -433,6 +434,7 @@ fn session_operation_forwards_supplemental_authorization_to_kernel_validation() 
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -485,6 +487,7 @@ fn session_operation_tool_call_malformed_nonce_clears_inflight() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
@@ -848,6 +851,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -951,6 +955,7 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "elicit_via_client".to_string(),
@@ -1043,6 +1048,7 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "roots_via_client".to_string(),
@@ -1129,6 +1135,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1234,6 +1241,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1344,6 +1352,7 @@ fn tool_call_nested_flow_rejects_malformed_execution_nonce_without_inflight_leak
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
@@ -1460,6 +1469,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
         &agent_kp.public_key().to_hex(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: tool_capability,
         server_id: "nested".to_string(),
         tool_name: "notify_resources_via_client".to_string(),

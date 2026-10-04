@@ -44,7 +44,10 @@ impl Upstream {
     }
 
     fn proxy_state(&self, token: Option<&str>) -> Arc<ProxyState> {
-        let mut state = test_state(Vec::new(), format!("http://{}", self.address));
+        let mut state = test_state(
+            ProtectProxy::routes_from_spec(PETSTORE_YAML).test_unwrap(),
+            format!("http://{}", self.address),
+        );
         Arc::get_mut(&mut state).test_unwrap().sidecar_control_token = token.map(str::to_owned);
         state
     }
@@ -280,8 +283,11 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
         let receipt_db = directory.path().join("state/receipts.db");
         let observed = std::sync::atomic::AtomicBool::new(false);
         let error = ProtectProxy::new(ProtectConfig {
+            transport: Default::default(),
             upstream: "http://127.0.0.1:1".into(),
             spec_content: None,
+            spec_sha256: None,
+            allow_anonymous_reads: false,
             spec_path: Some(
                 directory
                     .path()
@@ -293,8 +299,11 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
             receipt_db: Some(receipt_db.to_string_lossy().into_owned()),
             allow_ephemeral_receipts: false,
             sidecar_control_token: Some(token.clone()),
+            receipt_retention: None,
+            signer_seed_file: None,
             signer_seed_hex: None,
             trusted_capability_issuers: Vec::new(),
+            approval: None,
             control_url: None,
             control_token: None,
             budget_db: None,
@@ -433,15 +442,21 @@ async fn serving_proxy_rejects_control_headers_without_waiting_for_request_body(
     let upstream = Upstream::start().await;
     let (ready, listening) = tokio::sync::oneshot::channel();
     let proxy = ProtectProxy::new(ProtectConfig {
+        transport: Default::default(),
         upstream: format!("http://{}", upstream.address),
         spec_content: Some(PETSTORE_YAML.into()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".into(),
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: Some(SECRET.into()),
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: None,

@@ -15,6 +15,20 @@ use chio_core::capability::scope::{ChioScope, Constraint, Operation, ToolGrant};
 /// permission. Policies that rely on negative matches or other semantics the
 /// scope model cannot encode fail closed and emit no default grants.
 pub(super) fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
+    let mut scope = compile_unbound_scope(policy)?;
+    let required = policy
+        .rules
+        .as_ref()
+        .and_then(|rules| rules.tool_access.as_ref())
+        .filter(|rule| rule.enabled)
+        .and_then(|rule| rule.dpop_required);
+    for grant in &mut scope.grants {
+        grant.dpop_required = required;
+    }
+    Ok(scope)
+}
+
+fn compile_unbound_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
     let Some(rules) = &policy.rules else {
         return Ok(permissive_scope());
     };

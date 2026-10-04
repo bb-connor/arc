@@ -34,6 +34,7 @@ pub(crate) fn dispatch_trust(
 ) -> Result<(), CliError> {
     match command {
             TrustCommands::Serve {
+            transport,
                 listen,
                 service_token,
                 tenant_read_tokens,
@@ -64,6 +65,7 @@ pub(crate) fn dispatch_trust(
                 certification_public_metadata_ttl_seconds,
                 roster_policy_file,
             } => cmd_trust_serve(
+            transport.into(),
                 listen,
                 &service_token,
                 &tenant_read_tokens,

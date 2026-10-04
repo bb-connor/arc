@@ -16,7 +16,8 @@ use chio_kernel::evidence_export::{
 use chio_kernel::ReceiptStoreError;
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::receipt_store::{sqlite_u64, SqliteReceiptStore};
+use crate::receipt_store::retained_read::RetainedSnapshot;
+use crate::receipt_store::SqliteReceiptStore;
 
 impl SqliteReceiptStore {
     /// Build a local-only evidence export bundle from the current SQLite store.
@@ -39,9 +40,7 @@ impl SqliteReceiptStore {
         &self,
         query: &EvidenceExportQuery,
     ) -> Result<(EvidenceExportBundle, CheckpointTransparencySummary), EvidenceExportError> {
-        let (bundle, transparency) = self.collect_evidence_export_bundle(query)?;
-        let transparency = self.enrich_evidence_export_transparency_summary(transparency)?;
-        Ok((bundle, transparency))
+        self.collect_evidence_export_bundle(query)
     }
 
     fn collect_evidence_export_bundle(
@@ -50,41 +49,65 @@ impl SqliteReceiptStore {
     ) -> Result<(EvidenceExportBundle, CheckpointTransparencySummary), EvidenceExportError> {
         query.validate_read_boundary()?;
         let query = query.normalized_for_read_boundary();
-        let tool_receipts = self.collect_tool_receipts_for_export(&query)?;
-        let child_receipt_scope = self.resolve_child_receipt_scope(&query);
-        let child_receipts = self.collect_child_receipts_for_export(&query, child_receipt_scope)?;
-        let (checkpoints, transparency) = self.collect_checkpoints_for_export(&tool_receipts)?;
-        let capability_lineage = self.collect_lineage_for_export(&tool_receipts)?;
-        let (inclusion_proofs, uncheckpointed_receipts) =
-            self.collect_inclusion_proofs_for_export(&tool_receipts, &checkpoints)?;
-        let retention = match &query.read_boundary {
-            Some(chio_kernel::ReceiptReadBoundary::TenantScoped { tenant }) => {
-                EvidenceRetentionMetadata {
-                    live_db_size_bytes: None,
-                    oldest_live_receipt_timestamp: self
-                        .oldest_receipt_timestamp_for_tenant(tenant)?,
+        self.with_retained_snapshot(|snapshot| {
+            snapshot.reject_legacy_receipt_omission()?;
+            let tool_receipts = self.collect_tool_receipts_for_export(snapshot, &query)?;
+            let child_receipt_scope = self.resolve_child_receipt_scope(&query);
+            let child_receipts =
+                self.collect_child_receipts_for_export(snapshot, &query, child_receipt_scope)?;
+            let (checkpoints, transparency) =
+                self.collect_checkpoints_for_export(snapshot, &tool_receipts)?;
+            let capability_lineage = self.collect_lineage_for_export(snapshot, &tool_receipts)?;
+            let transparency =
+                Self::enrich_transparency_on_connection(snapshot.live, transparency)?;
+            let (inclusion_proofs, uncheckpointed_receipts) =
+                self.collect_inclusion_proofs_for_export(snapshot, &tool_receipts, &checkpoints)?;
+            let tenant = match &query.read_boundary {
+                Some(chio_kernel::ReceiptReadBoundary::TenantScoped { tenant }) => {
+                    Some(tenant.as_str())
                 }
-            }
-            Some(chio_kernel::ReceiptReadBoundary::AdminAll) | None => EvidenceRetentionMetadata {
-                live_db_size_bytes: Some(self.db_size_bytes()?),
-                oldest_live_receipt_timestamp: self.oldest_receipt_timestamp()?,
-            },
-        };
+                _ => None,
+            };
+            let oldest: Option<i64> = snapshot.live.query_row(
+            "SELECT MIN(timestamp) FROM chio_tool_receipts WHERE (?1 IS NULL OR tenant_id = ?1)",
+            [tenant], |row| row.get(0),
+        )?;
+            let live_db_size_bytes = if tenant.is_none() {
+                let pages: i64 = snapshot
+                    .live
+                    .query_row("PRAGMA page_count", [], |r| r.get(0))?;
+                let size: i64 = snapshot
+                    .live
+                    .query_row("PRAGMA page_size", [], |r| r.get(0))?;
+                Some(
+                    crate::receipt_store::sqlite_u64(pages, "page count")?
+                        .saturating_mul(crate::receipt_store::sqlite_u64(size, "page size")?),
+                )
+            } else {
+                None
+            };
+            let retention = EvidenceRetentionMetadata {
+                live_db_size_bytes,
+                oldest_live_receipt_timestamp: oldest
+                    .map(|v| crate::receipt_store::sqlite_u64(v, "oldest receipt timestamp"))
+                    .transpose()?,
+            };
 
-        Ok((
-            EvidenceExportBundle {
-                query: query.clone(),
-                tool_receipts,
-                child_receipts,
-                child_receipt_scope,
-                checkpoints,
-                capability_lineage,
-                inclusion_proofs,
-                uncheckpointed_receipts,
-                retention,
-            },
-            transparency,
-        ))
+            Ok((
+                EvidenceExportBundle {
+                    query: query.clone(),
+                    tool_receipts,
+                    child_receipts,
+                    child_receipt_scope,
+                    checkpoints,
+                    capability_lineage,
+                    inclusion_proofs,
+                    uncheckpointed_receipts,
+                    retention,
+                },
+                transparency,
+            ))
+        })
     }
 
     pub fn build_evidence_export_transparency_summary(
@@ -97,16 +120,22 @@ impl SqliteReceiptStore {
 
     fn enrich_evidence_export_transparency_summary(
         &self,
+        summary: CheckpointTransparencySummary,
+    ) -> Result<CheckpointTransparencySummary, EvidenceExportError> {
+        Self::enrich_transparency_on_connection(&*self.connection()?, summary)
+    }
+
+    fn enrich_transparency_on_connection(
+        connection: &Connection,
         mut summary: CheckpointTransparencySummary,
     ) -> Result<CheckpointTransparencySummary, EvidenceExportError> {
         if summary.publications.is_empty() {
             return Ok(summary);
         }
 
-        let connection = self.connection()?;
         for publication in &mut summary.publications {
             let persisted =
-                load_checkpoint_publication_core(&connection, publication.checkpoint_seq)?
+                load_checkpoint_publication_core(connection, publication.checkpoint_seq)?
                     .ok_or_else(|| {
                         EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(format!(
                             "checkpoint {} is missing persisted publication metadata",
@@ -122,7 +151,7 @@ impl SqliteReceiptStore {
                 ));
             }
             if let Some(binding) = load_checkpoint_publication_trust_anchor_binding(
-                &connection,
+                connection,
                 publication.checkpoint_seq,
             )? {
                 *publication =
@@ -135,13 +164,14 @@ impl SqliteReceiptStore {
 
     fn collect_tool_receipts_for_export(
         &self,
+        snapshot: &RetainedSnapshot<'_>,
         query: &EvidenceExportQuery,
     ) -> Result<Vec<EvidenceToolReceiptRecord>, EvidenceExportError> {
         let mut cursor = None;
         let mut records = Vec::new();
 
         loop {
-            let page = self.query_receipts(&query.as_receipt_query(cursor))?;
+            let page = snapshot.query_receipts(&query.as_receipt_query(cursor))?;
             if page.receipts.is_empty() {
                 break;
             }
@@ -150,7 +180,7 @@ impl SqliteReceiptStore {
                 .receipts
                 .into_iter()
                 .map(|stored| {
-                    let seq = self.claim_log_entry_seq_for_receipt_id(&stored.receipt.id)?;
+                    let seq = snapshot.claim_seq(&stored.receipt.id)?;
                     Ok(EvidenceToolReceiptRecord {
                         seq,
                         receipt: stored.receipt,
@@ -167,26 +197,6 @@ impl SqliteReceiptStore {
         Ok(records)
     }
 
-    fn claim_log_entry_seq_for_receipt_id(
-        &self,
-        receipt_id: &str,
-    ) -> Result<u64, EvidenceExportError> {
-        let connection = self.connection()?;
-        let seq = connection
-            .query_row(
-                "SELECT entry_seq FROM claim_receipt_log_entries WHERE receipt_id = ?1",
-                params![receipt_id],
-                |row| row.get::<_, i64>(0),
-            )
-            .optional()?
-            .ok_or_else(|| {
-                EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(format!(
-                    "receipt {receipt_id} is missing from claim receipt log"
-                )))
-            })?;
-        sqlite_u64(seq, "claim receipt log entry_seq").map_err(EvidenceExportError::ReceiptStore)
-    }
-
     fn resolve_child_receipt_scope(
         &self,
         query: &EvidenceExportQuery,
@@ -196,6 +206,7 @@ impl SqliteReceiptStore {
 
     fn collect_child_receipts_for_export(
         &self,
+        snapshot: &RetainedSnapshot<'_>,
         query: &EvidenceExportQuery,
         scope: EvidenceChildReceiptScope,
     ) -> Result<Vec<EvidenceChildReceiptRecord>, EvidenceExportError> {
@@ -211,37 +222,44 @@ impl SqliteReceiptStore {
             .until
             .map(crate::integer::checked::<_, i64>)
             .transpose()?;
-        let connection = self.connection()?;
-        let mut statement = connection.prepare(
-            r#"
-            SELECT seq, raw_json
-            FROM chio_child_receipts
-            WHERE (?1 IS NULL OR timestamp >= ?1)
-              AND (?2 IS NULL OR timestamp <= ?2)
-            ORDER BY seq ASC
-            "#,
-        )?;
-        let rows = statement.query_map(params![since, until], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })?;
-
-        rows.map(|row| {
-            let (seq, raw_json) = row?;
-            let seq = u64::try_from(seq.max(0)).unwrap_or_default();
-            Ok(EvidenceChildReceiptRecord {
-                seq,
-                receipt: crate::receipt_store::decode_verified_child_receipt(
-                    &raw_json,
-                    "persisted child receipt",
-                    Some(seq),
-                )?,
-            })
-        })
-        .collect()
+        let mut records = Vec::new();
+        for (connection, upper) in [
+            (Some(snapshot.live), i64::MAX.unsigned_abs()),
+            (snapshot.archive, snapshot.watermark),
+        ] {
+            let Some(connection) = connection else {
+                continue;
+            };
+            let mut statement = connection.prepare(
+                "SELECT r.seq, r.raw_json FROM chio_child_receipts r
+                 JOIN claim_receipt_log_entries e ON e.receipt_kind = 'child_receipt' AND e.source_seq = r.seq AND e.receipt_id = r.receipt_id
+                 WHERE (?1 IS NULL OR r.timestamp >= ?1) AND (?2 IS NULL OR r.timestamp <= ?2)
+                   AND e.entry_seq <= ?3 ORDER BY r.seq ASC"
+            )?;
+            let rows = statement.query_map(
+                params![since, until, crate::integer::checked::<_, i64>(upper)?],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            )?;
+            for row in rows {
+                let (seq, raw_json) = row?;
+                let seq = crate::receipt_store::sqlite_u64(seq, "child receipt seq")?;
+                records.push(EvidenceChildReceiptRecord {
+                    seq,
+                    receipt: crate::receipt_store::decode_verified_child_receipt(
+                        &raw_json,
+                        "retained child receipt",
+                        Some(seq),
+                    )?,
+                });
+            }
+        }
+        records.sort_by_key(|row| row.seq);
+        Ok(records)
     }
 
     fn collect_checkpoints_for_export(
         &self,
+        snapshot: &RetainedSnapshot<'_>,
         tool_receipts: &[EvidenceToolReceiptRecord],
     ) -> Result<(Vec<KernelCheckpoint>, CheckpointTransparencySummary), EvidenceExportError> {
         if tool_receipts.is_empty() {
@@ -258,7 +276,7 @@ impl SqliteReceiptStore {
             .max()
             .unwrap_or(0);
 
-        let connection = self.connection()?;
+        let connection = snapshot.live;
         let mut statement = connection.prepare(
             r#"
             SELECT checkpoint_seq
@@ -283,7 +301,13 @@ impl SqliteReceiptStore {
         let mut checkpoints = Vec::new();
         for row in rows {
             let checkpoint_seq = u64::try_from(row?.max(0)).unwrap_or_default();
-            if let Some(checkpoint) = self.load_checkpoint_by_seq(checkpoint_seq)? {
+            if let Some(checkpoint) = crate::receipt_store::support::load_persisted_checkpoint_row(
+                connection,
+                checkpoint_seq,
+            )?
+            .map(crate::receipt_store::support::parse_persisted_checkpoint_row)
+            .transpose()?
+            {
                 checkpoints.push(checkpoint);
             }
         }
@@ -294,11 +318,15 @@ impl SqliteReceiptStore {
 
     fn collect_lineage_for_export(
         &self,
+        snapshot: &RetainedSnapshot<'_>,
         tool_receipts: &[EvidenceToolReceiptRecord],
     ) -> Result<Vec<CapabilitySnapshot>, EvidenceExportError> {
         let mut snapshots = BTreeMap::<String, CapabilitySnapshot>::new();
         for record in tool_receipts {
-            for snapshot in self.get_combined_delegation_chain(&record.receipt.capability_id)? {
+            for snapshot in Self::get_combined_delegation_chain_on_connection(
+                snapshot.live,
+                &record.receipt.capability_id,
+            )? {
                 snapshot.validate_for_transport()?;
                 snapshots
                     .entry(snapshot.capability_id.clone())
@@ -310,6 +338,7 @@ impl SqliteReceiptStore {
 
     fn collect_inclusion_proofs_for_export(
         &self,
+        snapshot: &RetainedSnapshot<'_>,
         tool_receipts: &[EvidenceToolReceiptRecord],
         checkpoints: &[KernelCheckpoint],
     ) -> Result<
@@ -339,19 +368,25 @@ impl SqliteReceiptStore {
                 // receipts are in this export.
                 continue;
             }
-            let canonical_bytes = self.receipts_canonical_bytes_range(
+            let canonical_bytes = snapshot.canonical_range(
                 checkpoint.body.batch_start_seq,
                 checkpoint.body.batch_end_seq,
             )?;
-            if canonical_bytes.is_empty() {
-                continue;
-            }
 
             let leaves = canonical_bytes
                 .iter()
                 .map(|(_, bytes)| bytes.clone())
                 .collect::<Vec<_>>();
             let tree = MerkleTree::from_leaves(&leaves)?;
+            if tree.root() != checkpoint.body.merkle_root
+                || crate::integer::checked::<_, u64>(canonical_bytes.len())?
+                    != checkpoint.body.batch_end_seq - checkpoint.body.batch_start_seq + 1
+            {
+                return Err(ReceiptStoreError::Conflict(
+                    "retained checkpoint batch does not reproduce its signed root".into(),
+                )
+                .into());
+            }
             let leaf_index_by_seq = canonical_bytes
                 .iter()
                 .enumerate()
@@ -503,6 +538,9 @@ mod tests {
 
     use super::*;
 
+    #[path = "retained_tests.rs"]
+    mod retained_tests;
+
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -612,7 +650,14 @@ mod tests {
     }
 
     fn child_receipt_with_ts(id: &str, timestamp: u64) -> ChildRequestReceipt {
-        let keypair = Keypair::generate();
+        child_receipt_with_ts_and_key(id, timestamp, &Keypair::generate())
+    }
+
+    fn child_receipt_with_ts_and_key(
+        id: &str,
+        timestamp: u64,
+        keypair: &Keypair,
+    ) -> ChildRequestReceipt {
         ChildRequestReceipt::sign(
             ChildRequestReceiptBody {
                 id: id.to_string(),
@@ -627,7 +672,7 @@ mod tests {
                 metadata: None,
                 kernel_key: keypair.public_key(),
             },
-            &keypair,
+            keypair,
         )
         .expect("sign child receipt")
     }
@@ -963,5 +1008,46 @@ mod tests {
         assert!(bundle.child_receipts.is_empty());
 
         let _ = std::fs::remove_file(path);
+    }
+    #[test]
+    fn evidence_retained_export_includes_archived_receipts_and_their_proofs() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("live.db");
+        let archive = directory.path().join("archive.db");
+        let store = SqliteReceiptStore::open(&path).unwrap();
+        let key = evidence_receipt_keypair();
+        let receipt = receipt_with_ts("archive-evidence", "cap-1", 100);
+        let seq = store.append_chio_receipt_returning_seq(&receipt).unwrap();
+        let bytes = store.receipts_canonical_bytes_range(seq, seq).unwrap();
+        let checkpoint = build_checkpoint(
+            1,
+            seq,
+            seq,
+            &bytes
+                .into_iter()
+                .map(|(_, bytes)| bytes)
+                .collect::<Vec<_>>(),
+            &key,
+        )
+        .unwrap();
+        store.store_checkpoint(&checkpoint).unwrap();
+        assert_eq!(
+            store
+                .archive_receipts_before(101, archive.to_str().unwrap())
+                .unwrap(),
+            1
+        );
+        let bundle = store
+            .build_evidence_export_bundle(&EvidenceExportQuery::admin_all())
+            .unwrap();
+        assert_eq!(
+            bundle.tool_receipts.len(),
+            1,
+            "archiving cannot hide evidence from export"
+        );
+        assert_eq!(bundle.tool_receipts[0].receipt.id, receipt.id);
+        assert_eq!(bundle.inclusion_proofs.len(), 1);
+        assert!(bundle.uncheckpointed_receipts.is_empty());
+        assert_eq!(bundle.checkpoints[0].body.checkpoint_seq, 1);
     }
 }

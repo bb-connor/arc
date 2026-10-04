@@ -62,6 +62,8 @@ pub mod capability_lineage;
 pub mod channel_lifecycle_store;
 pub mod channel_release_publisher_store;
 pub mod clearing_lifecycle_store;
+#[cfg(test)]
+mod clock_consumer_tests;
 pub mod dead_letters;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
@@ -99,6 +101,7 @@ pub mod security_admission_operation_store;
 pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
+mod store_clock;
 mod store_connection;
 pub mod tool_outcome_store;
 

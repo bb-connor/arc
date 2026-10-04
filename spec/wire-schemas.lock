@@ -390,9 +390,39 @@ files = ["crates/platform/chio-control-plane/src/security/event_consumer/admissi
 first_seen = "b39b131271"
 
 [[schema]]
+value = "chio.authority-lifecycle.v2"
+files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
+first_seen = "a617c0b02f"
+
+[[schema]]
+value = "chio.authority-replication-anchor.v1"
+files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
+first_seen = "0fd0a9d66d"
+
+[[schema]]
+value = "chio.authority-replication-anchor.v2"
+files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
+first_seen = "a617c0b02f"
+
+[[schema]]
+value = "chio.authority-rotation.v1"
+files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
+first_seen = "0fd0a9d66d"
+
+[[schema]]
 value = "chio.authority-seed-handoff.v1"
 files = ["crates/platform/chio-control-plane/src/keyring_runtime.rs"]
 first_seen = "b39b131271"
+
+[[schema]]
+value = "chio.authority-snapshot.v1"
+files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
+first_seen = "0fd0a9d66d"
+
+[[schema]]
+value = "chio.authority-snapshot.v2"
+files = ["crates/kernel/chio-kernel/src/authority/replication.rs"]
+first_seen = "a617c0b02f"
 
 [[schema]]
 value = "chio.autonomous-comparison-report.v1"
@@ -1488,6 +1518,11 @@ first_seen = "34ce6257cc"
 value = "chio.eval-report.bundle.v1"
 files = ["crates/sdk/chio-eval-receipt/src/lib.rs"]
 first_seen = "2d6c8ed146"
+
+[[schema]]
+value = "chio.evidence_export_commitment.v1"
+files = ["crates/platform/chio-control-plane/src/evidence_export/envelope.rs"]
+first_seen = "0a455ac2c0"
 
 [[schema]]
 value = "chio.evidence_export_disclosure_notice.v1"
@@ -3118,6 +3153,11 @@ first_seen = "3d3e4b4d9d"
 value = "chio.mcp.delivery-ack.v1"
 files = ["crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs"]
 first_seen = "31c28d05c3"
+
+[[schema]]
+value = "chio.mcp.operator-approval.v2"
+files = ["crates/protocol/chio-mcp-remote/src/remote_mcp/approvals.rs"]
+first_seen = "a617c0b02f"
 
 [[schema]]
 value = "chio.mcp.session-credential.v1"
@@ -5000,6 +5040,11 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome/security_release.rs"]
 first_seen = "7e54c14a60"
 
 [[schema]]
+value = "chio.session-threshold-approval.v1"
+files = ["crates/kernel/chio-kernel/src/kernel/session_ops/threshold_binding.rs"]
+first_seen = "a617c0b02f"
+
+[[schema]]
 value = "chio.session_anchor.v1"
 files = ["crates/core/chio-core-types/src/session/anchor.rs"]
 first_seen = "11e573d2d7"
@@ -5183,6 +5228,11 @@ first_seen = "2a36f21acf"
 value = "chio.threshold-approval-proposal.v1"
 files = ["crates/core/chio-core-types/src/capability/governance.rs"]
 first_seen = "51e46336b1"
+
+[[schema]]
+value = "chio.tool-approval-context.v1"
+files = ["crates/kernel/chio-kernel/src/approval/tool_context.rs"]
+first_seen = "a617c0b02f"
 
 [[schema]]
 value = "chio.tool-outcome.v1"

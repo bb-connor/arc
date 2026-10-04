@@ -27,8 +27,7 @@ fn bounded_cost_page_and_count_queries_use_scope_appropriate_indexes() {
         ("(?12 IS NULL)", None, "idx_chio_tool_receipts_cost_global"),
     ] {
         let (data_sql, count_sql) =
-            crate::receipt_store::evidence_retention::receipt_query_sql(&query, tenant_fragment)
-                .test_unwrap();
+            crate::receipt_query::receipt_query_sql(&query, tenant_fragment).test_unwrap();
         for sql in [data_sql, count_sql] {
             let plan = connection
                 .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))

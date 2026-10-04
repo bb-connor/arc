@@ -212,9 +212,14 @@ pub(crate) fn run() {
                 crate::process_host::dispatch(command)
             }
         }
-        Commands::Run { policy, command } => cmd_run(
+        Commands::Run {
+            policy,
+            command,
+            agent_public_key,
+        } => cmd_run(
             &policy,
             &command,
+            agent_public_key.as_deref(),
             json_output,
             receipt_db.as_deref(),
             revocation_db.as_deref(),
@@ -420,13 +425,17 @@ pub(crate) fn run() {
             json_output,
         ),
         Commands::Start {
+            transport,
             listen,
             receipt_store,
+            receipt_retention,
             allow_ephemeral_receipts,
             print_config,
-        } => cmd_start(
+        } => receipt_retention.into_config().and_then(|policy| cmd_start(
+            transport.into(),
             &listen,
             receipt_store.as_deref().or(receipt_db.as_deref()),
+            policy,
             authority_seed_file.as_deref(),
             budget_db.as_deref(),
             revocation_db.as_deref(),
@@ -434,7 +443,7 @@ pub(crate) fn run() {
             control_token.as_deref(),
             allow_ephemeral_receipts,
             print_config,
-        ),
+        )),
     };
 
     if let Err(e) = result {

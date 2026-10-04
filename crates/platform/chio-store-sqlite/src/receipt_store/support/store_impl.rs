@@ -11,51 +11,17 @@ impl SqliteReceiptStore {
         let scope = chio_kernel::ReceiptQuery::default()
             .with_read_context(read_context.clone())
             .effective_read_scope()?;
-        let mut connection = self.connection()?;
-        ensure_checkpoint_transparency_guards(&connection)?;
-        let transaction = connection.transaction()?;
-        verify_latest_checkpoint_integrity(&transaction)?;
-        let row = transaction
-            .query_row(
-                "SELECT seq, raw_json FROM chio_tool_receipts \
-             WHERE receipt_id = ?1 AND (?2 IS NULL OR tenant_id = ?2)",
-                params![receipt_id, scope.tenant.as_deref()],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()?;
-        let receipt = row
-            .map(|(seq, raw_json)| {
-                let receipt = decode_verified_chio_receipt(
-                    &raw_json,
-                    "authorized tool receipt",
-                    Some(sqlite_positive_u64(seq, "receipt seq")?),
-                )?;
-                if receipt.id != receipt_id {
-                    return Err(ReceiptStoreError::Conflict(
-                        "authorized receipt ID differs from the requested ID".to_owned(),
-                    ));
-                }
-                if scope
-                    .tenant
-                    .as_deref()
-                    .is_some_and(|tenant| receipt.tenant_id.as_deref() != Some(tenant))
-                {
-                    return Err(
-                        chio_kernel::receipt_query::ReceiptReadError::TenantProjectionMismatch
-                            .into(),
-                    );
-                }
-                Ok(receipt)
-            })
-            .transpose()?;
-        transaction.commit()?;
-        Ok(receipt)
+        self.with_retained_snapshot(|snapshot| {
+            snapshot.receipt(receipt_id, scope.tenant.as_deref())
+        })
     }
 }
 
 /// Flatten a capability-lineage error into the receipt-store error the
 /// `ReceiptStore` trait surface speaks.
-fn capability_lineage_store_error(error: chio_kernel::CapabilityLineageError) -> ReceiptStoreError {
+pub(crate) fn capability_lineage_store_error(
+    error: chio_kernel::CapabilityLineageError,
+) -> ReceiptStoreError {
     match error {
         chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
         chio_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
@@ -74,7 +40,7 @@ fn trusted_retention_archive(
     trusted_retention_archive_for_connection(&connection)
 }
 
-fn trusted_retention_archive_for_connection(
+pub(crate) fn trusted_retention_archive_for_connection(
     connection: &Connection,
 ) -> Result<Option<Connection>, ReceiptStoreError> {
     let recorded = retention_watermark(connection)?.unwrap_or(0);
@@ -114,18 +80,10 @@ fn load_retained_chio_receipt_with_archive_hook<F>(
 where
     F: FnOnce() -> Result<(), ReceiptStoreError>,
 {
-    let Some(archive) = trusted_retention_archive(store)? else {
-        return store.load_chio_receipt(receipt_id);
-    };
-    after_archive_trusted()?;
-    let connection = store.connection()?;
-    if let Some(receipt) =
-        load_chio_receipt_row(&connection, receipt_id, "retained live tool receipt")?
-    {
-        return Ok(Some(receipt));
-    }
-    drop(connection);
-    load_chio_receipt_row(&archive, receipt_id, "retained archived tool receipt")
+    store.with_retained_snapshot(|snapshot| {
+        after_archive_trusted()?;
+        snapshot.receipt(receipt_id, None)
+    })
 }
 
 #[cfg(test)]

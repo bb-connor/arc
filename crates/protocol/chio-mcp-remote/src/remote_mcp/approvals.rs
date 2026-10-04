@@ -2,11 +2,21 @@
 //! Returned artifacts are admitted only by the ordinary kernel tools/call path.
 use super::*;
 use chio_core::capability::governance::{
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    GovernedTransactionIntent, GovernedTransactionIntentBody,
+    GovernedApprovalDecision, GovernedApprovalToken, GovernedTransactionIntent,
+    GovernedTransactionIntentBody,
 };
-use chio_core::Hash;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+
+#[path = "approvals/records.rs"]
+mod records;
+#[path = "approvals/redemption.rs"]
+mod redemption;
+#[path = "approvals/validation.rs"]
+mod validation;
+use records::load_record;
+pub(super) use redemption::{validate_redemption, ApprovalRedemption};
+
+const RECORD_SCHEMA: &str = "chio.mcp.operator-approval.v2";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,10 +38,11 @@ fn default_ttl() -> u64 {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DecisionRequest {
-    decision: GovernedApprovalDecision,
+    token: GovernedApprovalToken,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ApprovalRecord {
     schema: String,
     id: String,
@@ -39,6 +50,7 @@ struct ApprovalRecord {
     capability_id: String,
     subject: PublicKey,
     policy_fingerprint: String,
+    runtime_contract_fingerprint: String,
     request_id: String,
     arguments: Value,
     intent: GovernedTransactionIntent,
@@ -49,6 +61,7 @@ struct ApprovalRecord {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SignedRecord {
     record: ApprovalRecord,
     signature: Ed25519Signature,
@@ -70,6 +83,12 @@ fn storage(state: &RemoteAppState, headers: &HeaderMap) -> Result<(Connection, K
         return Err(failure(
             StatusCode::CONFLICT,
             "approvals require a distinct operator credential",
+        ));
+    }
+    if state.factory.config.approval.is_none() {
+        return Err(failure(
+            StatusCode::CONFLICT,
+            "explicit approval authority is required",
         ));
     }
     let runtime = state.factory.durable_admission.as_ref().ok_or_else(|| {
@@ -115,34 +134,9 @@ fn serialize_record(record: ApprovalRecord, signer: &Keypair) -> Result<String, 
     serde_json::to_string(&SignedRecord { record, signature }).map_err(internal)
 }
 
-fn load_record(
-    connection: &Connection,
-    id: &str,
-    signer: &Keypair,
-) -> Result<ApprovalRecord, Response> {
-    let serialized: String = connection
-        .query_row(
-            "SELECT signed_record FROM remote_operator_approvals WHERE id = ?1",
-            [id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(internal)?
-        .ok_or_else(|| failure(StatusCode::NOT_FOUND, "unknown approval"))?;
-    let signed: SignedRecord = decode_json(serialized.as_bytes(), MAX_SESSION_JSON_BYTES)
-        .map_err(|error| input::with_source(internal(error.code()), error))?;
-    if signed.record.id != id
-        || !signer
-            .public_key()
-            .verify_canonical_strict(&signed.record, &signed.signature)
-            .map_err(internal)?
-    {
-        return Err(failure(
-            StatusCode::CONFLICT,
-            "approval record integrity check failed",
-        ));
-    }
-    Ok(signed.record)
+fn record_id(session_id: &str, request_id: &str) -> chio_core::error::Result<String> {
+    let bytes = canonical_json_bytes(&json!([session_id, request_id]))?;
+    Ok(format!("approval-{}", sha256_hex(&bytes)))
 }
 
 fn projection(record: &ApprovalRecord) -> Value {
@@ -222,13 +216,8 @@ pub(super) async fn submit(
         Ok(value) => value,
         Err(response) => return response,
     };
-    let identity = json!([request.session_id, request.request_id]);
-    let id = match canonical_json_bytes(&identity) {
-        Ok(bytes) => format!("approval-{}", sha256_hex(&bytes)),
-        Err(error) => return internal(error),
-    };
-    let parameters_hash = match canonical_json_bytes(&request.arguments) {
-        Ok(bytes) => Hash::from_bytes(Sha256::digest(&bytes).into()),
+    let id = match record_id(&request.session_id, &request.request_id) {
+        Ok(id) => id,
         Err(error) => return internal(error),
     };
     let intent = GovernedTransactionIntent {
@@ -242,27 +231,36 @@ pub(super) async fn submit(
         runtime_attestation: None,
         call_chain: None,
         autonomy: None,
-        context: Some(
-            json!({"mcpSessionId": request.session_id, "capabilityId": request.capability_id,
-            "policyFingerprint": session.policy_fingerprint}),
-        ),
-        body: GovernedTransactionIntentBody::BoundToolInvocation {
-            capability_id: capability.id.clone(),
-            parameters_hash,
-        },
+        context: Some(json!({"mcpSessionId": request.session_id})),
+        body: GovernedTransactionIntentBody::ToolInvocation,
+    };
+    let invocation = validation::invocation(
+        &session,
+        capability,
+        &request.request_id,
+        &request.arguments,
+        intent,
+    );
+    let intent = match state.factory.bind_approval_intent(&session, &invocation) {
+        Ok(intent) => intent,
+        Err(error) => return failure(StatusCode::CONFLICT, error),
+    };
+    let Some(expires_at) = now.checked_add(request.ttl_seconds) else {
+        return failure(StatusCode::BAD_REQUEST, "approval lifetime overflow");
     };
     let record = ApprovalRecord {
-        schema: "chio.mcp.operator-approval.v1".into(),
+        schema: RECORD_SCHEMA.into(),
         id: id.clone(),
         session_id: request.session_id,
         capability_id: request.capability_id,
         subject: capability.subject.clone(),
         policy_fingerprint: session.policy_fingerprint.clone(),
+        runtime_contract_fingerprint: session.runtime_contract_fingerprint.clone(),
         request_id: request.request_id,
         arguments: request.arguments,
         intent,
         created_at: now,
-        expires_at: (now + request.ttl_seconds).min(capability.expires_at),
+        expires_at: expires_at.min(capability.expires_at),
         decision: None,
     };
     let serialized = match serialize_record(record.clone(), &signer) {
@@ -286,9 +284,9 @@ pub(super) async fn get_record(
         Ok(value) => value,
         Err(response) => return response,
     };
-    match load_record(&connection, &id, &signer) {
+    match load_record(&connection, &id, &signer.public_key()) {
         Ok(record) => Json(projection(&record)).into_response(),
-        Err(response) => response,
+        Err(error) => error.response(),
     }
 }
 
@@ -302,50 +300,40 @@ pub(super) async fn decide(
         Ok(value) => value,
         Err(response) => return response,
     };
+    // Resolve the live session before taking the SQLite writer transaction.
+    // Reload the signed record under that transaction before accepting a decision.
+    let pending = match load_record(&connection, &id, &signer.public_key()) {
+        Ok(record) => record,
+        Err(error) => return error.response(),
+    };
+    let Some(RemoteSessionEntry::Active(session)) =
+        resolve_session_entry(&state, &pending.session_id).await
+    else {
+        return failure(StatusCode::CONFLICT, "active MCP session required");
+    };
     let transaction = match connection.transaction_with_behavior(TransactionBehavior::Immediate) {
         Ok(value) => value,
         Err(error) => return internal(error),
     };
-    let mut record = match load_record(&transaction, &id, &signer) {
+    let mut record = match load_record(&transaction, &id, &signer.public_key()) {
         Ok(value) => value,
-        Err(response) => return response,
+        Err(error) => return error.response(),
     };
+    let now = match state.factory.config.clock.seconds() {
+        Ok(now) => now,
+        Err(error) => return clock::rejection(error),
+    };
+    if let Err(response) = validation::decision(&state, &session, &record, &request.token, now) {
+        return response;
+    }
     if let Some(existing) = &record.decision {
-        return if existing.decision == request.decision {
+        return if existing == &request.token {
             Json(projection(&record)).into_response()
         } else {
             failure(StatusCode::CONFLICT, "approval decision is terminal")
         };
     }
-    let now = match state.factory.config.clock.seconds() {
-        Ok(now) => now,
-        Err(error) => return clock::rejection(error),
-    };
-    if now >= record.expires_at {
-        return failure(StatusCode::CONFLICT, "approval expired; no artifact issued");
-    }
-    let intent_hash = match record.intent.binding_hash() {
-        Ok(value) => value,
-        Err(error) => return internal(error),
-    };
-    let token = match GovernedApprovalToken::sign(
-        GovernedApprovalTokenBody {
-            id: format!("{}-decision", record.id),
-            approver: signer.public_key(),
-            subject: record.subject.clone(),
-            governed_intent_hash: intent_hash,
-            request_id: record.request_id.clone(),
-            threshold_proposal_hash: None,
-            issued_at: now,
-            expires_at: record.expires_at,
-            decision: request.decision,
-        },
-        &signer,
-    ) {
-        Ok(value) => value,
-        Err(error) => return internal(error),
-    };
-    record.decision = Some(token);
+    record.decision = Some(request.token);
     let serialized = match serialize_record(record.clone(), &signer) {
         Ok(value) => value,
         Err(response) => return response,

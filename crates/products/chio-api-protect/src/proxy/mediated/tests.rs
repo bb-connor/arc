@@ -4,12 +4,16 @@ use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_test_support::prelude::*;
 use tower::ServiceExt;
 
+#[path = "tests/approvals.rs"]
+mod approvals;
 #[path = "tests/authenticated.rs"]
 mod authenticated;
 #[path = "tests/authorization.rs"]
 mod authorization;
 #[path = "../tests/mediated_boundary_tests.rs"]
 mod boundary_tests;
+#[path = "../tests/subject_identity.rs"]
+mod subject_identity;
 
 /// Build an ephemeral kernel used only to mint capabilities in tests. It
 /// shares the budget store with the state's mediation kernel; cost is never
@@ -24,7 +28,11 @@ fn issuing_kernel(
         build_mediation_kernel(
             signer,
             budget,
-            trusted_capability_issuers,
+            super::MediationPolicy {
+                issuers: trusted_capability_issuers,
+                hash: None,
+                receipt_store: None,
+            },
             Vec::new(),
             None,
             None,
@@ -261,7 +269,14 @@ fn mediated_test_state_with_durable_admission(
         build_mediation_kernel(
             &signer,
             Arc::clone(&budget),
-            &trusted_capability_issuers,
+            super::MediationPolicy {
+                issuers: &trusted_capability_issuers,
+                hash: None,
+                // Legacy financial regression fixtures intentionally exercise the
+                // ephemeral admission profile. Durable production composition is
+                // exercised separately with qualified admission stores.
+                receipt_store: None,
+            },
             Vec::new(),
             payment_adapter,
             durable_admission,
@@ -277,6 +292,7 @@ fn mediated_test_state_with_durable_admission(
         http_client,
         egress_contract,
         approval_admin: ApprovalAdmin::new(approval_store),
+        approval_config: None,
         receipt_log: Mutex::new(ReceiptLog {
             receipts: Vec::new(),
         }),
@@ -591,12 +607,14 @@ fn open_temp_receipt_store() -> (std::path::PathBuf, SqliteReceiptStore) {
 }
 
 /// A receipt store whose `append_tool_receipt` fails deterministically: the
-/// backing `tool_receipts` table is dropped through a second connection to
+/// backing `chio_tool_receipts` table is dropped through a second connection to
 /// the same database, so every append errors.
 fn failing_receipt_store() -> SqliteReceiptStore {
     let (db, store) = open_temp_receipt_store();
     let dropper = rusqlite::Connection::open(&db).unwrap();
-    dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+    dropper
+        .execute("DROP TABLE chio_tool_receipts", [])
+        .unwrap();
     drop(dropper);
     store
 }
@@ -696,6 +714,7 @@ async fn mediated_receipt_persistence_failure_returns_nonce_and_keeps_reservatio
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["status"], "reserved");
+    assert_eq!(json["evidence_persisted"], false);
     assert!(
         json["execution_nonce"].is_object(),
         "a persistence failure after a successful reserve must still return the nonce"
@@ -760,6 +779,7 @@ async fn mediated_receipt_persistence_success_keeps_reservation() {
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["status"], "reserved");
+    assert_eq!(json["evidence_persisted"], true);
     assert!(json["execution_nonce"].is_object());
 
     let usage = budget.get_usage(&cap_id, 0).unwrap();
@@ -810,6 +830,7 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["status"], "reserved");
+    assert_eq!(json["evidence_persisted"], false);
     let nonce_json = json["execution_nonce"].clone();
     assert!(
         nonce_json.is_object(),
@@ -846,13 +867,8 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_mustprepay_receipt_persistence_failure_returns_nonce_without_refund() {
-    // Money-loss guard: a governed MustPrepay reserve authorizes AND captures the
-    // quoted prepayment before minting the nonce. If the sidecar's local receipt
-    // append then fails, tearing the reservation down would leave the captured
-    // prepayment charged for a reservation the caller never received (direct
-    // financial loss). The handler must return 200 with the nonce so the captured
-    // prepayment backs a usable authorization, and must not refund or re-charge.
+async fn mediated_direct_approval_rejects_before_payment_and_receipt_side_effects() {
+    // A legacy approval envelope is rejected before payment or receipt storage.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -895,40 +911,14 @@ async fn mediated_mustprepay_receipt_persistence_failure_returns_nonce_without_r
     });
 
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
-        status,
-        StatusCode::OK,
-        "a captured MustPrepay reserve whose receipt fails to persist must not 500"
+        json["message"],
+        "use approval_id to redeem the retained server-built approval"
     );
-    assert_eq!(json["status"], "reserved");
-    assert!(
-        json["execution_nonce"].is_object(),
-        "the caller must receive the nonce the captured prepayment backs"
-    );
-
-    // The prepayment was captured exactly once and never refunded: the payer is
-    // billed for the authorization the caller now holds, with no money lost to a
-    // torn-down reservation.
-    assert_eq!(
-        captures.load(std::sync::atomic::Ordering::SeqCst),
-        1,
-        "the MustPrepay quote must be captured exactly once"
-    );
-    assert_eq!(
-        refunds.load(std::sync::atomic::Ordering::SeqCst),
-        0,
-        "the captured prepayment must not be refunded: it backs the returned nonce"
-    );
-
-    // The reservation is intact: the reserved hold stays open.
-    let hold_id = json["execution_nonce"]["nonce"]["reserved_hold_id"]
-        .as_str()
-        .expect("the returned nonce must name its reserved hold");
-    let hold = budget.get_budget_hold(hold_id).unwrap();
-    assert!(
-        hold.map(|hold| hold.disposition.is_open()).unwrap_or(false),
-        "the captured MustPrepay reservation must stay open, backing the returned nonce"
-    );
+    assert_eq!(captures.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(refunds.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert!(budget.get_usage(&cap.id, 0).test_unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1088,15 +1078,21 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
     std::fs::create_dir_all(&dir).unwrap();
     let db = dir.join("budget.sqlite");
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: Some(db.to_string_lossy().to_string()),
@@ -1120,15 +1116,21 @@ fn build_budget_store_remote_is_not_hold_capable() {
     // so it must be flagged not hold-capable; the mediated routes then fail
     // closed rather than mint a reservation it can never reconcile or reap.
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: Some("http://127.0.0.1:1".to_string()),
         control_token: Some("token".to_string()),
         budget_db: None,
@@ -1155,15 +1157,21 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
     std::fs::create_dir_all(&dir).unwrap();
     let db = dir.join("budget.sqlite");
     let config = ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: Some("http://127.0.0.1:1".to_string()),
         control_token: Some("token".to_string()),
         budget_db: Some(db.to_string_lossy().to_string()),
@@ -1189,15 +1197,21 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
 
 fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
     ProtectConfig {
+        transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),
         spec_content: Some("{}".to_string()),
+        spec_sha256: None,
+        allow_anonymous_reads: false,
         spec_path: None,
         listen_addr: "127.0.0.1:0".to_string(),
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        receipt_retention: None,
+        signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        approval: None,
         control_url: None,
         control_token: None,
         budget_db: None,
@@ -1258,7 +1272,11 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
     let kernel = build_mediation_kernel(
         &signer,
         Arc::clone(&budget),
-        &[],
+        super::MediationPolicy {
+            issuers: &[],
+            hash: None,
+            receipt_store: None,
+        },
         Vec::new(),
         None,
         None,
@@ -1523,7 +1541,9 @@ async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
     // post-settle append fails: unlike a reversible reservation, the settled
     // spend cannot be undone, so the authoritative receipt is the only proof.
     let dropper = rusqlite::Connection::open(&db).unwrap();
-    dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+    dropper
+        .execute("DROP TABLE chio_tool_receipts", [])
+        .unwrap();
     drop(dropper);
 
     let reconcile_body = serde_json::json!({
@@ -1537,6 +1557,7 @@ async fn reconcile_returns_authoritative_receipt_when_persistence_fails() {
     // authoritative receipt rather than a 500 that discards the only proof.
     assert_eq!(status, StatusCode::OK);
     assert_eq!(reconciled["status"], "reconciled");
+    assert_eq!(reconciled["evidence_persisted"], false);
     let receipt: ChioReceipt = serde_json::from_value(reconciled["receipt"].clone()).unwrap();
     let nonce: SignedExecutionNonce = serde_json::from_value(nonce_json).unwrap();
     assert_eq!(
@@ -1591,7 +1612,9 @@ async fn reconcile_still_fails_closed_on_replayed_nonce_when_persistence_fails()
     // Even with receipt persistence broken, a replayed nonce is a reconcile
     // ERROR: it is rejected 4xx and never returns a receipt.
     let dropper = rusqlite::Connection::open(&db).unwrap();
-    dropper.execute("DROP TABLE tool_receipts", []).unwrap();
+    dropper
+        .execute("DROP TABLE chio_tool_receipts", [])
+        .unwrap();
     drop(dropper);
     let (status, replay) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);

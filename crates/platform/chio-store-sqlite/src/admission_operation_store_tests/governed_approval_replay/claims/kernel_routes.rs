@@ -11,6 +11,8 @@ mod authenticated_caller;
 #[path = "kernel_routes/boundaries.rs"]
 mod boundaries;
 
+const APPROVAL_TENANT: &str = "approval-custody-tenant";
+
 struct Server(Arc<AtomicUsize>);
 #[async_trait::async_trait]
 impl ToolServerConnection for Server {
@@ -91,6 +93,7 @@ impl Route {
         let binding = activate(&fixture, source.as_ref())?;
         let signer = Keypair::generate();
         let mut kernel = kernel_recovery::kernel_with_signer(&fixture, signer.clone())?;
+        kernel.set_governed_approval_policy(APPROVAL_TENANT.into(), vec![signer.public_key()])?;
         kernel.set_operation_owned_governed_approval_source(binding.clone(), source.clone())?;
         let calls = Arc::new(AtomicUsize::new(0));
         let legacy = Arc::new(AtomicUsize::new(0));
@@ -129,7 +132,8 @@ impl Route {
             },
             300,
         )?;
-        let intent = GovernedTransactionIntent {
+        let arguments = serde_json::json!({"record": id});
+        let mut intent = GovernedTransactionIntent {
             id: id.into(),
             server_id: "approval-server".into(),
             tool_name: "tool".into(),
@@ -143,6 +147,14 @@ impl Route {
             context: None,
             body: Default::default(),
         };
+        chio_kernel::approval::ToolApprovalContext::bind(
+            &mut intent,
+            &capability,
+            &arguments,
+            id,
+            self.kernel.policy_hash(),
+            APPROVAL_TENANT,
+        )?;
         let token = GovernedApprovalToken::sign(
             GovernedApprovalTokenBody {
                 id: format!("approval-{id}"),
@@ -159,7 +171,7 @@ impl Route {
         )?;
         Ok(serde_json::from_value(serde_json::json!({
             "request_id": id, "capability": capability, "agent_id": agent.public_key().to_hex(),
-            "server_id": "approval-server", "tool_name": "tool", "arguments": {"record": id},
+            "server_id": "approval-server", "tool_name": "tool", "arguments": arguments,
             "governed_intent": intent, "approval_token": token,
         }))?)
     }
@@ -385,6 +397,7 @@ fn nonce_preflight_releases_approval_then_execution_claims_a_new_episode() -> An
                 };
                 let operation = chio_core::session::SessionOperation::ToolCall(Box::new(
                     chio_core::session::ToolCallOperation {
+                        dpop_proof: None,
                         capability: request.capability.clone(),
                         server_id: request.server_id.clone(),
                         tool_name: request.tool_name.clone(),

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_store_sqlite-b2be040cdaea43ae",
+    "receipt_store::tests::",
+    "receipt_query::tests::",
+    "evidence_export::tests::",
+    "capability_lineage::tests::",
+    "--test-threads=2"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 116.19,
+  "log_sha256": "c3b0e300384210bb0705ebe95a65eb4db47837634475d1526076fc9e144cdf59"
+}

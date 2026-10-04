@@ -559,12 +559,18 @@ pub(crate) async fn record_receipt(
     receipt: &HttpReceipt,
 ) -> Result<(), ProtectError> {
     if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
-        store.append(receipt)?;
+        let store = store.lock().await;
+        store.append(receipt, &state.signer_keypair)?;
     }
 
-    let mut log = state.receipt_log.lock().await;
-    log.receipts.push(receipt.clone());
+    #[cfg(test)]
+    {
+        let mut log = state.receipt_log.lock().await;
+        if log.receipts.len() == 128 {
+            log.receipts.remove(0);
+        }
+        log.receipts.push(receipt.clone());
+    }
     Ok(())
 }
 
@@ -573,12 +579,58 @@ pub(crate) async fn record_tool_receipt(
     receipt: &ChioReceipt,
 ) -> Result<(), ProtectError> {
     if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
+        let store = store.lock().await;
         store.append_tool_receipt(receipt)?;
     }
 
-    let mut log = state.tool_receipt_log.lock().await;
-    log.receipts.push(receipt.clone());
+    #[cfg(test)]
+    {
+        let mut log = state.tool_receipt_log.lock().await;
+        if log.receipts.len() == 128 {
+            log.receipts.remove(0);
+        }
+        log.receipts.push(receipt.clone());
+    }
+    Ok(())
+}
+
+/// Kernel redelivery is idempotent in the same authoritative sink. This also
+/// retries a transient persistence failure after an irreversible settlement.
+pub(crate) async fn record_kernel_receipt(
+    state: &Arc<ProxyState>,
+    receipt: &ChioReceipt,
+) -> Result<(), ProtectError> {
+    if let Some(store) = &state.receipt_store {
+        use chio_kernel::ReceiptStore;
+        let store = store.lock().await;
+        if let Err(error) = store
+            .core
+            .append_chio_receipt_with_timeout(receipt, std::time::Duration::from_secs(5))
+        {
+            // Archived IDs remain tombstoned against new writes. Redelivery
+            // succeeds only when the authenticated retained snapshot already
+            // contains this exact signed evidence, without appending anything.
+            let retained = store.core.load_retained_chio_receipt(&receipt.id)?;
+            let identical = match retained {
+                Some(retained) => {
+                    chio_core_types::canonical_json_bytes(&retained)?
+                        == chio_core_types::canonical_json_bytes(receipt)?
+                }
+                None => false,
+            };
+            if !identical {
+                return Err(error.into());
+            }
+        }
+    }
+    #[cfg(test)]
+    {
+        let mut log = state.tool_receipt_log.lock().await;
+        if log.receipts.len() == 128 {
+            log.receipts.remove(0);
+        }
+        log.receipts.push(receipt.clone());
+    }
     Ok(())
 }
 

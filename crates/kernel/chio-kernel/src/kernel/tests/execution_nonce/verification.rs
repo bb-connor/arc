@@ -244,6 +244,7 @@ fn strict_nonce_mode_nested_flow_operation_forwards_presented_nonce(
     kernel.activate_session(&session_id)?;
     let context = make_operation_context(&session_id, request_id, &agent_kp.public_key().to_hex());
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: cap,
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

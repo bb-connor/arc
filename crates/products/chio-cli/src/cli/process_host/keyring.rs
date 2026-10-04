@@ -10,6 +10,7 @@ use chio_keyring::{
     KeyLogPolicyDocument, KeyringArtifactSignature, SignedArtifactTimeAnchor,
     SqlitePinnedKeyLogVerifier, SystemClock,
 };
+use chio_security_types::clock::Clock;
 use serde::{Deserialize, Serialize};
 
 use super::state::error;
@@ -40,13 +41,21 @@ impl Config {
     }
 
     pub fn verifier(&self, path: &Path) -> Result<SqlitePinnedKeyLogVerifier, CliError> {
+        self.verifier_with_clock(path, Arc::new(SystemClock))
+    }
+
+    fn verifier_with_clock(
+        &self,
+        path: &Path,
+        clock: Arc<dyn Clock>,
+    ) -> Result<SqlitePinnedKeyLogVerifier, CliError> {
         SqlitePinnedKeyLogVerifier::open(
             path,
             self.verification_policy
                 .clone()
                 .into_policy()
                 .map_err(error)?,
-            Arc::new(SystemClock),
+            clock,
         )
         .map_err(|cause| error(format!("cannot open pinned key-log verifier: {cause}")))
     }
@@ -59,29 +68,38 @@ pub(super) struct HostKeyring {
 
 impl HostKeyring {
     pub fn authority(&self) -> Result<Box<dyn chio_kernel::CapabilityAuthority>, CliError> {
+        self.runtime.capability_verification_state()?;
+        let runtime = self.runtime.clone();
         Ok(Box::new(ParentAuthority {
             inner: self.runtime.capability_authority()?,
-            verification_keys: self.runtime.authority_status()?.witnessed_verification_keys,
+            live_key_log: Box::new(move || runtime.capability_verification_state()),
         }))
     }
 
-    pub fn open(config: &Config, directory: &Path, initializing: bool) -> Result<Self, CliError> {
+    pub fn open(
+        config: &Config,
+        directory: &Path,
+        initializing: bool,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, CliError> {
         config.validate()?;
         // Preserve the original audit signer. These authority receipts cannot
         // enter the kernel's single-signer call checkpoint stream.
         let receipts = Arc::new(
-            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
+            chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool_with_clock(
                 directory.join("keyring-receipts.db"),
                 &config.receipt_anchor_directory,
+                clock.clone(),
             )?,
         );
         receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
         // This loader completes an existing rotation handoff or refuses a stale
         // seed. Never replace governed signing with the host's receipt key.
-        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed(
+        let (_, runtime) = chio_control_plane::load_keyring_runtime_from_authority_seed_with_clock(
             &config.runtime_config,
             &config.authority_seed_file,
             receipts,
+            clock.clone(),
         )?;
         let path = directory.join("keylog-verifier.db");
         let verifier = if initializing {
@@ -92,11 +110,11 @@ impl HostKeyring {
                     .clone()
                     .into_policy()
                     .map_err(error)?,
-                Arc::new(SystemClock),
+                clock.clone(),
             )
             .map_err(error)?
         } else {
-            config.verifier(&path)?
+            config.verifier_with_clock(&path, clock)?
         };
         let base = verifier.pin().map_err(error)?;
         verifier
@@ -118,9 +136,18 @@ impl HostKeyring {
     }
 }
 
+type LiveKeyLog = dyn Fn() -> Result<
+        (
+            chio_security_types::clock::UnixMillis,
+            chio_keyring::KeyLogState,
+        ),
+        CliError,
+    > + Send
+    + Sync;
+
 struct ParentAuthority {
     inner: chio_kernel::GovernedCapabilityAuthority,
-    verification_keys: Vec<chio_core_types::PublicKey>,
+    live_key_log: Box<LiveKeyLog>,
 }
 
 impl chio_kernel::CapabilityAuthority for ParentAuthority {
@@ -129,7 +156,43 @@ impl chio_kernel::CapabilityAuthority for ParentAuthority {
     }
 
     fn trusted_public_keys(&self) -> Vec<chio_core_types::PublicKey> {
-        self.verification_keys.clone()
+        match (self.live_key_log)() {
+            Ok((now, state)) => state
+                .witnessed_verification_keys_at(now.get())
+                .into_iter()
+                .map(|record| record.public_key)
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    fn check_issuer_lifecycle(
+        &self,
+        issuer: &chio_core_types::PublicKey,
+        issued_at: u64,
+        _now: u64,
+    ) -> Result<(), chio_kernel::KernelError> {
+        let (now, state) = (self.live_key_log)().map_err(|error| {
+            chio_kernel::KernelError::CapabilityIssuanceFailed(format!(
+                "current witnessed issuer authority unavailable: {error}"
+            ))
+        })?;
+        let permitted = state
+            .witnessed_verification_keys_at(now.get())
+            .into_iter()
+            .any(|key| {
+                key.public_key == *issuer
+                && issued_at >= key.activated_at / 1_000
+                && issued_at <= now.as_secs()
+                // A whole-second token cannot prove that it preceded a cutoff
+                // inside the same second. Require issuance before that second.
+                && key.deactivated_at.is_none_or(|cutoff| issued_at < cutoff / 1_000)
+            });
+        if permitted {
+            Ok(())
+        } else {
+            Err(chio_kernel::KernelError::UntrustedIssuer)
+        }
     }
 
     fn issue_capability(
@@ -192,3 +255,7 @@ impl Evidence {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "keyring/live_tests.rs"]
+mod live_tests;

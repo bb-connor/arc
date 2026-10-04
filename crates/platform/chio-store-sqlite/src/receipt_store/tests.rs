@@ -56,3 +56,6 @@ mod underwriting_credit;
 mod verified_head;
 #[path = "tests/writer_checkpoint_boundaries.rs"]
 mod writer_checkpoint_boundaries;
+
+#[path = "tests/injected_clock.rs"]
+mod injected_clock;

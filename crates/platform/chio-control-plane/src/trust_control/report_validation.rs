@@ -43,6 +43,15 @@ pub(crate) fn normalize_cluster_config_url(
             )));
         }
     }
+    if parsed.scheme() == "http"
+        && !matches!(parsed.host(),
+        Some(Host::Ipv4(address)) if address.is_loopback())
+        && !matches!(parsed.host(), Some(Host::Ipv6(address)) if address.is_loopback())
+    {
+        return Err(CliError::cli_other_error(
+            "plaintext cluster URLs require a literal loopback address".to_string(),
+        ));
+    }
     if !parsed.username().is_empty() || parsed.password().is_some() {
         return Err(CliError::cli_other_error(
             "cluster URL must not contain username or password material".to_string(),
@@ -697,6 +706,7 @@ pub(crate) fn load_authority_status_for_state(
         public_key: Some(status.public_key.to_hex()),
         generation: Some(generation),
         rotated_at: status.activated_at,
+        issuer_state: None,
         applies_to_future_sessions_only: true,
         trusted_public_keys: status
             .witnessed_verification_keys
@@ -725,6 +735,7 @@ pub(crate) fn load_authority_status(
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         });
@@ -736,6 +747,7 @@ pub(crate) fn load_authority_status(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -745,6 +757,7 @@ pub(crate) fn load_authority_status(
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         }),
@@ -780,6 +793,7 @@ pub(crate) fn rotate_authority(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -826,7 +840,8 @@ pub(crate) fn authority_status_response(
         public_key: Some(status.public_key.to_hex()),
         generation: Some(status.generation),
         rotated_at: Some(status.rotated_at),
-        applies_to_future_sessions_only: true,
+        issuer_state: Some(status.issuer_state),
+        applies_to_future_sessions_only: false,
         trusted_public_keys: status
             .trusted_public_keys
             .into_iter()

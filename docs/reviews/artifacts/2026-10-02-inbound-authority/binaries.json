@@ -1,0 +1,69 @@
+{
+  "scope": "Current retained binaries used by successful final commands, captured at qualification; earlier attempts remain log evidence only.",
+  "binaries": {
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_api_protect-159aef855d3bb3cf": {
+      "sha256": "e12b9bd9ad244f7649ddc6d1d302e0645084c6435141f2e738861e384604b40b",
+      "bytes": 94652320
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/code_agent_preset-f8087e3386711953": {
+      "sha256": "9706429a8106b5a2380e2104e7a4e63edc85a3c2a5b508e29d4f17172cbc47a0",
+      "bytes": 1824584
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio-1fe6676623dff16a": {
+      "sha256": "593f819c7c2fc17348f4ab043dab49dd01331d6609959f65f46b88d25e3a6d56",
+      "bytes": 206533824
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_edge-208c54843e6a9741": {
+      "sha256": "7f24ca9b7886f5fa6bbb929f76bd535d7e33266631cc3524eb43ec6583b7ff78",
+      "bytes": 51888392
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/hello_a2a-2a1b0fc462592a37": {
+      "sha256": "b4988680884159aa10ec26155b76759b06ab5bbdd7fbbf4dede5aeffe413f92b",
+      "bytes": 44254544
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/hello_acp-3a8cea40eba43384": {
+      "sha256": "07f2967f57a612cb7ccedcc119b3c5a02a4ea82ddb268ef7814c3679b99a72e9",
+      "bytes": 44143288
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/hello_mcp-85834063056d8430": {
+      "sha256": "18c1a785435c23fe9ff007383c7654e03dd01eef76ce4432107eff5cf5efbf13",
+      "bytes": 43840648
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_mcp_remote-91539c7b2f25d0ae": {
+      "sha256": "4c03d56ee0b303f25ba9f2b5ace9b495914db9f877b279472334dee52eb95f1b",
+      "bytes": 127673968
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/ssrf_external_guard_api_protect_dispatch-25b64d4d7c405a7c": {
+      "sha256": "da7e520565638936db3f9490899729122b9690f9d1e950ddbba0b607db391fa2",
+      "bytes": 90419296
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/protocol_primitives_generated-f393a238f8e44c1c": {
+      "sha256": "bf4f765fda095fa8ee074ac1c032e0dfe17b3bfb654eb6b166bd9ba1ad7066a5",
+      "bytes": 8687160
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/security_generated_vectors-1eea764418cbbad3": {
+      "sha256": "5dc04c6ea99870d8bc643f146c4801e79bf62e3baf42df6fe80e636bd7a22688",
+      "bytes": 13208160
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-69e3f9459f5fbd5a": {
+      "sha256": "edea266d2087f9687a0c669ec775f70fd741c3d66dc4bfa3dd9a53a8db8fda4e",
+      "bytes": 94551696
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_kernel-6a5d91d6f2b21197": {
+      "sha256": "28300612e293291cb26dba43f1c2868999b9eadbed42e057a2fcec0bf35b093c",
+      "bytes": 94411424
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/chio_control_plane-c377478f770036e4": {
+      "sha256": "480394df590f087d0c87905a1fdb9764a0efaa2421f928bb59c0ce1df0c50070",
+      "bytes": 251222896
+    },
+    "/home/connor/chio-security-target-6d-final/debug/deps/wire_protocol_schema-99b30669408cafb7": {
+      "sha256": "36553dc6ea49ecebd41cca9c7c6cce48256ae02e6865aeac5b8e407da39c1492",
+      "bytes": 16332464
+    },
+    "/home/connor/chio-security-target-6d-final/debug/xtask": {
+      "sha256": "559adfab349b48cfcdbe51a0424bd02ee6e71eb51e8de5b23f0b4fe2a1b2cb60",
+      "bytes": 35772392
+    }
+  }
+}

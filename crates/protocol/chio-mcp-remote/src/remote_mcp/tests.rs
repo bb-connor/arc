@@ -186,6 +186,8 @@ fn empty_header_map() -> HeaderMap {
 
 fn test_remote_config() -> RemoteServeHttpConfig {
     RemoteServeHttpConfig {
+        transport: Default::default(),
+        trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().expect("parse listen addr"),
         auth_token: Some("remote-auth-token".to_string()),
@@ -201,6 +203,7 @@ fn test_remote_config() -> RemoteServeHttpConfig {
         auth_jwt_issuer: None,
         auth_jwt_audience: None,
         admin_token: Some("admin-token".to_string()),
+        approval: None,
         control_url: None,
         control_token: None,
         remote_authority_workload_token: None,
@@ -1089,6 +1092,7 @@ fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         retained_notification_events,
         next_event_id,
         session_db_path: Some(PathBuf::from("unused-session-store.sqlite3")),
+        approval_redemption: None,
         session_store_lease: None,
         resume_hmac_keyring: Some(test_resume_hmac_keyring()),
         resume_generation: 0,
@@ -1362,7 +1366,8 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
             nbf: None,
         },
         JwtProviderProfile::AzureAd,
-    );
+    )
+    .unwrap();
     assert_eq!(federated_claims.client_id.as_deref(), Some("client-azp"));
     assert_eq!(federated_claims.object_id.as_deref(), Some("object-456"));
     assert_eq!(federated_claims.tenant_id.as_deref(), Some("tenant-123"));
@@ -1380,6 +1385,8 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
 #[test]
 fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
     let config = RemoteServeHttpConfig {
+        transport: Default::default(),
+        trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().unwrap(),
         auth_token: None,
@@ -1395,6 +1402,7 @@ fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
         auth_jwt_issuer: Some("https://id.example.com/oauth2/default".to_string()),
         auth_jwt_audience: None,
         admin_token: Some("admin-token".to_string()),
+        approval: None,
         control_url: None,
         control_token: None,
         remote_authority_workload_token: None,
@@ -1552,6 +1560,8 @@ fn identity_federation_derives_stable_keypair_per_principal() {
 #[test]
 fn jwt_remote_auth_requires_separate_admin_token() {
     let config = RemoteServeHttpConfig {
+        transport: Default::default(),
+        trusted_proxy: None,
         clock: Default::default(),
         listen: "127.0.0.1:0".parse().unwrap(),
         auth_token: None,
@@ -1567,6 +1577,7 @@ fn jwt_remote_auth_requires_separate_admin_token() {
         auth_jwt_issuer: None,
         auth_jwt_audience: None,
         admin_token: None,
+        approval: None,
         control_url: None,
         control_token: None,
         remote_authority_workload_token: None,
@@ -1708,3 +1719,6 @@ fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queu
     let subscriber_count = subscribers.lock().unwrap().len();
     assert_eq!(subscriber_count, 2);
 }
+
+#[path = "tests/revocation_transport.rs"]
+mod revocation_transport;

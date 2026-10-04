@@ -24,7 +24,7 @@ impl SecurityReleaseArtifacts<'_> {
         let record = SecurityReleaseRecordV1::pending(
             self,
             self.outcome.recording_fence.clone(),
-            crate::kernel::read_unix_timestamp_ms()?.max(self.evaluation.trusted_time_unix_ms()),
+            self.evaluation.trusted_time_unix_ms(),
         )?;
         let context = DurableSecurityReleaseContext::new(&record, self)?;
         Ok(inspect(&context))
@@ -64,10 +64,12 @@ impl AcknowledgedSecurityReleaseV1 {
         artifacts: SecurityReleaseArtifacts<'_>,
         store_fence: StoreMutationFence,
         acknowledged_at_unix_ms: u64,
+        clock: &dyn chio_security_types::clock::Clock,
         prepare_output: impl FnOnce(
             &DurableSecurityReleaseContext<'_>,
         ) -> Result<(), crate::KernelError>,
     ) -> Result<Self, crate::KernelError> {
+        let acknowledged_at_unix_ms = acknowledged_at_unix_ms.max(clock.unix_millis()?.get());
         let mut record =
             SecurityReleaseRecordV1::pending(&artifacts, store_fence, acknowledged_at_unix_ms)
                 .map_err(|error| {
@@ -81,8 +83,7 @@ impl AcknowledgedSecurityReleaseV1 {
         permit.ensure_final_release_for(&context)?;
         // A native callback can outlive the selected evaluation time. Lease
         // validation must see the time of its acknowledgement, not its start.
-        record.acknowledged_at_unix_ms =
-            acknowledged_at_unix_ms.max(crate::kernel::read_unix_timestamp_ms()?);
+        record.acknowledged_at_unix_ms = acknowledged_at_unix_ms.max(clock.unix_millis()?.get());
         record.canonical_bytes().map_err(|error| {
             crate::KernelError::SecurityDispatchOutcomeRecoveryRequired(error.to_string())
         })?;

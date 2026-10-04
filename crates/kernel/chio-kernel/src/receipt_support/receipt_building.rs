@@ -9,6 +9,7 @@ pub(crate) fn build_child_request_receipt(
     operation_kind: OperationKind,
     terminal_state: OperationTerminalState,
     outcome_payload: serde_json::Value,
+    now: chio_security_types::clock::UnixMillis,
 ) -> Result<ChildRequestReceipt, KernelError> {
     let outcome_hash = canonical_json_bytes(&outcome_payload)
         .map(|bytes| sha256_hex(&bytes))
@@ -22,7 +23,7 @@ pub(crate) fn build_child_request_receipt(
 
     let body = ChildRequestReceiptBody {
         id: next_receipt_id("child-rcpt")?,
-        timestamp: read_unix_timestamp()?,
+        timestamp: now.as_secs(),
         session_id: context.session_id.clone(),
         parent_request_id,
         request_id: context.request_id.clone(),

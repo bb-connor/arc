@@ -14,10 +14,22 @@ pre-configured trust on the registry side.
 
 ---
 
+## Canonical release signer policy
+
+The approved repository is **`bb-connor/arc`**, confirmed through GitHub's API on
+2026-10-02. All release verification uses the exact workflow and exact selected
+tag, with issuer `https://token.actions.githubusercontent.com`.
+[VERIFY.md](VERIFY.md) and `scripts/verify-release-identity.py` define the executable
+consumer policy. Do not substitute another owner or repository without a reviewed
+policy change. The instructions below require operator account and registry access;
+this document does not establish that publisher registrations, environment
+protections or signed releases currently exist. Historical release evidence must
+be retained separately from acceptance of the new pipeline.
+
 ## Tag format
 
-Both workflows trigger on annotated git tags. The tag name encodes
-what to publish.
+Both workflows trigger on matching git tag pushes. Annotated tags are the
+operator convention. The tag name encodes what to publish.
 
 | Tag pattern | Publishes |
 |---|---|
@@ -111,8 +123,8 @@ a Trusted Publisher:
    pending publisher for a brand-new distribution).
 2. Under **Publishing** -> **Add a new pending publisher**, set:
    - PyPI Project Name: e.g. `chio-crewai`
-   - Owner: `backbay-industries`
-   - Repository name: `chio`
+   - Owner: `bb-connor`
+   - Repository name: `arc`
    - Workflow name: `release-pypi.yml`
    - Environment name: `pypi`
 3. Save.
@@ -122,6 +134,9 @@ not change it without also updating the Trusted Publisher
 configuration for every project.
 
 Reference: https://docs.pypi.org/trusted-publishers/
+
+The [PyPI publisher configuration guide](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
+uses the repository owner, repository name, workflow filename and environment.
 
 ### npm OIDC / provenance
 
@@ -133,13 +148,16 @@ for the npm package to opt in to Trusted Publishing:
 2. For each package (`chio-ts`, `node-http`, `express`, `fastify`, `elysia`,
    `ai-sdk`), go to **Settings** -> **Trusted Publishers** -> **Add**
    and register:
-   - GitHub org: `backbay-industries`
-   - Repository: `chio`
-   - Workflow path: `.github/workflows/release-npm.yml`
+   - GitHub owner: `bb-connor`
+   - Repository: `arc`
+   - Workflow filename: `release-npm.yml` (stored under `.github/workflows/`)
    - Environment name: `npm`
 3. Confirm the org-level 2FA policy is set to "Publishing and
    settings modification" -- provenance publishes bypass interactive
    2FA but still honor the org policy.
+
+The [npm trusted publishing guide](https://docs.npmjs.com/trusted-publishers/)
+requires the workflow filename, including its extension, rather than a full path.
 
 After this is done, `npm publish --provenance` from the workflow will
 mint an attestation signed by Sigstore and linked to the tag's source
@@ -166,7 +184,9 @@ restrictions) can gate publishes. Configure under
 Both workflows expose `workflow_dispatch` with a `dry_run` toggle
 (default `true`). A dry run builds the sdist+wheel (Python) or runs
 `build` + `lint` + `test` + `npm pack` (TypeScript) and uploads the
-artifacts, but skips the `publish` job entirely.
+artifacts, but skips the `publish` job entirely. Manual SDK dispatch builds also
+skip release signing because their branch identity cannot satisfy the tagged
+release signer policy.
 
 Dry runs are the right way to validate CI after changing the
 workflow or adding a new package. Trigger via **Actions** ->
@@ -281,7 +301,7 @@ Use Python 3.11 or newer, a clean checkout at the reviewed release tag and an
 empty download directory:
 
 ```sh
-REPO=backbay-labs/chio
+REPO=bb-connor/arc
 TAG=v0.1.1-rc.1
 SOURCE="$(git rev-list -n 1 "$TAG")"
 CANDIDATE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/chio-rc-qualification.XXXXXX")"
@@ -301,7 +321,7 @@ replace the source gates or publish anything.
 
 Before executing a downloaded binary, perform the cosign and SLSA verification
 recipes below for its exact archive. Pin the exact certificate identity, for
-example `https://github.com/backbay-labs/chio/.github/workflows/release-binaries.yml@refs/tags/v0.1.1-rc.1`,
+example `https://github.com/bb-connor/arc/.github/workflows/release-binaries.yml@refs/tags/v0.1.1-rc.1`,
 and the GitHub OIDC issuer. Run `scripts/verify-release-provenance.py verify`
 with the intended source SHA, run ID and attempt as shown below. It verifies the
 signed source commit, tag, original workflow and immutable upstream builder
@@ -448,7 +468,7 @@ runner memory envelope while retaining an optimized container artifact.
    lets `cosign sign --yes` exchange a GitHub-issued OIDC token for a
    short-lived Fulcio signing certificate. No long-lived signing key is
    held in repo secrets.
-4. `cosign sign --yes ghcr.io/<owner>/chio-sidecar@sha256:<digest>`
+4. `cosign sign --yes ghcr.io/bb-connor/chio-sidecar@sha256:<digest>`
    uploads the resulting signature blob and certificate to the
    sigstore cosign signature tag (`sha256-<digest>.sig`) on the same
    ghcr.io repository, and writes a Rekor transparency-log entry that
@@ -456,42 +476,23 @@ runner memory envelope while retaining an optimized container artifact.
 
 ### Consumer verification
 
-Operators pulling the image can confirm the signature offline against
-Sigstore's transparency log:
+Operators select the exact digest and source ref they intend to deploy. A release
+image uses the literal tag identity; a deliberately selected main-branch image
+uses the literal `@refs/heads/main` identity and is not release acceptance.
 
 ```bash
-# Pin the digest you intend to deploy (recommended in production).
-DIGEST=$(docker buildx imagetools inspect \
-  ghcr.io/<owner>/chio-sidecar:<tag> --format '{{json .Manifest}}' \
-  | jq -r .digest)
-
+TAG=v0.1.1-rc.1
+DIGEST='sha256:<verified-image-digest>'
 cosign verify \
-  --certificate-identity-regexp \
-    "^https://github\.com/<owner>/chio/\.github/workflows/sidecar-image\.yml@refs/(tags/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|heads/[A-Za-z0-9._/-]+)$" \
-  --certificate-oidc-issuer \
-    "https://token.actions.githubusercontent.com" \
-  ghcr.io/<owner>/chio-sidecar@${DIGEST}
+  --certificate-identity \
+    "https://github.com/bb-connor/arc/.github/workflows/sidecar-image.yml@refs/tags/${TAG}" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  "ghcr.io/bb-connor/chio-sidecar@${DIGEST}"
 ```
 
-The `<owner>` placeholder is the lower-cased GitHub repository owner;
-the `Normalize image repository` step in the workflow performs the
-same lower-casing for the image name itself. Pin a tag rather than
-following `:latest` if you need reproducible deploys; the digest is
-the canonical reference.
-
-The regex covers the two trigger shapes that push and sign images:
-
-| Trigger             | SAN suffix                               |
-|---------------------|------------------------------------------|
-| `v*.*.*` tag push   | `@refs/tags/v<MAJOR.MINOR.PATCH[-pre]>`  |
-| `main` branch push  | `@refs/heads/main`                       |
-
-Manual `workflow_dispatch` runs are smoke builds only. They do not push
-GHCR tags and do not mint cosign signatures.
-
-Operators who require strict release-only verification should narrow
-the `--certificate-identity-regexp` to just the `refs/tags/v...` arm
-and reject `main`-branch images at deploy time.
+Replace the digest with the intended immutable digest. Keep public certificate
+and transparency checks enabled. Manual dispatch builds do not publish images.
+This OCI recipe is separate from the blob fixture checks in VERIFY.md.
 
 ### Programmatic verification from chio code
 
@@ -502,8 +503,8 @@ and exposes `verify_blob`, `verify_bytes`, and
 `verify_bundle` with a single canonical `ExpectedIdentity`
 (`certificate_identity_regexp`, `certificate_oidc_issuer`). The
 sidecar-image workflow's signing identity matches that surface
-directly: pass the regex shape above and the
-`https://token.actions.githubusercontent.com` issuer.
+directly: pass an anchored regex built with `regex::escape` from the full literal
+identity above and the `https://token.actions.githubusercontent.com` issuer.
 
 ### Rotation and rebake
 
@@ -556,47 +557,25 @@ sidecars are unchanged.
 
 ### Consumer verification
 
-The `release-binaries.yml` workflow signs only tag-bound release
-builds. Tag pushes already run on `refs/tags/v...`; dispatched
-rebuilds must be launched from the matching tag ref and then check out
-`refs/tags/<input-tag>` before building. The workflow attaches release
-metadata that SLSA consumes. The verification regex below therefore
-rejects branch-shaped signing identities by default.
+The `release-binaries.yml` workflow signs only tag-bound builds. Pushes run on
+`refs/tags/v...`; dispatch rebuilds must run from the matching tag. The signing
+steps check the canonical repository, workflow ref and exact tag before signing.
+
+Use the executable [native archive recipe in VERIFY.md](VERIFY.md#native-archive).
+For example:
 
 ```bash
-# Pin the version you intend to install and pick a target triple.
-VERSION=0.1.0
-TARGET=x86_64-unknown-linux-gnu
-ARCHIVE="chio-${VERSION}-${TARGET}.tar.gz"
-
-# Download the archive plus its cosign siblings.
-gh release download "v${VERSION}" --repo <owner>/chio \
-    --pattern "${ARCHIVE}" \
-    --pattern "${ARCHIVE}.sig" \
-    --pattern "${ARCHIVE}.pem" \
-    --pattern "${ARCHIVE}.sha256"
-
-# Verify the cosign signature against the workflow identity.
-cosign verify-blob \
-    --certificate "${ARCHIVE}.pem" \
-    --signature   "${ARCHIVE}.sig" \
-    --certificate-identity-regexp \
-        "^https://github\.com/<owner>/chio/\.github/workflows/release-binaries\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$" \
-    --certificate-oidc-issuer \
-        "https://token.actions.githubusercontent.com" \
-    "${ARCHIVE}"
-
-# Confirm the SHA-256 against the published manifest.
-shasum -a 256 -c "${ARCHIVE}.sha256"
+TAG=v0.1.1-rc.1
+ARCHIVE=chio-0.1.1-rc.1-x86_64-unknown-linux-gnu.tar.gz
+gh release download "$TAG" --repo bb-connor/arc \
+  --pattern "$ARCHIVE" --pattern "${ARCHIVE}.sig" --pattern "${ARCHIVE}.pem"
+python3 scripts/verify-release-identity.py verify \
+  --channel binaries --tag "$TAG" --artifact "$ARCHIVE"
 ```
 
-The `<owner>` placeholder is the lower-cased GitHub repository owner
-(e.g. `backbay-industries`). Five archive variants ship per release
-(one per matrix leg) and each carries its own `.sig` + `.pem`
-pair; verifying one platform never implies verifying another.
-
-Archives whose Fulcio SAN is not `refs/tags/v...` are not valid Chio
-release archives, even if they are attached to a release name.
+This illustrative tag is not a claim of a hosted signed release. Verify every
+platform archive separately and run source/provenance/runtime acceptance gates
+before promotion. A signed checksum index uses the same channel and exact tag.
 
 ### Programmatic verification from chio code
 
@@ -607,8 +586,8 @@ and exposes `verify_blob`, `verify_bytes`, and
 `verify_bundle` with a single canonical `ExpectedIdentity`
 (`certificate_identity_regexp`, `certificate_oidc_issuer`). The
 release-binaries workflow's signing identity matches that surface
-directly: pass the regex shape above and the
-`https://token.actions.githubusercontent.com` issuer.
+directly: pass an anchored regex built with `regex::escape` from the full literal
+identity above and the `https://token.actions.githubusercontent.com` issuer.
 
 ### Rotation and rebake
 

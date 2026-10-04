@@ -1,0 +1,16 @@
+{
+  "observed_at_utc": "2026-10-04T01:20:23.722202+00:00",
+  "source_commit": "5a14e0f3b8ea8b93cb0e50b65847de477b9e8cdd",
+  "branch": "packet/3-retention-accounting",
+  "remote_commit": "5a14e0f3b8ea8b93cb0e50b65847de477b9e8cdd",
+  "push_succeeded": true,
+  "tracked_state_clean_after_source_push": true,
+  "source_hashes_verified_against_commit": 28,
+  "preexisting_untracked_evidence_preserved": [
+    "output/"
+  ],
+  "followup_scope": "documentation only; final follow-up remote equality verified at task completion",
+  "merged": false,
+  "deployed": false,
+  "hosted_qualification_claimed": false
+}

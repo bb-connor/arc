@@ -57,6 +57,7 @@ async fn anonymous_nested_receipt_cannot_inherit_a_concurrent_tenant() -> TestRe
 
 fn operation(request: &ToolCallRequest) -> ToolCallOperation {
     ToolCallOperation {
+        dpop_proof: None,
         capability: request.capability.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

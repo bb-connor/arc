@@ -352,6 +352,8 @@ impl ChioKernel {
             execution_nonce_config: None,
             execution_nonce_store: None,
             governed_approval_authority: None,
+            governed_approvers: Vec::new(),
+            governed_approval_tenant: None,
             approval_replay_store: Some(Box::new(
                 crate::governed_approval_replay::InMemoryGovernedApprovalReplayStore::with_default_capacity(
                     clock.clone(),
@@ -968,7 +970,7 @@ impl ChioKernel {
                 Some(crate::receipt_store::RetentionMaintenanceHandle::spawn(
                     Arc::clone(&receipt_store),
                     config,
-                ));
+                )?);
         }
         self.receipt_store = Some(receipt_store);
         Ok(())
@@ -1782,6 +1784,17 @@ impl ChioKernel {
             return None;
         }
         self.emergency_stop_reason.load_full().as_ref().clone()
+    }
+
+    /// Install bounded volatile replay custody only when no store is configured.
+    /// This preserves existing history and does not activate durable replay authority.
+    pub fn install_default_dpop_store(&mut self) {
+        if self.dpop_nonce_store.is_none() {
+            self.dpop_nonce_store = Some(dpop::DpopNonceStore::defaults_with_clock(
+                self.clock.clone(),
+            ));
+            self.dpop_config = Some(dpop::DpopConfig::default());
+        }
     }
 
     /// Install a DPoP nonce replay store and verification config.

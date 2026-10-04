@@ -763,14 +763,22 @@ pub(crate) fn build_checkpoint_after_frontier_cache_miss(
     connection: &mut Connection,
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<(CheckpointChainFrontier, bool), ReceiptStoreError> {
-    build_checkpoint_after_frontier_cache_miss_with_hook(connection, head, signer, |_| Ok(()))
+    build_checkpoint_after_frontier_cache_miss_with_hook(
+        connection,
+        head,
+        signer,
+        clock,
+        |_| Ok(()),
+    )
 }
 
 pub(crate) fn build_checkpoint_after_frontier_cache_miss_with_hook(
     connection: &mut Connection,
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
+    clock: &crate::store_clock::StoreClock,
     after_audit: impl FnOnce(&rusqlite::Savepoint<'_>) -> Result<(), ReceiptStoreError>,
 ) -> Result<(CheckpointChainFrontier, bool), ReceiptStoreError> {
     let mut staged_head = head.clone();
@@ -844,12 +852,15 @@ pub(crate) fn build_checkpoint_after_frontier_cache_miss_with_hook(
             .checkpoint_seq()
             .checked_add(1)
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
-        let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_chain_frontier(
+        let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_chain_frontier_at(
             checkpoint_seq,
             start_seq,
             end_seq,
             &receipt_bytes,
-            &signer.keypair,
+            chio_kernel::checkpoint::CheckpointSigningContext {
+                keypair: &signer.keypair,
+                issued_at: clock.unix_millis()?,
+            },
             staged_head.latest_checkpoint.as_ref(),
             &frontier,
         )
@@ -1153,10 +1164,11 @@ pub(crate) fn create_checkpoint_anchored(
     max_batch: u64,
     keypair: &Keypair,
     rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
     checkpoint_guarded_anchored_immediate(connection, rollback_anchor, |tx| {
         validate_or_backfill_claim_receipt_log_entries_in_transaction(tx, false)?;
-        create_next_receipt_checkpoint_tx(tx, max_batch, keypair)
+        create_next_receipt_checkpoint_tx(tx, max_batch, keypair, clock)
     })
 }
 
@@ -1164,6 +1176,7 @@ fn create_next_receipt_checkpoint_tx(
     connection: &Connection,
     max_batch: u64,
     keypair: &Keypair,
+    clock: &crate::store_clock::StoreClock,
 ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
     let previous_checkpoint = verify_checkpoint_chain_integrity(connection)?;
     let latest_committed_entry_seq = super::latest_claim_log_entry_seq(connection)?;
@@ -1198,12 +1211,15 @@ fn create_next_receipt_checkpoint_tx(
             })
     })?;
     let chain_leaf_hashes = load_checkpoint_chain_leaf_hashes(connection)?;
-    let checkpoint = chio_kernel::build_checkpoint_with_previous(
+    let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_previous_at(
         checkpoint_seq,
         range.start_seq,
         range.end_seq,
         &receipt_bytes,
-        keypair,
+        chio_kernel::checkpoint::CheckpointSigningContext {
+            keypair,
+            issued_at: clock.unix_millis()?,
+        },
         previous_checkpoint.as_ref(),
         &chain_leaf_hashes,
     )

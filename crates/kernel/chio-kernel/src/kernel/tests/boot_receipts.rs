@@ -465,6 +465,7 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
         request.agent_id.clone(),
     );
     let operation = ToolCallOperation {
+        dpop_proof: None,
         capability: request.capability.clone(),
         server_id: request.server_id.clone(),
         tool_name: request.tool_name.clone(),

@@ -391,11 +391,11 @@ fn load_record(
 
 pub(super) async fn authenticate_request(
     state: &RemoteAppState,
-    headers: &HeaderMap,
+    headers: SenderRequest<'_>,
     method: &str,
     target: &str,
 ) -> Result<(SessionAuthContext, Option<SessionCredential>), Response> {
-    let token = extract_bearer_token(headers, state.protected_resource_metadata.as_deref())?;
+    let token = extract_bearer_token(&headers, state.protected_resource_metadata.as_deref())?;
     if !token.starts_with(PREFIX) {
         return authenticate_session_request(
             headers,
@@ -412,7 +412,7 @@ pub(super) async fn authenticate_request(
     if !matches!(method, "POST" | "DELETE") || target != MCP_ENDPOINT_PATH {
         return Err(unavailable());
     }
-    let session_id = match mcp_session_id_header(headers) {
+    let session_id = match mcp_session_id_header(&headers) {
         McpSessionIdHeader::Valid(id) => id,
         _ => return Err(unavailable()),
     };

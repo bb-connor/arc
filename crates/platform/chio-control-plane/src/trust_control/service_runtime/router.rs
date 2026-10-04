@@ -656,7 +656,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         router
     };
 
-    let router = router.with_state(state);
+    let router = router
+        .route_layer(axum::middleware::from_fn(
+            super::super::json_ingress::validate,
+        ))
+        .with_state(state);
 
     // Dashboard SPA is served from the same origin via ServeDir -- no CORS
     // headers needed.

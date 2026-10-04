@@ -10,6 +10,8 @@ use chio_kernel::{NestedFlowBridge, ToolDispatchContext};
 use serde::{Deserialize, Serialize};
 
 pub mod authorization;
+mod ingress;
+pub use ingress::decode_mcp_request;
 pub mod metrics;
 mod runtime;
 

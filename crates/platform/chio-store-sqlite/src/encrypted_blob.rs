@@ -10,8 +10,10 @@
 //! nonce. Authentication failures on read are surfaced as errors and do
 //! not return plaintext.
 
+use chio_security_types::clock::{Clock, SystemClock};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 
 use chacha20poly1305::aead::rand_core::RngCore;
 use chacha20poly1305::aead::{Aead, KeyInit, OsRng, Payload};
@@ -353,6 +355,7 @@ fn cipher_for_key(tenant_key: &TenantKey) -> ChaCha20Poly1305 {
 
 /// SQLite-backed encrypted BLOB store.
 pub struct SqliteEncryptedBlobStore {
+    clock: crate::store_clock::StoreClock,
     pool: Pool<SqliteConnectionManager>,
 }
 
@@ -369,6 +372,14 @@ const ENCRYPTED_BLOB_STORE_LEGACY_ANCHOR_TABLES: &[&str] =
 impl SqliteEncryptedBlobStore {
     /// Open the store at `path`, creating parent directories if needed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BlobStoreError> {
+        Self::open_with_clock(path, Arc::new(SystemClock))
+    }
+
+    /// Open with the time authority shared by the composing service.
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, BlobStoreError> {
         let path = path.as_ref();
         // Resolve any `file:` URI to its on-disk parent before creating it, so a
         // URI-configured store creates the real backing directory rather than a
@@ -384,16 +395,26 @@ impl SqliteEncryptedBlobStore {
             )
             .with_init(configure_blob_connection);
         let pool = Pool::builder().max_size(8).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
 
     /// Open an in-memory store for tests.
     pub fn open_in_memory() -> Result<Self, BlobStoreError> {
+        Self::open_in_memory_with_clock(Arc::new(SystemClock))
+    }
+
+    pub fn open_in_memory_with_clock(clock: Arc<dyn Clock>) -> Result<Self, BlobStoreError> {
         let manager = SqliteConnectionManager::memory().with_init(configure_blob_connection);
         let pool = Pool::builder().max_size(1).build(manager)?;
-        let store = Self { pool };
+        let store = Self {
+            pool,
+            clock: crate::store_clock::StoreClock::new(clock),
+        };
         store.run_migrations()?;
         Ok(store)
     }
@@ -480,9 +501,10 @@ impl SqliteEncryptedBlobStore {
         key: &TenantKey,
         payload: &[u8],
     ) -> Result<BlobHandle, BlobStoreError> {
+        let now = self.now_secs()?;
         validate_tenant_id(tenant_id)?;
         let blob_id = format!("blob-{}", Uuid::now_v7());
-        let created_at = now_secs()?;
+        let created_at = now;
         let aad = blob_aad(&blob_id, tenant_id.as_str(), created_at);
         let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
@@ -512,9 +534,10 @@ impl SqliteEncryptedBlobStore {
         key: &TenantKey,
         payload: &[u8],
     ) -> Result<BlobHandle, BlobStoreError> {
+        let now = self.now_secs()?;
         validate_tenant_id(reference.tenant_id())?;
         let blob_id = format!("blob-{}", Uuid::now_v7());
-        let created_at = now_secs()?;
+        let created_at = now;
         let aad = blob_aad(&blob_id, reference.tenant_id().as_str(), created_at);
         let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
@@ -564,6 +587,7 @@ impl SqliteEncryptedBlobStore {
         operation_id: &str,
         mutation_digest: &str,
     ) -> Result<(BlobHandle, BlobReferenceMutationOutcome), BlobStoreError> {
+        let now = self.now_secs()?;
         validate_tenant_id(reference.tenant_id())?;
         validate_mutation_binding(operation_id, mutation_digest)?;
         let mut conn = self.pool.get()?;
@@ -584,7 +608,7 @@ impl SqliteEncryptedBlobStore {
         }
 
         let blob_id = format!("blob-{}", Uuid::now_v7());
-        let created_at = now_secs()?;
+        let created_at = now;
         let aad = blob_aad(&blob_id, reference.tenant_id().as_str(), created_at);
         let encrypted = try_encrypt_blob_with_aad(key, payload, &aad)
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
@@ -670,6 +694,7 @@ impl SqliteEncryptedBlobStore {
 
     /// Disable an opaque reference without deleting its encrypted bytes.
     pub fn disable_blob_reference(&self, reference: &BlobReference) -> Result<(), BlobStoreError> {
+        self.now_secs()?;
         validate_tenant_id(reference.tenant_id())?;
         let conn = self.pool.get()?;
         let changed = conn.execute(
@@ -698,6 +723,7 @@ impl SqliteEncryptedBlobStore {
         operation_id: &str,
         mutation_digest: &str,
     ) -> Result<BlobReferenceMutationOutcome, BlobStoreError> {
+        let now = self.now_secs()?;
         validate_tenant_id(reference.tenant_id())?;
         validate_mutation_binding(operation_id, mutation_digest)?;
         let mut conn = self.pool.get()?;
@@ -738,7 +764,7 @@ impl SqliteEncryptedBlobStore {
                 mutation_kind: "disable",
                 reference,
                 result_blob_id: None,
-                applied_at: now_secs()?,
+                applied_at: now,
             },
         )?;
         transaction.commit()?;
@@ -747,6 +773,7 @@ impl SqliteEncryptedBlobStore {
 
     /// Delete an opaque reference and its encrypted bytes in one transaction.
     pub fn delete_blob_reference(&self, reference: &BlobReference) -> Result<(), BlobStoreError> {
+        self.now_secs()?;
         validate_tenant_id(reference.tenant_id())?;
         let mut conn = self.pool.get()?;
         let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -795,6 +822,7 @@ impl SqliteEncryptedBlobStore {
         operation_id: &str,
         mutation_digest: &str,
     ) -> Result<BlobReferenceMutationOutcome, BlobStoreError> {
+        let now = self.now_secs()?;
         validate_tenant_id(reference.tenant_id())?;
         validate_mutation_binding(operation_id, mutation_digest)?;
         let mut conn = self.pool.get()?;
@@ -853,7 +881,7 @@ impl SqliteEncryptedBlobStore {
                 mutation_kind: "delete",
                 reference,
                 result_blob_id: None,
-                applied_at: now_secs()?,
+                applied_at: now,
             },
         )?;
         transaction.commit()?;
@@ -1076,12 +1104,10 @@ fn validate_tenant_id(tenant_id: &TenantId) -> Result<(), BlobStoreError> {
     Ok(())
 }
 
-fn now_secs() -> Result<i64, BlobStoreError> {
-    Ok(i64::try_from(
-        chio_security_types::clock::Clock::unix_millis(&chio_security_types::clock::SystemClock)?
-            .as_secs(),
-    )
-    .map_err(|_| chio_security_types::clock::ClockError::Overflow)?)
+impl SqliteEncryptedBlobStore {
+    fn now_secs(&self) -> Result<i64, BlobStoreError> {
+        Ok(self.clock.now_secs()?)
+    }
 }
 
 #[cfg(test)]

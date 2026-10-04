@@ -68,7 +68,8 @@ pub mod trust_control;
 pub use chio_trust_market_context as trust_market;
 pub use keyring_runtime::{
     key_log_verification_migration_posture_digest, load_keyring_runtime_composition,
-    load_keyring_runtime_from_authority_seed, KeyringRuntimeAuthorityStatus,
+    load_keyring_runtime_composition_with_clock, load_keyring_runtime_from_authority_seed,
+    load_keyring_runtime_from_authority_seed_with_clock, KeyringRuntimeAuthorityStatus,
     KeyringRuntimeComposition,
 };
 struct LoadedThresholdApprovalResolver(ThresholdApprovalRequirement);
@@ -174,6 +175,7 @@ fn build_kernel_components(
     };
 
     let mut kernel = ChioKernel::new_with_clock(config, clock);
+    kernel.install_default_dpop_store();
     if kernel_policy.require_swarm_admission {
         kernel.require_swarm_admission();
     }
@@ -277,7 +279,10 @@ pub fn configure_receipt_store(
                         .to_string(),
                 ));
             }
-            let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
+            let store = chio_store_sqlite::SqliteReceiptStore::open_with_clock(
+                path,
+                kernel.authority_clock(),
+            )?;
             store.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
             kernel.set_receipt_store(Box::new(store))?;
         }
@@ -309,9 +314,12 @@ pub fn configure_revocation_store(
             ));
         }
         (Some(path), None) => {
-            kernel.set_revocation_store(Box::new(chio_store_sqlite::SqliteRevocationStore::open(
-                path,
-            )?));
+            kernel.set_revocation_store(Box::new(
+                chio_store_sqlite::SqliteRevocationStore::open_with_clock(
+                    path,
+                    kernel.authority_clock(),
+                )?,
+            ));
         }
         (None, Some(url)) => {
             let token = require_control_token(control_token)?;
@@ -351,8 +359,8 @@ pub fn configure_capability_authority(
         }
         let token = require_control_token(control_token)?;
         kernel.set_capability_authority(
-            trust_control::service_runtime::remote_authority::build_remote_capability_authority(
-                url, token,
+            trust_control::service_runtime::remote_authority::build_remote_capability_authority_with_clock(
+                url, token, kernel.authority_clock(),
             )?,
         );
         return Ok(());
@@ -366,7 +374,7 @@ pub fn configure_capability_authority(
         }
         (Some(path), None) => {
             let keypair = load_or_create_authority_keypair(path)?;
-            kernel.set_capability_authority(issuance::wrap_capability_authority(
+            kernel.set_capability_authority(issuance::wrap_capability_authority_with_clock(
                 Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                     keypair,
                     kernel.authority_clock(),
@@ -375,10 +383,11 @@ pub fn configure_capability_authority(
                 runtime_assurance_policy,
                 receipt_db_path,
                 budget_db_path,
+                kernel.authority_clock(),
             ));
         }
         (None, Some(path)) => {
-            kernel.set_capability_authority(issuance::wrap_capability_authority(
+            kernel.set_capability_authority(issuance::wrap_capability_authority_with_clock(
                 Box::new(
                     chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
                         path,
@@ -389,6 +398,7 @@ pub fn configure_capability_authority(
                 runtime_assurance_policy,
                 receipt_db_path,
                 budget_db_path,
+                kernel.authority_clock(),
             ));
         }
         (None, None) => {
@@ -396,7 +406,7 @@ pub fn configure_capability_authority(
                 || runtime_assurance_policy.is_some()
                 || receipt_db_path.is_some()
             {
-                kernel.set_capability_authority(issuance::wrap_capability_authority(
+                kernel.set_capability_authority(issuance::wrap_capability_authority_with_clock(
                     Box::new(chio_kernel::LocalCapabilityAuthority::new_with_clock(
                         default_authority_keypair.clone(),
                         kernel.authority_clock(),
@@ -405,6 +415,7 @@ pub fn configure_capability_authority(
                     runtime_assurance_policy,
                     receipt_db_path,
                     budget_db_path,
+                    kernel.authority_clock(),
                 ));
             }
         }
@@ -477,6 +488,7 @@ pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError
     }
 }
 
+pub mod server_transport;
 mod signing_custody;
 pub use signing_custody::{load_existing_authority_keypair, read_private_signing_custody};
 
@@ -894,5 +906,62 @@ mod tests {
 
         assert!(kernel.guard_count() >= 2);
         assert!(kernel.post_invocation_hook_count() >= 1);
+    }
+    #[test]
+    fn inbound_authority_production_kernel_accepts_subject_proof_preview() {
+        let keypair = Keypair::generate();
+        let loaded_policy = policy::LoadedPolicy {
+            format: policy::PolicyFormat::ChioYaml,
+            identity: policy::PolicyIdentity {
+                source_hash: "source".to_string(),
+                runtime_hash: "runtime".to_string(),
+            },
+            kernel: policy::KernelPolicyConfig::default(),
+            default_capabilities: Vec::new(),
+            guard_pipeline: chio_guards::GuardPipeline::new(),
+            post_invocation_pipeline: PostInvocationPipeline::new(),
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            threshold_approval: None,
+        };
+
+        let kernel = build_kernel(loaded_policy, &keypair);
+
+        let agent = Keypair::generate();
+        let capability = kernel
+            .issue_capability(
+                &agent.public_key(),
+                chio_core::capability::scope::ChioScope::default(),
+                300,
+            )
+            .unwrap();
+        let proof = chio_kernel::DpopProof::sign(
+            chio_kernel::DpopProofBody {
+                schema: chio_kernel::DPOP_SCHEMA.into(),
+                replay_authority: None,
+                capability_id: capability.id.clone(),
+                tool_server: "proof-srv".into(),
+                tool_name: "read".into(),
+                action_hash: chio_core::sha256_hex(b"{}"),
+                nonce: "production-proof".into(),
+                issued_at: kernel
+                    .authority_clock_reading()
+                    .unwrap()
+                    .unix_millis()
+                    .as_secs(),
+                agent_key: agent.public_key(),
+            },
+            &agent,
+        )
+        .unwrap();
+        kernel
+            .verify_dpop_for_permission_preview(
+                &proof,
+                &capability,
+                "proof-srv",
+                "read",
+                &serde_json::json!({}),
+            )
+            .unwrap();
     }
 }

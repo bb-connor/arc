@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::capability::aggregate_invocation::verify_aggregate_invocation_budget;
 use chio_core::receipt::decision::ToolCallAction;
 use chio_kernel::budget_store::{BudgetQuotaKey, BudgetQuotaProfile, BudgetStore};
@@ -26,13 +24,12 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         authority.join_receipts.is_empty() && authority.terminal_receipts.is_empty(),
         "expected original live fan-out authority",
     )?;
-    let now = u64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(error)?
-            .as_millis(),
-    )
-    .map_err(error)?;
+    let now = host
+        .kernel
+        .authority_clock_reading()
+        .map_err(error)?
+        .unix_millis()
+        .get();
     authority.now_unix_ms = now;
     verify_swarm_authority_for_admission(&authority, &[host.kernel.public_key()]).map_err(error)?;
     let calls: Value = read_json(&directory.join("swarm-calls.json"))?;

@@ -6,19 +6,18 @@
 //!
 //! Used by the no-key CI lane; not a user-facing production subcommand.
 
-use super::*;
 use super::payment_config::PaymentAdapterConfig;
+use super::*;
 
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-    MeteredSettlementMode,
+    GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote, MeteredSettlementMode,
 };
 use chio_core::capability::scope::{Constraint, Operation, ToolGrant};
 use chio_core::crypto::Keypair;
 use chio_kernel::{
-    KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest,
-    ToolInvocationCost, ToolServerConnection,
+    KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolInvocationCost,
+    ToolServerConnection,
 };
 
 const SIM_SERVER_ID: &str = "governed-sim-srv";
@@ -121,6 +120,12 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
     // This command is an explicit local payment simulation. Production kernels
     // keep the safe default and require durable admission before financial dispatch.
     kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
+    let approver = Keypair::generate();
+    kernel
+        .set_governed_approval_policy("governed-sim".into(), vec![approver.public_key()])
+        .map_err(|error| {
+            CliError::cli_other_error(format!("simulation approval policy: {error}"))
+        })?;
     kernel.register_tool_server(Box::new(SimFlatCostServer));
 
     match args.payment_adapter.as_str() {
@@ -165,12 +170,9 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         .issue_capability(&agent_kp.public_key(), scope, SIM_TTL_SECS)
         .map_err(|e| CliError::cli_other_error(format!("capability issuance: {e}")))?;
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+    let now = cap.issued_at;
 
-    let intent = GovernedTransactionIntent {
+    let mut intent = GovernedTransactionIntent {
         id: "governed-sim-intent-1".to_string(),
         server_id: SIM_SERVER_ID.to_string(),
         tool_name: SIM_TOOL_NAME.to_string(),
@@ -204,6 +206,15 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         body: Default::default(),
     };
 
+    chio_kernel::approval::ToolApprovalContext::bind(
+        &mut intent,
+        &cap,
+        &serde_json::json!({}),
+        "governed-sim-req-1",
+        kernel.policy_hash(),
+        "governed-sim",
+    )
+    .map_err(|error| CliError::cli_other_error(format!("simulation intent binding: {error}")))?;
     let intent_hash = intent
         .binding_hash()
         .map_err(|e| CliError::cli_other_error(format!("intent binding hash: {e}")))?;
@@ -211,7 +222,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
     let approval_token = GovernedApprovalToken::sign(
         GovernedApprovalTokenBody {
             id: "governed-sim-approval-1".to_string(),
-            approver: kernel_kp.public_key(),
+            approver: approver.public_key(),
             subject: agent_kp.public_key(),
             governed_intent_hash: intent_hash,
             request_id: "governed-sim-req-1".to_string(),
@@ -220,7 +231,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
             expires_at: now + SIM_TTL_SECS,
             decision: GovernedApprovalDecision::Approved,
         },
-        &kernel_kp,
+        &approver,
     )
     .map_err(|e| CliError::cli_other_error(format!("approval token sign: {e}")))?;
 
@@ -249,14 +260,15 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
 
     let receipt_json = serde_json::to_vec_pretty(&response.receipt)
         .map_err(|e| CliError::cli_other_error(format!("receipt serialize: {e}")))?;
-    std::fs::write(&args.out, &receipt_json).map_err(|e| {
-        CliError::cli_io_error(format!("write receipt to {:?}: {e}", args.out))
-    })?;
+    std::fs::write(&args.out, &receipt_json)
+        .map_err(|e| CliError::cli_io_error(format!("write receipt to {:?}: {e}", args.out)))?;
 
     if response.verdict != chio_kernel::Verdict::Allow {
         return Err(CliError::cli_other_error(format!(
             "governed MustPrepay denied: {}",
-            response.reason.unwrap_or_else(|| "no reason given".to_string())
+            response
+                .reason
+                .unwrap_or_else(|| "no reason given".to_string())
         )));
     }
 

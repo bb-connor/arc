@@ -155,6 +155,7 @@ mod tests {
             merge_strategy: None,
             rules: Some(Rules {
                 tool_access: Some(ToolAccessRule {
+                    dpop_required: None,
                     enabled: true,
                     allow: vec!["mail.send".to_string()],
                     block: Vec::new(),
@@ -276,6 +277,7 @@ mod tests {
             merge_strategy: None,
             rules: Some(Rules {
                 tool_access: Some(ToolAccessRule {
+                    dpop_required: None,
                     enabled: true,
                     allow: Vec::new(),
                     block: Vec::new(),

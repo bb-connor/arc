@@ -5,9 +5,7 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chio_control_plane::{
-    build_kernel, configure_capability_authority, policy, DurableAdmissionRuntime,
-};
+use chio_control_plane::{configure_capability_authority, policy, DurableAdmissionRuntime};
 use chio_control_plane::{prepare_private_directory, PreparedPrivateDirectory};
 use chio_core_types::capability::attenuation::scope_hash;
 use chio_kernel::admission_operation::DurableAdmissionMode;
@@ -444,6 +442,24 @@ pub(super) fn kernel(
     execution_nonces: bool,
     keyring_config: Option<&super::keyring::Config>,
 ) -> Result<KernelAssembly, CliError> {
+    kernel_with_clock(
+        directory,
+        loaded,
+        initializing,
+        execution_nonces,
+        keyring_config,
+        Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
+pub(super) fn kernel_with_clock(
+    directory: &Path,
+    loaded: policy::LoadedPolicy,
+    initializing: bool,
+    execution_nonces: bool,
+    keyring_config: Option<&super::keyring::Config>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<KernelAssembly, CliError> {
     if loaded.default_capabilities.len() != 1 {
         return Err(error(
             "host policy must define one default capability TTL group",
@@ -459,12 +475,20 @@ pub(super) fn kernel(
     let root_scope = loaded.default_capabilities[0].scope.clone();
     let issuance = loaded.issuance_policy.clone();
     let assurance = loaded.runtime_assurance_policy.clone();
-    let authority = DurableAdmissionRuntime::open(&directory.join("authority.db"))?;
+    let authority =
+        DurableAdmissionRuntime::open_with_clock(&directory.join("authority.db"), clock.clone())?;
     let key = authority.kernel_keypair();
+    let mut kernel = chio_control_plane::build_kernel_with_clock(loaded, &key, clock);
     let keyring = keyring_config
-        .map(|config| super::keyring::HostKeyring::open(config, directory, initializing))
+        .map(|config| {
+            super::keyring::HostKeyring::open(
+                config,
+                directory,
+                initializing,
+                kernel.authority_clock(),
+            )
+        })
         .transpose()?;
-    let mut kernel = build_kernel(loaded, &key);
     if execution_nonces {
         kernel.set_execution_nonce_store(
             ExecutionNonceConfig {
@@ -476,11 +500,15 @@ pub(super) fn kernel(
     }
     kernel.set_capability_trust_root(key.public_key(), scope_hash(&root_scope).map_err(error)?);
     let receipts = Arc::new(match keyring_config {
-        Some(config) => chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool(
+        Some(config) => chio_store_sqlite::SqliteReceiptStore::open_for_finding_pool_with_clock(
             directory.join("receipts.db"),
             &config.receipt_anchor_directory,
+            kernel.authority_clock(),
         )?,
-        None => chio_store_sqlite::SqliteReceiptStore::open(directory.join("receipts.db"))?,
+        None => chio_store_sqlite::SqliteReceiptStore::open_with_clock(
+            directory.join("receipts.db"),
+            kernel.authority_clock(),
+        )?,
     });
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
     kernel
@@ -499,13 +527,16 @@ pub(super) fn kernel(
             governed.authority_public_key(),
             scope_hash(&root_scope).map_err(error)?,
         );
-        kernel.set_capability_authority(chio_control_plane::issuance::wrap_capability_authority(
-            governed,
-            issuance,
-            assurance,
-            Some(&directory.join("receipts.db")),
-            None,
-        ));
+        kernel.set_capability_authority(
+            chio_control_plane::issuance::wrap_capability_authority_with_clock(
+                governed,
+                issuance,
+                assurance,
+                Some(&directory.join("receipts.db")),
+                None,
+                kernel.authority_clock(),
+            ),
+        );
         if !initializing {
             let registry =
                 chio_process::ProcessRegistry::open(directory.join("process.db"), &kernel)

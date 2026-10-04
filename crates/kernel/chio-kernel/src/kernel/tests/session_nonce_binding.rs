@@ -29,6 +29,7 @@ fn session_operation_rejects_nonce_bound_to_another_request(
         &agent.public_key().to_hex(),
     );
     let operation = SessionOperation::ToolCall(Box::new(ToolCallOperation {
+        dpop_proof: None,
         capability,
         server_id: bound_request.server_id,
         tool_name: bound_request.tool_name,

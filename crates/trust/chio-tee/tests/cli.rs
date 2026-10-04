@@ -45,6 +45,7 @@ fn observation(
     decision: Decision,
 ) -> Observation {
     let request = AgentMessage::ToolCallRequest {
+        dpop_proof: None,
         id: id.to_string(),
         capability_token: Box::new(capability(kp, id)),
         server_id: "srv-1".to_string(),

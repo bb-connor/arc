@@ -30,6 +30,8 @@ fn nested_label_write_is_rejected_and_rollback_disables_egress_callback() -> Anc
 
 #[test]
 fn acquisition_and_commit_errors_recover_exactly_one_event_per_phase() -> AnchoredTestResult {
+    // Exercise state transitions independently of wall time spent validating the catalog.
+    let _clock = chio_test_support::clock::scope_unix_secs(1_800_000_000);
     let _reset = ResetCutpoint;
     for commit_phase in [false, true] {
         for stage in 12..=16 {

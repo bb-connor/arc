@@ -43,8 +43,8 @@ pub(super) fn pre_approval_claim_schema_fixture() -> String {
 pub(super) fn pre_approval_activation_schema_fixture() -> String {
     migration_v23::predecessor_approval_schema()
 }
-pub(crate) use clock::verify_trusted_time;
-pub(super) use clock::{authority_validation_time, observe_authority_time};
+pub(super) use clock::authority_validation_time;
+pub(crate) use clock::{observe_authority_time, verify_trusted_time};
 
 #[cfg(test)]
 pub(super) fn pre_runtime_claim_schema_fixture() -> String {

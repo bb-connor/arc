@@ -2768,6 +2768,18 @@
       "artifactKind": "native_funded_decision",
       "introducedBy": "registered-native-funded-work-v1",
       "schemaFile": "spec/schemas/chio-work/v2/decision.schema.json"
+    },
+    {
+      "schema": "chio.dpop_proof.v1",
+      "artifactKind": "invocation_sender_proof",
+      "introducedBy": "inbound-authority-ap5",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/dpop_proof.schema.json"
+    },
+    {
+      "schema": "chio.dpop_proof.v2",
+      "artifactKind": "invocation_sender_proof",
+      "introducedBy": "inbound-authority-ap5",
+      "schemaFile": "spec/schemas/chio-wire/v1/kernel/dpop_proof.schema.json"
     }
   ]
 }

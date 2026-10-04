@@ -61,8 +61,6 @@
 1	crates/kernel/chio-kernel/src/authority/aggregate.rs	aggregate_root_response_is_explicit_exact_and_ca_authenticated	validate(&plain, 2).is_err()
 1	crates/kernel/chio-kernel/src/authority/aggregate.rs	aggregate_root_response_is_explicit_exact_and_ca_authenticated	validate(&root, 1).is_err()
 1	crates/kernel/chio-kernel/src/authority/aggregate.rs	aggregate_root_response_is_explicit_exact_and_ca_authenticated	validate(&root, 3).is_err()
-1	crates/kernel/chio-kernel/src/authority/aggregate.rs	aggregate_root_response_is_explicit_exact_and_ca_authenticated	validate_issued_aggregate_family_root_response( &root, &subject, &scope, 1, &key.public_key(), 2, ) .is_err()
-1	crates/kernel/chio-kernel/src/authority/aggregate.rs	aggregate_root_response_is_explicit_exact_and_ca_authenticated	validate_issued_capability_response( &root, &subject, &scope, 300, &key.public_key(), ) .is_err()
 1	crates/kernel/chio-kernel/src/authority/aggregate.rs	backend_capability_budget_preserves_its_exact_scope_and_limit	authority .issue_capability_with_aggregate_budget(&subject, requested_scope.clone(), 300, 2) .is_err()
 1	crates/kernel/chio-kernel/src/caller_delivery/tests.rs	a_late_authenticated_report_does_not_renew_permission	verify( &fixture, &fixture.authorization, report.report.completed_at_unix_ms ) .is_err()
 1	crates/kernel/chio-kernel/src/caller_delivery/tests.rs	codecs_reject_unknown_fields_noncanonical_bytes_unsafe_numbers_and_size_overflow	SignedCallerDeliveryReportV1::from_canonical_bytes(&vec![ ; MAX_REPORT_BYTES + 1]) .is_err()

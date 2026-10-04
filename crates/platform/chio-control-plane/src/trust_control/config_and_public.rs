@@ -850,6 +850,7 @@ pub(crate) fn authority_status_for_config(
             public_key: Some(public_key.to_hex()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![public_key.to_hex()],
         }),
@@ -1566,6 +1567,7 @@ mod config_and_public_tests {
 
     fn base_config() -> TrustServiceConfig {
         TrustServiceConfig {
+            transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_expect("parse listen addr"),
             service_token: "token".to_string(),
             tenant_read_tokens: BTreeMap::new(),
@@ -1680,6 +1682,7 @@ mod config_and_public_tests {
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: false,
             trusted_public_keys: Vec::new(),
         })
@@ -1695,6 +1698,7 @@ mod config_and_public_tests {
             public_key: Some(current.clone()),
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: vec![current.clone()],
         })
@@ -1708,6 +1712,7 @@ mod config_and_public_tests {
             public_key: None,
             generation: None,
             rotated_at: None,
+            issuer_state: None,
             applies_to_future_sessions_only: true,
             trusted_public_keys: Vec::new(),
         })
@@ -1795,18 +1800,25 @@ mod config_and_public_tests {
 
     #[test]
     fn public_discovery_uses_local_db_signer_after_replica_snapshot() {
-        let source_path = unique_temp_path("chio-trust-control-authority-source", "sqlite");
-        let follower_path = unique_temp_path("chio-trust-control-authority-follower", "sqlite");
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let source_path = directory.path().join("source.sqlite3");
+        let follower_path = directory.path().join("follower.sqlite3");
         let source =
             SqliteCapabilityAuthority::open(&source_path).test_expect("open source authority");
         let follower =
             SqliteCapabilityAuthority::open(&follower_path).test_expect("open follower authority");
         let follower_local_key = follower.local_keypair().test_expect("read follower seed");
 
+        let anchor = source
+            .initialize_replication("local-custody-test")
+            .test_unwrap();
+        follower.pin_replication_anchor(&anchor).test_unwrap();
         source.rotate().test_expect("rotate source authority");
-        let snapshot = source.snapshot().test_expect("snapshot source authority");
+        let snapshot = source
+            .signed_snapshot()
+            .test_expect("snapshot source authority");
         assert!(follower
-            .apply_snapshot(&snapshot)
+            .apply_signed_snapshot(&snapshot)
             .test_expect("apply source snapshot"));
         assert!(follower.current_keypair().is_err());
 

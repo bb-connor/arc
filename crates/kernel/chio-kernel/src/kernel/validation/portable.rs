@@ -2,8 +2,8 @@
 use super::*;
 
 impl ChioKernel {
-    /// Run the portable pure-compute verdict path provided by
-    /// `chio-kernel-core`.
+    /// Resolve current issuer authority, then run the portable pure-compute
+    /// verdict path provided by `chio-kernel-core`.
     ///
     /// This exposes the same synchronous checks the core kernel performs
     /// (capability signature, issuer trust, time bounds, subject binding,
@@ -14,8 +14,8 @@ impl ChioKernel {
     ///
     /// Adapters that run the kernel on constrained platforms (wasm32,
     /// edge workers, mobile via FFI) should prefer this entry point --
-    /// it does not require a tokio runtime, a sqlite database, or any
-    /// IO adapter. The full `evaluate_tool_call_*` API remains the
+    /// the pure core needs no IO adapter. A configured managed authority still
+    /// performs its current-state checks. The full `evaluate_tool_call_*` API remains the
     /// authoritative path for the desktop sidecar.
     ///
     /// Verified-core boundary note:
@@ -31,7 +31,6 @@ impl ChioKernel {
         clock: &'a dyn chio_kernel_core::Clock,
         session_filesystem_roots: Option<&'a [String]>,
     ) -> chio_kernel_core::EvaluationVerdict {
-        let trusted = self.trusted_issuer_keys();
         let now = match clock.unix_millis() {
             Ok(now) => now.as_secs(),
             Err(error) => {
@@ -43,6 +42,17 @@ impl ChioKernel {
                 };
             }
         };
+        // Refresh managed authority before resolving trust. Explicit CA pins
+        // cannot restore a retired issuer or extend its verification deadline.
+        if let Err(reason) = self.check_capability_issuer_lifecycle(capability, now) {
+            return chio_kernel_core::EvaluationVerdict {
+                verdict: chio_kernel_core::Verdict::Deny,
+                reason: Some(reason),
+                matched_grant_index: None,
+                verified: None,
+            };
+        }
+        let trusted = self.trusted_issuer_keys();
         let peer_profile = match self.capability_negotiation_for_remote(None, now) {
             Ok(profile) => profile,
             // Fail closed: a negotiation error denies rather than falling back

@@ -293,6 +293,7 @@ impl ChioMcpEdge {
         let stable_request_id = parse_request_stable_request_id(id, params)?;
         let model_metadata = parse_request_model_metadata(id, params)?;
         let execution_nonce = parse_request_execution_nonce(id, params)?;
+        let dpop_proof = parse_request_dpop_proof(id, params)?;
         let governed_intent = parse_request_governed_intent(id, params)?;
         let (approval_token, approval_tokens, threshold_approval_proposal) =
             parse_request_approval_artifacts(id, params)?;
@@ -432,6 +433,7 @@ impl ChioMcpEdge {
             session_id,
             context,
             ToolCallOperation {
+                dpop_proof,
                 capability,
                 server_id: binding.server_id,
                 tool_name: binding.tool_name,

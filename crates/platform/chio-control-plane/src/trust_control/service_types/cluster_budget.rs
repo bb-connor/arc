@@ -280,22 +280,8 @@ pub(crate) struct BudgetMutationEventView {
     pub(crate) authority: Option<BudgetMutationAuthorityView>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AuthoritySnapshotView {
-    pub(crate) public_key_hex: String,
-    pub(crate) generation: u64,
-    pub(crate) rotated_at: u64,
-    pub(crate) trusted_keys: Vec<AuthorityTrustedKeyView>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AuthorityTrustedKeyView {
-    pub(crate) public_key_hex: String,
-    pub(crate) generation: u64,
-    pub(crate) activated_at: u64,
-}
+pub(crate) type AuthoritySnapshotView =
+    chio_kernel::authority::replication::SignedAuthoritySnapshot;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
