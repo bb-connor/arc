@@ -5662,6 +5662,11 @@ def run_campaign(
     cross_package_control = control["package"] != campaign["package"]
     if cross_package_control:
         command.extend(["--test-package", control["package"]])
+        # The pinned engine applies --test-package only to mutants. Its
+        # baseline otherwise runs the owner package with zero matching tests
+        # and derives the consumer deadline from that unrelated workload.
+        # A Cargo package argument also includes the control in the baseline.
+        command.append(f"--cargo-arg=--package={control['package']}")
     if control["features"]:
         command.extend(["--features", ",".join(control["features"])])
     # A Cargo target selector is global to every package in cargo-mutants'

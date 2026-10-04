@@ -7,6 +7,7 @@ test -x scripts/check-security-adversarial-evidence.sh
 bash -n scripts/check-security-adversarial-evidence.sh
 python3 -m py_compile scripts/check-security-adversarial-evidence.py
 python3 scripts/tests/check-cargo-mutants-source-paths.test.py
+python3 scripts/tests/check-cargo-mutants-control-packages.test.py
 
 if enterprise_promotion_output="$(
   CHIO_ENTERPRISE_SECURITY_RUNNER=1 \
@@ -4299,8 +4300,12 @@ checker.atomic_replace_many(
             raise AssertionError(f"wrong cross-package control: {command}")
         if "--cargo-arg=--locked" not in command:
             raise AssertionError("cross-package control omitted the dependency lock")
+        if "--cargo-arg=--package=fixture-control-package" not in command:
+            raise AssertionError("cross-package baseline omitted its behavioral control")
         if any(
-            argument.startswith("--cargo-arg=") and argument != "--cargo-arg=--locked"
+            argument.startswith("--cargo-arg=") and argument not in {
+                "--cargo-arg=--locked", "--cargo-arg=--package=fixture-control-package",
+            }
             for argument in command
         ):
             raise AssertionError(
