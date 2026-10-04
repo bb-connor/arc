@@ -335,6 +335,8 @@ jobs:
           export RUST_TEST_THREADS=1
           bash scripts/run-exact-cargo-test-inventory.sh \
             --label "Threshold reservation qualification" --allow-filtered --expected \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_rejects_a_different_typed_proposal_atomically \
+            admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_retains_typed_proposal_and_preserves_legacy_commands \
             admission_operation_store::tests::threshold_approval::qualification::oversized_threshold_proposal_is_not_an_absent_nonce_approval \
             admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_rejects_foreign_participant_attachments_atomically \
             admission_operation_store::tests::threshold_approval::qualification::threshold_reservation_replay_rechecks_the_exact_packet \
@@ -641,6 +643,7 @@ jobs:
           umask 022
           bash scripts/run-exact-cargo-test-inventory.sh \
             --label "Native pending approval delivery" --allow-filtered --expected \
+            session_cli::tests::pending_approval::ap23_stdio_host_binds_pending_intent_before_collecting_votes \
             session_cli::tests::pending_approval::pending_approval_transports_the_signed_proposal_without_dispatch \
             session_cli::tests::pending_approval::pending_approval_round_trip_resumes_the_original_request_once \
             session_cli::tests::pending_approval::pending_approval_projection_rejects_broken_shape_and_signed_content_bindings \
