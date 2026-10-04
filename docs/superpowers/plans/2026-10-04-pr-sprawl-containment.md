@@ -1,0 +1,127 @@
+# PR sprawl containment implementation plan
+
+> **For agentic workers:** Use `superpowers:executing-plans` inline. The user
+> prohibits subagents. Existing authorization covers the described PR updates,
+> protected merges, commits and pushes.
+
+**Goal:** Consolidate duplicate PRs without abandoning valuable work, maintain an
+exact landing ledger, and qualify and merge the process/security foundation.
+
+**Architecture:** Preserve published histories and transfer each original review
+obligation to an explicit surviving candidate. Keep unique valuable work open
+until completed and merged. Use the existing integration worktree and qualify
+the final source with the existing protected checks and native trust boundaries.
+
+**Tech Stack:** Git, GitHub REST/GraphQL, Python audit tooling, Rust workspace and
+its existing native, formal and hosted qualification workflows.
+
+**Spec:** The user's four-step execution request and subsequent preservation
+constraint, `docs/security/landing-ledger.md`, and
+`docs/security/foundation-acceptance-scope.md`.
+
+## Global constraints
+
+- No subagents, branch deletion, force pushes or qualification bypasses.
+- No feature is dropped or placed in closed backlog to reduce a count.
+- A duplicate PR may close only after its complete source and review obligations
+  are preserved in a named surviving candidate. Closure is not a merge claim.
+- Refresh exact heads, bases and all review threads before mutations.
+- At most two active landing candidates. Other useful tracks retain named open
+  destinations and explicit remaining acceptance.
+- Search existing security branches and source repair records before changing
+  behavior. Keep genuine source audits and fail-closed enforcement intact.
+- Retain failed, cancelled, unavailable and partial evidence distinctly.
+- No em dashes in code or documentation.
+
+## Review focus
+
+- Changed heads or new review comments invalidate stale retirement decisions.
+- Patch equivalence must cover every absent commit, not only the last patch.
+- A surviving child must not lose its base or acquire unrelated source silently.
+- Code preservation does not establish that review findings have been repaired.
+- Source changes invalidate exact-candidate qualification; a green local subset
+  cannot establish native, hosted, independent review or merge acceptance.
+
+### Task 1: Consolidate the 57 process/security duplicates
+
+**Files:** Update `docs/security/landing-ledger.{json,md}`; create
+`docs/security/pr-consolidation-20261004.json` and a compact retained review
+snapshot under `docs/security/audits/`.
+
+**Interfaces:** Consumes current PR heads, full review threads, the existing
+retirement manifest and source histories. Produces a published source/review
+transfer record and one recorded GitHub outcome per candidate.
+
+- [ ] Refresh the open inventory, review threads and published refs; refuse any
+  unexplained drift or incomplete pagination.
+- [ ] Verify 54 original heads through ancestry and all absent commits of the
+  other three through exact patch/blob equivalence and published archives.
+- [ ] Preserve every live review obligation in the ledger; retain original
+  thread bodies and resolution states without marking them repaired by closure.
+- [ ] Retarget #1155 to the surviving foundation branch and verify its unique
+  change remains intact.
+- [ ] Publish the transfer record, then close duplicates in child-before-parent
+  order with exact source and review links. Preserve all branches and archives.
+- [ ] Verify the resulting 28 open PRs, source refs and closure outcomes.
+
+### Task 2: Consolidate the workbench stack into #1164
+
+**Files:** Extend the same consolidation record and ledger; update #1164's
+description with its expanded scope, inherited review obligations and open
+acceptance.
+
+**Interfaces:** Consumes the six older workbench heads and review records.
+Produces one surviving workbench candidate, separate from foundation acceptance.
+
+- [ ] Verify #1164 contains all six complete older heads and refresh reviews.
+- [ ] Transfer each original review obligation and inherited feature to #1164.
+- [ ] Retarget #1164 to main, verify the expanded diff, then close the six older
+  PRs as superseded while keeping their branches.
+- [ ] Verify the resulting 22 open PRs and all preserved source refs.
+
+### Task 3: Account for all remaining valuable work
+
+**Files:** Update the authoritative ledger and consolidation record.
+
+**Interfaces:** Consumes the 22 surviving PRs and current main/foundation source.
+Produces explicit landing destinations, dependency order and remaining acceptance.
+
+- [ ] Give every survivor a named open destination or an active landing slot.
+- [ ] Keep #1155 and #1136's unique changes accounted for and open.
+- [ ] Reconcile #1029 and other legacy changes against main and the security
+  histories by requirement and patch; do not retire unmatched valuable source.
+- [ ] Verify every PR appears exactly once and no useful track is closed merely
+  because it is outside the active two-PR queue.
+
+### Task 4: Repair and qualify the foundation
+
+**Files:** Only the owning source/tests or qualification definitions identified
+by current failures; record exact repairs and evidence in the landing ledger.
+
+**Interfaces:** Consumes final candidate failures and the seven existing review
+slices. Produces reviewed source, terminal hosted/native evidence, and a protected
+foundation merge with post-merge source verification.
+
+- [ ] Retrieve current failed job logs and reproduce each root cause; search
+  existing repairs before writing new code.
+- [ ] For each behavioral repair, first demonstrate the failure with an owning
+  regression, then implement the smallest modular repair and rerun the relevant
+  suite and owning Clippy checks.
+- [ ] Complete dependency-ordered source review and reconcile every finding.
+- [ ] Obtain independent review of the exact final source without subagents.
+- [ ] Complete the required native mutation campaigns and trusted capture chain
+  under their existing isolation and acceptance rules.
+- [ ] Obtain terminal passing required checks for the exact candidate, merge
+  through protection, and verify the actual main ancestry and remaining ledger.
+
+## Execution rulings
+
+- The user's later preservation instruction supersedes the earlier proposal to
+  close deferred valuable work into backlog. Only duplicate PR containers close;
+  their work continues in the surviving candidate until qualified and merged.
+- The earlier manifest's requirement to merge #1160 before closing any duplicate
+  is replaced by the user's explicit pre-merge supersession authorization.
+  Published preservation and transferred obligations remain mandatory.
+- The existing integration worktree is clean and already isolated. Baseline CI
+  is known to fail; diagnosis and repair are explicitly authorized, so no fresh
+  worktree, broad baseline rebuild or additional permission cycle is needed.

@@ -1,0 +1,1968 @@
+{
+  "schema": "chio.pr-consolidation.v1",
+  "observed_utc": "2026-10-04T23:18:13.691022+00:00",
+  "state": "prepared-before-remote-mutations",
+  "initial_open": 85,
+  "expected_after_security": 28,
+  "expected_after_workbench": 22,
+  "preservation_rule": "Close only duplicate PR containers after complete source and review transfer. Keep unique valuable work open, complete it, qualify it and merge. Never delete source branches or archives.",
+  "active_landing_prs": [
+    1160
+  ],
+  "reference_foundation": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+  "reference_workbench": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+  "review_snapshot": {
+    "path": "docs/security/audits/pr-consolidation-reviews-20261004.json.gz",
+    "sha256": "9af354917c4ded0a0ff894f230f27e42a4d039c9b946fb73671038505c22fb50",
+    "prs": 85,
+    "threads": 425,
+    "open_threads": 322,
+    "new_ledger_rows": 201
+  },
+  "closures": [
+    {
+      "pr": 1156,
+      "destination_pr": 1160,
+      "expected_head": "7059c71ca86239e1ba5fe7b63c391db2b2ded3bc",
+      "head_ref": "codex/required-agent-integrations-20260909",
+      "original_base": "main",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992517787",
+        "inherited-thread:r3992517800",
+        "inherited-thread:r3994643731"
+      ]
+    },
+    {
+      "pr": 1154,
+      "destination_pr": 1160,
+      "expected_head": "d99e03027c57dc9c0929a5bca553e745c6286d99",
+      "head_ref": "codex/process-response-binding-20260908",
+      "original_base": "codex/shared-resource-execution-contract-20260908",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992275572",
+        "inherited-thread:r3992275578",
+        "inherited-thread:r3992275583"
+      ]
+    },
+    {
+      "pr": 1153,
+      "destination_pr": 1160,
+      "expected_head": "3ca011d103c82ddaba88dc829680f248bafe28d6",
+      "head_ref": "codex/shared-resource-execution-contract-20260908",
+      "original_base": "perf/kernel-custody-dependencies",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1152,
+      "destination_pr": 1160,
+      "expected_head": "cfd608f79339129a9d810b6a62c28043beb13afb",
+      "head_ref": "perf/kernel-custody-dependencies",
+      "original_base": "feat/renewable-mailbox-leases",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992205988",
+        "inherited-thread:r3992205994"
+      ]
+    },
+    {
+      "pr": 1151,
+      "destination_pr": 1160,
+      "expected_head": "8a3b0bc2acb2633d635e20ac89201cf4dcc30a45",
+      "head_ref": "feat/renewable-mailbox-leases",
+      "original_base": "feat/supervised-child-outcomes",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992197834"
+      ]
+    },
+    {
+      "pr": 1150,
+      "destination_pr": 1160,
+      "expected_head": "e6f66cba20e9554d5d954a4f8d4b1b4423d1a2e7",
+      "head_ref": "feat/supervised-child-outcomes",
+      "original_base": "feat/independent-worker-failures",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1149,
+      "destination_pr": 1160,
+      "expected_head": "edb4c94763f54089045a839334bf1ef12492439d",
+      "head_ref": "feat/independent-worker-failures",
+      "original_base": "docs/native-application-adoption",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992193263"
+      ]
+    },
+    {
+      "pr": 1148,
+      "destination_pr": 1160,
+      "expected_head": "8df43e7cb83288c06ed75980d064a33eb62921a9",
+      "head_ref": "docs/native-application-adoption",
+      "original_base": "feat/scoped-repository-workspace",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992136372"
+      ]
+    },
+    {
+      "pr": 1147,
+      "destination_pr": 1160,
+      "expected_head": "4c500826da2abf7151dab7acdaeaddf47dee0349",
+      "head_ref": "feat/scoped-repository-workspace",
+      "original_base": "feat/structured-checkpoints",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1146,
+      "destination_pr": 1160,
+      "expected_head": "163c2e2ea898adddf87c0edad8d9fb0a843a615f",
+      "head_ref": "feat/structured-checkpoints",
+      "original_base": "feat/repository-snapshot-store",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1145,
+      "destination_pr": 1160,
+      "expected_head": "45a24f3c966eb26dfb787eb51c9e214af7fdeed1",
+      "head_ref": "feat/repository-snapshot-store",
+      "original_base": "ci/optimized-mini-swe-comparison",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992112711"
+      ]
+    },
+    {
+      "pr": 1144,
+      "destination_pr": 1160,
+      "expected_head": "515ee6fd05c3aef4c5151c47bf72e470cde1f618",
+      "head_ref": "ci/optimized-mini-swe-comparison",
+      "original_base": "test/mini-swe-upstream-comparison",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1143,
+      "destination_pr": 1160,
+      "expected_head": "4064e31ddc630e1dff43b8c1c12b4a550157487c",
+      "head_ref": "test/mini-swe-upstream-comparison",
+      "original_base": "fix/process-socket-path",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992106237"
+      ]
+    },
+    {
+      "pr": 1142,
+      "destination_pr": 1160,
+      "expected_head": "5bba03333ff2c426a7b6e051d93ad6310999c07b",
+      "head_ref": "fix/process-socket-path",
+      "original_base": "feat/coding-task-session",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992068069"
+      ]
+    },
+    {
+      "pr": 1141,
+      "destination_pr": 1160,
+      "expected_head": "10459274a3687ccbabafa9335344a8f9dfc24441",
+      "head_ref": "feat/coding-task-session",
+      "original_base": "feat/repository-export-verification",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992073789",
+        "inherited-thread:r3992073800",
+        "inherited-thread:r3994436978"
+      ]
+    },
+    {
+      "pr": 1140,
+      "destination_pr": 1160,
+      "expected_head": "90914a3e5288bc0094588bbf84a86422364c2af9",
+      "head_ref": "fix/xtask-runtime-workspace",
+      "original_base": "feat/repository-execution-service",
+      "preservation": {
+        "kind": "all-absent-commits-have-exact-full-index-patch-and-blob-equivalence",
+        "head_in_archive": false,
+        "absent_commit_count": 1,
+        "equivalence": {
+          "pr": 1140,
+          "original": "90914a3e5288bc0094588bbf84a86422364c2af9",
+          "equivalent_in_archive": "f6c531ca96aed9603fec8c4430084079dd461980",
+          "stable_patch_id": "3c8f886d156d38cfe733b67e8460937af79acb74",
+          "raw_full_index_patch_identical": true,
+          "patch_sha256": [
+            "0767760949e24de645afab59abf362eb5b5a2978426f8ddb2444bbf858f9d293",
+            "0767760949e24de645afab59abf362eb5b5a2978426f8ddb2444bbf858f9d293"
+          ],
+          "blob_comparison": [
+            {
+              "path": "docs/formal/COVERAGE.md",
+              "old_blobs": [
+                "2a443a4be412fb83d8947f2514164627fb288834",
+                "2a443a4be412fb83d8947f2514164627fb288834"
+              ],
+              "new_blobs": [
+                "d50b00659dc33054e525779520c96d7f5ffd9a0f",
+                "d50b00659dc33054e525779520c96d7f5ffd9a0f"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            },
+            {
+              "path": "xtask/README.md",
+              "old_blobs": [
+                null,
+                null
+              ],
+              "new_blobs": [
+                "9070ddd786150ec62f92a0828f4d59680c3a3461",
+                "9070ddd786150ec62f92a0828f4d59680c3a3461"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            },
+            {
+              "path": "xtask/src/support.rs",
+              "old_blobs": [
+                "cc3b06ff53d54bfefd6b0993f1fca678e8c85cbd",
+                "cc3b06ff53d54bfefd6b0993f1fca678e8c85cbd"
+              ],
+              "new_blobs": [
+                "8be37d92ede36fc63233a3bdd48f6684e7244913",
+                "8be37d92ede36fc63233a3bdd48f6684e7244913"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            },
+            {
+              "path": "xtask/tests/workspace_root.rs",
+              "old_blobs": [
+                null,
+                null
+              ],
+              "new_blobs": [
+                "1499af690f7d7317d79b35d3809d795403284c42",
+                "1499af690f7d7317d79b35d3809d795403284c42"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            }
+          ]
+        }
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991742821"
+      ]
+    },
+    {
+      "pr": 1139,
+      "destination_pr": 1160,
+      "expected_head": "0ccca5bca6e0c47fca16d11bee202512511bd9ac",
+      "head_ref": "feat/repository-export-verification",
+      "original_base": "feat/repository-execution-service",
+      "preservation": {
+        "kind": "all-absent-commits-have-exact-full-index-patch-and-blob-equivalence",
+        "head_in_archive": false,
+        "absent_commit_count": 1,
+        "equivalence": {
+          "pr": 1139,
+          "original": "0ccca5bca6e0c47fca16d11bee202512511bd9ac",
+          "equivalent_in_archive": "10459274a3687ccbabafa9335344a8f9dfc24441",
+          "stable_patch_id": "eaae619258977b661da949b0219ec6829482b411",
+          "raw_full_index_patch_identical": true,
+          "patch_sha256": [
+            "7279deef91805ff0da205d569181e33cfd6af5ab3567d20a5a58bb2874140592",
+            "7279deef91805ff0da205d569181e33cfd6af5ab3567d20a5a58bb2874140592"
+          ],
+          "blob_comparison": [
+            {
+              "path": "examples/repository-review/adaptive/configuration.py",
+              "old_blobs": [
+                "3a84f694d021dc0befe40add099395c5e4ace71e",
+                "3a84f694d021dc0befe40add099395c5e4ace71e"
+              ],
+              "new_blobs": [
+                "490af5bf5b89374dd23f13d3cebb877861a7fa82",
+                "490af5bf5b89374dd23f13d3cebb877861a7fa82"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            },
+            {
+              "path": "examples/repository-review/test_adaptive.py",
+              "old_blobs": [
+                "80c86519ee3e3a2e0ad8f6cb825b4462197be26a",
+                "80c86519ee3e3a2e0ad8f6cb825b4462197be26a"
+              ],
+              "new_blobs": [
+                "73821fcaca695d2295ccf580f3a7702457a9452d",
+                "73821fcaca695d2295ccf580f3a7702457a9452d"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            }
+          ]
+        }
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992038961",
+        "inherited-thread:r3992038968"
+      ]
+    },
+    {
+      "pr": 1138,
+      "destination_pr": 1160,
+      "expected_head": "23549b979f04a3d563a94499db4bd11b53425155",
+      "head_ref": "feat/repository-execution-service",
+      "original_base": "feat/native-coding-operator",
+      "preservation": {
+        "kind": "all-absent-commits-have-exact-full-index-patch-and-blob-equivalence",
+        "head_in_archive": false,
+        "absent_commit_count": 1,
+        "equivalence": {
+          "pr": 1138,
+          "original": "23549b979f04a3d563a94499db4bd11b53425155",
+          "equivalent_in_archive": "10459274a3687ccbabafa9335344a8f9dfc24441",
+          "stable_patch_id": "eaae619258977b661da949b0219ec6829482b411",
+          "raw_full_index_patch_identical": true,
+          "patch_sha256": [
+            "7279deef91805ff0da205d569181e33cfd6af5ab3567d20a5a58bb2874140592",
+            "7279deef91805ff0da205d569181e33cfd6af5ab3567d20a5a58bb2874140592"
+          ],
+          "blob_comparison": [
+            {
+              "path": "examples/repository-review/adaptive/configuration.py",
+              "old_blobs": [
+                "3a84f694d021dc0befe40add099395c5e4ace71e",
+                "3a84f694d021dc0befe40add099395c5e4ace71e"
+              ],
+              "new_blobs": [
+                "490af5bf5b89374dd23f13d3cebb877861a7fa82",
+                "490af5bf5b89374dd23f13d3cebb877861a7fa82"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            },
+            {
+              "path": "examples/repository-review/test_adaptive.py",
+              "old_blobs": [
+                "80c86519ee3e3a2e0ad8f6cb825b4462197be26a",
+                "80c86519ee3e3a2e0ad8f6cb825b4462197be26a"
+              ],
+              "new_blobs": [
+                "73821fcaca695d2295ccf580f3a7702457a9452d",
+                "73821fcaca695d2295ccf580f3a7702457a9452d"
+              ],
+              "same_old_blob": true,
+              "same_new_blob": true
+            }
+          ]
+        }
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992047183"
+      ]
+    },
+    {
+      "pr": 1137,
+      "destination_pr": 1160,
+      "expected_head": "a5c93261db8741c822ad7e3152b1e68b5854a925",
+      "head_ref": "feat/native-coding-operator",
+      "original_base": "feat/native-mini-swe-process",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992089900",
+        "inherited-thread:r3992089913",
+        "inherited-thread:r3992089926",
+        "inherited-thread:r3994667012"
+      ]
+    },
+    {
+      "pr": 1135,
+      "destination_pr": 1160,
+      "expected_head": "e5e39993477bd7337287d5af736b617decfe91b4",
+      "head_ref": "feat/native-mini-swe-process",
+      "original_base": "feat/native-container-workers",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991676396"
+      ]
+    },
+    {
+      "pr": 1134,
+      "destination_pr": 1160,
+      "expected_head": "db8d1c6ac9d6579074fc53c6f5899af17634683d",
+      "head_ref": "feat/native-container-workers",
+      "original_base": "feat/mini-swe-worker-boundary",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991701833",
+        "inherited-thread:r3991701839",
+        "inherited-thread:r3991701845",
+        "inherited-thread:r3994654488"
+      ]
+    },
+    {
+      "pr": 1133,
+      "destination_pr": 1160,
+      "expected_head": "dd6734f7447a2156289949ca4bafa31c34fdb9f6",
+      "head_ref": "feat/mini-swe-worker-boundary",
+      "original_base": "feat/mini-swe-process",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991685121",
+        "inherited-thread:r3991685126",
+        "inherited-thread:r3991685135",
+        "inherited-thread:r3991685139",
+        "inherited-thread:r3994434006"
+      ]
+    },
+    {
+      "pr": 1132,
+      "destination_pr": 1160,
+      "expected_head": "607620d99e82cdf230219889d3fbfe2ec3c40c04",
+      "head_ref": "feat/mini-swe-process",
+      "original_base": "integration/process-security-recovery",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991619239",
+        "inherited-thread:r3991619255"
+      ]
+    },
+    {
+      "pr": 1131,
+      "destination_pr": 1160,
+      "expected_head": "75d664822abf5f6e8da6e6f858cab5a6d81dc3bd",
+      "head_ref": "integration/process-security-recovery",
+      "original_base": "security/launch-integration",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1130,
+      "destination_pr": 1160,
+      "expected_head": "752f7d7d5145a16b1c486381f4b61453f00189e6",
+      "head_ref": "fix/process-continuation-recovery",
+      "original_base": "fix/reproducible-release-paths",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992317718",
+        "inherited-thread:r3992317724"
+      ]
+    },
+    {
+      "pr": 1129,
+      "destination_pr": 1160,
+      "expected_head": "dfd13be9563895613553024dd65f16baf08a1766",
+      "head_ref": "fix/reproducible-release-paths",
+      "original_base": "feat/mailbox-receive-waits",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992311124",
+        "inherited-thread:r3992311128"
+      ]
+    },
+    {
+      "pr": 1128,
+      "destination_pr": 1160,
+      "expected_head": "2d0a89baa0f1fde3925bd2e7feda918cfc7cea61",
+      "head_ref": "feat/mailbox-receive-waits",
+      "original_base": "feat/subtree-fair-slots",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3994441489"
+      ]
+    },
+    {
+      "pr": 1127,
+      "destination_pr": 1160,
+      "expected_head": "b2f87938c7ebe547d7c9d7ae9f4c490d977aca6e",
+      "head_ref": "feat/subtree-fair-slots",
+      "original_base": "feat/mailbox-delivery-leases",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992292274",
+        "inherited-thread:r3992292279"
+      ]
+    },
+    {
+      "pr": 1126,
+      "destination_pr": 1160,
+      "expected_head": "048b868925e6d4f465c83ed121875fc06897f8c0",
+      "head_ref": "feat/mailbox-delivery-leases",
+      "original_base": "feat/resident-memory-accounting",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992265664"
+      ]
+    },
+    {
+      "pr": 1125,
+      "destination_pr": 1160,
+      "expected_head": "6535f35a4d1d964f63af10dd09fc5b6dde7160ab",
+      "head_ref": "feat/resident-memory-accounting",
+      "original_base": "feat/process-abi",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992272920",
+        "inherited-thread:r3994441318"
+      ]
+    },
+    {
+      "pr": 1124,
+      "destination_pr": 1160,
+      "expected_head": "de2a086b56cc6449522e61830773a450dd3fbe8b",
+      "head_ref": "feat/process-abi",
+      "original_base": "feat/fused-joint-claims",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992258391",
+        "inherited-thread:r3992258397",
+        "inherited-thread:r3994441142"
+      ]
+    },
+    {
+      "pr": 1123,
+      "destination_pr": 1160,
+      "expected_head": "b4e57e9cfa6ca8f228e785975ee770ad4a20c5de",
+      "head_ref": "feat/fused-joint-claims",
+      "original_base": "feat/fused-recovery-claims",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992284331",
+        "inherited-thread:r3992284339"
+      ]
+    },
+    {
+      "pr": 1122,
+      "destination_pr": 1160,
+      "expected_head": "1e58a0dd59fea3e13e314db7e8df733603eeb5d2",
+      "head_ref": "feat/fused-recovery-claims",
+      "original_base": "feat/runner-suspension-budget",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992259460",
+        "inherited-thread:r3992259468"
+      ]
+    },
+    {
+      "pr": 1121,
+      "destination_pr": 1160,
+      "expected_head": "1c07de944e7bfbf8d77e0cf23c8c247c9bda3aa8",
+      "head_ref": "feat/runner-suspension-budget",
+      "original_base": "feat/rollback-anchor-single-write",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992229913"
+      ]
+    },
+    {
+      "pr": 1120,
+      "destination_pr": 1160,
+      "expected_head": "760c23730d8257053df177d43e5d5839f89de2cd",
+      "head_ref": "feat/rollback-anchor-single-write",
+      "original_base": "feat/read-only-redispatch",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992232130",
+        "inherited-thread:r3992232141"
+      ]
+    },
+    {
+      "pr": 1119,
+      "destination_pr": 1160,
+      "expected_head": "bca43783e15ebdb978083cfd83b627ff03d78be1",
+      "head_ref": "feat/read-only-redispatch",
+      "original_base": "feat/portable-host-state",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992210003",
+        "inherited-thread:r3992210008",
+        "inherited-thread:r3992210018",
+        "inherited-thread:r3994431629"
+      ]
+    },
+    {
+      "pr": 1118,
+      "destination_pr": 1160,
+      "expected_head": "7599eb9d1eb14a60d9d128a24f588f449458dd73",
+      "head_ref": "feat/portable-host-state",
+      "original_base": "feat/runner-resource-limits",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992202107",
+        "inherited-thread:r3992202115",
+        "inherited-thread:r3992202118",
+        "inherited-thread:r3994431235"
+      ]
+    },
+    {
+      "pr": 1117,
+      "destination_pr": 1160,
+      "expected_head": "5d1a9ec0d900bd03ce55de903919d972be852d79",
+      "head_ref": "security/launch-integration",
+      "original_base": "main",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3994851885",
+        "inherited-thread:r3996483666",
+        "inherited-thread:r3996483673",
+        "inherited-thread:r3996483676",
+        "inherited-thread:r3996483684",
+        "inherited-thread:r3996483688",
+        "inherited-thread:r3996483693",
+        "inherited-thread:r3996483699",
+        "inherited-thread:r3996483704",
+        "inherited-thread:r3996483710",
+        "inherited-thread:r3997874701",
+        "inherited-thread:r3997874703"
+      ]
+    },
+    {
+      "pr": 1116,
+      "destination_pr": 1160,
+      "expected_head": "92e6acc8058ae36634498b304e9067135fe3f80a",
+      "head_ref": "feat/runner-resource-limits",
+      "original_base": "feat/mailbox-sender-attestation",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992185519"
+      ]
+    },
+    {
+      "pr": 1115,
+      "destination_pr": 1160,
+      "expected_head": "d63d7bcf45a533cdb7a0b2fc7f69f5ab18a27741",
+      "head_ref": "feat/mailbox-sender-attestation",
+      "original_base": "feat/ai-sdk-adoption-benchmark",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992172332",
+        "inherited-thread:r3992172339",
+        "inherited-thread:r3992172347"
+      ]
+    },
+    {
+      "pr": 1114,
+      "destination_pr": 1160,
+      "expected_head": "2020939c1edb633a12f7b57db8ff3c68cb2f8d4f",
+      "head_ref": "feat/ai-sdk-adoption-benchmark",
+      "original_base": "feat/ai-sdk-cooperative-swarms",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992138045",
+        "inherited-thread:r3992138053",
+        "inherited-thread:r3996307787"
+      ]
+    },
+    {
+      "pr": 1113,
+      "destination_pr": 1160,
+      "expected_head": "2e2b45c4560a5b19214be1f47ccc2f2bba8359bc",
+      "head_ref": "feat/ai-sdk-cooperative-swarms",
+      "original_base": "feat/process-state-blobs",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1112,
+      "destination_pr": 1160,
+      "expected_head": "789d2617c37c075e894a6f5fad1e487982ab4fcf",
+      "head_ref": "feat/process-state-blobs",
+      "original_base": "feat/ai-sdk-model-journal",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992118386",
+        "inherited-thread:r3996289850"
+      ]
+    },
+    {
+      "pr": 1111,
+      "destination_pr": 1160,
+      "expected_head": "8be2f2d718f85b3755bdb93fe7a28b24e6d78418",
+      "head_ref": "feat/ai-sdk-model-journal",
+      "original_base": "feat/ai-sdk-process-tools",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992125893",
+        "inherited-thread:r3992125901",
+        "inherited-thread:r3992125906"
+      ]
+    },
+    {
+      "pr": 1110,
+      "destination_pr": 1160,
+      "expected_head": "2e7491a6046442e033e677e127c8cdbe69d30c29",
+      "head_ref": "feat/ai-sdk-process-tools",
+      "original_base": "feat/adaptive-review-distribution",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1109,
+      "destination_pr": 1160,
+      "expected_head": "354dbb515e6503e3c9ebefb8233c3a738c845e49",
+      "head_ref": "feat/adaptive-review-distribution",
+      "original_base": "feat/adaptive-repository-review",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992100477",
+        "inherited-thread:r3992100483",
+        "inherited-thread:r3996288421"
+      ]
+    },
+    {
+      "pr": 1108,
+      "destination_pr": 1160,
+      "expected_head": "b52440916a3007af0c04c7c4f8621211b1823e87",
+      "head_ref": "feat/adaptive-repository-review",
+      "original_base": "feat/adaptive-processes",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992052216",
+        "inherited-thread:r3996343664"
+      ]
+    },
+    {
+      "pr": 1107,
+      "destination_pr": 1160,
+      "expected_head": "cab6645d94bbea905e4d4724e7454912c7af075f",
+      "head_ref": "feat/adaptive-processes",
+      "original_base": "feat/process-status",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1106,
+      "destination_pr": 1160,
+      "expected_head": "1d777a62e2cc9a226549532219af95c47e0829ec",
+      "head_ref": "feat/process-status",
+      "original_base": "feat/process-distribution",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992019823",
+        "inherited-thread:r3996331112"
+      ]
+    },
+    {
+      "pr": 1105,
+      "destination_pr": 1160,
+      "expected_head": "3156e516fcead5c3582ce6dab71b26a8adb4d911",
+      "head_ref": "feat/process-distribution",
+      "original_base": "feat/process-runner",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991738167",
+        "inherited-thread:r3991738173",
+        "inherited-thread:r3991738181",
+        "inherited-thread:r3996332703"
+      ]
+    },
+    {
+      "pr": 1104,
+      "destination_pr": 1160,
+      "expected_head": "4a5a2ff51f83980a03d6d0f620a504a694d33564",
+      "head_ref": "feat/process-runner",
+      "original_base": "feat/process-mailboxes",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991732725",
+        "inherited-thread:r3991732729",
+        "inherited-thread:r3996327236",
+        "inherited-thread:r3996327239"
+      ]
+    },
+    {
+      "pr": 1103,
+      "destination_pr": 1160,
+      "expected_head": "43b4e62378910705c857294fe7b02b66773afded",
+      "head_ref": "feat/process-mailboxes",
+      "original_base": "feat/repository-review-processes",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1102,
+      "destination_pr": 1160,
+      "expected_head": "2abeb9d524475acc54e3c72b28ea808324c4cbcf",
+      "head_ref": "feat/repository-review-processes",
+      "original_base": "feat/process-mcp-host",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3992033463",
+        "inherited-thread:r3992033471",
+        "inherited-thread:r3992033479"
+      ]
+    },
+    {
+      "pr": 1101,
+      "destination_pr": 1160,
+      "expected_head": "fe45c50666e76ae09fb36d686fcd9a611a1db7e0",
+      "head_ref": "feat/process-mcp-host",
+      "original_base": "feat/langgraph-process-tools",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991666208",
+        "inherited-thread:r3991666217",
+        "inherited-thread:r3991666225"
+      ]
+    },
+    {
+      "pr": 1100,
+      "destination_pr": 1160,
+      "expected_head": "8940377cf7d93ac9bd170be607c51d95001d0208",
+      "head_ref": "feat/langgraph-process-tools",
+      "original_base": "feat/process-worker-protocol",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991471536",
+        "inherited-thread:r3991471544"
+      ]
+    },
+    {
+      "pr": 1099,
+      "destination_pr": 1160,
+      "expected_head": "1002146719b6ab87f8a588f25a7be13775c09ab3",
+      "head_ref": "feat/process-worker-protocol",
+      "original_base": "feat/swarm-process-runtime",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": []
+    },
+    {
+      "pr": 1098,
+      "destination_pr": 1160,
+      "expected_head": "7b4fe03abe28d9dd08d0981e34660ec086a1a919",
+      "head_ref": "feat/swarm-process-runtime",
+      "original_base": "main",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_archive": true,
+        "head_in_published_foundation": true
+      },
+      "candidate_head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991381073",
+        "inherited-thread:r3991381082",
+        "inherited-thread:r3991381090",
+        "inherited-thread:r3996327683"
+      ]
+    },
+    {
+      "pr": 1097,
+      "destination_pr": 1164,
+      "expected_head": "80e586c77232dae66b0a852e5c016fd7f8f27027",
+      "head_ref": "feat/agent-preview-workbench",
+      "original_base": "feat/workbench-claude-code",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_surviving_candidate": true
+      },
+      "candidate_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3996333625"
+      ]
+    },
+    {
+      "pr": 1096,
+      "destination_pr": 1164,
+      "expected_head": "bec09e7ee386ed866b0c1ebce4ddd8175384e6d2",
+      "head_ref": "feat/workbench-claude-code",
+      "original_base": "feat/agent-preview-runtime",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_surviving_candidate": true
+      },
+      "candidate_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991516959",
+        "inherited-thread:r3996327582",
+        "inherited-thread:r3996327584",
+        "inherited-thread:r3996327585"
+      ]
+    },
+    {
+      "pr": 1095,
+      "destination_pr": 1164,
+      "expected_head": "4db368d98c3623b2d65a5e6914254afe3dc2af7d",
+      "head_ref": "feat/agent-preview-runtime",
+      "original_base": "feat/agent-preview-bundle",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_surviving_candidate": true
+      },
+      "candidate_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991491349"
+      ]
+    },
+    {
+      "pr": 1094,
+      "destination_pr": 1164,
+      "expected_head": "a345db2b0a3271bd1e01487d86606ac7290170e4",
+      "head_ref": "feat/agent-preview-bundle",
+      "original_base": "feat/mcp-activation",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_surviving_candidate": true
+      },
+      "candidate_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991452639",
+        "inherited-thread:r3991452646"
+      ]
+    },
+    {
+      "pr": 1093,
+      "destination_pr": 1164,
+      "expected_head": "9a84798adc38057c573e2dc54f16d43cdda74079",
+      "head_ref": "feat/mcp-activation",
+      "original_base": "feat/agent-workbench",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_surviving_candidate": true
+      },
+      "candidate_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991420409",
+        "inherited-thread:r3991420414"
+      ]
+    },
+    {
+      "pr": 1092,
+      "destination_pr": 1164,
+      "expected_head": "30250dd109eb834f5a2aa5cdc49aad8c6fe00937",
+      "head_ref": "feat/agent-workbench",
+      "original_base": "main",
+      "preservation": {
+        "kind": "exact-head-ancestry",
+        "head_in_surviving_candidate": true
+      },
+      "candidate_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "action": "close-duplicate-after-published-source-and-review-transfer",
+      "state": "prepared",
+      "review_requirements": [
+        "inherited-thread:r3991417144",
+        "inherited-thread:r3996329221"
+      ]
+    }
+  ],
+  "retargets": [
+    {
+      "pr": 1155,
+      "expected_head": "bef5a98e6b408d26ccc9863b8a0a449d27b1efba",
+      "old_base": "codex/process-response-binding-20260908",
+      "new_base": "integration/process-security-m4",
+      "unique_commit_patch_unchanged_required": true,
+      "already_consolidated_parent": "2e84f121273df7f205cc218739b86e93c91bdc37",
+      "preflight": {
+        "pr": 1155,
+        "old_base": "d99e03027c57dc9c0929a5bca553e745c6286d99",
+        "new_base": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+        "head": "bef5a98e6b408d26ccc9863b8a0a449d27b1efba",
+        "old_patch_sha256": "d9944efbf59d81a6f4d586047d054554188e0c905aa36af0cf2c34560c44fa9d",
+        "new_patch_sha256": "28eb09b406b4c1a7031bb1ce88c8043b4f8c8b0a21988ac3668049a38dc9708f",
+        "whole_displayed_patch_unchanged": false,
+        "new_changed_paths": 24,
+        "unique_patch_byte_identical": true,
+        "preserved_parent": "2e84f121273df7f205cc218739b86e93c91bdc37"
+      }
+    },
+    {
+      "pr": 1164,
+      "expected_head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "old_base": "feat/agent-preview-workbench",
+      "new_base": "main",
+      "scope": "Expanded candidate retains all seven workbench histories and their inherited reviews.",
+      "preflight": {
+        "pr": 1164,
+        "old_base": "80e586c77232dae66b0a852e5c016fd7f8f27027",
+        "new_base": "4f3c967f04af40b5025b9222e8db95a3aee0b5f4",
+        "head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+        "old_patch_sha256": "cca49b00244ceb617f664bd4e962fc4867bc6d46c2668d63d34d24b6c4045b19",
+        "new_patch_sha256": "da97e06857f9dcecc6d7189d04d1c3014851d0eef0dbb4b456672c7f29ccd68a",
+        "whole_displayed_patch_unchanged": false,
+        "new_changed_paths": 141
+      }
+    }
+  ],
+  "remaining": [
+    {
+      "pr": 1173,
+      "url": "https://github.com/bb-connor/arc/pull/1173",
+      "title": "feat(work): consolidate verifiable work and agentic kernel roadmap",
+      "head": "14477aaac8998f623bf49f9fd4dac6966c2d6cff",
+      "branch": "work/verifiable-work-session-20261003",
+      "original_base": "packet/3-retention-accounting",
+      "track": "verifiable-work",
+      "destination_pr": 1173,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile the verifiable-work and agentic-kernel roadmap with current security and funded-work implementation, preserve the packet base, then complete and land this candidate.",
+      "depends_on": [
+        1160,
+        1161
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1172,
+      "url": "https://github.com/bb-connor/arc/pull/1172",
+      "title": "Specify native recovery architecture and add OpenAPPA research lab",
+      "head": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "branch": "research/openappa-recovery-20261001",
+      "original_base": "integration/process-security-m4",
+      "track": "recovery-research",
+      "destination_pr": 1172,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile OpenAPPA/recovery architecture with implemented authority contracts, address its review threads, and land the complete research contribution separately.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r4163031115",
+        "inherited-thread:r4163031120"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1171,
+      "url": "https://github.com/bb-connor/arc/pull/1171",
+      "title": "spec(ietf): complete the Chio protocol Internet-Draft",
+      "head": "ad9df87a579c2840e76403699e4beeb26aae31c4",
+      "branch": "spec/ietf-draft-whelan-00",
+      "original_base": "main",
+      "track": "protocol-spec",
+      "destination_pr": 1171,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Resolve the five protocol-draft review threads against normative implemented contracts and complete the Internet-Draft landing.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r4149306766",
+        "inherited-thread:r4149306773",
+        "inherited-thread:r4149306777",
+        "inherited-thread:r4149369375",
+        "inherited-thread:r4149767540"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1170,
+      "url": "https://github.com/bb-connor/arc/pull/1170",
+      "title": "docs(research): NVIDIA agent safety stack research and Chio strategy set",
+      "head": "666274baef7a503a6bf4791816483cbc6eb1b4ed",
+      "branch": "docs/nvidia-stack-research",
+      "original_base": "main",
+      "track": "nvidia-research",
+      "destination_pr": 1170,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Preserve and complete the NVIDIA research and strategy contribution in this existing PR; review claims and citations before its separate documentation landing.",
+      "depends_on": [],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1164,
+      "url": "https://github.com/bb-connor/arc/pull/1164",
+      "title": "wip(workbench): git task engine",
+      "head": "5bdf08fc3573eba00dd2be7b4fab1c22e48db1f7",
+      "branch": "feat/workbench-git-tasks",
+      "original_base": "feat/agent-preview-workbench",
+      "track": "workbench",
+      "destination_pr": 1164,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Complete the consolidated seven-PR workbench, including all 12 inherited review findings and native installation acceptance; qualify and merge in its separate track.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1163,
+      "url": "https://github.com/bb-connor/arc/pull/1163",
+      "title": "wip(bench): 2026-09-13 bilateral admission benchmark results",
+      "head": "6e6aba76f4ba579cb16d807af930c370db6d26f5",
+      "branch": "wip/bench-results-2026-09-13",
+      "original_base": "paper/roadmap-phase-0-1",
+      "track": "bench-evidence",
+      "destination_pr": 1163,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Preserve benchmark source and results, reconcile exact revisions and reproducibility with the paper, then complete this evidence contribution.",
+      "depends_on": [
+        1159
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1162,
+      "url": "https://github.com/bb-connor/arc/pull/1162",
+      "title": "wip: outcome continuation, unknown release, A2A v1 edge, and paper review notes 15 to 35",
+      "head": "d4e2b1da9d6a6ca42b24c3b18f73616fae425243",
+      "branch": "wip/outcome-continuation-review-2026-09-14",
+      "original_base": "paper/roadmap-phase-0-1",
+      "track": "continuation-paper",
+      "destination_pr": 1162,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile outcome-continuation and A2A source/review notes with implemented security repairs; complete its unique contribution without losing negative evidence.",
+      "depends_on": [
+        1159,
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1161,
+      "url": "https://github.com/bb-connor/arc/pull/1161",
+      "title": "feat: funded native admission and authenticated peer verifier transport",
+      "head": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "branch": "feat/funded-native-admission",
+      "original_base": "main",
+      "track": "funded-work",
+      "destination_pr": 1161,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Complete funded native admission and authenticated peer transport with its own adversarial and recovery evidence, then merge separately.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1160,
+      "url": "https://github.com/bb-connor/arc/pull/1160",
+      "title": "feat(security): consolidate process and security foundation",
+      "head": "41db0a8bcc8b4d5483a9d8b2cd7e67bb5a593951",
+      "branch": "integration/process-security-m4",
+      "original_base": "main",
+      "track": "foundation",
+      "destination_pr": 1160,
+      "disposition": "active-landing",
+      "next_action": "Active landing candidate: repair hosted failures, complete independent review and native/trusted qualification, then protected merge.",
+      "depends_on": [],
+      "open_review_requirements": [
+        "2026-10-01-execution-review-product-cli-provider-readers:PR2",
+        "2026-10-01-execution-review-protocol-boundaries:PB5",
+        "2026-10-01-execution-review-protocol-boundaries:PB9",
+        "2026-10-01-execution-review-product-cli-provider-readers:PR10",
+        "2026-10-01-execution-review-trust-guard-platform-economy-readers:TR9"
+      ],
+      "head_in_foundation": true
+    },
+    {
+      "pr": 1159,
+      "url": "https://github.com/bb-connor/arc/pull/1159",
+      "title": "feat(paper): whitepaper roadmap phases 0 to 3",
+      "head": "2b3b5af8cbfbc6f16ce6005de3f97cd149803b81",
+      "branch": "paper/roadmap-phase-0-1",
+      "original_base": "main",
+      "track": "whitepaper",
+      "destination_pr": 1159,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile paper roadmap phases and its review threads with current verifiable-work source/evidence; complete the contribution before merge.",
+      "depends_on": [
+        1160,
+        1161
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3994102329",
+        "inherited-thread:r3994490521",
+        "inherited-thread:r3994490524",
+        "inherited-thread:r3994859503",
+        "inherited-thread:r3995524712",
+        "inherited-thread:r3995524714",
+        "inherited-thread:r3995524718",
+        "inherited-thread:r3996153795",
+        "inherited-thread:r3996693112",
+        "inherited-thread:r3996693114",
+        "inherited-thread:r3996693116",
+        "inherited-thread:r3996905525",
+        "inherited-thread:r3996913374",
+        "inherited-thread:r3996943598",
+        "inherited-thread:r3998116236"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1158,
+      "url": "https://github.com/bb-connor/arc/pull/1158",
+      "title": "docs(papers): September 2026 whitepaper review",
+      "head": "728abe498a6db4ab43814fcfd332458cacc0c1d7",
+      "branch": "docs/whitepaper-review-2026-09",
+      "original_base": "main",
+      "track": "paper-review",
+      "destination_pr": 1158,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Carry the September whitepaper review requirements into the current paper candidate and preserve unique analysis; complete reconciliation before any consolidation closure.",
+      "depends_on": [
+        1159
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3991342073"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1155,
+      "url": "https://github.com/bb-connor/arc/pull/1155",
+      "title": "docs(install): provide a usable path to the process preview",
+      "head": "bef5a98e6b408d26ccc9863b8a0a449d27b1efba",
+      "branch": "codex/process-preview-entrypoint-20260908",
+      "original_base": "codex/process-response-binding-20260908",
+      "track": "process-preview",
+      "destination_pr": 1155,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Complete the unique portable and installed-session preview changes in this PR after foundation; retain its one unincorporated commit and all five added files.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1136,
+      "url": "https://github.com/bb-connor/arc/pull/1136",
+      "title": "fix(sqlite): inspect the open database descriptor directly",
+      "head": "dcd455f07e163abba68f61f42f131d29964bceee",
+      "branch": "codex/macos-sqlite-file-identity",
+      "original_base": "main",
+      "track": "native-sqlite",
+      "destination_pr": 1136,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile the descriptor identity and POSIX-lock repair against current SQLite custody, refresh native macOS tests, and merge the useful platform fix.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1073,
+      "url": "https://github.com/bb-connor/arc/pull/1073",
+      "title": "fix: split release qualification budget",
+      "head": "cae222b085229d0f8c7c363694cf409307e63a68",
+      "branch": "fix/release-qualification-budget",
+      "original_base": "main",
+      "track": "release-qualification",
+      "destination_pr": 1073,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Compare all 12 commits with the landed trusted workflows and current release gates; forward-port genuinely missing qualification fixes and resolve the original review obligations.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3880815557"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1056,
+      "url": "https://github.com/bb-connor/arc/pull/1056",
+      "title": "chore(scripts): add the chio mirror sync script",
+      "head": "716e056c0dbafe8399a094a70ba640d0e2bd6a9c",
+      "branch": "chore/mirror-to-chio",
+      "original_base": "main",
+      "track": "mirror-tooling",
+      "destination_pr": 1056,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Review the unique mirror synchronization script and its operational effects; complete and qualify it in this existing PR before merge.",
+      "depends_on": [],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1046,
+      "url": "https://github.com/bb-connor/arc/pull/1046",
+      "title": "fix: unblock the MCP handshake, path_allowlist, and workspace packaging",
+      "head": "e693691ceab65ee73b03e8d23a2275f3227e7dcd",
+      "branch": "fix/docs-release-gate",
+      "original_base": "main",
+      "track": "mcp-packaging",
+      "destination_pr": 1046,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile the old handshake, path-allowlist and packaging repairs with current implementations; retain and forward-port every still-missing fix.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3695800374",
+        "inherited-thread:r3695800375"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1043,
+      "url": "https://github.com/bb-connor/arc/pull/1043",
+      "title": "Docs/policy expansion design",
+      "head": "9a3fd87867d6f3de0b8d6834dab6b3a434d5bf5c",
+      "branch": "docs/policy-expansion-design",
+      "original_base": "main",
+      "track": "policy-design",
+      "destination_pr": 1043,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile the policy expansion design against the current native policy/guard roadmap and retain useful requirements in a reviewed landing.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 1029,
+      "url": "https://github.com/bb-connor/arc/pull/1029",
+      "title": "BREAKING: feat(security): integrate agent economy and enterprise evidence authority",
+      "head": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
+      "branch": "codex/chio-security-execution",
+      "original_base": "main",
+      "track": "legacy-security",
+      "destination_pr": 1029,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Keep open: reconcile 219 patch-unique non-merge commits and all 78 review threads requirement by requirement against current main/security histories. Forward-port useful unmatched work before retirement; patch uniqueness is not semantic uniqueness.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 959,
+      "url": "https://github.com/bb-connor/arc/pull/959",
+      "title": "M2: Phase-1 (off-chain netting + verifiability pricing + x402/EAS interop)",
+      "head": "ffaeb21d159e15259276bd805bd473f77adb69db",
+      "branch": "chio/m2-build",
+      "original_base": "chio/m1-launch",
+      "track": "economy-m2",
+      "destination_pr": 959,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile M2 netting, pricing and interop against current economy crates and all original reviews; preserve useful missing changes and complete their ordered landing.",
+      "depends_on": [
+        958,
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3484993596",
+        "inherited-thread:r3484993597",
+        "inherited-thread:r3484993599",
+        "inherited-thread:r3484993601",
+        "inherited-thread:r3484993602",
+        "inherited-thread:r3484993603",
+        "inherited-thread:r3485075166",
+        "inherited-thread:r3485075167",
+        "inherited-thread:r3485075170",
+        "inherited-thread:r3485075172",
+        "inherited-thread:r3485075175",
+        "inherited-thread:r3485075177",
+        "inherited-thread:r3485075179",
+        "inherited-thread:r3485105504",
+        "inherited-thread:r3485105505",
+        "inherited-thread:r3485105506",
+        "inherited-thread:r3485105507",
+        "inherited-thread:r3485105509",
+        "inherited-thread:r3486171590",
+        "inherited-thread:r3486171591",
+        "inherited-thread:r3486171593",
+        "inherited-thread:r3486171594",
+        "inherited-thread:r3486171598",
+        "inherited-thread:r3486171599",
+        "inherited-thread:r3486309729",
+        "inherited-thread:r3486309731",
+        "inherited-thread:r3486371070",
+        "inherited-thread:r3486371072",
+        "inherited-thread:r3486371073",
+        "inherited-thread:r3486452264",
+        "inherited-thread:r3486452267",
+        "inherited-thread:r3486452269",
+        "inherited-thread:r3486452271",
+        "inherited-thread:r3486508684",
+        "inherited-thread:r3486508685",
+        "inherited-thread:r3486580368",
+        "inherited-thread:r3486580372",
+        "inherited-thread:r3486580375",
+        "inherited-thread:r3486580381",
+        "inherited-thread:r3486647799",
+        "inherited-thread:r3486647805",
+        "inherited-thread:r3486647809",
+        "inherited-thread:r3486647811",
+        "inherited-thread:r3562930477",
+        "inherited-thread:r3562930479",
+        "inherited-thread:r3562930481",
+        "inherited-thread:r3563253333",
+        "inherited-thread:r3563253335",
+        "inherited-thread:r3563253338",
+        "inherited-thread:r3691452413",
+        "inherited-thread:r3691452419",
+        "inherited-thread:r3691452423",
+        "inherited-thread:r3691452429",
+        "inherited-thread:r3691452431"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 958,
+      "url": "https://github.com/bb-connor/arc/pull/958",
+      "title": "M1: Phase-0 launch (tokenless marketplace + Pass M0 wired)",
+      "head": "813b1896f926ed4b57e35e5211e4691b21e13904",
+      "branch": "chio/m1-launch",
+      "original_base": "chio/m0-pass-build",
+      "track": "economy-m1",
+      "destination_pr": 958,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile tokenless marketplace and Pass wiring against current economy implementation and all original reviews; finish missing behavior before merge.",
+      "depends_on": [
+        957,
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3485004286",
+        "inherited-thread:r3485004289",
+        "inherited-thread:r3485004290",
+        "inherited-thread:r3485004293",
+        "inherited-thread:r3485004294",
+        "inherited-thread:r3485004295",
+        "inherited-thread:r3485004296",
+        "inherited-thread:r3485004298",
+        "inherited-thread:r3485004301",
+        "inherited-thread:r3485004302",
+        "inherited-thread:r3485004304",
+        "inherited-thread:r3485106467",
+        "inherited-thread:r3485106470",
+        "inherited-thread:r3485106473",
+        "inherited-thread:r3485106476",
+        "inherited-thread:r3485106481",
+        "inherited-thread:r3486152895",
+        "inherited-thread:r3486152898",
+        "inherited-thread:r3486152899",
+        "inherited-thread:r3486152900",
+        "inherited-thread:r3486152901",
+        "inherited-thread:r3486152902",
+        "inherited-thread:r3486152905",
+        "inherited-thread:r3486152907",
+        "inherited-thread:r3486152908",
+        "inherited-thread:r3486292642",
+        "inherited-thread:r3486292646",
+        "inherited-thread:r3486292647",
+        "inherited-thread:r3486292651",
+        "inherited-thread:r3486292656",
+        "inherited-thread:r3486292661",
+        "inherited-thread:r3486292665",
+        "inherited-thread:r3486366134",
+        "inherited-thread:r3486366136",
+        "inherited-thread:r3486366139",
+        "inherited-thread:r3486366142",
+        "inherited-thread:r3486366145",
+        "inherited-thread:r3486366146",
+        "inherited-thread:r3486451284",
+        "inherited-thread:r3486451286",
+        "inherited-thread:r3486451289",
+        "inherited-thread:r3486562053",
+        "inherited-thread:r3486562057",
+        "inherited-thread:r3486562060",
+        "inherited-thread:r3486562062",
+        "inherited-thread:r3486643240",
+        "inherited-thread:r3486643243",
+        "inherited-thread:r3486643244",
+        "inherited-thread:r3486643245",
+        "inherited-thread:r3486643246",
+        "inherited-thread:r3515795670",
+        "inherited-thread:r3515795679",
+        "inherited-thread:r3563250932",
+        "inherited-thread:r3691473217",
+        "inherited-thread:r3691473224",
+        "inherited-thread:r3691473230",
+        "inherited-thread:r3691473236"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 957,
+      "url": "https://github.com/bb-connor/arc/pull/957",
+      "title": "M0: Chio Pass build (soulbound credential + 3 kernel controls)",
+      "head": "d7cce14cfe6746e697b850b3ceff4e04051bd280",
+      "branch": "chio/m0-pass-build",
+      "original_base": "main",
+      "track": "economy-m0",
+      "destination_pr": 957,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile credential and kernel-control implementation with current grants/credentials; complete useful missing behavior and review acceptance before merge.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3484995396",
+        "inherited-thread:r3484995398",
+        "inherited-thread:r3484995400",
+        "inherited-thread:r3484995402",
+        "inherited-thread:r3484995404",
+        "inherited-thread:r3484995406",
+        "inherited-thread:r3485100056",
+        "inherited-thread:r3485100058",
+        "inherited-thread:r3485100060",
+        "inherited-thread:r3485100063",
+        "inherited-thread:r3562688159",
+        "inherited-thread:r3562688161",
+        "inherited-thread:r3562688162",
+        "inherited-thread:r3562688165",
+        "inherited-thread:r3562688166",
+        "inherited-thread:r3562688169",
+        "inherited-thread:r3562688170",
+        "inherited-thread:r3562688172",
+        "inherited-thread:r3562688174",
+        "inherited-thread:r3562688175",
+        "inherited-thread:r3563096964",
+        "inherited-thread:r3563096965",
+        "inherited-thread:r3563096966",
+        "inherited-thread:r3563096967",
+        "inherited-thread:r3563096968"
+      ],
+      "head_in_foundation": false
+    },
+    {
+      "pr": 956,
+      "url": "https://github.com/bb-connor/arc/pull/956",
+      "title": "BAC-541: C2 approval-bound settlement (VerifiedApproval witness)",
+      "head": "2e52b7a2fe30249420cf53f77d1cef1fe7528fad",
+      "branch": "bac-541-c2-approval-binding",
+      "original_base": "main",
+      "track": "settlement-approval",
+      "destination_pr": 956,
+      "disposition": "keep-open-complete-and-merge",
+      "next_action": "Reconcile approval-bound settlement and VerifiedApproval with current settlement/capability authority, preserve unique repairs, and complete qualification before merge.",
+      "depends_on": [
+        1160
+      ],
+      "open_review_requirements": [
+        "inherited-thread:r3470677971",
+        "inherited-thread:r3470677974",
+        "inherited-thread:r3470677977",
+        "inherited-thread:r3470677980",
+        "inherited-thread:r3470677985",
+        "inherited-thread:r3470677986",
+        "inherited-thread:r3470677989",
+        "inherited-thread:r3471020814",
+        "inherited-thread:r3471020821",
+        "inherited-thread:r3471020825",
+        "inherited-thread:r3471020832",
+        "inherited-thread:r3471020837",
+        "inherited-thread:r3471020845",
+        "inherited-thread:r3471724953",
+        "inherited-thread:r3471724954",
+        "inherited-thread:r3471724955",
+        "inherited-thread:r3471724957",
+        "inherited-thread:r3472041618",
+        "inherited-thread:r3472041621",
+        "inherited-thread:r3472041624",
+        "inherited-thread:r3472245159",
+        "inherited-thread:r3472245161",
+        "inherited-thread:r3472245162",
+        "inherited-thread:r3472245165",
+        "inherited-thread:r3472245167",
+        "inherited-thread:r3472245171",
+        "inherited-thread:r3563101189"
+      ],
+      "head_in_foundation": false
+    }
+  ]
+}

@@ -7,6 +7,22 @@
 superseded PRs without losing source or review obligations, and retain an exact
 remaining-work ledger.
 
+## PR consolidation execution (October 4)
+
+The user authorized duplicate-container retirement before the replacement merge.
+Unique useful code remains open through completion and merge. The
+[consolidation record](pr-consolidation-20261004.json) accounts for every original
+PR and all 22 intended survivors. It carries a fresh, fully paginated snapshot
+of 425 review threads, including 322 still open, without treating a transferred
+thread as repaired. All 57 security candidate heads and their source preservation
+were refreshed; #1164 retains all six older workbench heads and their 12 open
+review obligations.
+
+The transfer is prepared and publication/remote mutations are pending. The open
+count is still 85. The only active landing candidate is #1160. There are now
+1583 ledger requirements, including 201 newly carried review records.
+The original 1,382 rows and their source/acceptance dispositions remain intact.
+
 **Current landing state (October 4):** #1168 is merged to `main` at
 `4e3d94f07df30f37f364dd562b3e793c5cbf4e68`. All 25 exact-head workflow runs
 passed on attempt 1, with 79 successful and ten explicitly skipped checks;
