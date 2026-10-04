@@ -1391,6 +1391,322 @@ fn load_hushspec_policy_materializes_runtime_state() {
     assert_ne!(loaded.identity.source_hash, loaded.identity.runtime_hash);
 }
 
+fn policy_identity_request() -> chio_kernel::ToolCallRequest {
+    let issuer = chio_core::Keypair::generate();
+    let capability = chio_core::capability::token::CapabilityToken::sign(
+        chio_core::capability::token::CapabilityTokenBody {
+            id: "policy-identity-test".to_string(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 0,
+            expires_at: 1,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .test_unwrap();
+    chio_kernel::ToolCallRequest {
+        request_id: "policy-identity-request".to_string(),
+        agent_id: issuer.public_key().to_hex(),
+        capability,
+        tool_name: "read_file".to_string(),
+        server_id: "filesystem".to_string(),
+        arguments: serde_json::json!({"path": "/workspace/report.txt"}),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    }
+}
+
+#[test]
+fn kg4_broader_sql_guard_does_not_discharge_token_table_allowlist() {
+    use chio_core::capability::scope::Constraint;
+    use chio_data_guards::{SqlGuardConfig, SqlOperation, SqlQueryGuard};
+    use chio_kernel::{Guard, GuardContext, Verdict};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    struct SqlServer(Arc<AtomicUsize>);
+    #[async_trait::async_trait]
+    impl chio_kernel::ToolServerConnection for SqlServer {
+        fn server_id(&self) -> &str {
+            "db"
+        }
+        fn tool_names(&self) -> Vec<String> {
+            vec!["sql".to_string()]
+        }
+        async fn invoke(
+            &self,
+            _tool: &str,
+            _arguments: serde_json::Value,
+            _bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+        ) -> Result<serde_json::Value, chio_kernel::KernelError> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Ok(serde_json::json!({"rows": []}))
+        }
+    }
+
+    let directory = tempfile::tempdir().test_unwrap();
+    let path = directory.path().join("sql.yaml");
+    std::fs::write(
+        &path,
+        r#"
+kernel:
+  allow_ephemeral_receipt_log: true
+  allow_ephemeral_revocation_store: true
+  durable_admission_mode: off
+  allow_unsafe_durable_admission_off: true
+capabilities:
+  default:
+    tools:
+      - { server: db, tool: sql, ttl: 300 }
+"#,
+    )
+    .test_unwrap();
+    let loaded = load_policy(&path).test_unwrap();
+    let scope = loaded.default_capabilities[0].scope.clone();
+    let issuer = chio_core::Keypair::generate();
+    let mut kernel = crate::build_kernel(loaded, &issuer);
+    let invocations = Arc::new(AtomicUsize::new(0));
+    kernel.register_tool_server(Box::new(SqlServer(Arc::clone(&invocations))));
+    let mut request = policy_identity_request();
+    request.capability = kernel
+        .issue_capability(&issuer.public_key(), scope, 300)
+        .test_unwrap();
+    request.agent_id = issuer.public_key().to_hex();
+    request.server_id = "db".to_string();
+    request.tool_name = "sql".to_string();
+    request.arguments = serde_json::json!({"query": "SELECT * FROM users", "database": "prod"});
+    let guard = SqlQueryGuard::try_new(SqlGuardConfig {
+        table_allowlist: vec!["orders".to_string(), "users".to_string()],
+        operation_allowlist: vec![SqlOperation::Select],
+        ..SqlGuardConfig::default()
+    })
+    .test_unwrap();
+    kernel.add_guard(Box::new(guard));
+    assert_eq!(
+        kernel
+            .evaluate_tool_call_blocking(&request)
+            .test_unwrap()
+            .verdict,
+        Verdict::Allow
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+
+    // Bypass local issuance as a trusted external signer can. The SQL guard
+    // allows users globally, while this token promises orders-only access.
+    let mut body = request.capability.body();
+    body.id = "external-orders-only".to_string();
+    body.scope.grants[0]
+        .constraints
+        .push(Constraint::TableAllowlist(vec!["orders".to_string()]));
+    request.capability =
+        chio_core::capability::token::CapabilityToken::sign(body, &issuer).test_unwrap();
+    request.request_id = "external-orders-only-request".to_string();
+    let broad_guard = SqlQueryGuard::try_new(SqlGuardConfig {
+        table_allowlist: vec!["orders".to_string(), "users".to_string()],
+        operation_allowlist: vec![SqlOperation::Select],
+        ..SqlGuardConfig::default()
+    })
+    .test_unwrap();
+    let context = GuardContext {
+        request: &request,
+        scope: &request.capability.scope,
+        agent_id: &request.agent_id,
+        server_id: &request.server_id,
+        session_filesystem_roots: None,
+        matched_grant_index: Some(0),
+        security_context: None,
+    };
+    assert_eq!(
+        broad_guard.evaluate(&context).test_unwrap().verdict,
+        Verdict::Allow
+    );
+    let response = kernel.evaluate_tool_call_blocking(&request).test_unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response
+        .reason
+        .as_deref()
+        .test_expect("unsupported constraint reason")
+        .contains("unsupported capability constraint"));
+    assert_eq!(
+        invocations.load(Ordering::SeqCst),
+        1,
+        "unsupported token reached the SQL server"
+    );
+}
+
+#[test]
+fn kg6_runtime_hash_tracks_velocity_enforcement() {
+    use chio_kernel::{Guard, GuardContext, Verdict};
+    let directory = tempfile::tempdir().test_unwrap();
+    let mut hashes = Vec::new();
+    let request = policy_identity_request();
+    for limit in [1, 2] {
+        let path = directory.path().join(format!("velocity-{limit}.yaml"));
+        std::fs::write(
+            &path,
+            format!(
+                r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    allow: [read_file]
+    default: block
+  velocity:
+    max_invocations_per_window: {limit}
+    window_secs: 3600
+    burst_factor: 1
+"#
+            ),
+        )
+        .test_unwrap();
+        let loaded = load_policy(&path).test_unwrap();
+        let context = GuardContext {
+            request: &request,
+            scope: &loaded.default_capabilities[0].scope,
+            agent_id: &request.agent_id,
+            server_id: &request.server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: Some(0),
+            security_context: None,
+        };
+        assert_eq!(
+            loaded
+                .guard_pipeline
+                .evaluate(&context)
+                .test_unwrap()
+                .verdict,
+            Verdict::Allow
+        );
+        assert_eq!(
+            loaded
+                .guard_pipeline
+                .evaluate(&context)
+                .test_unwrap()
+                .verdict,
+            if limit == 1 {
+                Verdict::Deny
+            } else {
+                Verdict::Allow
+            }
+        );
+        hashes.push(loaded.identity.runtime_hash);
+    }
+    assert_ne!(
+        hashes[0], hashes[1],
+        "different enforced velocity policies share authority identity"
+    );
+}
+
+#[test]
+fn kg6_runtime_hash_binds_approval_roster_threshold_and_timeout() {
+    let directory = tempfile::tempdir().test_unwrap();
+    let keys: Vec<_> = (0..3)
+        .map(|_| chio_core::Keypair::generate().public_key().to_hex())
+        .collect();
+    let mut hashes = std::collections::BTreeSet::new();
+    for (index, threshold, second, timeout) in [
+        (0, 1, 1, 600),
+        (1, 2, 1, 600),
+        (2, 1, 2, 600),
+        (3, 1, 1, 300),
+    ] {
+        let path = directory.path().join(format!("approval-{index}.yaml"));
+        std::fs::write(
+            &path,
+            format!(
+                r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    allow: [payments.charge]
+extensions:
+  chio:
+    human_in_loop:
+      approvers:
+        n: {threshold}
+        of: ["{}", "{}"]
+        timeout_seconds: {timeout}
+"#,
+                keys[0], keys[second]
+            ),
+        )
+        .test_unwrap();
+        let loaded = load_policy(&path).test_unwrap();
+        let requirement = loaded
+            .threshold_approval
+            .as_ref()
+            .test_expect("approval requirement");
+        requirement.validate().test_unwrap();
+        assert_eq!(requirement.policy_hash, loaded.identity.runtime_hash);
+        hashes.insert(loaded.identity.runtime_hash);
+    }
+    assert_eq!(
+        hashes.len(),
+        4,
+        "changed approval requirements reused an earlier policy identity"
+    );
+}
+
+#[test]
+fn kg6_policy_hash_uses_rfc8785_canonical_bytes() {
+    // UTF-16 key ordering differs from UTF-8/BTreeMap ordering here. The
+    // integral float must also be normalized, rather than serialized as 1.0.
+    let value = serde_json::json!({"\u{e000}": 1.0, "\u{10000}": 2});
+    let canonical = "{\"\u{10000}\":2,\"\u{e000}\":1}";
+    assert_eq!(
+        super::util::hash_json_value(&value).test_unwrap(),
+        super::util::hash_bytes(canonical.as_bytes())
+    );
+}
+
+#[test]
+fn kg6_nonfinite_policy_numbers_reject_at_load() {
+    let directory = tempfile::tempdir().test_unwrap();
+    let mut accepted = Vec::new();
+    for (format, prefix) in [
+        ("chio", "guards:"),
+        ("hushspec", "hushspec: '0.1.0'\nrules:"),
+    ] {
+        for value in [".nan", ".inf", "-.inf"] {
+            let path = directory.path().join(format!("{format}-{value}.yaml"));
+            std::fs::write(&path, format!("{prefix}\n  patch_integrity:\n    enabled: true\n    require_balance: true\n    max_imbalance_ratio: {value}\n")).test_unwrap();
+            if let Ok(policy) = load_policy(&path) {
+                accepted.push((format, value, policy.identity.runtime_hash));
+            }
+        }
+    }
+    assert!(
+        accepted.is_empty(),
+        "nonfinite policy values collapse to JSON null: {accepted:?}"
+    );
+}
+
+#[test]
+fn kg6_hushspec_hash_ignores_mapping_order_and_formatting() {
+    let directory = tempfile::tempdir().test_unwrap();
+    let path_a = directory.path().join("a.yaml");
+    let path_b = directory.path().join("b.yaml");
+    std::fs::write(&path_a, "hushspec: '0.1.0'\nrules:\n  velocity:\n    window_secs: 60\n    max_invocations_per_window: 2\n").test_unwrap();
+    std::fs::write(&path_b, "rules: { velocity: { max_invocations_per_window: 2, window_secs: 60 } }\nhushspec: '0.1.0'\n").test_unwrap();
+    let a = load_policy(&path_a).test_unwrap();
+    let b = load_policy(&path_b).test_unwrap();
+    assert_ne!(a.identity.source_hash, b.identity.source_hash);
+    assert_eq!(a.identity.runtime_hash, b.identity.runtime_hash);
+}
+
 #[test]
 fn load_hushspec_materializes_threshold_approval_against_runtime_policy_hash() {
     let approver_a = chio_core::Keypair::generate().public_key().to_hex();

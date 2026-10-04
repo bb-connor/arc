@@ -95,8 +95,15 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         build_default_capabilities_from_scope(&compiled.default_scope, kernel.max_capability_ttl);
     let issuance_policy = materialize_reputation_issuance_policy(&spec)?;
     let runtime_assurance_policy = materialize_runtime_assurance_policy(&spec)?;
-    let runtime_hash =
-        runtime_hash_for_hushspec(&kernel, &default_capabilities, &spec, &auxiliary_assets)?;
+    let runtime_hash = runtime_hash_for_hushspec(
+        &kernel,
+        &default_capabilities,
+        &spec,
+        &auxiliary_assets,
+        issuance_policy.as_ref(),
+        runtime_assurance_policy.as_ref(),
+        compiled.threshold_approval.as_ref(),
+    )?;
     let threshold_approval = compiled
         .threshold_approval
         .map(|requirement| {

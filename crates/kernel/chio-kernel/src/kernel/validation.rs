@@ -352,6 +352,8 @@ impl ChioKernel {
         .map_err(|error| {
             chio_kernel_core::KernelCoreError::InvalidCapability(error).deny_reason()
         })?;
+        crate::ensure_capability_issuance_supported(&cap.scope)
+            .map_err(|error| error.to_string())?;
         Ok(())
     }
 

@@ -368,30 +368,43 @@ pub enum Constraint {
     // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).
     /// Data layer: database tables the grant may reference.
     ///
-    /// Evaluated against parsed SQL by `chio-data-guards`; the kernel
-    /// records the constraint and leaves enforcement to that guard.
+    /// Kernel issuance and admission currently reject this variant until
+    /// grant-specific SQL enforcement is available. A global SQL guard's
+    /// table allowlist does not establish enforcement of this constraint.
     TableAllowlist(Vec<String>),
     /// Data layer: forbidden columns, formatted as `"table.column"`.
     ///
-    /// Evaluated by `chio-data-guards`; kernel treats it as an advisory
-    /// constraint and does not reject at the request-matching stage.
+    /// Kernel issuance and admission currently reject this variant until
+    /// grant-specific column enforcement is available.
     ColumnDenylist(Vec<String>),
     /// Data layer: maximum number of rows a query may return.
     ///
-    /// Enforced post-invocation by downstream result-shaping guards.
+    /// Kernel issuance and admission currently reject this variant until
+    /// grant-specific result enforcement is available.
     MaxRowsReturned(u64),
     /// Data layer: operation class the grant authorises.
+    ///
+    /// Kernel issuance and admission currently reject this variant until
+    /// grant-specific SQL operation enforcement is available.
     OperationClass(SqlOperationClass),
     /// Communication: allowed recipient channels or IDs.
     AudienceAllowlist(Vec<String>),
     /// Communication: content review tier demanded of downstream guards.
+    ///
+    /// Kernel issuance and admission currently reject this variant until
+    /// grant-specific content-review enforcement is available.
     ContentReviewTier(ContentReviewTier),
     /// Financial: maximum transaction amount in USD.
     ///
     /// The value is a decimal string (e.g. `"100.00"`) because
     /// `rust_decimal` is not in the workspace.
+    /// Kernel issuance and admission currently reject this variant; use the
+    /// supported governed monetary constraints for enforced authorization.
     MaxTransactionAmountUsd(String),
     /// Financial: whether the grant requires dual approval before execution.
+    ///
+    /// Kernel issuance and admission currently reject this variant; use the
+    /// policy-owned threshold-approval path for enforced quorum requirements.
     RequireDualApproval(bool),
     /// Model routing: constrain the models this grant may execute under.
     ModelConstraint {

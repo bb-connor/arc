@@ -303,6 +303,9 @@ pub(super) fn resolve_matching_grants<'a>(
     arguments: &serde_json::Value,
     model_metadata: Option<&ModelMetadata>,
 ) -> Result<Vec<MatchingGrant<'a>>, KernelError> {
+    // Validate the entire signed scope before filtering by route or trying
+    // another grant. External issuers must not bypass local issuance support.
+    crate::ensure_capability_issuance_supported(&cap.scope)?;
     let mut matches = Vec::new();
 
     for (index, grant) in cap.scope.grants.iter().enumerate() {
@@ -452,18 +455,18 @@ fn constraint_matches(
         }
         Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
 
-        // Constraints that require domain-specific evaluation (SQL parsing,
-        // post-invocation result inspection, or cross-request HITL state)
-        // outside this argument-matching stage, or that match against
-        // well-known argument keys. Unless a specific check below rejects
-        // the request, the constraint is accepted at this stage and enforced
-        // by a downstream guard.
+        // A global domain guard cannot prove enforcement of the signed
+        // grant's narrower semantics. Never treat these as a match or as a
+        // recoverable mismatch that permits sibling-grant fallback.
         Constraint::TableAllowlist(_)
         | Constraint::ColumnDenylist(_)
         | Constraint::MaxRowsReturned(_)
-        | Constraint::OperationClass(_) => Ok(true),
-        Constraint::ContentReviewTier(_) => Ok(false),
-        Constraint::MaxTransactionAmountUsd(_) | Constraint::RequireDualApproval(_) => Ok(false),
+        | Constraint::OperationClass(_)
+        | Constraint::ContentReviewTier(_)
+        | Constraint::MaxTransactionAmountUsd(_)
+        | Constraint::RequireDualApproval(_) => Err(KernelError::InvalidConstraint(
+            "unsupported capability constraint requires grant-specific enforcement".to_string(),
+        )),
 
         // RTC-08: evaluate the model-routing constraint against
         // request-carried `model_metadata`. The separate provenance class
@@ -561,16 +564,15 @@ mod tests {
         let capability = capability_with_constraints(vec![Constraint::ContentReviewTier(
             ContentReviewTier::Strict,
         )]);
-        assert!(
-            !capability_matches_request(
+        assert!(matches!(
+            capability_matches_request(
                 &capability,
                 "tool",
                 "srv",
                 &serde_json::json!({"text": "review this outbound message"}),
-            )
-            .expect("evaluate request match"),
-            "content review tier should deny until a review guard supplies runtime context"
-        );
+            ),
+            Err(KernelError::InvalidConstraint(_))
+        ));
     }
 
     #[test]
@@ -582,16 +584,15 @@ mod tests {
 
         for constraint in constraints {
             let capability = capability_with_constraints(vec![constraint]);
-            assert!(
-                !capability_matches_request(
+            assert!(matches!(
+                capability_matches_request(
                     &capability,
                     "tool",
                     "srv",
                     &serde_json::json!({"amount_usd": "25.00"}),
-                )
-                .expect("evaluate request match"),
-                "governed transaction constraint should deny without its dedicated enforcement path"
-            );
+                ),
+                Err(KernelError::InvalidConstraint(_))
+            ));
         }
     }
 

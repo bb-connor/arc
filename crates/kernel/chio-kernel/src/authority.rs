@@ -1,7 +1,7 @@
 use chio_core::capability::{
     caveat::{CapabilitySecurityBinding, CAPABILITY_SECURITY_BINDING_SCHEMA},
     runtime_attestation::RuntimeAttestationEvidence,
-    scope::ChioScope,
+    scope::{ChioScope, Constraint},
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{Keypair, PublicKey, SigningBackend};
@@ -92,8 +92,50 @@ pub struct CapabilityAuthorityWorkloadBinding {
     pub signer_public_key: PublicKey,
 }
 
-/// Validate that the local authority can issue the requested scope semantics.
-pub fn ensure_capability_issuance_supported(_scope: &ChioScope) -> Result<(), KernelError> {
+/// Validate that the kernel can enforce the requested scope semantics.
+///
+/// Domain-specific table, column, row-count, SQL operation, content-review,
+/// USD transaction and dual-approval constraints are temporarily unsupported.
+/// A registered global guard does not establish enforcement of a narrower
+/// grant. Issuance and admission reject these variants until grant-specific
+/// enforcement is available, including when another grant would match.
+pub fn ensure_capability_issuance_supported(scope: &ChioScope) -> Result<(), KernelError> {
+    for constraint in scope.grants.iter().flat_map(|grant| &grant.constraints) {
+        let name = match constraint {
+            Constraint::TableAllowlist(_) => "TableAllowlist",
+            Constraint::ColumnDenylist(_) => "ColumnDenylist",
+            Constraint::MaxRowsReturned(_) => "MaxRowsReturned",
+            Constraint::OperationClass(_) => "OperationClass",
+            Constraint::ContentReviewTier(_) => "ContentReviewTier",
+            Constraint::MaxTransactionAmountUsd(_) => "MaxTransactionAmountUsd",
+            Constraint::RequireDualApproval(_) => "RequireDualApproval",
+            // Keep this exhaustive so new variants require an explicit
+            // enforcement decision before they can mint authority.
+            Constraint::PathPrefix(_)
+            | Constraint::DomainExact(_)
+            | Constraint::DomainGlob(_)
+            | Constraint::RegexMatch(_)
+            | Constraint::MaxLength(_)
+            | Constraint::MaxArgsSize(_)
+            | Constraint::GovernedIntentRequired
+            | Constraint::RequireApprovalAbove { .. }
+            | Constraint::RequireCumulativeApprovalAbove { .. }
+            | Constraint::SellerExact(_)
+            | Constraint::MinimumRuntimeAssurance(_)
+            | Constraint::MinimumAutonomyTier(_)
+            | Constraint::Custom(_, _)
+            | Constraint::AudienceAllowlist(_)
+            | Constraint::ModelConstraint { .. }
+            | Constraint::MemoryStoreAllowlist(_)
+            | Constraint::MemoryWriteDenyPatterns(_)
+            | Constraint::OutputDigestSha256(_)
+            | Constraint::RequireFindingPurchase(_)
+            | Constraint::RequireFindingRecovery(_) => continue,
+        };
+        return Err(KernelError::InvalidConstraint(format!(
+            "unsupported capability constraint: {name}; grant-specific enforcement is unavailable"
+        )));
+    }
     Ok(())
 }
 
