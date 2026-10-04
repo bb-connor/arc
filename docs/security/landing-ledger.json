@@ -3624,7 +3624,7 @@
     }
   ],
   "landing_state": {
-    "observed_utc": "2026-10-04T14:11:01.660510+00:00",
+    "observed_utc": "2026-10-04T16:33:36.609465+00:00",
     "current_main": "4e3d94f07df30f37f364dd562b3e793c5cbf4e68",
     "historical_inventory_main": "f5566d9a765c21cb36652a99c79de64968a656bf",
     "merged_prerequisites": {
@@ -3651,6 +3651,27 @@
         "entry_sha256": "ae5281259a54b1c8ce1293f75f6abb1c6bcb70986fd4b67e55b7ba48fdf42a7d",
         "result": "The non-required controller refused the historical source authorization. Preserve the failure; qualify this definition-only prerequisite through its reviewed exact source and ordinary required checks. Final foundation capture acceptance remains mandatory.",
         "scope": "Frozen native startup diagnostics and component repair evidence. The original native verifier attempt failed on a valid Cargo-mutants module path. The later image build failed during unpacking with a full disk. Both failures remain unsuccessful. Controller bootstrap refusal on #1167 is separate from definition qualification. No final foundation native, trusted, hosted or operational acceptance is claimed."
+      },
+      "local_composition": {
+        "commit": "9e86e4045b5bf54a94467139f31e5f803c4d62a1",
+        "actual_main_merge_pending": true,
+        "evidence": {
+          "path": "docs/security/audits/foundation-definition-composition-20261004.json.gz",
+          "sha256": "4380e5a3db412028100cc9d847c50b9579622cfa0c6be44ea972fafeda06745a",
+          "entry": "foundation-1167-inline-composition/committed-composition.json",
+          "entry_sha256": "3eca9a2a172e0a8ba2198e0fe65de0fe9309afa77227f46c245a6984e8319b4c",
+          "result": "Composed checker and all 20 definition methods pass; complete CI-contract regression suite exits 0 in 553.486 seconds. Five authority workflow blobs match the reviewed prerequisite.",
+          "scope": "Local composition of the reviewed #1167 definitions and completed contract regressions. Protected #1167 landing is still pending. The native preflight has one caught mutation with a passing consumer baseline, while overall refresh and final-source qualification remain incomplete. Unique superseded heads and restorable historical images are preserved; no PR was closed."
+        },
+        "independent_final_review": "pending; retained prerequisite and composition source reviews do not qualify the final foundation"
+      },
+      "required_checks_observed": {
+        "path": "docs/security/audits/foundation-definition-composition-20261004.json.gz",
+        "sha256": "4380e5a3db412028100cc9d847c50b9579622cfa0c6be44ea972fafeda06745a",
+        "entry": "foundation-1167-inline-composition/prerequisite-still-pending.json",
+        "entry_sha256": "5e2c1f42e59318e930c2866e7297e4612603f54609ae17886993e48464097978",
+        "result": "Exact prerequisite head remains open and blocked while Build, lint, test runs. MSRV, Cargo Vet and Cargo Deny passed. The historical non-required controller refusal remains separate.",
+        "scope": "Local composition of the reviewed #1167 definitions and completed contract regressions. Protected #1167 landing is still pending. The native preflight has one caught mutation with a passing consumer baseline, while overall refresh and final-source qualification remain incomplete. Unique superseded heads and restorable historical images are preserved; no PR was closed."
       }
     },
     "foundation": "local preparation; not projected, pushed, qualified or landed",
@@ -3658,7 +3679,7 @@
       "last_terminal_source": "0e5a5812e628137655399e428e331714bce138e5",
       "last_terminal_attempt": "cancelled after confirmed cross-package baseline defect; wrapper exit 1",
       "next_source": "7c6bf2c8fdd51f1b14a1e68e3d7b313256168468",
-      "next_attempt": "image-build-and-native-refresh-preparation",
+      "next_attempt": "running; image build and 14 boundary checks passed; first consumer baseline passed and selected mutant caught, overall refresh pending",
       "cancellation": {
         "path": "docs/security/audits/foundation-mutant-baseline-repair-20261004.json.gz",
         "sha256": "b5a1f240f1ca5d9fef72bf91c7f4ddf513a34c4701c4b9de078a2ea7a38e651e",
@@ -3675,7 +3696,47 @@
         "result": "Reclaimed 4.821 GB of six explicitly inventoried unused private build cache entries; every image ID preserved.",
         "scope": "Real pinned-engine cross-package baseline regression and fixed candidate compile budget. The original native source 0e5a5812e6 was intentionally cancelled after diagnosis, with no final mutation outcome accepted. Component tests passed; the full shell gate still rejects stale evidence. No final native, hosted, trusted or foundation acceptance."
       },
-      "qualification_claim": false
+      "qualification_claim": false,
+      "running_component": {
+        "path": "docs/security/audits/foundation-definition-composition-20261004.json.gz",
+        "sha256": "4380e5a3db412028100cc9d847c50b9579622cfa0c6be44ea972fafeda06745a",
+        "entry": "native-foundation-preflight-7c6bf2c8fd/approval-plan-native-caught-partial.json",
+        "entry_sha256": "c6b1ca687cc66d05197bf24d22b7b85f15b2e95aef80c52eb0099596e484c156",
+        "result": "Response-plan authority-binding scenario: positive baseline passes, one selected mutant caught, zero missed, unviable or timed-out mutants. Overall refresh and input-bound final outcome validation are incomplete.",
+        "scope": "Local composition of the reviewed #1167 definitions and completed contract regressions. Protected #1167 landing is still pending. The native preflight has one caught mutation with a passing consumer baseline, while overall refresh and final-source qualification remain incomplete. Unique superseded heads and restorable historical images are preserved; no PR was closed."
+      },
+      "historical_image_preservation": {
+        "path": "docs/security/audits/foundation-definition-composition-20261004.json.gz",
+        "sha256": "4380e5a3db412028100cc9d847c50b9579622cfa0c6be44ea972fafeda06745a",
+        "entry": "native-image-archive/image-cache-removal.json",
+        "entry_sha256": "e4f9341e352846ede90f9490db648ee67ab159f56a9d9d27eb1dafd75f7ed61c",
+        "result": "Three superseded image IDs were removed from cache only after complete archive verification and a successful real restore of the same IDs. The exact current image and all other image IDs were retained; archive remains on the mounted evidence volume.",
+        "scope": "Local composition of the reviewed #1167 definitions and completed contract regressions. Protected #1167 landing is still pending. The native preflight has one caught mutation with a passing consumer baseline, while overall refresh and final-source qualification remain incomplete. Unique superseded heads and restorable historical images are preserved; no PR was closed."
+      }
+    },
+    "retirement_preparation": {
+      "conditional_closure_candidates": 57,
+      "closed": 0,
+      "draft_hold": {
+        "path": "docs/security/audits/foundation-definition-composition-20261004.json.gz",
+        "sha256": "4380e5a3db412028100cc9d847c50b9579622cfa0c6be44ea972fafeda06745a",
+        "entry": "pr1156-after-draft-hold.json",
+        "entry_sha256": "00274dc087843afdcc48ba3b250c904de6d544c73d0e9a90ebc5b00458649f8b",
+        "result": "#1156 is open and draft at its preserved ancestor head. All 57 conditional retirement candidates are now draft; closure still requires the qualified foundation and accounted review obligations.",
+        "scope": "Local composition of the reviewed #1167 definitions and completed contract regressions. Protected #1167 landing is still pending. The native preflight has one caught mutation with a passing consumer baseline, while overall refresh and final-source qualification remain incomplete. Unique superseded heads and restorable historical images are preserved; no PR was closed."
+      },
+      "unique_head_preservation": {
+        "path": "docs/security/audits/foundation-definition-composition-20261004.json.gz",
+        "sha256": "4380e5a3db412028100cc9d847c50b9579622cfa0c6be44ea972fafeda06745a",
+        "entry": "retirement-unique-head-archives-verified.json",
+        "entry_sha256": "c76e914516f0b41462c8ebaa5d3da51e219d5d42917ca7bce058ce16d8e00a99",
+        "result": "Original heads of patch-equivalent #1140, #1139 and #1138 are preserved by three remotely verified archive tags. Original commit ancestry is distinct from source patch equivalence.",
+        "scope": "Local composition of the reviewed #1167 definitions and completed contract regressions. Protected #1167 landing is still pending. The native preflight has one caught mutation with a passing consumer baseline, while overall refresh and final-source qualification remain incomplete. Unique superseded heads and restorable historical images are preserved; no PR was closed."
+      },
+      "retarget_after_landing": [
+        1155,
+        1172
+      ]
     }
   },
   "requirements": [

@@ -12,7 +12,12 @@ remaining-work ledger.
 passed on attempt 1, with 79 successful and ten explicitly skipped checks;
 all 13 review threads are resolved. #1167 is the sole active prerequisite at
 `dd0e727ae6bc49728ec0e7e77be9b52ef85768a4`, composed on that actual main base.
-Its 20 behavioral methods pass locally; hosted qualification is running.
+Its 20 behavioral methods pass locally. Hosted Cargo Vet, Cargo Deny and MSRV
+passed; the required Build, lint, test job is still running. Local merge
+`9e86e4045b` composes the reviewed definitions and checker contract. Its complete
+CI-contract regression suite passes in 553.486 seconds, and all five authority
+workflow blobs match the reviewed prerequisite. This preparation still requires
+the actual protected #1167 main merge and the final caller binding to that merge.
 #1160 remains local preparation and has not been projected or landed.
 
 The current inventory contains **1,351 requirement records**. Native startup
@@ -49,7 +54,26 @@ the memory/PID limits remain unchanged; forwarded concurrency variables are
 rejected. Wrapper and adversarial fixtures pass. The complete shell gate still
 rejects stale outcomes. The [baseline repair bundle](audits/foundation-mutant-baseline-repair-20261004.json.gz)
 preserves the cancelled attempt, regressions, source review and cache cleanup.
-Fresh native execution on the repaired source is pending.
+The image for `7c6bf2c8fd` builds and all 14 installed boundary checks pass.
+Its first native scenario passes the consumer baseline and catches the selected
+response-plan authority-binding mutant, with zero missed, unviable or timed-out
+mutants. The full refresh and final input-bound outcome validation are still
+running. These component results do not qualify a later composed foundation.
+
+The [definition composition bundle](audits/foundation-definition-composition-20261004.json.gz)
+retains those partial native records, the complete composition regression
+results and PR-retirement preparation. All 57 conditional retirement candidates
+are now draft, including #1156. None has been closed. Original unique heads for
+patch-equivalent #1140, #1139 and #1138 have remotely verified archive tags.
+Their closure and retargeting of #1155 and #1172 still depend on the qualified
+foundation reaching `main`.
+
+Three superseded native preparation images were archived, fully checked and
+successfully restored before their exact image IDs were removed from the worker
+cache. The archive remains on the mounted evidence volume; the current image and
+all other image IDs were retained. The bundle preserves the first failed archive
+validator, corrected OCI index/manifest/config/layer verification, real restore
+and explicit removal records separately.
 
 Ruling: use the existing container CPU quota for candidate compilation while
 keeping one mutation and one broker command active at a time. Retain complete
