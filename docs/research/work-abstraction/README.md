@@ -10,6 +10,7 @@ The package is a plan, not an implementation-completion or beta-release claim. I
 2. [Current code and gap review](CURRENT-STATE.md).
 3. [Pinned source inputs](SOURCES.json).
 4. [Planning review and validation](REVIEW.md).
+5. [Session intent and next design questions](SESSION-INTENT-REVIEW.md), a brainstorm companion proposing amendments without changing the approved beta scope.
 
 ## Plans and order
 
