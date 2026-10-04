@@ -81,10 +81,10 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "8f4c07e4fe575a4acb602e66c18aa746a625293eba4b14b6dc40c59cecc2305f"
+    "d83e4538360c46bf45a7b10724cf4184bc4afd13f15baa3a5f51aa32f689a62d"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "9f706e5d2d6ddba084d71c723dd5572d8a5d82df60b3bef86771e90844bc02ba"
+    "4ccc9c2ff00cf418bb6aa9b37c31f34ef5810e0936308141128c7f7fc44b2f91"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
@@ -2986,7 +2986,7 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         }
     )
     expected_candidate_values = {
-        "CARGO_BUILD_JOBS": "'1'",
+        "CARGO_BUILD_JOBS": "'4'",
         "CARGO_HOME": "'/cargo-home'",
         "CARGO_INCREMENTAL": "'0'",
         "CARGO_NET_OFFLINE": "'true'",

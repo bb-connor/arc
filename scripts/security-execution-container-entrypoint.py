@@ -544,7 +544,9 @@ def candidate_environment(
     home = candidate_gate_root(gate_root) / "home"
     target = Path("/target/build")
     environment = {
-        "CARGO_BUILD_JOBS": "1",
+        # Compile within the existing four-CPU container quota. The verifier
+        # still owns one mutation at a time and the broker resets each command.
+        "CARGO_BUILD_JOBS": "4",
         "CARGO_HOME": "/cargo-home",
         "CARGO_INCREMENTAL": "0",
         "CARGO_NET_OFFLINE": "true",

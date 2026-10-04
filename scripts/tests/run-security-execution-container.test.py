@@ -106,12 +106,16 @@ def candidate_helper_environment_tests() -> None:
         "LD_PRELOAD": "/tmp/hostile.so",
         "RUSTC_WRAPPER": "/tmp/hostile",
         "SOURCE_SHA": "f" * 40,
+        "CARGO_BUILD_JOBS": "999",
+        "CARGO_MAKEFLAGS": "--jobserver-auth=3,4",
     }
     with mock.patch.dict(os.environ, helpers | forbidden, clear=True):
         forwarded = CLIENT.forwarded_environment()
     if forwarded != helpers:
         raise AssertionError("candidate client did not forward exactly the helper paths")
     candidate = ENTRYPOINT.candidate_environment(forwarded=forwarded)
+    if candidate["CARGO_BUILD_JOBS"] != "4":
+        raise AssertionError("candidate compilation does not use its fixed four-CPU budget")
     if any(candidate.get(key) != value for key, value in helpers.items()):
         raise AssertionError("candidate command lost an authorized helper path")
     for key, authorized in helpers.items():
