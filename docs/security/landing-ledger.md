@@ -39,6 +39,9 @@ security acceptance requirements.
   outside this security landing queue. Existing security repairs stay preserved.
 - Automatic response remains disabled. A foundation merge is not M10 release or
   M11 pilot acceptance.
+- Ruling: continue execution inline without subagents, as explicitly directed by
+  the user. Retain completed independent reviews and require the final hosted
+  review and qualification evidence; do not describe self-review as independent.
 
 ## Review focus
 
@@ -164,7 +167,40 @@ test-fixture lint failure remain separate records. The same commit corrects
 two unqualified FIPS Rustdoc claims and one test-only sorting lint. The
 [memory-boundary evidence bundle](audits/foundation-memory-boundaries-20261004.json.gz)
 retains the input snapshots, command logs and independent reviews. The inventory
-remains 1,343 records; composed foundation acceptance is still open.
+remains 1,343 records at that checkpoint; composed foundation acceptance is still open.
+
+The latest inventory contains **1,344 records**. The additional obligation records
+the reproduced native unsigned-discovery decimal regression. Its repair and the
+wrap evidence-claim containment are committed at `690ab00ada`. Sixty portable
+tests and strict lint passed. The real native discovery control failed on the
+baseline and passed all five modes on the frozen CLI snapshot; independent source
+and native-evidence reviews accepted that component. This snapshot predates the
+separate verifier test-module extraction and is not the final integration tree.
+Wrap now refuses an explicit receipt-store option before launch and no longer
+emits an unbound verification stamp. Durable denial evidence remains a follow-up.
+
+Alert authenticity containment is committed at `6a4bfdad7c`. Paging requires
+independent operator pins and fresh receipt ID, strict signature and action-hash
+verification. The five original negative cases each reached both paging test
+backends. The repaired default suites passed 199 tests with one explicitly
+ignored feature-specific control; a separate actual P-256 feature run passed
+that control. Six startup controls, strict lint and independent source review
+passed. Existing paging deployments must configure pins before upgrading.
+
+The verifier test-module extraction at `5c6b637af3` preserves both test bodies and
+the existing file-size cap; all 83 package tests and strict lint passed. The
+formal refresh at `8dd57215da` updates one reviewed portable-binding mirror,
+documents its model limits and regenerates coverage. All 232 mirrors match;
+65 rows and 179 declared artifacts are current. No new theorem is claimed.
+
+The [consumer repair evidence](audits/foundation-consumer-repairs-20261004.json.gz)
+retains 206 records, including command logs, source inventories, reviews and
+original unsuccessful campaigns. Its SHA-256 is
+`8d0db384ec986bd6f4af09bbd8d5024c1b59f1ada5dc1606aafbdabd67aa53ae`.
+It also retains the disposable #1167/foundation composition preflight: all 596
+named controls passed after including the 15 approved additions. The earlier
+observer failure and incomplete 581-control assembly remain separate records.
+Actual merged-base checks and final foundation qualification are still required.
 
 ## Active queue
 
