@@ -91,6 +91,17 @@ def check(path: Path) -> list[str]:
                 git("cat-file", "-e", reference + ":" + repair)
             except subprocess.CalledProcessError:
                 errors.append("missing repair record: " + repair)
+        elif isinstance(repair, dict):
+            checkpoint = repair.get("checkpoint", "")
+            paths = repair.get("files", [])
+            if not re.fullmatch(r"[0-9a-f]{40}", checkpoint) or not paths:
+                errors.append("repair requires an exact checkpoint and files: " + row["id"])
+                continue
+            for repair_path in paths:
+                try:
+                    git("cat-file", "-e", checkpoint + ":" + repair_path)
+                except subprocess.CalledProcessError:
+                    errors.append("missing pinned repair record: " + row["id"] + ":" + repair_path)
     return errors
 
 

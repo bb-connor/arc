@@ -67,6 +67,8 @@ and nine prerequisite review threads. The October 1 slices account for all 128
 execution findings and 69 product/compliance findings. These records overlap by
 design and are not 1,303 distinct defects. Uncorroborated historical claims remain
 open for source/acceptance reconciliation; no count establishes readiness.
+The October 4 prerequisite review adds 14 audit, regression and residual-debt
+records: the current inventory is 1,317 records from 45 source documents.
 
 ## Active queue
 
@@ -93,7 +95,7 @@ threads; produce requirement-level dispositions and a bounded landing queue.
 - [x] Verify coverage, unique identities, source hashes, evidence links and queue
   limits with `python3 scripts/check-security-landing-ledger.py`.
 - [x] Update existing status documents and remove competing continuation orders.
-- [ ] Commit and publish the reconciled ledger.
+- [x] Commit and publish the reconciled ledger (`f6b9203728`).
 
 ### Task 2: Repair and land the prerequisites
 
@@ -103,10 +105,10 @@ audit records, regression and workflow inputs; PR #1167's five workflow files.
 **Interfaces:** Consume Task 1's exact source and review IDs; produce reviewed
 dependency closure and trusted workflow definitions on `main`.
 
-- [ ] Reproduce the Cargo Vet failure and disposition all nine #1168 threads.
-- [ ] Complete genuine source review and exact fork reconstruction; retain
+- [x] Reproduce the Cargo Vet failure and disposition all nine #1168 threads.
+- [x] Complete genuine source review and exact fork reconstruction; retain
   failures and run default, FIPS and DES regression qualification.
-- [ ] Repair confirmed regressions with failing-then-passing checks. Verify
+- [x] Repair confirmed regressions with failing-then-passing checks. Verify
   standalone locks, reduced build contexts and workflow triggers.
 - [ ] Obtain an independent review and required terminal checks for #1168's exact
   head, then merge without bypassing protection.
@@ -156,3 +158,37 @@ produce fewer open PRs with preserved source and explicit follow-up ownership.
 - Ruling: retained raw logs stay outside the source tree; commit concise audit
   reports, exact identities and content hashes. If a required artifact cannot be
   independently retrieved, its public-evidence acceptance remains open.
+- October 4 prerequisite candidate: `c5b36bd17bcd4c1189f40285451e30117480c236`
+  is committed, pushed and independently source-approved. All nine original
+  review threads are resolved. Exact-commit hosted checks and protected merge
+  remain pending; main has not moved.
+- Genuine AWS-LC review found six partial AES-key initialization sites and an
+  invalid private C-string conversion. The fork repairs both and retains DES
+  validation. The published registry wrapper is not certified safe to deploy;
+  its non-implying review criterion is combined with mandatory authenticated fork
+  reconstruction, six deployment graphs, native/transitive audits and tests.
+  No Cargo Vet exemption was added.
+- Independent review also drove mandatory immutable-source publisher gates,
+  build-output isolation, current hosted/formal contracts, static native builder
+  dependencies and a disputed-payment regression repair. The original failures
+  remain retained. Native default/FIPS/Memcheck and focused repair tests passed.
+  Actual aarch64 Alpine builder commands exited zero; 4,379 copied source inputs
+  and the Dockerfile match the candidate. This is not full image publication or
+  native security-enforcement qualification.
+- The npm lock repair removes 23 patchable advisory IDs. Two unpatched
+  peer-tooling exceptions expire on October 18 and have independently exercised
+  scope/expiry controls. They, three inherited npm exceptions and the inherited
+  cpp_demangle baseline audit remain explicit follow-up debt. An effective
+  passing scan does not erase the retained raw findings.
+- Foundation boundary assessment: retain #1160's lineage and both histories,
+  integrate the qualified prerequisites, and project the archive's necessary
+  source repairs into dependency-ordered review slices. Bare historical cuts
+  omit later custody/authority repairs. RV1-RV5 are mandatory foundation
+  obligations because their owners are exposed; they are no longer queued as
+  optional follow-ups. The candidate has not yet been constructed or qualified.
+- Raw evidence externalization requires dependency analysis. Four evidence
+  trees account for 14,770 of the archive's 20,701 changed paths. Required test
+  fixtures, exact-source manifests and retrievable evidence must survive a cut.
+  The eight `chio-http-serve` paths also need a review-slice owner before the
+  broad-diff gate can accept the projection. Existing Mercury security consumer
+  repairs remain in scope; new proof development stays in its separate track.
