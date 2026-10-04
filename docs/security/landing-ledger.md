@@ -104,7 +104,19 @@ The foundation integration adds two concrete qualification repairs, reaching
 precise stub classification. KG4-KG8 now link their committed bounded repairs
 and [retained source evidence](foundation-containment-20261004.md). Broader
 original requirements and candidate acceptance remain open. The length-8
-formal check and broader affected-package integration run are still pending.
+formal check is still pending. The broader affected-package run ended with
+1,437 passed, one failed and one ignored. Its stale weak-key fixture was repaired
+and all 83 finding-verifier package tests passed; the original campaign remains
+failed and did not reach whole-package kernel tests.
+
+The next source reconciliation reaches **1,342 records**. It records native
+runner/wrapper binding, the checkpoint fixture repair, confirmed HTTP/portable
+security-binding loss, post-refresh authority-time gaps and unbounded child
+stderr. SF6 now links its explicit numeric decision. Preparatory packet 1 and 2
+reviews and unsuccessful campaigns are in the
+[review evidence bundle](audits/foundation-review-reconciliation-20261004.json.gz).
+Open P1 repairs, aggregate MCP bounds, secret-output growth and final qualification
+remain pending. No prerequisite or foundation merge is claimed.
 
 ## Active queue
 
@@ -148,8 +160,8 @@ audit records, regression and workflow inputs; PR #1167's five workflow files.
 **Interfaces:** Consume Task 1's exact source and review IDs; produce reviewed
 dependency closure and trusted workflow definitions on `main`.
 
-- [x] Reproduce the Cargo Vet failure and disposition all ten #1168 threads,
-  including the subsequent standalone-vendor lint review.
+- [x] Reproduce the Cargo Vet failure and disposition all 13 #1168 threads,
+  including the later vendor, runtime and reduced-context reviews.
 - [x] Complete genuine source review and exact fork reconstruction; retain
   failures and run default, FIPS and DES regression qualification.
 - [x] Repair confirmed regressions with failing-then-passing checks. Verify

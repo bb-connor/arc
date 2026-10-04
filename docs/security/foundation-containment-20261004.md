@@ -73,7 +73,13 @@ corrections; a later pass does not relabel them.
   attenuation and stale-result controls remain asserted.
 
 These runs use Rust 1.95.0 and an external Cargo target with an explicit checkout
-root. Broader affected-package integration testing is pending. Full source,
+root. The broader affected-package campaign ended with 1,437 passed, one failed
+and one ignored. The failing weak-key test still expected an obsolete permissive
+verifier result; its corrected strong/weak controls passed with all 83
+finding-verifier package tests. The original campaign remains failed and never
+reached kernel whole-package testing. See the
+[retained review and campaign records](audits/foundation-review-reconciliation-20261004.json.gz).
+Full source,
 feature, native, trusted hosted and exact-commit landing requirements remain in
 the ledger. The eventual landing candidate must preserve these source repairs
 and recheck its composition against the merged prerequisites.
