@@ -134,6 +134,14 @@ flowchart LR
   parameter hash to verify AND the signer to be in the caller-supplied
   trusted-kernel-key set; a self-signed or untrusted receipt is never
   reported as authorized.
+- Alerting dispatch owns its own typed kernel signer pins, supplied through
+  `AlertingExporterBuilder::with_trusted_kernel_keys`. An empty pin set never
+  pages. Before invoking backends it checks the original receipt's canonical ID,
+  strict signature and action parameter hash, then applies Deny severity/guard
+  filters. Public SiemEvent annotations are descriptive, not dispatch authority.
+  Wall's operator pin configuration feeds both manager annotations and the
+  exporter policy; configured paging without independent pins rejects startup.
+  Existing callers must supply pins explicitly when upgrading.
 - Every exporter that accepts a caller-supplied endpoint URL (Splunk HEC,
   Elasticsearch, Sumo Logic, webhook, the OCSF exporter with a non-empty
   endpoint, PagerDuty, OpsGenie) rejects a non-`https://` scheme at

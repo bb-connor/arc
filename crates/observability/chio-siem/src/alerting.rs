@@ -20,6 +20,8 @@
 //!
 //! # Integration
 //!
+//! Paging requires independent kernel signer pins; the default empty set never
+//! pages. Supply keys from trusted operator configuration, not receipt contents.
 //! Register the exporter through the existing
 //! [`crate::manager::ExporterManager::add_exporter`] surface:
 //!
@@ -27,10 +29,11 @@
 //! use chio_siem::alerting::{AlertingConfig, AlertingExporter, PagerDutyBackend};
 //! use chio_siem::manager::{ExporterManager, SiemConfig};
 //!
-//! # fn build() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn build(trusted_kernel_keys: Vec<chio_core::crypto::PublicKey>) -> Result<(), Box<dyn std::error::Error>> {
 //! let mut manager = ExporterManager::new(SiemConfig::default())?;
 //! let pagerduty = PagerDutyBackend::new("rk_live_xxx".into())?;
 //! let alerting = AlertingExporter::builder(AlertingConfig::default())
+//!     .with_trusted_kernel_keys(trusted_kernel_keys)
 //!     .with_backend(Box::new(pagerduty))
 //!     .build();
 //! manager.add_exporter(Box::new(alerting));
@@ -47,6 +50,7 @@ use zeroize::Zeroizing;
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::redaction::redact_for_operator_log;
+use chio_core::crypto::PublicKey;
 use chio_core::receipt::body::chio_receipt_id;
 use chio_core::receipt::{body::ChioReceipt, decision::Decision, metadata::GuardEvidence};
 use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
@@ -147,10 +151,11 @@ pub fn derive_severity(receipt: &ChioReceipt) -> AlertSeverity {
     }
 }
 
-/// Derive severity from an already-verified SIEM event. This path preserves
-/// signer trust and semantic authorization computed at ingestion time.
+/// Derive a descriptive severity from SIEM event data. This is not an
+/// authenticity boundary; alert dispatch independently verifies the receipt.
 pub fn derive_event_severity(event: &SiemEvent) -> AlertSeverity {
     match &event.receipt.decision {
+        Some(Decision::Deny { guard, .. }) => severity_for_guard(guard, &event.receipt.evidence),
         Some(Decision::Allow) => {
             if !event.authorized || event.receipt.evidence.iter().any(|g| !g.verdict) {
                 AlertSeverity::Low
@@ -639,11 +644,22 @@ impl Default for AlertingConfig {
 /// Builder for [`AlertingExporter`].
 pub struct AlertingExporterBuilder {
     config: AlertingConfig,
+    trusted_kernel_keys: Vec<PublicKey>,
     backends: Vec<Arc<dyn AlertBackend>>,
     metrics: std::sync::Arc<dyn crate::metrics_sink::SiemMetricsSink>,
 }
 
 impl AlertingExporterBuilder {
+    /// Replace the independently configured receipt signer pins.
+    ///
+    /// With no pins, the exporter never pages. Obtain these keys from trusted
+    /// kernel configuration, never from an event or its mutable annotations.
+    #[must_use]
+    pub fn with_trusted_kernel_keys(mut self, keys: Vec<PublicKey>) -> Self {
+        self.trusted_kernel_keys = keys;
+        self
+    }
+
     /// Attach a backend to the builder. Accepts owned `Box<dyn AlertBackend>`
     /// so the caller keeps full control over the concrete type.
     #[must_use]
@@ -675,6 +691,7 @@ impl AlertingExporterBuilder {
     pub fn build(self) -> AlertingExporter {
         AlertingExporter {
             config: self.config,
+            trusted_kernel_keys: self.trusted_kernel_keys,
             backends: self.backends,
             metrics: self.metrics,
         }
@@ -686,6 +703,7 @@ impl AlertingExporterBuilder {
 /// [`AlertBackend`].
 pub struct AlertingExporter {
     config: AlertingConfig,
+    trusted_kernel_keys: Vec<PublicKey>,
     backends: Vec<Arc<dyn AlertBackend>>,
     // Consumed by `export_batch` to emit alert-dispatch outcome/latency metrics
     // on every real dispatch. The SIEM serve-mode host installs a registry-backed
@@ -699,6 +717,7 @@ impl AlertingExporter {
     pub fn builder(config: AlertingConfig) -> AlertingExporterBuilder {
         AlertingExporterBuilder {
             config,
+            trusted_kernel_keys: Vec::new(),
             backends: Vec::new(),
             metrics: crate::metrics_sink::noop_metrics_sink(),
         }
@@ -710,20 +729,30 @@ impl AlertingExporter {
     }
 
     fn should_alert(&self, event: &SiemEvent) -> bool {
-        // Only fire on explicit Deny; Allow/Cancelled/Incomplete never page.
-        let (guard, _reason) = match &event.receipt.decision {
-            Some(Decision::Deny { guard, reason }) => (guard.clone(), reason.clone()),
+        let receipt = &event.receipt;
+        // Public SiemEvent annotations can be stale or caller-controlled.
+        // Verify the original immutable receipt at the dispatch boundary.
+        let guard = match &receipt.decision {
+            Some(Decision::Deny { guard, .. }) => guard,
             _ => return false,
         };
-
-        if derive_event_severity(event) < self.config.min_severity {
+        if !self.trusted_kernel_keys.contains(&receipt.kernel_key)
+            || !chio_receipt_id(&receipt.body())
+                .map(|expected| expected == receipt.id)
+                .unwrap_or(false)
+            || !receipt.verify_signature().unwrap_or(false)
+            || !receipt.action.verify_hash().unwrap_or(false)
+        {
             return false;
         }
-        if self.config.exclude_guards.iter().any(|g| g == &guard) {
+        if severity_for_guard(guard, &receipt.evidence) < self.config.min_severity {
+            return false;
+        }
+        if self.config.exclude_guards.iter().any(|g| g == guard) {
             return false;
         }
         if !self.config.include_guards.is_empty()
-            && !self.config.include_guards.iter().any(|g| g == &guard)
+            && !self.config.include_guards.iter().any(|g| g == guard)
         {
             return false;
         }
@@ -891,7 +920,7 @@ mod tests {
     }
 
     fn deny_receipt(guard: &str) -> ChioReceipt {
-        let keypair = Keypair::generate();
+        let keypair = Keypair::from_seed(&[41; 32]);
         let action = ToolCallAction::from_parameters(serde_json::json!({}))
             .expect("hash receipt parameters");
         ChioReceipt::sign(
@@ -931,7 +960,7 @@ mod tests {
     }
 
     fn allow_receipt() -> ChioReceipt {
-        let keypair = Keypair::generate();
+        let keypair = Keypair::from_seed(&[41; 32]);
         let action = ToolCallAction::from_parameters(serde_json::json!({}))
             .expect("hash receipt parameters");
         ChioReceipt::sign(
@@ -964,7 +993,7 @@ mod tests {
     }
 
     fn trace_allow_receipt() -> ChioReceipt {
-        let keypair = Keypair::generate();
+        let keypair = Keypair::from_seed(&[41; 32]);
         let action = ToolCallAction::from_parameters(serde_json::json!({}))
             .expect("hash receipt parameters");
         let semantics = ReceiptSemanticFields::trace_detect_only();
@@ -1043,21 +1072,27 @@ mod tests {
 
     #[test]
     fn allow_never_alerts() {
-        let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+        let exporter = AlertingExporter::builder(AlertingConfig::default())
+            .with_trusted_kernel_keys(vec![Keypair::from_seed(&[41; 32]).public_key()])
+            .build();
         let event = SiemEvent::from_receipt(allow_receipt());
         assert!(!exporter.should_alert(&event));
     }
 
     #[test]
     fn medium_deny_does_not_alert_by_default() {
-        let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+        let exporter = AlertingExporter::builder(AlertingConfig::default())
+            .with_trusted_kernel_keys(vec![Keypair::from_seed(&[41; 32]).public_key()])
+            .build();
         let event = SiemEvent::from_receipt(deny_receipt("CustomGuard"));
         assert!(!exporter.should_alert(&event));
     }
 
     #[test]
-    fn high_deny_alerts_by_default() {
-        let exporter = AlertingExporter::builder(AlertingConfig::default()).build();
+    fn pinned_high_deny_alerts_at_default_threshold() {
+        let exporter = AlertingExporter::builder(AlertingConfig::default())
+            .with_trusted_kernel_keys(vec![Keypair::from_seed(&[41; 32]).public_key()])
+            .build();
         let event = SiemEvent::from_receipt(deny_receipt("ForbiddenPathGuard"));
         assert!(exporter.should_alert(&event));
     }
@@ -1069,7 +1104,9 @@ mod tests {
             exclude_guards: vec!["NoisyGuard".to_string()],
             include_guards: Vec::new(),
         };
-        let exporter = AlertingExporter::builder(cfg).build();
+        let exporter = AlertingExporter::builder(cfg)
+            .with_trusted_kernel_keys(vec![Keypair::from_seed(&[41; 32]).public_key()])
+            .build();
         let event = SiemEvent::from_receipt(deny_receipt("NoisyGuard"));
         assert!(!exporter.should_alert(&event));
     }
@@ -1081,7 +1118,9 @@ mod tests {
             exclude_guards: Vec::new(),
             include_guards: vec!["ForbiddenPathGuard".to_string()],
         };
-        let exporter = AlertingExporter::builder(cfg).build();
+        let exporter = AlertingExporter::builder(cfg)
+            .with_trusted_kernel_keys(vec![Keypair::from_seed(&[41; 32]).public_key()])
+            .build();
         let match_event = SiemEvent::from_receipt(deny_receipt("ForbiddenPathGuard"));
         let miss_event = SiemEvent::from_receipt(deny_receipt("OtherGuard"));
         assert!(exporter.should_alert(&match_event));

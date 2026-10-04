@@ -13,8 +13,10 @@ async fn p0p1_paging_omits_arguments_denial_text_evidence_and_metadata() {
             .mount(&server)
             .await;
     }
+    let key = Keypair::generate();
     let authority = test_server_authority(&server);
     let exporter = AlertingExporter::builder(AlertingConfig::default())
+        .with_trusted_kernel_keys(vec![key.public_key()])
         .with_backend(Box::new(
             PagerDutyBackend::with_endpoint_and_contract(
                 "routing-key".into(),
@@ -32,7 +34,6 @@ async fn p0p1_paging_omits_arguments_denial_text_evidence_and_metadata() {
             .unwrap(),
         ))
         .build();
-    let key = Keypair::generate();
     let mut body = deny_receipt("private", "SecretLeakGuard").body();
     body.action = ToolCallAction::from_parameters(serde_json::json!({"token":SECRET})).unwrap();
     body.decision = Some(Decision::Deny {
