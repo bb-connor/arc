@@ -61,7 +61,14 @@ pub(crate) fn dispatch_mcp(
     control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
 ) -> Result<(), CliError> {
     match command {
-        McpCommands::Wrap(args) => cmd_mcp_wrap(&args),
+        McpCommands::Wrap(args) => {
+            if receipt_db.is_some() {
+                return Err(CliError::cli_other_error(
+                    "mcp wrap does not support --receipt-db",
+                ));
+            }
+            cmd_mcp_wrap(&args)
+        }
         McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),
         McpCommands::Serve {
             agent_public_key,

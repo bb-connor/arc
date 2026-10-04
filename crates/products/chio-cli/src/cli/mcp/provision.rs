@@ -1423,12 +1423,15 @@ fn decode_tools_fixture(
     bytes: &[u8],
     path: &Path,
 ) -> Result<Vec<chio_mcp_adapter::edge::McpToolInfo>, CliError> {
-    let input: ReviewedToolsInput = crate::input::json(bytes).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to parse reviewed tools fixture {}: {error}",
-            path.display()
-        ))
-    })?;
+    let input: ReviewedToolsInput =
+        chio_core::canonical::UntrustedJsonText::from_wire(bytes, crate::input::MAX_DOCUMENT_BYTES)
+            .and_then(|input| input.decode_document())
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "failed to parse reviewed tools fixture {}: {error}",
+                    path.display()
+                ))
+            })?;
     let tools = match input {
         ReviewedToolsInput::Wrapped(value) => value.tools,
         ReviewedToolsInput::Bare(value) => value,
@@ -1953,3 +1956,7 @@ fn tampered(message: &str) -> CliError {
         "existing native MCP demo output is partial, tampered, or input-mismatched: {message}"
     ))
 }
+
+#[cfg(test)]
+#[path = "provision/document_tests.rs"]
+mod document_tests;

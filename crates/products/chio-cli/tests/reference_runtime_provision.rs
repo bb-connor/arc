@@ -849,3 +849,37 @@ fn shadow_discovery_refuses_before_executing_the_target() {
     assert!(!marker.exists());
     assert!(!output.exists());
 }
+
+#[test]
+fn unsigned_decimal_tools_fixture_reaches_signed_provisioning_and_reopen(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = Fixture::new();
+    std::fs::write(
+        &fixture.tools,
+        br#"[{"name":"read_file","inputSchema":{"type":"object","properties":{"scale":{"type":"number","multipleOf":0.50,"minimum":1e-05}}},"annotations":{"readOnlyHint":true}}]"#,
+    )?;
+    let directory = fixture.output("unsigned-decimal-tools");
+    let output = fixture.provision(&directory, &[]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let reviewed_bytes = std::fs::read(directory.join("reviewed-tools.json"))?;
+    let reviewed: Value = serde_json::from_slice(&reviewed_bytes)?;
+    assert_eq!(
+        reviewed
+            .pointer("/tools/0/inputSchema/properties/scale/multipleOf")
+            .and_then(Value::as_f64),
+        Some(0.5)
+    );
+    assert_eq!(
+        reviewed
+            .pointer("/tools/0/inputSchema/properties/scale/minimum")
+            .and_then(Value::as_f64),
+        Some(0.00001)
+    );
+    assert_eq!(reviewed_bytes, chio_core::canonical_json_bytes(&reviewed)?);
+    let policy_path = directory.join("cage-launch-policy.json");
+    let policy = std::fs::read(&policy_path)?;
+    let reopened = fixture.provision(&directory, &[]);
+    assert!(reopened.status.success(), "{}", stderr(&reopened));
+    assert_eq!(std::fs::read(policy_path)?, policy);
+    Ok(())
+}

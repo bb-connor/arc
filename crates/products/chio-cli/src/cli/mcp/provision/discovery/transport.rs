@@ -134,8 +134,10 @@ fn parse_message(line: &[u8]) -> Result<Option<DiscoveryReply>, String> {
     if line.iter().all(u8::is_ascii_whitespace) {
         return Ok(None);
     }
-    let message: Value = crate::input::json(line)
-        .map_err(|error| format!("the target sent invalid JSON-RPC: {error}"))?;
+    let message: Value =
+        chio_core::canonical::UntrustedJsonText::from_wire(line, MAX_RESPONSE_LINE_BYTES)
+            .and_then(|input| input.decode_document())
+            .map_err(|error| format!("the target sent invalid JSON-RPC: {error}"))?;
     let id = message.get("id").and_then(Value::as_u64);
     if !matches!(id, Some(1 | 2)) {
         return Ok(None);
@@ -225,3 +227,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "transport/document_tests.rs"]
+mod document_tests;

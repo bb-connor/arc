@@ -67,7 +67,7 @@ void probe_start(long *stack) {
     line();
     send("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{},\"serverInfo\":{\"name\":\"confined\",\"version\":\"1\"}}}\n");
     line(); line();
-    send("{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"confined_probe\",\"inputSchema\":{\"type\":\"object\"},\"annotations\":{\"readOnlyHint\":true}}]}}\n");
+    send("{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{\"tools\":[{\"name\":\"confined_probe\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"scale\":{\"type\":\"number\",\"multipleOf\":0.50,\"minimum\":1e-05}}},\"annotations\":{\"readOnlyHint\":true}}]}}\n");
     for (;;) { call(271, 0, 0, 0, 0); }
 }
 __asm__(".global _start\n.type _start,@function\n_start:\nmov %rsp,%rdi\nandq $-16,%rsp\ncall probe_start\n");

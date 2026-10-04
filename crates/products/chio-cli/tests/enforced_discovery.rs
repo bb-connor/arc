@@ -172,7 +172,10 @@ fn privileged_discovery_enforces_identity_filesystem_deadline_and_cleanup() -> T
             assert_eq!(reviewed["tools"][0]["name"], "confined_probe");
             assert_eq!(
                 reviewed["tools"][0]["inputSchema"],
-                serde_json::json!({"type":"object"})
+                serde_json::json!({
+                    "type":"object",
+                    "properties":{"scale":{"type":"number","multipleOf":0.5,"minimum":0.00001}}
+                })
             );
         } else {
             assert!(!result.success(), "hostile discovery reported success");

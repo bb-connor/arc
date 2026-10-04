@@ -20,7 +20,6 @@
 
 use super::*;
 
-use super::attestation::attach_chio_verified_header;
 use super::cage_policy::load_native_mcp_launch;
 use super::ide::IdeTarget;
 use super::manifest::load_manifest_allowlist;
@@ -70,6 +69,9 @@ impl VerdictGate for ManifestVerdictGate {
 
 /// CLI argument bundle for `chio mcp wrap`.
 #[derive(clap::Args, Debug)]
+#[command(
+    after_help = "Receipt persistence is unsupported by mcp wrap. --receipt-db is rejected before startup; successful tool results carry no receipt-bound verification."
+)]
 pub(crate) struct McpWrapArgs {
     /// Server ID to assign to the wrapped MCP server inside the inferred
     /// manifest scaffold.
@@ -124,9 +126,8 @@ pub(crate) struct McpWrapArgs {
     #[arg(long)]
     pub(crate) e2e_fixture: Option<std::path::PathBuf>,
 
-    /// Self-test mode for the attestation header. Prints the
-    /// "Chio-verified" attestation block for the given tool name as
-    /// JSON and exits.
+    /// Legacy attestation self-test flag. Refuses because wrap does not
+    /// provide receipt-bound verification.
     #[arg(long)]
     pub(crate) self_test_attestation: Option<String>,
 
@@ -683,9 +684,8 @@ where
                         summary.allowed += 1;
                         let response = match transport.call_tool(&tool_name, arguments) {
                             Ok(result) => {
-                                let mut payload = serde_json::to_value(&result)
+                                let payload = serde_json::to_value(&result)
                                     .unwrap_or(serde_json::Value::Null);
-                                attach_chio_verified_header(&mut payload, &tool_name);
                                 serde_json::json!({
                                     "jsonrpc": "2.0",
                                     "id": id,

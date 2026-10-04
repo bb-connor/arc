@@ -402,10 +402,14 @@ mutation calibration removes, weakens and reorders those phases.
 
 ## Compliance and product-truth review (October 1, 2026)
 
-The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Open findings for `chio mcp wrap` consumers:
+The [compliance and product-truth review](../reviews/2026-10-01-compliance-product-truth-review.md) re-verified at `122414b48e` the product defects behind the repository's compliance, security and supply-chain claims: 69 findings, 3 High. Current status for `chio mcp wrap` consumers:
 
 - **EV3, Medium.** `mcp wrap` persists no per-call decision receipts.
-- **EV14, Low.** It stamps `_meta.chio_verified` without a durable receipt and silently ignores the
-  global `--receipt-db`.
+- **EV14, Low, interface containment.** Wrap rejects explicit global `--receipt-db`
+  before startup and no longer adds the unbound `_meta.chio_verified` marker.
+  The legacy `--self-test-attestation` flag remains recognized but explicitly
+  refuses because receipt-bound verification is unavailable. This containment
+  does not implement durable per-call receipts or close EV3. See the
+  [CLI migration contract](../../crates/products/chio-cli/README.md#global-flags).
 - **KG18, Low.** Strict mode builds its server from the child's own `tools/list` and ignores the
   verified manifest registry it already loaded.

@@ -225,7 +225,7 @@ Accepted before or after the subcommand; every one is optional.
 |---|---|
 | `--json` | Short alias for `--format json`. |
 | `--format <human\|json>` | Output format for results and terminal error reporting. Default `human`. |
-| `--receipt-db <PATH>` | SQLite path for durable receipt persistence. |
+| `--receipt-db <PATH>` | SQLite path for durable receipt persistence. Unsupported by `mcp wrap`, which rejects it before startup. |
 | `--revocation-db <PATH>` | SQLite path for durable capability revocation persistence. |
 | `--authority-seed-file <PATH>` | Persistent capability-authority seed file. |
 | `--authority-db <PATH>` | SQLite path for shared capability-authority state. |
@@ -233,6 +233,18 @@ Accepted before or after the subcommand; every one is optional.
 | `--session-db <PATH>` | SQLite path for durable remote MCP session tombstones. |
 | `--control-url <URL>` | Shared trust-control service base URL; switches supporting commands to the remote backend. |
 | `--control-token <TOKEN>` | Bearer token for the trust-control service. Prefer the `CHIO_CONTROL_TOKEN` env var over argv so the bearer does not leak via `ps`. |
+
+`mcp wrap` has no durable per-call receipt store, including with
+`--strict-execution-nonce`. Remove `--receipt-db` from a wrap invocation only
+when that receipt contract meets the caller's requirements. Other commands
+that support the configured receipt store retain their persistence behavior.
+
+Wrap no longer adds `_meta.chio_verified` to successful tool results. The former
+static `urn:chio:attest:tool-call/v1` block had no receipt identity or signature
+binding; consumers must stop using it as verification evidence. The public
+`--self-test-attestation <TOOL>` flag remains recognized and returns an explicit
+unsupported error. Allowed response content, scope denials, strict execution
+nonces, and required signed native launch policies retain their existing roles.
 
 ## Usage
 
