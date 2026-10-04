@@ -15,6 +15,26 @@ all 13 review threads are resolved. #1167 is the sole active prerequisite at
 Its 20 behavioral methods pass locally; hosted qualification is running.
 #1160 remains local preparation and has not been projected or landed.
 
+The current inventory contains **1,348 requirement records**. Native startup
+repairs include source modes, exact bind-mount identity independent of Docker's
+array order, bounded escaped verifier diagnostics, and constrained normalization
+of valid Cargo-mutants Rust module paths. The latter passes eight boundary
+methods, the existing checker fixtures and the real 16-file package inventory.
+Ordinary validation still rejects stale mutation evidence. The next image build
+failed during unpacking because the worker disk was full; it is retained as a
+failed attempt, with no native campaign pass claimed. The
+[startup evidence bundle](audits/foundation-native-startup-20261004.json.gz)
+preserves the original failures and component results.
+
+Ruling: #1167's non-required controller run rejected the historical configured
+source authorization, which predates the foundation execution files. Preserve
+that failure and qualify this definition-only prerequisite through its reviewed
+exact source and required ordinary CI. Do not change source authorization to
+make the prerequisite green. The foundation still requires its full authorized
+native capture and trusted evidence chain. If this separation were wrong, the
+definition merge would lack required execution coverage; it cannot be used as
+foundation acceptance.
+
 **Architecture:** Preserve the accumulated branch as an immutable reference.
 Land dependency closure and trusted workflow definitions first. Use PR #1160 for
 the bounded foundation; qualify subsequent changes in dependency order. Keep at
