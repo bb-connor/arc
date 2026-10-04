@@ -23,10 +23,42 @@ Local merge `f934e3ef7b` retains the actual definition landing without changing
 the prepared source tree. The reusable caller now pins that full protected merge,
 and its structural contract passes. All five authority workflow blobs match the
 reviewed and landed prerequisite. #1160 is the sole active landing vehicle;
-its bounded projection, final review and native/trusted/hosted qualification are
-still pending. The [definition landing bundle](audits/foundation-definition-landing-20261004.json.gz)
+the bounded cut is committed, while final review and native/trusted/hosted
+qualification remain pending. The [definition landing bundle](audits/foundation-definition-landing-20261004.json.gz)
 retains the exact PR, protection, merge and component records. The foundation has
 not landed.
+
+Projection `059c33104a` externalizes exactly 14,764 evidence files, keeps six
+required local inputs byte for byte, and rewrites 101 links in 38 documents to
+the immutable archive. The latest complete source is preserved remotely at
+`archive/security-foundation-before-cut-20261004` (`bae73644c3`). Both required
+histories and every later source repair remain ancestors of the cut. The cut
+changes no production runtime source and preserves all 1,353 requirement rows.
+Historical path literals resolve against archive `ecb44791501c2aba671de2a967d2506f039ab42e`;
+use that commit's GitHub tree or `git show COMMIT:PATH` when a local artifact has
+been externalized. Historical evidence keeps its original qualification limits.
+
+The cut has 5,794 changed paths against prerequisite main `4f3c967f04`. Every path
+has one primary review owner in the following dependency order. The retained
+[projection bundle](audits/foundation-projection-20261004.json.gz) contains exact
+path inventories and hashes; its own bookkeeping is a later packet-7 addition.
+
+| Packet | Boundary | Paths at the cut |
+| --- | --- | ---: |
+| 1 | Wire, trust and time contracts | 326 |
+| 2 | Durable authority and receipts | 938 |
+| 3 | Kernel/process and privileged native boundary | 841 |
+| 4 | Response and control-plane composition | 582 |
+| 5 | Exposed consumers and network authority | 1,396 |
+| 6 | Export, notification and existing product consumers | 88 |
+| 7 | Qualification and operational definitions | 1,623 |
+
+Ledger identities, all three source-copy controls, the full release-truth gate,
+review classification, CI structure, all 20 definition methods and the 82-test
+cage source inventory pass on the cut. These are bounded source checks. The
+existing classifier retains its 15 defined classes, with 14 active in this diff.
+Native execution, full mutation refresh, independent final review and exact
+hosted qualification remain required before the foundation can land.
 
 The current inventory contains **1,353 requirement records**. Commit
 `dfb7543f40` adds five negative response-mode controls. Each detects deletion of
@@ -353,12 +385,11 @@ retains 62 records, including unsuccessful attempts, with SHA-256
 Later hardening and product-evidence slices receive a PR only when an active
 slot becomes available. Their source remains in the preserved reference.
 
-Foundation source reconciliation may proceed locally while prerequisite CI runs.
-Projection, hosted qualification and landing still require the actual merged
-prerequisite main history. Local preparation does not add #1160 to the active
-queue. The composition preserves the audited fork byte for byte and resolves
-shared manifests by retaining the foundation source closure with the repaired
-dependency floors; an uncommitted merge is not a qualified candidate.
+Both prerequisite merges are now present in the foundation history. The bounded
+cut advances #1160 into the sole active landing slot. The composition preserves
+the audited fork byte for byte and resolves shared manifests by retaining the
+foundation source closure with the repaired dependency floors. The committed
+projection is still awaiting final qualification.
 
 ### Task 1: Establish and validate the authoritative ledger
 
@@ -392,7 +423,7 @@ dependency closure and trusted workflow definitions on `main`.
   standalone locks, reduced build contexts and workflow triggers.
 - [x] Obtain an independent review and required terminal checks for #1168's exact
   head, then merge without bypassing protection.
-- [ ] Integrate that main base into #1167, qualify its reviewed definitions and
+- [x] Integrate that main base into #1167, qualify its reviewed definitions and
   exact-head checks, then merge without bypassing protection.
 
 ### Task 3: Qualify and land the bounded foundation
@@ -403,7 +434,7 @@ required by its dependency closure.
 **Interfaces:** Consume both preserved histories and Task 2's merged main base;
 produce a source-pinned qualified foundation on `main`.
 
-- [ ] Select a dependency-ordered cut and map later repairs onto exposed
+- [x] Select a dependency-ordered cut and map later repairs onto exposed
   boundaries. Preserve all remaining source in the archive reference.
 - [ ] Reconcile source, review, native runner, signed capture and CI identities.
 - [ ] Run complete foundation acceptance and independent review, repair failures

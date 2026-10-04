@@ -3698,7 +3698,97 @@
         }
       }
     },
-    "foundation": "Both actual prerequisite merges composed locally; bounded projection, final source review, native/trusted/hosted qualification and landing remain pending.",
+    "foundation": {
+      "source": "059c33104aa40135df5b89b93662e8de0a2bffbb",
+      "base": "4f3c967f04af40b5025b9222e8db95a3aee0b5f4",
+      "state": "bounded source cut committed; final qualification and protected landing pending",
+      "visible_changed_paths": 5794,
+      "externalized_evidence_files": 14764,
+      "retained_local_inputs": 6,
+      "rewritten_archive_links": 101,
+      "latest_complete_reference": "archive/security-foundation-before-cut-20261004",
+      "latest_complete_reference_commit": "bae73644c3ffe1b1ac36955a0f7cf9a07f72c91e",
+      "projection": {
+        "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+        "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+        "entry": "foundation-projected-checks/inventory.json",
+        "entry_sha256": "56a8ebcfbee3cdb8b85c0e7ef06a5cce966c06af5735711ab81e34969988f267",
+        "result": "Exact exclusion inventory, retained bytes and all 1,353 unchanged requirement records verified. Projection changes no production runtime source.",
+        "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+      },
+      "review_partition": {
+        "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+        "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+        "entry": "foundation-projected-checks/packet-inventory.json",
+        "entry_sha256": "c25e8d49eb17d2cf1492d0ea77cb82676ff1e42dafc49eaf432494de53f37426",
+        "result": "All 5,794 paths assigned to one of seven dependency-ordered review packets; the existing classifier accepts 14 active slices.",
+        "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+      },
+      "source_checks": [
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/ledger.json",
+          "entry_sha256": "a40f19957d00d19f036acd791c5d891ce1d134f3667e4a866c505144b6f8d421",
+          "result": "Ledger coverage and identities pass.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        },
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/proof-copy-scope.json",
+          "entry_sha256": "3d3845235198b434955c1011cc2bdf5a01f41fac018cf3761b26682c8d2b70af",
+          "result": "All three real retained-source copy controls pass.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        },
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/release-truth.json",
+          "entry_sha256": "4d77a3b9fed31f0b010c75b2774a3dbcf203103753243e694697f91c9ad410f4",
+          "result": "The complete release-truth gate passes after the exact historical-artifact projection.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        },
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/review-slices.json",
+          "entry_sha256": "f67de4d537966d9a6a2fe6663d7e8eeb08ccb63d9646689a88b891cdde5928fa",
+          "result": "All projected paths are classified without broadening the gate.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        },
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/ci-contract.json",
+          "entry_sha256": "23a670d28d5e29daac796516d6c764edd2478182f31e5827f3a27de1ab6376d6",
+          "result": "The actual merged definition caller and full structural contract pass.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        },
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/definition-methods.json",
+          "entry_sha256": "bfd66c8acb9f2059f46574b9b02e1c367ee243f0b7a56cc744a1f376eac04fdc",
+          "result": "All 20 definition behavioral methods pass at the projected source.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        },
+        {
+          "path": "docs/security/audits/foundation-projection-20261004.json.gz",
+          "sha256": "f164dadb2e657b5366098fe589754de06bf133a9d1915699bb7e716be3ab3f64",
+          "entry": "foundation-projected-checks/cage-inventory.json",
+          "entry_sha256": "b9154509ab845c9cee32d083450a572818255663a9dc895e3dba1182cade77ab",
+          "result": "All 82 expected cage test source identities pass; no native execution claimed.",
+          "scope": "Exact bounded projection 059c33104aa40135df5b89b93662e8de0a2bffbb on actual prerequisite main 4f3c967f04af40b5025b9222e8db95a3aee0b5f4. Archive preservation, consumer/link/retained-byte checks, source gates and review partition only. Final candidate review, complete mutation/native/trusted/hosted acceptance and protected foundation landing remain pending."
+        }
+      ],
+      "remaining_acceptance": [
+        "Fresh independent review of final source and any repairs.",
+        "Complete source-bound mutation outcomes and required real native/trusted capture.",
+        "Terminal exact-candidate hosted CI, protected merge and current main ancestry.",
+        "Retarget surviving dependents and retire accounted superseded PRs only after foundation landing."
+      ]
+    },
     "native_preparation": {
       "last_terminal_source": "0e5a5812e628137655399e428e331714bce138e5",
       "last_terminal_attempt": "cancelled after confirmed cross-package baseline defect; wrapper exit 1",
