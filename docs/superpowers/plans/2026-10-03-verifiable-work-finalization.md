@@ -8,6 +8,8 @@
 **Spec:** [whitepaper design brief](../specs/2026-10-03-agentic-work-kernel-design.md#whitepaper-design-brief), the three component specifications linked there.
 **Working source:** docs/papers/verifiable-work at 611660eb24521a4d02020615f650dadad92eae03. Preserve the approved title.
 
+**Approved design refinements:** The [session intent review](../../research/work-abstraction/SESSION-INTENT-REVIEW.md) is now incorporated in the component specs and their [LC01-LC06 cases](../specs/2026-10-03-work-developer-surface-design.md#required-composition-cases). P.1-P.4 writes this completed design before implementation; it does not report those future cases as observed.
+
 ## Global Constraints
 
 - Retain the title: Chio: A Peer-to-Peer Economy of Verifiable Work.
@@ -42,7 +44,8 @@
 - New profile tracks design_complete, implementation_claims_verified, artifact_consistent, technical_review_complete, empirical_claims_supported, publish_ready and source identities. Each Boolean has concrete acceptance and evidence references.
 - Architecture-claims rows contain claim ID/text, kind (architectural, modeled, implemented, empirical), assumptions, spec/code/evidence references and current status. Planned APIs cannot be listed as implemented.
 
-- [ ] Write the contribution statement and three precise contributions in the review record: common work abstraction; owner-controlled execution composition; reusable realization across existing protocol/host surfaces.
+- [ ] Write the contribution statement and three precise contributions in the review record: a common contract for forming and evolving work programs; owner-controlled composition of authority, acceptance and persistent obligations; reusable realization across existing protocol/host surfaces. State the synthesis: agents propose program development, owners admit participation, and commitments preserve the terms/history on which later work depends.
+- [ ] Map the six accepted ideas to explicit architecture claims and their AW26-AW31/LC01-LC06 acceptance evidence. Before execution, these rows remain architectural claims with proposed validation. Resolve any missing acceptance/evaluator/authority premise before prose revision.
 - [ ] Explain the deliberate change of publication question from proving a foundational/economic breakthrough to substantiating this architecture. Preserve the old open hypotheses and their evidence requirements.
 - [ ] Add negative checker cases before changing profile handling:
       assert architecture_profile_with_unverified_implementation_is_rejected;
@@ -65,13 +68,14 @@ Acceptance: AW19/AW20. It is clear which artifact can be written now and what la
 - Create: sections/03-programming.tex; update paper.tex section inclusion.
 - Add the figure directly in the existing LaTeX/TikZ style.
 
-**Interfaces:** Definitions used throughout: owner, agent, kernel, work commitment, program, admission, execution observation, release, funded obligation. Use the finalized architecture spec, not experimental module names, as the design source.
+**Interfaces:** Definitions used throughout: owner, agent, kernel, working contract, work commitment, program, admission, execution observation, acceptance, dependency/join, release, funded obligation. Use the finalized architecture spec, not experimental module names, as the design source. A resolved profile is a view of working terms; acceptance names an exact artifact/procedure/evaluator; neither is a new bearer capability.
 
 - [ ] Draft the abstract as one connected argument: independently owned resources; common execution contract; work commitment as composition unit; local admission and preserved commitments; architectural consequence. Target roughly 160 to 200 words, subject to clarity.
 - [ ] End the abstract with what programs can do across independently governed systems. Put implementation language, local trial administration and detailed limitations in their appropriate later sections.
-- [ ] Introduce a short programmer-facing work lifecycle before the encoding details: authorize an allowance, delegate/select, commit, execute, extend, inspect/recover, accept/collect. Distinguish owner setup from agent operations.
+- [ ] Introduce the programmer-facing lifecycle before encodings: authorize resources, resolve terms, select an approved collaborator, delegate/commit, execute/evaluate, join accepted results, inspect/recover, and reconcile earned obligations. Current result release is checked separately. Distinguish owner setup from agent operations.
 - [ ] Explain programmable sovereignty through capabilities, treaties, policy/guards and admission. Show owner-local kernels connected by work commitments/evidence, with untrusted planning outside each authority boundary.
-- [ ] Give one pseudocode program and an API-review running example. Mark pseudocode as the architecture interface, not currently executable SDK syntax. Show how a second owner can refuse and how a planner can change without changing old work.
+- [ ] Give one pseudocode program and the API-review running example: select an unused approved catalog participant, prepare exact work, inspect acceptance evidence, prepare a join and extend, then navigate an authorized recovery reference. Mark pseudocode as architecture syntax; match actual proposed operations and never turn query into execution or a draft into authority.
+- [ ] Explain the same rules at three scales: unpaid work inside an owner, cross-owner collaboration, and a service that accepts work and delegates portions under bounded contracts. Use the support-disclosure application for policy/recovery behavior and the optional funded profile for obligations. Do not add a third application or imply that an organization/governance product is shipped.
 - [ ] Make the claims register point each architectural statement to a contract and each guarantee to its assumptions.
 - [ ] Commit: docs(paper): lead with the work programming abstraction.
 
@@ -90,6 +94,10 @@ Acceptance: AW18. A systems reader can explain the abstraction and owner boundar
 - [ ] Describe how existing allocation, graph, capability, treaty, native execution and optional financial records jointly realize a work commitment. Avoid suggesting a universal new token or atomic transaction across owners.
 - [ ] Explain the three different lifetimes of fresh permission, historical execution and earned obligations. Include current authority for output release and the distinct bilateral-delivery state.
 - [ ] Integrate recovery as part of the architecture: exact new continuation after an approved change, unchanged original operation for historical settlement, unknown effect retained, and mediated artifact/child returns. Do not imply arbitrary rewrites of a sealed allocation.
+- [ ] Explain constructive admission through owner-approved catalog selection, existing treaty intersection and receiver admission. A signed provider description does not establish all remote behavior, and discovery cannot enroll trust. Keep deployment authority distinct from the planner's selection authority.
+- [ ] Explain acceptance-to-dependency composition using exact evaluator evidence, the existing S1 join, protected inputs and HistoricalFact/CurrentPredicate/HeldReservation. Distinguish task acceptance from funding-verifier acceptance, permitted release and universal usefulness. A signed join alone does not prove its semantic preconditions.
+- [ ] Walk a policy/semantic-generation change through an outstanding commitment: stale new offers, retained captured history, current output withholding, and preserved backed obligations. Describe refusal leading to exact authorized recovery and independent progress in a separate budgeted workflow. Do not claim a proof for arbitrary policy amendment or global liveness.
+- [ ] Define bounded provider substitution for fresh work under the same external requirements and show incremental unpaid/cross-owner/funded adoption. Keep changed trust/effects/acceptance subject to admission and sealed routes immutable. The observed substitution case is not a general contextual-equivalence theorem.
 - [ ] Explain protocol/host independence using the common kernel contract and explicit fidelity boundaries. Driver/adapter breadth supports the architecture without becoming a product feature catalogue.
 - [ ] Re-read the preservation proposition against the broader narrative. Retain its additive-growth, honest-custodian and bounded-verifier premises. Add prose linking it to the programming model; do not quietly generalize its proof to all recovery/adapter behavior.
 - [ ] Reframe related work as the architectural relationship to capabilities, workflow recovery, multi-agent task allocation, policy enforcement and settlement. Retain the factual financial overlap and acknowledge conventional constructions.
@@ -113,7 +121,7 @@ Acceptance: the technical argument explains how the abstraction works and its ac
 - [ ] Put the new evaluation questions in the artifact/design companion during this early draft. Do not leave invented tables, empty results or repeated future-work paragraphs in the manuscript.
 - [ ] Run make -C docs/papers/verifiable-work test and build, followed by the explicit artifact checks appropriate to the new profile. Verify every claim/evidence path and bibliography entry.
 - [ ] Inspect the rendered PDF page by page for awkward breaks, diagram legibility, excessive notation, repetition and abstract/conclusion quality. Verify title, definitions, contribution claims and theorem scope against each other.
-- [ ] Perform technical and prose review against the revised W1/W2 construction and second architecture review: client/service/native boundaries, qualified allocator ownership, exact request custody, original-ID resolution, independent observations and current release must agree. The reader must understand the programming abstraction, authority ownership, failure semantics, assumptions and evidence status. Resolve blocking findings; record the actual reviewer and method.
+- [ ] Perform technical and prose review against the revised W1/W2 construction, second architecture review and accepted session-intent refinements: client/service/native boundaries, qualified allocator ownership, exact request custody, original-ID resolution, resolved terms, acceptance/join evidence, recovery links, generation changes and current release must agree. The reader must understand what can be composed and how owners retain control, alongside failure semantics, assumptions and evidence status. Resolve blocking findings; record the actual reviewer and method.
 - [ ] Record architecture-manuscript completion separately from implementation and publication readiness; commit the final source/PDF pair.
 
 Acceptance: a complete, professional manuscript of the intended architecture exists before W1 execution. It reads as a coherent kernel design; it does not claim the unbuilt product has shipped.
@@ -125,6 +133,7 @@ Acceptance: a complete, professional manuscript of the intended architecture exi
 
 - [ ] Replace the early implementation mapping with exact public runtime/owner-service/SDK paths and the integrated candidate's source identity.
 - [ ] Add the two-application reuse results and matched comparison as actually observed. A tie, loss or unfinished outside trial remains visible in the relevant evidence and claim scope.
+- [ ] Reconcile each AW26-AW31 claim with LC01-LC06 results from the exact candidate. Record actual substitution limits and installed harness/package evidence; no unrun lifecycle case can be presented as measured or operationally accepted.
 - [ ] Remove unsupported assertions or leave their claim status pending. Do not change historical PUBLICATION.json gates to passed merely because the architecture publication profile is ready.
 - [ ] Rerun artifact/PDF checks and technical review after the final claim changes. Verify all publication-profile gates individually.
 - [ ] Prepare the concrete source, PDF, reproducibility instructions and release-aligned claims for publication under the existing authorization process.

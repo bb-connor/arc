@@ -1,7 +1,7 @@
 # Agentic work kernel: architecture and beta convergence
 
 Date: 2026-10-03
-Status: proposed execution specification, revised after the second source review; grounded in the source snapshots below.
+Status: execution specification incorporating the owner's approved session-intent refinements; grounded in the source snapshots below. Implementation remains pending.
 Scope: the third workstream alongside the active security and recovery roadmaps.
 Authorization: the owner approved the architectural thesis and requested the complete planning package. This package does not execute the implementation or revise the manuscript.
 
@@ -12,6 +12,8 @@ Chio makes work a reusable programming abstraction across independently governed
 The contribution is a common execution contract, implemented through existing capability, treaty, guard, swarm, process, receipt and settlement machinery. Reconstructability from known components is not a veto on systems innovation. Comparisons must assess the reusable contract and application responsibilities, not merely whether another escrow reproduces a financial trace. No exclusive-expressiveness, universal result-correctness or inevitable ecosystem-impact claim follows.
 
 Success means a developer can construct two materially different applications using the same supported work interface, without writing a custom authority verifier, retry coordinator, graph-signing script or settlement state machine. Owners can refuse admission under their own configuration. Adding supported transports does not create new execution semantics.
+
+The full programming lifecycle is part of that criterion: resolve a working contract, select a previously unused approved collaborator, delegate, accept and compose results, recover through an authorized continuation, and change current policy without rewriting prior commitments. An agent proposes how a program develops; each owner admits its own participation. Work commitments preserve the terms and history on which subsequent work depends.
 
 ## Source and ownership snapshot
 
@@ -41,6 +43,8 @@ Use chio-runtime as the public Rust client facade and chio-runtime-core for chec
 
 The [second architecture review](../../research/work-abstraction/ARCHITECTURE-REVIEW.md) records why a generic host pass-through, unrestricted request envelopes and an unfenced allocator are insufficient. Its corrections are incorporated into the specs and tasks, not deferred as optional polish.
 
+The owner subsequently approved all six proposals in the [session intent review](../../research/work-abstraction/SESSION-INTENT-REVIEW.md). Incorporate them into these same five plans. An editorial-only amendment would omit the public API gaps; a separate collaboration engine or sixth implementation plan would split ownership of the same contracts. Add focused runtime tasks for resolved profiles and accepted-result joins, and extend existing owner, SDK, application, release and paper tasks. No new crate, policy language, trust authority or recovery coordinator is required.
+
 ## Component specifications
 
 - [W1: reusable work runtime](2026-10-03-work-runtime-design.md)
@@ -66,12 +70,13 @@ These requirements apply to every implementation plan.
 - Keep signer intent and idempotency at the issuing authority. Coordinator indexes, copied stores and retry caches cannot mint rights. New authoritative tables join the existing serving projection, integrity, migration and continuity contracts.
 - Bound parsing, verification work, queues and blocking tasks. Never hold a store transaction across remote I/O. Cancellation or dropped futures cannot erase committed obligations.
 - Separate query, historical reconciliation and current result release. Protect metadata as well as payload bytes. Work commitments reference protected exact invocation custody; they do not become generic credential containers.
+- Resolved profiles, acceptance observations and recovery links are audience-scoped projections of existing authorities. They do not install trust, authorize effects, declassify artifacts or certify arbitrary usefulness.
 - No em dashes. Do not invent observed results, outside participants, shipped surfaces or release acceptance.
 - Run focused checks at each changed boundary. Run the inherited full release qualification once at the integrated candidate boundary, and rerun only what subsequent changes invalidate.
 
 ## Programming and authority model
 
-A work commitment links an allocation, exact selected invocation, receiving authority, graph participation and optional funded agreement. It is a programming abstraction over these records, not a replacement wire capability or a global atomic transaction.
+A work commitment links an allocation, exact selected invocation, receiving authority, original working terms and acceptance contract, graph participation and optional funded agreement. It is a programming abstraction over these records, not a replacement wire capability or a global atomic transaction.
 
 Owner-controlled resources keep separate authoritative stores:
 
@@ -84,6 +89,8 @@ Owner-controlled resources keep separate authoritative stores:
 | Knowledge and result release | Recovery P3/P4/P5 authorities | Project references and request authorized reads/returns |
 | Funding and earned payment | PaymentAdapter plus selected financial rail | Join exact agreement/reserve/operation; report financial state separately |
 | Peer evidence | Federation/treaty verification and durable receipt machinery | Deliver and reconcile exact signed evidence under pinned peer policy |
+| Working terms and candidate catalog | Owner-provisioned manifests, semantic registry generations and treaty scope | Resolve bounded authorized views; revalidate at preparation and native commitment |
+| Result acceptance and joins | Agreed evaluator evidence, S1 issuer and recovery artifact/dependency owners | Project exact decisions and construct qualified joins without application signing |
 
 The runtime may retain command IDs, requested digests and references for coordination. These records cannot certify dispatch, no effect, an earned claim or output-release permission. Each mutation is idempotent at its owning authority. Lost acknowledgement means exact readback under the original command, never a new ID.
 
@@ -123,20 +130,22 @@ The release integration plan reuses the existing RELEASE_CANDIDATE, RELEASE_AUDI
 
 Stop adding features when these obligations are met. Open provider discovery, arbitrary graph edits, task migration between owners, budget reclamation, a universal marketplace, generalized semantic correctness and a new consensus layer are outside this third workstream.
 
+Selecting a previously unused participant from an owner-approved catalog is in scope. Enrollment, key installation and deployment activation remain owner operations. Provider substitution applies to future commitments satisfying the same explicit external requirements; it does not retarget sealed work or imply unobserved equivalence between implementations.
+
 ## Acceptance requirements and plan ownership
 
 | ID | Requirement | Plan / acceptance |
 | --- | --- | --- |
-| AW01 | Public facade supports the work contract without direct example/core imports | W1.1, W1.5 |
-| AW02 | Existing allocation/selection/seal bindings are preserved | W1.2, W1.3 |
-| AW03 | Additive growth preserves old rights and uses one protected head | W1.1, W1.3, W1.4 |
-| AW04 | Command loss/reopen preserves original identities and cannot infer no effect | W1.4 |
-| AW05 | Execution, output release, settlement and bilateral-delivery states remain separate | W1.4, W2.3 |
+| AW01 | Public facade supports the work contract without direct example/core imports | W1.1, W1.7 |
+| AW02 | Existing allocation/selection/seal bindings are preserved | W1.2, W1.4 |
+| AW03 | Additive growth preserves old rights and uses one protected head | W1.1, W1.4, W1.6 |
+| AW04 | Command loss/reopen preserves original identities and cannot infer no effect | W1.6 |
+| AW05 | Execution, acceptance, recovery, output release, settlement and bilateral-delivery observations remain separate | W1.5, W1.6, W2.3 |
 | AW06 | Paid and unpaid work use the same execution contract; amounts are not hardcoded to W0 | W2.3 |
 | AW07 | Each receiver selects trust and admission policy; requests cannot provision | W2.1 |
 | AW08 | Separate owners exchange authenticated work without sharing private keys/stores | W2.2 |
 | AW09 | Bilateral co-signing reconstructs the exact authorized statement and survives loss | W2.2 |
-| AW10 | Existing recovery P1/P3/P4/P5 handles compose without a duplicate coordinator | W1.4, W2.4 |
+| AW10 | Existing recovery P1/P3/P4/P5 handles compose without a duplicate coordinator | W1.6, W2.4 |
 | AW11 | Protocols preserve bindings or explicitly refuse unsupported fidelity | W3.1 |
 | AW12 | Python and TypeScript clients use the same host contract and error semantics | W3.2 |
 | AW13 | A clean installation runs two different applications without authority glue | W3.3 |
@@ -147,11 +156,17 @@ Stop adding features when these obligations are met. Open provider discovery, ar
 | AW18 | The paper leads with the programming model and programmable sovereignty | P.2, P.3 |
 | AW19 | Completed-design prose is separate from unobserved implementation/evaluation | P.1, P.4 |
 | AW20 | Publication and breakthrough claims have claim-specific, explicit acceptance | P.1, P.5 |
-| AW21 | Checked data, opaque authority, closed results and dependency boundaries are enforced by Rust API and feature checks | W1.1, W1.5, W2.3 |
-| AW22 | Production allocation and graph issuance participate in qualified serving ownership, integrity and explicit migration | W1.2, W1.3, W4.2 |
-| AW23 | Every issuance/mutation has owner-local original-ID readback; coordinator loss cannot duplicate rights | W1.3, W1.4, W2.2 |
-| AW24 | Exact invocation custody and distinct digest meanings preserve every signed binding without credential leakage | W1.0, W1.3, W2.3 |
-| AW25 | Bounded concurrency/decoding, metadata release and cancellation preserve ownership under stalled peers | W1.0, W1.1, W1.4, W2.1, W3.2 |
+| AW21 | Checked data, opaque authority, closed results and dependency boundaries are enforced by Rust API and feature checks | W1.1, W1.7, W2.3 |
+| AW22 | Production allocation and graph issuance participate in qualified serving ownership, integrity and explicit migration | W1.2, W1.4, W4.2 |
+| AW23 | Every issuance/mutation has owner-local original-ID readback; coordinator loss cannot duplicate rights | W1.4, W1.6, W2.2 |
+| AW24 | Exact invocation custody and distinct digest meanings preserve every signed binding without credential leakage | W1.0, W1.4, W2.3 |
+| AW25 | Bounded concurrency/decoding, metadata release and cancellation preserve ownership under stalled peers | W1.0, W1.1, W1.6, W2.1, W3.2 |
+| AW26 | Bounded resolved work profiles join existing manifests, semantic generations, treaty conditions and acceptance terms without minting authority | W1.3, W2.1, W3.1 |
+| AW27 | An application selects an unused owner-approved collaborator through existing treaty/admission checks, without per-relationship code or trust installation | W1.4, W2.1, W2.2, W3.3 |
+| AW28 | Exact acceptance observations and qualified S1 joins make results usable by later work while preserving dependency categories and labels | W1.5, W2.3, W2.4, W3.3 |
+| AW29 | Refusal/pending observations expose only authorized existing recovery references; exact recovery enables progress without fresh retries or blocking independent workflows | W1.6, W2.4, W3.2, W3.3 |
+| AW30 | Policy/semantic-generation changes during outstanding work preserve historical interpretation and earned obligations while rechecking current execution/release | W2.4, W3.3, W4.2 |
+| AW31 | The same application contract supports single-owner unpaid, cross-owner and optional funded work, plus one installed harness and bounded provider substitution | W3.3, W3.4, W4.3 |
 
 ## Execution order
 
@@ -161,11 +176,15 @@ Then W1 -> W2 -> W3 -> W4 -> P.5. W3 schema/SDK preparation can follow the froze
 
 Use one implementation owner for this tightly coupled third lane and focused review at the public API, owner-boundary and final candidate boundaries. This package does not authorize spawning agents or publishing.
 
+Within W1, execute the numbered tasks in order: source inventory, checked contracts, qualified stores, resolved profiles, owner preparation, accepted-result joins, recovery projections, public-client conversion. The two added tasks make independent review boundaries explicit. W2 and W3 then qualify these contracts remotely and through installed clients. The shared lifecycle cases in the developer specification are mandatory composition checks, not a new experimental campaign.
+
 ## Whitepaper design brief
 
 Retain the approved title, Chio: A Peer-to-Peer Economy of Verifiable Work. Explain Chio as a modern kernel architecture for independently governed agent programs. The work commitment is the unit of composition; programmable sovereignty is the local authority rule making that composition possible.
 
 The architecture sections describe the completed design in present tense. Introduce the programming model before detailed record encodings, theorem premises or the retained experiment. Language/runtime names belong in implementation details. Use one running application to explain the model and a second to establish that it is reusable.
+
+Explain working terms, treaty-based collaborator selection, acceptance and joins, authorized progress after refusal, and policy evolution through that running application. Show the same rules inside one owner, between owners, and in a service that accepts work and delegates portions of it. A service organization is an explanatory composition, not a new governance or marketplace product. Admission is the constructive step that makes proposed participation executable; any linking analogy remains an analogy. Do not generalize the existing preservation proof to arbitrary substitutions or all policy changes.
 
 Keep research history and artifact detail available, but do not make the abstract conclude with implementation language, a limitation inventory or a promise of future work. End the abstract with what the architecture enables. Assumptions belong beside the guarantees they delimit and in a concise system model.
 

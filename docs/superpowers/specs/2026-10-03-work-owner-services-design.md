@@ -1,6 +1,6 @@
 # Work across independently controlled owners
 
-Status: proposed. Implements AW06 through AW10 and AW15.
+Status: incorporates the approved composition refinements. Implements AW06 through AW10, AW15 and the owner boundaries of AW26 through AW30.
 Parent: [architecture and constraints](2026-10-03-agentic-work-kernel-design.md).
 Consumes: [work runtime contract](2026-10-03-work-runtime-design.md).
 
@@ -32,6 +32,14 @@ The existing D1 offer and capability issuance happen at the receiver. Selection 
 
 Unknown peers remain unauthorized until owner enrollment. Discovery may suggest a provider; it does not create trust or data-reader authorization.
 
+## Approved catalogs and working relationships
+
+WorkDeploymentProfileV1 references an owner-provisioned catalog of manifest, semantic-deployment, treaty and acceptance configurations. Catalog entries resolve to pinned peer/provider/account/tool identities, configured endpoints, allowed authoring roles and resource ceilings. Only the owner can add entries or activate a new generation. Query responses expose only the caller's permitted subset through W1's Catalog/Profile variants; neither a profile reference nor a provider's advertised description provisions authority.
+
+An application may select an unused approved entry during a run. The receiving owner resolves the proposed profile, computes the existing governance-ladder intersection for the configured TreatyScope, verifies participant identities, validity/revocation and required evidence, and prepares an offer under its own issuer. The other owner checks its own policy before selection. Reuse compute_ladder_intersection and evaluate_cross_boundary_admission, plus the existing native federation-context checks. Their pure report is not a live permit. Fresh native admission checks the exact retained context again.
+
+Beta relationship formation uses already enrolled peers and owner-approved treaty scopes/templates; it does not negotiate arbitrary new trust or grant administrative approval to the planner. A candidate requiring enrollment or a new treaty approval returns a scoped refusal/recovery reference only if the existing owner workflow supports it. The supported happy path requires no application edit or per-relationship signing script. Refusal, generation change and lost offer acknowledgement preserve each issuer's original-ID rules. No cross-owner transaction is implied.
+
 ## Peer transport and evidence delivery
 
 Implement BilateralCoSigningProtocol using configured peer endpoints and the hardened HTTP/egress machinery. Reuse chio-federation's canonical receipt and DSSE reconstruction. A remote request must authenticate the expected peer, reconstruct the signing body, verify its signature, check the retained local invocation/treaty context and audience, and only then request the local signing authority.
@@ -61,6 +69,16 @@ The recovery agent owns exact reviewed continuation allocation, native effect ob
 A legitimate changed request after denial uses a recovery-approved new continuation and explicit relationship to the original work. It must not mutate the original sealed selection or pretend the changed request has the original D1 binding. Until the current D1/S1 profile has an explicitly authorized way to allocate and link that continuation, return a typed unsupported binding result. Do not loosen D1 to make a demo succeed. Beta acceptance includes one supported fresh-child allocation path within existing authority/budget, linked to the recovery continuation.
 
 After caller expiry or cancellation, scoped historical settlement can advance an already owned obligation. It cannot trigger a new tool call or disclose retained output. Current release authority is checked separately. Effect state remains unknown if the native authority cannot resolve it.
+
+Expose authorized WorkRecoveryLinkV1 values from the recovery owner's existing operations. The work client uses that protocol's explanation, offer, approval and resumption commands; no second selection or approval state machine lives in work. A pending unknown effect offers only the actions the recovery owner actually permits. Demonstrate progress by a separate authorized workflow with its own budget while the unknown workflow remains blocked.
+
+## Policy changes during outstanding work
+
+Use the recovery lane's existing atomic semantic-registry activation and security/governance revocation paths. Retain original policy/treaty/semantic bindings with each issued work basis and evidence record. Do not mutate old signed artifacts, reinterpret prior acceptance using a new checker, or reactivate old authority through a current profile lookup.
+
+Qualify a generation change at three points: before offer selection, after native capture with uncertain effect, and after acceptance before result delivery/settlement. Stale offers fail according to the owning basis rules. Captured work remains reconcilable under historical custody. Fresh execution and result release use current authority; an earned, properly backed obligation continues under its original financial contract. A revoked caller may lose metadata access as well as result access. Inspect that history through a separately authorized operator, not a revoked worker.
+
+Policy change does not guarantee future cooperation or payment from an unbacked/unwilling operator. Use existing F1 backing/finality assumptions for the earned-claim case. No new constitutional interpreter, policy amendment language or recovery proof is part of this lane.
 
 ## Acceptance topology
 

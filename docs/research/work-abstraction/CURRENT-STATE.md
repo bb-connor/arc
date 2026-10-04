@@ -61,6 +61,10 @@ The [second architecture review](ARCHITECTURE-REVIEW.md) found that facade promo
 
 ## Planning consequence
 
+The subsequent session review exposed additional public-contract gaps: the original WorkView omitted acceptance, preparation omitted the existing join machinery, and the plans underexpressed working terms, relationship formation and policy evolution. The owner approved incorporating all six refinements. These are planned deltas; they do not report newly implemented APIs.
+
+The source already supplies signed manifests; TreatyScope/compute_ladder_intersection/evaluate_cross_boundary_admission; D1's bounded Acceptance::check; S1 join definitions, minting and verification; and a LangGraph authenticated process adapter with persisted operation identity. Join signing itself does not verify the semantic truth of supplied parent/result claims. Recovery revision 3 supplies immutable semantic generations, exact offer/approval operations and HistoricalFact/CurrentPredicate/HeldReservation. The revised W1.3/W1.5 tasks join these authorities, while W2/W3 qualify the whole lifecycle through their actual public boundaries. Additional source hashes for these inputs are recorded in SOURCES.json.
+
 Use the existing public runtime and host, add the missing owner-authorized preparation/service joins, qualify shared protocol behavior, and demonstrate reuse. Do not commission another search for a novel financial primitive or another standalone experiment. The selected contribution is a systems architecture with a usable contract.
 
 The whitepaper can be completed as a specification of that architecture before these plans run. Statements about new implementation, comparative advantage, outside operation and shipping wait for their actual evidence.

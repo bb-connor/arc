@@ -479,6 +479,78 @@
       "commit": "a99437b3ea8ef7ea03c7d2926049b27cb140b3c5",
       "path": "crates/platform/chio-control-plane/src/economic_effect_coordinator.rs",
       "sha256": "6118048eec8010befb057b85260e12dbe1152427c989f5e78fa09f10fc1cbbd2"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/platform/chio-manifest/src/lib.rs",
+      "sha256": "3419d4bd6ad21622e1ecb0be9b8d3c27b7b3f67a3cfc5d048a15bafc7fd371dc"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
+      "sha256": "9595b649edc3ac163e259924b9139fe4b28ac24823ca749a0040c47664e2c1f8"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/trust/chio-federation/src/treaty.rs",
+      "sha256": "ccb6b6a146a832628a744019bb02d8d41a29e51ea091f1b43b51ad2953777b14"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-swarm-authority/src/types.rs",
+      "sha256": "33b9b0a28adbccb868f12c490822bc422ba3fc1319ce0b8ad16bb9a7671adf05"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-swarm-authority/src/lib.rs",
+      "sha256": "1a63b97fdda889acd8cf3d8ea84554b856901ffd8a770d28cb31a0ea9891b7e1"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-swarm-authority/src/verifier.rs",
+      "sha256": "0aacf8ccd0b5d300f293e9b24da8da2aaba38890e39534846445f05911f92c5f"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "crates/kernel/chio-swarm-authority/tests/swarm_authority_stage0.rs",
+      "sha256": "cc2f5a126b6b3069281624de9be7fe499493327ca3d417a71d453c7c38121789"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "examples/federated-work/src/funded_work/finding_acceptance.rs",
+      "sha256": "6f67b85f70093c14d0bba6838d2b025a4b5f5073e7f8dc27ccb4f91c55502713"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "sdks/python/chio-langgraph/src/chio_langgraph/process.py",
+      "sha256": "7d0ab3d37a8b4dc540643e0e6322240f6ecff43ae053d7d47efeeb5e753dab58"
+    },
+    {
+      "lane": "work",
+      "commit": "611660eb24521a4d02020615f650dadad92eae03",
+      "path": "sdks/python/chio-langgraph/pyproject.toml",
+      "sha256": "5e1116f7fabe9dbf8927e5346b803311a6680f7c5eeb4a01e544fc96928ab098"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/05-semantic-contracts.md",
+      "sha256": "8d98f869225d67be41fcd3e5d953110f02a6ab045fc56bd2c77e289d4eedd4a8"
+    },
+    {
+      "lane": "recovery",
+      "commit": "de84fc306efbb4c8dd6de748d0ad2a8d695fd30e",
+      "path": "docs/architecture/recoverable-agent-runtime/08-protocol-operations.md",
+      "sha256": "33e107ad6c2df9febd23f50a5c28931d7e8a35fb90dceed53e20a4dbe15656ce"
     }
   ],
   "architecture_review": {
@@ -486,5 +558,10 @@
     "recorded_at_utc": "2026-10-03T23:48:37.021920+00:00",
     "method": "coordinator source review and inline plan revision",
     "runtime_qualification": false
+  },
+  "composition_refinement": {
+    "reviewed_planning_base": "13db9905b184dc6e515cd87fab07a9fe68a60828",
+    "authorization": "Owner approved all six session-intent proposals and requested incorporation into existing plans",
+    "scope": "Additional pinned code/spec inputs for planning, no implementation qualification"
   }
 }

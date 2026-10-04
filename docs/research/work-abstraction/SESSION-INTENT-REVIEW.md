@@ -1,7 +1,7 @@
 # Session intent, missing connections and next design questions
 
 Reviewed against planning commit cc11cd5636 and its pinned work/security/recovery sources.
-Status: brainstorming and proposed plan amendments. This document does not expand the approved beta scope, change implementation plans or report new runtime evidence.
+Status: historical brainstorm, subsequently approved in full by the owner and incorporated into the current specs/plans. The numbered analysis below records the pre-amendment gaps; the incorporation map at the end records the resulting decisions. No new runtime evidence is reported.
 
 ## Judgment
 
@@ -122,7 +122,26 @@ The session retired exclusive financial novelty and a universal claim that compe
 
 Open provider discovery, unrestricted replacement/migration and new governance products remain outside this beta plan. The proposed bounded catalog, policy-generation and join cases should not silently reintroduce them.
 
-Before amending the normative plans, settle the common work-profile surface and which recovery/join operations need facade exposure. That decision should improve W1/W2/W3 and the paper brief rather than create a fourth feature roadmap.
+The incorporation below settles the common work-profile surface and recovery/join exposure. It improves W1/W2/W3 and the paper brief within the same five-plan structure.
+
+## Incorporated design and task ownership
+
+Selected approach: update the four existing specifications and five plans. An editorial-only change would leave the discovered interface gaps; a new cooperation subsystem would duplicate current ownership. Add two independently reviewable runtime tasks, then extend the existing service, SDK, application, convergence and paper tasks. Earlier task IDs in the historical analysis above refer to planning commit cc11cd5636; old W1.3/W1.4/W1.5 are now W1.4/W1.6/W1.7.
+
+| Approved idea | Concrete design | Requirement / current tasks |
+| --- | --- | --- |
+| Working terms | Audience-scoped Catalog/Profile queries over existing manifest, semantic, treaty and acceptance sources; immutable source generations; 64-entry pages | AW26; W1.3, W2.1, W3.1 |
+| Collaboration formation | Receiver-owned offers through existing treaty intersection/admission for unused, already approved catalog participants | AW27; W1.4, W2.1, W2.2, W3.3 |
+| Authorized progress | WorkRecoveryLinkV1 exposes the existing recovery protocol; no new planner, approval authority or retry reducer | AW29; W1.6, W2.4, W3.2, W3.3 |
+| Evolving policy | Existing semantic generation/revocation controls checked at live boundaries; original acceptance, custody and earned obligations remain historical | AW30; W2.4, W3.3, W4.2 |
+| Accepted-result composition | Exact acceptance/evaluator evidence; protected join inputs; unsigned Join drafts consumed by qualified Extend; existing dependency categories | AW28; W1.5, W2.3, W2.4, W3.3 |
+| Substitution and adoption | Same consumer contract across bounded provider implementations and unpaid/cross-owner/funded profiles; one installed LangGraph work adapter | AW31; W3.3, W3.4, W4.3 |
+
+All six feed paper P.1-P.4 before implementation and P.5 after evidence. The developer spec defines LC01-LC06 across the existing two applications. A runtime test or installed harness result has not been produced by this planning revision.
+
+Self-review corrections: keep query views separate from deployment configuration; create the service/session skeleton before its profile methods; keep evaluator execution explicit native work, not a query side effect; freeze join drafts without publishing competing signatures; distinguish task acceptance from funding acceptance; retain current dependency/release checks after an accepted historical result; and preserve unsigned/profile references as non-authorizing data.
+
+Validation of the incorporated package: 14 Markdown files, four specifications, five plans, 55 local links (12 anchors), 25 named tasks, 31 mapped AW requirements, six lifecycle cases and 88 verified source hashes. All checks passed, including whitespace, task references, plan structure and the documentation-only change boundary. Method: coordinator source/design review and local document validation; no independent reviewer or runtime qualification is claimed. The existing paper-first order remains P.1-P.4, W1-W4, then P.5.
 
 ## Source anchors
 

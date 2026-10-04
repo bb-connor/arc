@@ -31,7 +31,7 @@
 - Update: docs/release/RELEASE_CANDIDATE.md, RELEASE_AUDIT.md, QUALIFICATION.md.
 - Create: docs/release/WORK_BETA_ACCEPTANCE.json.
 
-**Interfaces:** The acceptance record maps supported surfaces to exact security milestones, recovery phase requirements, AW requirements, source commits, required commands and evidence artifacts.
+**Interfaces:** The acceptance record maps supported surfaces to exact security milestones, recovery phase requirements, AW01-AW31, LC01-LC06, source commits, required commands and evidence artifacts. Each lifecycle case has its own status and evidence; none is accepted solely because its component unit tests passed.
 
 - [ ] Read each lane's latest accepted checkpoint and unresolved findings. The Mac recovery lane supplies its actual commit and requirements record; a proposed spec is not implementation evidence.
 - [ ] Integrate semantic changes on an isolated release branch. Review overlaps in worker negotiation, native capture, result release, runtime stores, payment and evidence export.
@@ -55,10 +55,11 @@ Acceptance: AW16 has an auditable candidate and a complete gate inventory.
 - [ ] Run changed-boundary migration tests: explicitly import/quiesce legacy D1 once, retire its writer and preserve namespace/allocation/permit bytes. Reject stale fence, missing catalog/table and unqualified restored state. Include new delegation/financial records in serving integrity, projection/global-commit and relocation checks.
 - [ ] Reopen original native requests and recover admitted work across upgrade. Test rollback only to a schema-compatible version; an unsupported old binary must refuse serving rather than discard new obligations. Retain payable claims and authority tombstones independently of coordinator cache retention.
 - [ ] Run the three-lane application suite on the designated enforced native platform with an independent effect observer. Missing platform or optional artifacts required by an advertised feature is unavailable, not a pass.
+- [ ] Include LC01-LC06 in that existing suite: installed catalog/profile/acceptance/join behavior, scoped recovery progress, policy-generation cutpoints, bounded substitution and unpaid/funded/harness adoption. Reuse native vectors and prior artifacts when source-valid; run the missing integrated compositions rather than restarting historical campaigns.
 - [ ] Run the existing full required release schedule once on the integrated candidate, including supply-chain/source audits and packaging. Never add audit exemptions just to close the gate.
 - [ ] Obtain terminal hosted CI and Release Qualification results for the exact candidate and required workflow definitions. Reconcile remote/local/PR SHA, run attempt, review threads, failed/cancelled/skipped checks and generated package hashes.
 - [ ] Fix a failure at its owning boundary, record the new candidate, and rerun invalidated checks. Preserve the failed campaign instead of overwriting it.
-- [ ] Review the complete candidate against AW21 through AW25 as well as the original contract: checked/opaque types, owner-local idempotency, exhaustive request projection, feature graph, bounded executor behavior, private diagnostics and current release. Close blocking security, recovery, work-contract and packaging findings; do not relax engineering ratchets.
+- [ ] Review the complete candidate against AW21 through AW31 as well as the original contract: checked/opaque types, owner-local idempotency, exhaustive request projection, feature graph, bounded executor behavior, private diagnostics, accepted-result evidence, current release and generation changes. Close blocking security, recovery, work-contract and packaging findings; do not relax engineering ratchets.
 
 Acceptance: required qualification passes on one candidate. If any requirement remains unavailable, report a candidate with that specific blocker; do not infer readiness from the fraction of green checks.
 
@@ -72,6 +73,7 @@ Acceptance: required qualification passes on one candidate. If any requirement r
 - Produce: existing signed release bundle with beta acceptance and work support matrix.
 
 - [ ] Install the exact built artifacts in a clean environment without repository source imports. Run both work applications and inspect signed evidence, effects and ownership.
+- [ ] Run LC06's installed LangGraph entrypoint and adoption profiles. Verify source/package identities, no unpaid funding requirement, no local fallback and the same public semantics after checkpoint resume. Verify LC05's unchanged consumer logic evidence against the actual release artifacts.
 - [ ] Verify the installer selects that candidate and does not fall back to an older package. Confirm supported feature/platform/rail dimensions match documentation.
 - [ ] Distinguish architecture completeness, implemented source, local qualification, hosted qualification, release readiness and publication. Automatic-defense promotion still follows Security M11's observed cohort requirements.
 - [ ] Complete the concrete release bundle, operator instructions and remaining-scope record before any publication decision.

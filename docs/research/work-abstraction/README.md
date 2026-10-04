@@ -10,14 +10,14 @@ The package is a plan, not an implementation-completion or beta-release claim. I
 2. [Current code and gap review](CURRENT-STATE.md).
 3. [Pinned source inputs](SOURCES.json).
 4. [Planning review and validation](REVIEW.md).
-5. [Session intent and next design questions](SESSION-INTENT-REVIEW.md), a brainstorm companion proposing amendments without changing the approved beta scope.
+5. [Session intent and incorporated refinements](SESSION-INTENT-REVIEW.md), preserving the brainstorm and mapping the six subsequently approved ideas into the current tasks.
 
 ## Plans and order
 
 | Order | Plan | Concrete result |
 | --- | --- | --- |
 | First | [P: final whitepaper](../../superpowers/plans/2026-10-03-verifiable-work-finalization.md), P.1 through P.4 | Complete architecture manuscript, written before implementation and precise about actual evidence |
-| 1 | [W1: reusable runtime](../../superpowers/plans/2026-10-03-work-runtime.md) | Public facade, owner-authorized preparation, existing D1/S1 composition and durable command references |
+| 1 | [W1: reusable runtime](../../superpowers/plans/2026-10-03-work-runtime.md) | Public facade, resolved terms, owner preparation, accepted-result joins, existing D1/S1 composition and durable references |
 | 2 | [W2: owner services](../../superpowers/plans/2026-10-03-work-owner-services.md) | Authenticated separate-owner execution, real co-signing, funded/unpaid profiles and recovery joins |
 | 3 | [W3: developer surface](../../superpowers/plans/2026-10-03-work-developer-surface.md) | Protocol fidelity, installed Python/TypeScript clients, CLI and two applications sharing the model |
 | 4 | [W4: beta convergence](../../superpowers/plans/2026-10-03-work-beta-convergence.md) | One exact candidate accepted against the existing release requirements |
@@ -41,10 +41,14 @@ The work model should be evident in two applications: the growing API-review pro
 
 The [second architecture review](ARCHITECTURE-REVIEW.md) records eleven concrete plan corrections and their source evidence. The revised runtime plan qualifies allocation/graph issuance, uses checked client/service contracts, and keeps protected request custody and original-operation recovery in their existing owners.
 
+The approved session refinements extend these same five plans. Two new runtime tasks resolve working terms (W1.3) and compose accepted results through existing joins (W1.5). The [six shared lifecycle cases](../../superpowers/specs/2026-10-03-work-developer-surface-design.md#required-composition-cases) cover collaborator formation, acceptance/dependencies, authorized recovery progress, policy changes, bounded substitution and incremental adoption, including the existing LangGraph harness. AW01-AW31 map the complete acceptance scope. No additional feature roadmap is needed.
+
 ## Decisions fixed by this package
 
 - Extend chio-runtime and existing authorities rather than introducing another kernel, treaty system, scheduler or recovery coordinator.
 - Preserve programmable sovereignty at local admission and result-release boundaries.
+- Make owner-approved relationship formation, exact acceptance, dependency joins and policy evolution visible through the shared programming model.
+- Reuse existing recovery operations from scoped links; preserve separate workflows/budgets for independent progress beside uncertainty.
 - Promote reusable code from the standalone funded-work example; retain its historical evidence and fixture-specific behavior.
 - Make owner-authorized preparation part of the public surface, so applications do not assemble signatures or hold foreign private keys.
 - Treat adapter compatibility as explicit enforced capabilities, not a universal guarantee.
