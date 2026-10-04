@@ -46,8 +46,8 @@ package tests, 109 vectors, 91 Unix recovery tests, 75 PQ threshold tests, all
 ten active-defense scenarios and all ten process crash/recovery tests pass in
 their retained component runs. Native MCP targets compile and four proxy
 identity controls pass; actual Windows and native MCP execution remain required.
-The runtime spine campaign is retained with its observed status, rather than
-being inferred green from its component output. The separate npm parent-source
+The runtime spine campaign completed successfully in 746 seconds; its original
+running observation and malformed invocation remain retained. The npm parent-source
 re-review passes eight real-scanner controls without broadening advisory scope
 or claiming the advisory itself fixed.
 
@@ -61,14 +61,44 @@ is still required.
 
 The [bounded review repair bundle](audits/foundation-bounded-review-repairs-20261004.json.gz)
 retains these results and the unsuccessful hosted campaign. The ledger now has
-**1,375 requirement records**, including all seven current threads and fourteen
-repair boundaries. The worker and ACP threads have source repairs; five consumer
+**1,382 requirement records**, including all seven current threads, the repair
+boundaries and the incomplete native campaign. The worker and ACP threads have
+source repairs and their resolution is verified in the live API; five consumer
 threads remain open under PR2, PB5, PB9, PR10 and TR9. Their original acceptance
 and earlier foundation review assignment are preserved in each row's history.
 They receive sequential follow-up landings under the existing
 [foundation acceptance scope](foundation-acceptance-scope.md), and are not marked
-fixed. Missing native fixtures in separate PostgreSQL and C++ consumers and
-unqualified packaging jobs also remain explicit consumer acceptance.
+fixed. Missing native fixtures in separate PostgreSQL and C++ consumers remain
+explicit consumer acceptance. Shared SDK/Conan/Drogon HTTP 500 failures were
+traced to the local authority fixture's directory permissions, not an established
+upstream package outage.
+
+Follow-up repairs `3a5aacd8e7`, `b137e2ad0a` and `7d32192a40` fix the remaining
+Unix-only re-export, reconcile the broker/threshold/flow exact inventories,
+resolve existing npm security overrides, and create private shared HTTP example
+state. The actual CLI regression passes authority retrieval, issuance and file
+permissions, then verifies refusal of an unsafe existing parent. The threshold
+gate passes 47 tests and the security-types flow target passes 26, with zero
+ignored. The full CI-contract mutation suite passes. The real OSV scan has zero
+effective findings; eight advisory-scope controls, 78 node-http tests and a real
+Miniflare request pass. Previously scoped advisory identities remain explicit.
+
+The return-value proof repairs retain owned error results without exploring
+unrelated error destructors. The Merkle proof passes 1,479 checks and catches a
+real left/right traversal mutation. All 21 non-core harnesses pass, and three
+attestation-model mutations fail their intended assertions. Across the retained
+runs, all 53 PR-manifest harnesses have a successful local component result.
+This is not a single final-candidate hosted sweep or proof of the modeled native
+quote implementations. The original full sweep timed out; the first remainder
+was cancelled, and the hosted runners lost the original expensive proofs.
+
+The [follow-up repair bundle](audits/foundation-followup-repairs-20261004.json.gz)
+retains those attempts, terminal results, review resolutions and the native
+preflight cancellation. On superseded source `7c6bf2c8fd`, six of 35 mutation
+campaigns completed before cancellation after 16,644 seconds. Their actual
+baseline and mutant results remain retained. Repeated cold compilation between
+isolated commands exposes an unresolved execution cost; the remaining campaign
+and final-source native qualification have not completed.
 
 These commits still require fresh independent review, exact-candidate hosted
 checks, complete source-bound mutation/native evidence and the trusted capture
