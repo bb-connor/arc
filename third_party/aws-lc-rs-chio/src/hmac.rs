@@ -201,6 +201,8 @@ impl Drop for LcHmacCtx {
 }
 
 impl Clone for LcHmacCtx {
+    // CHIO-LINT hmac-clone: Preserve upstream Clone; native context-copy failure panics.
+    #[allow(clippy::expect_used)]
     fn clone(&self) -> Self {
         self.try_clone().expect("Unable to clone LcHmacCtx")
     }
@@ -294,6 +296,8 @@ impl Key {
     /// Panics if the HMAC context cannot be constructed
     #[inline]
     #[must_use]
+    // CHIO-LINT hmac-new: Preserve documented infallible constructor; native initialization failure panics.
+    #[allow(clippy::expect_used)]
     pub fn new(algorithm: Algorithm, key_value: &[u8]) -> Self {
         Key::try_new(algorithm, key_value).expect("Unable to create HmacContext")
     }
@@ -340,6 +344,8 @@ impl hkdf::KeyType for Algorithm {
 }
 
 impl From<hkdf::Okm<'_, Algorithm>> for Key {
+    // CHIO-LINT hmac-from: Preserve upstream infallible From; derivation or HMAC initialization failure panics.
+    #[allow(clippy::unwrap_used)]
     fn from(okm: hkdf::Okm<Algorithm>) -> Self {
         Self::construct(*okm.len(), |buf| okm.fill(buf)).unwrap()
     }
@@ -387,6 +393,8 @@ impl Context {
     /// # Panics
     /// Panics if the HMAC cannot be updated
     #[inline]
+    // CHIO-LINT hmac-update: Preserve documented infallible update; native failure panics.
+    #[allow(clippy::expect_used)]
     pub fn update(&mut self, data: &[u8]) {
         Self::try_update(self, data).expect("HMAC_Update failed");
     }
@@ -421,6 +429,8 @@ impl Context {
     /// Panics if the HMAC calculation cannot be finalized
     #[inline]
     #[must_use]
+    // CHIO-LINT hmac-sign: Preserve documented infallible finalization; native failure panics.
+    #[allow(clippy::expect_used)]
     pub fn sign(self) -> Tag {
         Self::try_sign(self).expect("HMAC_Final failed")
     }

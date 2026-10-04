@@ -1,6 +1,7 @@
 name: cargo-vet
 
 on:
+  workflow_call:
   workflow_dispatch:
   push:
     branches:
@@ -11,6 +12,16 @@ on:
       - "crates/**/Cargo.toml"
       - "supply-chain/**"
       - "third_party/aws-lc-rs-chio/**"
+      - "scripts/check-aws-lc-fork.py"
+      - "scripts/check-aws-lc-lints.py"
+      - "scripts/tests/check-aws-lc-lints.test.py"
+      - "scripts/check-supply-chain.sh"
+      - "scripts/tests/check-aws-lc-fork.test.py"
+      - "scripts/tests/check-supply-chain-workflows.test.py"
+      - "scripts/render-vcpkg-release.py"
+      - "scripts/tests/render-vcpkg-release.test.py"
+      - "tools/vcpkg-overlay/**"
+      - "docs/security/audits/**"
       - ".github/workflows/cargo-vet.yml"
   pull_request:
     paths:
@@ -19,6 +30,16 @@ on:
       - "crates/**/Cargo.toml"
       - "supply-chain/**"
       - "third_party/aws-lc-rs-chio/**"
+      - "scripts/check-aws-lc-fork.py"
+      - "scripts/check-aws-lc-lints.py"
+      - "scripts/tests/check-aws-lc-lints.test.py"
+      - "scripts/check-supply-chain.sh"
+      - "scripts/tests/check-aws-lc-fork.test.py"
+      - "scripts/tests/check-supply-chain-workflows.test.py"
+      - "scripts/render-vcpkg-release.py"
+      - "scripts/tests/render-vcpkg-release.test.py"
+      - "tools/vcpkg-overlay/**"
+      - "docs/security/audits/**"
       - ".github/workflows/cargo-vet.yml"
 
 permissions:
@@ -27,22 +48,25 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pr-{0}-cargo-vet', github.ref) || format('main-{0}-cargo-vet', github.sha) }}
+  group: cargo-vet-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   cargo-vet:
     name: cargo-vet (locked supply-chain audit)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Install Rust toolchain
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install --profile minimal
+          rustup toolchain install --profile minimal --component clippy
           rustup show active-toolchain
 
       - name: Install cargo-vet
@@ -125,8 +149,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
-      - name: cargo vet --locked
+      - name: Verify source-bound fork and locked supply-chain audits
         shell: bash
         run: |
           set -euo pipefail
-          cargo vet --locked
+          bash scripts/check-supply-chain.sh

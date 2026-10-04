@@ -1323,10 +1323,10 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/kernel/chio-kernel-core/src/formal_aeneas.rs"
 rust_symbols = ["InclusionStep", "inclusion_step"]
-normalized_sha256 = "1d6e3d557bd434794b80eddf86ef281695aaa7ef2efe6c5ad6bf16d7c8d84b96"
+normalized_sha256 = "5d8ab5ee7034743630ac7dc3921d2a40dc50fd906e1372a1c814bdc54f3e8090"
 symbol_sha256 = [
   { symbol = "InclusionStep", sha256 = "6a16b005ea025862aeb47b8188a6f08bb0cc4182c4cdd545013a3fd40a4cc443" },
-  { symbol = "inclusion_step", sha256 = "9b5909acc603bfdcaa6bb6209e3e05a132a5e0ef236dacb5ecbbf40ef398e593" },
+  { symbol = "inclusion_step", sha256 = "89e48f423f13b8c87f5e1a04e05ff4eadcf1ebac0e36b93050af7bc530f6769a" },
 ]
 
 # PredicateLang is a bounded post-validation projection, not a

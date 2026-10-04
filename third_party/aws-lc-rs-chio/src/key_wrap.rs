@@ -218,7 +218,9 @@ impl KeyWrap for KeyEncryptionKey<AesBlockCipher> {
             return Err(Unspecified);
         }
 
-        let mut aes_key = MaybeUninit::<AES_KEY>::uninit();
+        // Native AES setup leaves unused schedule words untouched. Initialize
+        // every integer field before converting the aggregate into a Rust value.
+        let mut aes_key = MaybeUninit::<AES_KEY>::zeroed();
 
         let key_bits: u32 = (self.key.len() * 8).try_into().map_err(|_| Unspecified)?;
 
@@ -272,7 +274,9 @@ impl KeyWrap for KeyEncryptionKey<AesBlockCipher> {
             return Err(Unspecified);
         }
 
-        let mut aes_key = MaybeUninit::<AES_KEY>::uninit();
+        // Native AES setup leaves unused schedule words untouched. Initialize
+        // every integer field before converting the aggregate into a Rust value.
+        let mut aes_key = MaybeUninit::<AES_KEY>::zeroed();
 
         if 0 != unsafe {
             AES_set_decrypt_key(
@@ -327,7 +331,9 @@ impl KeyWrapPadded for KeyEncryptionKey<AesBlockCipher> {
         plaintext: &[u8],
         output: &'output mut [u8],
     ) -> Result<&'output mut [u8], Unspecified> {
-        let mut aes_key = MaybeUninit::<AES_KEY>::uninit();
+        // Native AES setup leaves unused schedule words untouched. Initialize
+        // every integer field before converting the aggregate into a Rust value.
+        let mut aes_key = MaybeUninit::<AES_KEY>::zeroed();
 
         let key_bits: u32 = (self.key.len() * 8).try_into().map_err(|_| Unspecified)?;
 
@@ -373,7 +379,9 @@ impl KeyWrapPadded for KeyEncryptionKey<AesBlockCipher> {
         ciphertext: &[u8],
         output: &'output mut [u8],
     ) -> Result<&'output mut [u8], Unspecified> {
-        let mut aes_key = MaybeUninit::<AES_KEY>::uninit();
+        // Native AES setup leaves unused schedule words untouched. Initialize
+        // every integer field before converting the aggregate into a Rust value.
+        let mut aes_key = MaybeUninit::<AES_KEY>::zeroed();
 
         if 0 != unsafe {
             AES_set_decrypt_key(

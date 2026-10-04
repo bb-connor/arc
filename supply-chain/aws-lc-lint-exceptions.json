@@ -1,0 +1,775 @@
+{
+  "schema": "chio.aws-lc-lint-exceptions.v1",
+  "compiler": "rustc 1.95.0",
+  "scope": "Linux default library plus legacy-des; Linux FIPS library. Upstream cfg(test), examples and benchmarks are not Clippy targets. The authenticated source inventory also binds uncompiled code.",
+  "profiles": {
+    "default-legacy": [
+      "--features",
+      "legacy-des"
+    ],
+    "fips": [
+      "--no-default-features",
+      "--features",
+      "alloc,fips,ring-io,ring-sig-verify"
+    ]
+  },
+  "files": {
+    "build.rs": "45650a641f7e39a5a67ebf9a16338886b450602e4ee0bd82a7917868e1e1decc",
+    "src/aead/chacha20_poly1305_openssh.rs": "8800f1d9d917b5b652d43dbd2b84676502b4f60262fc2c51ad5c5aca2f6339e4",
+    "src/aead/quic.rs": "16b3e5f7904cf3385e98b2b56f4b63f25ebab2a142b32a86f213927273a27eb0",
+    "src/aead/unbound_key.rs": "8e1479fabe0910705c75be42a9c9a6301340cf68fc12600131917a82a1030143",
+    "src/cipher.rs": "019f918892dc9c872705bb5217576ef7d089a7b626907cfc6308b3f9178b1b5a",
+    "src/cipher/key.rs": "fcc48e7b40d7d49c84bdfce29ba1ffe035e86806dfc70d156723f2ad144619e4",
+    "src/cmac.rs": "d57a64dc4177efea17e5cd60f8b9cfc0929ee74f5d778428036b013c2f7dd26f",
+    "src/digest.rs": "a8e1284d26b59a2d1e983ce4af51c63e60f5e53c2fedc2c2558c0f872f469be3",
+    "src/digest/digest_ctx.rs": "80a750ec85bd8aaad8bcd75ecae4f03c4b2b674bbb8b09c1cc3ea7446a02a83f",
+    "src/ed25519.rs": "32b7fbffd3eeba58ad9380f5b74c8bb8b8b6a7089ee3eb6289c97b37f290078c",
+    "src/evp_pkey.rs": "f6c22ed62330f45e97ac51e4c58a04064ece8acb3eaf238dde4152a2f98c113b",
+    "src/hex.rs": "56c0ed3adcfdf80066b338465ebf87b8b2138521f468369e90e1063abd85b542",
+    "src/hkdf.rs": "107d9ca0af0c16a613a5458fc4343323385e7acadb8752d0fa2f0dc9dee5ef1a",
+    "src/hmac.rs": "dcb92537b2bd01137ff1996f3973346eddf0cf4b690a07f88b6697e22e36806a",
+    "src/lib.rs": "4cdc3d102cece0cd02ae426773db60baafd9d932696f29fe5c3849c50b29b498",
+    "src/pbkdf2.rs": "ff283f77b5cb3d6f5aea207dfeaa285d7ea4256a0828983742833c9814857295",
+    "src/ptr.rs": "fc6b48de564bde8bb79e910b8f1527983dd8697d0669e10ab346b2fcb0310585",
+    "src/rsa/encryption.rs": "96a7ae65163b5819547a9c545e7e6f2f27595a37dadde8030697874ee95caef1",
+    "src/test.rs": "bce437487bc4718edd18028addaec31c20cee3d786b080d5929878c55fc358c7"
+  },
+  "exceptions": [
+    {
+      "id": "openssh-key-halves",
+      "file": "src/aead/chacha20_poly1305_openssh.rs",
+      "item": "aead::chacha20_poly1305_openssh::Key::new",
+      "lint": "clippy::unwrap_used",
+      "rationale": "KEY_LEN is twice chacha::KEY_LEN; both halves have fixed, exact lengths.",
+      "sites": {
+        "default-legacy": [
+          [
+            5899,
+            5922
+          ],
+          [
+            5965,
+            5988
+          ]
+        ],
+        "fips": [
+          [
+            5899,
+            5922
+          ],
+          [
+            5965,
+            5988
+          ]
+        ]
+      }
+    },
+    {
+      "id": "quic-from-okm",
+      "file": "src/aead/quic.rs",
+      "item": "aead::quic::HeaderProtectionKey::from",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve upstream infallible From; native derivation or key initialization failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            1093,
+            1121
+          ],
+          [
+            1131,
+            1171
+          ]
+        ],
+        "fips": [
+          [
+            1093,
+            1121
+          ],
+          [
+            1131,
+            1171
+          ]
+        ]
+      }
+    },
+    {
+      "id": "aead-from-okm",
+      "file": "src/aead/unbound_key.rs",
+      "item": "aead::UnboundKey::from",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve upstream infallible From; native derivation or key initialization failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            19238,
+            19266
+          ],
+          [
+            19276,
+            19316
+          ]
+        ],
+        "fips": [
+          [
+            19238,
+            19266
+          ],
+          [
+            19276,
+            19316
+          ]
+        ]
+      }
+    },
+    {
+      "id": "cipher-from-okm",
+      "file": "src/cipher/key.rs",
+      "item": "cipher::UnboundCipherKey::from",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve upstream infallible From; native derivation or key initialization failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            13631,
+            13659
+          ],
+          [
+            13669,
+            13709
+          ]
+        ],
+        "fips": [
+          [
+            13631,
+            13659
+          ],
+          [
+            13669,
+            13709
+          ]
+        ]
+      }
+    },
+    {
+      "id": "cmac-clone",
+      "file": "src/cmac.rs",
+      "item": "Clone for LcPtr<CMAC_CTX>",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve upstream Clone; native allocation or context-copy failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            6577,
+            6644
+          ]
+        ],
+        "fips": [
+          [
+            6577,
+            6644
+          ]
+        ]
+      }
+    },
+    {
+      "id": "digest-clone",
+      "file": "src/digest/digest_ctx.rs",
+      "item": "digest::DigestContext::clone",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve upstream Clone; native context-copy failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            1481,
+            1537
+          ]
+        ],
+        "fips": [
+          [
+            1481,
+            1537
+          ]
+        ]
+      }
+    },
+    {
+      "id": "digest-new",
+      "file": "src/digest.rs",
+      "item": "digest::Context::new",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve documented infallible constructor; native initialization failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            2801,
+            2839
+          ]
+        ],
+        "fips": [
+          [
+            2801,
+            2839
+          ]
+        ]
+      }
+    },
+    {
+      "id": "digest-update",
+      "file": "src/digest.rs",
+      "item": "digest::Context::update",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve upstream update; excessive input or native update failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            3309,
+            3368
+          ]
+        ],
+        "fips": [
+          [
+            3309,
+            3368
+          ]
+        ]
+      }
+    },
+    {
+      "id": "digest-finish",
+      "file": "src/digest.rs",
+      "item": "digest::Context::finish",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve documented infallible finalization; native failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            4733,
+            4788
+          ]
+        ],
+        "fips": [
+          [
+            4733,
+            4788
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hkdf-salt-from",
+      "file": "src/hkdf.rs",
+      "item": "hkdf::Salt::from",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve upstream infallible From; native derivation failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            6761,
+            6795
+          ]
+        ],
+        "fips": [
+          [
+            6761,
+            6795
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hkdf-prk-new",
+      "file": "src/hkdf.rs",
+      "item": "hkdf::Prk::new_less_safe",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve documented rejection by panic when the PRK exceeds its length limit.",
+      "sites": {
+        "default-legacy": [
+          [
+            10917,
+            10994
+          ]
+        ],
+        "fips": [
+          [
+            10917,
+            10994
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hkdf-prk-from",
+      "file": "src/hkdf.rs",
+      "item": "hkdf::Prk::from",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve upstream infallible From; native derivation failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            13442,
+            13487
+          ]
+        ],
+        "fips": [
+          [
+            13442,
+            13487
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hmac-clone",
+      "file": "src/hmac.rs",
+      "item": "hmac::LcHmacCtx::clone",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve upstream Clone; native context-copy failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            6285,
+            6337
+          ]
+        ],
+        "fips": [
+          [
+            6285,
+            6337
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hmac-new",
+      "file": "src/hmac.rs",
+      "item": "hmac::Key::new",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve documented infallible constructor; native initialization failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            9627,
+            9700
+          ]
+        ],
+        "fips": [
+          [
+            9627,
+            9700
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hmac-from",
+      "file": "src/hmac.rs",
+      "item": "hmac::Key::from",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve upstream infallible From; derivation or HMAC initialization failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            11095,
+            11152
+          ]
+        ],
+        "fips": [
+          [
+            11095,
+            11152
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hmac-update",
+      "file": "src/hmac.rs",
+      "item": "hmac::Context::update",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve documented infallible update; native failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            12377,
+            12434
+          ]
+        ],
+        "fips": [
+          [
+            12377,
+            12434
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hmac-sign",
+      "file": "src/hmac.rs",
+      "item": "hmac::Context::sign",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve documented infallible finalization; native failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            13565,
+            13613
+          ]
+        ],
+        "fips": [
+          [
+            13565,
+            13613
+          ]
+        ]
+      }
+    },
+    {
+      "id": "pbkdf2-derive",
+      "file": "src/pbkdf2.rs",
+      "item": "pbkdf2::derive",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve upstream unit-returning API; output-bound or native derivation failure panics.",
+      "sites": {
+        "default-legacy": [
+          [
+            6897,
+            6980
+          ]
+        ],
+        "fips": [
+          [
+            6897,
+            6980
+          ]
+        ]
+      }
+    },
+    {
+      "id": "test-consume-usize",
+      "file": "src/test.rs",
+      "item": "test::TestCase::consume_usize",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Public test-vector helper intentionally panics on malformed input; compiled in the library.",
+      "sites": {
+        "default-legacy": [
+          [
+            10213,
+            10240
+          ]
+        ],
+        "fips": [
+          [
+            10213,
+            10240
+          ]
+        ]
+      }
+    },
+    {
+      "id": "zeroize-enc",
+      "file": "src/cipher/key.rs",
+      "item": "cipher::SymmetricCipherKey::drop::enc_bytes",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Pointer is derived from a live exclusive reference; cast preserves nonnull address for full zeroization.",
+      "sites": {
+        "default-legacy": [
+          [
+            2244,
+            2387
+          ]
+        ],
+        "fips": [
+          [
+            2244,
+            2387
+          ]
+        ]
+      }
+    },
+    {
+      "id": "zeroize-dec",
+      "file": "src/cipher/key.rs",
+      "item": "cipher::SymmetricCipherKey::drop::dec_bytes",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Pointer is derived from a live exclusive reference; cast preserves nonnull address for full zeroization.",
+      "sites": {
+        "default-legacy": [
+          [
+            2684,
+            2827
+          ]
+        ],
+        "fips": [
+          [
+            2684,
+            2827
+          ]
+        ]
+      }
+    },
+    {
+      "id": "zeroize-key",
+      "file": "src/cipher/key.rs",
+      "item": "cipher::SymmetricCipherKey::drop::key_bytes",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Pointer is derived from a live exclusive reference; cast preserves nonnull address for full zeroization.",
+      "sites": {
+        "default-legacy": [
+          [
+            3390,
+            3527
+          ]
+        ]
+      }
+    },
+    {
+      "id": "ed25519-sign",
+      "file": "src/ed25519.rs",
+      "item": "ed25519::Ed25519KeyPair::sign",
+      "lint": "clippy::expect_used",
+      "rationale": "Preserve documented signing panic; callers needing errors can use try_sign.",
+      "sites": {
+        "default-legacy": [
+          [
+            15383,
+            15441
+          ]
+        ],
+        "fips": [
+          [
+            15383,
+            15441
+          ]
+        ]
+      }
+    },
+    {
+      "id": "pkey-bits",
+      "file": "src/evp_pkey.rs",
+      "item": "ConstPointer<EVP_PKEY>::key_size_bits",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Bundled native bits methods return nonnegative sizes or zero; retain checked conversion.",
+      "sites": {
+        "default-legacy": [
+          [
+            3440,
+            3531
+          ]
+        ],
+        "fips": [
+          [
+            3440,
+            3531
+          ]
+        ]
+      }
+    },
+    {
+      "id": "pkey-size",
+      "file": "src/evp_pkey.rs",
+      "item": "ConstPointer<EVP_PKEY>::signature_size_bytes",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Bundled native size methods return nonnegative sizes or zero; retain checked conversion.",
+      "sites": {
+        "default-legacy": [
+          [
+            3755,
+            3846
+          ]
+        ],
+        "fips": [
+          [
+            3755,
+            3846
+          ]
+        ]
+      }
+    },
+    {
+      "id": "pkey-clone",
+      "file": "src/evp_pkey.rs",
+      "item": "Clone for LcPtr<EVP_PKEY>",
+      "lint": "clippy::expect_used",
+      "rationale": "Existing owner is nonnull; refcount increment reconstructs the same pointer.",
+      "sites": {
+        "default-legacy": [
+          [
+            19855,
+            19944
+          ]
+        ],
+        "fips": [
+          [
+            19855,
+            19944
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hex-encode",
+      "file": "src/hex.rs",
+      "item": "hex::encode",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Both nibbles are in 0..=15, so radix-16 conversion succeeds.",
+      "sites": {
+        "default-legacy": [
+          [
+            680,
+            731
+          ],
+          [
+            756,
+            807
+          ]
+        ],
+        "fips": [
+          [
+            680,
+            731
+          ],
+          [
+            756,
+            807
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hex-dirty",
+      "file": "src/hex.rs",
+      "item": "hex::decode_dirty",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Filtering to ASCII hexadecimal excludes every decode character error.",
+      "sites": {
+        "default-legacy": [
+          [
+            2521,
+            2552
+          ]
+        ],
+        "fips": [
+          [
+            2521,
+            2552
+          ]
+        ]
+      }
+    },
+    {
+      "id": "pointer-borrow",
+      "file": "src/ptr.rs",
+      "item": "DetachablePointer::as_mut_ptr",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Private state is Some while borrowable; only consuming detach or Drop takes it.",
+      "sites": {
+        "default-legacy": [
+          [
+            2419,
+            2449
+          ]
+        ],
+        "fips": [
+          [
+            2419,
+            2449
+          ]
+        ]
+      }
+    },
+    {
+      "id": "pointer-detach",
+      "file": "src/ptr.rs",
+      "item": "DetachablePointer::detach",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Constructed attached and consumed by detach; a second detach cannot use the moved owner.",
+      "sites": {
+        "default-legacy": [
+          [
+            3126,
+            3154
+          ]
+        ],
+        "fips": [
+          [
+            3126,
+            3154
+          ]
+        ]
+      }
+    },
+    {
+      "id": "rsa-public-key",
+      "file": "src/rsa/encryption.rs",
+      "item": "rsa::PrivateDecryptingKey::public_key",
+      "lint": "clippy::expect_used",
+      "rationale": "Private and public wrappers enforce the same key predicate on the same immutable key.",
+      "sites": {
+        "default-legacy": [
+          [
+            4455,
+            4607
+          ]
+        ],
+        "fips": [
+          [
+            4455,
+            4607
+          ]
+        ]
+      }
+    },
+    {
+      "id": "fips-mode",
+      "file": "src/lib.rs",
+      "item": "fips_mode",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve documented panic when the backend is not FIPS; try_fips_mode returns errors.",
+      "sites": {
+        "fips": [
+          [
+            15261,
+            15285
+          ]
+        ]
+      }
+    },
+    {
+      "id": "awslc-version",
+      "file": "src/lib.rs",
+      "item": "awslc_version",
+      "lint": "clippy::expect_used",
+      "rationale": "Bundled native version is build-owned ASCII; preserve documented invalid-UTF8 panic.",
+      "sites": {
+        "default-legacy": [
+          [
+            16223,
+            16360
+          ]
+        ],
+        "fips": [
+          [
+            16223,
+            16360
+          ]
+        ]
+      }
+    },
+    {
+      "id": "fips-entropy",
+      "file": "src/lib.rs",
+      "item": "fips_cpu_jitter_entropy",
+      "lint": "clippy::unwrap_used",
+      "rationale": "Preserve documented CPU jitter assertion; try_fips_cpu_jitter_entropy returns errors.",
+      "sites": {
+        "fips": [
+          [
+            17615,
+            17653
+          ]
+        ]
+      }
+    }
+  ]
+}

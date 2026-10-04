@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-ARG RUST_VERSION=1.94.1
+ARG RUST_VERSION=1.95.0
 ARG DEBIAN_VERSION=bookworm
 
-FROM rust:${RUST_VERSION}-slim-${DEBIAN_VERSION}@sha256:cf9dd0ec73e75f827fe59123fff9dc65af1a1c8363c3c31ee8d7f8ad0b6a5fb2 AS builder
+FROM rust:${RUST_VERSION}-slim-${DEBIAN_VERSION}@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS builder
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential cmake libssl-dev pkg-config perl \
     && rm -rf /var/lib/apt/lists/*

@@ -21,7 +21,14 @@ url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/
 
 [policy.aws-lc-rs]
 audit-as-crates-io = true
-notes = "Audit the published 1.18.1 base. Cargo Vet cannot authenticate the local path bytes; separately review CHIO-PATCH.patch and the restored-fixture manifest before accepting this fork."
+criteria = "aws-lc-upstream-reviewed"
+notes = "Published 1.18.1 has confirmed AES initialization and DES validation defects and is not certified safe-to-deploy. The non-implying upstream-review criterion records that source audit. Deployment additionally requires the exact repaired fork audit, complete source reconstruction and locked source/feature checks in scripts/check-supply-chain.sh, used by both required Cargo Vet jobs and release qualification. Native/transitive dependencies retain safe-to-deploy. See docs/security/audits/aws-lc-rs-1.18.1-fork.md."
+
+[policy.aws-lc-rs.dependency-criteria]
+aws-lc-fips-sys = "safe-to-deploy"
+aws-lc-sys = "safe-to-deploy"
+untrusted = "safe-to-deploy"
+zeroize = "safe-to-deploy"
 
 [policy.chio-a2a-adapter]
 audit-as-crates-io = true
@@ -613,16 +620,8 @@ criteria = "safe-to-deploy"
 version = "1.0.3"
 criteria = "safe-to-deploy"
 
-[[exemptions.aws-lc-fips-sys]]
-version = "0.13.14"
-criteria = "safe-to-deploy"
-
 [[exemptions.aws-lc-rs]]
 version = "1.16.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.aws-lc-sys]]
-version = "0.39.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.aws-sdk-bedrockruntime]]
@@ -2693,10 +2692,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.simd_cesu8]]
 version = "1.1.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.simdutf8]]
-version = "0.1.5"
 criteria = "safe-to-deploy"
 
 [[exemptions.simple-dns]]

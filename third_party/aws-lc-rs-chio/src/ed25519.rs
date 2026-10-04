@@ -439,6 +439,8 @@ impl Ed25519KeyPair {
     /// Panics if the message is unable to be signed
     #[inline]
     #[must_use]
+    // CHIO-LINT ed25519-sign: Preserve documented signing panic; callers needing errors can use try_sign.
+    #[allow(clippy::expect_used)]
     pub fn sign(&self, msg: &[u8]) -> Signature {
         Self::try_sign(self, msg).expect("ED25519 signing failed")
     }

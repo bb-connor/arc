@@ -304,3 +304,14 @@ produce fewer open PRs with preserved source and explicit follow-up ownership.
   follow-up hardening. Current publisher/revoker code rejects any post-issuance
   scope other than this repository before writes; no cross-repository write path
   was established by review. This is not a waiver of identity or scope checks.
+
+- Ruling: prepare #1160 locally while prerequisite hosted checks run, using the
+  preserved archive, latest published ledger and independently reviewed
+  prerequisite heads. This avoids idle integration work; it does not change
+  landing order. Bind and integrate actual prerequisite main merges before
+  artifact projection, exact-candidate qualification or protected foundation
+  landing. Keep #1160 outside the active landing queue until a slot opens.
+- The provisional dependency integration retains the complete authenticated
+  AWS-LC fork from #1168. Resolve shared manifests, locks, workflow contracts and
+  source ratchets semantically, preserving the foundation's later exposed-owner
+  repairs. No blanket choice of either branch qualifies that composition.
