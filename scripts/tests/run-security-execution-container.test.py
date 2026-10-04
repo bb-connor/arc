@@ -430,6 +430,32 @@ def copy_and_output_tests() -> None:
         ):
             raise AssertionError("private candidate copy is hardlinked to authority")
 
+        for mask in (0o000, 0o022, 0o077):
+            masked_copy = temporary / f"private-{mask:o}"
+            previous_mask = os.umask(mask)
+            try:
+                BOUNDARY.materialize_private_copy(identity, masked_copy)
+            finally:
+                os.umask(previous_mask)
+            expected_modes = {
+                masked_copy: 0o700,
+                masked_copy / "bin": 0o755,
+                masked_copy / "bin/tool.sh": 0o755,
+                masked_copy / "plain.txt": 0o644,
+            }
+            for path, expected_mode in expected_modes.items():
+                actual_mode = stat.S_IMODE(path.lstat().st_mode)
+                if actual_mode != expected_mode:
+                    raise AssertionError(
+                        f"umask {mask:o} changed materialized source mode for "
+                        f"{path.relative_to(masked_copy)}: "
+                        f"{actual_mode:o} != {expected_mode:o}"
+                    )
+            if (masked_copy / "plain.txt").read_bytes() != b"authority\n":
+                raise AssertionError("umask-independent copy changed source bytes")
+            if os.readlink(masked_copy / "link.txt") != "plain.txt":
+                raise AssertionError("umask-independent copy changed source symlink")
+
         stage = temporary / "stage"
         stage.mkdir()
         (stage / "probe.log").write_bytes(b"bounded\n")
@@ -1744,6 +1770,13 @@ def fake_docker_main_tests() -> None:
                 "real runner main path did not import fake Docker output"
             )
 
+        reversed_mounts = FakeDocker(image)
+        reversed_mounts.inspect_mutator = lambda document: document["Mounts"].reverse()
+        reversed_output = temporary / "reversed-mount-output"
+        invoke(reversed_mounts, reversed_output, authorized_sha="a" * 40)
+        if (reversed_output / "probe.log").read_bytes() != b"fake isolated output\n":
+            raise AssertionError("valid reversed bind mounts did not execute")
+
         def mutate_network(document: dict[str, object]) -> None:
             document["HostConfig"]["NetworkMode"] = "host"
 
@@ -1774,6 +1807,33 @@ def fake_docker_main_tests() -> None:
         for label, mutator in (
             ("post-create network override", mutate_network),
             ("post-create extra mount", add_mount),
+            (
+                "post-create duplicate mount",
+                lambda document: document["Mounts"].__setitem__(
+                    1, dict(document["Mounts"][0])
+                ),
+            ),
+            ("post-create missing mount", lambda document: document["Mounts"].pop()),
+            (
+                "post-create writable source mount",
+                lambda document: document["Mounts"][0].update(RW=True),
+            ),
+            (
+                "post-create substituted source mount",
+                lambda document: document["Mounts"][0].update(Source="/"),
+            ),
+            (
+                "post-create redirected output mount",
+                lambda document: document["Mounts"][1].update(Destination="/host"),
+            ),
+            (
+                "post-create shared propagation",
+                lambda document: document["Mounts"][0].update(Propagation="rshared"),
+            ),
+            (
+                "post-create unknown mount option",
+                lambda document: document["Mounts"][0].update(Unknown="option"),
+            ),
             ("post-create relaxed pids", relax_pids),
             ("post-create relaxed memory", relax_memory),
             ("post-create relaxed CPU", relax_cpu),

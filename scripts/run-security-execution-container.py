@@ -498,6 +498,10 @@ def safe_parent(root: Path, relative: PurePosixPath) -> Path:
                 raise BoundaryError(
                     "candidate copy has a non-directory parent collision"
                 )
+        else:
+            # The isolated copy identity must traverse source directories even
+            # when the trusted host process uses a restrictive umask.
+            current.chmod(0o755)
     return current
 
 
@@ -540,6 +544,7 @@ def materialize_private_copy(identity: RepositoryIdentity, destination: Path) ->
                 if written <= 0:
                     raise BoundaryError("candidate copy write did not make progress")
                 view = view[written:]
+            os.fchmod(descriptor, 0o755 if mode == 0o100755 else 0o644)
         finally:
             os.close(descriptor)
 
@@ -1245,7 +1250,12 @@ def validate_created_container(
             "Propagation": "rprivate",
         },
     )
-    if not isinstance(mounts, list) or tuple(mounts) != expected_mounts:
+    # Docker does not guarantee mount inventory order. Accept exactly the two
+    # complete bind records in either order, without dropping duplicate entries.
+    if not isinstance(mounts, list) or (
+        tuple(mounts) != expected_mounts
+        and tuple(mounts) != expected_mounts[::-1]
+    ):
         raise BoundaryError("Docker changed the created container mount inventory")
 
 
