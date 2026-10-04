@@ -397,6 +397,18 @@ ledger and activation regressions are runtime evidence, not a refinement proof
 or an extension of the existing model transitions, assumptions or bounds.
 Full live multi-resource fault and process-crash qualification remains open.
 
+The portable `finish_verified_evaluation` mirror is the bounded guard-composition
+projection in `Core/Protocol.lean`. Its `coreAuthorized` Boolean abstracts the
+concrete authorization prerequisites; the Lean model does not interpret
+`BindSecurityContext` or prove an authenticated flow-context bridge. Portable
+evaluation refuses an original token carrying that binding, and rejects binding
+parse errors, before its guard loop and delegated budget admission. The shared
+verification-only path remains unchanged and available to context-aware native
+admission. The portable `tests/security_binding.rs` controls exercise the six
+entry points and shared-verifier compatibility.
+Refreshing this source digest records review of that refusal; it executes no
+Lean proof and adds no theorem about binding parsing or context enforcement.
+
 ## TLA+ named invariants (RevocationPropagation.tla)
 
 Source file: `formal/tla/RevocationPropagation.tla`. The five safety names

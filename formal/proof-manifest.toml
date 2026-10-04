@@ -1319,9 +1319,9 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/kernel/chio-kernel-core/src/evaluate.rs"
 rust_symbols = ["finish_verified_evaluation"]
-normalized_sha256 = "6033d4b61f057638485b5e0bcbd8546bedcf92d8f173ee8ecdea43eeda921fc3"
+normalized_sha256 = "33427de5d1e364934fa7977e59dce6341746121337c63e11ba2f0555a681bcee"
 symbol_sha256 = [
-  { symbol = "finish_verified_evaluation", sha256 = "bf3c3de0b01d215ddc569cfac58cb232a26324fcd40ea5f444bc1fe65a74cd85" },
+  { symbol = "finish_verified_evaluation", sha256 = "72d7c39c51b715d062ed321b36bd0b3815eb576488e28a26f3490ba96720347a" },
 ]
 
 [[mirror]]
