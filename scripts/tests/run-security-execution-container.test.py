@@ -96,9 +96,9 @@ def assert_rejected(label: str, callback) -> None:
 
 def candidate_helper_environment_tests() -> None:
     helpers = {
-        "CHIO_BROKER_MCP_TOOL": "/target/build/x86_64-unknown-linux-musl/debug/chio-broker-mcp",
-        "CHIO_KEYLOG_WITNESS": "/target/build/debug/chio-keylog-witness",
-        "CHIO_KEYLOG_AUDIT": "/target/build/debug/chio-keylog-audit",
+        "CHIO_BROKER_MCP_TOOL": "/target/artifacts/broker-helper-target/x86_64-unknown-linux-musl/debug/chio-broker-mcp",
+        "CHIO_KEYLOG_WITNESS": "/target/artifacts/broker-helper-target/debug/chio-keylog-witness",
+        "CHIO_KEYLOG_AUDIT": "/target/artifacts/broker-helper-target/debug/chio-keylog-audit",
     }
     forbidden = {
         "CHIO_KEYLOG_SEED": "secret",
@@ -123,7 +123,8 @@ def candidate_helper_environment_tests() -> None:
             "",
             "debug/" + Path(authorized).name,
             "/tmp/" + Path(authorized).name,
-            authorized.replace("/build/", "/build/../"),
+            authorized.replace("/broker-helper-target/", "/broker-helper-target/../"),
+            authorized.replace("/artifacts/broker-helper-target/", "/build/"),
             authorized + "-substituted",
             helpers[next(name for name in helpers if name != key)],
         ):
@@ -138,6 +139,16 @@ def candidate_helper_environment_tests() -> None:
         except ENTRYPOINT.EntrypointError:
             continue
         raise AssertionError(f"candidate accepted an unsafe environment key: {key}")
+    helper_target = "/target/artifacts/broker-helper-target"
+    candidate = ENTRYPOINT.candidate_environment(forwarded={"CARGO_TARGET_DIR": helper_target})
+    if candidate["CARGO_TARGET_DIR"] != helper_target:
+        raise AssertionError("candidate helper build lost its gate artifact target")
+    for invalid in (helper_target + "/../escape", helper_target + "/nested", "/target/artifacts"):
+        try:
+            ENTRYPOINT.candidate_environment(forwarded={"CARGO_TARGET_DIR": invalid})
+        except ENTRYPOINT.EntrypointError:
+            continue
+        raise AssertionError(f"candidate accepted an unbound helper target: {invalid}")
 
 
 def static_contract_tests() -> None:
@@ -2415,6 +2426,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     candidate_helper_environment_tests()
+    run([sys.executable, os.fspath(ROOT / "scripts/tests/check-broker-helper-lifetime.test.py")], cwd=ROOT)
     static_contract_tests()
     copy_and_output_tests()
     refresh_inventory_tests()

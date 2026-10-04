@@ -1369,7 +1369,7 @@ assert_boundary_file_rejected(
     "security entrypoint rejects unchecked candidate helper paths",
     Path("scripts/security-execution-container-entrypoint.py"),
     replace_once(
-        "if value != os.fspath(target / helper):",
+        "if value != os.fspath(helper_target / helper):",
         "if False:",
     ),
     "candidate environment forwarding changed",

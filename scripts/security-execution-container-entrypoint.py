@@ -590,7 +590,8 @@ def candidate_environment(
                     "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
                     "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
                 }[key]
-                if value != os.fspath(target / helper):
+                helper_target = Path("/target/artifacts/broker-helper-target")
+                if value != os.fspath(helper_target / helper):
                     raise EntrypointError("candidate helper path differs from its built executable")
                 environment[key] = value
             elif key == "RUSTFLAGS":
@@ -599,12 +600,13 @@ def candidate_environment(
                 environment[key] = value
             elif key == "CARGO_TARGET_DIR":
                 requested = Path(value)
-                persistent_cage_target = Path(
-                    "/target/artifacts/static-pie-target"
-                )
+                persistent_helper_targets = {
+                    Path("/target/artifacts/static-pie-target"),
+                    Path("/target/artifacts/broker-helper-target"),
+                }
                 if not requested.is_absolute() or not (
                     requested.is_relative_to(target)
-                    or requested == persistent_cage_target
+                    or requested in persistent_helper_targets
                 ):
                     raise EntrypointError("candidate target override escapes gate state")
                 environment[key] = value

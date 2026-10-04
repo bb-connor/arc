@@ -81,10 +81,10 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "d83e4538360c46bf45a7b10724cf4184bc4afd13f15baa3a5f51aa32f689a62d"
+    "c17f0c0b32e335d748583b299edd4ba915a7688b803743e2d590529af9e7cfd3"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "4ccc9c2ff00cf418bb6aa9b37c31f34ef5810e0936308141128c7f7fc44b2f91"
+    "b38e161a9b4dd0910d5b8144f81c8fa37a7365cb371902af3fbb8906fdcc8666"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
@@ -3074,7 +3074,8 @@ if forwarded:
                 "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
                 "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
             }[key]
-            if value != os.fspath(target / helper):
+            helper_target = Path("/target/artifacts/broker-helper-target")
+            if value != os.fspath(helper_target / helper):
                 raise EntrypointError("candidate helper path differs from its built executable")
             environment[key] = value
         elif key == "RUSTFLAGS":
@@ -3083,10 +3084,13 @@ if forwarded:
             environment[key] = value
         elif key == "CARGO_TARGET_DIR":
             requested = Path(value)
-            persistent_cage_target = Path("/target/artifacts/static-pie-target")
+            persistent_helper_targets = {
+                Path("/target/artifacts/static-pie-target"),
+                Path("/target/artifacts/broker-helper-target"),
+            }
             if not requested.is_absolute() or not (
                 requested.is_relative_to(target)
-                or requested == persistent_cage_target
+                or requested in persistent_helper_targets
             ):
                 raise EntrypointError("candidate target override escapes gate state")
             environment[key] = value
@@ -4687,6 +4691,9 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "scripts/check-secret-broker-boundary.sh": (
             "/private/candidate",
             "/opt/chio-security/gates/check-exact-cargo-test-inventory.py",
+            "/target/artifacts",
+            'helper_target="$candidate_artifacts/broker-helper-target"',
+            'CARGO_TARGET_DIR="$helper_target" cargo build',
         ),
         "scripts/check-cage-enforcement.sh": (
             "/private/candidate",
