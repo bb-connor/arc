@@ -10,15 +10,23 @@ remaining-work ledger.
 **Current landing state (October 4):** #1168 is merged to `main` at
 `4e3d94f07df30f37f364dd562b3e793c5cbf4e68`. All 25 exact-head workflow runs
 passed on attempt 1, with 79 successful and ten explicitly skipped checks;
-all 13 review threads are resolved. #1167 is the sole active prerequisite at
-`dd0e727ae6bc49728ec0e7e77be9b52ef85768a4`, composed on that actual main base.
-Its 20 behavioral methods pass locally. Hosted Cargo Vet, Cargo Deny and MSRV
-passed; the required Build, lint, test job is still running. Local merge
-`9e86e4045b` composes the reviewed definitions and checker contract. Its complete
-CI-contract regression suite passes in 553.486 seconds, and all five authority
-workflow blobs match the reviewed prerequisite. This preparation still requires
-the actual protected #1167 main merge and the final caller binding to that merge.
-#1160 remains local preparation and has not been projected or landed.
+all 13 review threads are resolved. #1167 is now merged through protection at
+`4f3c967f04af40b5025b9222e8db95a3aee0b5f4`, preserving exact head
+`dd0e727ae6bc49728ec0e7e77be9b52ef85768a4` and the actual #1168 parent.
+All four required checks passed. All eight exact-head runs are terminal on
+attempt 1: seven succeeded and the historical-source controller refusal remains
+failed. There are zero review threads and a Codex thumbs-up after the candidate
+push; no formal GitHub review is claimed. Retained independent source review and
+the repeated 20-method suite cover the unchanged definition bytes.
+
+Local merge `f934e3ef7b` retains the actual definition landing without changing
+the prepared source tree. The reusable caller now pins that full protected merge,
+and its structural contract passes. All five authority workflow blobs match the
+reviewed and landed prerequisite. #1160 is the sole active landing vehicle;
+its bounded projection, final review and native/trusted/hosted qualification are
+still pending. The [definition landing bundle](audits/foundation-definition-landing-20261004.json.gz)
+retains the exact PR, protection, merge and component records. The foundation has
+not landed.
 
 The current inventory contains **1,353 requirement records**. Commit
 `dfb7543f40` adds five negative response-mode controls. Each detects deletion of
@@ -36,15 +44,20 @@ broker readiness up to the smaller of 420 seconds and the operation budget;
 cache setup already allowed 300 seconds plus execution probes. The delayed
 readiness, shorter deadline and fixed ceiling controls pass, as does the full
 CI-contract suite in 561.131 seconds. Process quiescence and the outer host
-execution deadline remain unchanged. Fresh native image execution and final
-independent review are still required.
+execution deadline remain unchanged. A real Linux image at
+`536a677369` subsequently built successfully, matched all 14 installed boundary
+files, and passed the Docker hostile-boundary suite in 77.817 seconds. This
+component does not complete the native gates or final independent review.
 
 A separate direct Linux cage run at `7c6bf2c8fd` passes all 82 tests, 29 real
 probes and ten helper mutations with zero ignored. The initial driver parse
 failure ran no native tests and is retained separately. The second native
 mutation scenario, broker destination rebinding, also records a passing baseline
 and one caught mutant; its command logs were removed by normal gate cleanup
-before retention, so only its outcome and case bytes are retained. The complete
+before retention, so only its outcome and case bytes are retained. The third native
+scenario, execution overspend, also passed its baseline and caught one mutant
+with zero missed, unviable or timed-out mutants. Its outcome and case bytes are
+retained; per-command logs were removed by normal gate cleanup. The complete
 35-campaign refresh remains running and does not qualify later source.
 The [response and runner bundle](audits/foundation-response-runner-controls-20261004.json.gz)
 retains these bounded observations, failed fixtures and a zero-test invocation
