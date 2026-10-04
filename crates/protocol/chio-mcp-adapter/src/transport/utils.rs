@@ -1,4 +1,6 @@
-use std::io::{BufRead, Write};
+#[cfg(test)]
+use std::io::BufRead;
+use std::io::Write;
 #[cfg(test)]
 use std::process::Command;
 use std::time::Duration;
@@ -8,6 +10,7 @@ use chio_kernel::KernelError;
 use serde_json::json;
 
 use crate::edge::AdapterError;
+#[cfg(test)]
 use crate::framing::read_jsonrpc_frame;
 
 pub(super) const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
@@ -261,6 +264,7 @@ pub(super) fn jsonrpc_request_id_label(request_id: &serde_json::Value) -> String
 }
 
 /// Read a single newline-terminated JSON line from the reader.
+#[cfg(test)]
 pub(super) fn read_line(reader: &mut impl BufRead) -> Result<serde_json::Value, AdapterError> {
     read_jsonrpc_frame(reader)?
         .ok_or_else(|| AdapterError::ConnectionFailed("MCP server closed stdout (EOF)".into()))

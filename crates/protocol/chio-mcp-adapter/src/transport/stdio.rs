@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufReader, Read, Write};
 #[cfg(test)]
 use std::process::Child;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,9 +22,8 @@ use super::handlers::{
 };
 use super::nested_flow::NestedFlowTaskRuntime;
 use super::utils::{
-    adapter_jsonrpc_error, is_nested_flow_notification, proxy_client_capabilities, read_line,
-    send_line, MAX_STDIO_MCP_BUFFERED_MESSAGES, MCP_PROTOCOL_VERSION,
-    UPSTREAM_REQUEST_POLL_INTERVAL,
+    adapter_jsonrpc_error, is_nested_flow_notification, proxy_client_capabilities, send_line,
+    MAX_STDIO_MCP_BUFFERED_MESSAGES, MCP_PROTOCOL_VERSION, UPSTREAM_REQUEST_POLL_INTERVAL,
 };
 
 const UPSTREAM_INITIALIZATION_TIMEOUT: Duration = Duration::from_secs(10);
@@ -32,6 +31,10 @@ const UPSTREAM_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
 const UPSTREAM_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 #[cfg(test)]
 const TEST_CHILD_REAP_TIMEOUT: Duration = Duration::from_secs(2);
+
+mod ingress_budget;
+mod stderr;
+use ingress_budget::{AccountedMessage, IngressBudget};
 
 include!("stdio_parts/transport.inc");
 include!("stdio_parts/lifecycle_and_tests.inc");
@@ -46,3 +49,6 @@ mod test_process;
 
 #[cfg(test)]
 mod final_response_tests;
+
+#[cfg(test)]
+mod ingress_limits_tests;

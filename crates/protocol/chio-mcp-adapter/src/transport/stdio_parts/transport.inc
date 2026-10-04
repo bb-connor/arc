@@ -481,7 +481,7 @@ struct ExpectedCageEvidence {
 }
 
 enum RequestMessage {
-    Message(serde_json::Value),
+    Message(AccountedMessage),
     ReadError(String),
     Cancelled(String),
 }
@@ -502,8 +502,9 @@ pub struct StdioMcpTransport {
     inner: Mutex<TransportInner>,
     child_lifecycle: Arc<Mutex<ChildLifecycle>>,
     active_request: Arc<Mutex<Option<ActiveRequest>>>,
-    notification_tx: mpsc::SyncSender<serde_json::Value>,
-    notification_rx: Mutex<mpsc::Receiver<serde_json::Value>>,
+    notification_tx: mpsc::SyncSender<AccountedMessage>,
+    notification_rx: Mutex<mpsc::Receiver<AccountedMessage>>,
+    ingress_budget: IngressBudget,
     shutdown_requested: Arc<AtomicBool>,
     request_timeouts: StdioRequestTimeouts,
     capabilities: McpServerCapabilities,
@@ -712,6 +713,7 @@ impl StdioMcpTransport {
     ) -> Result<Self, AdapterError> {
         let child_lifecycle = Arc::new(Mutex::new(ChildLifecycle::new(child)));
         let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let ingress_budget = IngressBudget::new(Arc::clone(&shutdown_requested));
 
         let (writer_tx, writer_rx) = mpsc::sync_channel(MAX_STDIO_MCP_BUFFERED_MESSAGES);
         if let Err(error) = std::thread::Builder::new()
@@ -732,12 +734,14 @@ impl StdioMcpTransport {
         if let Err(error) = std::thread::Builder::new()
             .name("chio-mcp-stderr".to_string())
             .spawn(move || {
-                let reader = BufReader::new(stderr);
-                for line in reader.lines() {
-                    match line {
-                        Ok(text) => warn!(target: "chio_mcp_adapter::stderr", "{text}"),
-                        Err(_) => break,
+                let mut reader = BufReader::new(stderr);
+                if let Err(error) = stderr::drain(&mut reader, |fragment| {
+                    if tracing::enabled!(target: "chio_mcp_adapter::stderr", tracing::Level::WARN) {
+                        let text = stderr::diagnostic_text(fragment);
+                        warn!(target: "chio_mcp_adapter::stderr", "{text}");
                     }
+                }) {
+                    warn!(target: "chio_mcp_adapter::stderr", kind = ?error.kind(), "MCP stderr read failed");
                 }
             })
         {
@@ -759,40 +763,15 @@ impl StdioMcpTransport {
         let reader_child_lifecycle = Arc::clone(&child_lifecycle);
         let reader_cage_receipts = cage_receipts.clone();
         let reader_shutdown_requested = Arc::clone(&shutdown_requested);
+        let reader_ingress_budget = ingress_budget.clone();
         if let Err(error) = std::thread::Builder::new()
             .name("chio-mcp-stdout".to_string())
             .spawn(move || {
                 let mut reader = BufReader::new(stdout);
-                loop {
-                    let message = match read_line(&mut reader) {
+                let error = loop {
+                    let message = match reader_ingress_budget.read_message(&mut reader) {
                         Ok(message) => message,
-                        Err(error) => {
-                            let terminal = finish_child_lifecycle(
-                                reader_child_lifecycle.as_ref(),
-                                reader_cage_receipts.as_ref(),
-                            );
-                            let terminal_error = merge_cleanup_failures(
-                                error,
-                                [("terminal receipt", terminal)],
-                            )
-                            .to_string();
-                            if let Ok(mut active_request) = reader_active_request.lock() {
-                                if let Some(active_request) = active_request.take() {
-                                    let message = if reader_shutdown_requested
-                                        .load(Ordering::Acquire)
-                                    {
-                                        RequestMessage::Cancelled(
-                                            "upstream MCP request cancelled by shutdown"
-                                                .to_string(),
-                                        )
-                                    } else {
-                                        RequestMessage::ReadError(terminal_error)
-                                    };
-                                    let _ = active_request.sender.try_send(message);
-                                }
-                            }
-                            break;
-                        }
+                        Err(error) => break error,
                     };
 
                     let active_sender = reader_active_request
@@ -803,24 +782,61 @@ impl StdioMcpTransport {
                                 .as_ref()
                                 .map(|active_request| active_request.sender.clone())
                         });
-                    if let Some(sender) = active_sender {
-                        if sender
-                            .try_send(RequestMessage::Message(message.clone()))
-                            .is_ok()
-                        {
-                            continue;
+                    let message = if let Some(sender) = active_sender {
+                        match sender.try_send(RequestMessage::Message(message)) {
+                            Ok(()) => continue,
+                            Err(mpsc::TrySendError::Full(_)) => {
+                                break reader_ingress_budget.fail(
+                                    "upstream MCP ingress request queue is full",
+                                );
+                            }
+                            Err(mpsc::TrySendError::Disconnected(
+                                RequestMessage::Message(message),
+                            )) => message,
+                            Err(mpsc::TrySendError::Disconnected(_)) => {
+                                break reader_ingress_budget.fail(
+                                    "upstream MCP ingress routing invariant failed",
+                                );
+                            }
                         }
-                    }
+                    } else {
+                        message
+                    };
 
-                    if message.get("id").is_none() {
+                    if message.value().get("id").is_none() {
                         if reader_notification_tx.try_send(message).is_err() {
-                            warn!(
-                                target: "chio_mcp_adapter::transport",
-                                "dropping upstream MCP notification because the bounded queue is full"
+                            break reader_ingress_budget.fail(
+                                "upstream MCP ingress notification queue is full or disconnected",
                             );
                         }
                     } else {
-                        warn!(target: "chio_mcp_adapter::transport", "unexpected upstream message without an active request: {message}");
+                        warn!(target: "chio_mcp_adapter::transport", "unexpected upstream message without an active request");
+                    }
+                };
+                let terminal = finish_child_lifecycle(
+                    reader_child_lifecycle.as_ref(),
+                    reader_cage_receipts.as_ref(),
+                );
+                reader_ingress_budget.note_cleanup(&terminal);
+                let ingress_error = reader_ingress_budget.terminal_error();
+                let terminal_error = IngressBudget::diagnostic(merge_cleanup_failures(
+                    error,
+                    [("terminal receipt", terminal)],
+                ));
+                if let Ok(mut active_request) = reader_active_request.lock() {
+                    if let Some(active_request) = active_request.take() {
+                        let message = match ingress_error {
+                            Ok(Some(error)) | Err(error) => {
+                                RequestMessage::ReadError(error.to_string())
+                            }
+                            Ok(None) if reader_shutdown_requested.load(Ordering::Acquire) => {
+                                RequestMessage::Cancelled(
+                                    "upstream MCP request cancelled by shutdown".to_string(),
+                                )
+                            }
+                            Ok(None) => RequestMessage::ReadError(terminal_error),
+                        };
+                        let _ = active_request.sender.try_send(message);
                     }
                 }
             })
@@ -889,6 +905,7 @@ impl StdioMcpTransport {
             active_request,
             notification_tx,
             notification_rx: Mutex::new(notification_rx),
+            ingress_budget,
             shutdown_requested,
             request_timeouts,
             capabilities: McpServerCapabilities::default(),
@@ -1079,15 +1096,16 @@ impl StdioMcpTransport {
                     continue;
                 }
 
-                if response.get("method").is_some() && response.get("id").is_some() {
-                    let method = response
+                let value = response.value();
+                if value.get("method").is_some() && value.get("id").is_some() {
+                    let method = value
                         .get("method")
                         .and_then(serde_json::Value::as_str)
                         .unwrap_or("unknown");
                     if nested_flow_bridge.is_none() {
                         let remaining = timeout.saturating_sub(started.elapsed());
                         if self.with_terminal_writer(remaining, |writer| {
-                            respond_to_upstream_roots_without_bridge(writer, &response)
+                            respond_to_upstream_roots_without_bridge(writer, value)
                         })? {
                             continue;
                         }
@@ -1105,7 +1123,7 @@ impl StdioMcpTransport {
                             })?;
                             respond_to_upstream_nested_flow(
                                 writer,
-                                &response,
+                                value,
                                 bridge,
                                 &mut nested_task_runtime,
                             )?;
@@ -1120,13 +1138,13 @@ impl StdioMcpTransport {
                     continue;
                 }
 
-                if response.get("id").is_none() {
-                    if is_nested_flow_notification(&response) {
+                if value.get("id").is_none() {
+                    if is_nested_flow_notification(value) {
                         let Some(bridge) = nested_flow_bridge.as_deref_mut() else {
                             self.queue_notification(response)?;
                             continue;
                         };
-                        forward_upstream_notification(&response, bridge)?;
+                        forward_upstream_notification(value, bridge)?;
                     } else {
                         self.queue_notification(response)?;
                     }
@@ -1145,8 +1163,8 @@ impl StdioMcpTransport {
                     continue;
                 }
 
-                if response["id"] != request_id {
-                    debug!("MCP response id mismatch (expected {id}): {response}");
+                if value["id"] != request_id {
+                    debug!("MCP response id mismatch (expected {id})");
                     if nested_flow_bridge.is_none() {
                         continue;
                     }
@@ -1162,13 +1180,12 @@ impl StdioMcpTransport {
                     continue;
                 }
 
-                if let Some(err) = response.get("error") {
+                if let Some(err) = value.get("error") {
                     return Err(adapter_jsonrpc_error(err));
                 }
 
-                return response.get("result").cloned().ok_or_else(|| {
-                    AdapterError::ParseError("response missing 'result' field".into())
-                });
+                self.ingress_budget.ensure_open()?;
+                return response.into_result();
             }
         })();
 
@@ -1199,6 +1216,7 @@ impl StdioMcpTransport {
         timeout: Duration,
         action: impl FnOnce(&mut BoundedStdioWriter) -> Result<T, AdapterError>,
     ) -> Result<T, AdapterError> {
+        self.ingress_budget.ensure_open()?;
         if timeout.is_zero() {
             return Err(AdapterError::ConnectionFailed(
                 "MCP stdin write deadline expired".to_string(),
@@ -1229,6 +1247,7 @@ impl StdioMcpTransport {
     }
 
     fn ensure_request_can_start(&self) -> Result<(), AdapterError> {
+        self.ingress_budget.ensure_open()?;
         if self.shutdown_requested.load(Ordering::Acquire) {
             return Err(AdapterError::ConnectionFailed(
                 "upstream MCP transport is shutting down".to_string(),
@@ -1249,6 +1268,9 @@ impl StdioMcpTransport {
     }
 
     fn request_interruption_error(&self) -> Result<Option<AdapterError>, AdapterError> {
+        if let Some(error) = self.ingress_budget.terminal_error()? {
+            return Ok(Some(error));
+        }
         let lifecycle = self.child_lifecycle.lock().map_err(|error| {
             AdapterError::ConnectionFailed(format!("child lifecycle lock poisoned: {error}"))
         })?;
@@ -1295,19 +1317,23 @@ impl StdioMcpTransport {
     fn terminalize_connection_failure(&self, error: AdapterError) -> AdapterError {
         let terminal =
             finish_child_lifecycle(self.child_lifecycle.as_ref(), self.cage_receipts.as_ref());
+        self.ingress_budget.note_cleanup(&terminal);
         merge_cleanup_failures(error, [("terminal receipt", terminal)])
     }
 
-    fn queue_notification(&self, message: serde_json::Value) -> Result<(), AdapterError> {
+    fn queue_notification(&self, message: AccountedMessage) -> Result<(), AdapterError> {
         self.notification_tx
             .try_send(message)
-            .map_err(|error| match error {
-                mpsc::TrySendError::Full(_) => {
-                    AdapterError::ConnectionFailed("upstream notification queue is full".into())
-                }
-                mpsc::TrySendError::Disconnected(_) => AdapterError::ConnectionFailed(
-                    "upstream notification queue disconnected".into(),
-                ),
+            .map_err(|error| {
+                let reason = match error {
+                    mpsc::TrySendError::Full(_) => {
+                        "upstream MCP ingress notification queue is full"
+                    }
+                    mpsc::TrySendError::Disconnected(_) => {
+                        "upstream MCP ingress notification queue disconnected"
+                    }
+                };
+                self.terminalize_connection_failure(self.ingress_budget.fail(reason))
             })
     }
 
@@ -1373,14 +1399,20 @@ impl McpTransport for StdioMcpTransport {
     fn drain_notifications(&self) -> Vec<serde_json::Value> {
         let mut notifications = Vec::new();
         let Ok(notification_rx) = self.notification_rx.lock() else {
-            return notifications;
+            return Vec::new();
         };
 
-        while let Ok(notification) = notification_rx.try_recv() {
+        for _ in 0..MAX_STDIO_MCP_BUFFERED_MESSAGES {
+            let Ok(notification) = notification_rx.try_recv() else {
+                break;
+            };
             notifications.push(notification);
         }
 
-        notifications
+        if self.ingress_budget.ensure_open().is_err() {
+            return Vec::new();
+        }
+        AccountedMessage::into_values(notifications)
     }
 
     fn shutdown(&self) -> Result<(), AdapterError> {

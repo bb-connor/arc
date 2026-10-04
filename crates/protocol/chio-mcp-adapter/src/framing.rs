@@ -15,7 +15,19 @@ pub(crate) const MAX_STDIO_MCP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 /// returned as `Ok(None)` so callers can map it to their own connection state.
 /// A non-empty EOF before the newline delimiter is a parse error because MCP
 /// stdio framing is line-delimited.
+#[cfg(any(test, feature = "fuzz"))]
 pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Value>, AdapterError> {
+    read_jsonrpc_frame_with_admission(reader, |_| Ok(()))
+        .map(|frame| frame.map(|(value, ())| value))
+}
+
+/// Admit the complete bounded wire frame before allocating its JSON tree.
+/// The returned admission follows the decoded value, and is dropped on a
+/// canonical decoding error. Syntax and duplicate-key authority stay here.
+pub(crate) fn read_jsonrpc_frame_with_admission<T>(
+    reader: &mut impl BufRead,
+    mut admit: impl FnMut(&str) -> Result<T, AdapterError>,
+) -> Result<Option<(Value, T)>, AdapterError> {
     loop {
         let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_RESPONSE_BYTES)? else {
             return Ok(None);
@@ -26,13 +38,13 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
             continue;
         }
 
-        return chio_core::canonical::UntrustedJsonText::from_wire(
+        let admission = admit(&line)?;
+        let value = chio_core::canonical::UntrustedJsonText::from_wire(
             trimmed.as_bytes(),
             MAX_STDIO_MCP_RESPONSE_BYTES,
         )?
-        .decode_document()
-        .map(Some)
-        .map_err(Into::into);
+        .decode_document()?;
+        return Ok(Some((value, admission)));
     }
 }
 
