@@ -91,8 +91,7 @@ name: empty
     let compiled = compile_policy(&spec).unwrap();
     assert_eq!(compiled.guards.len(), 0);
     assert!(compiled.guard_names.is_empty());
-    assert_eq!(compiled.default_scope.grants.len(), 1);
-    assert_eq!(compiled.default_scope.grants[0].tool_name, "*");
+    assert!(compiled.default_scope.grants.is_empty());
 }
 
 #[test]

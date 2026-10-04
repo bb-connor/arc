@@ -14,6 +14,8 @@ use chio_core::capability::scope::{ChioScope, Constraint, Operation, ToolGrant};
 /// `ChioScope`, each entry becomes a wildcard ToolGrant with `Invoke`
 /// permission. Policies that rely on negative matches or other semantics the
 /// scope model cannot encode fail closed and emit no default grants.
+/// Missing or disabled tool_access rules also emit no default grants: a
+/// guard-only policy does not itself authorize automatic capability issuance.
 pub(super) fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
     let mut scope = compile_unbound_scope(policy)?;
     let required = policy
@@ -30,15 +32,15 @@ pub(super) fn compile_scope(policy: &HushSpec) -> Result<ChioScope, CompileError
 
 fn compile_unbound_scope(policy: &HushSpec) -> Result<ChioScope, CompileError> {
     let Some(rules) = &policy.rules else {
-        return Ok(permissive_scope());
+        return Ok(ChioScope::default());
     };
 
     let Some(ta) = &rules.tool_access else {
-        return Ok(permissive_scope());
+        return Ok(ChioScope::default());
     };
 
     if !ta.enabled {
-        return Ok(permissive_scope());
+        return Ok(ChioScope::default());
     }
 
     let human_in_loop = rules.human_in_loop.as_ref();

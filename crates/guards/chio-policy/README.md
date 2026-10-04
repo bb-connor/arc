@@ -10,6 +10,20 @@ silently compiling to a permissive default. The crate is a pure translator:
 it does not sign receipts, verify capabilities, or hold kernel state; those
 belong to `chio-kernel`.
 
+Automatic tool capabilities require an enabled `rules.tool_access` block.
+Missing `rules`, missing `tool_access`, and `enabled: false` produce an empty
+default scope. Guard-only policies remain valid and keep their guards, but
+do not grant tools merely because no tool restriction was configured. The
+pure reference evaluator still treats an absent tool rule as no additional
+restriction; its Allow result is not capability issuance authority.
+
+The `permissive` development builtin explicitly opts into `tool_access`
+with `default: allow`. The `remote-desktop` builtin supplies guards only;
+compose it with an enabled tool rule to authorize the intended tools. This
+changes the former implicit wildcard issuance behavior. Enabled tool-rule
+defaults and allowlist semantics remain unchanged, including the existing
+Allow schema default when `tool_access` is present.
+
 ## Responsibilities
 
 - Define the versioned HushSpec YAML schema (`models`): 14 rule blocks, 5

@@ -53,3 +53,7 @@ mod capability_budget_tests;
 #[cfg(test)]
 #[path = "policy/swarm_admission_tests.rs"]
 mod swarm_admission_tests;
+
+#[cfg(test)]
+#[path = "policy/implicit_authority_tests.rs"]
+mod implicit_authority_tests;
