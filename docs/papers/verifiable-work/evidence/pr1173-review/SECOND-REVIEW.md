@@ -102,3 +102,7 @@ Another execution lane was rotating the authorized source and definition. This
 PR does not replace those trust roots, self-authorize its source, or synthesize a
 signed evidence package. The missing operational prerequisite remains open until
 the protected capture and finalizer supply and verify the actual package.
+The user confirmed that the security agent owns that package. This candidate's
+CI caller uses the already merged, repository-authorized definition
+`4f3c967f04af40b5025b9222e8db95a3aee0b5f4`; repository authority variables remain
+under that separate lane's ownership.

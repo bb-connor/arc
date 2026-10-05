@@ -138,3 +138,11 @@ evidence package. On October 5 its evidence commit and policy repository
 variables were absent, and another lane was rotating the authorized source and
 definition. Preserve that independent trust boundary. Do not replace those
 variables or declare the aggregate qualified using local or PostgreSQL results.
+
+The user confirmed that the security agent owns this package. The caller is
+updated to the repository-authorized definition
+`4f3c967f04af40b5025b9222e8db95a3aee0b5f4`, already merged by PR 1167 and
+present in this branch's ancestry. No repository authority variable is changed.
+The first replacement qualification was interrupted after three passing commands
+when the stale caller pin was found; retain its partial outputs and rerun the
+entire source-bound package after this correction.
