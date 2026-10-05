@@ -2675,8 +2675,8 @@
       "head_in_foundation": false,
       "semantic_reconciliation": {
         "path": "docs/security/legacy-integration-reconciliation-20261005.json",
-        "sha256": "3d4259a2511ede4a36e5183c3eb0f88d575508ab8296d07b7392d64cdaf59f48",
-        "status": "16 bounded source comparisons across nine original commits. 219 distinct non-merge patches and 78 original threads in #1029 remain preserved; no PR retirement or whole-commit equivalence follows."
+        "sha256": "fa835d4e5cbff62799033a2ca4a935f4a2c2ec02ba9dcd55c57207d419b21d9d",
+        "status": "29 bounded source-only comparisons across 22 original commits. Each row names its inspection source. No whole-commit equivalence, retirement or landing claim. All 219 patch-unique commits and 78 original review threads remain preserved."
       }
     },
     {
@@ -3326,5 +3326,16 @@
       "source": "GitHub live inventory after duplicate closures",
       "scope": "The initial 85 to 22 consolidation remains complete; #1174 was opened independently afterward. Unique proposals stay open in their own review track. No new landing slot is activated."
     }
-  ]
+  ],
+  "preservation_refresh": {
+    "path": "docs/security/audits/foundation-evidence-binding-repair-20261005.json.gz",
+    "sha256": "a3155befe1d41f3a596c7ea1af253eca5db3e39e2b513bc873027e97c77a7e74",
+    "source_commit": "850ee8ab38725f90384be265ffe72072250524a8",
+    "scope": "Reviewed source-bound component repairs and preserved reconciliation. The full source-bound native inventory, final exact-source independent review, hosted/trusted publication, strict merge-context activation and protected foundation landing remain open. Failed, cancelled and incomplete attempts retain those outcomes.",
+    "entry": "254fbd-preservation-refresh.json",
+    "entry_sha256": "9bdd227cd36f5038cb219fc705d89f27b734f09b7b7a6a7c2a0ebcd82f54751c",
+    "source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+    "retired_heads_verified": 63,
+    "surviving_prs": 23
+  }
 }

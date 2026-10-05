@@ -143,3 +143,23 @@ hosted runner. Stop the diagnostic worker after its owned work completes.
   `68cff8cd6a`. Foundation CI, the original PostgreSQL workflow and both expired
   controller attempts remain unsuccessful. Component results do not establish
   the final native/trusted publication or protected merge.
+
+## Evidence binding and refresh discovery follow-up
+
+Repair `850ee8ab38725f90384be265ffe72072250524a8` fixes the reproduced signed-output input cycle using binding
+schema v7 and a closed, no-follow three-file output namespace. Nine controls
+cover output addition and refresh, unexpected entries, aliases, replacement and
+compile references. Seven real-engine tests cover selected discovery, full
+ordinary discovery and retained path/function refusal. The original failures
+and the stable-source contract rerun are retained in the landing ledger bundle.
+
+The superseded 254fbd native attempt is cancelled after its successful initial
+baseline, without a caught mutation or complete campaign. Its image and installed
+boundaries remain component evidence. All 35 current-source campaigns and the
+final hosted/trusted chain remain mandatory. Publish all source and ledger work
+before freezing inputs; mutation refresh and signed publication may then change
+only their exact derived paths. Do not append status prose after regeneration.
+
+The #1029 reconciliation now covers 29 source comparisons across 22 commits and
+all 219 unique commits in the path inventory. Preserve that PR and its remaining
+semantic, compatibility and execution obligations.

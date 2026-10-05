@@ -5,7 +5,7 @@
   "original_head": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
   "destination_pr": 1029,
   "status": "open-preserved-partial-reconciliation",
-  "scope": "Thirteen source-only assessments across six named original review-repair commits. The original six refer to foundation_source; the later seven name their inspection source. No full patch equivalence, retirement or landing claim. All 219 patch-unique commits and 78 original review threads remain preserved.",
+  "scope": "29 bounded source-only comparisons across 22 original commits. Each row names its inspection source. No whole-commit equivalence, retirement or landing claim. All 219 patch-unique commits and 78 original review threads remain preserved.",
   "requirements": [
     {
       "requirement": "Cumulative-approval negotiation and authenticated family-root verification",
@@ -29,7 +29,8 @@
           ]
         }
       ],
-      "remaining": "Run the owning final-candidate constraints and lineage suites; compare every original scope/token change before declaring full commit equivalence."
+      "remaining": "Run the owning final-candidate constraints and lineage suites; compare every original scope/token change before declaring full commit equivalence.",
+      "foundation_source_at_inspection": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49"
     },
     {
       "requirement": "Reject invalid retry policy during runtime construction",
@@ -46,7 +47,8 @@
           ]
         }
       ],
-      "remaining": "Qualify current observer configuration; do not restore the older duplicate SettlementRuntime abstraction."
+      "remaining": "Qualify current observer configuration; do not restore the older duplicate SettlementRuntime abstraction.",
+      "foundation_source_at_inspection": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49"
     },
     {
       "requirement": "Preserve fractional retry delay without scheduling early",
@@ -62,7 +64,8 @@
           ]
         }
       ],
-      "remaining": "Qualify current millisecond outcome-store API rather than adding a second seconds-based rounding helper."
+      "remaining": "Qualify current millisecond outcome-store API rather than adding a second seconds-based rounding helper.",
+      "foundation_source_at_inspection": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49"
     },
     {
       "requirement": "Receipt-ID idempotency across settlement lease recovery",
@@ -86,7 +89,8 @@
           ]
         }
       ],
-      "remaining": "Reconcile concrete effectful hooks and recovery tests. The required argument and claim binding are not proof of downstream effect idempotency."
+      "remaining": "Reconcile concrete effectful hooks and recovery tests. The required argument and claim binding are not proof of downstream effect idempotency.",
+      "foundation_source_at_inspection": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49"
     },
     {
       "requirement": "Validate accepted settlement transcript identifiers before routing",
@@ -102,7 +106,8 @@
           ]
         }
       ],
-      "remaining": "The current routing owner checks schema but ignores accepted transcript contents. Determine the retained transcript contract and repair/test its owning boundary before retiring this obligation."
+      "remaining": "The current routing owner checks schema but ignores accepted transcript contents. Determine the retained transcript contract and repair/test its owning boundary before retiring this obligation.",
+      "foundation_source_at_inspection": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49"
     },
     {
       "requirement": "Credit-facility election and prevention of duplicate legacy IOU effects",
@@ -126,7 +131,8 @@
           ]
         }
       ],
-      "remaining": "Compare legacy evaluation and explicit obligation-v2 minting call sites and facility custody. Do not infer whole-feature equivalence from either path alone."
+      "remaining": "Compare legacy evaluation and explicit obligation-v2 minting call sites and facility custody. Do not infer whole-feature equivalence from either path alone.",
+      "foundation_source_at_inspection": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49"
     },
     {
       "requirement": "Bind capture dispatch and returned run to immutable workflow identity",
@@ -398,6 +404,517 @@
       ],
       "remaining": "The current operation-keyed journal uses validated records, exact expected/desired equality and checked row decoding. It is not the original request-keyed API. Qualify initial duplicate identity, every immutable field, corrupt monetary columns and restart behavior through the current public owner before reconciling the original regression suite; no historical-format migration or full commit equivalence is inferred.",
       "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Targeted mutation refresh avoids recomputing unrelated conservative input closures",
+      "original_commit": "f45b6ca80f5d68e0a4200116572fd0cb32ce6b44",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-current-source-present",
+      "witnesses": [
+        {
+          "path": "scripts/check-security-adversarial-evidence.py",
+          "sha256": "ca46694dbc5c35325bb54c32430d80637e0396ef46fb172591250c80a7a713de",
+          "git_blob": "d5d10911dda7c8292cdd0ac0ccbe14722c4b10ee",
+          "symbols": [
+            "if refresh_campaign is not None and campaign[\"id\"] != refresh_campaign:",
+            "Targeted refresh deliberately permits other promoted campaigns"
+          ]
+        },
+        {
+          "path": "scripts/tests/check-security-adversarial-evidence.test.sh",
+          "sha256": "e4fac8774e247bc748c3611f38b4837dadcde164f105e9995e296173489ea321",
+          "git_blob": "cf332798112bfc5e9569902ca5b910fee7785c4c",
+          "symbols": [
+            "targeted refresh recomputed an untouched campaign input closure"
+          ]
+        }
+      ],
+      "remaining": "Already present at the current source. Preserve its strict ordinary validation and the full 35-campaign requirement; this optimization is not a completed cold-compilation performance repair or qualification result.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Trusted refresh has executable candidate targets, exact toolchain installation and verifier-owned shutdown",
+      "original_commit": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-current-source-present",
+      "witnesses": [
+        {
+          "path": "scripts/security-execution-container-entrypoint.py",
+          "sha256": "8fd4dd02dacb31283453475e883409b716268ac5e918e25062b749cfe6e29742",
+          "git_blob": "0eb17f312a8f652125f9102c1c544ee3b6916fc7",
+          "symbols": [
+            "candidate command broker stop barrier changed",
+            "with effective_identity(VERIFIER_UID, VERIFIER_GID):",
+            "[os.fspath(execution_probe), \"-I\", \"-c\", \"pass\"]"
+          ]
+        },
+        {
+          "path": "scripts/run-security-execution-container.py",
+          "sha256": "14a788449ad5867bfeb196cbd0cc811b2f20c007e7634db64c0d937fbd3b073e",
+          "git_blob": "23989b3277daa2504602da27388963cbe4179b65",
+          "symbols": [
+            "rw,nosuid,nodev,exec,size=8589934592,uid=65532,gid=65532,mode=0700",
+            "BASE_IMAGE_LABELS"
+          ]
+        },
+        {
+          "path": "deploy/docker/Dockerfile.security-evidence-runner",
+          "sha256": "d0606da0587dfad7710e62696f5e8ab455346311824a7d19620dac28179ef715",
+          "git_blob": "329863e70b7be67a46486bf0ca89b4d5811e1260",
+          "symbols": [
+            "rustup component add",
+            "chmod -R a+rX /opt/chio-security/cargo-cache",
+            "clippy 0.1.95"
+          ]
+        }
+      ],
+      "remaining": "The reviewed current execution owner retains these repairs with the newer pinned toolchain. Do not cherry-pick the old image pins or historical outcome files. Final native/trusted execution remains open; this is not whole-commit patch equivalence.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Only content-bound authenticated transparency-log entries contribute verification time",
+      "original_commit": "7b3a7667f5b0dcececd7fddddba4b413e0e68893",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-current-production-source-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "git_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "symbols": [
+            "entry_indices.sort_unstable();",
+            "entry_indices.dedup();",
+            "unrelated_genuine_tlog_entry_does_not_change_content_bound_time",
+            "verified.entry_indices.as_slice()"
+          ]
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/tlog.rs",
+          "sha256": "3afb04361e1ab04893e9f057280d6c8982e47680d4f56af8d5ef66f37d616937",
+          "git_blob": "4ad6e54821024ce7ff5e4abd4a06e2b201277a38",
+          "symbols": [
+            "content_bound_entry_indices: &[usize]",
+            "for &entry_index in content_bound_entry_indices",
+            "current_time.min(time)"
+          ]
+        }
+      ],
+      "remaining": "Diff against the original PR head changes only verifier documentation, added checkpoint regressions and test formatting in these two owners. The matched-entry production repair and its original regression are already carried. Preserve fresh package/native and final integration qualification separately.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "MCP nonce retries retain signed request identity and require matching live inflight custody",
+      "original_commit": "14ad381e32e2feb9404f3ac6afba3ec71a0eb4f2",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-current-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs",
+          "sha256": "40aed8fea874c602a7d63023974d82a61b213783bd3d1e872166857a54d0ed1d",
+          "git_blob": "422152c89a721049bffaf9cff66f94413daeeeff",
+          "symbols": [
+            "build_operation_context_for_retry",
+            "nonce_bound_request_id: Option<&str>",
+            "Uuid::new_v4().simple()",
+            "_meta.chioRequestId must be at most 2048 bytes"
+          ]
+        },
+        {
+          "path": "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
+          "sha256": "df40d312a15520768a113aa84ee597dc29a5d57afb62730d627c473023bfa977",
+          "git_blob": "d26fc39c4edc64a3e2a28303ef5b0b0f4f4e839e",
+          "symbols": [
+            "MCP approval artifacts and supplemental authorization require",
+            "build_operation_context_for_retry"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/session_ops.rs",
+          "sha256": "03a4eabd91196bcf08ef5a1f091a1f53211350777c14c44c64e4d6d3192512e5",
+          "git_blob": "40ca7eb7fcf3a753f02c71f3b1393185444a3a9e",
+          "symbols": [
+            "fn begin_or_resume_tool_request",
+            "session.validate_execution_nonce_retry(",
+            "session.terminal().get(&context.request_id).is_some()"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/session.rs",
+          "sha256": "45d1f1c7c78c72016f4f9ce76b06ef729015f2f37993b781a0ed2b02633ea9f3",
+          "git_blob": "35bff074cb3e343120139eb2cfc3c6fb16cd402f",
+          "symbols": [
+            "pub fn validate_execution_nonce_retry",
+            "request.session_anchor_id != current_anchor.id()",
+            "request.pending_execution_nonce_id.as_deref() != Some(nonce_id)"
+          ]
+        },
+        {
+          "path": "crates/protocol/chio-mcp-edge/src/runtime/runtime_tests/request_identity.rs",
+          "sha256": "3f90852309d33ec2c46a251ef9fb3bb437942b1ae09d41d7fa892d1cb4975a01",
+          "git_blob": "2d467f793bb72c64ff10bf9329991408c4ae0470",
+          "symbols": [
+            "request_bound_artifacts_require_a_caller_supplied_request_identity",
+            "execution_nonce_retry_uses_the_nonce_bound_request_identity"
+          ]
+        }
+      ],
+      "remaining": "The current split owners preserve this request-identity and custody behavior. Reconcile all original session/operation changes and execute their final-candidate tests before whole-commit acceptance; no duplicate nonce implementation is needed.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Policy-derived authority workload ceilings cover tool, resource and prompt operations without changing TTL",
+      "original_commit": "348f9b951f99ac71f0b5470a557a006a09e56b0c",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "unique-legacy-policy-integration-not-equivalent",
+      "witnesses": [
+        {
+          "path": "crates/products/chio-cli/src/cli/runtime.rs",
+          "sha256": "5d8d38708fd318216fe7b89f7fac4fb5a0c9d0d5d0d2acfc2e6ec9c77abc7245",
+          "git_blob": "b7a7b246d61d71a924455e807ce5a8172f491c19",
+          "symbols": [
+            "pub(crate) fn cmd_trust_serve(",
+            "map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))",
+            "authority_workload_token: authority_workload_token.map(ToOwned::to_owned)"
+          ]
+        }
+      ],
+      "remaining": "The current CLI passes issuance/runtime-assurance policy to TrustServiceConfig and contains no authority_workload_capabilities helper or its grant-expansion test. Preserve the original implementation and its regression in open #1029. Trace the newer issuance-policy authority boundary before adapting this feature; do not widen grants by importing an older helper blindly.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Bind certificate transparency timestamps to trusted signing time",
+      "original_commit": "5e668652a1e5b76438601b46f17d3bdb4cec61d9",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/helpers.rs",
+          "legacy_head_blob": "95a6f632d238c960d7977c8939a8a96797c6af38",
+          "current_blob": "3c0c7ea6a7b98182b6de6c5e5ab817a4ecf85a8e",
+          "legacy_sha256": "30f1d0f30dd1f126ad863075715715c400b6d54fad3f367e172e0a5d188dedf3",
+          "sha256": "4ad65ca8a5e0be427e357b2da8dde0f66b026ea02d8fd21ce17277a8a98e1fda",
+          "production_projection_sha256": "3744042ac01cc9f212e88b8164b69b6413a50715e9dad315ce0ac5508118597e",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/sct.rs",
+          "legacy_head_blob": "b873d0db70896a8e309a292da800de57fe459fdf",
+          "current_blob": "b873d0db70896a8e309a292da800de57fe459fdf",
+          "legacy_sha256": "dc7ee0117937d05e8712dd307f22f7045b43243c9c0b2594a5576fbfcba7d654",
+          "sha256": "dc7ee0117937d05e8712dd307f22f7045b43243c9c0b2594a5576fbfcba7d654",
+          "production_projection_sha256": "c2bea67ee62f5c10d35525424b4fed75d0f02fbdedc4fd3099254b5af5a3a598",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "sct_rejects_timestamp_after_trusted_signing_time"
+          ],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Verify redundant authenticated time and transparency log proofs",
+      "original_commit": "a9a2ede09bd38986603ab483a573ca439c97a47b",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "legacy_head_blob": "1d5c9ef02b8f015b37edf54d3db200d1f299a4d7",
+          "current_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "legacy_sha256": "a95c09b936725aad24591d910d87438122fd01cac7fea7406f41e158c8db5d43",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "production_projection_sha256": "93517823bcc9f56fc40faae9e70f73a768d0047c97b313a779db76d9facdf812",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "v1_content_bound_set_time_survives_invalid_optional_tsa_material"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/helpers.rs",
+          "legacy_head_blob": "95a6f632d238c960d7977c8939a8a96797c6af38",
+          "current_blob": "3c0c7ea6a7b98182b6de6c5e5ab817a4ecf85a8e",
+          "legacy_sha256": "30f1d0f30dd1f126ad863075715715c400b6d54fad3f367e172e0a5d188dedf3",
+          "sha256": "4ad65ca8a5e0be427e357b2da8dde0f66b026ea02d8fd21ce17277a8a98e1fda",
+          "production_projection_sha256": "3744042ac01cc9f212e88b8164b69b6413a50715e9dad315ce0ac5508118597e",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/rekor.rs",
+          "legacy_head_blob": "bf23de08c69ae939b9dd0f94f85681311cafb3b2",
+          "current_blob": "bf23de08c69ae939b9dd0f94f85681311cafb3b2",
+          "legacy_sha256": "b7c9955349dac994f5785dd4f0e3da9137c5354731bc2194ecc046258157031c",
+          "sha256": "b7c9955349dac994f5785dd4f0e3da9137c5354731bc2194ecc046258157031c",
+          "production_projection_sha256": "e6f718c004e29a3cc18dff4357a0474c165be8387731f2c8c511ea27f001a5c5",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/tlog.rs",
+          "legacy_head_blob": "c6ad9902b1fdc3f18910d8edbcd6e44494721174",
+          "current_blob": "4ad6e54821024ce7ff5e4abd4a06e2b201277a38",
+          "legacy_sha256": "c55dc51826b28050e6810ebac9411e977e58597db03dae92f74b36443bd65c8d",
+          "sha256": "3afb04361e1ab04893e9f057280d6c8982e47680d4f56af8d5ef66f37d616937",
+          "production_projection_sha256": "c65ff10742535d8b5b3378b004e33585f98f51e58e02e4f91fd60a2712629b81",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "checkpoint_tries_a_valid_signature_after_an_invalid_matching_signature",
+            "checkpoint_tries_a_valid_key_after_a_colliding_invalid_key"
+          ],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Bind timestamp authority identity, validity windows and inclusion proofs",
+      "original_commit": "944cd9e0c32b459810bb9e930654126f85cc6d26",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "legacy_head_blob": "1d5c9ef02b8f015b37edf54d3db200d1f299a4d7",
+          "current_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "legacy_sha256": "a95c09b936725aad24591d910d87438122fd01cac7fea7406f41e158c8db5d43",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "production_projection_sha256": "93517823bcc9f56fc40faae9e70f73a768d0047c97b313a779db76d9facdf812",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "managed_key_verification_rejects_a_forged_inclusion_path"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/helpers.rs",
+          "legacy_head_blob": "95a6f632d238c960d7977c8939a8a96797c6af38",
+          "current_blob": "3c0c7ea6a7b98182b6de6c5e5ab817a4ecf85a8e",
+          "legacy_sha256": "30f1d0f30dd1f126ad863075715715c400b6d54fad3f367e172e0a5d188dedf3",
+          "sha256": "4ad65ca8a5e0be427e357b2da8dde0f66b026ea02d8fd21ce17277a8a98e1fda",
+          "production_projection_sha256": "3744042ac01cc9f212e88b8164b69b6413a50715e9dad315ce0ac5508118597e",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "validity_period_contains_datetime",
+            "timestamp_signer_certificate",
+            "tsa_timestamp_is_bound_to_the_signing_authority_window",
+            "redundant_tsa_evidence_accepts_a_valid_timestamp_after_a_malformed_one"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/sct.rs",
+          "legacy_head_blob": "b873d0db70896a8e309a292da800de57fe459fdf",
+          "current_blob": "b873d0db70896a8e309a292da800de57fe459fdf",
+          "legacy_sha256": "dc7ee0117937d05e8712dd307f22f7045b43243c9c0b2594a5576fbfcba7d654",
+          "sha256": "dc7ee0117937d05e8712dd307f22f7045b43243c9c0b2594a5576fbfcba7d654",
+          "production_projection_sha256": "c2bea67ee62f5c10d35525424b4fed75d0f02fbdedc4fd3099254b5af5a3a598",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "sct_rejects_a_ct_key_outside_its_authority_window"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/tlog.rs",
+          "legacy_head_blob": "c6ad9902b1fdc3f18910d8edbcd6e44494721174",
+          "current_blob": "4ad6e54821024ce7ff5e4abd4a06e2b201277a38",
+          "legacy_sha256": "c55dc51826b28050e6810ebac9411e977e58597db03dae92f74b36443bd65c8d",
+          "sha256": "3afb04361e1ab04893e9f057280d6c8982e47680d4f56af8d5ef66f37d616937",
+          "production_projection_sha256": "c65ff10742535d8b5b3378b004e33585f98f51e58e02e4f91fd60a2712629b81",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "verify_inclusion_proof"
+          ],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Enforce certificate and transparency log authority windows",
+      "original_commit": "abf6b585592ee093f59673b6767fd543f8d10bc5",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/helpers.rs",
+          "legacy_head_blob": "95a6f632d238c960d7977c8939a8a96797c6af38",
+          "current_blob": "3c0c7ea6a7b98182b6de6c5e5ab817a4ecf85a8e",
+          "legacy_sha256": "30f1d0f30dd1f126ad863075715715c400b6d54fad3f367e172e0a5d188dedf3",
+          "sha256": "4ad65ca8a5e0be427e357b2da8dde0f66b026ea02d8fd21ce17277a8a98e1fda",
+          "production_projection_sha256": "3744042ac01cc9f212e88b8164b69b6413a50715e9dad315ce0ac5508118597e",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "validity_period_contains",
+            "certificate_chain_rejects_fulcio_anchors_outside_their_authority_window"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/sct.rs",
+          "legacy_head_blob": "b873d0db70896a8e309a292da800de57fe459fdf",
+          "current_blob": "b873d0db70896a8e309a292da800de57fe459fdf",
+          "legacy_sha256": "dc7ee0117937d05e8712dd307f22f7045b43243c9c0b2594a5576fbfcba7d654",
+          "sha256": "dc7ee0117937d05e8712dd307f22f7045b43243c9c0b2594a5576fbfcba7d654",
+          "production_projection_sha256": "c2bea67ee62f5c10d35525424b4fed75d0f02fbdedc4fd3099254b5af5a3a598",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "extract_scts",
+            "extract_sct_accepts_multiple_timestamps"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/tlog.rs",
+          "legacy_head_blob": "c6ad9902b1fdc3f18910d8edbcd6e44494721174",
+          "current_blob": "4ad6e54821024ce7ff5e4abd4a06e2b201277a38",
+          "legacy_sha256": "c55dc51826b28050e6810ebac9411e977e58597db03dae92f74b36443bd65c8d",
+          "sha256": "3afb04361e1ab04893e9f057280d6c8982e47680d4f56af8d5ef66f37d616937",
+          "production_projection_sha256": "c65ff10742535d8b5b3378b004e33585f98f51e58e02e4f91fd60a2712629b81",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "inclusion_proof_is_bound_to_the_canonicalized_entry",
+            "set_rejects_a_rekor_key_outside_its_authority_window"
+          ],
+          "symbol_transitions": [
+            {
+              "original_symbol": "verify_entry_inclusion",
+              "current_symbol": "verify_inclusion_proof",
+              "transition_commit": "944cd9e0c32b459810bb9e930654126f85cc6d26",
+              "transition_diff_sha256": "b254a2d327a8eba521c4a73d6b1950d3fc951b29fab6d3efb8dbb5dc38838766",
+              "reason": "Later preserved repair moves checkpoint verification into the shared inclusion-proof helper."
+            }
+          ]
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Bind V1 log time to verified entry content",
+      "original_commit": "141db49bb1d4c2a154275934ea0895ee36cc5ffc",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "legacy_head_blob": "1d5c9ef02b8f015b37edf54d3db200d1f299a4d7",
+          "current_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "legacy_sha256": "a95c09b936725aad24591d910d87438122fd01cac7fea7406f41e158c8db5d43",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "production_projection_sha256": "93517823bcc9f56fc40faae9e70f73a768d0047c97b313a779db76d9facdf812",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "v1_dsse_content_cannot_borrow_an_unrelated_hashedrekord_integrated_time"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/helpers.rs",
+          "legacy_head_blob": "95a6f632d238c960d7977c8939a8a96797c6af38",
+          "current_blob": "3c0c7ea6a7b98182b6de6c5e5ab817a4ecf85a8e",
+          "legacy_sha256": "30f1d0f30dd1f126ad863075715715c400b6d54fad3f367e172e0a5d188dedf3",
+          "sha256": "4ad65ca8a5e0be427e357b2da8dde0f66b026ea02d8fd21ce17277a8a98e1fda",
+          "production_projection_sha256": "3744042ac01cc9f212e88b8164b69b6413a50715e9dad315ce0ac5508118597e",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "determine_validation_time_from_tlog"
+          ],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Prevent V2 bundles from borrowing unrelated V1 integrated time",
+      "original_commit": "0478be993d4cbbbcf4bcc56f07c9100979b3d15c",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "legacy_head_blob": "1d5c9ef02b8f015b37edf54d3db200d1f299a4d7",
+          "current_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "legacy_sha256": "a95c09b936725aad24591d910d87438122fd01cac7fea7406f41e158c8db5d43",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "production_projection_sha256": "93517823bcc9f56fc40faae9e70f73a768d0047c97b313a779db76d9facdf812",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "v2_content_cannot_borrow_an_unrelated_v1_integrated_time"
+          ],
+          "symbol_transitions": []
+        },
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify_impl/helpers.rs",
+          "legacy_head_blob": "95a6f632d238c960d7977c8939a8a96797c6af38",
+          "current_blob": "3c0c7ea6a7b98182b6de6c5e5ab817a4ecf85a8e",
+          "legacy_sha256": "30f1d0f30dd1f126ad863075715715c400b6d54fad3f367e172e0a5d188dedf3",
+          "sha256": "4ad65ca8a5e0be427e357b2da8dde0f66b026ea02d8fd21ce17277a8a98e1fda",
+          "production_projection_sha256": "3744042ac01cc9f212e88b8164b69b6413a50715e9dad315ce0ac5508118597e",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Refuse ambiguous multi-signature DSSE timestamp binding",
+      "original_commit": "4f419b872c2e15934d967956cf246b38975058e6",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "legacy_head_blob": "1d5c9ef02b8f015b37edf54d3db200d1f299a4d7",
+          "current_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "legacy_sha256": "a95c09b936725aad24591d910d87438122fd01cac7fea7406f41e158c8db5d43",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "production_projection_sha256": "93517823bcc9f56fc40faae9e70f73a768d0047c97b313a779db76d9facdf812",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "default_policy_rejects_ambiguous_multi_signature_dsse_timestamps"
+          ],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
+    },
+    {
+      "requirement": "Keep authenticated signing-time and signature checks when skipping transparency logs",
+      "original_commit": "40171477b950b7af68fb2e886e582315fa7c3abe",
+      "inspection_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "disposition": "corresponding-final-legacy-production-source-and-regressions-present",
+      "witnesses": [
+        {
+          "path": "third_party/sigstore-verify-chio/src/verify.rs",
+          "legacy_head_blob": "1d5c9ef02b8f015b37edf54d3db200d1f299a4d7",
+          "current_blob": "fc2c9014738d5e73a9bf9f33397a66add3d3b999",
+          "legacy_sha256": "a95c09b936725aad24591d910d87438122fd01cac7fea7406f41e158c8db5d43",
+          "sha256": "87abcddbb58c9e49dbee4b177d5be3ae73a8f73b334f4de6831d3e3c9c554026",
+          "production_projection_sha256": "93517823bcc9f56fc40faae9e70f73a768d0047c97b313a779db76d9facdf812",
+          "matching_projection": "Source before the single cfg(test) module with rustdoc-only lines removed. Full Git diffs were reviewed and contain no other production changes.",
+          "introduced_symbols_present": [
+            "skip_tlog_requires_an_authenticated_rfc3161_time",
+            "skip_tlog_ignores_untrusted_rekor_content"
+          ],
+          "symbol_transitions": []
+        }
+      ],
+      "remaining": "Run the required current-fork and integrated authority gates for the landing candidate. Source comparisons do not close original review obligations, establish whole-commit patch equivalence or authorize PR retirement.",
+      "foundation_source_at_inspection": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8"
     }
   ],
   "assessment_addenda": [
@@ -418,6 +935,29 @@
       "scope": "Three additional source-only requirement comparisons, not execution evidence or retirement authorization.",
       "requirements_added": 3,
       "evidence_sha256": "c9c834eafcf0292b06428b565c4ae5dadb7687a897c2db4cf4ac573bc303c232"
+    },
+    {
+      "foundation_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "scope": "Five source-only requirement comparisons. No execution, whole-commit equivalence, retirement or landing claim. Candidate source remains frozen for independent/native/hosted qualification.",
+      "requirements_added": 5,
+      "evidence_entry": "legacy1029-source-followup-254fbd.json",
+      "evidence_sha256": "4bcda80113de6afeef8ab8182e1b9c921c53fcc71b9dda99094989064254b34c"
+    },
+    {
+      "foundation_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+      "scope": "Eight additional Sigstore-only repairs compared against the final preserved legacy head. Production code matches current source after the reviewed rustdoc-only changes and test modules are excluded. Introduced symbols remain or have an explicitly witnessed later transition. Later trust-root changes require their own qualification.",
+      "requirements_added": 8,
+      "evidence_entry": "legacy1029-sigstore-followup-254fbd.json",
+      "evidence_sha256": "31493b5ce24f7f42960ab67757f46e2eed712788f3eb28ee8da7f30ccf0d7015"
     }
-  ]
+  ],
+  "latest_assessment_source": "254fbd162fb5b3b75e5f53e57dca94d4665b5eb8",
+  "complete_owner_inventory": {
+    "path": "docs/security/audits/foundation-evidence-binding-repair-20261005.json.gz",
+    "sha256": "a3155befe1d41f3a596c7ea1af253eca5db3e39e2b513bc873027e97c77a7e74",
+    "source_commit": "850ee8ab38725f90384be265ffe72072250524a8",
+    "scope": "219 unique commits and 2358 touched paths mapped at 254fbd. Exact path/blob matches do not establish semantic acceptance for changed or absent paths.",
+    "entry": "legacy1029-complete-owner-inventory-254fbd.json",
+    "entry_sha256": "3e48356ca4640c3b90b5e790ca0bc865e7f1320ca71a984645f5762a8d49aaf7"
+  }
 }

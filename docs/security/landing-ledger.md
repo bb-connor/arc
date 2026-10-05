@@ -27,12 +27,46 @@ it has an explicit separate R&D disposition and no foundation landing slot.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1600 ledger requirements, including 201 carried review records, the October 5
+1601 ledger requirements, including 201 carried review records, the October 5
 independent findings and subsequent qualification repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+Repair `850ee8ab38725f90384be265ffe72072250524a8` removes a qualification cycle: adding the three signed
+publication files previously changed the mutation source-input hash. Binding v7
+uses a closed output directory, rejects extra or linked entries and forbids
+compile-time references to that output. Nine focused tests pass. Targeted
+refresh also avoids unrelated Cargo source-discovery work; all seven real-engine
+scope tests pass while complete final discovery and command isolation remain.
+The [retained repair evidence](audits/foundation-evidence-binding-repair-20261005.json.gz) includes
+failed regressions, the complete checker fixtures, committed-evidence verifier
+controls and the successful stable-source CI contract mutation suite.
+
+The original `254fbd162f` source has a positive GitHub Codex review and all eight
+inline threads resolved. Source authorization names that reviewed checkpoint;
+this newer repair still needs its own independent review. Two isolated hosted
+evidence jobs fail, and a fresh controller dispatch expires while its child is
+queued. The orphan child is cancelled before native execution. The exact native
+image and installed boundaries pass; its initial mutation baseline passes, then
+the superseded run is cancelled after 1,457 seconds with clean source. No caught
+mutation, complete campaign, signed publication or foundation merge is claimed.
+
+All 63 retired heads and original archive tags were reverified. All 23 surviving
+PRs remain open. #1029 now has 29 bounded source comparisons across 22 original
+commits, plus a complete map of its 219 unique commits and 2,358 touched paths.
+Eight additional Sigstore repairs already have matching production source and
+retained regressions. Unique workload policy, interval compaction and provenance
+work remain preserved for reconciliation. These source comparisons do not close
+execution obligations or authorize retirement.
+
+Freeze source and status documents before native regeneration. After that,
+commit only the exact derived mutation patch, then the three authenticated
+signing outputs in their authorized evidence-only descendant. Any other source
+or documentation change requires refreshed input evidence.
+
+### Earlier native lifecycle repair
 
 Repair `49a21b1a7e9dc76e96edb3b2bbd53488005034ef` retains a bounded native launch thread through delivery
 shutdown, fixing a child SIGKILL caused by retirement of its creating Tokio
