@@ -4130,6 +4130,18 @@
         "Kotlin mobile native ABI"
       ],
       "android_device_or_aar_qualified": false
+    },
+    "hosted_swift_b587": {
+      "source_commit": "b587a81cd3932aeb9580dbe55cad30fa199a3b99",
+      "push_run": 37262570539,
+      "pull_request_run": 37262578248,
+      "conclusion": "success",
+      "rebuilt_native_tests": 5,
+      "rebuilt_artifact": 11324819266,
+      "artifact_zip_sha256": "3a92f97cda785da606712ce2de5b614ce583a48917c3aa3ac04d57ba159a13f9",
+      "installed_generated_exports_identical": true,
+      "static_library_bytes_identical": false,
+      "installed_package_provenance_preserved": true
     }
   },
   "postgres_mediation_execution": {
@@ -4141,7 +4153,25 @@
       "scope": "Caller-bound resource source and bounded local verification. The full native handoff, committed-claim-loss, independent composition review, native/trusted qualification and protected merge remain open."
     },
     "native_composition_qualified": false,
-    "candidate_qualified": false
+    "candidate_qualified": false,
+    "independent_review": {
+      "source_commit": "b587a81cd3932aeb9580dbe55cad30fa199a3b99",
+      "url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-5988018130",
+      "result": "Did not find any major issues",
+      "inline_threads": 8,
+      "unresolved_inline_threads": 0,
+      "formal_approval_inferred": false
+    },
+    "latest_native_attempt": {
+      "run": 37262578320,
+      "conclusion": "failure",
+      "enforcing_host": "passed",
+      "worker_api": "passed",
+      "tls_component": "passed",
+      "process_initialization": "failed",
+      "claim_response_loss": "skipped"
+    },
+    "initialization_budget_repair": "18a35fed79be5d9780b09d8964859dcb363d44dc"
   },
   "process_caller_clock_execution": {
     "observed_utc": "2026-10-05T04:13:28.218988+00:00",
@@ -4152,7 +4182,38 @@
       "source_commit": "ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6",
       "scope": "Bounded caller-clock source and local verification. Final independent review, terminal hosted checks, supported native/trusted qualification and protected merge remain open."
     },
-    "candidate_qualified": false
+    "candidate_qualified": false,
+    "independent_review": {
+      "source_commit": "b587a81cd3932aeb9580dbe55cad30fa199a3b99",
+      "url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-5988018130",
+      "result": "Did not find any major issues",
+      "inline_threads": 8,
+      "unresolved_inline_threads": 0,
+      "formal_approval_inferred": false
+    }
+  },
+  "qualification_inputs_execution": {
+    "observed_utc": "2026-10-05T05:29:37.290110+00:00",
+    "source_commit": "18a35fed79be5d9780b09d8964859dcb363d44dc",
+    "evidence": {
+      "path": "docs/security/audits/foundation-qualification-inputs-20261005.json.gz",
+      "sha256": "5f8d9da1287c4e038020856cd96171d5d9d573309484c7ea655feeceac3b51bf",
+      "source_commit": "18a35fed79be5d9780b09d8964859dcb363d44dc",
+      "scope": "Bounded repair and local qualification of retained image inputs, PostgreSQL initialization wiring, source inventories and typed rejection assertions. Prior native PostgreSQL and hosted structural failures remain failed. Final source review, complete native/trusted execution, publication, strict protection activation and merge remain open."
+    },
+    "previous_source_review": {
+      "source_commit": "b587a81cd3932aeb9580dbe55cad30fa199a3b99",
+      "url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-5988018130",
+      "result": "Did not find any major issues",
+      "inline_threads": 8,
+      "unresolved_inline_threads": 0,
+      "formal_approval_inferred": false
+    },
+    "new_source_review": "pending",
+    "authorized_security_source": "b587a81cd3932aeb9580dbe55cad30fa199a3b99",
+    "cancelled_refresh_controller": 37263466073,
+    "candidate_qualified": false,
+    "requirements_count": 1595
   },
   "requirements": [
     {"id": "launch-execution-plan:M0","label": "M0","requirement": "M0. Reset execution and consolidate the candidate","context": "M0. Reset execution and consolidate the candidate","source": {"path": "docs/security/launch-execution-plan.md","line": 161,"additional_lines": [],"line_sha256": "afbbbf3bbe715ac3f55b5eadaceb3c971d33eaf80c65e0042fcc58884add8866"},"disposition": "open-acceptance","source_repair": null,"verification_evidence": [],"remaining_acceptance": ["Reconcile the requirement against current source and its review corrections; no completion is inferred from this inventory.","Verify the owning source and tests on its selected landing candidate.","Obtain required exact-candidate qualification and review before landing."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false},
@@ -5748,6 +5809,7 @@
     {"id": "foundation-followup-20261005:kotlin-native-abi","label": "Repair generated Kotlin error payload and shared-library name","requirement": "Repair generated Kotlin error payload and shared-library name","source": {"path": "crates/kernel/chio-kernel-mobile/uniffi.toml"},"disposition": "recorded-native-component-repair","source_repair": {"checkpoint": "e3a85a724b243c83c17fadef8c3ac5e709e0d9d2","files": ["crates/kernel/chio-kernel-mobile/uniffi.toml","scripts/check-kotlin-mobile.sh","tests/bindings/kotlin-mobile/src/main/kotlin/Qualification.kt",".github/workflows/jvm.yml"]},"verification_evidence": [{"path": "docs/security/audits/foundation-mobile-consumers-20261005.json.gz","sha256": "5c7ce3a69872c1596f1e1cf2ea7a296996e35279ff6cf26a1b9658d12701d4c5","source_commit": "e3a85a724b243c83c17fadef8c3ac5e709e0d9d2","scope": "Bounded Kotlin host ABI and rebuilt native Swift evidence. Android device/AAR, final review, PostgreSQL mediation, native Linux/trusted qualification and protected merge remain open."}],"remaining_acceptance": ["Final independent review, required hosted/native/trusted qualification and protected foundation merge."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false},
     {"id": "foundation-followup-20261005:swift-generated-whitespace","label": "Normalize generated Swift headers before native testing and artifact hashing","requirement": "Normalize generated Swift headers before native testing and artifact hashing","source": {"path": "scripts/build-ios-framework.sh"},"disposition": "recorded-native-component-repair","source_repair": {"checkpoint": "5e9c904834cb98c16b2139096850782354bd8a86","files": ["scripts/build-ios-framework.sh"]},"verification_evidence": [{"path": "docs/security/audits/foundation-mobile-consumers-20261005.json.gz","sha256": "5c7ce3a69872c1596f1e1cf2ea7a296996e35279ff6cf26a1b9658d12701d4c5","source_commit": "e3a85a724b243c83c17fadef8c3ac5e709e0d9d2","scope": "Bounded Kotlin host ABI and rebuilt native Swift evidence. Android device/AAR, final review, PostgreSQL mediation, native Linux/trusted qualification and protected merge remain open."}],"remaining_acceptance": ["Final independent review, required hosted/native/trusted qualification and protected foundation merge."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false},
     {"id": "foundation-followup-20261005:postgres-native-mediation","label": "Mediate PostgreSQL jobs outside the native cage with original caller binding","requirement": "Preserve typed tenant/lease operations and original operation identity through a credential-mediated host resource; qualify handoff and committed-response loss under enforced native isolation.","source": {"path": "docs/superpowers/plans/2026-10-05-postgres-native-resource-mediation.md"},"disposition": "recorded-local-repair-native-composition-open","source_repair": {"checkpoint": "6d18cf0a572bdf6dcee0ea2775a45941eddf37ce","files": ["crates/security/chio-secret-broker/src/host_resource.rs","crates/security/chio-secret-broker/src/host_https.rs","crates/products/chio-cli/src/cli/process_host/native_broker/preparation.rs","crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/adapter.rs","examples/postgres-job-swarm/resources.py"]},"verification_evidence": [{"path": "docs/security/audits/foundation-postgres-mediation-20261005.json.gz","sha256": "8366a0cc01d5a08025866fd8030f4ae4ddd0045f6df0f2daa15361c96d414a07","source_commit": "6d18cf0a572bdf6dcee0ea2775a45941eddf37ce","scope": "Caller-bound resource source and bounded local verification. The full native handoff, committed-claim-loss, independent composition review, native/trusted qualification and protected merge remain open."}],"remaining_acceptance": ["Execute both full PostgreSQL native scenarios on the supported enforcing host and retain their original receipts and request identities.","Obtain independent review of the complete composition; fix findings and finish exact-candidate hosted/native/trusted qualification and protected merge.","The live framework consumer adaptation and operator deployment evidence remain distinct product acceptance; fixture identities cannot qualify production deployment."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false},
-    {"id": "foundation-followup-20261005:process-caller-authority-clock","label": "Use the kernel authority clock for admitted process callers","requirement": "Registry lookup, child submission and wait recording must share the kernel authority source and regression fence, with typed clock failures refusing access.","source": {"path": "crates/kernel/chio-process/src/store/children.rs","thread": "PRRT_kwDOR0fQBc6o5L2o","url": "https://github.com/bb-connor/arc/pull/1160#discussion_r4180437395"},"disposition": "recorded-local-repair-final-review-and-landing-open","source_repair": {"checkpoint": "ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6","files": ["crates/kernel/chio-process/src/store.rs","crates/kernel/chio-process/src/store/children.rs","crates/kernel/chio-process/src/registry.rs","crates/kernel/chio-process/tests/child_submission/caller_clock.rs"]},"verification_evidence": [{"path": "docs/security/audits/foundation-process-caller-clock-20261005.json.gz","sha256": "94f792c853464d0d37acf99784e35743e29b2a9b1768986330501415dbaacf70","source_commit": "ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6","scope": "Bounded caller-clock source and local verification. Final independent review, terminal hosted checks, supported native/trusted qualification and protected merge remain open."}],"remaining_acceptance": ["Obtain independent review of the complete composition, reconcile the original thread and finish exact-candidate hosted/native/trusted qualification and protected merge."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false}
+    {"id": "foundation-followup-20261005:process-caller-authority-clock","label": "Use the kernel authority clock for admitted process callers","requirement": "Registry lookup, child submission and wait recording must share the kernel authority source and regression fence, with typed clock failures refusing access.","source": {"path": "crates/kernel/chio-process/src/store/children.rs","thread": "PRRT_kwDOR0fQBc6o5L2o","url": "https://github.com/bb-connor/arc/pull/1160#discussion_r4180437395"},"disposition": "recorded-reviewed-repair-landing-open","source_repair": {"checkpoint": "ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6","files": ["crates/kernel/chio-process/src/store.rs","crates/kernel/chio-process/src/store/children.rs","crates/kernel/chio-process/src/registry.rs","crates/kernel/chio-process/tests/child_submission/caller_clock.rs"]},"verification_evidence": [{"path": "docs/security/audits/foundation-process-caller-clock-20261005.json.gz","sha256": "94f792c853464d0d37acf99784e35743e29b2a9b1768986330501415dbaacf70","source_commit": "ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6","scope": "Bounded caller-clock source and local verification. Final independent review, terminal hosted checks, supported native/trusted qualification and protected merge remain open."},{"url": "https://github.com/bb-connor/arc/pull/1160#issuecomment-5988018130","source_commit": "b587a81cd3932aeb9580dbe55cad30fa199a3b99","scope": "Independent composition review complete; original clock thread resolved. This does not qualify hosted/native execution or protected merge."}],"remaining_acceptance": ["Finish exact-candidate hosted/native/trusted qualification and protected merge; the original clock review thread is resolved."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false},
+    {"id": "foundation-followup-20261005:qualification-inputs","label": "Repair fresh image input availability and native qualification contracts","requirement": "Retain the original authenticated CA package, reconcile reviewed input and wire inventories, require precise rejection assertions and supply the PostgreSQL family budget without weakening native isolation.","source": {"path": "docs/superpowers/plans/2026-10-05-foundation-qualification-inputs.md"},"disposition": "recorded-local-repair-native-trusted-qualification-open","source_repair": {"checkpoint": "18a35fed79be5d9780b09d8964859dcb363d44dc","files": ["deploy/docker/Dockerfile.security-evidence-runner","deploy/docker/ca-certificates-20260611-r0.apk","scripts/check-security-ci-contract.py","crates/security/chio-secret-broker/src/host_resource.rs","examples/postgres-job-swarm/host.py","docs/security/trust-boundary-inventory.json","spec/wire-schemas.lock"]},"verification_evidence": [{"path": "docs/security/audits/foundation-qualification-inputs-20261005.json.gz","sha256": "5f8d9da1287c4e038020856cd96171d5d9d573309484c7ea655feeceac3b51bf","source_commit": "18a35fed79be5d9780b09d8964859dcb363d44dc","scope": "Bounded repair and local qualification of retained image inputs, PostgreSQL initialization wiring, source inventories and typed rejection assertions. Prior native PostgreSQL and hosted structural failures remain failed. Final source review, complete native/trusted execution, publication, strict protection activation and merge remain open."}],"remaining_acceptance": ["Complete fresh independent review, the full PostgreSQL handoff and lost-response scenarios, final hosted/native/trusted qualification and protected merge.","Activate the reviewed strict trusted merge contexts only after genuine authenticated publication succeeds."],"landing_unit": "foundation","landing_pr": 1160,"main_ancestry_verified": false}
   ]
 }

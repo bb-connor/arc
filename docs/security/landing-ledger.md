@@ -27,12 +27,45 @@ it has an explicit separate R&D disposition and no foundation landing slot.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1594 ledger requirements, including 201 carried review records, four findings
-from the October 5 independent reviews and seven subsequent repair obligations.
+1595 ledger requirements, including 201 carried review records, four findings
+from the October 5 independent reviews and eight subsequent repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+The foundation remains unmerged. Repair `18a35fed79be5d9780b09d8964859dcb363d44dc`
+retains the original signed CA package as a bounded, read-only build input after
+a hosted CDN 404, without changing the pinned package closure. It also reconciles
+the two reviewed PostgreSQL readers and wire schema, strengthens nine broker
+error assertions, supplies the native host's mandatory 100-call aggregate budget,
+and fixes direct CLI-module formatting. The [qualification input plan](../superpowers/plans/2026-10-05-foundation-qualification-inputs.md)
+and [retained results](audits/foundation-qualification-inputs-20261005.json.gz)
+record six input tests, the full CI contract mutation suite, 37 boundary tests,
+180 broker tests, strict owning Clippy and the trusted definition/container gates.
+
+Native PostgreSQL run `37262578320` on `b587a81cd3` passed host enforcement,
+the public worker API and the real TLS resource component, then failed process
+initialization. Its lost-response step was skipped. The missing invocation
+budget is repaired in source; both complete native scenarios remain required.
+That source's failed hosted structural, formatting and image-build checks remain
+failed. Its queued mutation refresh `37263466073` was cancelled after the image
+input failure. Authorization still names `b587a81cd3` pending review of the new
+source. No final native capture, signed publication or protected merge is claimed.
+
+GitHub Codex found no major issues on `b587a81cd3` in
+[its completed review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5988018130).
+All eight inline threads are resolved, including the original caller-clock
+finding. Both current-source Swift workflows pass (`37262570539` and
+`37262578248`), including five rebuilt native tests. Artifact `11324819266` has
+verified ZIP and manifest hashes; its generated exports match the installed
+package, while the two static-library hashes differ. The installed artifact's
+original provenance remains intact. Fresh candidate review and full hosted,
+native and trusted qualification remain open, followed by strict trusted-context
+activation and protected merge. Android and live framework acceptance remain
+separate product work.
+
+### Earlier source and component records
 
 Source `6d18cf0a572bdf6dcee0ea2775a45941eddf37ce` implements caller-bound PostgreSQL resource mediation.
 The [retained evidence](audits/foundation-postgres-mediation-20261005.json.gz)
@@ -43,8 +76,14 @@ compiler and harness failures remain retained. The full native handoff and
 committed-claim-loss scenarios are wired but still unqualified. No production
 migration approval is inferred from the native test fixture identities.
 
-The mobile stale-export thread is now resolved with its source and native ABI
-evidence. Android and live framework acceptance remain open. Source `ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6` repairs the later process-caller clock finding. Both injected-epoch regressions failed before the repair; all 41 affected process, mailbox and worker tests now pass, with no ignored tests. All-target/all-feature Clippy and regenerated proof coverage pass. The [clock evidence](audits/foundation-process-caller-clock-20261005.json.gz) retains the original failures. Final independent review and landing qualification remain required.
+The mobile stale-export thread is resolved with its source and native ABI
+evidence. Source `ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6` repairs the later
+process-caller clock finding. Both injected-epoch regressions failed before the
+repair; all 41 affected process, mailbox and worker tests pass, with no ignored
+tests. All-target/all-feature Clippy and regenerated proof coverage pass. The
+[clock evidence](audits/foundation-process-caller-clock-20261005.json.gz) retains
+the original failures. Its composition review is complete as recorded above;
+final landing qualification remains required.
 
 The latest [mobile consumer evidence](audits/foundation-mobile-consumers-20261005.json.gz)
 records four native Kotlin ABI tests passing on `e3a85a724b`. The locked
@@ -67,11 +106,10 @@ Four original consumer threads are resolved against their source repairs and
 that review. Codex subsequently reports no major issues on `4816966dc0` in
 [its completed review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5987578006),
 while the separate clock finding is retained and repaired as recorded above.
-The PostgreSQL and clock composition requires a new independent review. Source
-`8384454ca6` was briefly authorized for mutation refresh, but its queued
+Source `8384454ca6` was briefly authorized for mutation refresh, but its queued
 controller was cancelled when superseded and the refresh label removed. No
-native capture or signed qualification resulted; authorization still names that
-older source.
+native capture or signed qualification resulted from that attempt. The later
+review and authorization of `b587a81cd3` are recorded above.
 
 The [PostgreSQL mediation plan](../superpowers/plans/2026-10-05-postgres-native-resource-mediation.md)
 records the mandatory repair and remaining native acceptance. Database

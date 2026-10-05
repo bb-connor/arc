@@ -105,6 +105,17 @@ and committed-claim-loss qualification remain required. The live framework
 consumer and operator deployment have separate outstanding acceptance in the
 [mediation plan](../superpowers/plans/2026-10-05-postgres-native-resource-mediation.md).
 
+The subsequent `b587a81cd3` native run passes enforcing-host preparation, the
+public PostgreSQL worker API and the actual TLS resource component, then fails
+process initialization. Source `18a35fed79` supplies its missing explicit
+aggregate invocation budget. The same repair retains the exact signed CA image
+input after a hosted CDN 404 and reconciles the source/format/schema gates.
+Its local checks and prior positive composition review are retained in the
+[qualification input evidence](audits/foundation-qualification-inputs-20261005.json.gz).
+Both full PostgreSQL native scenarios, fresh source review, complete trusted
+execution/publication, strict merge-context activation and protected merge
+remain mandatory. The failed and cancelled attempts retain those outcomes.
+
 A foundation merge establishes only the reviewed and executed foundation
 contract for its named source and supported profile. It is not full roadmap
 completion, hardware quote verification, a FIPS-validated executable, complete
