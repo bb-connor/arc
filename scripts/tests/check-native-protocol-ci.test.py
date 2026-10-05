@@ -25,6 +25,7 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
 )
 CONSUMERS = (
     (0, "check", "Workspace tests"),
@@ -32,10 +33,25 @@ CONSUMERS = (
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
     (3, "conformance", "Run live C++ conformance areas"),
     (4, "native", "Exercise the public worker role and actual native process host"),
+    (5, "sdk-parity", "Run SDK parity"),
 )
 
 
 class NativeProtocolCiTests(unittest.TestCase):
+    def test_sdk_parity_requires_enforced_native_consumers(self):
+        workflow = yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text())
+        CHECKER.validate_consumer(
+            workflow,
+            "sdk-parity",
+            "Run SDK parity",
+            {"name": CHECKER.FIXTURE_NAME, "uses": CHECKER.FIXTURE_ACTION},
+        )
+        _, step = CHECKER.named_step(workflow["jobs"]["sdk-parity"], "Run SDK parity")
+        self.assertIn(
+            "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement",
+            step["run"].splitlines(),
+        )
+
     def rejected(self, documents, expected):
         with self.assertRaisesRegex(CHECKER.ContractError, expected):
             CHECKER.validate(*documents)
@@ -114,6 +130,18 @@ class NativeProtocolCiTests(unittest.TestCase):
                 self.assertIn(text, step["run"])
                 step["run"] = step["run"].replace(text, " ", 1)
                 self.rejected(changed, "target set must execute every required target")
+
+    def test_standalone_native_consumers_build_enforcing_cli(self):
+        for document, job_id, consumer in (
+            (3, "conformance", "Run live C++ conformance areas"),
+            (4, "native", "Build the real gateway and kernel"),
+            (5, "sdk-parity", "Run SDK parity"),
+        ):
+            with self.subTest(job=job_id):
+                changed = copy.deepcopy(LIVE)
+                _, step = CHECKER.named_step(changed[document]["jobs"][job_id], consumer)
+                step["run"] = step["run"].replace(" --features real-linux-enforcement", "")
+                self.rejected(changed, "native consumer must build the enforcing CLI")
 
     def test_static_report_cannot_clear_runtime_before_protocol_targets(self):
         changed = copy.deepcopy(LIVE)

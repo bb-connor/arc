@@ -91,7 +91,7 @@ def validate_consumer(
         )
 
 
-def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict) -> None:
+def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict, sdk: dict) -> None:
     checks = (
         "python3 scripts/check-native-protocol-ci.py",
         "python3 scripts/tests/check-native-protocol-ci.test.py",
@@ -144,11 +144,13 @@ def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict) -
     for workflow, job_id, consumer in (
         (cpp, "conformance", "Run live C++ conformance areas"),
         (postgres, "native", "Exercise the public worker role and actual native process host"),
+        (sdk, "sdk-parity", "Run SDK parity"),
     ):
         validate_consumer(workflow, job_id, consumer, {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION})
     for workflow, job_id, step_name in (
         (cpp, "conformance", "Run live C++ conformance areas"),
         (postgres, "native", "Build the real gateway and kernel"),
+        (sdk, "sdk-parity", "Run SDK parity"),
     ):
         _, step = named_step(workflow["jobs"][job_id], step_name)
         require(
@@ -171,8 +173,9 @@ def main() -> None:
         yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
     )
-    print("native protocol CI contract passed: workspace, process, C++ and PostgreSQL consumers")
+    print("native protocol CI contract passed: workspace, process, C++, PostgreSQL and SDK parity consumers")
 
 
 if __name__ == "__main__":
