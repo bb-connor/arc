@@ -2,6 +2,7 @@
 # OSV 2.3.6 directory-local configs do not propagate to child directories.
 # Do not pass this file with --config: that overrides every directory's config.
 #
-# The root Bun lock has no accepted advisories. TypeScript peer-tooling and
-# standalone ai-sdk peer-test dispositions live beside their package-lock.json.
+# The scanned Bun and TypeScript locks have no accepted advisories. The private
+# peer-tooling repairs are authenticated and monitored under their original
+# registry identities by scripts/check-npm-tooling-forks.py.
 # The Rust cargo-audit and cargo-deny gates are unchanged.

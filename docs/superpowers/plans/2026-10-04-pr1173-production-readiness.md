@@ -225,3 +225,17 @@ output produces the exact marker and passes the same reader. Select terse output
 for the existing helper without changing its test selection, startup barrier or
 exact readiness check. Retain both the failed hosted attempt and the subprocess
 control, then rerun the actual ownership and response-loss scenarios.
+
+### Unfiltered advisory review
+
+The current hosted policy passes, but its retained unfiltered report still finds
+`GHSA-866g-f22w-33x8` in the standalone AI SDK 5 peer-test lock. The inherited
+waiver claims that remediation requires AI SDK 6. Upstream has since published
+the response-body bound in `@ai-sdk/provider-utils` 3.0.28. Align this standalone
+development graph with the existing workspace's AI SDK 5.0.210 and provider-utils
+3.0.28, remove the stale waiver, and preserve the published peer contract.
+The latest 5.0.271 trial introduced an affected Undici 5 graph; retain that failed
+scan and use the repository's already qualified compatible selection. Run the
+standalone build, type check and full existing tests, then require the actual
+unfiltered OSV selection to contain no findings. Refresh the source-bound
+qualification before pushing the final candidate.

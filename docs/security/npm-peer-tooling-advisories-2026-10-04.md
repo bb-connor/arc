@@ -44,6 +44,17 @@ upstream monitoring and installed-package security regressions before scanning
 the normal Python/npm closure. The two temporary advisory suppressions are
 removed. The now-unused image-size suppressions are removed as well.
 
+Review of the hosted unfiltered report also found the inherited
+`GHSA-866g-f22w-33x8` waiver in the standalone AI SDK peer-test lock. Its claim
+that remediation requires AI SDK 6 is obsolete: the
+[upstream 3.0.28 release](https://github.com/vercel/ai/releases/tag/@ai-sdk/provider-utils@3.0.28)
+backports bounded JSON response reads. The development graph now selects
+AI SDK 5.0.210 and `@ai-sdk/provider-utils` 3.0.28, matching the existing workspace
+selection within the same major version. That waiver is removed. The package's
+published peer range is unchanged; the repository lock qualifies the tested
+graph, not consumers' independent dependency selections. Retain the prior
+unfiltered finding and require the updated unfiltered scan to be clear.
+
 This repairs the repository's build and qualification tooling. A consumer who
 independently installs upstream Expo tooling still selects that upstream
 dependency graph. Repository overrides are not propagated into a published
