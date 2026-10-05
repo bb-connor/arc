@@ -600,7 +600,7 @@ pub enum IdentityDisposition {
     | `DenyTombstone` | stay `Unbegun`; the deny receipt is signed `Reusable`, because no tombstone committed. A retry re-evaluates and meets the same committed fences |
     | Every other pre-dispatch effect (`IntentCommit` from `Prepared`, `ParticipantCommit`, slow-path dispatch-commit step, `Park`) | `Retain` the same planned member with its expected version. Every hold stays. Never `Compensate` because of the failure. If the caller abandons the call, M17's rules apply: the member is known not committed, so abandonment compensates through its own `Compensate` member, which M19 retains in turn while the store is down |
     | Post-effect crossings (`ReturnRecord`, `OutcomeCommit`, release crossings) | `Retain` in the phase with output withheld in custody; the same plan is re-submitted. Never terminalize because of the failure |
-    | Post-effect `CheckOnlyCrossing` (release of a read-only or `NonDurable` call) | fail closed as an unverifiable release: the output is withheld. A check-only read gets `Withheld { retry: AfterResume }` (`Reusable`); a `NonDurable` effect gets the terminal `Withheld { retry: Never }` (`Terminal`), as in M11 |
+    | Post-effect `CheckOnlyCrossing` (release of a read-only or `NonDurable` call) | fail closed as an unverifiable release: the output is withheld. A check-only read gets `Withheld { reason: StoreUnavailable, retry: AfterStoreRecovery }` (`Reusable`). No stop is involved, and there is no durable operation for `StoreRecoveryDriver` to re-feed, so the client retries after a backoff once the store is healthy (spec 8's `OutputWithheld`). A `NonDurable` effect gets the terminal `Withheld { retry: Never }` (`Terminal`), as in M11 |
     | Non-crossing effects (`Terminalize`, `Compensate`, `ReleaseHold`) | `Retain` the same planned member, the same expected version and every hold. `ReleaseHold` keeps `Releasing`, and a rail-held release keeps `ReleaseSubmitted`. Never convert to another terminal, never release |
 
     - **Re-feed.** `StoreRecoveryDriver` (section 7) re-feeds every operation retained under this rule: with bounded backoff, and at once on the writer's `store_healthy` signal, which spec 10 emits after its next successful batch commit. A poisoned owner stops writes until restart (spec 10 X22), so `StartupReconciler` re-projects and re-drives those operations.
@@ -1061,6 +1061,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187433118 | Exempt no-row cleanup from T13 | Fixed now. T13 is scoped to persisted members and explicitly permits M19's no-row in-memory ledger release for a `NonDurable` or check-only attempt from `Unbegun`, so the theorem and the cleanup no longer conflict | T13 |
+
+### Codex review (PR #1174, round 22)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187663058 | Use a store-recovery retry condition for unavailable checks | Fixed now. A post-effect check-only release that meets `StoreUnavailable` returns `Withheld { reason: StoreUnavailable, retry: AfterStoreRecovery }` (`Reusable`), a transient condition defined in spec 8's `OutputWithheld`, instead of the stop-only `AfterResume` | M19 table |
 
 ## Appendix A. External and FTL precedent
 

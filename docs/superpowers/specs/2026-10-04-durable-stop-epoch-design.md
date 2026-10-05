@@ -200,11 +200,13 @@ pub struct StopEpochV1 {
     pub reason_commitment: Sha256Digest,     // SHA-256(salt || text), salt and text in the note table (S1); Rollover: the fixed commitment of S2
     pub authorizer: StopAuthorizer,
     pub decided_at: DecisionTime,
+    pub trusted_floor_at_commit: u64,        // persisted trusted-time floor read in the appending transaction; always available, even when decided_at is Unavailable
     pub previous: Sha256Digest,              // digest of this scope's prior record, or zero
     pub allow_containment: bool,             // section 7.1, S12
     pub requested_via: StopRequestPath,
     pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
     pub offline_bypass: bool,                    // true only for an offline-CLI Stop or Restrict appended without a journal entry (S2, S25); then satisfies_intent is None
+    pub subsumes_intents: Vec<StopIntentRef>,    // offline_bypass only: the scope's pending journal entries the CLI read and folded in (S25); empty otherwise
     pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
 }
 
@@ -493,7 +495,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - **Two-commit read** (spec 10 X14, no return record):
       - a `KernelStopped` refusal of the outcome commit rolls back the savepoint, then writes a progress-only return record that holds the bytes;
       - the operation is then `Finalizing` with output withheld, so recovery never signs `OutcomeUnknownAfterDispatch` for it and the process runtime never re-dispatches the read.
-    - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed_epoch }, retry: AfterResume | Never, effect_executed: bool }`:
+    - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed_epoch } | StoreUnavailable, retry: AfterResume | AfterStoreRecovery | Never, effect_executed: bool }`. `AfterStoreRecovery` is the transient condition for a reusable check-only read whose release met `StoreUnavailable` (spec 9 M19). The client retries after a backoff once the store is healthy, with no stop involved:
       - on JSON-RPC surfaces, an error with code `output_withheld` and data `{ operation_id, scope, observed_epoch, retry, effect_executed }`;
       - on the process ABI, `invoke` returns status `withheld` with the same fields.
       - **`retry: AfterResume`** applies to durable operations (the output stays in release custody) and to check-only reads (no effect, so a retry is safe). After resume, a replay with the same request id (or the same process operation key) returns the released output through the bound durable result. A surface without that replay path delivers the outcome only through the terminal receipt and is named in the claim limit.
@@ -615,7 +617,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - the attestation verifies against the time source pinned in signed deployment configuration;
       - its `authority_id`, `scope` and `expected_epoch` equal the artifact's and the current head's;
       - its `incident_opening` equals the incident's opening record;
-      - `attested_unix_ms` is at or after the opening record's commit, and at or above the persisted trusted-time floor;
+      - `attested_unix_ms` is at or above the opening record's `trusted_floor_at_commit`, a signed value that is present even when that record's `decided_at` is `Unavailable`, and at or above the current persisted trusted-time floor. No local database timestamp is consulted;
       - its `nonce` has not been used before, because nonces are recorded with the resume.
 
       Any failure refuses the break-glass resume.
@@ -720,7 +722,8 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - So a host latch, or a stop whose write failed (`process_only` or `latch_only`), refuses store-only crossings with no tier-1 site, such as P4 artifact release, P5 `admit_confined_return`, and the recovery and semantic store checks.
 - **S36. Priority lane.**
     - `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover` commits run in a priority lane of spec 10's writer loop, exempt from `Overloaded`, `max_batch` and per-tenant caps (spec 10 X17, X20). Overload and full disks are incident conditions.
-    - Under `SQLITE_FULL` or `IOERR` retry (spec 10 X21), the route waits at most `stop_commit_wait` (default 2 s). It then returns `stop_not_durable` with the intent latch in force, and keeps the write queued.
+    - **Narrowing transitions.** Under `SQLITE_FULL` or `IOERR` retry (spec 10 X21), a `Stop` or `Restrict` waits at most `stop_commit_wait` (default 2 s). It then returns `stop_not_durable` with the intent latch in force, and keeps the write queued. A late commit can only narrow.
+    - **Widening transitions are never left queued.** A `Resume` or `Relax` that reaches `stop_commit_wait` is withdrawn from the queue if it has not started executing, and the route returns `resume_not_committed`. If it is already inside a batch transaction, the route returns `resume_outcome_unknown`, and the operator reads the scope's status before retrying. Its `expected_epoch` makes a retry safe: a commit that did land moved the head, so the retry refuses. A widening write never commits after the operator was told it failed.
 - **S37. Sharding** (only together with spec 10 section 10).
     - The kernel-scope chain originates in the pool shard.
     - Each tenant shard holds a verified replica: the same record bytes and digests, appended as a restrictive commit in the shard. That replica is what spec 10 X3 needs for a tier-2 check in the shard's own writer.
@@ -775,7 +778,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       - **Why the application is always a valid S2 transition.** Every `Stop` and `Restrict` record of a scope applies that scope's entry, and `Resume` and `Relax` are refused while an entry is pending (below). So the head cannot reach the entry's state by any other record, and the application is either a `Stop` over `Running` or a narrowing `Restrict` over `Stopped`.
       - An intent for one scope never overwrites another scope's entry. With tenant A's stop pending as `latch_only` under `SQLITE_FULL`, a stop for tenant B adds a second entry, and a crash restores both.
     - **Satisfaction.** An entry is satisfied only by proof, never by an epoch number. `satisfied(entry, head)` holds when the scope's anchored head is `Stopped`, and some record `r` in the head's ancestry within the current incident:
-      - carries `satisfies_intent = { intent_id: entry.intent_id, generation: g }` with `g >= entry.generation`, so its `contributors` cover the entry's merged set;
+      - carries `satisfies_intent = { intent_id: entry.intent_id, generation: g }` with `g >= entry.generation`, so its `contributors` cover the entry's merged set, or is an `offline_bypass` record whose `subsumes_intents` lists `{ entry.intent_id, g }` with `g >= entry.generation`;
       - has `allow_containment` no wider than the entry's (`false` when the entry says `false`);
       - is followed only by records that preserve a state at least as narrow: `Restrict`, or a `Rollover` that restates the head. No `Relax` or `Resume` follows `r`.
 
@@ -791,7 +794,12 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - **Writer.** The serving owner, which holds the lock root, serializes journal writes. The offline CLI takes the same owner lock (S30).
     - A failed intent write leaves only the process latch (`process_only`), and the route reports it. This applies only to a serving host, whose process keeps the latch.
     - **Offline CLI.** The offline CLI never reports `process_only`, because its process exits and no latch survives. With the host down and the owner lock held (S30), it appends the durable stop record itself:
-      - when the journal is full or the intent write fails, it skips the journal and appends the transition directly: a `Stop` over a running head, or a narrowing `Restrict` over a stopped head. A down host has no queue to overload. That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
+      - when the journal is full or the intent write fails, it skips the journal and appends the transition directly: a `Stop` over a running head, or a narrowing `Restrict` over a stopped head. A down host has no queue to overload.
+      - **Pending entries are folded in first.** Before a bypass append, the CLI reads the scope's existing journal entries. Reading still works when a write does not. The bypass record folds them in:
+        - its `allow_containment` is the narrowest of the request and every pending entry;
+        - `subsumes_intents` lists each entry's `{ intent_id, generation }`.
+
+        Satisfaction (below) treats a listed entry as satisfied, so a stale entry can neither be re-applied over an already narrow head nor block `Resume` or `Relax`. If the journal cannot even be read, the CLI still appends the bypass record with an empty list and reports `stop_durable` with `journal_unreadable`. Boot then refuses readiness until the journal is readable (S9). That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
       - success requires the record committed and anchored, and the CLI reports `stop_durable`;
       - if that append also fails, the CLI exits non-zero and reports `stop_not_in_force`. It states that no stop is recorded and that the operator must keep the host down or retry. It never claims a stop is in force.
     - This extends AC6's "publish first" rule from memory to durability.
@@ -1165,6 +1173,15 @@ Open decisions:
 |---|---|---|---|
 | 4187599062 | Remove satisfied intents before allowing resume | Fixed now. Under the journal mutex, and before a `Resume` or `Relax` commits, the writer removes every satisfied entry for the scope and fsyncs the slot. A failed removal refuses the widening transition, so no stale intent can be reapplied at boot over a resumed scope | S25 |
 | 4187599073 | Bind break-glass time attestations to the incident | Fixed now. `SignedTimeAttestation` names the authority, scope, `expected_epoch`, incident opening, time and a nonce. The quorum approvals cover its hash, so it cannot be grafted onto a new quorum. The resume transaction checks the pinned source, the incident binding, freshness against the opening commit and the trusted-time floor, and nonce reuse | S29; S19 break-glass |
+
+### Codex review (PR #1174, round 22)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187663042 | Define a timestamp for clockless incident openings | Fixed now. Every `StopEpochV1` carries a signed `trusted_floor_at_commit`, the persisted floor read in its own transaction, so it is present even when `decided_at` is `Unavailable`. Break-glass checks the attestation against the opening record's floor and the current floor, never a local timestamp | record fields; S29 break-glass |
+| 4187663066 | Reconcile pending intents before an offline bypass | Fixed now. Before a bypass append, the CLI reads the scope's pending entries and folds them in: narrowest containment, and a new `subsumes_intents` list. Satisfaction treats listed entries as satisfied, so a stale entry cannot block resume or be re-applied. An unreadable journal still gets the stop, and boot refuses readiness | record fields; S25 offline CLI and satisfaction |
+| 4187663074 | Cancel timed-out resume and relax writes | Fixed now. Only narrowing transitions stay queued after `stop_commit_wait`. A timed-out `Resume` or `Relax` is withdrawn before execution (`resume_not_committed`), or reported `resume_outcome_unknown` if already in a batch. `expected_epoch` makes the retry safe, so a widening write never commits after a failure report | S36 |
+| 4187663058 (spec 9) | Use a store-recovery retry condition for unavailable checks | `OutputWithheld` gains `reason: StoreUnavailable` and `retry: AfterStoreRecovery`, used by spec 9 M19 for reusable check-only reads | S14 client-visible result |
 
 ## Appendix A. FTL reference
 
