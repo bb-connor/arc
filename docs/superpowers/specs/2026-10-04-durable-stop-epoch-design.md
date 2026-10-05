@@ -708,7 +708,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       - The lease lasts `shard_origin_lease` (default 1 s), measured on the shard's monotonic clock, never on authority time.
       - **Bound under replay.** Replaying or delaying origin messages can only withhold renewals, so it can make the shard fail closed sooner. It can never extend the lease.
     - **Behind.** When a response or heartbeat shows an origin head id above the replica's head id, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
-    - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds, and returns to service only after a fresh read shows its replica's head id at or above the origin's.
+    - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds. It returns to service only after a newly accepted challenge response, bound to a fresh nonce under the acceptance rule above, shows the origin head equal to the replica head by `(chain_generation, epoch)` and by record digest. A replica behind catches up first. A replica ahead of the origin is an origin regression: it latches `stop_origin_regressed` and stays out of service.
     - **Acknowledgement bound.**
       - The origin reports a shard as `enforced` when its replica reaches the stop record's id. Otherwise it reports `fenced_by_lease`, with the time at which that shard's lease expires.
       - Every shard therefore enforces a kernel stop within `shard_origin_lease` plus one renewal interval, whether or not it can reach the origin. A response to a poll sent before the stop committed extends the lease to at most `sent_at + shard_origin_lease`. Every response to a later poll carries the stop record's id or a later one, so it puts the shard on the "Behind" path.
@@ -719,7 +719,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 - **S34. Restore and version rules.**
     - **Anchored transitions.** Stop and resume are restrictive commits, anchored before acknowledgement (spec 10 section 5). A database-only restore to before a stop does not extend the anchor, so `reconcile_startup` refuses (M: `rollback_anchor.rs:106-130`) and the host fails closed.
     - **Stop-intent journal.** It lives in the lock root beside the anchor (S25). A database-only restore therefore keeps every scope's intent entry, and the boot honors them.
-    - **Whole-volume restore.** A volume or VM snapshot that restores the database together with the anchor and the latch silently resurrects a running kernel. Later transitions then reuse epoch numbers, so two different signed artifacts can exist for the same `(authority_id, scope, chain_generation, epoch)`. This is a residual risk. Deployments may enable `stop_epoch_floor_check`: at boot, the head id per scope must be at or above the last id exported to SIEM or published to federation peers (compared as `(chain_generation, epoch)`), read from a configured external witness. Otherwise the host is not ready.
+    - **Whole-volume restore.** A volume or VM snapshot that restores the database together with the anchor and the latch silently resurrects a running kernel. Later transitions then reuse epoch numbers, so two different signed artifacts can exist for the same `(authority_id, scope, chain_generation, epoch)`. This is a residual risk. Deployments may enable `stop_epoch_floor_check`: at boot, the last record exported to SIEM or published to federation peers is read from a configured external witness as an exact `(StopEpochId, record_digest)` per scope. That exact pair must occur in the local chain's ancestry: the record at that id must exist locally with that digest, and the local head must be at or after it. A local chain that reached the same or a higher position through a different sequence fails this check. Otherwise the host is not ready.
     - **Schema version.** Phase 1 bumps the admission schema version from 34 (M: `admission_operation_store.rs:219`), so the open gate refuses older binaries (M: `schema.rs:63-72`). An older binary never runs against a store that has a stop table.
     - **Upgrade.** The migration that bumps the version creates the stop tables in the same transaction. "Absent before migration" is a normal upgrade. "Missing after migration" means not ready (S9).
 - **S25. Stop-intent journal.**
@@ -1064,6 +1064,13 @@ Open decisions:
 |---|---|---|---|
 | R-6-07 (alignment) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. `retryable_after_resume` stays equal to `identity_disposition == Reusable`, so it is `false` for the new `Retained` value. A stop refusal is definite, so stop receipts are never `Retained` | S15 |
 | R-10-03 (consumer side) | The crossing index lacks the ordering contract required by its consumers | Fixed. S7's `Settle` test, its predicate and the DST property use spec 10 X4's `CrossingOrder`. A subject's order is compared with the stop record's own `commit_sequence` in the same store, or the shard's replica. `ChainRollover`'s `writer_epoch` remains the serving owner's fence and is not used for ordering | S7; section 8 predicate; section 17 DST |
+
+### Codex review (PR #1174, round 13)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186619802 | Require exact origin equality when recovering the lease | Fixed now. Recovery from `stop_origin_stale` requires a newly accepted challenge response showing the origin head equal to the replica head by position and digest. A replica behind catches up first, and a replica ahead latches `stop_origin_regressed` | S37 lost origin |
+| 4186619834 | Verify the witnessed stop-chain digest | Fixed now. `stop_epoch_floor_check` reads the witnessed `(StopEpochId, record_digest)` and requires that exact pair in the local chain ancestry. A forked chain that reaches the same position through a different sequence is not ready | section 13a whole-volume restore |
 
 ## Appendix A. FTL reference
 

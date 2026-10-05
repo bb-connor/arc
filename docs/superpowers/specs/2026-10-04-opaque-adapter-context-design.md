@@ -252,7 +252,7 @@ pub trait ProviderAdapter: Send + Sync {
         &self,
         binding: InvocationBinding<'_>, // invocation plus optional permit and model-context digests
         verdict: VerdictResult,
-        result: BoundToolResult,
+        result: Option<BoundToolResult>,     // Some for an Allow; None for a Deny (rule 9)
     ) -> Result<ProviderResponse, ProviderError>;
     #[deprecated(note = "use lower_bound; correlation from ToolResult bytes is removed in the next minor")]
     async fn lower(&self, verdict: VerdictResult, result: ToolResult)
@@ -452,7 +452,7 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
    - `result.binding_digest` equals the recomputed binding digest;
    - for `Allow` with `result_sha256 = Some(h)`, `SHA256(result.result.0) == h`;
    - for `Allow` with `result_sha256 = None`, the kernel did not observe the output (the receipt's content is the null digest, for example a caller-executed tool). The executor stamps the sealed record's complete `binding_digest`, at execution time. The digest is handed to it through `BoundOutcome` together with the verdict, because a v2 binding that includes a permit or model-context digest cannot be recomputed from the `ToolInvocation` alone. An executor never derives the digest itself;
-   - for `Deny`, `result.result.0` MUST be empty. A deny is lowered from its `reason` alone.
+   - for `Deny`, `result` MUST be `None`. A deny is lowered from its `reason` and disposition alone, so the trusted constructor passes its deny `BoundOutcome` (`result: None`) straight to `lower_bound` with no fabricated value. A `Deny` with `Some(result)`, or an `Allow` with `None`, is `ResultBindingMismatch`.
 
    Any mismatch returns `ResultBindingMismatch`, and nothing is lowered. Passing invocation and verdict B with result A therefore fails: A's binding digest differs, and A's bytes do not hash to B's signed `content_hash`.
 10. **The kernel response is bound before the verdict exists.** `bound_verdict_from_response` checks in this order, and constructs nothing until every check passes:
@@ -729,6 +729,12 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 |---|---|---|---|
 | R-6-07 (consumer side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. Rule 10 check 6 consumes spec 9's new `Retained` disposition. The ambiguous deny for an unconfirmed commit is lowered as `Deny { disposition: Retained }` and leaves the sealed record unbound and retained. A same-id retry gets status or replay, never a fresh dispatch, and recovery's terminal receipt is constructed and binds. Tests cover deny A then recovery terminal B under the same namespace, request id and binding, including across a restart | Section 5.1 (`DenyDisposition`, `bound_receipt_id`); rule 10 check 6; rule 11 retention; sections 5.3, 7, 8 and 10 |
 | R-6-08 | The bound request builder cannot carry the governed D1 request it promises to seal | Fixed. `build_bound_tool_call_request` takes a `BoundAuthorization` (governed intent, host-established negotiation, installed D1 layout). It runs the existing checks, assembles the complete request, validates peer capabilities and authorization extensions, checks the D1 shape against the receiver's layout, and derives the permit digest from the actual request before sealing. Both V: layouts are supported (`Arguments` and `GovernedContext`); unsupported combinations fail before sealing. A post-seal intent change fails `GovernedIntent`. Open question 2 is answered | Section 5.1 (builder, `BoundAuthorization`, errors); rule 10 check 2; rule 11; sections 5.3, 7, 8, 10 and 11 |
+
+### Codex review (PR #1174, round 13)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186619827 | Allow deny lowering without a tool result | Fixed now. `lower_bound` takes `result: Option<BoundToolResult>`: `Some` for an `Allow`, `None` for a `Deny`, so a deny `BoundOutcome` passes straight through. A mismatched pairing is `ResultBindingMismatch` | section 5.1 API; rule 9 |
 
 ## Appendix A: FTL reference
 

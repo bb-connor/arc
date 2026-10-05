@@ -336,7 +336,16 @@ Rules:
      - `member_ordinal` is the member's 0-based position in its batch, assigned in dequeue order (X19).
      - Members run serially and the chain sequence is strictly increasing within a store, so `commit_sequence` alone already orders written crossings, including two members of one batch. `member_ordinal` is a tiebreak that a written crossing never needs.
      - The tuple is chosen over `(batch_index, writer_epoch)`, which revision 2 used and this revision withdraws. A per-batch ordinal collides across consecutive batches, a batch number leaves members of one batch unordered, and `writer_epoch` is the serving owner's fence, not a commit counter.
-   - **Check-only crossings** write nothing. A `CheckOnlyDispatch` or X13a release records `(store_uuid, observed_commit_sequence, check_ordinal)` in the call's receipt metadata as `chio_runtime.crossing`. `observed_commit_sequence` is the chain head that the check read in the writer. The check is ordered after that commit and before the next one, and `check_ordinal` orders only checks that observed the same head.
+   - **Check-only crossings** write nothing. A `CheckOnlyDispatch` or X13a release records `(store_uuid, observed_commit_sequence, check_ordinal)` in the call's receipt metadata as `chio_runtime.crossing`, where `observed_commit_sequence` is the chain head that the check read in the writer.
+     - **Comparison.** Written and check-only positions are compared through a discriminated key, not as raw tuples:
+
+       ```text
+       key(written(s, c, m))       = (s, c, 0, m)
+       key(check_only(s, c, k))    = (s, c, 1, k)
+       ```
+
+     - Every check that observed head `c` therefore sorts after every crossing written at `c`, whatever its `member_ordinal`, and before anything written at `c + 1`. The two ordinal domains never collide, because the discriminator separates them.
+     - `check_ordinal` orders only checks that observed the same head.
    - **Comparison.**
      - Orders compare only within one `store_uuid`.
      - `commit_sequence` continues across owner changes, because it is the store's own table key, not an owner counter.
@@ -892,3 +901,9 @@ Where the analogy breaks:
 |---|---|---|---|
 | R-10-03 | The crossing index lacks the ordering contract required by its consumers | Fixed. X4 defines `CrossingOrder = (store_uuid, commit_sequence, member_ordinal)` over the existing durable authority chain, with check-only crossings placed by `observed_commit_sequence`, plus comparison rules for owner change, sharding and restore. `(batch_index, writer_epoch)` is withdrawn everywhere. X19 ties the order to execution order, and tests cover same-batch, consecutive-batch, stop-between and owner-restart cases. Answers the owner's open question 3: reuse the global commit sequence with a member ordinal, and add no new sequence | X4; X19; section 15 receipt metadata; section 17 |
 | R-6-07 (emitter side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. X22 states that pre-dispatch members answered `OutcomeUnknown` sign `Retained` denials, and that the reconciled outcome-unknown terminal is the one `Terminal` receipt | X22; section 17 |
+
+### Codex review (PR #1174, round 13)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186619818 | Give check-only crossings a true after-commit order | Fixed now. Written and check-only positions compare through a discriminated key: `(s, c, 0, member_ordinal)` for written crossings and `(s, c, 1, check_ordinal)` for checks. A check that observed head `c` sorts after everything written at `c` and before `c + 1`, and the two ordinal domains cannot collide | X4 check-only crossings |

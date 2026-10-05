@@ -314,8 +314,10 @@ Restored sessions seed sequences from a fresh generation, so ids from an earlier
 Revision 4 persists subscriptions rather than asking clients to re-subscribe, because MCP has no "subscription ended" notification that existing clients understand.
 
 1. **A24. Persisted set.** The resume record gains `subscriptions: Vec<PersistedSubscription>`, a tagged entry `PersistedSubscription = Live { uri, capability_id } | Ended { uri, capability_id, reason, end_event_id }` (the `Ended` arm is H5a's durable end marker), added to the integrity envelope under a new schema label `chio.remote-mcp.resume-record-integrity.v3`. A successful `resources/subscribe` or `resources/unsubscribe` signs and persists a new resume record. If that persist fails, the subscribe returns an error and the registry change is rolled back, so the client never holds a subscription the store does not know.
-2. **A25. Re-authorization at restore.** After A17's persist and before `insert_active`, restore replays each persisted subscription through the same path as a client `resources/subscribe`: validate the capability, check scope, check the subject exists (`session_ops.rs:320-338`), then register it (including any upstream forwarding). A subscription that fails re-authorization is dropped and removed from the next persisted record.
-3. **A26. Catch-up.** Updates during downtime were lost, so restore posts one `notifications/resources/updated` for every persisted URI, including those that failed re-authorization. A client whose subscription was dropped learns it from the authorization error on its re-read.
+2. **A25. Re-authorization at restore.** After A17's persist and before `insert_active`, restore branches on each persisted entry's tag:
+   - **`Ended` markers** are re-queued as `SubscriptionEnded { reason }` with their `end_event_id` (H5a). They are never re-authorized or resurrected as live, and they leave the persisted set only after emission.
+   - **`Live` entries** are replayed through the same path as a client `resources/subscribe`: validate the capability, check scope, check the subject exists (`session_ops.rs:320-338`), then register it, including any upstream forwarding. A `Live` entry that fails re-authorization (expired, revoked, or the subject is gone) is terminalized, not silently dropped. It becomes an `Ended` marker with the failing reason, its `SubscriptionEnded` is queued, and it is persisted as `Ended` until emitted.
+3. **A26. Catch-up.** Updates during downtime were lost, so restore posts one `notifications/resources/updated` for every `Live` entry that passed re-authorization. Entries that are `Ended`, or that were terminalized at restore, get their `SubscriptionEnded` instead and no catch-up update.
 4. **A27. Downgrade.** A binary that predates the v3 envelope fails integrity on such a record and treats it as malformed (`session_recovery.rs:30-31` deletes it). Downgrade therefore loses sessions with subscriptions rather than restoring them without subscriptions. This is stated as a migration note.
 5. **A28. Envelope selection on every re-sign.** Today's tag covers a fixed v2 field list with no `subscriptions` (M: `session_resume.rs:801-829`). The record therefore names its envelope in `resume_integrity.envelope`, and an absent value means `v2` for records written before this change. The version is part of the MAC'd bytes, because the schema label differs, so relabeling a record changes its tag. Every re-sign applies the same rule: A17's generation bump, A24's subscribe and unsubscribe persists, and terminal records.
    - A record with a non-empty `subscriptions` is signed `v3`.
@@ -890,6 +892,12 @@ Open decisions:
 |---|---|---|---|
 | 4186364927 | Encode durable end markers in the resume schema | Fixed now. A24's persisted entry is a tagged `PersistedSubscription = Live { .. } \| Ended { uri, capability_id, reason, end_event_id }`, inside the v3 integrity envelope, so H5a's end marker is representable and authenticated | A24; H5a |
 | 4186364968 | Bind approval events to their owning session | Fixed now. `chio_hitl_events`, `ApprovalRequest` and `chio_hitl_pending` carry `audience_owner`, the creating request's canonical `HintOwnerRef`, written in the event's transaction. Routing uses it, never `subject_id`, so two sessions of one subject never cross | H10a |
+
+### Codex review (PR #1174, round 13)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186619810 | Preserve ended subscriptions during restore | Fixed now. A25 branches on the tag. `Ended` markers are re-queued and never re-authorized. A `Live` entry that fails re-authorization is terminalized into an `Ended` marker with its `SubscriptionEnded`, not dropped. A26 sends catch-up updates only for `Live` entries that passed | A25; A26 |
 
 ## Appendix A. FTL reference
 
