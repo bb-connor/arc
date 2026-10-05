@@ -112,6 +112,8 @@ scripts/generate-proof-report.sh             @bb-connor
 scripts/check-proof-report.sh                @bb-connor
 scripts/qualify-release.sh                   @bb-connor
 scripts/tests/**                             @bb-connor
+/scripts/outcome-ledger-profile.py            @bb-connor
+/.github/workflows/research-workspaces.yml    @bb-connor
 scripts/tests/check-proof-report.test.sh     @bb-connor
 scripts/tests/lane-gate.test.sh              @bb-connor
 crates/*/tests/regression_*.rs               @bb-connor

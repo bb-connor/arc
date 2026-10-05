@@ -297,6 +297,40 @@ pub struct Probe {
 
 pub fn probe(path: &Path) -> Result<()> {
     let spec: Probe = serde_json::from_slice(&std::fs::read(path)?)?;
+    let status = std::fs::read_to_string("/proc/self/status")?;
+    for name in ["CapInh:", "CapPrm:", "CapEff:", "CapBnd:", "CapAmb:"] {
+        let mask = status
+            .lines()
+            .find_map(|line| line.strip_prefix(name))
+            .ok_or("sandbox capability mask absent")?;
+        if u64::from_str_radix(mask.trim(), 16)? != 0 {
+            return Err("sandbox retained Linux capabilities".into());
+        }
+    }
+    // The positive control distinguishes namespace denial from a missing
+    // executable or dynamic loader. Only probe launches mount this helper.
+    if !Command::new("/usr/bin/bwrap")
+        .arg("--version")
+        .output()?
+        .status
+        .success()
+    {
+        return Err("sandbox namespace probe executable unavailable".into());
+    }
+    let nested = Command::new("/usr/bin/bwrap")
+        .args([
+            "--unshare-user",
+            "--ro-bind",
+            "/",
+            "/",
+            "--",
+            "/usr/bin/bwrap",
+            "--version",
+        ])
+        .output()?;
+    if nested.status.success() || !String::from_utf8_lossy(&nested.stderr).contains("namespace") {
+        return Err("sandbox nested user namespace denial unverified".into());
+    }
     let mut denied = Vec::new();
     for path in &spec.denied_paths {
         let read_denied = std::fs::File::open(path).is_err();
@@ -361,7 +395,7 @@ pub fn probe(path: &Path) -> Result<()> {
     };
     println!(
         "{}",
-        serde_json::json!({"deniedPaths":denied,"namespaces":namespaces,"hostLoopbackDenied":true,"procRootDenied":true,"symlinkEscapeDenied":true,"ownReceiverKeyReadable":own_key,"receiverConfigReadonly":spec.receiver})
+        serde_json::json!({"deniedPaths":denied,"namespaces":namespaces,"hostLoopbackDenied":true,"procRootDenied":true,"symlinkEscapeDenied":true,"ownReceiverKeyReadable":own_key,"receiverConfigReadonly":spec.receiver,"capabilitiesDropped":true,"nestedUserNamespaceDenied":true})
     );
     Ok(())
 }
@@ -418,6 +452,7 @@ impl Brokers {
                 self.courier_mounts(job_path)?
             };
             command
+                .args(["--ro-bind", "/usr/bin/bwrap", "/usr/bin/bwrap"])
                 .arg("--ro-bind")
                 .arg(&spec_path)
                 .arg("/probe.json")

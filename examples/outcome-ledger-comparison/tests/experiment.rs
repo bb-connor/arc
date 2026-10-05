@@ -142,6 +142,8 @@ fn isolated_couriers_cannot_read_receiver_keys_and_preserve_graph_recovery(
             assert_eq!(role["report"]["hostLoopbackDenied"], true);
             assert_eq!(role["report"]["procRootDenied"], true);
             assert_eq!(role["report"]["symlinkEscapeDenied"], true);
+            assert_eq!(role["report"]["capabilitiesDropped"], true);
+            assert_eq!(role["report"]["nestedUserNamespaceDenied"], true);
         }
     }
     let stderr = String::from_utf8_lossy(&result.stderr);

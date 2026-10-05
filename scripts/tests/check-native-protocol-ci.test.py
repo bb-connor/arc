@@ -39,6 +39,35 @@ CONSUMERS = (
 
 
 class NativeProtocolCiTests(unittest.TestCase):
+    def test_postgres_lifetime_preserves_the_callers_unprivileged_identity(self):
+        self.assertNotEqual(os.geteuid(), 0, "run CI controls as an unprivileged user")
+        _, step = CHECKER.named_step(LIVE[5]["jobs"]["native"], CHECKER.BROKER_LIFETIME_NAME)
+        name = "process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime"
+        with tempfile.TemporaryDirectory(prefix="broker-identity-") as temporary:
+            directory = Path(temporary)
+            identity = directory / "observed-uid"
+            binary = directory / "selected-test"
+            binary.write_text(
+                "#!/usr/bin/env python3\nimport os, sys\nfrom pathlib import Path\n"
+                f"name = {name!r}\n"
+                "if '--list' in sys.argv:\n    print(name + ': test')\n    sys.exit(0)\n"
+                f"Path({str(identity)!r}).write_text(str(os.geteuid()))\n"
+                "print('test ' + name + ' ... ok')\n"
+                "print('test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 206 filtered out; finished in 0.01s')\n"
+            )
+            binary.chmod(0o755)
+            environment = dict(os.environ, RUNNER_TEMP=str(directory),
+                               CHIO_BROKER_TEST_BINARY=str(binary),
+                               CHIO_CAGE_INIT="/tmp/fixture-cage-init",
+                               CHIO_BROKER_MCP_TOOL="/tmp/fixture-broker-mcp",
+                               CHIO_KEYLOG_WITNESS="/tmp/fixture-witness",
+                               CHIO_KEYLOG_AUDIT="/tmp/fixture-audit")
+            result = subprocess.run(["bash", "-c", step["run"]], cwd=ROOT,
+                                    env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(int(identity.read_text()), os.geteuid(),
+                             "lifetime fixture must not select a root target")
+
     def test_postgres_lane_executes_the_confined_preparation_lifetime_regression(self):
         name = "Confined broker survives preparation runtime retirement"
         job = LIVE[5]["jobs"]["native"]

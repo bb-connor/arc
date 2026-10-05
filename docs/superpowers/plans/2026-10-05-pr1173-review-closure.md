@@ -240,3 +240,48 @@ hash, aggregate assertion and tamper control. Run the full historical suite and
 the real `--check-historical` command, then renew the native source inventory
 and paper freeze before replacing the candidate. The failed hosted campaign
 remains historical.
+
+## Nested namespace and final hosted campaign repairs
+
+The `acf34b0746` campaign supplies three further reproducible source findings.
+Complete them before the next source freeze:
+
+- [ ] Remove only the four obsolete `regress` and `typify*` duplicate-baseline
+  rows and matching Cargo Deny skips. The locked graph has no remaining split
+  for these packages. Require the unchanged baseline checker and actual bans
+  check to pass; add no new allowance.
+- [ ] Import `alloc::string::ToString` inside the bounded-reader test module.
+  The isolated `chio-security-types --no-default-features` suite reproduces the
+  missing trait; run its full suite and Clippy in both portable and `std` modes.
+- [ ] Qualify nested auditing under an enforcing AppArmor profile attached only
+  to the candidate-built outcome-ledger controller. Preserve the package's
+  ordinary Bubblewrap profile, global namespace restrictions, every read-only
+  mount and checker resource limit. The trusted auditor needs nested namespaces;
+  candidate checkers must still drop all capabilities and prevent further user
+  namespaces. Reject unsafe executable paths before generating policy; compile
+  the policy with the real parser and exercise actual nested auditing and leaf
+  isolation in the full nine-test suite. Require the x86 matrix rerun.
+- [ ] Rerun stale promoted adversarial campaigns through the existing
+  transactional refresh tool after all source repairs. Preserve original
+  outcomes, caught-only acceptance, behavioral controls, source restoration and
+  input-closure checks. Never edit a digest to promote old execution.
+
+The authorized enterprise definition also requests shard controls absent from
+this checkout. That coherent source handoff and the committed signed Linux
+package remain under the security agent's ownership. Retain the failed logs,
+and do not weaken the consumer or change repository authority variables.
+
+The same campaign reproduces six stale Apalache runtime-test paths after the
+existing kernel test-module split. Update only those paths to their actual
+private modules; preserve function names, production commits, invariants and
+all 16 negative models. Require all negative-gate controls and actual Apalache
+counterexamples on the replacement candidate.
+
+The final PostgreSQL attempt passes both confined trajectories, then its
+separate lifetime fixture selects a forbidden root target because the workflow
+elevates the entire test. Run that fixture as the observed unprivileged runner,
+which the production cage helper explicitly supports. Keep the privileged host
+enforcement preflight, all actual broker/key-log binaries, exact test inventory
+and receipt assertions. A shell-boundary regression must observe the unchanged
+caller UID (the original step reproduces UID 0 instead of 1000). Require actual
+x86 lifetime execution before resolving its review thread.

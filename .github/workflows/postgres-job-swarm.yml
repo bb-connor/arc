@@ -101,9 +101,10 @@ jobs:
       - name: Confined broker survives preparation runtime retirement
         run: |
           set -euo pipefail
+          test "$(id -u)" -ne 0
           test_name=process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime
           "$CHIO_BROKER_TEST_BINARY" --list --exact "$test_name" > "$RUNNER_TEMP/broker-preparation.list"
-          sudo env CHIO_CAGE_TEST_HELPER="$CHIO_CAGE_INIT" CHIO_BROKER_MCP_TOOL="$CHIO_BROKER_MCP_TOOL" CHIO_KEYLOG_WITNESS="$CHIO_KEYLOG_WITNESS" CHIO_KEYLOG_AUDIT="$CHIO_KEYLOG_AUDIT" "$CHIO_BROKER_TEST_BINARY" --exact "$test_name" --nocapture 2>&1 | tee "$RUNNER_TEMP/broker-preparation.log"
+          env CHIO_CAGE_TEST_HELPER="$CHIO_CAGE_INIT" CHIO_BROKER_MCP_TOOL="$CHIO_BROKER_MCP_TOOL" CHIO_KEYLOG_WITNESS="$CHIO_KEYLOG_WITNESS" CHIO_KEYLOG_AUDIT="$CHIO_KEYLOG_AUDIT" "$CHIO_BROKER_TEST_BINARY" --exact "$test_name" --nocapture 2>&1 | tee "$RUNNER_TEMP/broker-preparation.log"
           python3 scripts/check-exact-cargo-test-inventory.py --label "confined broker preparation lifetime" --allow-filtered --list-output "$RUNNER_TEMP/broker-preparation.list" --run-output "$RUNNER_TEMP/broker-preparation.log" "$test_name"
       - name: Preserve the exact broker lifetime test inventory
         if: ${{ always() }}
