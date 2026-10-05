@@ -205,7 +205,7 @@ where
         payload.as_bytes(),
         MAX_SSE_EVENT_BYTES,
     )?
-    .decode_signed::<Value>()?;
+    .decode_document::<Value>()?;
     let stream_response = decode_event(event)?;
     let (stream_response, terminal_or_interrupted) = validate_stream_response(stream_response)?;
     if chunks.len() >= MAX_SSE_CHUNKS {

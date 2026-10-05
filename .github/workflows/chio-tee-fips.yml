@@ -641,6 +641,7 @@ jobs:
           umask 022
           bash scripts/run-exact-cargo-test-inventory.sh \
             --label "Native pending approval delivery" --allow-filtered --expected \
+            session_cli::tests::pending_approval::ap23_stdio_host_binds_pending_intent_before_collecting_votes \
             session_cli::tests::pending_approval::pending_approval_transports_the_signed_proposal_without_dispatch \
             session_cli::tests::pending_approval::pending_approval_round_trip_resumes_the_original_request_once \
             session_cli::tests::pending_approval::pending_approval_projection_rejects_broken_shape_and_signed_content_bindings \

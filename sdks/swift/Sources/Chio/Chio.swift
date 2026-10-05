@@ -2,6 +2,7 @@ import Foundation
 
 #if canImport(chio_kernel_mobile)
 import chio_kernel_mobile
+public typealias VerifiedCapability = chio_kernel_mobile.CapabilityVerificationRecord
 #else
 public struct VerifiedCapability: Equatable, Sendable {
     public let id: String
@@ -38,10 +39,11 @@ public struct ChioKernel {
         #endif
     }
 
-    public func signReceipt(bodyJson: String, signingSeedHex: String) throws -> String {
+    public func signReceipt(bodyJson: String, canonicalContentHex: String, signingSeedHex: String) throws -> String {
         #if canImport(chio_kernel_mobile)
         return try chio_kernel_mobile.signReceipt(
             bodyJson: bodyJson,
+            canonicalContentHex: canonicalContentHex,
             signingSeedHex: signingSeedHex
         )
         #else
@@ -98,12 +100,13 @@ public struct ChioKernel {
         #endif
     }
 
-    public func verifyMobileReceipt(
+    /// Inspect envelope shape only; this does not verify device integrity or authorize a call.
+    public func inspectMobileReceiptEnvelopes(
         receiptJson: String,
         evidenceJson: String
     ) throws -> String {
         #if canImport(chio_kernel_mobile)
-        return try chio_kernel_mobile.verifyMobileReceipt(
+        return try chio_kernel_mobile.inspectMobileReceiptEnvelopes(
             receiptJson: receiptJson,
             evidenceJson: evidenceJson
         )

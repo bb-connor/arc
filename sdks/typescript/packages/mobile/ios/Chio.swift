@@ -13,7 +13,7 @@ public class Chio: Module {
             try unavailable("evaluate")
         }
 
-        AsyncFunction("signReceipt") { (_ bodyJson: String, _ signingSeedHex: String) -> String in
+        AsyncFunction("signReceipt") { (_ bodyJson: String, _ canonicalContentHex: String, _ signingSeedHex: String) -> String in
             try unavailable("signReceipt")
         }
 
@@ -33,8 +33,8 @@ public class Chio: Module {
             try unavailable("attestPlayIntegrity")
         }
 
-        AsyncFunction("verifyMobileReceipt") { (_ receiptJson: String, _ evidenceJson: String) -> String in
-            try unavailable("verifyMobileReceipt")
+        AsyncFunction("inspectMobileReceiptEnvelopes") { (_ receiptJson: String, _ evidenceJson: String) -> String in
+            try unavailable("inspectMobileReceiptEnvelopes")
         }
     }
 }

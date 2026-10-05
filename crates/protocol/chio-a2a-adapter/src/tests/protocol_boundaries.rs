@@ -113,3 +113,65 @@ fn protocol_boundary_sse_duplicate_fields_never_reach_decoder() {
     ));
     assert!(chunks.is_empty());
 }
+
+#[test]
+fn protocol_boundary_sse_accepts_ordinary_decimal_metadata() {
+    let mut chunks = Vec::new();
+    let mut terminal = false;
+    let mut lines = vec![
+        r#"{"message":{"metadata":{"ratio":0.50,"small":1e-05,"id":18446744073709551615}}}"#.into(),
+    ];
+    process_sse_event(&mut chunks, &mut terminal, &mut lines, &mut 0, &Ok).unwrap();
+    assert!(terminal);
+    assert_eq!(chunks.len(), 1);
+    let metadata = &chunks[0].data["message"]["metadata"];
+    assert_eq!(metadata["ratio"].as_f64(), Some(0.5));
+    assert_eq!(metadata["small"].as_f64(), Some(0.00001));
+    assert_eq!(metadata["id"].as_u64(), Some(u64::MAX));
+}
+
+#[test]
+fn protocol_boundary_registry_refuses_oversize_save_without_losing_previous_tasks() {
+    let path = unique_path("protocol-registry-write-bound", ".json");
+    let store = A2aTaskRegistry::open(&path).unwrap();
+    let mut registry = A2aPersistedTaskRegistry::default();
+    registry.tasks.insert(
+        "task".into(),
+        A2aTaskRecord {
+            task_id: "task".into(),
+            tool_name: "read".into(),
+            server_id: "server".into(),
+            interface_url: "https://example.com".into(),
+            protocol_binding: "JSONRPC".into(),
+            tenant: None,
+            partner: "peer".into(),
+            first_seen_at: 10,
+            last_seen_at: 11,
+            last_state: None,
+            last_source: String::new(),
+        },
+    );
+    let overhead = serde_json::to_vec_pretty(&registry).unwrap().len();
+    registry.tasks.get_mut("task").unwrap().last_source = "x".repeat(MAX_A2A_JSON_BYTES - overhead);
+    store.save(&registry).unwrap();
+    let before = fs::read(&path).unwrap();
+    assert_eq!(before.len(), MAX_A2A_JSON_BYTES);
+    assert_eq!(store.load().unwrap().tasks.len(), 1);
+
+    registry
+        .tasks
+        .get_mut("task")
+        .unwrap()
+        .last_source
+        .push('x');
+    assert!(
+        store.save(&registry).is_err(),
+        "an unreopenable registry must never replace durable state"
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    assert_eq!(
+        A2aTaskRegistry::open(&path).unwrap().load().unwrap().tasks["task"].last_seen_at,
+        11
+    );
+    fs::remove_file(path).unwrap();
+}

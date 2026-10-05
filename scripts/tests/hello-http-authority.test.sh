@@ -5,7 +5,12 @@ repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 : "${CHIO_BIN:?set CHIO_BIN to the freshly built chio executable}"
 fixture_root="$(mktemp -d /tmp/chio-hello-authority.XXXXXX)"
 trust_pid=""
+sidecar_pid=""
 cleanup() {
+  if [[ -n "${sidecar_pid}" ]]; then
+    kill "${sidecar_pid}" 2>/dev/null || true
+    wait "${sidecar_pid}" 2>/dev/null || true
+  fi
   if [[ -n "${trust_pid}" ]]; then
     kill "${trust_pid}" 2>/dev/null || true
     wait "${trust_pid}" 2>/dev/null || true
@@ -33,6 +38,18 @@ trust_authority_public_key "${control_url}" fixture-only-token >"${fixture_root}
 issue_demo_capability "${control_url}" fixture-only-token "${fixture_root}/capability.json"
 materialize_capability_token "${fixture_root}/capability.json" "${fixture_root}/capability.token"
 
+create_demo_signing_custody "${fixture_root}/state/sidecar.seed"
+sidecar_url="http://127.0.0.1:$(pick_free_port)"
+"${CHIO_BIN}" --authority-seed-file "${fixture_root}/state/sidecar.seed" api protect \
+  --upstream http://127.0.0.1:1 \
+  --spec "${repo_root}/examples/hello-drogon/openapi.yaml" \
+  --allow-anonymous-reads \
+  --listen "${sidecar_url#http://}" \
+  --receipt-store "${fixture_root}/sidecar.sqlite3" \
+  >"${fixture_root}/sidecar.log" 2>&1 &
+sidecar_pid=$!
+wait_for_http "${sidecar_url}/chio/health" 20
+
 python3 - "${fixture_root}" <<'PY'
 import json
 from pathlib import Path
@@ -43,6 +60,7 @@ root = Path(sys.argv[1])
 assert stat.S_IMODE((root / "state").stat().st_mode) == 0o700
 for path in (root / "state").iterdir():
     assert stat.S_IMODE(path.stat().st_mode) == 0o600, path
+assert len(bytes.fromhex((root / "state/sidecar.seed").read_text().strip())) == 32
 for name in ("public-key", "capability.json", "capability.token"):
     assert stat.S_IMODE((root / name).stat().st_mode) == 0o600, name
 assert len(bytes.fromhex((root / "public-key").read_text().strip())) == 32

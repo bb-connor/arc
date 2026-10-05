@@ -14,6 +14,11 @@ SUPPORT_PATHS = (CHECKPOINT, EFFECT)
 # (owner path, reader symbol): (constrained API, required source expressions).
 # Every expression is confined to this named function with nested items masked.
 RULES = {
+    ("crates/products/chio-wall/src/commands/siem_pins.rs", "parse"): ("bounded_operator_key_list", (
+        r"if\s+value\.len\(\)\s*>\s*MAX_CONFIG_BYTES\s*\{\s*return\s+Err\(",
+        r"let\s+encoded\s*:\s*Vec<String>\s*=\s*serde_json::from_str\(&value\)",
+        r"if\s+encoded\.is_empty\(\)\s*\|\|\s*encoded\.len\(\)\s*>\s*MAX_KEYS\s*\{\s*return\s+Err\(",
+    )),
     (CORE + "canonical.rs", "from_str"): ("StrictJson::deserialize+Deserializer::end", (
         r"StrictJson::deserialize\s*\(\s*&mut\s+de\s*\)", r"\bde\.end\s*\(\s*\)",
     )),
@@ -94,6 +99,29 @@ def special_apis(path, reader, body, supports):
 
 def private_producer_apis(path, reader, body, owners, calls, canonical_equality):
     """Pin the finite private producer/readback relationships reviewed in code."""
+    if path == "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs" and reader == "measure":
+        witnesses = {
+            "measure": (
+                r"wire_bytes\s*:\s*text\.len\(\)",
+                r"if\s+let\s+Some\(limit\)\s*=\s*counter\.footprint\.exceeded\(\)\s*\{\s*return\s+Err\(AdmissionError::Limit\(limit\)\)",
+                r"ValueSeed\(&mut\s+counter\)\s*\.deserialize\(&mut\s+decoder\)",
+                r"\.and_then\(\|\(\)\|\s*decoder\.end\(\)\)",
+            ),
+            "add": (
+                r"self\.footprint\.checked_add\(Footprint\s*\{\s*nodes,\s*text_bytes,",
+                r"if\s+let\s+Some\(limit\)\s*=\s*next\.exceeded\(\)\s*\{\s*self\.limit\s*=\s*Some\(limit\);\s*return\s+Err\(",
+            ),
+            "deserialize#1": (r"self\.0\.add\(1,\s*0\)\?",),
+            "visit_str#1": (r"self\.0\.add\(0,\s*value\.len\(\)\)",),
+            "visit_str#2": (r"self\.0\.add\(0,\s*value\.len\(\)\)",),
+            "visit_seq": (r"sequence\.next_element_seed\(ValueSeed\(self\.0\)\)\?",),
+            "visit_map": (
+                r"map\.next_key_seed\(KeySeed\(self\.0\)\)\?",
+                r"map\.next_value_seed\(ValueSeed\(self\.0\)\)\?",
+            ),
+        }
+        if all(re.search(pattern, owners.get(owner, "")) for owner, patterns in witnesses.items() for pattern in patterns):
+            return ["Counter::checked_add+ValueSeed::structural_limits+Deserializer::end"]
     if path == "crates/security/chio-active-response-authority/src/store.rs" and reader == "prepare_logical_records":
         callers = {name: text for name, text in owners.items() if name != reader and calls(text, reader)}
         check = owners.get("validate_payload_size", "")

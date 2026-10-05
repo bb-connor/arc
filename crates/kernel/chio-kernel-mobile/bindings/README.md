@@ -144,7 +144,7 @@ static libraries (`libchio_kernel_mobile.a`) from step 1.
    `try verifyAppAttestEvidence(keyId:challengeHex:appId:attestationCborHex:previousCounter:)`,
    `try attestPlayIntegrity(nonceHex:)`,
    `try verifyPlayIntegrityEvidence(token:expectedNonce:expectedPackageName:expectedAudience:jwksJson:)`, and
-   `try verifyMobileReceipt(receiptJson:evidenceJson:)`.
+   `try inspectMobileReceiptEnvelopes(receiptJson:evidenceJson:)`.
 
 ## Generating the Kotlin bindings
 
@@ -186,7 +186,7 @@ into `src/main/jniLibs/<abi>/` alongside the module's resources.
    `verifyAppAttestEvidence(keyId, challengeHex, appId, attestationCborHex, previousCounter)`,
    `attestPlayIntegrity(nonceHex)`,
    `verifyPlayIntegrityEvidence(token, expectedNonce, expectedPackageName, expectedAudience, jwksJson)`, and
-   `verifyMobileReceipt(receiptJson, evidenceJson)`.
+   `inspectMobileReceiptEnvelopes(receiptJson, evidenceJson)`.
 
 ## Offline receipt sync pattern
 

@@ -1479,6 +1479,8 @@
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::from_wire",
     "crates/products/chio-cli/src/cli/input/private.rs::read::from_wire",
+    "crates/products/chio-cli/src/cli/mcp/provision.rs::decode_tools_fixture::from_wire",
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs::parse_message::from_wire",
     "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse::from_wire",
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire",
@@ -1494,7 +1496,7 @@
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs::parse_token::from_wire",
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire",
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire",
-    "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire",
+    "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission::from_wire",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
@@ -6082,6 +6084,9 @@
     "crates/products/chio-proof-room/src/input.rs": [
       "project::from_value"
     ],
+    "crates/products/chio-wall/src/commands/siem_pins.rs": [
+      "parse::from_str"
+    ],
     "crates/products/chio-wall/src/commands.rs": [
       "read_json_file::from_slice"
     ],
@@ -6124,6 +6129,11 @@
     ],
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs": [
       "parse_requested_task::from_value"
+    ],
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs": [
+      "add::custom_deserialize",
+      "measure::Deserializer::from_str",
+      "visit_map::custom_deserialize"
     ],
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc": [
       "call_tool_with_params::from_value",
@@ -11094,6 +11104,49 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/products/chio-wall/src/commands/siem_pins.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Operator-owned key list rejects more than 1 MiB before typed string-list decoding; rejects empty or more than 64 keys, weak keys and normalized duplicates before paging configuration. This is not signed-document verification.",
+      "readers": [
+        {
+          "reader": "parse",
+          "decoders": [
+            "from_str"
+          ],
+          "apis": [
+            "bounded_operator_key_list"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Non-authorizing structural preflight checks wire bytes, node and text growth with checked accounting and terminal JSON parsing before the duplicate-aware document decoder. Named source witnesses and mutation calibration retain every bound.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true,
+          "instances": 2
+        },
+        {
+          "reader": "measure",
+          "decoders": [
+            "Deserializer::from_str"
+          ],
+          "apis": [
+            "Counter::checked_add+ValueSeed::structural_limits+Deserializer::end"
           ],
           "checked": true
         }
@@ -16275,6 +16328,8 @@
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire#1::decode_document",
     "crates/products/chio-cli/src/cli/input/config.rs::yaml::from_wire#1::bounds_only",
     "crates/products/chio-cli/src/cli/input/private.rs::read::from_wire#1::bounds_only",
+    "crates/products/chio-cli/src/cli/mcp/provision.rs::decode_tools_fixture::from_wire#1::decode_document",
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs::parse_message::from_wire#1::decode_document",
     "crates/products/chio-cli/src/cli/process_response_verify/json.rs::parse::from_wire#1::bounds_only",
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire#1::canonicalize",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire#1::decode_canonical",
@@ -16282,15 +16337,15 @@
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire#1::decode_signed",
-    "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire#1::decode_signed",
+    "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire#1::canonicalize",
-    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire#1::decode_signed",
+    "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire#1::decode_document",
     "crates/protocol/chio-acp-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire#1::decode_signed",
     "crates/protocol/chio-acp-proxy/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs::parse_token::from_wire#1::decode_signed",
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire#1::decode_document",
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire#1::decode_document",
-    "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame::from_wire#1::decode_document",
+    "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#2::decode_signed",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire#1::decode_signed",
@@ -19944,6 +19999,22 @@
     "crates/products/chio-cli/src/cli/mcp/manifest.rs": [
       "load_manifest_allowlist::format-toml::from_str"
     ],
+    "crates/products/chio-cli/src/cli/mcp/provision.rs": [
+      "cmd_provision_native_mcp_demo::shared-reader::crates/products/chio-cli/src/cli/mcp/provision.rs::resolve_inputs",
+      "decode_tools_fixture::original-json-reader::UntrustedJsonText",
+      "resolve_inputs::shared-reader::crates/products/chio-cli/src/cli/mcp/provision.rs::decode_tools_fixture",
+      "resolve_inputs::shared-reader::crates/products/chio-cli/src/cli/mcp/provision/discovery.rs::discover_tool_surface"
+    ],
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery.rs": [
+      "discover_tool_surface::shared-reader::crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs::exchange_until"
+    ],
+    "crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs": [
+      "exchange_until::shared-reader::crates/products/chio-cli/src/cli/mcp/provision/discovery/transport.rs::parse_message",
+      "parse_message::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/products/chio-cli/src/cli/mcp/provision/reference_runtime.rs": [
+      "cmd_provision_reference_runtime::shared-reader::crates/products/chio-cli/src/cli/mcp/provision.rs::resolve_inputs"
+    ],
     "crates/products/chio-cli/src/cli/mcp/wrap.rs": [
       "cmd_mcp_wrap_run::shared-reader::crates/products/chio-cli/src/cli/mcp/manifest.rs::load_manifest_allowlist"
     ],
@@ -20226,8 +20297,10 @@
     "crates/products/chio-wall/src/commands.rs": [
       "cmd_chio_wall_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::export_control_path",
       "cmd_chio_wall_control_path_validate::shared-reader::crates/products/chio-wall/src/commands.rs::export_control_path",
+      "cmd_chio_wall_siem_export::shared-reader::crates/products/chio-wall/src/commands.rs::serve_siem_export",
       "export_control_path::shared-reader::crates/products/chio-wall/src/commands.rs::verify_control_path_export",
       "export_control_path::shared-reader::crates/products/chio-wall/src/commands/evidence.rs::write_chio_evidence_package",
+      "serve_siem_export::shared-reader::crates/products/chio-wall/src/commands/siem_pins.rs::configuration",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
       "verify_control_path_export::shared-reader::crates/products/chio-wall/src/commands.rs::read_json_file",
@@ -20240,9 +20313,13 @@
     "crates/products/chio-wall/src/commands/evidence.rs": [
       "write_chio_evidence_package::shared-reader::crates/platform/chio-control-plane/src/evidence_export.rs::cmd_evidence_export"
     ],
+    "crates/products/chio-wall/src/commands/siem_pins.rs": [
+      "configuration::shared-reader::crates/products/chio-wall/src/commands/siem_pins.rs::parse"
+    ],
     "crates/products/chio-wall/src/main.rs": [
       "main::shared-reader::crates/products/chio-wall/src/commands.rs::cmd_chio_wall_control_path_export",
-      "main::shared-reader::crates/products/chio-wall/src/commands.rs::cmd_chio_wall_control_path_validate"
+      "main::shared-reader::crates/products/chio-wall/src/commands.rs::cmd_chio_wall_control_path_validate",
+      "main::shared-reader::crates/products/chio-wall/src/commands.rs::cmd_chio_wall_siem_export"
     ],
     "crates/protocol/chio-a2a-adapter/src/auth.rs": [
       "fetch_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract",
@@ -20365,13 +20442,15 @@
       "gate_sse_stream::shared-reader::crates/protocol/chio-provider-adapter-core/src/streaming.rs::gate_openai_sse_tool_calls"
     ],
     "crates/protocol/chio-mcp-adapter/src/framing.rs": [
-      "read_jsonrpc_frame::original-json-reader::UntrustedJsonText"
+      "read_jsonrpc_frame::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission",
+      "read_jsonrpc_frame_with_admission::original-json-reader::UntrustedJsonText"
     ],
     "crates/protocol/chio-mcp-adapter/src/fuzz.rs": [
       "fuzz_mcp_envelope_parse::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame"
     ],
-    "crates/protocol/chio-mcp-adapter/src/transport/utils.rs": [
-      "read_line::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame"
+    "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget.rs": [
+      "admit::shared-reader::crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs::measure",
+      "read_message::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission"
     ],
     "crates/protocol/chio-mcp-edge/src/fuzz.rs": [
       "fuzz_mcp_envelope_decode::shared-reader::crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame"

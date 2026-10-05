@@ -23,11 +23,15 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text()),
     yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
 )
 CONSUMERS = (
     (0, "check", "Workspace tests"),
     (0, "msrv", "MSRV workspace lane"),
     (1, "host-tests", CHECKER.PROTOCOL_NAME),
+    (3, "conformance", "Run live C++ conformance areas"),
+    (4, "native", "Exercise the public worker role and actual native process host"),
 )
 
 

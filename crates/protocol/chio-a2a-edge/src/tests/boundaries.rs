@@ -90,6 +90,24 @@ fn original_bytes_reject_duplicates_before_dispatch_and_preserve_integer_ids() {
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 #[test]
+fn unsigned_envelopes_accept_decimals_without_bypassing_authority() {
+    let (mut edge, kernel, mut execution, _, calls) = harness();
+    let bytes = br#"{"jsonrpc":"2.0","id":1,"method":"message/send","params":{"metadata":{"chio":{"targetSkillId":"echo"}},"message":{"role":"user","parts":[{"type":"data","data":{"ratio":0.50,"small":1e-05}}]}}}"#;
+    let response = edge
+        .handle_jsonrpc(bytes, &kernel, &execution)
+        .test_unwrap();
+    assert!(response.local_error().is_none(), "{response:?}");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+    execution.capability.expires_at = 1;
+    let response = edge
+        .handle_jsonrpc(bytes, &kernel, &execution)
+        .test_unwrap();
+    assert_eq!(response["result"]["status"].as_str(), Some("failed"));
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn argument_objects_reject_unsafe_integer_values() {
     let (mut edge, kernel, execution, _, calls) = harness();
     let request = SendMessageRequest {

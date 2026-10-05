@@ -41,7 +41,9 @@ fn parse_at(text: &str, depth: usize) -> Result<Value, CliError> {
             Ok(Value::Object(object))
         }
         Some(b'[') => {
-            let entries: Vec<Box<RawValue>> = serde_json::from_str(text).map_err(|source| {
+            // Borrow every subtree from the bounded source. Ancestor frames
+            // must not retain another owned copy of all descendant bytes.
+            let entries: Vec<&RawValue> = serde_json::from_str(text).map_err(|source| {
                 CliError::with_source(&chio_errors::_generated::error_codes::CLI_JSON, source)
             })?;
             entries
@@ -70,7 +72,7 @@ fn parse_at(text: &str, depth: usize) -> Result<Value, CliError> {
 struct UniqueObject;
 
 impl<'de> Visitor<'de> for UniqueObject {
-    type Value = BTreeMap<String, Box<RawValue>>;
+    type Value = BTreeMap<String, &'de RawValue>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("a JSON object with unique keys")
@@ -78,7 +80,7 @@ impl<'de> Visitor<'de> for UniqueObject {
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         let mut entries = BTreeMap::new();
-        while let Some((key, value)) = map.next_entry::<String, Box<RawValue>>()? {
+        while let Some((key, value)) = map.next_entry::<String, &'de RawValue>()? {
             if entries.insert(key, value).is_some() {
                 return Err(serde::de::Error::custom("duplicate process document key"));
             }
@@ -123,6 +125,71 @@ fn decimal_identity(text: &str) -> Result<(bool, String, i64), CliError> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn nested_document_fits_a_bounded_process() {
+        const CHILD: &str = "CHIO_JSON_MEMORY_REGRESSION_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let text = format!(
+                "{}\"{}\"{}",
+                "[".repeat(60),
+                "x".repeat(12 * 1024 * 1024),
+                "]".repeat(60)
+            );
+            let value = parse(&text).unwrap();
+            let mut leaf = &value;
+            for _ in 0..60 {
+                leaf = &leaf[0];
+            }
+            assert_eq!(leaf.as_str().unwrap().len(), 12 * 1024 * 1024);
+            return;
+        }
+
+        use std::os::unix::process::CommandExt;
+        let current = std::thread::current();
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command.args(["--exact", current.name().unwrap(), "--test-threads=1"]);
+        command.env(CHILD, "1");
+        // SAFETY: the child callback uses only async-signal-safe setrlimit
+        // and errno conversion before exec, without allocations or locks.
+        let apply_limit = || {
+            let bound = libc::rlimit {
+                rlim_cur: 512 * 1024 * 1024,
+                rlim_max: 512 * 1024 * 1024,
+            };
+            // SAFETY: bound is initialized and lives for this synchronous syscall.
+            if unsafe { libc::setrlimit(libc::RLIMIT_AS, &bound) } == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::last_os_error())
+            }
+        };
+        // SAFETY: the child hook only sets a resource limit and constructs an
+        // OS error, without allocation or locks between fork and exec.
+        unsafe { command.pre_exec(apply_limit) };
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "bounded parser child failed: {}\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn nested_documents_keep_duplicate_precision_and_depth_guards() {
+        for source in [r#"[{"x":1,"x":2}]"#, r#"{"x":[0.123456789012345678901]}"#] {
+            assert!(parse(source).is_err());
+        }
+        assert!(parse(&format!("{}0{}", "[".repeat(64), "]".repeat(64))).is_ok());
+        assert!(parse(&format!("{}0{}", "[".repeat(65), "]".repeat(65))).is_err());
+        assert_eq!(
+            parse(r#"{"x":[18446744073709551615]}"#).unwrap()["x"][0].as_u64(),
+            Some(u64::MAX)
+        );
+    }
+
     #[test]
     fn ordinary_worker_numbers_accept_equivalent_decimal_spellings_without_rounding() {
         for source in ["1e0", "1.00", "0e10", "100e-2"] {

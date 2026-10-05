@@ -9,7 +9,7 @@ final class IntegrationTests: XCTestCase {
             try kernel.attestAppAttest(keyId: "mock-key", challengeHex: "010203")
         )
         XCTAssertThrowsError(
-            try kernel.verifyMobileReceipt(receiptJson: "{}", evidenceJson: "{}")
+            try kernel.inspectMobileReceiptEnvelopes(receiptJson: "{}", evidenceJson: "{}")
         )
     }
 }

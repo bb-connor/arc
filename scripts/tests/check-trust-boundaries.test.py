@@ -234,6 +234,36 @@ class ContractScopeCalibration(unittest.TestCase):
         code = gate._lexer.blank_rust_noise(source)
         return gate._contracts.reader_evidence(path, code, list(gate.json_decoders(code)), code)
 
+    def test_siem_pin_reader_requires_typed_list_and_both_bounds(self):
+        path = "crates/products/chio-wall/src/commands/siem_pins.rs"
+        source = (ROOT / path).read_text().split("#[cfg(test)]", 1)[0]
+        self.assertTrue(all(row["checked"] for row in self.evidence(source, path)))
+        for before, after in (
+            ("value.len() > MAX_CONFIG_BYTES", "false"),
+            ("Vec<String>", "serde_json::Value"),
+            ("encoded.is_empty() || encoded.len() > MAX_KEYS", "false"),
+        ):
+            self.assertIn(before, source)
+            with self.subTest(before=before):
+                self.assertTrue(any(not row["checked"] for row in self.evidence(source.replace(before, after, 1), path)))
+
+    def test_mcp_admission_reader_requires_full_structural_preflight(self):
+        path = "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs"
+        source = (ROOT / path).read_text()
+        self.assertTrue(all(row["checked"] for row in self.evidence(source, path)))
+        for before, after in (
+            ("wire_bytes: text.len()", "wire_bytes: 0"),
+            ("counter.footprint.exceeded()", "None"),
+            ("ValueSeed(&mut counter)", "UncheckedValue"),
+            ("decoder.end()", "Ok(())"),
+            ("self.footprint.checked_add(Footprint", "self.footprint.unchecked_add(Footprint"),
+            ("next.exceeded()", "None"),
+            ("self.0.add(1, 0)?", "Ok(())?"),
+        ):
+            self.assertIn(before, source)
+            with self.subTest(before=before):
+                self.assertTrue(any(not row["checked"] for row in self.evidence(source.replace(before, after, 1), path)))
+
     def test_import_and_local_aliases_keep_the_actual_contract(self):
         source = """
             use chio_core_types::canonical::{UntrustedJsonText as Original};

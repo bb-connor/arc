@@ -5,7 +5,7 @@ EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 source "${ROOT}/examples/_shared/hello-http-common.sh"
 
-ARTIFACT_ROOT="${EXAMPLE_ROOT}/.artifacts/$(date -u +"%Y%m%dT%H%M%SZ")"
+ARTIFACT_ROOT="${CHIO_DROGON_ARTIFACT_ROOT:-${EXAMPLE_ROOT}/.artifacts/$(date -u +"%Y%m%dT%H%M%SZ")}"
 LOG_DIR="${ARTIFACT_ROOT}/logs"
 STATE_DIR="${ARTIFACT_ROOT}/state"
 BUILD_DIR="${ARTIFACT_ROOT}/build"
@@ -58,6 +58,8 @@ CONTROL_URL="http://127.0.0.1:${TRUST_PORT}"
 APP_URL="http://127.0.0.1:${APP_PORT}"
 SIDECAR_URL="http://127.0.0.1:${SIDECAR_PORT}"
 RECEIPT_STORE="${STATE_DIR}/sidecar-receipts.sqlite3"
+SIGNER_SEED="${STATE_DIR}/sidecar-signer.seed"
+create_demo_signing_custody "${SIGNER_SEED}"
 
 cleanup() {
   local code=$?
@@ -96,11 +98,13 @@ wait_for_http "${APP_URL}/healthz"
 (
   export CHIO_TRUSTED_ISSUER_KEY="${TRUSTED_ISSUER_KEY}"
   exec "${CHIO_BIN}" \
+    --authority-seed-file "${SIGNER_SEED}" \
     --control-url "${CONTROL_URL}" \
     --control-token "${SERVICE_TOKEN}" \
     api protect \
     --upstream "${APP_URL}" \
     --spec "${EXAMPLE_ROOT}/openapi.yaml" \
+    --allow-anonymous-reads \
     --listen "127.0.0.1:${SIDECAR_PORT}" \
     --receipt-store "${RECEIPT_STORE}"
 ) >"${LOG_DIR}/sidecar.log" 2>&1 &
@@ -225,9 +229,14 @@ expected_ids = {hello_receipt_id, deny_receipt_id, allow_receipt_id}
 assert "" not in expected_ids, {"expected_ids": sorted(expected_ids)}
 
 with sqlite3.connect(receipt_store) as db:
-    rows = db.execute("SELECT receipt_json FROM http_receipts ORDER BY rowid ASC").fetchall()
+    rows = db.execute("SELECT raw_json FROM chio_tool_receipts ORDER BY seq ASC").fetchall()
 
-records = [json.loads(row[0]) for row in rows]
+envelopes = [json.loads(row[0]) for row in rows]
+records = [
+    envelope["metadata"]["chio_http_receipt_v1"]
+    for envelope in envelopes
+    if "chio_http_receipt_v1" in (envelope.get("metadata") or {})
+]
 receipt_ids = {record["id"] for record in records}
 missing = expected_ids - receipt_ids
 assert not missing, {"missing": sorted(missing), "stored": sorted(receipt_ids)}

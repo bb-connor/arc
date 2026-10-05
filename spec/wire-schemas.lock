@@ -4715,6 +4715,11 @@ files = ["crates/economy/chio-appraisal/src/types.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.runtime-policy.v2"
+files = ["crates/platform/chio-control-plane/src/policy/util.rs"]
+first_seen = "5546fdc325"
+
+[[schema]]
 value = "chio.runtime-replay-source-seal.v1"
 files = ["crates/core/chio-core-types/src/runtime_replay.rs"]
 first_seen = "7e54c14a60"

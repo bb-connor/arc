@@ -108,7 +108,7 @@ expected_counts = {
     "security issuance-freeze types": 4,
     "security port contracts": 7,
     "security response-dispatch types": 4,
-    "security response types": 9,
+    "security response types": 16,
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 46,
     "strict manifest v2": 24,

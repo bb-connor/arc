@@ -99,6 +99,24 @@ ensure_chio_bin() {
   printf '%s\n' "${chio_bin}"
 }
 
+create_demo_signing_custody() {
+  local seed_path="$1"
+  python3 - "${seed_path}" <<'PY'
+import os
+from pathlib import Path
+import secrets
+import sys
+
+# Fresh private custody for this smoke run only. Refuse an existing pathname.
+path = Path(sys.argv[1])
+descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(descriptor, "w", encoding="ascii") as handle:
+    handle.write(secrets.token_hex(32) + "\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+PY
+}
+
 issue_demo_capability() {
   local control_url="$1"
   local service_token="$2"

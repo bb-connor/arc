@@ -174,13 +174,14 @@ fn approved_retry_after_the_issuance_lifetime_still_executes() -> TestResult {
 
 #[test]
 fn unbound_issuance_still_expires_before_execution() -> TestResult {
+    // Establish fixture time before any authority records its first reading.
+    // Truncating a live millisecond clock afterward is a real clock rollback.
+    let issued_at = now();
+    let _issuance_clock = chio_test_support::clock::scope_unix_secs(issued_at);
     let fixture = nonce_fixture(1)?;
     let runtime = fixture.open()?;
     let request = fixture.request(&runtime, "expired-before-binding")?;
-    let issued_at = now();
-    let issuance_clock = chio_test_support::clock::scope_unix_secs(issued_at);
     let nonce = preflight(&runtime, &request)?;
-    drop(issuance_clock);
     let _expired_clock = chio_test_support::clock::scope_unix_secs(issued_at + 2);
     let denied = evaluate(&runtime, &with_nonce(&request, &nonce))?;
     assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
@@ -194,6 +195,7 @@ fn unbound_issuance_still_expires_before_execution() -> TestResult {
     );
     assert_state(&fixture, &request, "prepared")?;
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    drop(runtime);
     Ok(())
 }
 

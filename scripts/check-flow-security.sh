@@ -112,13 +112,20 @@ run_exact_target --label "security response-dispatch types" --expected \
   execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields \
   -- cargo test -p chio-security-types --features std --test response_dispatch
 run_exact_target --label "security response types" --expected \
+  execution_binding_preserves_its_closed_wire_shape \
+  execution_binding_rejection_carries_the_compared_versions \
+  execution_binding_rejects_unsupported_wire_versions \
+  fresh_live_admission_refuses_simulated_plans \
+  live_execution_rules_name_the_binding_that_refused \
   mutation_capacity_accepts_the_exact_bound_and_rejects_one_more \
   mutation_capacity_reserves_the_complete_sixty_four_effect_lifecycle \
   mutation_capacity_tracks_rollback_failure_and_retry_boundaries \
   permanent_revocation_is_not_a_reversible_effect_kind \
   prepared_dispatch_binding_is_strict_and_plan_bound \
   prepared_dispatch_binding_rejects_unknown_serialized_fields \
+  response_execution_binding_is_preserved_in_authorization \
   response_plan_rejects_zero_cryptographic_commitments \
+  response_plans_and_authorization_require_explicit_execution \
   response_targets_and_mutation_records_reject_unknown_fields \
   response_transition_matrix_contains_only_the_specified_edges \
   -- cargo test -p chio-security-types --test response

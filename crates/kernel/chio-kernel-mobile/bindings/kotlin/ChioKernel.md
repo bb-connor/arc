@@ -214,11 +214,11 @@ the function signature but is only honoured in non-production builds;
 production verification always uses the pinned Google JWKS. Throws
 `ChioMobileException.AttestationRejected` on any verification failure.
 
-### `verifyMobileReceipt`
+### `inspectMobileReceiptEnvelopes`
 
 ```kotlin
 @Throws(ChioMobileException::class)
-fun verifyMobileReceipt(receiptJson: String, evidenceJson: String): String
+fun inspectMobileReceiptEnvelopes(receiptJson: String, evidenceJson: String): String
 ```
 
 Shape-checks a mobile receipt against App Attest or Play Integrity

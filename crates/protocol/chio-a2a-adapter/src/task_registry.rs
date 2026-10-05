@@ -132,29 +132,7 @@ impl A2aTaskRegistry {
     }
 
     fn save(&self, registry: &A2aPersistedTaskRegistry) -> Result<(), AdapterError> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                AdapterError::Lifecycle(format!(
-                    "failed to create A2A task registry directory {}: {error}",
-                    parent.display()
-                ))
-            })?;
-        }
-        fs::write(
-            &self.path,
-            serde_json::to_vec_pretty(registry).map_err(|error| {
-                AdapterError::Lifecycle(format!(
-                    "failed to encode A2A task registry {}: {error}",
-                    self.path.display()
-                ))
-            })?,
-        )
-        .map_err(|error| {
-            AdapterError::Lifecycle(format!(
-                "failed to write A2A task registry {}: {error}",
-                self.path.display()
-            ))
-        })
+        task_registry_persistence::save(&self.path, registry)
     }
 
     fn validate_follow_up(
@@ -402,3 +380,5 @@ fn validate_task_record_binding(
     }
     Ok(())
 }
+#[path = "task_registry/persistence.rs"]
+mod task_registry_persistence;

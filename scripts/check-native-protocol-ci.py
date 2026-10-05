@@ -91,7 +91,7 @@ def validate_consumer(
         )
 
 
-def validate(ci: dict, process: dict, action: dict) -> None:
+def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict) -> None:
     checks = (
         "python3 scripts/check-native-protocol-ci.py",
         "python3 scripts/tests/check-native-protocol-ci.test.py",
@@ -141,6 +141,20 @@ def validate(ci: dict, process: dict, action: dict) -> None:
         process["jobs"]["host-tests"], "Native MCP and worker recovery under enforced authority"
     )
     require(index < report_index, "native protocol targets must precede static report setup")
+    for workflow, job_id, consumer in (
+        (cpp, "conformance", "Run live C++ conformance areas"),
+        (postgres, "native", "Exercise the public worker role and actual native process host"),
+    ):
+        validate_consumer(workflow, job_id, consumer, {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION})
+    for workflow, job_id, step_name in (
+        (cpp, "conformance", "Run live C++ conformance areas"),
+        (postgres, "native", "Build the real gateway and kernel"),
+    ):
+        _, step = named_step(workflow["jobs"][job_id], step_name)
+        require(
+            "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement" in step["run"].splitlines(),
+            f"{job_id}: native consumer must build the enforcing CLI",
+        )
     digest = hashlib.sha256(
         json.dumps(action, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -155,8 +169,10 @@ def main() -> None:
         yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/process-workers.yml").read_text()),
         yaml.safe_load((ROOT / ".github/actions/enforced-native-fixture/action.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
     )
-    print("native protocol CI contract passed: two workspace lanes and four native targets")
+    print("native protocol CI contract passed: workspace, process, C++ and PostgreSQL consumers")
 
 
 if __name__ == "__main__":

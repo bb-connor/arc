@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-168 of 520 identifier constants in the security crates are unpinned.
+169 of 521 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (26)
 
@@ -95,7 +95,7 @@ since been pinned is removed by the next `--update`.
 
 - `crates/kernel/chio-kernel-core/src/passport_verify.rs:46` `PORTABLE_PASSPORT_SCHEMA` = `chio.portable-agent-passport.v1`
 
-## crates/platform/chio-control-plane (42)
+## crates/platform/chio-control-plane (43)
 
 - `crates/platform/chio-control-plane/src/certify/schema.rs:7` `CERTIFICATION_PUBLIC_SEARCH_SCHEMA` = `chio.certify.search.v1`
 - `crates/platform/chio-control-plane/src/certify/schema.rs:8` `CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA` = `chio.certify.transparency.v1`
@@ -105,6 +105,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/keyring_runtime.rs:1312` `AUTHORITY_SEED_HANDOFF_SCHEMA` = `chio.authority-seed-handoff.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:30` `PASSPORT_STATUS_REGISTRY_VERSION` = `chio.passport-status-registry.v1`
 - `crates/platform/chio-control-plane/src/passport_verifier.rs:31` `PASSPORT_ISSUANCE_REGISTRY_VERSION` = `chio.passport-issuance-offers.v1`
+- `crates/platform/chio-control-plane/src/policy/util.rs:10` `RUNTIME_POLICY_IDENTITY_SCHEMA` = `chio.runtime-policy.v2`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:13` `SCIM_LIFECYCLE_REGISTRY_VERSION` = `chio.scim-lifecycle-registry.v1`
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:43` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`

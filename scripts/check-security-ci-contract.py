@@ -63,7 +63,7 @@ EXPECTED_APK_LOCK_SHA256 = (
     "65c6ed6a7ec4e3c85fa27b46aa259ed217f93e2ce6f0ecb15b26fd5163c715ca"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "c6879f7d5e80feb49c0c4f426ed8ec3e98e2f6c896e54c3a624d301296a6e7a9"
+    "5aaac717fb51911be9e58bb8121f655af92cacecc8ca43acb6a18fff5c03be44"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
@@ -4856,7 +4856,7 @@ def validate_isolated_execution_job(
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
     "threshold-crypto-floor": "5ae66bc1cb766994b1d568e592acd66b294404bf3dbb1f5ef7ebc9761b07bf19",
-    "session-reports": "d1c24c08fdfe5a79033589e1d370a8103249353792a1b690c98de9f29e2ccbfe",
+    "session-reports": "16ad2e1401ffc2ea0361cc508047e837d6ee3c09a01fa863e9cb3f35a461defc",
     "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
 }
 EXPECTED_NONCE_FIPS_PATHS = [
