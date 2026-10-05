@@ -638,6 +638,39 @@ fn inbound_sender_verifier(key: &Keypair) -> JwtBearerVerifier {
 }
 
 #[test]
+fn inbound_authority_jwt_rejects_weak_key_forgery() {
+    let mut identity = [0_u8; 32];
+    identity[0] = 1;
+    let key = PublicKey::from_bytes(&identity).unwrap();
+    let mut signature = [0_u8; 64];
+    signature[0] = 1;
+    let token = sign_jwt_with_header(
+        json!({"alg": "EdDSA", "typ": "JWT"}),
+        &json!({"iss": "https://issuer.example", "aud": "chio-mcp",
+            "sub": "forged-subject", "exp": unix_now() + 300}),
+        |_| signature.to_vec(),
+    );
+    let signed_input = token.rsplit_once('.').unwrap().0.as_bytes();
+    assert!(key.verify(signed_input, &Ed25519Signature::from_bytes(&signature)));
+    for key_source in [
+        JwtVerificationKeySource::Static(key.clone()),
+        JwtVerificationKeySource::Jwks(JwtJwksKeySet {
+            keys_by_kid: Default::default(),
+            anonymous_keys: vec![JwtResolvedJwkPublicKey {
+                alg_hint: Some("EdDSA".into()),
+                key: JwtResolvedPublicKey::Ed25519(key.clone()),
+            }],
+        }),
+    ] {
+        let mut verifier = inbound_sender_verifier(&Keypair::generate());
+        verifier.key_source = key_source;
+        assert!(verifier
+            .authenticate_token(&token, &empty_header_map(), None, None, "POST", "chio-mcp")
+            .is_err());
+    }
+}
+
+#[test]
 fn inbound_authority_jwt_unknown_empty_or_null_confirmation_never_becomes_bearer() {
     let key = Keypair::generate();
     let verifier = inbound_sender_verifier(&key);

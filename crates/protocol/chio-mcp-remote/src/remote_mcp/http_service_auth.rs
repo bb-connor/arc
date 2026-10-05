@@ -1098,7 +1098,7 @@ fn build_request_sender_constraint(
     let chio_sender_key =
         normalize_optional_sender_value(dpop_public_key, CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER)?;
     if let Some(sender_key) = chio_sender_key.as_deref() {
-        PublicKey::from_hex(sender_key).map_err(|error| {
+        sender_constraint::decode_sender_key(sender_key).map_err(|error| {
             input::with_source(
                 oauth_token_error(
                     StatusCode::BAD_REQUEST,

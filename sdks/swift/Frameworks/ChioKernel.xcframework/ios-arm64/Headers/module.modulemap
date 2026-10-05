@@ -1,4 +1,7 @@
 module chio_kernel_mobileFFI {
     header "chio_kernel_mobileFFI.h"
     export *
+    use "Darwin"
+    use "_Builtin_stdbool"
+    use "_Builtin_stdint"
 }

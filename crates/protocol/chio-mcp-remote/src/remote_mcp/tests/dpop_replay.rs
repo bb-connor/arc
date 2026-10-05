@@ -3,6 +3,48 @@ use chio_core::crypto::Keypair;
 use chio_kernel::dpop::{DpopProofBody, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
 use std::time::Duration;
 
+fn weak_sender_key() -> PublicKey {
+    let mut identity = [0_u8; 32];
+    identity[0] = 1;
+    PublicKey::from_bytes(&identity).expect("encoded Ed25519 identity point")
+}
+
+#[test]
+fn sender_confirmation_rejects_weak_key_registration() {
+    let key = weak_sender_key().to_hex();
+    let response = build_request_sender_constraint(Some(&key), None, None, None)
+        .expect_err("a sender constraint requires a key with a private signing authority");
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[test]
+fn sender_confirmation_rejects_weak_key_decoding() {
+    let claims = serde_json::json!({"chioSenderKey": weak_sender_key().to_hex()});
+    assert!(serde_json::from_value::<ChioSenderConstraintClaims>(claims).is_err());
+}
+
+#[test]
+fn sender_dpop_rejects_weak_key_forgery_without_consuming_nonce() {
+    let config = DpopConfig::default();
+    let store = DpopNonceStore::new(8, Duration::from_secs(300)).unwrap();
+    let mut forged = proof(&Keypair::generate(), "forged-proof".into(), unix_now());
+    forged.body.agent_key = weak_sender_key();
+    let mut signature = [0_u8; 64];
+    signature[0] = 1;
+    forged.signature = chio_core::crypto::Signature::from_bytes(&signature);
+    let message = canonical_json_bytes(&forged.body).unwrap();
+    assert!(
+        forged.body.agent_key.verify(&message, &forged.signature),
+        "fixture must reproduce permissive verification of a forged proof"
+    );
+    assert!(matches!(
+        verify(&forged, &store, &config),
+        Err(SenderConstraintError::InvalidSignature)
+    ));
+    assert_eq!(store.utilization().unwrap().0, 0);
+    assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
+}
+
 #[test]
 fn sender_headers_retain_non_text_causes_before_replay_custody() {
     use std::error::Error;

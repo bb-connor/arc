@@ -1,6 +1,18 @@
 //! Runtime sender binding and original DPoP proof verification.
 use super::*;
 
+/// Sender keys identify a signing authority, so decoding must reject keys
+/// whose small-order group admits signatures without a private key.
+pub(super) fn decode_sender_key(raw: &str) -> Result<PublicKey, chio_core::error::Error> {
+    let key = PublicKey::from_hex(raw)?;
+    if key.is_weak_ed25519() {
+        return Err(chio_core::error::Error::InvalidPublicKey(
+            "weak Ed25519 sender key".into(),
+        ));
+    }
+    Ok(key)
+}
+
 pub(super) fn decode_sender_dpop_proof(raw: &str) -> Result<DpopProof, SenderConstraintError> {
     let encoded = raw;
     if encoded.len() > MAX_AUTH_JSON_BYTES {
@@ -78,7 +90,11 @@ impl<'a> SenderConstraintVerifier<'a> {
             return Err(ClockError::Expired.into());
         }
         let message = canonical_json_bytes(&proof.body)?;
-        if !proof.body.agent_key.verify(&message, &proof.signature) {
+        if !proof
+            .body
+            .agent_key
+            .verify_strict(&message, &proof.signature)
+        {
             return Err(SenderConstraintError::InvalidSignature);
         }
         match self.nonce_store.check_and_insert_through(
@@ -134,7 +150,7 @@ impl<'a> SenderConstraintVerifier<'a> {
                 .transpose()?
                 .ok_or(SenderConstraintError::MissingProof)?;
             let proof = decode_sender_dpop_proof(proof)?;
-            let sender_key = PublicKey::from_hex(sender_key)?;
+            let sender_key = decode_sender_key(sender_key)?;
             self.verify_proof(
                 &proof,
                 binding_id,
@@ -211,7 +227,7 @@ fn validate_profile(claims: &ChioSenderConstraintClaims) -> Result<(), &'static 
         }
     }
     if let Some(key) = &claims.chio_sender_key {
-        PublicKey::from_hex(key).map_err(|_| "invalid sender key")?;
+        decode_sender_key(key).map_err(|_| "invalid sender key")?;
     }
     Ok(())
 }
