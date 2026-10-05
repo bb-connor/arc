@@ -53,6 +53,22 @@ jobs:
       - uses: ./.github/actions/apt-install
         with:
           packages: protobuf-compiler
+      - name: Install outcome-ledger namespace prerequisites
+        if: matrix.workspace == 'examples/outcome-ledger-comparison'
+        uses: ./.github/actions/apt-install
+        with:
+          packages: apparmor-profiles apparmor-utils bubblewrap python3.12 python3-cryptography git dash util-linux
+      - name: Qualify the outcome-ledger namespace fixture
+        if: matrix.workspace == 'examples/outcome-ledger-comparison'
+        run: |
+          set -euo pipefail
+          # Use the same package-provided profile as release qualification.
+          bwrap_profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          test -f "$bwrap_profile"
+          sudo install -m 0644 "$bwrap_profile" /etc/apparmor.d/bwrap-userns-restrict
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          /usr/bin/python3.12 -I -c 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM'
+          /usr/bin/bwrap --unshare-user --unshare-net --disable-userns --ro-bind / / --proc /proc --dev /dev -- /bin/true
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
         with:
           key: research-${{ matrix.workspace }}

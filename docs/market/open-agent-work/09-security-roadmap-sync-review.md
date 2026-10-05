@@ -166,7 +166,7 @@ Sources: [production A2A constructor](https://github.com/bb-connor/arc/blob/8738
 ### S05. Negotiate complete authority through supported transports
 
 Security retains peer authorization negotiation across MCP session recovery and
-threads selected profiles through A2A/ACP. Legacy profiles do not gain stronger
+threads selected profiles through A2A/ACP-Client. Legacy profiles do not gain stronger
 features after restart. Its bounded provider-fabric lowering rejects aggregate
 or cumulative authority that the envelope cannot represent. SDK caller helpers
 carry messages; they do not become cryptographic verifiers or durable executors.

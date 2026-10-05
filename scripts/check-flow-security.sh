@@ -707,24 +707,29 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
-  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_approval_authority \
-  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_dpop_authority \
-  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_preserves_genuinely_unselected_and_legacy_custody_absence \
-  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody \
-  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_selected_runtime_custody \
+  kernel::admission_coordinator::return_context::caller::caller_return_wire_pins_its_written_and_legacy_schema_identities \
   kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
-  kernel::admission_coordinator::return_context::caller::tests::custody::caller_custody_rejects_each_selected_family_without_its_physical_ledger \
-  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
-  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_legacy_identity_absence_explicit \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_individually_valid_but_unadmitted_security_context \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_noncanonical_oversized_and_unbound_frames \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_private_payload_schema_identity_grant_and_limit_substitution \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_custody_rejects_each_selected_family_without_its_physical_ledger \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_preserve_legacy_absence_without_upgrading_custody \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_caller_decode \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_live_context \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_require_every_reference_and_reject_substitution \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_single_approval_missing_all_custody_artifacts_is_rejected \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_accepts_threshold_and_unused_cumulative_approval_custody \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_approval_authority \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_allows_configured_but_unused_dpop_authority \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_preserves_genuinely_unselected_and_legacy_custody_absence \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_approval_custody \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_required_dpop_custody \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::caller_snapshot_rejects_missing_selected_runtime_custody \
+  kernel::admission_coordinator::return_context::caller::tests::selected_custody::cumulative_custody_requirement_ignores_unselected_grants_and_survives_retention \
   kernel::tests::durable_admission::return_context::capture_callback_panics_retain_uncertainty_without_poisoning_recovery \
   kernel::tests::durable_admission::return_context::changed_capture_participant_denies_before_tool_effect_and_retains_accounting \
   kernel::tests::durable_admission::return_context::frozen_return_context_cannot_cross_operations_with_the_same_request_id \

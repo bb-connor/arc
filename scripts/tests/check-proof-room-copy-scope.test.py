@@ -15,7 +15,10 @@ script = (ROOT / "scripts/check-chio-proof-room-release-truth.sh").read_text()
 source = script.split("python3 - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
 namespace = {}
 exec(compile(source.split("\ntruth_doc = read_truth", 1)[0], str(ROOT / "scripts/check-chio-proof-room-release-truth.sh"), "exec"), namespace)
-SNAPSHOT = Path("docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/kernel-source-before.json")
+SNAPSHOTS = (
+    Path("docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/kernel-source-before.json"),
+    Path("docs/market/open-agent-work/execution/15-native-integration-evidence.json"),
+)
 copy_check = compile(
     "for path, line_no, line in iter_doc_lines(configured_docs(DEFAULT_DOCS)):"
     + source.split("for path, line_no, line in iter_doc_lines(configured_docs(DEFAULT_DOCS)):", 1)[1].split("\nif failures:", 1)[0],
@@ -45,14 +48,18 @@ class ReleaseCopyScopeTests(unittest.TestCase):
         return document
 
     def test_committed_source_snapshot_is_preserved_as_evidence(self):
-        target = self.write(SNAPSHOT, "")
-        shutil.copyfile(ROOT / SNAPSHOT, target)
-        self.assertEqual(copy_failures([target]), [])
+        for snapshot in SNAPSHOTS:
+            with self.subTest(path=snapshot):
+                target = self.write(snapshot, "")
+                shutil.copyfile(ROOT / snapshot, target)
+                self.assertEqual(copy_failures([target]), [])
 
     def test_source_snapshot_cannot_be_replaced_with_marketing_copy(self):
-        target = self.write(SNAPSHOT, json.dumps({"summary": "Chio ships ACP support."}))
-        with self.assertRaisesRegex(SystemExit, "source-snapshot-digest-mismatch"):
-            copy_failures([target])
+        for snapshot in SNAPSHOTS:
+            with self.subTest(path=snapshot):
+                target = self.write(snapshot, json.dumps({"summary": "Chio ships ACP support."}))
+                with self.assertRaisesRegex(SystemExit, "source-snapshot-digest-mismatch"):
+                    copy_failures([target])
 
     def test_review_plan_and_adjacent_json_claims_remain_enforced(self):
         for relative in [
@@ -60,6 +67,8 @@ class ReleaseCopyScopeTests(unittest.TestCase):
             "docs/superpowers/plans/2026-10-01-plan.md",
             "docs/reviews/artifacts/2026-09-29-native-clock-test-ownership/marketing.json",
             "docs/release/kernel-source-before.json",
+            "docs/market/open-agent-work/execution/marketing.json",
+            "docs/release/15-native-integration-evidence.json",
         ]:
             with self.subTest(path=relative):
                 target = self.write(relative, "Chio ships ACP support. Chio is the universal agent protocol.\n")

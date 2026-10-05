@@ -168,20 +168,10 @@ fn isolated_audit(
         "--cap-drop",
         "ALL",
         "--clearenv",
-        "--ro-bind",
-        "/usr/lib",
-        "/usr/lib",
-        "--symlink",
-        "usr/lib",
-        "/lib",
-        "--proc",
-        "/proc",
-        "--dev",
-        "/dev",
-        "--size",
-        "16777216",
-        "--tmpfs",
-        "/tmp",
+    ]);
+    crate::graph::isolation::mount_runtime_libraries(&mut command)?;
+    command.args([
+        "--proc", "/proc", "--dev", "/dev", "--size", "16777216", "--tmpfs", "/tmp",
     ]);
     for path in [
         "/usr/bin/bwrap",

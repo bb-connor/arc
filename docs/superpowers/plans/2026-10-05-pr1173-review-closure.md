@@ -158,3 +158,37 @@ its copied shell wrapper lacked the new exemption-control fixture. Model that
 control consistently with the fixture's existing Python stubs, keeping the real
 control mandatory in the enclosing gate. Require the complete composite gate,
 then repeat source qualification and hosted acceptance on the repaired candidate.
+
+## Replacement-candidate preflight repairs
+
+The `28842e598e` candidate exposed additional failures in actual hosted and
+local qualification. Complete these repairs before the next source freeze:
+
+- [x] Include mandatory claim sources in the publication manifest, with missing,
+  duplicate and escaping-path rejection. Preserve the open publication gates.
+- [x] Repair the isolated composite-build test fixture while retaining the real
+  AWS-LC source, feature, lint and exemption controls. Run the complete gate.
+- [x] Share read-only runtime-library mounts between outcome-ledger execution and
+  audit; install and qualify its namespace prerequisites in x86 CI. Local tests
+  and Clippy pass. The x86 matrix result remains an acceptance requirement.
+- [x] Move HTTP test clients into compiler-gated private files. Preserve adjacent
+  Windows modules, production functions, test names and signed fixture bytes.
+  Run both test groups and strict Clippy.
+- [x] Compare the compiled return-context inventory to the flow gate. Include all
+  41 identities and reconcile its mutation-control count without weakening the
+  selection check.
+- [x] Use ACP-Client in mutable protocol descriptions; preserve captured results
+  under an exact digest pin with tamper and adjacent-claim rejection controls.
+- [x] Require the current explicit repository owner on every protected evidence
+  path in the ownership contract. Repository enforcement remains separate.
+- [x] Replace obsolete generic JWT assertions with the exact retained expiry and
+  audience causes. Run the full threat target and strict Clippy.
+- [x] Retain the initial structural failures, finish the complete diagnostic
+  selection and recheck every failure using the pinned Python environment.
+- [ ] Freeze the repaired source, regenerate native evidence and the PDF,
+  verify the actual publication manifest, then push the replacement candidate.
+
+Some hosted jobs on `28842e598e` were cancelled before acquiring a runner.
+GitHub annotations report that no hosted runner acquired those jobs after
+multiple attempts. These are unavailable execution evidence. Requalification
+requires actual terminal execution on the replacement commit.

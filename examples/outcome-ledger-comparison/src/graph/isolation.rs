@@ -89,27 +89,38 @@ pub(super) fn require_terminated(children: &[ChildIdentity]) -> Result<()> {
     }
 }
 
+pub(super) fn mount_runtime_libraries(command: &mut Command) -> Result<()> {
+    command.args([
+        "--ro-bind",
+        "/usr/lib",
+        "/usr/lib",
+        "--symlink",
+        "usr/lib",
+        "/lib",
+    ]);
+    // x86 glibc executables name /lib64 as their interpreter location. ARM
+    // uses /lib, so retain the host's extra library directory only if present.
+    if Path::new("/lib64").try_exists()? {
+        command.args(["--ro-bind", "/lib64", "/lib64"]);
+    }
+    Ok(())
+}
+
 pub(super) fn base_command() -> Result<Command> {
     let mut command = Command::new("/usr/bin/bwrap");
+    command.env_clear().args([
+        "--unshare-all",
+        "--unshare-user",
+        "--disable-userns",
+        "--die-with-parent",
+        "--new-session",
+        "--cap-drop",
+        "ALL",
+        "--clearenv",
+    ]);
+    mount_runtime_libraries(&mut command)?;
     command
-        .env_clear()
-        .args([
-            "--unshare-all",
-            "--unshare-user",
-            "--disable-userns",
-            "--die-with-parent",
-            "--new-session",
-            "--cap-drop",
-            "ALL",
-            "--clearenv",
-            "--ro-bind",
-            "/usr/lib",
-            "/usr/lib",
-            "--symlink",
-            "usr/lib",
-            "/lib",
-            "--ro-bind",
-        ])
+        .arg("--ro-bind")
         .arg(std::env::current_exe()?)
         .arg("/app/chio")
         .args([

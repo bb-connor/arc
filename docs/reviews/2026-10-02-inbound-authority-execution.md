@@ -49,7 +49,7 @@ Successful local owner checks:
 | Wire protocol schemas | 11 |
 | Generated primitives / security vectors | 1 / 5 |
 | SSRF external guard / API dispatch | 6 |
-| A2A / ACP / MCP examples | 6 / 6 / 7 |
+| A2A / ACP-Client / MCP examples | 6 / 6 / 7 |
 
 The control-plane campaign was interrupted after four nested proof failures; it
 is not a full-suite pass. All five affected nested controls subsequently passed,
@@ -59,11 +59,11 @@ workspace runtime campaign. Failed compiler/fixture runs and the CLI test abort
 remain retained. Final commands, logs and source/binary identities are in the
 [artifact directory](artifacts/2026-10-02-inbound-authority/README.md).
 
-Workspace qualification also repaired stale A2A/ACP example callers, all three
+Workspace qualification also repaired stale A2A/ACP-Client example callers, all three
 examples' unbounded line allocation, and MCP's duplicate-collapsing example reader.
 Four new controls went RED to GREEN. Existing UUID is now a dev dependency for
 generated-type tests. SSRF fixtures explicitly authorize their known read route
-while retaining redirect, size and zero-forbidden-target assertions. ACP test
+while retaining redirect, size and zero-forbidden-target assertions. ACP-Client test
 imports/layout were repaired without allowances.
 
 One fresh independent review returned **changes requested**, with two Important

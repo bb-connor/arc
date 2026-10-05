@@ -1661,7 +1661,7 @@ for protected in (
     ".github/workflows/release-qualification.yml",
     "releases.toml",
 ):
-    if codeowners.get(protected) != ["@backbay-labs/chio-maintainers"]:
+    if codeowners.get(protected) != ["@bb-connor"]:
         raise SystemExit(f"evidence TCB lacks CODEOWNERS protection: {protected}")
 PY
 

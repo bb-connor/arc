@@ -10,11 +10,11 @@
 //   (a) drop the nonce comparison that returns
 //       `Err(AttestationError::PlayIntegrityNonceMismatch)`. The
 //       replayed-nonce deny-arm assertion below fails.
-//   (b) drop the `exp` claim check that returns
-//       `Err(AttestationError::PlayIntegrityInvalidToken)`. The
+//   (b) disable the JWT expiration check. The typed cause must be
+//       `jsonwebtoken::errors::ErrorKind::ExpiredSignature`. The
 //       expired-token deny-arm assertion below fails.
-//   (c) drop the audience-claim check that returns
-//       `Err(AttestationError::PlayIntegrityInvalidToken)`. The
+//   (c) disable the JWT audience check. The typed cause must be
+//       `jsonwebtoken::errors::ErrorKind::InvalidAudience`. The
 //       audience-mismatch deny-arm assertion below fails.
 
 use std::error::Error;
@@ -26,6 +26,7 @@ use chio_custody_hw::{
     MobileAttestationBinding, MobileChallengeAuthority, MobileChallengeError,
     PlayIntegrityVerificationInput, VerifiedMobileAttestationEvidence, MEETS_DEVICE_INTEGRITY,
 };
+use jsonwebtoken::errors::ErrorKind;
 
 use crate::mobile_attestation_common::{
     future_exp, signed_play_integrity_token, AUDIENCE, NONCE, PACKAGE,
@@ -70,10 +71,10 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
     })
     .err()
     .ok_or("expected stale token rejection")?;
-    assert!(matches!(
-        expired_error,
-        AttestationError::PlayIntegrityInvalidToken(_)
-    ));
+    assert_eq!(
+        token_rejection_kind(&expired_error)?,
+        &ErrorKind::ExpiredSignature
+    );
 
     let wrong_audience = signed_play_integrity_token(
         NONCE,
@@ -91,11 +92,22 @@ fn play_integrity_token_replay_fails_nonce_expiry_and_audience_gates() -> Result
     })
     .err()
     .ok_or("expected audience rejection")?;
-    assert!(matches!(
-        audience_error,
-        AttestationError::PlayIntegrityInvalidToken(_)
-    ));
+    assert_eq!(
+        token_rejection_kind(&audience_error)?,
+        &ErrorKind::InvalidAudience
+    );
     Ok(())
+}
+
+fn token_rejection_kind(error: &AttestationError) -> Result<&ErrorKind, Box<dyn Error>> {
+    let AttestationError::PlayIntegrityVerification(cause) = error else {
+        return Err(format!("expected a typed Play Integrity rejection, got {error}").into());
+    };
+    let jwt_error = cause
+        .source()
+        .and_then(|source| source.downcast_ref::<jsonwebtoken::errors::Error>())
+        .ok_or("Play Integrity rejection lost its local JWT cause")?;
+    Ok(jwt_error.kind())
 }
 
 #[test]

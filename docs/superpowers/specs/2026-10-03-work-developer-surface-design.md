@@ -14,7 +14,7 @@ Support is a set of dimensions: admission, owned dispatch, durable execution obs
 
 Extend that same matrix with resolved-profile queries, qualified all_success joins and acceptance-evidence projections. A transport carrying a profile description has not thereby qualified its predicates, remote confinement or result-release path. Canonical vectors include stale generations, wrong evaluator/artifact and changed dependency category as well as invocation bindings.
 
-MCP, A2A, ACP and governed HTTP receive positive and negative work vectors. Envoy ext_authz advertises admission only unless a particular complete deployment earns additional dimensions. Provider trace-only surfaces remain trace-only. Reuse the existing CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json; add work-profile dimensions rather than a competing inventory.
+MCP, A2A, ACP-Client and governed HTTP receive positive and negative work vectors. Envoy ext_authz advertises admission only unless a particular complete deployment earns additional dimensions. Provider trace-only surfaces remain trace-only. Reuse the existing CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json; add work-profile dimensions rather than a competing inventory.
 
 ## SDK and host operations
 

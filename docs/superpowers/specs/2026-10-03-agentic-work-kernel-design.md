@@ -113,7 +113,7 @@ The recovery specification's proposed names are contract anchors, not proof thos
 
 ## Beta target and stopping rule
 
-The proposed beta profile is an installable developer kernel and reference host on the platform qualified by the security lane. Linux x86_64 Enforced mode is the initial acceptance target; other platforms retain their own explicit support levels. Native Rust, Python process workers and TypeScript process workers share the same work model. MCP, A2A, ACP and HTTP are individually qualified according to their actual mediation boundaries.
+The proposed beta profile is an installable developer kernel and reference host on the platform qualified by the security lane. Linux x86_64 Enforced mode is the initial acceptance target; other platforms retain their own explicit support levels. Native Rust, Python process workers and TypeScript process workers share the same work model. MCP, A2A, ACP-Client and HTTP are individually qualified according to their actual mediation boundaries.
 
 Funded work is part of the architecture and the beta API. The initial qualified rail may remain an explicitly labeled local development-chain profile with mock assets. Public-money deployment needs its own rail, contract, finality and operational acceptance; a devnet result cannot authorize it. No mandatory chain or payment is introduced for unpaid work.
 
