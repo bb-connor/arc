@@ -91,15 +91,19 @@ repairs do not close their broader original requirements. Mobile wrappers now
 match the current FFI. Source `6428fac61a` installs a rebuilt Apple framework
 that passes five native tests, with exact source and artifact hashes retained.
 The committed package and rebuild subsequently pass on `69435a1a5b`; the
-supported Kotlin matrix and final foundation qualification remain open. The authoritative
+Kotlin host consumer subsequently passes four native ABI tests and hosted run
+`37259208574` on `4816966dc0`. Android device/AAR acceptance and final foundation
+qualification remain open. The authoritative
 [repair ledger](landing-ledger.md#foundation-repair-batch-after-consolidation)
 records each component result and remaining acceptance.
 
-The PostgreSQL native demo still needs a mediated database boundary: its direct
-connection conflicts with the selected enforced cage profile. Adding its
-missing native fixture does not resolve this behavior or qualify the job. Its
-valuable source remains preserved, and neither the cage nor required checks
-are weakened to obtain a pass.
+Source `6d18cf0a57` implements the mediated PostgreSQL boundary after the direct
+connection failed under the selected enforced cage profile. Six fixed host
+routes retain tenant and original caller identity, and the actual TLS/database
+component passes its hostile requests and lease operations. Full native handoff
+and committed-claim-loss qualification remain required. The live framework
+consumer and operator deployment have separate outstanding acceptance in the
+[mediation plan](../superpowers/plans/2026-10-05-postgres-native-resource-mediation.md).
 
 A foundation merge establishes only the reviewed and executed foundation
 contract for its named source and supported profile. It is not full roadmap

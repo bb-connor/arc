@@ -27,19 +27,32 @@ it has an explicit separate R&D disposition and no foundation landing slot.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1592 ledger requirements, including 201 carried review records, four findings
-from the October 5 independent reviews and five subsequent repair obligations.
+1594 ledger requirements, including 201 carried review records, four findings
+from the October 5 independent reviews and seven subsequent repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+Source `6d18cf0a572bdf6dcee0ea2775a45941eddf37ce` implements caller-bound PostgreSQL resource mediation.
+The [retained evidence](audits/foundation-postgres-mediation-20261005.json.gz)
+records 179 passing broker tests, five CLI broker/preparation tests, owning
+Clippy, supply-chain checks and the actual TLS/database component. Four hostile
+requests are refused; lease supersession, handoff and completion pass. Original
+compiler and harness failures remain retained. The full native handoff and
+committed-claim-loss scenarios are wired but still unqualified. No production
+migration approval is inferred from the native test fixture identities.
+
+The mobile stale-export thread is now resolved with its source and native ABI
+evidence. Android and live framework acceptance remain open. Source `ff23fa48f969bde1f0bcd3eddbe52f8690e04fc6` repairs the later process-caller clock finding. Both injected-epoch regressions failed before the repair; all 41 affected process, mailbox and worker tests now pass, with no ignored tests. All-target/all-feature Clippy and regenerated proof coverage pass. The [clock evidence](audits/foundation-process-caller-clock-20261005.json.gz) retains the original failures. Final independent review and landing qualification remain required.
 
 The latest [mobile consumer evidence](audits/foundation-mobile-consumers-20261005.json.gz)
 records four native Kotlin ABI tests passing on `e3a85a724b`. The locked
 UniFFI generator now renames error payload fields to `detail` and selects the
 actual Rust shared-library name. The original compile and loader failures are
 retained. The checked-in wrapper is exercised against Rust, and CI runs this
-consumer check. Android AAR packaging and device qualification remain open.
+consumer check. Hosted run `37259208574` passes both JVM and Kotlin native ABI
+jobs on `4816966dc0`. Android AAR packaging and device qualification remain open.
 
 Both Swift jobs pass in run `37257006831` on `5e9c904834`, including five
 native tests of the rebuilt framework. Generated headers are normalized before
@@ -51,16 +64,19 @@ required.
 GitHub Codex reports no major issues on `8384454ca6` in
 [its completed review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5987167491).
 Four original consumer threads are resolved against their source repairs and
-that review. The subsequent mobile changes require another review. Source
+that review. Codex subsequently reports no major issues on `4816966dc0` in
+[its completed review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5987578006),
+while the separate clock finding is retained and repaired as recorded above.
+The PostgreSQL and clock composition requires a new independent review. Source
 `8384454ca6` was briefly authorized for mutation refresh, but its queued
 controller was cancelled when superseded and the refresh label removed. No
 native capture or signed qualification resulted; authorization still names that
 older source.
 
 The [PostgreSQL mediation plan](../superpowers/plans/2026-10-05-postgres-native-resource-mediation.md)
-records the mandatory unfinished repair. Database credentials and sockets must
-stay at the host resource boundary, with caller identity bound by durable broker
-preparation. Both PostgreSQL native scenarios, final Linux/trusted evidence and
+records the mandatory repair and remaining native acceptance. Database
+credentials and sockets stay at the host resource boundary, with caller identity
+bound by durable broker preparation. Both PostgreSQL native scenarios, final Linux/trusted evidence and
 the protected foundation merge remain open.
 
 Source `75f2a51c9daecd6852939d2490b289a4f54997c6` closes five reproduced
@@ -166,9 +182,8 @@ root without changing those permissions or weakening the check.
 
 **Foundation remains blocked.** Native C++ and PostgreSQL workflow consumers
 now receive the existing enforced fixture and enforcing CLI build. This repairs
-their missing inputs, but is not an execution pass. The PostgreSQL demo still
-opens direct database connections that the enforced cage forbids; it needs a
-mediated database boundary and native qualification. No socket permission or
+their missing inputs, but is not an execution pass. The PostgreSQL source now
+uses mediated routes; its complete native composition remains unqualified. No socket permission or
 required check is relaxed. The local host is ARM64, so it cannot supply the
 required trusted Linux x86_64 campaign or hosted provenance. Final source authorization
 and qualification remain pending; the superseded refresh is recorded above.
