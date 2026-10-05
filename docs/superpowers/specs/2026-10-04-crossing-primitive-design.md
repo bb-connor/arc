@@ -537,6 +537,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
 
 17. **X17. Writer loop.** One writer task owns the serving connection, and every write on it goes through the loop. That covers admission, revocation, stop, budget administration, the finding market, channels, FROST and fiscal, each with its commit class.
     - Members enqueue with a reply handle. Enqueue is the submission point (spec 9 M17). Once enqueued, the writer runs and commits the member whether or not anyone still holds its reply handle. A dropped handle never cancels a member, and spec 9's `DropReconcileJob` may take the handle over.
+    - **Explicit withdrawal.** The writer supports `withdraw(member)` for a member that is queued but not yet executing, including one re-queued after `Retry` (X21). It answers `Withdrawn`, meaning known not committed and removed from the queue, or `TooLate`, meaning the member has started executing and its final reply follows. Only an explicit `withdraw` removes a member; a dropped handle never does. Spec 9's `DropReconcileJob` (M17) and spec 8's timed-out widening transitions (S36) use it.
     - The loop takes the queue head and every member already queued (`max_batch`, default 64; at most `max_intent_members`, default 16, `DispatchIntent` members per batch).
     - It opens one IMMEDIATE transaction and runs each member as a closure inside its own `SAVEPOINT`.
     - Today's `lock_mutations` critical sections (claim, revalidate, commit) become one member closure.
@@ -949,3 +950,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187433143 | Complete the cross-spec crossing registry | Fixed by narrowing X1 to the owning registry. Section 4.2 is the registry of crossing kinds. The default ordering point is the kind's own `CrossingTx` commit under `CrossingOrder`. Spec 4 section 4.3 lists only kinds whose custody-exit point differs. Spec 1 registers the driving L0 ops, not crossings | X1 |
+
+### Codex review (PR #1174, round 24)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187829615 (spec 9) | Do not compensate while a Retry member is requeued | Supporting change. The writer gains an explicit `withdraw(member)` for queued, not-yet-executing members, including ones re-queued after `Retry`. It answers `Withdrawn` (known not committed) or `TooLate`. Spec 9 M17 and spec 8 S36 use it | X17 |

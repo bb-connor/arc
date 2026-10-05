@@ -537,6 +537,9 @@ Rules H1-H10 bind every surface:
 6. **H6. Terminal is last.** A surface with a lifecycle delivers exactly one `Terminal` hint, after discarding pending hints, from a slot reserved at creation. After it, posting is a no-op and subscribing fails.
    - **H6a. Flush, then cancel.** Writing `Terminal` into the log does not by itself make any stream emit it. A stream selecting between its event source and the cancellation token could see the cancellation first, or close before draining the slot. Session termination therefore runs in this order:
      1. **Log.** `terminate` discards pending hints, writes `Terminal { reason }` into the reserved terminal slot with a fixed sequence number, and refuses further posts and subscriptions.
+     1a. **Persist.** Before any flush wait, the session's terminal store transition (the existing terminal fence, M: `session_store.rs:980-985`) durably records `terminal_event { event_id, reason, retention_deadline, replay_consumed: false }` in the terminal tombstone.
+        - After a crash during the flush wait, the tombstone, not the lost in-memory log, serves the retained replay: the first reconnect presenting a `Last-Event-ID` below `event_id`, before `retention_deadline`, receives the `Terminal` once, and `replay_consumed` is set durably.
+        - If this persist fails, termination still proceeds fail-closed, as A19 does for a failed persist, but the spec claims no crash-survivable replay for that session.
      2. **Stream slots.** The transport copies the terminal hint into each attached stream's reserved terminal frame. Every stream reserves one at attach, so this step never blocks or allocates. A POST stream still waiting for its response first emits A13's outcome-unknown error for its request id.
      3. **Flush.** Each stream emits the frames already handed to it, then the terminal frame as its last frame, then acknowledges once the frame is written and flushed to the HTTP body. Streams poll their terminal frame before the cancellation token (a biased select), so a stream that observes both emits the terminal first.
      4. **Await.** The session waits for every attached stream's acknowledgement, bounded by `terminal_flush_deadline_ms` (default 2000).
@@ -977,6 +980,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187740942 | Define an ID for session terminal events | Fixed now. `subscription_id` is required on subscription-scoped kinds (`Changed`, `ThresholdCrossed`, `SubscriptionEnded`) and absent on the session `Terminal`. The terminal belongs to no subscription and is identified by its single per-session event id, so the frame is serializable under the declared shape | section 13 negotiation; section 16 wire |
+
+### Codex review (PR #1174, round 24)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187829610 | Persist terminal hints before waiting for stream flushes | Fixed now. H6a step 1a durably records the terminal event (id, reason, retention deadline, consumed flag) in the terminal tombstone before any flush wait. After a crash, the tombstone serves the one retained replay, and consumption is recorded durably | H6a |
 
 ## Appendix A. FTL reference
 

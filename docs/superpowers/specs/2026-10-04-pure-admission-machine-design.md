@@ -577,9 +577,9 @@ pub enum IdentityDisposition {
       - On the fused path before the intent commit, nothing was persisted, so only spec 3's in-memory ledger entries are released.
     - **Submitted, not acknowledged.** The outcome is unknown to the driver. This is spec 3's `BoundaryFailure::CommitUnconfirmed` (spec 3 rule 29): nothing is compensated and nothing latches.
       - Every in-memory ledger entry moves to retained. `Drop` hands the member's reply handle to a `DropReconcileJob`.
-      - The job awaits the writer's reply and feeds it to the machine as the driver would have: `DispatchCommitAcknowledged`, `CommitFailed { reason }` (M10 rows apply), or `CommitOutcomeUnknown` (M12). `Retry` is known not committed.
+      - The job awaits the writer's final reply and feeds it to the machine as the driver would have: `DispatchCommitAcknowledged`, `CommitFailed { reason }` (M10 rows apply), `CommitOutcomeUnknown` (M12), or `StoreUnavailable` (M19). **`Retry` is not final.** Spec 10 X21 requeues the same member under the same reply handle, so the job keeps holding that handle and awaiting the requeued attempt. Alternatively it asks the writer to withdraw the requeued member and waits for the writer's confirmation that the member was removed before executing.
       - It then feeds `Cut { cause: DriverDropped, .. }`. The `S` column classifies the phase actually committed: a pre-dispatch phase compensates, and `DispatchCommitted` terminalizes as outcome-unknown.
-      - On a fused intent from `Unbegun`, compensation happens only after a terminal reply of `Refused` or `Retry` and a read-back that finds no row under the replay key. Only then are the in-memory entries released under `PreDispatchNoEffect`.
+      - On a fused intent from `Unbegun`, compensation happens only after two things: a final reply of `Refused` or `StoreUnavailable`, or a confirmed withdrawal of the requeued member; and then a read-back that finds no row under the replay key. Only then are the in-memory entries released under `PreDispatchNoEffect`. A requeued member therefore can never commit after its reservations were released.
       - If the reply is lost (crash), startup reconciliation re-projects from the store, as for any unknown outcome.
     - **After the acknowledgement.** A driver future dropped after the acknowledgement enqueues a supervised reconciliation job. The job takes the lease and feeds `Cut { cause: DriverDropped, .. }`, which the cut table classifies by its `S` column.
       - A `DispatchCommitted` operation with no return record therefore terminalizes as outcome-unknown, as M:'s guard does today (M: `kernel_drop_guard.rs:530-548`), without waiting for a restart (S3-14).
@@ -1073,6 +1073,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187740934 | Classify AfterStoreRecovery receipts in M20 | Fixed now. M20's `Reusable` row lists both check-only withheld forms: `AfterResume` (M11) and `StoreUnavailable` with `AfterStoreRecovery` (M19). Neither falls through to `Terminal` | M20 table |
+
+### Codex review (PR #1174, round 24)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187829615 | Do not compensate while a Retry member is requeued | Fixed now. `Retry` is not a final reply for `DropReconcileJob`. It keeps the reply handle across X21's requeue, or obtains the writer's confirmed withdrawal of the member, and compensates only after a final `Refused`/`StoreUnavailable` or a confirmed withdrawal plus an empty read-back | M17 |
 
 ## Appendix A. External and FTL precedent
 

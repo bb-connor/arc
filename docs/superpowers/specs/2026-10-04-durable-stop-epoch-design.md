@@ -207,6 +207,7 @@ pub struct StopEpochV1 {
     pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
     pub offline_bypass: bool,                    // true only for an offline-CLI Stop or Restrict appended without a journal entry (S2, S25); then satisfies_intent is None
     pub subsumes_intents: Vec<StopIntentRef>,    // offline_bypass only: the scope's pending journal entries the CLI read and folded in (S25); empty otherwise
+    pub subsumes_unread: bool,                   // offline_bypass only: the journal was unreadable, so boot reconciles the unread entries against this record (S25)
     pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
 }
 
@@ -799,7 +800,12 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
         - its `allow_containment` is the narrowest of the request and every pending entry;
         - `subsumes_intents` lists each entry's `{ intent_id, generation }`.
 
-        Satisfaction (below) treats a listed entry as satisfied, so a stale entry can neither be re-applied over an already narrow head nor block `Resume` or `Relax`. If the journal cannot even be read, the CLI still appends the bypass record with an empty list and reports `stop_durable` with `journal_unreadable`. Boot then refuses readiness until the journal is readable (S9). That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
+        Satisfaction (below) treats a listed entry as satisfied, so a stale entry can neither be re-applied over an already narrow head nor block `Resume` or `Relax`. If the journal cannot even be read, the CLI still appends the bypass record, with an empty list and the signed flag `subsumes_unread: true`, and reports `stop_durable` with `journal_unreadable`. Boot then refuses readiness until the journal is readable (S9).
+        - **Recoverable proof.** Once the journal is readable, boot reconciles each entry for that scope against the `subsumes_unread` record.
+          - Any entry present then was recorded in the current incident, because a `Resume` or `Relax` cannot commit while an unsatisfied entry exists and removes every satisfied one first (S25).
+          - So an entry whose `allow_containment` is no narrower than the head's is satisfied by the `subsumes_unread` record. That requires no `Relax` or `Resume` to follow the record. Boot appends a progress-only note recording the entry's contributors for audit, then removes the entry.
+          - An entry narrower than the head is applied as a narrowing `Restrict`, as usual.
+          - No unread entry can block readiness or a later `Resume` or `Relax`. That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
       - success requires the record committed and anchored, and the CLI reports `stop_durable`;
       - if that append also fails, the CLI exits non-zero and reports `stop_not_in_force`. It states that no stop is recorded and that the operator must keep the host down or retry. It never claims a stop is in force.
     - This extends AC6's "publish first" rule from memory to durability.
@@ -1182,6 +1188,12 @@ Open decisions:
 | 4187663066 | Reconcile pending intents before an offline bypass | Fixed now. Before a bypass append, the CLI reads the scope's pending entries and folds them in: narrowest containment, and a new `subsumes_intents` list. Satisfaction treats listed entries as satisfied, so a stale entry cannot block resume or be re-applied. An unreadable journal still gets the stop, and boot refuses readiness | record fields; S25 offline CLI and satisfaction |
 | 4187663074 | Cancel timed-out resume and relax writes | Fixed now. Only narrowing transitions stay queued after `stop_commit_wait`. A timed-out `Resume` or `Relax` is withdrawn before execution (`resume_not_committed`), or reported `resume_outcome_unknown` if already in a batch. `expected_epoch` makes the retry safe, so a widening write never commits after a failure report | S36 |
 | 4187663058 (spec 9) | Use a store-recovery retry condition for unavailable checks | `OutputWithheld` gains `reason: StoreUnavailable` and `retry: AfterStoreRecovery`, used by spec 9 M19 for reusable check-only reads | S14 client-visible result |
+
+### Codex review (PR #1174, round 24)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187829605 | Make unreadable-journal bypasses retire pending intents | Fixed now. An unreadable-journal bypass record carries a signed `subsumes_unread: true`. Once readable, boot treats each entry no narrower than the head as satisfied by that record, records its contributors in a note and removes it, and applies a narrower entry as a `Restrict`. This is sound because entries present while stopped belong to the current incident. Unread entries can no longer block readiness or resume | record fields; S25 offline CLI |
 
 ## Appendix A. FTL reference
 
