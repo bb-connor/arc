@@ -1334,6 +1334,8 @@
     "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::resolve_budget_grant::from_wire",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::canonical::from_wire",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::decode::from_wire",
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/host_adapter.rs::decode_request::from_wire",
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/host_adapter.rs::serve::from_wire",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::canonical_input::from_wire",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::decode_native_durable::from_wire",
     "crates/platform/chio-finding-worker/src/protocol.rs::decode_original::from_wire",
@@ -5904,8 +5906,8 @@
       "parse_artifact_from_value::from_value"
     ],
     "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/main.rs": [
-      "main::from_slice",
-      "main::from_slice"
+      "legacy::from_slice",
+      "legacy::from_slice"
     ],
     "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/resource.rs": [
       "describe::from_slice",
@@ -8356,7 +8358,7 @@
       "contract": "Example or fuzz entry point; not evidence of a production signed-reader migration.",
       "readers": [
         {
-          "reader": "main",
+          "reader": "legacy",
           "decoders": [
             "from_slice",
             "from_slice"
@@ -11559,7 +11561,7 @@
     },
     "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs": {
       "kind": "reviewed-bounded-input",
-      "contract": "Receipt-profile transport frames are capped at 4 MiB before allocation and phase-timed. Closed request fields preserve exact signed body bytes. Signing requires one current directory snapshot, pinned matching passport key, authenticated peer identity/signature and exact profile reconstruction. Reply decoding checks schema; the origin signature is independently checked over the locally constructed preimage.",
+      "contract": "Receipt-profile transport frames are capped at 4 MiB before allocation and phase-timed. Closed request fields preserve exact signed body bytes. Signing requires one current directory snapshot, pinned matching passport key, authenticated peer identity, strict signature verification and exact profile reconstruction. Reply decoding checks schema; the origin signature is independently checked over the locally constructed preimage.",
       "readers": [
         {
           "reader": "receipt_exchange",
@@ -16657,6 +16659,8 @@
     "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::resolve_budget_grant::from_wire#1::decode_signed",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::canonical::from_wire#1::canonicalize",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::decode::from_wire#1::decode_signed",
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/host_adapter.rs::decode_request::from_wire#1::decode_signed",
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/host_adapter.rs::serve::from_wire#1::decode_signed",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::canonical_input::from_wire#1::canonicalize",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::decode_native_durable::from_wire#1::decode_canonical",
     "crates/platform/chio-finding-worker/src/protocol.rs::decode_original::from_wire#1::canonicalize+decode_canonical",
@@ -18400,6 +18404,10 @@
       "publish_inner::shared-reader::crates/platform/chio-finding-hosted-edge/src/server.rs::strict_canonical_body",
       "release_identity::shared-reader::crates/platform/chio-finding-hosted-edge/src/server.rs::authenticate",
       "strict_canonical_body::shared-reader::crates/platform/chio-finding-hosted-edge/src/input.rs::canonical"
+    ],
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/host_adapter.rs": [
+      "decode_request::original-json-reader::UntrustedJsonText",
+      "serve::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-finding-market-store-postgres/src/aggregates.rs": [
       "aggregate_event_from_row::shared-reader::crates/platform/chio-finding-market-store-postgres/src/validation.rs::verify_payload",

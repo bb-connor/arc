@@ -168,7 +168,15 @@ fn sqlite_unacknowledged_authorization_requires_authoritative_recovery(
                 assert!(after.authorization_id.is_none());
             }
             Lookup::Held => {
-                assert!(recovered.is_err());
+                match &recovered {
+                    Err(chio_kernel::KernelError::DurableAdmission(reason)) => {
+                        assert_eq!(
+                            reason,
+                            "payment rail unavailable: release acknowledgement unavailable"
+                        );
+                    }
+                    result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+                };
                 assert_eq!(after.state, PaymentJournalState::Settling);
                 assert_eq!(
                     after.authorization_id.as_deref(),
@@ -194,7 +202,22 @@ fn sqlite_unacknowledged_authorization_requires_authoritative_recovery(
                 assert_eq!(rail.releases.load(Ordering::SeqCst), 2);
             }
             _ => {
-                assert!(recovered.is_err());
+                let expected_reason = match lookup {
+    Lookup::Unavailable => "payment rail unavailable: lookup unavailable",
+    Lookup::Panic => "payment rail error: payment adapter settlement_state panicked; outcome unknown",
+    Lookup::InvalidIdentifier => "payment rail error: payment adapter returned an invalid recovered authorization identifier; outcome unknown",
+    Lookup::ChangedMode => "payment recovery rail changed",
+    Lookup::Held | Lookup::Absent => unreachable!("terminal lookup cases handled above"),
+};
+                match &recovered {
+                    Err(chio_kernel::KernelError::DurableAdmission(reason)) => {
+                        assert_eq!(reason, expected_reason)
+                    }
+                    result => panic!(
+                        "expected durable admission rejection, got {:?}",
+                        result.as_ref().err()
+                    ),
+                };
                 assert_eq!(after, before);
                 *rail.lookup.lock().map_err(|_| "test lock")? = Lookup::Absent;
                 rail.original_mode.store(true, Ordering::SeqCst);

@@ -87,9 +87,12 @@ fn execution_evidence_scenario(corruption: &str) -> Result<(), Box<dyn Error>> {
             outcomes.clone(),
             fence.clone(),
         )?;
-        assert!(wrong_signer
-            .export_durable_execution_evidence(&request)
-            .is_err());
+        match &wrong_signer.export_durable_execution_evidence(&request) {
+            Err(chio_kernel::KernelError::DurableAdmission(reason)) => {
+                assert_eq!(reason, "admission operation mutation was fenced");
+            }
+            result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+        };
         if corruption == "rollback" {
             // Capture committed pre-projection state while preserving the newer
             // out-of-database rollback anchor for the later restore attempt.
@@ -165,38 +168,51 @@ fn execution_evidence_scenario(corruption: &str) -> Result<(), Box<dyn Error>> {
                 "amount" => changed.amount_units += 1,
                 _ => changed.rail = "different-rail".into(),
             }
-            assert!(
-                record
-                    .validate_against(
-                        operation,
-                        &raw,
-                        &outcome,
-                        &evaluation,
-                        &changed,
-                        resolved.bytes()
-                    )
-                    .is_err(),
-                "{mutation}"
-            );
+            match &record.validate_against(
+                operation,
+                &raw,
+                &outcome,
+                &evaluation,
+                &changed,
+                resolved.bytes(),
+            ) {
+                Err(chio_kernel::tool_outcome::ToolOutcomeError::Binding(field)) => {
+                    assert_eq!(
+                        *field,
+                        if mutation == "hold" {
+                            "execution.payment_identity"
+                        } else {
+                            "execution.receipt_sources"
+                        }
+                    );
+                }
+                result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+            };
         }
         let mut changed = raw.to_persisted();
         changed.output = chio_kernel::tool_outcome::InvocationOutputV1::Value {
             value: serde_json::json!({"forged":true}),
         };
         let changed = RawInvocationOutcomeV1::from_persisted(changed)?;
-        assert!(record
-            .validate_against(
+        assert!(matches!(
+            &(record.validate_against(
                 operation,
                 &changed,
                 &outcome,
                 &evaluation,
                 &journal,
                 resolved.bytes()
-            )
-            .is_err());
-        assert!(record
-            .validate_against(operation, &raw, &outcome, &evaluation, &journal, b"null")
-            .is_err());
+            )),
+            Err(chio_kernel::tool_outcome::ToolOutcomeError::Binding(
+                "outcome.raw_invocation_blob"
+            ))
+        ));
+        assert!(matches!(
+            &(record.validate_against(operation, &raw, &outcome, &evaluation, &journal, b"null")),
+            Err(chio_kernel::tool_outcome::ToolOutcomeError::Binding(
+                "execution.resolution"
+            ))
+        ));
         let bytes = canonical_json_bytes(&execution)?;
         assert_eq!(
             canonical_json_bytes(&kernel.export_durable_execution_evidence(&request)?)?,
@@ -216,7 +232,12 @@ fn execution_evidence_scenario(corruption: &str) -> Result<(), Box<dyn Error>> {
         );
         let mut changed = request.clone();
         changed.arguments = serde_json::json!({"substituted": true});
-        assert!(kernel.export_durable_execution_evidence(&changed).is_err());
+        match &kernel.export_durable_execution_evidence(&changed) {
+            Err(chio_kernel::KernelError::DurableAdmission(reason)) => {
+                assert_eq!(reason, "admission operation invariant failed: request differs from its retained admission material");
+            }
+            result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+        };
         (request, operation.binding().operation_id().clone(), bytes)
     };
 

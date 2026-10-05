@@ -69,6 +69,16 @@ class ReaderWitnessCalibration(unittest.TestCase):
             with self.subTest(reader=rule["reader"], path=rule["path"]):
                 self.assertIn(rule["api_label"], self.labels(rule))
 
+    def test_bilateral_authority_requires_strict_signature_verification(self):
+        rule = next(rule for rule in witnesses.RULES
+                    if rule["api_label"] == "read_frame::capped_timed_receipt_request+cosign_authority")
+        path = rule["path"]
+        self.assertIn(rule["api_label"], self.labels(rule))
+        original = "directory_key.verify_strict(subject.signed_bytes, subject.org_b_signature)"
+        self.assertEqual(self.files[path].count(original), 1)
+        changed = self.files[path].replace(original, original.replace("verify_strict", "verify"))
+        self.assertNotIn(rule["api_label"], self.labels(rule, {path: changed}))
+
     def test_each_required_guard_removal_loses_actual_reader_evidence(self):
         for rule in witnesses.RULES:
             for target in self.targets(rule):

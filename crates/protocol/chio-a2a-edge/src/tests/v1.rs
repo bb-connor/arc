@@ -72,7 +72,11 @@ fn v1_rejects_unsupported_or_ambiguous_semantics_before_task_retention() {
     cases.push(tenant);
     for request in cases {
         let response = edge
-            .handle_jsonrpc(&serde_json::to_vec(&request.clone()).test_unwrap(), &kernel, &execution)
+            .handle_jsonrpc(
+                &serde_json::to_vec(&request.clone()).test_unwrap(),
+                &kernel,
+                &execution,
+            )
             .test_unwrap()
             .into_value()
             .test_unwrap();
@@ -89,8 +93,12 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
     let kernel = ChioKernel::new(config);
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let started = edge
-        .handle_jsonrpc(&serde_json::to_vec(&v1_request()).test_unwrap(), &kernel, &owner)
-            .test_unwrap()
+        .handle_jsonrpc(
+            &serde_json::to_vec(&v1_request()).test_unwrap(),
+            &kernel,
+            &owner,
+        )
+        .test_unwrap()
         .into_value()
         .test_unwrap();
     let task_id = started["result"]["task"]["id"].as_str().test_unwrap();
@@ -99,17 +107,25 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
             json!({"jsonrpc": "2.0", "id": 2, "method": method, "params": {"id": task_id}});
         let denied = edge
             .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &other)
-            .test_unwrap()
-            .into_value()
             .test_unwrap();
-        assert!(denied.get("error").is_some());
+        assert!(matches!(
+            denied.local_error(),
+            Some(A2aEdgeError::InvalidRequest(_))
+        ));
+        let denied = denied.into_value().test_unwrap();
+        assert_eq!(denied["id"], 2);
+        assert_eq!(denied["error"]["code"], -32602);
         assert_eq!(edge.tasks[task_id].response.status, TaskStatus::Working);
     }
     let cancel =
         json!({"jsonrpc": "2.0", "id": 3, "method": "CancelTask", "params": {"id": task_id}});
     let response = edge
-        .handle_jsonrpc(&serde_json::to_vec(&cancel.clone()).test_unwrap(), &kernel, &owner)
-            .test_unwrap()
+        .handle_jsonrpc(
+            &serde_json::to_vec(&cancel.clone()).test_unwrap(),
+            &kernel,
+            &owner,
+        )
+        .test_unwrap()
         .into_value()
         .test_unwrap();
     assert_eq!(response["result"]["status"]["state"], "TASK_STATE_CANCELED");
@@ -131,6 +147,37 @@ fn v1_task_get_and_cancel_keep_the_original_owner_boundary() {
 }
 
 #[test]
+fn v1_unknown_task_errors_preserve_the_original_response() {
+    let config = test_kernel_config();
+    let owner = v1_execution(&config.keypair);
+    let kernel = ChioKernel::new(config);
+    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    for (method, legacy_method) in [("GetTask", "task/get"), ("CancelTask", "task/cancel")] {
+        let request = json!({"jsonrpc": "2.0", "id": "missing-task", "method": method,
+            "params": {"id": "unknown-task"}});
+        let legacy = json!({"jsonrpc": "2.0", "id": "missing-task", "method": legacy_method,
+            "params": {"taskId": "unknown-task"}});
+        let response = edge
+            .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
+            .test_unwrap();
+        assert!(matches!(
+            response.local_error(),
+            Some(A2aEdgeError::ToolNotFound(task_id)) if task_id == "unknown-task"
+        ));
+        let expected = edge
+            .handle_jsonrpc(&serde_json::to_vec(&legacy).test_unwrap(), &kernel, &owner)
+            .test_unwrap();
+        assert!(matches!(
+            expected.local_error(),
+            Some(A2aEdgeError::ToolNotFound(task_id)) if task_id == "unknown-task"
+        ));
+        let expected = expected.into_value().test_unwrap();
+        assert_eq!(expected["error"]["code"], -32602);
+        assert_eq!(response.into_value().test_unwrap(), expected);
+    }
+}
+
+#[test]
 fn v1_card_does_not_advertise_sse_for_a_polling_lifecycle() {
     let edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let card = edge.agent_card();
@@ -149,23 +196,31 @@ fn v1_restart_never_rebinds_an_old_task_identifier() {
     let start = || ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let mut first = start();
     let previous = first
-        .handle_jsonrpc(&serde_json::to_vec(&v1_request()).test_unwrap(), &kernel, &owner)
-            .test_unwrap()
+        .handle_jsonrpc(
+            &serde_json::to_vec(&v1_request()).test_unwrap(),
+            &kernel,
+            &owner,
+        )
+        .test_unwrap()
         .into_value()
         .test_unwrap();
     let old_id = previous["result"]["task"]["id"].as_str().test_unwrap();
     drop(first);
     let mut restarted = start();
     let next = restarted
-        .handle_jsonrpc(&serde_json::to_vec(&v1_request()).test_unwrap(), &kernel, &owner)
-            .test_unwrap()
+        .handle_jsonrpc(
+            &serde_json::to_vec(&v1_request()).test_unwrap(),
+            &kernel,
+            &owner,
+        )
+        .test_unwrap()
         .into_value()
         .test_unwrap();
     assert_ne!(next["result"]["task"]["id"], old_id);
     let get = json!({"jsonrpc": "2.0", "id": 2, "method": "GetTask", "params": {"id": old_id}});
     let response = restarted
         .handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
-            .test_unwrap()
+        .test_unwrap()
         .into_value()
         .test_unwrap();
     assert!(response.get("error").is_some());
@@ -186,7 +241,7 @@ fn v1_output_negotiation_is_retained_when_polling() {
     request["params"]["configuration"] = json!({"acceptedOutputModes": ["text/plain"]});
     let result = edge
         .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
-            .test_unwrap()
+        .test_unwrap()
         .into_value()
         .test_unwrap();
     let task = &result["result"]["task"];

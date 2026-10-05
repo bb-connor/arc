@@ -115,6 +115,78 @@ fn strict_cosigner_pipeline_returns_a_verified_envelope() {
         .expect("producer returns a verified envelope");
 }
 
+fn assert_low_order_origin_rejected(strict: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let origin = Keypair::generate();
+    let host = Keypair::generate();
+    let receipt = sample_receipt(&host);
+    let mut envelope = if strict {
+        sign_chio_bilateral_dsse_envelope(
+            &receipt,
+            &origin,
+            &host,
+            "kernel.org-a",
+            "kernel.org-b",
+            "file_read",
+            1_734_000_000_000,
+            strict_treaty_extensions(&receipt),
+        )?
+    } else {
+        sign_dsse_envelope(
+            &receipt,
+            &origin,
+            &host,
+            "kernel.org-a",
+            "kernel.org-b",
+            "file_read",
+            1_734_000_000_000,
+        )?
+    };
+    let verify = if strict {
+        verify_chio_bilateral_dsse_envelope
+    } else {
+        verify_dsse_envelope
+    };
+    verify(&envelope, &origin.public_key(), &host.public_key())?;
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let weak_key = PublicKey::from_bytes(&identity)?;
+    let mut forged_bytes = [0; 64];
+    forged_bytes[0] = 1;
+    let forged = Signature::from_bytes(&forged_bytes);
+    let (mut statement, _) = envelope.decode_statement()?;
+    let weak_keyid = Keyid::from_public_key(&weak_key);
+    statement.predicate.tool_server_a.passport_key_fingerprint = weak_keyid.clone();
+    let bytes = statement.canonical_bytes()?;
+    let preimage = pae(PAYLOAD_TYPE_IN_TOTO, &bytes);
+    assert!(weak_key.verify(&preimage, &forged));
+    envelope.payload = BASE64_STANDARD.encode(&bytes);
+    envelope.signatures = vec![
+        DsseSignature {
+            keyid: weak_keyid.0,
+            sig: BASE64_STANDARD.encode(forged_bytes),
+        },
+        DsseSignature {
+            keyid: Keyid::from_public_key(&host.public_key()).0,
+            sig: BASE64_STANDARD.encode(host.sign(&preimage).to_bytes()),
+        },
+    ];
+    assert!(matches!(
+        verify(&envelope, &weak_key, &host.public_key()),
+        Err(BilateralCoSigningError::OrgASignatureInvalid)
+    ));
+    Ok(())
+}
+
+#[test]
+fn low_order_origin_cannot_forge_signature_slice_dsse() -> Result<(), Box<dyn std::error::Error>> {
+    assert_low_order_origin_rejected(false)
+}
+
+#[test]
+fn low_order_origin_cannot_forge_strict_treaty_dsse() -> Result<(), Box<dyn std::error::Error>> {
+    assert_low_order_origin_rejected(true)
+}
+
 #[cfg(feature = "typestate")]
 #[test]
 fn generated_typestate_calls_the_crypto_handlers_in_order() {

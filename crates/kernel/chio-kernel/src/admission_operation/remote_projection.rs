@@ -293,7 +293,7 @@ impl SignedAdmissionTerminalProjectionV1 {
             || !self
                 .body
                 .signer_key
-                .verify(&signing_preimage(&self.body)?, &self.signature)
+                .verify_strict(&signing_preimage(&self.body)?, &self.signature)
         {
             return Err(mismatch());
         }
@@ -1626,11 +1626,13 @@ mod tests {
             assert!(wrong
                 .verify_signature()
                 .map_err(|error| AdmissionOperationError::CanonicalJson(error.to_string()))?);
-            assert!(validate_denied_receipt_reason_and_delivery_metadata(
-                &wrong,
-                DeliveryDenialReason::OutputGuardRejected
-            )
-            .is_err());
+            assert!(matches!(
+                &(validate_denied_receipt_reason_and_delivery_metadata(
+                    &wrong,
+                    DeliveryDenialReason::OutputGuardRejected
+                )),
+                Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+            ));
         }
         Ok(())
     }

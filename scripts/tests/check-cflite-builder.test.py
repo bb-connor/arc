@@ -69,6 +69,7 @@ class BuilderTests(unittest.TestCase):
                 "    sys.exit(0)\n"
                 "assert sys.argv[1:4] == ['+nightly', 'fuzz', 'build'], sys.argv\n"
                 "with open(os.environ['BUILD_RECORD'], 'a') as stream:\n"
+                "    assert os.environ.get('CARGO_BUILD_JOBS') == os.environ.get('EXPECTED_BUILD_JOBS', '2'), 'unbounded compiler concurrency'\n"
                 "    stream.write(json.dumps(sys.argv[4:]) + '\\n')\n"
                 "target = pathlib.Path('target/x86_64-unknown-linux-gnu/release') / sys.argv[4]\n"
                 "target.parent.mkdir(parents=True, exist_ok=True)\n"
@@ -109,6 +110,19 @@ class BuilderTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(set(outputs), INVENTORY)
                 self.assertEqual(len(calls), len(INVENTORY))
+
+    def test_builder_preserves_an_explicit_compiler_budget(self):
+        for builder in BUILDERS:
+            with self.subTest(builder=builder):
+                result, _, outputs = self.build(
+                    builder,
+                    environment={
+                        "CARGO_BUILD_JOBS": "1",
+                        "EXPECTED_BUILD_JOBS": "1",
+                    },
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(set(outputs), INVENTORY)
 
     def test_local_environment_selection_preserves_required_features(self):
         result, calls, outputs = self.build(

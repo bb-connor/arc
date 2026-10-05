@@ -47,6 +47,9 @@ pub struct ContractualCaptureWaiverPolicyV1 {
 impl ContractualCaptureWaiverPolicyV1 {
     pub fn validate(&self) -> Result<(), CaptureWaiverError> {
         if self.receiver_key == self.counterparty_key
+            || self.receiver_key.is_weak_ed25519()
+            || self.counterparty_key.is_weak_ed25519()
+            || self.observation_key.is_weak_ed25519()
             || self.rail == "unspecified"
             || !super::payment_identifier_is_valid(&self.rail)
             || self.currency.len() != 3
@@ -94,10 +97,10 @@ impl SignedContractualCaptureWaiverTermsV1 {
             || t.expires_at_unix_ms - t.issued_at_unix_ms > 86_400_000
             || !policy
                 .receiver_key
-                .verify(&preimage(t, "receiver")?, &self.receiver_signature)
+                .verify_strict(&preimage(t, "receiver")?, &self.receiver_signature)
             || !policy
                 .counterparty_key
-                .verify(&preimage(t, "counterparty")?, &self.counterparty_signature)
+                .verify_strict(&preimage(t, "counterparty")?, &self.counterparty_signature)
         {
             return Err(fail("invalid original signed waiver terms"));
         }
@@ -180,7 +183,7 @@ impl ContractualCaptureWaiverRequestV1 {
         let b = op.binding().to_persisted();
         if !policy
             .observation_key
-            .verify(&preimage(o, "observation")?, &self.observation.signature)
+            .verify_strict(&preimage(o, "observation")?, &self.observation.signature)
         {
             return Err(fail("receiver-pinned observation signature is invalid"));
         }

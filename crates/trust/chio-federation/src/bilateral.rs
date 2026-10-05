@@ -225,13 +225,13 @@ impl DualSignedReceipt {
 
         if !expected
             .org_a_public_key
-            .verify(&bytes, &self.org_a_signature)
+            .verify_strict(&bytes, &self.org_a_signature)
         {
             return Err(BilateralCoSigningError::OrgASignatureInvalid);
         }
         if !expected
             .org_b_public_key
-            .verify(&bytes, &self.org_b_signature)
+            .verify_strict(&bytes, &self.org_b_signature)
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
@@ -652,7 +652,7 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
 
         if !self
             .tool_host_public_key
-            .verify(&bytes, &request.org_b_signature)
+            .verify_strict(&bytes, &request.org_b_signature)
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
@@ -683,7 +683,7 @@ impl BilateralCoSigningProtocol for InProcessCoSigner {
         }
         if !self
             .tool_host_public_key
-            .verify(&request.pae_bytes, &request.org_b_signature)
+            .verify_strict(&request.pae_bytes, &request.org_b_signature)
         {
             return Err(BilateralCoSigningError::OrgBSignatureInvalid);
         }
@@ -768,7 +768,7 @@ fn co_sign_with_origin_inner(
     );
     let response = cosigner.request_cosignature(&request)?;
 
-    if !origin_public_key.verify(&bytes, &response.org_a_signature) {
+    if !origin_public_key.verify_strict(&bytes, &response.org_a_signature) {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
 

@@ -491,3 +491,78 @@ P0/P1/P2 issue. The manifest authenticates 272 retained streams. Final hosted
 acceptance for the pushed evidence candidate remains required and is recorded
 in the PR without mutating that candidate. This is author self-review, with
 no independent approval implied.
+
+
+## External review of the replacement candidate
+
+The externally triggered review of `5dc7921d3c6437db40a01ceea20a9fdb1396ba31`
+([review 5415870805](https://github.com/bb-connor/arc/pull/1173#pullrequestreview-5415870805))
+found two P1 signature-verification defects and one P2 protocol projection
+defect. This supersedes the earlier author review's no-additional-findings
+judgment for these boundaries. The user marked the PR ready for review; that
+state is preserved. No subagent was used for the repairs or their self-review.
+
+Actual identity-point Ed25519 forgeries reproduce counterparty-authorized hold
+release, receiver consent acceptance, signed unknown terminal evidence,
+detached bilateral co-signing and both DSSE profiles. Adjacent directory tests
+also reproduce weak trusted-issuer and passport acceptance, plus endorsement
+of a weak revocation-oracle key. Capture-waiver tests reproduce weak consent
+and observer-key configuration. The repair uses the existing strict signature
+verifier at every affected authority boundary and rejects weak configured
+payment/oracle keys. Removed directory tombstones still suppress all authority
+without requiring a valid endorsement from an evicted peer. No generic crypto
+compatibility API, public signature algorithm, receipt preimage or schema is
+changed.
+
+A2A v1 now carries the existing JSON-RPC response through error projection,
+preserving its request ID, code, message, data and typed local error. Only
+successful task results receive v1 projection. Owner mismatch and missing-task
+regressions compare the original protocol behavior. The first new missing-task
+assertion incorrectly expected `InvalidRequest`; the correct lower-layer cause
+is `ToolNotFound`. The corrected test fails against the original implementation.
+The initial 109-pass/one-failure run is retained as a failed test campaign,
+separate from the corrected rerun. The next run exposed a legacy-route typo in
+the comparison fixture (`tasks/get` instead of this implementation's `task/get`,
+and the corresponding cancel route); that 109-pass/one-failure attempt is also
+retained. The final comparison checks the typed error on both responses before
+comparing their wire values. Likewise, the initial waiver test's missing
+`chio_core::Result` alias is a test compilation error, not a reproduced attack.
+
+The two CFLite attempts on `5dc7921d3c` failed during inventory build before any
+sampling. In attempt two, container exit 137 preceded runner shutdown; the
+last runner lease renewal was still valid. The diagnostics do not establish an
+OOM cause. Both failed outcomes and logs are retained. Cargo concurrency is now
+explicitly bounded to two jobs inside both nested builders by default, with an
+operator override. The actual shell handoff tests observe that budget at the
+compiler boundary and preserve the complete 34-target export, target-specific
+features, ASan and the existing total sampling budgets. Replacement-SHA hosted
+execution remains necessary; these local controls are not fuzz coverage.
+
+
+The subsequent same-class audit also reproduced weak-key enrollment through
+`KernelTrustExchange`, acceptance of a weak FROST artifact trust root, and
+forged fanout deposit signatures. The repair covers these remaining public-key
+verification sites in both federation crates. FROST artifact roots now reject
+weak Ed25519 material for all three authority roles before installation; the
+threshold group's native FROST verifier and signing protocol are unchanged.
+The deposit verifier remains bound to the existing canonical preimage. These
+additional failures are retained in `readiness-review-adjacent-authority-red.log.gz`.
+The preceding 502-test protocol/federation pass and strict Clippy pass precede
+this extension and are not attributed to the final source.
+
+The final authority repair passes 505 protocol/federation/Iroh tests with
+strict all-target Clippy. The kernel repair passes 1,580 tests and strict
+all-target Clippy after 52 weak negative assertions were replaced by exact
+rejection checks. Their diagnostic observations are retained separately from
+acceptance. The negative-assertion baseline remains unchanged at 1,254.
+Trust-boundary inventory review follows the two bounded PostgreSQL readers and
+the renamed legacy owner. The co-signing witness now requires strict verification;
+a permissive-verifier substitution fails its calibration. All 15 witness tests
+and the inventory gate pass. The 230 formal mirrors and 66-row, 182-artifact
+coverage check pass, as does workspace formatting.
+
+A second external static review, 5416240083, reports further lifecycle, CI and
+evidence findings against the same earlier candidate. These are not covered by
+the preceding passes. The closure plan is
+`docs/superpowers/plans/2026-10-05-pr1173-review-closure.md`; final source freeze
+and hosted acceptance remain open until its findings are resolved.

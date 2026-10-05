@@ -311,10 +311,12 @@ fn approval_authority_cannot_replace_receiver_owned_capability() -> Result {
     let mut body = req.capability.body();
     body.issuer = key(2).public_key();
     req.capability = chio_core::capability::token::CapabilityToken::sign(body, &key(2))?;
-    assert!(
-        child.bind_tool_approval_intent(&req).is_err(),
-        "approval issuer acquired the receiver's capability authority"
-    );
+    match &child.bind_tool_approval_intent(&req) {
+        Err(chio_kernel::KernelError::GovernedTransactionDenied(reason)) => {
+            assert_eq!(reason, "capability issuer is not a trusted CA");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let response = child.evaluate_tool_call_blocking(&req)?;
     assert_eq!(
         response.verdict,
@@ -349,17 +351,40 @@ fn test_rail_cannot_spend_refundable_parent_backing_on_child_claims() -> Result 
     parent.authorize(&authorization(100, "parent"))?;
     child.authorize(&authorization(80, "child"))?;
     child.authorize(&authorization(80, "child"))?;
-    assert!(child.authorize(&authorization(81, "child")).is_err());
-    assert!(child.authorize(&authorization(30, "underbacked")).is_err());
+    match &child.authorize(&authorization(81, "child")) {
+        Err(chio_kernel::PaymentError::RailError(reason)) => {
+            assert_eq!(reason, "rail authorization substitution");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
+    match &child.authorize(&authorization(30, "underbacked")) {
+        Err(chio_kernel::PaymentError::RailError(reason)) => {
+            assert_eq!(reason, "CHECK constraint failed: balance>=0");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     assert_eq!(Bank::balances(temp.path())?, vec![180, 900, 20, 0]);
     parent.release("parent", "original-parent-release")?;
     child.capture("child", 80, "USD", "original-child-capture")?;
     child.capture("child", 80, "USD", "original-child-capture")?;
-    assert!(parent.release("child", "parent-cancellation").is_err());
-    assert!(child.release("child", "parent-cancellation").is_err());
-    assert!(child
-        .capture("child", 80, "USD", "different-reference")
-        .is_err());
+    match &parent.release("child", "parent-cancellation") {
+        Err(chio_kernel::PaymentError::RailError(reason)) => {
+            assert_eq!(reason, "rail settlement authority or amount mismatch");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
+    match &child.release("child", "parent-cancellation") {
+        Err(chio_kernel::PaymentError::RailError(reason)) => {
+            assert_eq!(reason, "rail terminal action substitution");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
+    match &child.capture("child", 80, "USD", "different-reference") {
+        Err(chio_kernel::PaymentError::RailError(reason)) => {
+            assert_eq!(reason, "rail terminal action substitution");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     assert_eq!(Bank::balances(temp.path())?, vec![0, 1000, 20, 80]);
     Ok(())
 }

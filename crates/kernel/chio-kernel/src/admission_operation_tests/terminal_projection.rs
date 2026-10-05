@@ -25,6 +25,51 @@ fn signed_authorization_source(
 }
 
 #[test]
+fn signed_unknown_projection_rejects_a_low_order_signer() -> Result<(), Box<dyn std::error::Error>>
+{
+    let source = finalizing_tool_operation_with(AdmissionParticipantRequirements {
+        broker_attempt: true,
+        budget_capture: true,
+        ..AdmissionParticipantRequirements::NONE
+    });
+    let context = projection_context(&source);
+    let incident = AdmissionIncident::from_verified(
+        &source,
+        &context,
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        identifier("incident_id", "retained-incident"),
+        digest("incident_digest", POLICY_HASH),
+    )?;
+    let projection = AdmissionTerminalProjection::OutcomeUnknownAfterDispatch {
+        context,
+        incident: Box::new(incident),
+    };
+    let valid = SignedAdmissionTerminalProjectionV1::from_verified(
+        &source,
+        &projection,
+        &full_projection_capabilities(),
+        &Keypair::generate(),
+    )?;
+    valid.verify()?;
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let weak = chio_core::crypto::PublicKey::from_bytes(&identity)?;
+    let mut signature = [0; 64];
+    signature[0] = 1;
+    let forged = chio_core::crypto::Signature::from_bytes(&signature);
+    assert!(weak.verify(b"no terminal evidence", &forged));
+    let mut wire = serde_json::to_value(valid)?;
+    wire["body"]["signer_key"] = serde_json::to_value(weak)?;
+    wire["signature"] = serde_json::to_value(forged)?;
+    let altered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(wire)?;
+    assert!(matches!(
+        altered.verify(),
+        Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+    ));
+    Ok(())
+}
+
+#[test]
 fn signed_unknown_projection_binds_incident_contents_after_resigning(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let source = finalizing_tool_operation_with(AdmissionParticipantRequirements {
@@ -95,10 +140,10 @@ fn signed_unknown_projection_binds_incident_contents_after_resigning(
         preimage.extend_from_slice(&canonical_json_bytes(body)?);
         wire["signature"] = serde_json::to_value(key.sign(&preimage))?;
         let altered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(wire)?;
-        assert!(
-            altered.verify().is_err(),
-            "accepted incident substitution {mutation}"
-        );
+        assert!(matches!(
+            &(altered.verify()),
+            Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+        ));
     }
     Ok(())
 }

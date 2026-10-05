@@ -55,6 +55,8 @@ pub struct UnknownPaymentReleasePolicyV1 {
 impl UnknownPaymentReleasePolicyV1 {
     pub fn validate(&self) -> Result<(), UnknownPaymentReleaseError> {
         if self.receiver_key == self.counterparty_key
+            || self.receiver_key.is_weak_ed25519()
+            || self.counterparty_key.is_weak_ed25519()
             || self.rail.is_empty()
             || self.rail.len() > 512
             || self.rail == "unspecified"
@@ -128,7 +130,7 @@ impl UnknownPaymentReleaseProposalV1 {
         policy: &UnknownPaymentReleasePolicyV1,
     ) -> Result<(), UnknownPaymentReleaseError> {
         policy.validate()?;
-        if !policy.receiver_key.verify(
+        if !policy.receiver_key.verify_strict(
             &preimage(&self.body, b"receiver")?,
             &self.receiver_signature,
         ) {
@@ -169,7 +171,7 @@ impl CoSignedUnknownPaymentReleaseV1 {
     ) -> Result<VerifiedUnknownPaymentReleaseV1, UnknownPaymentReleaseError> {
         self.proposal.verify_receiver(policy)?;
         let terms = &self.proposal.body;
-        if !policy.counterparty_key.verify(
+        if !policy.counterparty_key.verify_strict(
             &preimage(terms, b"counterparty")?,
             &self.counterparty_signature,
         ) {

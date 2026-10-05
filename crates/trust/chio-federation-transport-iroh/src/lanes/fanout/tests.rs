@@ -469,6 +469,25 @@ fn frame_from_a_foreign_treaty_is_rejected_on_this_swarm() {
 }
 
 #[test]
+fn low_order_origin_cannot_forge_a_deposit() -> Result<(), Box<dyn std::error::Error>> {
+    let author = Keypair::from_seed(&[7; 32]);
+    let mut frame = signed_direct_frame(&author, AUTHOR, "did:chio:hub", TREATY_ALPHA, NAMESPACE);
+    verify_deposit_self_signature(&frame, &author.public_key())?;
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let weak_key = PublicKey::from_bytes(&identity)?;
+    let mut signature = [0; 64];
+    signature[0] = 1;
+    frame.deposit.signature = chio_core_types::Signature::from_bytes(&signature);
+    assert!(weak_key.verify(b"no deposit", &frame.deposit.signature));
+    assert!(matches!(
+        verify_deposit_self_signature(&frame, &weak_key),
+        Err(FanoutError::DepositSignatureInvalid)
+    ));
+    Ok(())
+}
+
+#[test]
 fn lane_verifies_a_real_chio_pheromone_deposit_signature() {
     // F3 guard: pin this lane's hand-copied signing preimage (clear
     // cost_commitment + canonical JSON) to the NORMATIVE signer. We build a

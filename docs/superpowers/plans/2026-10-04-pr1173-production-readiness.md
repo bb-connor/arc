@@ -75,8 +75,14 @@
 - [x] Write and self-review a focused design/plan after tracing the existing prepared broker and resource adapter implementation; pin exact modules and custody interfaces before transport implementation.
 - [x] Add failing boundary tests for credential isolation, forged caller, wrong tenant/lease fence, denied direct networking and lost committed replies.
 - [x] Implement the smallest mediated composition preserving these properties and the real TLS PostgreSQL resource.
-- [ ] Run the public worker API suite and both native qualification trajectories on Linux x86_64, including actual host termination and recovery without redispatch.
-- [ ] Verify receipts and nonsecret artifact contents, update operator documentation, run relevant Clippy and workflow contract tests, then commit.
+- [x] Run the public worker API suite and both native qualification trajectories on Linux x86_64, including actual host termination and recovery without redispatch.
+- [x] Verify receipts and nonsecret artifact contents, update operator documentation, run relevant Clippy and workflow contract tests, then commit.
+
+Task 4 passed on `5dc7921d3c` with both authenticated public artifacts and all
+23 exported receipts verified. Task 5 must repeat its hosted acceptance on the
+replacement review-repair candidate. Final acceptance is recorded in PR 1173
+and the execution ledger so that recording a terminal result does not mutate
+the candidate being accepted.
 
 ### Task 5: Qualify and review the exact production candidate
 
@@ -87,7 +93,7 @@
 - [ ] Perform a separate final review of every change against the spec and Review Focus; resolve P0/P1/P2 findings with regression evidence.
 - [ ] Freeze source and run the existing 21-command native qualification, format and artifact checks. Preserve superseded evidence through the existing history mechanism.
 - [ ] Push the authorized branch and refresh all exact-SHA CI checks; diagnose and fix any remaining failed or cancelled required gate, then requalify changed boundaries.
-- [ ] Confirm local/remote/PR identity, clean worktree, exact terminal checks and draft state. Report production acceptance separately from research publication gates, merge and deployment.
+- [ ] Confirm local/remote/PR identity, clean worktree, exact terminal checks and the user-selected draft/ready state. Report production acceptance separately from research publication gates, merge and deployment.
 
 ### Kani traversal resource bound
 
@@ -351,3 +357,48 @@ implementation fails the runtime-retirement regression; the imported owner
 passes all 200 broker library tests with the native gate's serialized test
 configuration and strict all-target Clippy. The parallel debug campaign's five
 timeout failures remain retained, distinct from that successful run.
+
+### External review: authority signatures and v1 error projection
+
+The review of `5dc7921d3c` identified weak-key signature acceptance at receipt
+co-signing and unknown-hold consent boundaries, plus loss of JSON-RPC client
+error semantics during v1 projection. Extend Task 5's existing fix-and-qualify
+pass. Reproduce each failure before repairing it, using real identity-point
+Ed25519 forgeries and the existing kernel, directory and protocol fixtures.
+
+Audit the adjacent consent, terminal-evidence, directory, co-signing and DSSE
+verification paths for the same compatibility-verifier mistake. Reuse
+`PublicKey::verify_strict` and `verify_canonical_strict` at authority boundaries;
+preserve the general compatibility verifier and other signature algorithms.
+Preserve the existing A2A response, request identity and typed local rejection
+when projecting a client error. Project only successful task results.
+
+Run the affected complete suites, strict Clippy and formatting. Review the final
+diff, refresh source-bound qualification and paper artifacts, then push one
+replacement candidate. Require terminal CI on that SHA. Retain the earlier
+runner-shutdown failure and its diagnostic retry as their actual outcomes.
+
+The diagnostic fuzz retry also stopped before sampling: its container exited
+137 before the runner shutdown. This is not a compiler failure, timeout or
+confirmed OOM attribution. Bound Cargo concurrency inside both nested builders
+to two jobs by default, retaining an explicit operator override. The real shell
+handoff tests must observe that budget at the compiler boundary while exporting
+the same complete inventory, features and sanitizer. Retain both failed hosted
+attempts and require an actual replacement-candidate sampling campaign.
+
+
+The repository's main-branch negative-assertion gate also reports 52 new weak
+assertions in this branch's kernel tests, including the new weak-key regressions.
+Close that integration gap without expanding its baseline: observe the original
+fixture errors, check each against its intended invariant and implementation,
+and replace bare `is_err()` with the specific rejection variant and stable
+reason where the current API uses a string wrapper. Rerun the affected full
+kernel, durable, delegation and three-owner suites, strict Clippy, and the gate
+before freezing the source. Preserve diagnostic attempts as diagnostics.
+
+### Additional external review
+
+Review 5416240083 arrived before final source freeze. Execute the subordinate
+`2026-10-05-pr1173-review-closure.md` plan and resolve verified lifecycle,
+workspace-CI and evidence findings before completing Task 5. The prior 87 hosted
+successes do not include the main-only workspace CI workflow.

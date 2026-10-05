@@ -127,10 +127,15 @@ fn federated_execution_export_uses_original_admission_without_remote_completion(
     assert!(f.kernel.federation_dsse_envelope(&receipt.id).is_none());
     f.kernel
         .set_federation_local_kernel_id("substituted-local-owner");
-    assert!(f
-        .kernel
-        .export_durable_execution_evidence(&f.request)
-        .is_err());
+    match &f.kernel.export_durable_execution_evidence(&f.request) {
+        Err(crate::KernelError::DurableAdmission(reason)) => {
+            assert_eq!(
+                reason,
+                "retained federation context does not match its admission"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     f.kernel.set_federation_local_kernel_id("kernel.org-b");
     let replay = f.kernel.export_durable_execution_evidence(&f.request)?;
     assert_eq!(
@@ -158,10 +163,19 @@ fn federated_execution_export_rejects_missing_or_substituted_frozen_context() ->
             wire.federation_context_json = if missing { None } else { Some("{}".into()) };
             state.raw_outcome = Some(RawInvocationOutcomeV1::from_persisted(wire)?);
         }
-        assert!(f
-            .kernel
-            .export_durable_execution_evidence(&f.request)
-            .is_err());
+        match &f.kernel.export_durable_execution_evidence(&f.request) {
+            Err(crate::KernelError::DurableAdmission(reason)) => {
+                assert_eq!(
+                    reason,
+                    if missing {
+                        "binding mismatch: execution.unsupported_provenance"
+                    } else {
+                        "binding mismatch: outcome.raw_invocation_blob"
+                    }
+                );
+            }
+            result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+        };
         assert!(f
             .outcomes
             .lookup_execution_evidence(f.operation.binding().operation_id())?
@@ -596,10 +610,15 @@ fn execution_export_replay_respects_the_current_crypto_floor() -> TestResult {
         .kernel
         .export_durable_execution_evidence(&fixture.request)?;
     fixture.kernel.signing_authority.floor = crate::KernelCryptoFloor::PqRequired;
-    assert!(fixture
+    match &fixture
         .kernel
         .export_durable_execution_evidence(&fixture.request)
-        .is_err());
+    {
+        Err(crate::KernelError::DurableAdmission(reason)) => {
+            assert_eq!(reason, "execution evidence: receipt rejected by crypto_floor=pq_required: signature algorithm ed25519 not permitted");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let retained = fixture
         .outcomes
         .lookup_execution_evidence(fixture.operation.binding().operation_id())?

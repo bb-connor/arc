@@ -211,7 +211,7 @@ pub fn sign_dsse_envelope_with_cosigner(
     if response.schema != crate::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA {
         return Err(BilateralCoSigningError::UnsupportedSchema(response.schema));
     }
-    if !org_a_public_key.verify(&pae_bytes, &response.org_a_signature) {
+    if !org_a_public_key.verify_strict(&pae_bytes, &response.org_a_signature) {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
 

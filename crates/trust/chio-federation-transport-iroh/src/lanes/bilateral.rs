@@ -24,7 +24,7 @@
 //!    same verified directory snapshot binds for that peer; a separately-pinned
 //!    map must AGREE with it or the co-sign is refused, so a rotated-away key is
 //!    never accepted), algorithm-agnostic, above iroh, via
-//!    [`chio_core_types::PublicKey::verify`], and re-checks trust / rotation-window
+//!    [`chio_core_types::PublicKey::verify_strict`], and re-checks trust / rotation-window
 //!    through the same directory resolution. On ANY failure it writes a typed error
 //!    mirroring [`BilateralCoSigningError`] and terminates WITHOUT signing.
 //! 5. On success Org A reconstructs `pae_bytes` as the DSSE pre-authentication
@@ -1194,7 +1194,7 @@ fn cosign_bytes(
     }
     // Verify Org B's signature over the exact bytes against the directory-bound
     // key (above iroh; the pinned map having been proven to match it).
-    if !directory_key.verify(subject.signed_bytes, subject.org_b_signature) {
+    if !directory_key.verify_strict(subject.signed_bytes, subject.org_b_signature) {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
     // Recompute and refuse, immediately above the signature and on every

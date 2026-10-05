@@ -137,11 +137,11 @@ pub fn verify_dsse_envelope(
     let sig_b_struct = Signature::from_bytes(&sig_b_bytes);
 
     // Spec §7 step 14, server_a.
-    if !org_a_public_key.verify(&pae_bytes, &sig_a_struct) {
+    if !org_a_public_key.verify_strict(&pae_bytes, &sig_a_struct) {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
     // Spec §7 step 14, server_b.
-    if !org_b_public_key.verify(&pae_bytes, &sig_b_struct) {
+    if !org_b_public_key.verify_strict(&pae_bytes, &sig_b_struct) {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
 
@@ -241,10 +241,10 @@ fn verify_chio_bilateral_dsse_envelope_inner(
         .ok_or(BilateralCoSigningError::OrgBSignatureInvalid)?;
     let sig_a_struct = Signature::from_bytes(&sig_a_bytes);
     let sig_b_struct = Signature::from_bytes(&sig_b_bytes);
-    if !org_a_public_key.verify(&pae_bytes, &sig_a_struct) {
+    if !org_a_public_key.verify_strict(&pae_bytes, &sig_a_struct) {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
-    if !org_b_public_key.verify(&pae_bytes, &sig_b_struct) {
+    if !org_b_public_key.verify_strict(&pae_bytes, &sig_b_struct) {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
 

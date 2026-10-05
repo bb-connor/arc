@@ -165,9 +165,15 @@ fn output_must_satisfy_the_immutable_contract() -> Result {
 #[test]
 fn installation_requires_durable_native_custody() {
     let mut kernel = unconfigured(3);
-    assert!(
-        delegated_work::install_delegated_work(&mut kernel, vec![key(1).public_key()]).is_err()
-    );
+    match &delegated_work::install_delegated_work(&mut kernel, vec![key(1).public_key()]) {
+        Err(chio_kernel::KernelError::GuardDenied(reason)) => {
+            assert_eq!(
+                reason,
+                "delegated work: durable native admission must be configured before installation"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
 }
 
 #[test]
@@ -280,7 +286,13 @@ fn unknown_original_keeps_its_allocation_while_a_sibling_completes() -> Result {
     );
     let (second, sibling_calls) = open(dir.path(), 4, false)?;
     let forbidden = request(&second, "uncertain", 2, "blind-replacement", 20)?;
-    assert!(choose(&store, &forbidden, 2, 4, 1, 20).is_err());
+    assert!(matches!(
+        (choose(&store, &forbidden, 2, 4, 1, 20))
+            .as_ref()
+            .err()
+            .and_then(|error| error.downcast_ref::<chio_workflow::delegation::DelegationError>()),
+        Some(chio_workflow::delegation::DelegationError::Conflict)
+    ));
     let mut sibling = request(&second, "sibling", 1, "independent-progress", 30)?;
     choose(&store, &sibling, 1, 4, 0, 30)?;
     seal(&store, &mut sibling, 30)?;

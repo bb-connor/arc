@@ -1644,6 +1644,234 @@
       "observed_result": "passed-all-21-source-bound-commands-6434f8c9e1",
       "bytes": 539,
       "sha256": "56b6848dc230813e18a5ad84bdd1d3b5ae19720be3fbe60ce7c8e4d42733c985"
+    },
+    {
+      "log": "readiness-review-release-red.log.gz",
+      "observed_result": "failed-reproduced-two-consent-forgeries",
+      "bytes": 3352,
+      "sha256": "09dc053f40a45e3779e3b3aa3b2129afbc1cef9246b649494c12fc782d1155ef"
+    },
+    {
+      "log": "readiness-review-waiver-red.log.gz",
+      "observed_result": "failed-test-compilation-not-a-regression-reproduction",
+      "bytes": 2577,
+      "sha256": "4ba87699aa5e1ff71f6ceeb31508abf75b1707d54f1f043e570119e61ce536ac"
+    },
+    {
+      "log": "readiness-review-waiver-fixed-test-red.log.gz",
+      "observed_result": "failed-reproduced-waiver-consent-and-policy-defects",
+      "bytes": 2986,
+      "sha256": "2eb2845295b91274f6b5f776767ea9368709e4df6036d323fea869e96baf2cae"
+    },
+    {
+      "log": "readiness-review-terminal-red.log.gz",
+      "observed_result": "failed-reproduced-terminal-evidence-forgery",
+      "bytes": 2827,
+      "sha256": "3694fd0e1dc059bf18912cf04d903b23f48f1714cbeecab54ccee6e86ce39389"
+    },
+    {
+      "log": "readiness-review-a2a-red.log.gz",
+      "observed_result": "failed-reproduced-client-error-recategorization",
+      "bytes": 9027,
+      "sha256": "77d69fe6268cb0339896f734f6a2f07da42c00fbb6cec74631d0541eb4e11e4c"
+    },
+    {
+      "log": "readiness-review-bilateral-red.log.gz",
+      "observed_result": "failed-reproduced-receipt-cosigning-forgeries",
+      "bytes": 8536,
+      "sha256": "b82d8f1c23edd742970fb0525fc18207cecf2b46b3e10b65b6c6ce8695365581"
+    },
+    {
+      "log": "readiness-review-directory-red.log.gz",
+      "observed_result": "failed-reproduced-directory-authority-forgeries",
+      "bytes": 16984,
+      "sha256": "c70b565672b9a508291fbfd5f8578b05256e2e5fb6258773e8ed7bad9e268849"
+    },
+    {
+      "log": "readiness-review-dsse-red.log.gz",
+      "observed_result": "failed-reproduced-both-dsse-profile-forgeries",
+      "bytes": 3282,
+      "sha256": "0bb6bb5f27db707d5faef4cc56a909d3f7cf4b690a1de0063022152d2a720113"
+    },
+    {
+      "log": "readiness-review-fuzz-concurrency-red.log.gz",
+      "observed_result": "failed-missing-bounded-builder-concurrency-and-test-fixture-selection",
+      "bytes": 4569,
+      "sha256": "2d36ee0442f7450796c68bdf7ba59a2a4c74a51d12559eabc7fb2e6cecb469e6"
+    },
+    {
+      "log": "readiness-review-fuzz-concurrency-green.log.gz",
+      "observed_result": "passed-nine-builder-and-selection-controls",
+      "bytes": 107,
+      "sha256": "5141d667f99ca4381f824a08f3ce084c74c57dbbb16dc961b942417cbfafa529"
+    },
+    {
+      "log": "readiness-review-fuzz-manifest-green.log.gz",
+      "observed_result": "passed-all-manifest-trigger-controls",
+      "bytes": 138,
+      "sha256": "c5082912688bad27bf3fb605e9eaffb75f3bd68c1233b549c3d9cb6954fae1e4"
+    },
+    {
+      "log": "readiness-5dc792-fuzz-attempt1.log.gz",
+      "observed_result": "failed-runner-shutdown-before-sampling",
+      "bytes": 1922255,
+      "sha256": "53d0142a277a159fc16702c58b793e268b773d63b4b7c4457bb03e4515300e68"
+    },
+    {
+      "log": "readiness-5dc792-fuzz-attempt2-log.gz",
+      "observed_result": "failed-container-exit-137-and-runner-shutdown-before-sampling",
+      "bytes": 1975810,
+      "sha256": "43be1cd300a950d55a5419a82c0eb87697bf907c497d4382a0f1b74a8fa35462"
+    },
+    {
+      "log": "readiness-review-formal-mirrors-before.log.gz",
+      "observed_result": "failed-stale-local-xtask-binary-not-current-checker-evidence",
+      "bytes": 328,
+      "sha256": "59fac58fb91095b39e25dbf6be8a0b93ff3ad57a7c1962dc401008cd72db841f"
+    },
+    {
+      "log": "readiness-review-a2a-green.log.gz",
+      "observed_result": "failed-109-passed-one-incorrect-new-test-expectation",
+      "bytes": 11867,
+      "sha256": "1219d0f251645a00c292c803cd3a1e085ba372727adb5a60dc6874c4ba269fa5"
+    },
+    {
+      "log": "readiness-review-a2a-corrected-red.log.gz",
+      "observed_result": "failed-original-implementation-loses-ToolNotFound",
+      "bytes": 2653,
+      "sha256": "66fd65b6fe09071d1d79af908a636b42defc3f30a15ef3f7dc94c583f2fde750"
+    },
+    {
+      "log": "readiness-review-kernel-lib-green.log.gz",
+      "observed_result": "passed-1533-kernel-unit-tests",
+      "bytes": 169466,
+      "sha256": "6306bf2050dfac2f30c6306cd8b74ddda374b6052b3ca39dfb02874a042a8be0"
+    },
+    {
+      "log": "readiness-review-kernel-durable-green.log.gz",
+      "observed_result": "passed-29-durable-and-two-waiver-tests",
+      "bytes": 5246,
+      "sha256": "e5a0f0adcea97418de5d1f3fb1809023682b3b8d5997003f76008a161aae6bbe"
+    },
+    {
+      "log": "readiness-review-protocol-federation-green.log.gz",
+      "observed_result": "failed-109-passed-one-legacy-route-typo-in-new-test",
+      "bytes": 14268,
+      "sha256": "fcbf19f0ad9be624e62af2b7e8e24cafd6f6b89a9c97a5b6c0da7f5f1fc67e4d"
+    },
+    {
+      "log": "readiness-review-protocol-federation-green-2.log.gz",
+      "observed_result": "passed-502-tests-before-trust-enrollment-extension",
+      "bytes": 44718,
+      "sha256": "ec3378b9f2cf837e347f14f08303caf7ebdbdd2f5455bc82eabed01d0931b18c"
+    },
+    {
+      "log": "readiness-review-clippy.log.gz",
+      "observed_result": "passed-before-trust-enrollment-extension",
+      "bytes": 14602,
+      "sha256": "a7aaea6382acad51451869a3cf7052229d9bfe039d6c7315791d359cfc3b580c"
+    },
+    {
+      "log": "readiness-review-adjacent-authority-red.log.gz",
+      "observed_result": "failed-reproduced-three-adjacent-authority-defects",
+      "bytes": 8483,
+      "sha256": "9d9c73c73c10ab7bb8181b1134e9d6241e666b95373ffb82bd8ac8f45a3d63fc"
+    },
+    {
+      "log": "readiness-review-formal-coverage-current.log.gz",
+      "observed_result": "failed-stale-coverage-digest-after-reviewed-source-change",
+      "bytes": 317,
+      "sha256": "6c54209cbb3f9ba1fae7a63b0fdd526fd21408a509b8a7d25e01c142d48597ab"
+    },
+    {
+      "log": "readiness-review-protocol-federation-green-final.log.gz",
+      "observed_result": "passed: 505 tests after all strict authority repairs",
+      "bytes": 48174,
+      "sha256": "662358ac4dc97a0797d8ea80720e001f8b21777da0b60839912f622a1d52545b"
+    },
+    {
+      "log": "readiness-review-clippy-final.log.gz",
+      "observed_result": "passed: strict all-target Clippy for kernel A2A federation and Iroh",
+      "bytes": 5018,
+      "sha256": "599e2f7f110d24e924a4986b998de32b9349b5e5f74966be11faee30df53ee1c"
+    },
+    {
+      "log": "readiness-review-check-trust-boundaries.py.log.gz",
+      "observed_result": "failed: stale owner census and permissive verification witness",
+      "bytes": 550,
+      "sha256": "f4bc89cedacb704380e3fe0c269e9b18f50a9bbd30de74472042f77a5cf99345"
+    },
+    {
+      "log": "readiness-review-trust-witness-red.log.gz",
+      "observed_result": "failed: existing witness does not recognize strict verification",
+      "bytes": 904,
+      "sha256": "84cbdab1bb0fc3406ea66de6d487d8731a9046decd6f95a0d05efa1f939f988f"
+    },
+    {
+      "log": "readiness-review-trust-witness-green.log.gz",
+      "observed_result": "passed: 15 calibrated reader witness tests including permissive-verifier mutation",
+      "bytes": 116,
+      "sha256": "948d67409dea22f470c3513b9f4c4c384db27431ccfadbc7c42053c915e38aaa"
+    },
+    {
+      "log": "readiness-review-trust-boundaries-green.log.gz",
+      "observed_result": "passed: reviewed owner census and strict verification witness",
+      "bytes": 91,
+      "sha256": "9a334b9220b5881cd096d13ed51133424d48653bf6265f2eac6fb7a4c6edb8a0"
+    },
+    {
+      "log": "readiness-review-rejection-observation.log.gz",
+      "observed_result": "diagnostic only: 52 exact rejection observations; instrumentation restored",
+      "bytes": 207559,
+      "sha256": "36ffd6e0e757f913cbe99724227df3fc95c9d1546a3227e3c4a3902ead16ed1b"
+    },
+    {
+      "log": "readiness-review-strong-rejections-tests.log.gz",
+      "observed_result": "passed: 1580 kernel tests with exact rejection checks before readability cleanup",
+      "bytes": 172872,
+      "sha256": "4e8f87d8af0a159b194a4cb0f3fecb97701290e8fb064891dffa21969a530950"
+    },
+    {
+      "log": "readiness-review-strong-rejections-clippy.log.gz",
+      "observed_result": "passed: strict all-target kernel Clippy before readability cleanup",
+      "bytes": 4063,
+      "sha256": "3ba7df4f92c64f3c3f7be7a563fe1398b50f3f9a310e6e05296d4dce07631994"
+    },
+    {
+      "log": "readiness-review-negative-assertions-final.log.gz",
+      "observed_result": "passed: no new weak negative assertion and no baseline increase",
+      "bytes": 163,
+      "sha256": "e349df75840f6def675edc242b4fdc3a919a31187fce6b32c83ebe835a2fc9a4"
+    },
+    {
+      "log": "readiness-review-final-rejections-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 172872,
+      "sha256": "d0a6f6c89c29fb4c22551816e9cff74869165e60a1554d20508a4dfcb4dff8f6"
+    },
+    {
+      "log": "readiness-review-final-rejections-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 2509,
+      "sha256": "f1fad41eb9d193f5b0b1f29ac28463f3db28445ae0d28b7e69e3115384cd4d8b"
+    },
+    {
+      "log": "readiness-review-formal-mirrors-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "readiness-review-proof-coverage-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "readiness-review-workspace-format-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ]
 }

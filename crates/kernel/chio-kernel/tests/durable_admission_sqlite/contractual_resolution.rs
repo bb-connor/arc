@@ -71,23 +71,37 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     let terms = SignedContractualCaptureWaiverTermsV1::sign(terms, &receiver, &buyer)?;
     request.arguments[CAPTURE_WAIVER_TERMS_ARGUMENT] =
         serde_json::json!(capture_waiver_digest(&terms)?);
-    assert!(kernel.evaluate_tool_call_blocking(&request).is_err());
+    match &kernel.evaluate_tool_call_blocking(&request) {
+        Err(chio_kernel::KernelError::DurableAdmission(reason)) => {
+            assert_eq!(
+                reason,
+                "payment rail unavailable: injected capture interruption"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let pending = operations.list_recoverable(now_unix_ms()? + 120000, 10)?;
     let operation_id = pending[0].binding().operation_id().clone();
     let id = operation_id.as_str();
     let source = operations.capture_waiver_source(id, &fence)?;
     let original = source.journal.clone();
-    assert!(original
-        .apply_transition(&PaymentJournalTransition::BeginRelease {
-            authority: PaymentReleaseAuthorityBinding {
-                kind: PaymentReleaseAuthorityKind::ContractualZeroCharge,
-                operation_id: id.into(),
-                operation_version: 1,
-                evidence_id: "release".into(),
-                evidence_digest: "b".repeat(64)
-            }
-        })
-        .is_err());
+    match &original.apply_transition(&PaymentJournalTransition::BeginRelease {
+        authority: PaymentReleaseAuthorityBinding {
+            kind: PaymentReleaseAuthorityKind::ContractualZeroCharge,
+            operation_id: id.into(),
+            operation_version: 1,
+            evidence_id: "release".into(),
+            evidence_digest: "b".repeat(64),
+        },
+    }) {
+        Err(error) => {
+            assert_eq!(
+                error.to_string(),
+                "invalid payment journal record: release intent requires an authorized journal"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let observation = SignedCaptureWaiverObservationV1::sign(
         CaptureWaiverObservationV1 {
             terms_digest: capture_waiver_digest(&terms)?,
@@ -104,9 +118,15 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
         &observer,
     )?;
     let resolution = ContractualCaptureWaiverRequestV1 { terms, observation };
-    assert!(operations
-        .begin_capture_waiver(&policy, &resolution, &fence, now_unix_ms()?)
-        .is_err());
+    match &operations.begin_capture_waiver(&policy, &resolution, &fence, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(
+                reason,
+                "capture waiver requires handoff from the active finalizer owner"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     // Even an expired coordinator claim does not prove its rail callback stopped.
     assert!(operations
         .begin_capture_waiver(&policy, &resolution, &fence, at + 120000)
@@ -133,9 +153,15 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     paid_waiver.observation.body.journal_digest = capture_waiver_digest(&paid_source.journal)?;
     paid_waiver.observation =
         SignedCaptureWaiverObservationV1::sign(paid_waiver.observation.body, &observer)?;
-    assert!(paid_waiver
-        .qualify(&policy, &paid_source, now_unix_ms()?)
-        .is_err());
+    match &paid_waiver.qualify(&policy, &paid_source, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(
+                reason,
+                "waiver requires the exact known positive capture awaiting settlement"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let mut prepaid_source = source.clone();
     prepaid_source.journal.rail_mode = PaymentRailMode::PrepaidFinal;
     prepaid_source.journal.state = PaymentJournalState::Settled;
@@ -147,19 +173,31 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
         capture_waiver_digest(&prepaid_source.journal)?;
     prepaid_waiver.observation =
         SignedCaptureWaiverObservationV1::sign(prepaid_waiver.observation.body, &observer)?;
-    assert!(prepaid_waiver
-        .qualify(&policy, &prepaid_source, now_unix_ms()?)
-        .is_err());
+    match &prepaid_waiver.qualify(&policy, &prepaid_source, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(
+                reason,
+                "waiver requires the exact known positive capture awaiting settlement"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let mut zero_source = source.clone();
     zero_source.journal.settle_amount_units = Some(0);
-    assert!(resolution
-        .qualify(&policy, &zero_source, now_unix_ms()?)
-        .is_err());
+    match &resolution.qualify(&policy, &zero_source, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "invalid payment journal record: settle_amount_units must be within the authorized amount");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let mut forged = resolution.clone();
     forged.observation.body.refund_reference = "forged".into();
-    assert!(operations
-        .begin_capture_waiver(&policy, &forged, &fence, now_unix_ms()?)
-        .is_err());
+    match &operations.begin_capture_waiver(&policy, &forged, &fence, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "receiver-pinned observation signature is invalid");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     for field in [
         "termsDigest",
         "journalDigest",
@@ -171,35 +209,59 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
         body[field] = serde_json::json!("c".repeat(64));
         wrong.observation =
             SignedCaptureWaiverObservationV1::sign(serde_json::from_value(body)?, &observer)?;
-        assert!(
-            operations
-                .begin_capture_waiver(&policy, &wrong, &fence, now_unix_ms()?)
-                .is_err(),
-            "accepted altered {field}"
-        );
+        match &operations.begin_capture_waiver(&policy, &wrong, &fence, now_unix_ms()?) {
+            Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+                assert_eq!(
+                    reason,
+                    "refund observation differs from its signed terms or native sources"
+                );
+            }
+            result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+        };
     }
     let mut wrong_policy = policy.clone();
     wrong_policy.observation_key = buyer.public_key();
-    assert!(operations
-        .begin_capture_waiver(&wrong_policy, &resolution, &fence, now_unix_ms()?)
-        .is_err());
+    match &operations.begin_capture_waiver(&wrong_policy, &resolution, &fence, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "invalid original signed waiver terms");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let mut wrong = resolution.clone();
     wrong.terms.body.contract_context_digest = "c".repeat(64);
     wrong.terms = SignedContractualCaptureWaiverTermsV1::sign(wrong.terms.body, &receiver, &buyer)?;
-    assert!(operations
-        .begin_capture_waiver(&policy, &wrong, &fence, now_unix_ms()?)
-        .is_err());
-    assert!(operations
-        .begin_capture_waiver(&policy, &resolution, &fence, at - 1)
-        .is_err());
-    assert!(operations
-        .begin_capture_waiver(&policy, &resolution, &fence, at + 600000)
-        .is_err());
+    match &operations.begin_capture_waiver(&policy, &wrong, &fence, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(
+                reason,
+                "waiver terms differ from the original retained authority"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
+    match &operations.begin_capture_waiver(&policy, &resolution, &fence, at - 1) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(
+                reason,
+                "admission operation invariant failed: trusted operation time regressed"
+            );
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
+    match &operations.begin_capture_waiver(&policy, &resolution, &fence, at + 600000) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "admission operation invariant failed: trusted_now_unix_ms exceeds the permitted system-clock skew");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let mut stale = fence.clone();
     stale.owner_epoch += 1;
-    assert!(operations
-        .begin_capture_waiver(&policy, &resolution, &stale, now_unix_ms()?)
-        .is_err());
+    match &operations.begin_capture_waiver(&policy, &resolution, &stale, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "admission operation mutation was fenced");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     // A trusted clock's high-water mark cannot be rewound. Run the expiry
     // branch in its own fixture, rather than returning this owner to the past.
     if expired_only {
@@ -255,11 +317,14 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
         .load_payment_journal(id, &fence)?
         .ok_or("pending journal missing")?;
     assert_eq!(pending_journal.state, PaymentJournalState::Resolving);
-    assert!(pending_journal
-        .apply_transition(&PaymentJournalTransition::SettlementCompleted {
-            transaction_id: "counterfeit-capture".into()
-        })
-        .is_err());
+    match &pending_journal.apply_transition(&PaymentJournalTransition::SettlementCompleted {
+        transaction_id: "counterfeit-capture".into(),
+    }) {
+        Err(error) => {
+            assert_eq!(error.to_string(), "invalid payment journal record: settlement completion requires a settling or reconcile_failed journal");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let db = rusqlite::Connection::open(&database)?;
     assert_eq!(
         db.query_row("SELECT COUNT(*) FROM capture_waiver_records", [], |row| row
@@ -291,9 +356,12 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     conflict.observation.body.refund_reference = "another-refund".into();
     conflict.observation =
         SignedCaptureWaiverObservationV1::sign(conflict.observation.body, &observer)?;
-    assert!(operations
-        .begin_capture_waiver(&policy, &conflict, &fence, now_unix_ms()?)
-        .is_err());
+    match &operations.begin_capture_waiver(&policy, &conflict, &fence, now_unix_ms()?) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "conflicting waiver authority");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
 
     // Restart between append-only acceptance and completion.
     drop(operations);
@@ -348,7 +416,12 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     )?;
     let operations = Arc::new(authority.admission_operation_store());
     let new_fence = authority.mutation_fence();
-    assert!(operations.load_capture_waiver(id, &fence).is_err());
+    match &operations.load_capture_waiver(id, &fence) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "waiver read fenced");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     let mut kernel =
         ChioKernel::new_with_clock(kernel_config(receiver), chio_test_support::clock::clock());
     kernel.require_durable_request_retention();
@@ -395,21 +468,34 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
         )?,
         1
     );
-    assert!(db
-        .execute("DELETE FROM capture_waiver_records", [])
-        .is_err());
-    assert!(db
-        .execute(
-            "UPDATE capture_waiver_records SET record_digest=record_digest",
-            []
-        )
-        .is_err());
+    match &db.execute("DELETE FROM capture_waiver_records", []) {
+        Err(rusqlite::Error::SqliteFailure(code, Some(reason))) => {
+            assert_eq!(code.extended_code, rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER);
+            assert_eq!(reason, "capture waiver history is immutable");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
+    match &db.execute(
+        "UPDATE capture_waiver_records SET record_digest=record_digest",
+        [],
+    ) {
+        Err(rusqlite::Error::SqliteFailure(code, Some(reason))) => {
+            assert_eq!(code.extended_code, rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER);
+            assert_eq!(reason, "capture waiver history is immutable");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     db.execute_batch("DROP TRIGGER capture_waiver_records_immutable")?;
     db.execute(
         "UPDATE capture_waiver_records SET record_digest=? WHERE sequence=1",
         ["c".repeat(64)],
     )?;
-    assert!(operations.load_capture_waiver(id, &new_fence).is_err());
+    match &operations.load_capture_waiver(id, &new_fence) {
+        Err(chio_kernel::payment::CaptureWaiverError(reason)) => {
+            assert_eq!(reason, "admission operation durable outcome is unknown: authority database changed outside its serving-owner connection");
+        }
+        result => panic!("unexpected rejection: {:?}", result.as_ref().err()),
+    };
     Ok(())
 }
 

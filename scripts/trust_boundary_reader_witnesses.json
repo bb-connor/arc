@@ -569,7 +569,7 @@
             "\\bif\\s+resolved\\s*!=\\s*subject\\.org_b_kernel_id\\s*\\{\\s*return\\s+Err\\(",
             "\\.resolve_passport_key\\(subject\\.org_b_kernel_id\\)",
             "\\bif\\s+pinned_key\\s*!=\\s*\\*directory_key\\s*\\{\\s*return\\s+Err\\(",
-            "\\bif\\s*!directory_key\\.verify\\(subject\\.signed_bytes,\\s*subject\\.org_b_signature\\)\\s*\\{\\s*return\\s+Err\\(",
+            "\\bif\\s*!directory_key\\.verify_strict\\(subject\\.signed_bytes,\\s*subject\\.org_b_signature\\)\\s*\\{\\s*return\\s+Err\\(",
             "\\breconstruct_cosigning_body\\(\\s*subject\\.signed_bytes,\\s*subject\\.org_a_kernel_id,\\s*subject\\.org_b_kernel_id,\\s*\\)\\?",
             "\\breconstruct_dsse_pae\\(",
             "\\.sign_bytes\\(subject\\.signed_bytes\\)"

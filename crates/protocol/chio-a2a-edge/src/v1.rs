@@ -195,10 +195,11 @@ fn v1_task(task: &TaskResponse, mode: V1OutputMode) -> Value {
 impl ChioA2aEdge {
     fn handle_v1_send(
         &mut self,
+        id: Value,
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Result<Value, A2aEdgeError> {
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
         let skill = self.resolve_jsonrpc_target_skill_id(&params)?;
         let parsed: V1SendRequest = serde_json::from_value(params)
             .map_err(|error| v1_invalid(format!("invalid SendMessage request: {error}")))?;
@@ -219,9 +220,12 @@ impl ChioA2aEdge {
             retained.v1_output_mode = Some(output_mode);
         }
         if deferred {
-            return Ok(json!({"task": v1_task(&task, output_mode)}));
+            return Ok(A2aJsonRpcResponse::response(json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": {"task": v1_task(&task, output_mode)},
+            })));
         }
-        let response = self.complete_task(&task.id, kernel, execution, Value::Null);
+        let response = self.complete_task(&task.id, kernel, execution, id);
         self.v1_project_response(response, true)
     }
 
@@ -229,9 +233,11 @@ impl ChioA2aEdge {
         &self,
         response: A2aJsonRpcResponse,
         wrap: bool,
-    ) -> Result<Value, A2aEdgeError> {
-        if let Some(error) = response.get("error") {
-            return Err(A2aEdgeError::Kernel(error.to_string()));
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
+        if response.get("error").is_some() {
+            // Projection changes the successful task representation. Preserve
+            // the original wire error and its typed local cause intact.
+            return Ok(response);
         }
         let task: TaskResponse = serde_json::from_value(response["result"].clone())
             .map_err(|error| A2aEdgeError::Kernel(format!("task projection failed: {error}")))?;
@@ -241,7 +247,10 @@ impl ChioA2aEdge {
             .and_then(|task| task.v1_output_mode)
             .unwrap_or(V1OutputMode::Json);
         let value = v1_task(&task, mode);
-        Ok(if wrap { json!({"task": value}) } else { value })
+        let result = if wrap { json!({"task": value}) } else { value };
+        Ok(A2aJsonRpcResponse::response(json!({
+            "jsonrpc": "2.0", "id": response["id"], "result": result,
+        })))
     }
 
     pub(super) fn handle_v1_jsonrpc(
@@ -253,25 +262,24 @@ impl ChioA2aEdge {
         execution: &A2aKernelExecutionContext,
     ) -> A2aJsonRpcResponse {
         let result = if method == "SendMessage" {
-            self.handle_v1_send(params, kernel, execution)
+            self.handle_v1_send(id.clone(), params, kernel, execution)
         } else {
-            self.handle_v1_task(method, params, kernel, execution)
+            self.handle_v1_task(id.clone(), method, params, kernel, execution)
         };
         match result {
-            Ok(value) => {
-                A2aJsonRpcResponse::response(json!({"jsonrpc": "2.0", "id": id, "result": value}))
-            }
+            Ok(response) => response,
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
 
     fn handle_v1_task(
         &mut self,
+        id: Value,
         method: &str,
         params: Value,
         kernel: &ChioKernel,
         execution: &A2aKernelExecutionContext,
-    ) -> Result<Value, A2aEdgeError> {
+    ) -> Result<A2aJsonRpcResponse, A2aEdgeError> {
         let parsed: V1TaskRequest = serde_json::from_value(params)
             .map_err(|error| v1_invalid(format!("invalid {method} request: {error}")))?;
         if parsed.history_length != 0 {
@@ -280,9 +288,9 @@ impl ChioA2aEdge {
         v1_object_metadata(&parsed.metadata)?;
         let params = json!({"taskId": parsed.id});
         let response = if method == "GetTask" {
-            self.handle_jsonrpc_task_get(Value::Null, params, kernel, execution)
+            self.handle_jsonrpc_task_get(id, params, kernel, execution)
         } else {
-            self.handle_jsonrpc_task_cancel(Value::Null, params, kernel, execution)
+            self.handle_jsonrpc_task_cancel(id, params, kernel, execution)
         };
         self.v1_project_response(response, false)
     }

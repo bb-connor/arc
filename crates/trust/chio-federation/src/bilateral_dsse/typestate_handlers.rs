@@ -122,7 +122,7 @@ pub(crate) fn request_cosignature(
     }
     if !host_signed
         .org_a_public_key
-        .verify(&host_signed.request.pae_bytes, &response.org_a_signature)
+        .verify_strict(&host_signed.request.pae_bytes, &response.org_a_signature)
     {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }

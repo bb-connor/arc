@@ -57,3 +57,17 @@ refinement, TLS, SQLite durability, wall-clock availability or arbitrary process
 execution. The source review preserves that distinction. Executable regressions,
 Kani results, mutation controls and native crash qualification provide separate
 evidence for their respective implementation boundaries.
+
+
+## Authority-signature review extension
+
+The review repair replaces compatibility Ed25519 verification with the existing
+strict verifier at consent, terminal-evidence, directory admission, bilateral
+receipt/DSSE, trust enrollment, FROST artifact authority and fanout boundaries.
+It does not change signed preimages, the native threshold-group verifier, or
+any proof premise. Weak configured payment, oracle and FROST artifact keys are
+rejected before they can establish authority. The A2A change preserves typed
+and wire errors while projecting successful task results. Recheck the existing abstraction
+anchors and regenerate the coverage input digest after this reviewed source
+change. These hashes continue to record review, not Rust
+refinement or cryptographic proof.

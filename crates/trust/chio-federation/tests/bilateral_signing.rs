@@ -52,6 +52,68 @@ fn sample_receipt(tool_host_kp: &Keypair) -> ChioReceipt {
     ChioReceipt::sign(body, tool_host_kp).unwrap()
 }
 
+fn low_order_forgery() -> chio_core_types::Result<(chio_core_types::PublicKey, Signature)> {
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let mut signature = [0; 64];
+    signature[0] = 1;
+    Ok((
+        chio_core_types::PublicKey::from_bytes(&identity)?,
+        Signature::from_bytes(&signature),
+    ))
+}
+
+#[test]
+fn low_order_peer_cannot_obtain_a_receipt_cosignature() -> Result<(), Box<dyn std::error::Error>> {
+    use chio_federation::bilateral::{BilateralCoSigningProtocol, CoSigningRequest};
+    let origin = Keypair::generate();
+    let host = Keypair::generate();
+    let (weak_key, signature) = low_order_forgery()?;
+    let receipt = sample_receipt(&host);
+    let body = CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b")?;
+    assert!(weak_key.verify(&body.canonical_bytes()?, &signature));
+    let cosigner = InProcessCoSigner::new("kernel.org-a", origin, weak_key);
+    let request = CoSigningRequest::new(
+        receipt,
+        "kernel.org-a".into(),
+        "kernel.org-b".into(),
+        signature,
+    );
+    assert!(matches!(
+        cosigner.request_cosignature(&request),
+        Err(BilateralCoSigningError::OrgBSignatureInvalid)
+    ));
+    Ok(())
+}
+
+#[test]
+fn low_order_origin_cannot_forge_a_dual_signed_receipt() -> Result<(), Box<dyn std::error::Error>> {
+    let host = Keypair::generate();
+    let (weak_key, signature) = low_order_forgery()?;
+    let body = sample_receipt(&host);
+    let bytes =
+        CoSigningBody::from_receipt(&body, "kernel.org-a", "kernel.org-b")?.canonical_bytes()?;
+    assert!(weak_key.verify(&bytes, &signature));
+    let dual = DualSignedReceipt {
+        schema: BILATERAL_DUAL_RECEIPT_SCHEMA.into(),
+        body,
+        org_a_kernel_id: "kernel.org-a".into(),
+        org_b_kernel_id: "kernel.org-b".into(),
+        org_a_signature: signature,
+        org_b_signature: host.sign(&bytes),
+    };
+    assert!(matches!(
+        dual.verify_pinned(ExpectedBilateralPeers {
+            org_a_kernel_id: "kernel.org-a",
+            org_a_public_key: &weak_key,
+            org_b_kernel_id: "kernel.org-b",
+            org_b_public_key: &host.public_key(),
+        }),
+        Err(BilateralCoSigningError::OrgASignatureInvalid)
+    ));
+    Ok(())
+}
+
 #[test]
 fn happy_path_dual_signs_and_verifies_on_both_sides() {
     let origin_kp = Keypair::generate();
