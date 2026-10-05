@@ -63,6 +63,7 @@
 - **Stop hints read spec 8's shared `StopHeads` notification**, and `Capability` posts match by lineage (S5-14).
 - **Server requests are routed by cause (Codex round 2).** Each inbound message carries a session-local sequence. The edge stamps every outgoing event with the sequence of the message it is handling, and the writer routes server-to-client requests by that cause instead of by the active slot (A1a-A1c).
 - **Restore keeps the v3 envelope, and expiry is scheduled (Codex round 7).** A17's boot re-sign carries the complete record, `subscriptions` included, and never lowers the envelope version (A28, A29). Capability expiry has its own schedule, re-armed at restore, so a quiet expiry still ends the subscription (H7a).
+- **Ended subscriptions wait for delivery, and termination flushes before cancelling (Codex round 8).** An ended subscription is `Terminalized` and keeps its slot until its `SubscriptionEnded` is delivered (H5a). Termination copies `Terminal` into each stream's reserved frame and waits for every stream to flush it, within a deadline, before cancelling the session token (H6a).
 - **Factual corrections (S5-26).** `EffectObservationV1` has ten variants; the replay window holds 64 notifications, not 64 events; `:608` and `:702` are buffered collectors; `resume_generation` advances per signed record; the recovery events `sequence` column is a global cursor.
 
 ## Revision 3 changes
@@ -504,12 +505,27 @@ Rules H1-H10 bind every surface:
 3. **H3. One pending per subscription, by precedence.** A pending hint is replaced in place by precedence: `SubscriptionEnded` > `ThresholdCrossed` > `Changed`. The pending entry keeps its first sequence number and a coalesce counter. Delivery re-arms.
 4. **H4. Subscribe, then check.** Subscribing inserts an armed entry first. The caller then reads the source level and calls `fire_if_dirty(id, level)`, which posts if the level is already dirty. A post that lands between insertion and the read is captured by the entry; a duplicate hint is acceptable. `SourceLevel` is defined per subject (Operation: terminal recorded; Approval: resolved; Capability: revoked or expired; Budget: threshold crossed; Recovery and Stop: revision or epoch above the caller's last seen; Elicitation: completed). `Resource` and the catalogs have no level: they are edge-triggered and carry no H4 guarantee.
 5. **H5. Reserve on subscribe.** Capacity for one pending hint is reserved before a subscription exists. An explicit subscription that cannot reserve is denied with a typed capacity error. Posting never allocates: pending entries live in a pre-sized ring of capacity `max_subscriptions` (S5-27).
+   - **H5a. An ended subscription keeps its slot until its end is delivered.** Every path that ends a subscription moves it to `Terminalized { reason }` with `SubscriptionEnded { reason }` pending in its own slot, and never removes it at that point. The paths are: H7 revalidation at drain or at auth rotation, H7a expiry (including expiry found at restore), a source reporting the subject gone, and clock failure.
+     - A terminalized subscription keeps its slot, subject, audience and authority metadata, so a later drain can still deliver its hint.
+     - It accepts no new posts: a matching post is a no-op, and H3 precedence would keep `SubscriptionEnded` anyway. It is not revalidated again, because its hint already asserts withdrawal and carries no state.
+     - It is removed, and its slot returned to its pool, only after a drain hands its `SubscriptionEnded` to the transport (the edge's reserved `hint_share`, section 12.1 rule 4). If the share is full, the drain stops and the entry waits for the next drain.
+     - Capacity: H5 and the explicit and implicit pools count terminalized entries until removal, and `bounded(s)` counts them as subscriptions. A subscribe can therefore be denied while ended subscriptions await delivery. That is bounded, because the next drain delivers them.
+     - A client unsubscribe of a terminalized subscription removes it at once. `Terminal` (H6) discards every pending hint, `SubscriptionEnded` included, and removes every subscription, because the terminal subsumes them.
+     - Persistence: a persisted subscription (A24) leaves the persisted set only after its `SubscriptionEnded` is delivered. A crash before delivery re-derives the end at restore, and delivers it again, at least once.
 6. **H6. Terminal is last.** A surface with a lifecycle delivers exactly one `Terminal` hint, after discarding pending hints, from a slot reserved at creation. After it, posting is a no-op and subscribing fails.
-7. **H7. Authority follows the source.** A consumer may subscribe to, or wait on, a subject only with the authority it needs to read that subject's state. Authority is revalidated at **drain time** (revocation store, plus expiry against the authority clock) before each hint is delivered; a failed revalidation delivers one `SubscriptionEnded` instead and removes the subscription. Auth rotation revalidates every subscription against the new auth context and ends those that fail (S5-06).
+   - **H6a. Flush, then cancel.** Writing `Terminal` into the log does not by itself make any stream emit it. A stream selecting between its event source and the cancellation token could see the cancellation first, or close before draining the slot. Session termination therefore runs in this order:
+     1. **Log.** `terminate` discards pending hints, writes `Terminal { reason }` into the reserved terminal slot with a fixed sequence number, and refuses further posts and subscriptions.
+     2. **Stream slots.** The transport copies the terminal hint into each attached stream's reserved terminal frame. Every stream reserves one at attach, so this step never blocks or allocates. A POST stream still waiting for its response first emits A13's outcome-unknown error for its request id.
+     3. **Flush.** Each stream emits the frames already handed to it, then the terminal frame as its last frame, then acknowledges once the frame is written and flushed to the HTTP body. Streams poll their terminal frame before the cancellation token (a biased select), so a stream that observes both emits the terminal first.
+     4. **Await.** The session waits for every attached stream's acknowledgement, bounded by `terminal_flush_deadline_ms` (default 2000).
+     5. **Cancel.** Only then does it cancel the session token (A12). A stream that has not acknowledged by the deadline is closed by the cancellation.
+   - **Exactly once.** The log produces one `Terminal` per session. Every attached stream carries the same hint with the same event id, so a client that sees it on two streams sees one logical event.
+   - **Slow streams.** A stream closed at the deadline without flushing leaves the terminal retrievable for one replay. The session keeps the terminal hint for `terminal_retention_ms` (default 60000) after termination. The first reconnect presenting a `Last-Event-ID` below it receives it once. After that, and after the retention window, requests get the WIRE_PROTOCOL 3.3 terminal-state response.
+7. **H7. Authority follows the source.** A consumer may subscribe to, or wait on, a subject only with the authority it needs to read that subject's state. Authority is revalidated at **drain time** (revocation store, plus expiry against the authority clock) before each hint is delivered; a failed revalidation terminalizes the subscription and delivers one `SubscriptionEnded` instead, in this drain if the share allows and otherwise in the next one, after which the subscription is removed (H5a). Auth rotation revalidates every subscription against the new auth context and ends those that fail (S5-06).
    - **H7a. Expiry is scheduled, not only checked at drain.** A quiet expiry commits nothing to any store and may have no pending hint to drain. So every subscription whose authorizing capability has an `expires_at` arms an entry in the session's `ExpirySchedule`, at subscribe time and again at auth rotation. The schedule is a pre-sized min-heap over the same subscriptions, keyed by `expires_at`, so arming never allocates (H5).
-     - **Firing.** The schedule wakes on the monotonic clock at the earliest deadline and confirms it against the authority clock. When the authority clock reaches `expires_at`, it posts `SubscriptionEnded { reason: Expired }` (H3 precedence) and removes the subscription. No other hint, drain or store commit is needed. A scan every `expiry_scan_ms` (default 1000) re-checks the heap head against the authority clock, so a clock adjustment cannot postpone an expiry by more than one scan.
-     - **Restore.** Restore re-arms the schedule from the persisted subscriptions (A24, generalized to subjects in Part B) and each authorizing capability's `expires_at`. An expiry that passed while the host was down fires during restore, before the catch-up of H10's restore step 2. The consumer therefore receives `SubscriptionEnded`, never a catch-up `Changed`, for an expired subscription.
-     - **Clock failure.** If the authority clock is unavailable when the schedule fires or scans, every subscription whose capability has an `expires_at` ends fail closed with `SubscriptionEnded { reason: AuthorityTimeUnavailable }`. Subscriptions whose capability has no expiry are unaffected. An expiry is never assumed not to have happened.
+     - **Firing.** The schedule wakes on the monotonic clock at the earliest deadline and confirms it against the authority clock. When the authority clock reaches `expires_at`, it terminalizes the subscription with `SubscriptionEnded { reason: Expired }` pending (H3 precedence, H5a). The next drain delivers it, and only then is the subscription removed. No source commit is needed. A scan every `expiry_scan_ms` (default 1000) re-checks the heap head against the authority clock, so a clock adjustment cannot postpone an expiry by more than one scan.
+     - **Restore.** Restore re-arms the schedule from the persisted subscriptions (A24, generalized to subjects in Part B) and each authorizing capability's `expires_at`. An expiry that passed while the host was down terminalizes the subscription during restore, before the catch-up of H10's restore step 2, and the first drain after restore delivers it (H5a). The consumer therefore receives `SubscriptionEnded`, never a catch-up `Changed`, for an expired subscription.
+     - **Clock failure.** If the authority clock is unavailable when the schedule fires or scans, every subscription whose capability has an `expires_at` is terminalized fail closed with `SubscriptionEnded { reason: AuthorityTimeUnavailable }` (H5a). Subscriptions whose capability has no expiry are unaffected. An expiry is never assumed not to have happened.
 8. **H8. Gaps resync.** Any transport loss surfaces as an explicit resync: a resync burst (A8), `409`, or a revision jump. It never surfaces as silent loss.
 9. **H9. Audience.** A hint is an existence and status channel, so it obeys the audience policy of its subject.
    - It may name an artifact only by an audience-scoped opaque handle, never by digest (W: `docs/architecture/recoverable-agent-runtime/06-artifacts-memory.md:9`, `:80`, ART-10).
@@ -542,6 +558,10 @@ no_silent_loss(sub) -> committed(c, source(sub)) and c after last_delivery(sub)
                        -> eventually delivered(hint(sub)) or delivered(SubscriptionEnded(sub))
                           or delivered(Terminal) or delivered(resync(sub))
 not_authority(h)    -> forall decisions d: h not in inputs(d)
+ended(sub)          -> removed(sub) only after delivered(SubscriptionEnded(sub))
+                       or delivered(Terminal) or unsubscribed(sub)             (H5a)
+terminated(s)       -> forall attached streams t: emitted(Terminal, t) before cancelled(t)
+                       or (deadline(t) and retained_for_replay(Terminal, s))   (H6a)
 ```
 
 `no_silent_loss` holds across a crash of either the source or the delivering process. Process revisions commit with their change (P1), and every other source is read through a durable cursor with catch-up on restore (H10). Only sources outside these stores remain uncovered, namely cross-owner hints (section 14).
@@ -568,7 +588,7 @@ not_authority(h)    -> forall decisions d: h not in inputs(d)
 ```rust
 pub struct SessionEventLog {
     next_seq: u64,
-    explicit: SubscriptionPool,                // max_subscriptions, default 256 (client subscriptions)
+    explicit: SubscriptionPool,                // max_subscriptions, default 256 (client subscriptions); entries Live or Terminalized (H5a)
     implicit: SubscriptionPool,                // sized from the in-flight request bound (one-shot subjects)
     pending: PendingRing,                      // pre-sized; one slot per subscription (H5)
     terminal: TerminalSlot,                    // reserved at construction
@@ -583,7 +603,7 @@ impl SessionEventLog {
         -> Vec<SessionHint>;                                                        // H7 at drain
     pub fn revalidate_all(&mut self, revalidate: &dyn Fn(&SubscriptionAuthority) -> bool); // auth rotation
     pub fn expire_due(&mut self, authority_now: Result<UnixMillis, AuthorityTimeError>); // H7a; Err ends expiring subscriptions
-    pub fn terminate(&mut self, reason: TerminalReason);                           // H6
+    pub fn terminate(&mut self, reason: TerminalReason) -> TerminalHint;           // H6; the transport flushes it before cancelling (H6a)
 }
 ```
 
@@ -666,7 +686,7 @@ A `Work { handle_ref }` hint means "re-query `WorkQueryV1::Work`". It is posted 
 ## 13. Transport and edge (Part B)
 
 1. **MCP edge.** Standard subjects keep their `notifications/*` methods and peer gates (`runtime_flow.rs:397`). Coalescing preserves MCP semantics, because those notifications are re-read hints. Control subjects require `chioEvents` (section 12.1 rule 7).
-2. **Terminal ends the stream.** A session `Terminal` hint is written, then the session cancellation token (A12) closes every stream. Later requests follow the WIRE_PROTOCOL 3.3 terminal-state rules.
+2. **Terminal ends the stream, in order.** The session writes `Terminal`, copies it into each attached stream's reserved terminal frame, waits until every stream has emitted and flushed it or `terminal_flush_deadline_ms` passes, and only then cancels the session token (A12). A stream closed at the deadline leaves the terminal retrievable for one replay (H6a). Later requests follow the WIRE_PROTOCOL 3.3 terminal-state rules. When Part B lands, Part A's A12 cancellation on session termination runs after this flush.
 3. **A2A.** No change. Any later A2A status push sources from the hint model and inherits H1-H10.
 
 ## 14. Cross-owner hints: known gap
@@ -681,8 +701,11 @@ Direction (not v1): a hint-only direct lane per treaty party reusing the lane ad
 |---|---|
 | Explicit subscription capacity exhausted | Subscribe denied with a typed capacity error |
 | Implicit pool exhausted | Request proceeds without the implicit hint (rule 12.1(5)) |
-| Authority withdrawn | Detected at drain or rotation; one `SubscriptionEnded`, then removal (H7) |
-| Capability expires with no other activity | `ExpirySchedule` posts `SubscriptionEnded { Expired }` at the deadline (H7a) |
+| Authority withdrawn | Detected at drain or rotation; the subscription is terminalized, one `SubscriptionEnded` is delivered, then the subscription is removed (H7, H5a) |
+| Capability expires with no other activity | `ExpirySchedule` terminalizes the subscription with `SubscriptionEnded { Expired }` pending at the deadline; the next drain delivers it, then removes the subscription (H7a, H5a) |
+| Ended subscription not yet drained | Keeps its slot and metadata, accepts no posts, counts against capacity, and is removed only after delivery (H5a) |
+| Session terminates while streams are attached | Each stream emits the terminal frame and acknowledges before the token is cancelled (H6a) |
+| A stream cannot flush the terminal within `terminal_flush_deadline_ms` | Closed by the cancellation; the terminal is retained for one replay within `terminal_retention_ms` (H6a) |
 | Capability expired while the host was down | Fires during restore, before the catch-up (H7a) |
 | Authority clock unavailable at an expiry check | Subscriptions with an `expires_at` end with `AuthorityTimeUnavailable`; others are unaffected (H7a) |
 | Backend cannot serve the subject | `Unsupported`; a subscription that cannot fire is never created |
@@ -724,6 +747,8 @@ Part B starts only after Part A ships and a second surface commits to consuming 
 ## 18. Tests (Part B)
 
 - **Unit (`chio-kernel`):** capacity denial for explicit subscriptions; implicit exhaustion never denies a call; infallible post after subscribe; coalescing precedence (`SubscriptionEnded` > `ThresholdCrossed` > `Changed`); subscribe-then-check catches a post between insertion and level read; one-shot retirement after delivery; terminal last and idempotent; drain-time revalidation ends a revoked or expired subscription; auth rotation revalidates; **quiet expiry:** a subscription whose capability expires with no other activity receives `SubscriptionEnded { Expired }` at the deadline (test clock), with no drain trigger or store commit; **expiry across restart:** the capability expires while the host is down, and restore delivers `SubscriptionEnded` before any catch-up and removes the subscription; **clock unavailable:** the authority clock fails at an expiry check, subscriptions with an `expires_at` end with `AuthorityTimeUnavailable`, and subscriptions without an expiry remain; a backward clock step postpones no expiry by more than one `expiry_scan_ms`; lineage matching delivers a root revocation to a descendant holder; second-session refusal.
+  - **Terminalized retention (H5a):** a quiet expiry with no drain for a while keeps the entry; a post to it is a no-op; it counts against `max_subscriptions` and a subscribe at capacity is denied; the next drain delivers `SubscriptionEnded`, then the entry is removed and capacity is freed. The same holds for a revalidation failure when the hint share is full, and for an expiry found at restore.
+  - **Terminal ordering (H6a):** a race where the cancellation token and the event source are both ready still emits the terminal frame before the stream ends (biased select, cancel only after acknowledgement); every attached stream (GET and a pending POST) emits the terminal with the same event id, and the POST stream emits A13's error first; a slow stream that cannot flush within `terminal_flush_deadline_ms` is closed, and its reconnect with an older `Last-Event-ID` receives the terminal exactly once, then the 3.3 terminal-state response.
 - **Proptest:** model-based subscribe/fire_if_dirty/post/drain/revoke/terminate sequences against a reference model, checking section 11.3's predicates.
 - **Loom:** `post` racing `drain` and `subscribe` racing `post` on `SessionEventLog` behind the session lock. `queue_tool_server_event` is `cfg(not(loom))` (`session.rs:1106`), so the loom target is the log itself or the post path is un-gated.
 - **Spec 9 integration:** no hint effect runs after `Refused`, `Retry` or `CommitOutcomeUnknown`; the no-op port changes no machine output.
@@ -818,6 +843,13 @@ Open decisions:
 |---|---|---|---|
 | 4185260831 | Persist restored subscriptions under the v3 envelope | Fixed now. A17's boot re-sign carries the complete record, `subscriptions` included, and changes only the generation. New A28 selects the envelope on every re-sign: `v3` when `subscriptions` is non-empty or the record was loaded as `v3`, otherwise the deployment floor (default `v3`). The version never decreases, and a would-be downgrade is refused fail closed. New A29 verifies under the named envelope, never retries a `v3` record under `v2`, and rejects `v2` records that carry subscriptions. Test: restore with subscriptions, restart twice, subscriptions intact and verified | A17; A28; A29; sections 8, 9, 10 |
 | 4185260873 | Schedule capability-expiry hints | Fixed now. New H7a adds a per-session `ExpirySchedule` (a pre-sized min-heap by `expires_at`). It wakes on the monotonic clock, confirms against the authority clock, and is backed by a periodic scan. It posts `SubscriptionEnded { Expired }` with no store commit needed. Restore re-arms it from the persisted subscriptions and fires expiries that passed during downtime before the catch-up. An unavailable authority clock ends expiring subscriptions fail closed. Tests cover quiet expiry, expiry across restart, and clock unavailable | H7a; H10 table; `EndReason`; section 12.1; sections 15, 18 |
+
+### Codex review (PR #1174, round 8)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185510067 | Retain expired subscriptions until the end hint is delivered | Fixed now. Every path that ends a subscription moves it to `Terminalized` with `SubscriptionEnded` pending in its own slot: expiry (including at restore), revalidation, subject gone, clock failure. It keeps its slot and metadata, accepts no posts, counts against capacity, and is removed only after a drain hands the hint to the transport. A persisted subscription leaves the persisted set only after delivery | H5a; H7; H7a; section 11.3 predicates; section 12.1; section 15; section 18 |
+| 4185510114 | Flush the terminal hint before cancelling streams | Fixed now. Termination runs in order: write `Terminal` to the log, copy it into each stream's reserved terminal frame, wait for every stream to emit and flush it (biased select, bounded by `terminal_flush_deadline_ms`), and only then cancel the session token. A stream closed at the deadline leaves the terminal retrievable for one replay within `terminal_retention_ms`. One logical terminal per session, with the same event id on every stream | H6a; section 13 item 2; section 11.3 predicates; section 15; section 18 |
 
 ## Appendix A. FTL reference
 

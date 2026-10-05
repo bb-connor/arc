@@ -391,7 +391,7 @@ A join and a capture can race. A tool output can be delivered into the same cont
       - **Fresh deployment.** `fresh_basis` holds now: deployment, policy and contract digests unchanged (W: `validation.rs:287-300`).
       - **Integrity authority.** Its `obligations` include `IntegrityEndorsement { principal }`, and `principal` is on the deployment's integrity roster (W: `recovery/authorization.rs:40-45`).
       - **Exact action.** Its `ActionIntentV1` names this call's request id, request namespace and semantic request digest (W: `authorization.rs:69-90`). An endorsement for another action never applies.
-      - **Within the contract.** When `requirement.action_contract` is set, the call's exact action is in the contract's `authorized_actions`. An endorsement replaces only the level condition: a human approved this action despite the influence, but no endorsement authorizes an action the grant's contract excludes.
+      - **Action contract still applies.** When `requirement.action_contract` is set, I22a's full action condition `action_ok` holds in this transaction, exactly as on the context branch: the selector inputs are bound (cardinality, membership, distinctness, commit order, single consumption), the call's exact action equals the selector's output for those bound values, and that action is in `authorized_actions`. An endorsement replaces only the level condition `satisfies(state, requirement)`. A human approved this action despite the influence, but no endorsement overrides the selector or authorizes an action the contract excludes. An endorsed call whose action differs from the selector's output is refused.
       - **Current influence.** Its `influence_basis` equals the commitment of the call's key state as committed in this transaction, not the state when the approval was made. Any join after approval makes it stale.
       - **Single use.** The continuation has not been consumed by another operation. W: binds each recovery workflow to exactly one native operation, through `native_link`, set in the same writer when the continuation's operation begins (W: `admission_operation_store/recovery/native.rs:49-86`, which also re-runs `fresh_basis`). The crossing that carries the call (`RecoveryCapture`, or `SemanticCapture` for P3 connectors) sets or verifies that link in this same transaction. A different operation naming the same continuation fails the check, and a replay of the same operation returns its bound terminal result.
     - **Otherwise** the check refuses with `InsufficientIntegrity`. A refused endorsement is not a new fault (I18). The recovery actor learns the reason at resolution: `stale`, `consumed`, `wrong_action`, `deployment_changed` or `unrecorded`.
@@ -406,10 +406,10 @@ A join and a capture can race. A tool output can be delivered into the same cont
 committed(join(ctx, s)) before intent_commit(op) and key(op) = ctx and not satisfies(s', req(op))
   and not endorsed(op, intent_commit(op))
   -> not DispatchCommitted(op)                     (s' = state after the join; I15a exception)
-DispatchCommitted(op) -> satisfies(state_at(intent_commit(op)), req(op)) and action_ok(op)
-                         or endorsed(op, intent_commit(op))                       (I15a)
+DispatchCommitted(op) -> action_ok(op)
+                         and (satisfies(state_at(intent_commit(op)), req(op))
+                              or endorsed(op, intent_commit(op)))                 (I15a, I22a)
 endorsed(op, t)        -> exact_action(approval(op), op)
-                          and in_contract(op)
                           and influence_basis(approval(op)) = commitment(state_at(t))
                           and fresh_deployment(approval(op), t)
                           and consumed_exactly_once(continuation(op), t)
@@ -423,7 +423,6 @@ inputs_bound(op)       -> |selector_inputs(op)| = slots(contract(op))
                           and each input is consumed exactly once, by op, at intent_commit(op)
 inherit(parent, child) -> state(child) at creation >= state(parent) at the same transaction,
                           with the inherited part exact on origins, bits and unknown, or creation is refused (I7a)
-in_contract(op)        -> req(op).action_contract = None or action(op) in authorized(contract(op))
 attenuate(p, c)        -> level_ge(c.level, p.level) and contract_preserved(c, p)             (I3, I9)
 forall ctx: state(ctx) only increases              (I2; SEC-05)
 ```
@@ -499,7 +498,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
       - **Unambiguous, in a defined order.** For each digest `d`, let `s_d` be the number of slots naming `d`. The key state must hold exactly `s_d` unconsumed returns under `d`, and they fill those slots in commit order (the confined-return admission's `batch_index` and `writer_epoch`). More unconsumed returns than slots is ambiguous and denies. A call therefore cannot pick whichever historical value makes its action pass, because at most one binding is admissible for a given state.
       - **Consumed once.** The crossing records each input as consumed by this operation, in the same transaction. A second operation that binds a consumed input denies, and a replay of the same operation returns its bound terminal result.
     - Crossing check 4 computes the expected action from the bound inputs' committed, host-recomputed values, in slot order, through the selector. It uses the host's canonical projections (I23), never model text. The bound ids go to the operator-only audit record (I25a), not to caller-visible receipts.
-    - It admits the call only when the call's exact action equals that expected action and is in `authorized_actions`. Otherwise it refuses with `InsufficientIntegrity`.
+    - It admits the call only when the call's exact action equals that expected action and is in `authorized_actions`. Otherwise it refuses with `InsufficientIntegrity`. This condition applies on both I15a branches. An endorsement satisfies only the level condition, never this one.
     - A value outside the selector's domain is already refused at projection (I23).
     - **No typed return.** The selector's `no_input` row gives the expected action only when the call binds no inputs and the key state holds no unconsumed return under any slot's digest. This is the normal case for a `Trusted` level. If the contract defines no such row, the call is refused. A call that binds no inputs while such a return exists is refused, so influence cannot bypass the selector by being left unbound.
     - **The property.** External content can choose only among `authorized_actions`; it can never reach an unauthorized action. Which authorized action it chooses remains influenced, and the operator accepts that when signing the set.
@@ -513,11 +512,17 @@ pub enum ConfinedReturnTypeV1 {
     Boolean,                                                   // 1 bit
     Enum { variants: BoundedList<ProtectedText<64>, 256> },    // ceil(log2(n)) bits
     Integer { min: i64, max: i64 },                            // ceil(log2(max - min + 1)) bits
-    Identifier { max_len: u8, charset: IdentifierCharsetV1 },  // max_len * log2(|charset|) bits, max_len <= 64
+    Identifier { min_len: u8, max_len: u8, charset: IdentifierCharsetV1 }, // bit_length(sum over i in min_len..=max_len of |charset|^i - 1) bits; 1 <= min_len <= max_len <= 64
 }
 ```
 
 23. **I23. Capacity.** Each type has a fixed capacity in bits, which becomes `ExternalBounded { max_bits }`.
+    - **Exact cardinality.** Capacity is `ceil(log2(N))`, where `N` counts every value the host projection accepts. It is computed with exact integer arithmetic as `bit_length(N - 1)`, never in floating point.
+      - `Boolean`: `N = 2`.
+      - `Enum`: `N = n` variants.
+      - `Integer`: `N = max - min + 1`.
+      - `Identifier`: `N = sum over i from min_len to max_len of |charset|^i`, so every permitted length is counted, not only the longest strings. With the 65-character charset below, lengths 1 to 44 give `N = (65^45 - 65) / 64` and 266 bits, while `44 * log2(65)` rounds to 265 and undercounts by one bit. A fixed-length identifier (`min_len = max_len = 44`) gives 265. Lengths 1 to 64 give 386.
+    - `Identifier` is the only variable-length type. Any future variable-length type must count every accepted length in the same way.
     - `Identifier` uses a restricted charset (ASCII letters, digits, `.`, `_`, `-`), with no spaces and no punctuation that can form instructions. Free text is not a return type.
     - The host projection rejects any value outside the type. There is no fallback.
 24. **I24. Return discipline unchanged.** One value, on the `Value` channel only, with every other channel withheld. `max_bytes` is derived from the type, up to 64.
@@ -607,6 +612,7 @@ pub enum ConfinedReturnTypeV1 {
 | Join commits, then a fresh endorsement over the post-join commitment, then the intent | Admitted once by endorsement (I15a) |
 | Delegation raises the level but drops or changes the parent's action contract | Delegation refused: not an attenuation (I3, I9) |
 | Endorsed action outside the grant's action contract | Deny (I15a) |
+| Endorsed action inside `authorized_actions` but different from the selector's output for the bound inputs | Deny (I15a, I22a) |
 | Bootstrap contribution pinned but not covered by a trust assertion | Joins `External`; a `Trusted` requirement denies (I7a) |
 | Bootstrap contribution that cannot be classified | Joins `unknown`; every requirement denies (I7a) |
 | Bootstrap trust assertion expired, for another run plan or deployment, or a digest mismatch | Assertion ignored; the contribution is `External` (I7a) |
@@ -667,7 +673,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Initial influence per verified worker profile. Each qualification failure starts at `unknown`.
   - Bootstrap classification (I7a): inherited, asserted, pinned without assertion (`External`), and unclassified (`unknown`). Assertions that are expired, for another run plan or deployment, or carry a mismatched digest are ignored.
   - **Lossless inheritance (I7a).** A parent holds `External`, `ModelProvider { p1 }`, `ModelProvider { p2 }`, and two distinct `ExternalBounded` observations of 3 and 5 bits. A child with disjoint keys and no other bootstrap contributions inherits re-keyed observations, and its `origins`, `bounded_bits_total = 8` and `unknown` equal the parent's. Each requirement the parent fails, the child fails too: `Trusted`, `ProviderOnly({p1})` and `BoundedExternal { 7 }`. A child sharing the parent's lineage does not re-key reachable rows, and its bit total stays 8. Re-running creation changes nothing. A parent above 4,096 rows refuses child creation.
-  - Typed return capacity and projection rejection.
+  - Typed return capacity and projection rejection. Capacity unit tests (I23): `Boolean` gives 1; `Enum` with 3 variants gives 2; `Integer { 0, 255 }` gives 8; a single-value type gives 0; `Identifier { 1, 44, 65 chars }` gives 266, and `Identifier { 44, 44, 65 chars }` gives 265. Each is computed by `bit_length(N - 1)` and compared with a big-integer reference.
   - `InsufficientIntegrity` yields the `integrity_fault` block, never an `authority_fault` block. Its field set equals I19's, and `remedy_classes` depends only on the caller's requirement (I18, I19).
 - **Conformance.**
   - An injected tool output followed by a consequential call is denied.
@@ -677,7 +683,8 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
     - **fresh:** an exact endorsement over the current commitment admits the call once, with `satisfied_by = endorsement`;
     - **stale:** a join committed after approval makes the same endorsement fail;
     - **reused:** a second call naming the consumed continuation is refused;
-    - **wrong action:** an endorsement for a different request, namespace or semantic digest is refused.
+    - **wrong action:** an endorsement for a different request, namespace or semantic digest is refused;
+    - **endorsed but off-selector:** under an action contract whose bound input selects publish, an otherwise valid endorsement for delete (also in `authorized_actions`) is refused. The same endorsement for publish is admitted once.
 
     The early guard defers each case to the crossing and never admits on the reference alone.
   - **Adversarial one-bit action selector.** An attacker-controlled document flips a boolean return that the framework uses to choose publish or delete.
@@ -766,6 +773,13 @@ Open decisions:
 | R-11-04 | Raising integrity to Trusted can remove a parent's action-selection constraint | Fixed. The requirement is now a pair, a level plus an optional action contract, ordered as a product. Attenuation may raise the level but must keep the parent's contract by digest, because equal action sets can still differ in selector mapping. `Trusted` alone is not stronger than `BoundedSelection`. The action condition applies at any level, a `no_input` selector row covers trusted contexts, and an endorsement never authorizes an action outside the contract. New attenuation tests cover an excluded action and a changed selector mapping | section 4 (requirement, I1, I3); I9; I15a; section 8 predicates; I19; I22a; section 11; I25; section 15; section 18 |
 | R-11-05 | Pinning bootstrap bytes is treated as proof that those bytes have no external influence | Fixed. Launch qualification and input influence are separate facts. New I7a joins every bootstrap contribution (inherited parent state, task and spawn input, seeds, checkpoint, control and selection metadata) before readiness, following P5. Unclassified contributions start `unknown`, and pinned but unasserted ones start `External`. Trust requires an operator-signed, scoped `BootstrapTrustAssertionV1`. The owner's open question 1 is answered in I7a, and a test covers a pinned external task in a fresh runtime. Spec 7's qualification text says the same | I4; I4a; I7; I7a; section 11; section 15; section 18; section 19; spec 7 rule 6.3.5 |
 | R-11-06 | The endorsement fix leaves an unconditional denial invariant and failure-table row | Fixed. The denial implication carries `not endorsed(op, intent_commit(op))`. The failure table separates the endorsed and unendorsed join-first cases. Loom tests both orders: approval, then join, then intent fails; join, then fresh approval, then intent succeeds | section 8 predicates; section 15; section 18 |
+
+### Codex review (PR #1174, round 8)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185510046 | Apply the selector check to endorsed calls | Fixed now. The endorsement branch of crossing check 4 requires I22a's full `action_ok` (bound inputs, selector output equal to the call's action, membership in `authorized_actions`), exactly as the context branch does. An endorsement bypasses only `satisfies(state, requirement)`. The predicate is restated as `action_ok and (satisfies or endorsed)`, with a new failure row and an off-selector endorsement test | I15a; I22a; section 8 predicates; section 15 failure table; section 18 tests |
+| 4185510106 | Include identifier length in the capacity bound | Fixed now. Capacity is `bit_length(N - 1)` over the exact count of accepted values. For `Identifier`, `N` sums `|charset|^i` over every permitted length, with a new explicit `min_len`. The 65-character, length 1-44 case gives 266 bits, not 265. The other types are fixed-cardinality and already exact. Unit tests are added | section 10 type table; I23; section 18 |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

@@ -72,6 +72,8 @@ The adversarial review (1 Blocker, 15 Major, 11 Minor, 3 Nit) found that revisio
 
 **Codex review (PR #1174, round 1).** S6 lets a stop or restrict fill the last slot, so exhaustion always ends `Stopped`. S19 binds the resume to the stored cooldown origin. S25 keys the intent journal by scope. S37 adds an origin-freshness lease for serving shards. New S38 defines the signing obligation.
 
+**Codex review (PR #1174, round 8).** S2 gains per-transition field rules. An automatic `Rollover` is representable without a fake request: `requested_via: SystemRollover`, `authorizer: ChainRollover { serving_owner, writer_epoch }`, no contributors, and a fixed reason commitment over the restated head. The contributor invariant applies only to `Stop`, `Restrict`, `Relax` and `Resume`. S37's origin-freshness lease renews only from a signed, challenge-bound response, extends only to `sent_at + lease`, and ignores heartbeats for renewal, so replay can never extend it.
+
 **Codex review (PR #1174, round 7).** Records carry a signed `chain_generation`, and positions compare as `StopEpochId = (chain_generation, epoch)` everywhere: heads, `expected_epoch`, replicas, floors and observed epochs. A `Rollover` record starts each new generation and restates the head, so a rollover never changes `Stopped` or `Running` (S2, S6, S37).
 
 ## 1. Decision summary
@@ -194,14 +196,22 @@ pub struct StopEpochV1 {
     pub transition: StopTransition,
     pub state: StopState,
     pub expected_epoch: StopEpochId,         // head id the transition was decided against; (1, 0) for a scope's first record
-    pub reason_commitment: Sha256Digest,     // SHA-256(salt || text); salt and text in the note table (S1)
+    pub reason_commitment: Sha256Digest,     // SHA-256(salt || text), salt and text in the note table (S1); Rollover: the fixed commitment of S2
     pub authorizer: StopAuthorizer,
     pub decided_at: DecisionTime,
     pub previous: Sha256Digest,              // digest of this scope's prior record, or zero
     pub allow_containment: bool,             // section 7.1, S12
-    pub requested_via: StopRequestPath,      // Route { host_id } | ControlSocket | OfflineCli | Migration
-    pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax and Migration
-    pub contributors: Vec<StopRequestRecord>,    // every request of the applied generation, at most 2 (S25); authorizer and reason_commitment above are contributors[0]
+    pub requested_via: StopRequestPath,
+    pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
+    pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
+}
+
+pub enum StopRequestPath {
+    Route { host_id: HostId },
+    ControlSocket,
+    OfflineCli,
+    Migration,                               // S5 only
+    SystemRollover,                          // S6: the writer's automatic Rollover; no request exists
 }
 
 /// A position in a scope's chain. Ordered lexicographically: chain_generation first, then epoch.
@@ -217,7 +227,7 @@ pub struct StopRequestRecord {
 
 pub enum DecisionTime {
     Observed(UnixMillis),                    // observe_authority_time inside the write transaction
-    Unavailable,                             // Stop and Restrict only (S4)
+    Unavailable,                             // Stop, Restrict and Rollover only (S4, S6)
     Attested(TimeAttestationRef),            // break-glass Resume (S19)
 }
 
@@ -230,7 +240,7 @@ pub enum StopAuthorizer {
     BreakGlass { artifact_digest: Sha256Digest, attestation: TimeAttestationRef }, // S19
     RecoveryActor { subject: PublicKeyHex },                                       // S32, Stop and Restrict only
     LegacySemanticStop,                                                            // S5 migration only
-    ChainRollover,                                                                 // S6: Rollover records only; changes no state
+    ChainRollover { serving_owner: ServingOwnerId, writer_epoch: u64 },            // S6: Rollover records only; the owner and serving epoch that appended it; changes no state
 }
 ```
 
@@ -248,6 +258,13 @@ Normative rules:
    - `state` follows the transition. `Restrict` and `Relax` require a `Stopped` head, and `Resume` requires a `Stopped` head.
    - A `Stop` over a stopped head is an idempotent no-op that returns the current head, unless it asks for narrower containment, in which case it is recorded as `Restrict`.
    - A `Resume` over a running head is a no-op that returns the current head.
+   - **Field rules per transition.** The writer constructs, and every verifier checks, the rule for the record's transition. A record that breaks its rule is invalid. A verifier refuses it, and the writer never appends it:
+     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set exactly for `Stop` and `Restrict` (S25). A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
+     - **`Rollover`.** No request exists, so `contributors` is empty and `satisfies_intent` is `None`. `authorizer` is `ChainRollover { serving_owner, writer_epoch }`, naming the serving owner and serving epoch that appended it. `requested_via` is `SystemRollover`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
+       - `state`, `allow_containment` and `expected_epoch` restate the previous generation's final record (its state, its containment flag, and its id).
+       - `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" || canonical(expected_epoch) || previous)`. That is a fixed domain string plus the restated head id and digest, with no salt and no note row, because there is no operator text to protect. A verifier recomputes it.
+       - `decided_at` is `Observed` when authority time is available, else `Unavailable`. A rollover never waits on the clock.
+     - **Migration** (S5). `contributors` is empty, `authorizer` is `LegacySemanticStop`, and `requested_via` is `Migration`.
    - The table joins the global commit chain projection coverage, as W:'s recovery projection kind does.
 - **S3. Head.**
    - The head for a scope is its highest `StopEpochId`, which is always in its current chain generation. A scope with no record is `Running`.
@@ -266,9 +283,9 @@ Normative rules:
    - `Resume` and `Relax` refuse once the current generation holds `bound - 1` records. `Stop` and `Restrict` may append up to `bound`, because both leave the head `Stopped`.
    - Only `Resume` produces a `Running` head, and it never takes the last slot, so a running head always has room for one durable `Stop`. Exhaustion therefore always ends `Stopped`. It can never leave a `Running` durable head with a stop that only tier 1 holds.
    - **Rollover.** When a commit leaves the current generation holding `bound - rollover_margin` records or more (`rollover_margin` default 8, at least 4), the writer appends a `Rollover` record as the scope's next commit, in the priority lane (S36).
-     - It is a restrictive commit, anchored before acknowledgement, with authorizer `ChainRollover`. It restates the head's `state` and `allow_containment` and satisfies no intent (`satisfies_intent: None`), so a rollover never changes `Stopped` or `Running` and never relaxes anything. It therefore needs no resume authority.
+     - It is a restrictive commit, anchored before acknowledgement, built under S2's `Rollover` field rules: authorizer `ChainRollover { serving_owner, writer_epoch }`, `requested_via: SystemRollover`, no contributors, the fixed reason commitment. It restates the head's `state` and `allow_containment` and satisfies no intent (`satisfies_intent: None`), so a rollover never changes `Stopped` or `Running` and never relaxes anything. It therefore needs no resume authority and invents no request.
      - The headroom rules above apply within each generation, so they hold before and after the rollover. Between the trigger and the rollover's commit, at least `rollover_margin - 1` slots remain, and resume and relax still refuse at `bound - 1`.
-     - If the rollover cannot commit (for example on `SQLITE_FULL`), the writer retries it with backoff. A generation that reaches `bound` meanwhile ends `Stopped` as above and stays stopped until the rollover commits. Readiness reports `stop_chain_exhausted`. The offline CLI can append the same `Rollover` record under the serving-owner lock (S30), with stop authority, because the record cannot relax anything.
+     - If the rollover cannot commit (for example on `SQLITE_FULL`), the writer retries it with backoff. A generation that reaches `bound` meanwhile ends `Stopped` as above and stays stopped until the rollover commits. Readiness reports `stop_chain_exhausted`. The offline CLI can append the same `Rollover` record under the serving-owner lock (S30), with `requested_via: OfflineCli` and the CLI's own `ChainRollover { serving_owner, writer_epoch }`. The CLI requires stop authority to run, and it logs that credential in its operator audit, not in the record, because the record cannot relax anything.
      - A pending intent (S25) applies after the rollover, at the new generation's next epoch.
      - Earlier generations stay in the append-only table. Heads, checks and replicas read only the current generation's head, so a generation reset of `epoch` never makes two records indistinguishable: they differ in `chain_generation`, which is signed.
 
@@ -659,13 +676,24 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - The operator acknowledgement returns after the origin commit, with per-shard `enforced` status. It never blocks on a dead shard, so stopping stays easy. A shard that misses the fan-out cannot become ready until it catches up.
     - **Origin-freshness lease.**
       - A serving tenant shard holds a lease on the origin head.
-      - It renews the lease at least every `shard_origin_refresh` (default 250 ms), either by reading the origin's kernel-scope head id `(chain_generation, epoch)` or by receiving a fan-out heartbeat that carries it.
+      - It polls the origin at least every `shard_origin_refresh` (default 250 ms). **Only a challenge-bound response renews the lease.**
+        - **Poll.** Each poll carries a fresh 128-bit `nonce` from the shard's CSPRNG. The shard keeps at most `shard_origin_outstanding` (default 4) outstanding nonces, each with the monotonic time at which it was sent.
+        - **Response.** The origin answers with `OriginHeadAttestationV1 { shard_id, nonce, origin_head: StopEpochId, origin_head_digest, origin_committed_mono_ms }`, signed by the serving authority's receipt key. `origin_committed_mono_ms` is the origin's monotonic time of that head's commit, for diagnostics only.
+        - **Acceptance.** The shard accepts a response only when all of these hold:
+          - the signature verifies against the pinned origin key;
+          - `shard_id` is its own;
+          - `nonce` is outstanding, and the shard consumes it on first use;
+          - `origin_head` is not behind the last head the shard accepted.
+        - **Lease extent.** An accepted response extends the lease to `sent_at(nonce) + shard_origin_lease`, measured from when the poll was sent, not when the response arrived. A delayed response can therefore never stretch the lease past its own challenge.
+        - **Rejection.** A replayed, stale, foreign or unknown-nonce response is discarded and renews nothing. A response whose head is behind the last accepted head is a regression: the shard latches as in "Lost origin" with `reason: stop_origin_regressed`.
+        - **Hints only.** Fan-out heartbeats and replicated records never renew the lease. A heartbeat that shows an origin head above the replica's triggers the "Behind" path and an immediate poll; nothing else.
       - The lease lasts `shard_origin_lease` (default 1 s), measured on the shard's monotonic clock, never on authority time.
+      - **Bound under replay.** Replaying or delaying origin messages can only withhold renewals, so it can make the shard fail closed sooner. It can never extend the lease.
     - **Behind.** When a renewal shows an origin head id above the replica's head id, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
     - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds, and returns to service only after a fresh read shows its replica's head id at or above the origin's.
     - **Acknowledgement bound.**
       - The origin reports a shard as `enforced` when its replica reaches the stop record's id. Otherwise it reports `fenced_by_lease`, with the time at which that shard's lease expires.
-      - Every shard therefore enforces a kernel stop within `shard_origin_lease` plus one renewal interval, whether or not it can reach the origin.
+      - Every shard therefore enforces a kernel stop within `shard_origin_lease` plus one renewal interval, whether or not it can reach the origin. A response to a poll sent before the stop committed extends the lease to at most `sent_at + shard_origin_lease`. Every response to a later poll carries the stop record's id or a later one, so it puts the shard on the "Behind" path.
     - A resume committed at the origin takes effect in a shard only after that shard replicates it, so a lagging shard errs toward stopped.
 
 ## 13a. Restore, upgrade and downgrade
@@ -722,6 +750,8 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | Chain at `bound - 1` | Resume and relax refuse; a stop or restrict can still append, and the head ends `Stopped` (S6) |
 | Generation reaches `bound - rollover_margin` | The writer appends a `Rollover` record in the priority lane. State is unchanged, and the new generation starts with full headroom (S6) |
 | Rollover cannot commit (disk full) | Retried with backoff. Resume and relax still refuse at `bound - 1`. A generation that reaches `bound` ends `Stopped` until the rollover commits, or until the offline CLI appends it (S6) |
+| Replayed or delayed origin response, or a replayed fan-out heartbeat | Discarded unless it answers an outstanding nonce, which is consumed on first use. A late answer extends the lease only to `sent_at + shard_origin_lease`. Heartbeats never renew. The shard loses its lease on schedule and reports `stop_origin_stale` (S37) |
+| Origin response whose head is behind the shard's last accepted head | Regression: the shard latches the kernel scope `Stopped` and goes `not_ready { stop_origin_regressed }` (S37) |
 | Crash around a rollover | The rollover is anchored before acknowledgement, so restart finds either generation `g`'s final record or the anchored `Rollover` record as head. Both carry the same state (S6) |
 | Delayed resume after a newer stop | Refused with `StopHeadMoved` (S31) |
 | Host latch set | Every crossing refuses `Deny` and `Withhold` kinds; containment refused (S20, S23) |
@@ -804,6 +834,8 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
     - every `AllowIfContainment` crossing during a stop has `allow_containment` and no host latch.
   - A shard offline during the fan-out, then restarted: it is not ready until caught up (S37).
   - A serving shard partitioned from the origin, then a kernel stop at the origin: within `shard_origin_lease` the shard refuses `Deny` crossings and reports `stop_origin_stale`. After it reconnects, it serves again only once its replica holds the stop (S37).
+  - **Replayed freshness evidence (Codex round 8).** Capture a pre-stop origin response and a pre-stop fan-out heartbeat. Commit a kernel stop at the origin, cut the shard's polls, and replay both repeatedly. Neither renews the lease. The lease expires no later than `shard_origin_lease` after the shard's last fresh poll was sent, and the shard reports `stop_origin_stale`. Responses with a consumed nonce, an unknown nonce, another shard's id, a bad signature, or a head behind the last accepted head never renew. The last of these latches with `stop_origin_regressed`. A response delayed past its poll extends the lease only to `sent_at + shard_origin_lease` (S37).
+  - **Rollover representability (Codex round 8).** An automatic rollover produces a record with empty `contributors`, `satisfies_intent: None`, `authorizer: ChainRollover { serving_owner, writer_epoch }`, `requested_via: SystemRollover`, and the fixed reason commitment, which verifies. A verifier rejects four records: a `Rollover` with a contributor; a `Rollover` whose reason commitment, state or `expected_epoch` does not restate the previous generation's final record; a `Stop` with authorizer `ChainRollover`; and a `Stop` whose authorizer differs from `contributors[0]` (S2 field rules).
 - **Crash injection** (store test hooks).
   - Commit a stop, kill before the head swap, restart: the kernel comes up stopped.
   - Kill mid-resume before commit, restart: still stopped.
@@ -969,6 +1001,13 @@ Open decisions:
 |---|---|---|---|
 | R-8-02 | Slow-path terminal stop denials are marked retryable after resume | Fixed. `retryable_after_resume` must equal spec 9 M20's `identity_disposition == Reusable`. It is `false` for compensated slow-path and `Prepared`-intent stop denials and for the `NonDurable` effect, and `true` only for tier-1, fused-from-`Unbegun` and check-only refusals. S15 gains the missing `Prepared` row. Per-path tests are separate for early, fused, prepared, slow, parked, post-effect, check-only and `NonDurable` | S15; section 10 deny receipts; section 17 |
 | R-6-05 / R-6-06 (cross-reference) | Kernel-reserved receipt metadata | Fixed. The `chio_runtime.stop` block, with `chio_runtime.identity_disposition`, is kernel-reserved, so caller metadata can never set or override it. This is a kernel change: M: reserves seven other keys (`kernel/mod.rs:151-159`) | section 10 deny receipts; S15 |
+
+### Codex review (PR #1174, round 8)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185510083 | Make automatic rollover records representable | Fixed now. S2 defines field rules per transition. A `Rollover` has `requested_via: SystemRollover` (or `OfflineCli` for the offline append), `authorizer: ChainRollover { serving_owner, writer_epoch }`, empty `contributors`, `satisfies_intent: None`, and `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" \|\| expected_epoch \|\| previous)`. It restates the previous generation's final state, containment and id. The `authorizer`/`reason_commitment == contributors[0]` invariant applies only to `Stop`, `Restrict`, `Relax` and `Resume`, and verifiers reject a record that breaks its transition's rule | section 4 types (`StopRequestPath`, `StopAuthorizer::ChainRollover`, `DecisionTime`); S2; S6; section 17 |
+| 4185510099 | Reject replayed origin-freshness heartbeats | Fixed now. Only a signed `OriginHeadAttestationV1` that answers an outstanding, single-use shard nonce renews the lease, and only to `sent_at(nonce) + shard_origin_lease`. A replayed, stale, foreign or unknown-nonce response renews nothing. A head behind the last accepted head latches with `stop_origin_regressed`. Fan-out heartbeats are hints that trigger the "Behind" path and never renew. Replay can only shorten the lease. New failure rows and a replay test | S37; section 14; section 17 |
 
 ## Appendix A. FTL reference
 
