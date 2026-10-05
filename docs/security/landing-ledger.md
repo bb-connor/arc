@@ -27,12 +27,44 @@ it has an explicit separate R&D disposition and no foundation landing slot.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1601 ledger requirements, including 201 carried review records, the October 5
+1602 ledger requirements, including 201 carried review records, the October 5
 independent findings and subsequent qualification repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+Repair `64cc05e10ed7c8951e6aaec8bdf6875f153d69d0` addresses the subsequent GitHub Codex
+[P1 review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5993144649):
+literal-reference checks do not cover dynamically assembled build-script paths.
+The isolated runner now excludes the three signed output blobs before creating
+any candidate source copy or Git baseline. It rejects unknown output entries,
+invalid modes and non-directory ancestors. Direct behavioral controls refuse
+evidence-bearing checkouts before execution. The separate committed-evidence
+verifier still authenticates the original signed files.
+
+All 16 focused controls pass, including real cold Rust builds before and after
+publication. Complete checker fixtures, container controls, all 12 committed
+verifier tests and the full CI contract mutation suite pass. The
+[retained repair evidence](audits/foundation-derived-output-projection-20261005.json.gz) preserves
+the original failures, corrected direct-control regression and reviewed source
+commitments. New independent review and complete qualification remain open.
+
+The superseded `aa76f23b11` native run passes its image and all 14 installed
+boundary checks and catches one approval mutation. It is cancelled after
+1,723.704 seconds following that review finding, with clean original source.
+This is partial evidence; the full 35-campaign inventory remains required.
+The owned worker is stopped. Source authorization remains the previously
+reviewed `254fbd162f` until the repaired composition passes review.
+
+Hosted PostgreSQL run `37287195448`, attempt 1, succeeds on `254fbd162f` in both
+native scenarios. Artifact archive and allowlisted report/receipt hashes are
+verified and retained. The claim-loss report records
+`original_claim_receipt_recovered=false`; its successful scenario does not imply
+recovery of that lost receipt. This checkpoint result does not qualify the new
+source or the foundation's final trusted publication and merge.
+
+### Earlier input-binding and discovery repair
 
 Repair `850ee8ab38725f90384be265ffe72072250524a8` removes a qualification cycle: adding the three signed
 publication files previously changed the mutation source-input hash. Binding v7
