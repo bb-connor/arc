@@ -5,7 +5,7 @@
   "original_head": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
   "destination_pr": 1029,
   "status": "open-preserved-partial-reconciliation",
-  "scope": "Source comparison of two named review-repair commits. No tests rerun by this record, no full patch equivalence, retirement or landing claim. All 219 patch-unique commits and 78 original review threads remain preserved.",
+  "scope": "Thirteen source-only assessments across six named original review-repair commits. The original six refer to foundation_source; the later seven name their inspection source. No full patch equivalence, retirement or landing claim. All 219 patch-unique commits and 78 original review threads remain preserved.",
   "requirements": [
     {
       "requirement": "Cumulative-approval negotiation and authenticated family-root verification",
@@ -127,6 +127,297 @@
         }
       ],
       "remaining": "Compare legacy evaluation and explicit obligation-v2 minting call sites and facility custody. Do not infer whole-feature equivalence from either path alone."
+    },
+    {
+      "requirement": "Bind capture dispatch and returned run to immutable workflow identity",
+      "original_commit": "5a29d1e7b5d97be892b7a98dc24de5453cfc84eb",
+      "disposition": "corresponding-current-source-and-mutation-control-present",
+      "witnesses": [
+        {
+          "path": ".github/workflows/enterprise-evidence-controller.yml",
+          "sha256": "5e1edd1b73d0e3b560e261fb578d68770dfedbac4962cb1eda6e45a3e33d57a6",
+          "git_blob": "686fc6e73eb9aa0ab2fb91cc356ffa1f67586584",
+          "symbols": [
+            "capture_workflow_id=\"$(jq -r",
+            ".workflow_id == $capture_workflow_id"
+          ]
+        },
+        {
+          "path": "scripts/check-security-ci-contract.py",
+          "sha256": "f6f87d0b49b3e7b301806546982bd12c8f314e80fa2e2a5cd867448e019455bb",
+          "git_blob": "dc3859e56a6126c0cd37939e197cd2c32e0ce336",
+          "symbols": [
+            "capture_workflow_id",
+            ".workflow_id == $capture_workflow_id"
+          ]
+        },
+        {
+          "path": "scripts/tests/check-security-ci-contract.test.py",
+          "sha256": "3ff9e7226505d837c2b89e8d58d44c428679a4828d25e11fdb2becc0edf090a8",
+          "git_blob": "7cd8f609031b0226c23515ab3bc23d0322fb7b1c",
+          "symbols": [
+            "controller trusts mutable capture run name"
+          ]
+        }
+      ],
+      "remaining": "Full local structural mutation suite passed at source 18a35fed79; source 68cff8cd6a contains identical tested checker bytes. Controller 37268890280 subsequently failed its 900-second admission window before dispatch; controller 37270147637 was cancelled after queue expiry before execution. Native capture and hosted authority qualification remain open.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Refuse unrepresentable SQLite approval filters and payment journal values",
+      "original_commit": "18df64a880ab2845f826380a592abb63fdc1eb1f",
+      "disposition": "reworked-in-current-owners",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/approval_store.rs",
+          "sha256": "94b59d8424b840c4f26c7ff7b6c4b837b68c234eefb21dd3a2a01e9470b57db6",
+          "git_blob": "982b9f5817f93c2681340ec04bd2f62f8e8f4160",
+          "symbols": [
+            "crate::integer::checked::<_, i64>(*t)?",
+            "crate::integer::checked::<_, i64>(*limit)?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/payment_journal.rs",
+          "sha256": "d3e3e116209f5a49a209c4749a5be9673f6f72bd2fefa8c353689e3187c68e7e",
+          "git_blob": "798b052e0de5927af20bb68f4a2fd0b223029f4e",
+          "symbols": [
+            "budget_u64_to_sqlite(record.amount_units",
+            "budget_u64_to_sqlite(expected.journal_version"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/rows.rs",
+          "sha256": "4939009567eb92ef68b2cc5f839772d3b71a5226e36f16c64f43782e542fb2b8",
+          "git_blob": "01ce7922031ca0c3af2234b308427f15cac860d3",
+          "symbols": [
+            "pub(super) fn budget_u64_to_sqlite",
+            "i64::try_from(value)"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/tests/checked_accounting.rs",
+          "sha256": "3b7b2a77aa89a036253e104563b029d477307344a38dcce2d59561b2a28fdb31",
+          "git_blob": "36cd36b9cf605152aef652429360d28d6c8f3042",
+          "symbols": [
+            "fn sqlite_range_refusal_leaves_no_hold_usage_or_sequence"
+          ]
+        }
+      ],
+      "remaining": "Payment model and module ownership changed. Compare every original field and executable approval query boundary before declaring whole-commit equivalence. Listed test source was inspected but not rerun for this record.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Bind evidence imports to verifier-owned trusted receipt and checkpoint signers",
+      "original_commit": "79f5c6341c1f4efbee32f245638ea6471879c2e4",
+      "disposition": "reworked-in-current-owner-with-explicit-trust-input",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-control-plane/src/evidence_export/envelope.rs",
+          "sha256": "c3f719581ec2a7a77af45686eab5c5f320060cd332d5069f23e4e7ff1f3c4328",
+          "git_blob": "0d81db79cf9b5fcd9f391ad5445e35cfb14fabd9",
+          "symbols": [
+            "pub struct EvidenceVerificationPolicy",
+            "fn require_signer",
+            "pub(super) fn verify_bundle_signers"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/evidence_export/verification.rs",
+          "sha256": "19d4bce4d42b4640068df0509472dd2204a6e68428034ba0afa9cf89d60f3c16",
+          "git_blob": "e20a0b5ae3fc571cc09742ded8947cf4fcf55f63",
+          "symbols": [
+            "verification.verify_bundle_signers(&package.bundle)?"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-control-plane/src/evidence_export/tests/package_trust.rs",
+          "sha256": "31e586c1b6eb92bb45e32915d273f408df8c47337d73bf5abfed4be1c0831d6a",
+          "git_blob": "27fa48dad100e808fa0b39826c56d5c36531712c",
+          "symbols": [
+            "fn package_rejects_fresh_key_even_when_every_signature_is_valid",
+            "fn package_rejects_foreign_receipt_even_when_manifest_signer_is_trusted"
+          ]
+        }
+      ],
+      "remaining": "Current import policy validates operator-supplied trusted keys and binds the signed manifest/payload. Reconcile original federation-v2 wire compatibility and CLI arguments separately. Do not restore package-selected trust roots. Listed test source was inspected, not rerun.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Refuse duplicate receipt identities and reused checkpoint leaves in evidence imports",
+      "original_commit": "79f5c6341c1f4efbee32f245638ea6471879c2e4",
+      "disposition": "original-controls-not-equivalent-in-reviewed-owner",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-control-plane/src/evidence_export/verification.rs",
+          "sha256": "19d4bce4d42b4640068df0509472dd2204a6e68428034ba0afa9cf89d60f3c16",
+          "git_blob": "e20a0b5ae3fc571cc09742ded8947cf4fcf55f63",
+          "symbols": [
+            "pub(super) fn verify_tool_receipts",
+            "let mut proved_receipt_seqs = BTreeSet::new()",
+            "duplicate inclusion proof for receipt seq"
+          ]
+        }
+      ],
+      "remaining": "Current owner rejects repeated sequence numbers but lacks the original receipt-ID and (checkpoint sequence, leaf index) sets. Signed manifest/payload and verifier-owned signer controls change the threat boundary. Trace all package producers and import consumers, reproduce reachability, and determine severity before porting the exact guards; no P0/P1 claim is made by this source-only comparison.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Bind the explicit uncheckpointed receipt inventory to actual proof coverage",
+      "original_commit": "79f5c6341c1f4efbee32f245638ea6471879c2e4",
+      "disposition": "corresponding-current-source-present",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-control-plane/src/evidence_export/verification.rs",
+          "sha256": "19d4bce4d42b4640068df0509472dd2204a6e68428034ba0afa9cf89d60f3c16",
+          "git_blob": "e20a0b5ae3fc571cc09742ded8947cf4fcf55f63",
+          "symbols": [
+            "let expected: BTreeSet<(u64, &str)>",
+            "actual.len() != package.bundle.uncheckpointed_receipts.len()",
+            "uncheckpointed receipt inventory does not match proof coverage"
+          ]
+        }
+      ],
+      "remaining": "Current verifier derives exact sequence/receipt-ID pairs from missing proofs and refuses duplicate inventory entries. Qualify source and on-disk package paths before full requirement acceptance; no new test execution in this record.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Migrate duplicate legacy memory provenance receipts atomically with authenticated chain validation",
+      "original_commit": "bca9168d13855a429053b27ae842e74a87a4b864",
+      "disposition": "unique-legacy-repair-preserved-in-pr-1029",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/memory_provenance_store.rs",
+          "sha256": "12fb94ea8bd78a92105ca1b6ed932752b990d4340f470c740493fc41b0aae489",
+          "git_blob": "20cca05b2a4f4f778665def7322e9e75078d3050",
+          "symbols": [
+            "fn run_migrations",
+            "CREATE INDEX IF NOT EXISTS idx_chio_memory_provenance_key",
+            "WHERE receipt_id = ?1",
+            "memory provenance receipt id was reused with different fields"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/tests/memory_provenance_store.rs",
+          "sha256": "08fb4c3a88f126d4753b3c628da878cc06d0c4d9f37ba120a233f82c6b616203",
+          "git_blob": "c890a314f66c133e016e7a17fa6a77d0f410c650",
+          "symbols": [
+            "fn append_is_idempotent_by_receipt_id"
+          ]
+        }
+      ],
+      "remaining": "Current append idempotency does not implement original legacy chain validation/deduplication, unique receipt index, or one-transaction schema stamp. Reconcile supported on-disk version transitions, signed-history preservation and bounded migration before adoption. Keep original commit/tests and PR open.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Reject unrepresentable provenance timestamps before durable append",
+      "original_commit": "bca9168d13855a429053b27ae842e74a87a4b864",
+      "disposition": "unique-legacy-repair-preserved-in-pr-1029",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/memory_provenance_store.rs",
+          "sha256": "12fb94ea8bd78a92105ca1b6ed932752b990d4340f470c740493fc41b0aae489",
+          "git_blob": "20cca05b2a4f4f778665def7322e9e75078d3050",
+          "symbols": [
+            "let written_at_i64 = i64::try_from(input.written_at).unwrap_or(i64::MAX)",
+            "written_at: crate::integer::checked::<_, u64>"
+          ]
+        }
+      ],
+      "remaining": "Original writer refuses values above i64::MAX while current writer clamps after hashing the original timestamp. Reproduce through owning public append API and trace clock/input provenance; test atomic refusal and reopening before porting. Source mismatch alone does not establish externally reachable P1 severity.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Compact abandoned budget sequence intervals without expanding every sequence",
+      "original_commit": "57b7483d13d0b8ffb7bf83a23a10e38e5200beb4",
+      "disposition": "unique-legacy-repair-preserved-in-pr-1029",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/replication.rs",
+          "sha256": "1341f47f87a3b576804a3f53c47c5e08202b050ae47599fc80048da4d2ae9dae",
+          "git_blob": "26fe548be2997c73d9c7d8cf49e11265167d6e69",
+          "symbols": [
+            "pub(super) fn insert_abandoned_event_seq_ranges",
+            "INSERT OR IGNORE INTO budget_abandoned_event_seqs(seq)",
+            "WITH RECURSIVE run(s) AS"
+          ]
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/snapshot.rs",
+          "sha256": "68cd04c8d4f3409b1e5db7946b57f28cfa1a9fdafabc041e1d6817dd71f10a9e",
+          "git_blob": "ca96f33881a2c3546f69650037eba851f8c8adc1",
+          "symbols": [
+            "fn snapshot_abandoned_seq_ranges",
+            "seq - ROW_NUMBER() OVER (ORDER BY seq) AS island",
+            "budget snapshot head overflowed i64"
+          ]
+        }
+      ],
+      "remaining": "Original interval storage, interval compaction and maximum-floor handling are not present in the current owner, which expands ranges into individual rows. Reconcile validated import bounds, stable ordering, migration and signed snapshot compatibility before porting. Preserve the original commit, its tests and PR. No runtime exploitability or whole-commit equivalence is asserted.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Reject unrepresentable reserved budget ceilings before changing a durable hold",
+      "original_commit": "0b3d540de92e813f403ff83659c8141a7d0d0433",
+      "disposition": "reworked-in-current-owner",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/reaper.rs",
+          "sha256": "ca1f32101bd70a6cfc86bdd10942e709b0b4456d5cf4d81d074ce39a870e223c",
+          "git_blob": "deffaf219e7ff6008c1dba1cfe7b0715fc082f7b",
+          "symbols": [
+            "pub fn mark_hold_reserved_until",
+            "pub fn reserve_invocation_hold",
+            ".map(crate::integer::checked::<_, i64>)",
+            "crate::integer::checked::<_, i64>(grant_index)?",
+            "budget hold `{hold_id}` is not an open invocation authorization"
+          ]
+        }
+      ],
+      "remaining": "Current hold stamping uses checked conversions before SQL execution and invocation adoption now updates an existing authorization instead of inserting an independent hold. Requalify public oversized-ceiling refusal, atomic state preservation and the revised grant-width/adoption contract; this does not account for the other persistence changes in the original commit.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    },
+    {
+      "requirement": "Preserve exact payment journal identity and reject negative durable monetary values",
+      "original_commit": "62e5f93c037fffbd2ed82e4c6bdf8b804833d448",
+      "disposition": "reworked-in-current-operation-journal",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/budget_store/payment_journal.rs",
+          "sha256": "d3e3e116209f5a49a209c4749a5be9673f6f72bd2fefa8c353689e3187c68e7e",
+          "git_blob": "798b052e0de5927af20bb68f4a2fd0b223029f4e",
+          "symbols": [
+            "pub(crate) fn insert_payment_journal",
+            "if stored == desired",
+            "if stored != *expected",
+            "payment journal compare-and-set conflicted",
+            "payment_u64_from_i64(row.get(10)?, \"amount_units\")?",
+            "u32::try_from(row.get::<_, i64>(4)?)"
+          ]
+        }
+      ],
+      "remaining": "The current operation-keyed journal uses validated records, exact expected/desired equality and checked row decoding. It is not the original request-keyed API. Qualify initial duplicate identity, every immutable field, corrupt monetary columns and restart behavior through the current public owner before reconciling the original regression suite; no historical-format migration or full commit equivalence is inferred.",
+      "foundation_source_at_inspection": "68cff8cd6a8654815ff0c4478faa1012aadd71d7"
+    }
+  ],
+  "assessment_addenda": [
+    {
+      "foundation_source": "68cff8cd6a8654815ff0c4478faa1012aadd71d7",
+      "original_commits": [
+        "18df64a880ab2845f826380a592abb63fdc1eb1f",
+        "5a29d1e7b5d97be892b7a98dc24de5453cfc84eb",
+        "79f5c6341c1f4efbee32f245638ea6471879c2e4",
+        "bca9168d13855a429053b27ae842e74a87a4b864"
+      ],
+      "assessment_count": 7,
+      "cache_record_sha256": "83e33403cc5f0334f5ac46588edd52aa25eb1dc173138862f116081b2d1a6157",
+      "scope": "Read-only source comparison. Witness hashes verified unchanged before retention; no new tests or whole-commit equivalence."
+    },
+    {
+      "foundation_source": "68cff8cd6a8654815ff0c4478faa1012aadd71d7",
+      "scope": "Three additional source-only requirement comparisons, not execution evidence or retirement authorization.",
+      "requirements_added": 3,
+      "evidence_sha256": "c9c834eafcf0292b06428b565c4ae5dadb7687a897c2db4cf4ac573bc303c232"
     }
   ]
 }

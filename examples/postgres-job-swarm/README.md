@@ -29,6 +29,11 @@ explicit isolated qualification identities and migration fixtures; it does not
 supply production deployment approval. Every serving broker, process host and
 resource uses its production implementation.
 
+The workflow builds the enforcing CLI with the existing `docker-release`
+profile. Native preparation, broker connection and invocation deadlines remain
+enforced; a debug build can expire preparation before the scenario reaches its
+intended assertion.
+
 The native scenarios require:
 
 - Rejection of a superseded caller using the replacement's current fence.
@@ -79,6 +84,12 @@ its own container and named volume, copies bootstrap files through the Docker
 API, and requires reachable loopback networking. Stop preserves its data volume.
 Private state contains credentials and signing material; export only selected
 qualification reports, receipts and public verification keys.
+
+The workflow also retains each operator call's original signed receipt and
+verification status if a later qualification assertion fails. These partial
+artifacts do not establish scenario success. A completed `qualification.json`
+report is written only after all required assertions and receipt checks pass.
+Host state, credentials, raw requests, responses and private logs stay private.
 
 ## Live and operator consumers
 

@@ -17,6 +17,9 @@ use crate::kernel_admission::{
     BrokerKernelConnection, BrokerMcpConnection, BrokerMcpToolConnection,
 };
 
+mod launch_owner;
+use launch_owner::LaunchOwner;
+
 /// A single-use confined connection for one original kernel dispatch.
 ///
 /// Construct and register this connection for the lifetime of one invocation,
@@ -35,7 +38,7 @@ pub struct NativeBrokerMcpTool {
     factory: Arc<dyn NativeMcpLaunchFactory>,
     timeouts: StdioRequestTimeouts,
     preparation_started: AtomicBool,
-    prepared: Mutex<Option<PreparedDelivery>>,
+    prepared: Mutex<Option<LaunchOwner<PreparedDelivery>>>,
 }
 
 struct PreparedDelivery {
@@ -229,13 +232,7 @@ impl BrokerMcpToolConnection for NativeBrokerMcpTool {
             }
             Ok(prepared)
         };
-        let prepared = if tokio::runtime::Handle::try_current().is_ok() {
-            tokio::task::spawn_blocking(prepare)
-                .await
-                .map_err(|_| refused())??
-        } else {
-            prepare()?
-        };
+        let prepared = LaunchOwner::prepare(prepare).await?;
         let mut slot = self.prepared.lock().map_err(|_| refused())?;
         *slot = Some(prepared);
         Ok(())

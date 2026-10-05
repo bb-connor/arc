@@ -38,6 +38,50 @@ def shell(script, directory, environment):
 
 
 class ProcessConsumerJobsTests(unittest.TestCase):
+    def test_failed_postgres_assignment_retains_only_public_denial_evidence(self):
+        workflow = yaml.safe_load(
+            (ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()
+        )
+        upload = next(
+            item for item in workflow["jobs"]["native"]["steps"]
+            if item.get("name") == "Preserve only nonsecret qualification evidence"
+        )
+        self.assertEqual(
+            upload["if"], "${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}"
+        )
+        public = {
+            "qualification/kernel.pub",
+            "qualification/operator-1/receipts.ndjson",
+            "qualification/operator-1/verification.json",
+            "resource-component/component.json",
+        }
+        private = {
+            "qualification/host-config.json",
+            "qualification/host.log",
+            "qualification/root/connection.json",
+            "qualification/resources/assign.credential",
+            "qualification/operator-1/request.json",
+            "qualification/operator-1/response.json",
+            "qualification/operator-1/logical-request.json",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in public | private:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("fixture\n")
+            selected = set()
+            prefix = "${{ env.CHIO_JOB_FIXTURE_ROOT }}/"
+            for pattern in upload["with"]["path"].splitlines():
+                self.assertTrue(pattern.startswith(prefix))
+                selected.update(
+                    str(path.relative_to(root))
+                    for path in root.glob(pattern.removeprefix(prefix))
+                    if path.is_file()
+                )
+            self.assertEqual(selected, public)
+            self.assertFalse((root / "qualification/qualification.json").exists())
+
     def test_build_and_execution_have_separate_bounded_jobs(self):
         for job in ("host-tests", "consumer-binaries", "installed-consumers"):
             self.assertEqual(JOBS[job]["runs-on"], "ubuntu-24.04")

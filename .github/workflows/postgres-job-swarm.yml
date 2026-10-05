@@ -65,7 +65,7 @@ jobs:
           PYTHONPATH=sdks/python/chio-process/src python3 -m unittest discover -s examples/postgres-job-swarm -p 'test_*.py'
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
-          cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
+          cargo build --locked --profile docker-release -p chio-cli --bin chio --features real-linux-enforcement
       - name: Build the existing confined broker and supervised service fixture
         uses: ./.github/actions/prepared-native-broker
       - name: Install the process package and create a dedicated TLS fixture
@@ -73,7 +73,7 @@ jobs:
           umask 077
           job_root=$(mktemp -d /tmp/chio-pg-jobs-XXXXXX)
           echo "CHIO_JOB_FIXTURE_ROOT=$job_root" >> "$GITHUB_ENV"
-          cp target/debug/chio "$job_root/chio"
+          cp target/docker-release/chio "$job_root/chio"
           cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
           chmod 700 "$job_root/chio" "$job_root/agent-jobs"
           uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"
@@ -100,6 +100,8 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/qualification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/kernel.pub
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/receipts.ndjson
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/verification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/resource-component/component.json
           if-no-files-found: warn
       - name: Preserve only nonsecret claim response loss evidence

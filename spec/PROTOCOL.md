@@ -116,7 +116,7 @@ The shipped v1 contract does not claim:
 - OAuth authorization-server product status before a dedicated accepted ADR or
   equivalent decision note defines scope, RAR grammar, telemetry, and
   feature-gating posture
-- manifest event publish/consume actions before the current v1 manifest
+- manifest event publish/consume actions before the current manifest
   planning work is accepted and implemented
 - multi-region consensus or Byzantine replication
 - a public certification marketplace
@@ -144,7 +144,7 @@ The v1 contract also covers:
 - an HTTP substrate sidecar protocol for protecting arbitrary HTTP APIs through
   Chio policy evaluation, typed HTTP receipts, and structured verdicts (see
   [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md))
-- an OpenAPI-to-manifest pipeline that derives `chio.manifest.v1` tool
+- an OpenAPI-to-manifest pipeline that derives `chio.manifest.v2` tool
   definitions from OpenAPI specifications with `x-chio-*` policy extensions (see
   [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md))
 - a reverse-proxy entrypoint (`chio api protect`) that combines OpenAPI
@@ -2696,10 +2696,10 @@ signing and evidence export always operate on the `ChioReceipt` representation.
 
 ## 7. Manifest Contract
 
-Tool discovery currently uses the frozen manifest schema:
+Tool discovery currently accepts the strict manifest schema:
 
 ```text
-chio.manifest.v1
+chio.manifest.v2
 ```
 
 The manifest defines:
@@ -2708,14 +2708,27 @@ The manifest defines:
 - one or more tool definitions
 - per-tool input and optional output schemas
 - operator-facing descriptions and metadata
+- required behavioral annotations and optional authenticated flow declarations
+- typed cage permissions, including explicit network ports and a closed native
+  syscall profile
 
 This manifest is the authoritative discovery contract for native tool servers
 and for mediated adapters that synthesize a Chio tool surface from another
-protocol. `chio.manifest.v1` remains frozen in this release for compatibility.
+protocol. The normative shape is
+[tool-manifest-v2.schema.json](schemas/chio-wire/v1/security/tool-manifest-v2.schema.json).
+Unknown fields and noncanonical optional-field spellings are rejected. Signed
+file loading also rejects duplicate fields and numeric aliases before decoding.
+
+The current implementation no longer accepts `chio.manifest.v1` or provides its
+former migration API. Operators MUST review the v2 annotations, flow policy
+and permissions, obtain a new signature and admit the manifest against the
+registered server key. Relabeling a v1 document does not preserve its signature
+or grant authority. This manifest schema transition does not rename the other
+v1 protocol artifacts.
 
 ### 7.1 OpenAPI-Derived Manifests
 
-Chio includes an automated pipeline for deriving `chio.manifest.v1` tool
+Chio includes an automated pipeline for deriving `chio.manifest.v2` tool
 definitions from OpenAPI 3.0.x and 3.1.x specifications. Each HTTP operation
 (method + path pair) in the OpenAPI spec becomes one `ToolDefinition`. The full
 pipeline is specified in [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md).
@@ -2733,7 +2746,7 @@ When no `x-chio-*` extensions are present, the pipeline applies a default
 deny-by-method policy that assigns conservative scope requirements based on
 the HTTP method. This ensures fail-closed behavior for undecorated specs.
 
-The derived `chio.manifest.v1` output is identical in structure to hand-authored
+The derived `chio.manifest.v2` output is identical in structure to hand-authored
 manifests. Downstream consumers (the kernel, trust-control, and receipt
 pipeline) do not distinguish between hand-authored and OpenAPI-derived
 manifests.

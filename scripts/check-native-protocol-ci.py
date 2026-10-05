@@ -147,16 +147,23 @@ def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict, s
         (sdk, "sdk-parity", "Run SDK parity"),
     ):
         validate_consumer(workflow, job_id, consumer, {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION})
-    for workflow, job_id, step_name in (
-        (cpp, "conformance", "Run live C++ conformance areas"),
-        (postgres, "native", "Build the real gateway and kernel"),
-        (sdk, "sdk-parity", "Run SDK parity"),
+    for workflow, job_id, step_name, profile in (
+        (cpp, "conformance", "Run live C++ conformance areas", ""),
+        (postgres, "native", "Build the real gateway and kernel", " --profile docker-release"),
+        (sdk, "sdk-parity", "Run SDK parity", ""),
     ):
         _, step = named_step(workflow["jobs"][job_id], step_name)
         require(
-            "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement" in step["run"].splitlines(),
+            f"cargo build --locked{profile} -p chio-cli --bin chio --features real-linux-enforcement" in step["run"].splitlines(),
             f"{job_id}: native consumer must build the enforcing CLI",
         )
+    _, install = named_step(
+        postgres["jobs"]["native"], "Install the process package and create a dedicated TLS fixture"
+    )
+    require(
+        'cp target/docker-release/chio "$job_root/chio"' in install["run"].splitlines(),
+        "PostgreSQL native consumer must stage the enforcing production build",
+    )
     digest = hashlib.sha256(
         json.dumps(action, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()

@@ -99,7 +99,9 @@ class ResourceGateway:
             ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
              "-keyout", self.root / "key.pem", "-out", self.root / "cert.pem",
              "-days", "1", "-subj", "/CN=" + SERVER_NAME,
-             "-addext", "subjectAltName=DNS:" + SERVER_NAME], self.directory,
+             "-addext", "subjectAltName=DNS:" + SERVER_NAME,
+             "-addext", "basicConstraints=critical,CA:FALSE",
+             "-addext", "extendedKeyUsage=serverAuth"], self.directory,
         )
         host.command(
             ["openssl", "x509", "-in", self.root / "cert.pem", "-outform", "DER",

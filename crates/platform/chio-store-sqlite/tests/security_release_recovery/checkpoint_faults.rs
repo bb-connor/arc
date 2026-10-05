@@ -17,6 +17,7 @@ enum Fault {
 struct FaultStore {
     inner: SqliteToolOutcomeStore,
     fault: Fault,
+    expired_clock: std::sync::Mutex<Option<chio_test_support::clock::ClockScope>>,
 }
 
 macro_rules! forward {
@@ -51,7 +52,11 @@ impl ToolOutcomeStore for FaultStore {
             // acknowledgement's original timestamp and lease unchanged while
             // the real authority observes that its 60-second lease has expired.
             let at = release.record().acknowledged_at_unix_ms() / 1_000 + 61;
-            let _clock = chio_test_support::clock::scope_unix_secs(at);
+            // Keep time advanced through replay. Restoring the old reading
+            // would instead test the authority's independent rollback denial.
+            *self.expired_clock.lock().map_err(|_| {
+                ToolOutcomeStoreError::Unavailable("fixture clock lock poisoned".into())
+            })? = Some(chio_test_support::clock::scope_unix_secs(at));
             let result = self.inner.record_security_release(release, lease);
             assert!(
                 result
@@ -96,6 +101,7 @@ fn run(fault: Fault) -> TestResult {
             Arc::new(FaultStore {
                 inner: runtime.authority.tool_outcome_store(),
                 fault,
+                expired_clock: std::sync::Mutex::new(None),
             }),
             runtime.authority.mutation_fence(),
         )?;

@@ -19,10 +19,7 @@ from resources import QualificationResources, server
 def value(response):
     if response["verdict"] != "allow":
         raise AssertionError("unexpected kernel denial")
-    output = response["output"]["value"]
-    if output.get("isError") is not False:
-        raise AssertionError("unexpected resource error")
-    return decode_broker_output(output["structuredContent"])
+    return decode_broker_output(response["output"]["value"])
 
 
 def main():

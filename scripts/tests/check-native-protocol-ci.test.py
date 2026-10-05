@@ -154,6 +154,23 @@ class NativeProtocolCiTests(unittest.TestCase):
         job["steps"].insert(protocol_index - 1, report)
         self.rejected(changed, "must precede static report setup")
 
+    def test_postgres_requires_the_built_production_profile_at_execution(self):
+        for mutation in ("omit_profile", "other_profile", "stage_debug"):
+            with self.subTest(mutation=mutation):
+                changed = copy.deepcopy(LIVE)
+                job = changed[4]["jobs"]["native"]
+                if mutation == "stage_debug":
+                    _, step = CHECKER.named_step(job, "Install the process package and create a dedicated TLS fixture")
+                    step["run"] = step["run"].replace("target/docker-release/chio", "target/debug/chio")
+                    self.rejected(changed, "must stage the enforcing production build")
+                else:
+                    _, step = CHECKER.named_step(job, "Build the real gateway and kernel")
+                    step["run"] = step["run"].replace(
+                        " --profile docker-release",
+                        "" if mutation == "omit_profile" else " --profile release",
+                    )
+                    self.rejected(changed, "native consumer must build the enforcing CLI")
+
     def test_action_cannot_omit_probe_or_replace_bounded_authority(self):
         for index, old, new in (
             (0, 'test "$(uname -s):$(uname -m)" = "Linux:x86_64"', ":"),
