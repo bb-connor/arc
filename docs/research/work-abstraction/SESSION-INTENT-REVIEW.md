@@ -21,7 +21,7 @@ The conversation developed through these decisions:
 6. The accepted organizing statement became: work commitments form a reusable programming abstraction across independently governed systems. The paper must explain what can be programmed before detailing encodings and experiments.
 7. Security and recovery remain existing parallel lanes. The paper assumes the completed recovery design as instructed; implementation and empirical claims still require actual evidence. The paper-first order remains in force.
 
-The relevant session messages were the assistant discussions at 2026-10-02 23:29 UTC and 2026-10-03 01:21, 17:04 and 22:27 UTC, followed by the owner's approvals and planning requests. These are recovered conversation decisions, not a new retrospective account of experimental success.
+The requirements below are the retained decision record. Their acceptance depends on the linked specifications and qualified implementation evidence, not on private conversation timestamps.
 
 ## 1. Describe a working relationship, not only an invocation
 

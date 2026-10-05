@@ -11534,7 +11534,7 @@
     },
     "crates/platform/chio-workflow/src/delegation/store.rs": {
       "kind": "durable-internal-state",
-      "contract": "The protected owner-local allocator writes canonical envelopes bounded to 64 KiB. Readback validates slot identity and allocation state; signed permit return revalidates original allocator, holder, receiver and exact live dispatch binding. The API requires protected non-rollback local custody; raw readback itself is not an original-byte canonical or native custody validator.",
+      "contract": "The protected owner-local allocator writes canonical envelopes bounded to 64 KiB. Readback validates slot identity and allocation state; signed permit return revalidates original allocator, holder, receiver and exact live dispatch binding. The API requires protected non-rollback local custody; raw readback itself is not an original-byte canonical or native custody validator. Permit sealing validates, signs and commits the allocation claim in the same immediate transaction.",
       "readers": [
         {
           "reader": "read",
@@ -20201,7 +20201,6 @@
       "claim_dispatch::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
       "create_root::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::read",
       "required::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::read",
-      "seal_dispatch::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
       "seal_dispatch::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
       "select::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",
       "slot::shared-reader::crates/platform/chio-workflow/src/delegation/store.rs::required",

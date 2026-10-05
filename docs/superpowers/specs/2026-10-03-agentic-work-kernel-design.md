@@ -25,9 +25,9 @@ The [current-state review](../../research/work-abstraction/CURRENT-STATE.md) and
 | Active security continuation | packet/3-retention-accounting, a99437b3ea8ef7ea03c7d2926049b27cb140b3c5 | Native admission, confinement, identity, clocks, readers, evidence, release assurance |
 | Published security integration checkpoint | PR #1160, f25cd61f49fbf9a15a70396da82d9808ba4e1da2 | An earlier checkpoint, not the entire active continuation |
 | Recovery contract | PR #1172, de84fc306efbb4c8dd6de748d0ad2a8d695fd30e | Recoverable-agent-runtime revision 3, P0 through P6 |
-| Active recovery implementation | Owner confirms an agent on their Mac, connected through Tailscale, is executing PR #1172 | Current implementation SHA and phase acceptance are not visible here |
+| Recovery implementation | PR #1172 is the pinned design contract | Implementation SHA and phase acceptance require independent qualification |
 
-The old local process-continuation-recovery checkout is not the current recovery lane. No remote machine access or completion claim is inferred from the owner's clarification.
+Recovery integration MUST identify its actual implementation commit and phase evidence before acceptance.
 
 The work and security snapshots have 93 and 21 commits exclusive of their common history respectively. Counts only describe divergence. A reviewed semantic integration is required; neither entire branch is silently substituted for the other.
 

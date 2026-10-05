@@ -1,104 +1,105 @@
 #!/usr/bin/env python3
-"""Fail when a cargo-vet config adds net-new exemption blocks.
+"""Reject added exemptions and weakened Cargo Vet policy requirements.
 
-Each exemption block is keyed on (name, version, criteria). Adding a row for
-an already-exempt name, escalating criteria from `safe-to-run` to
-`safe-to-deploy`, or repeating a name@version with a different criteria all
-count as net-new exemptions.
+The AWS-LC upstream-review criterion is the sole explicit composite exception:
+its exact policy is coupled to the source, feature and fork-audit checks in
+check-supply-chain.sh. It does not imply that published AWS-LC is deployable.
 """
-
 from __future__ import annotations
 
 import argparse
-import pathlib
-import re
+import json
+from pathlib import Path
 import sys
-
-EXEMPTION_HEADER = re.compile(r"^\s*\[\[exemptions\.([^\]]+)\]\]\s*$")
-VERSION_LINE = re.compile(r"^\s*version\s*=\s*[\"']([^\"']+)[\"']\s*$")
-CRITERIA_LINE_STRING = re.compile(r"^\s*criteria\s*=\s*[\"']([^\"']+)[\"']\s*$")
-CRITERIA_LINE_LIST = re.compile(r"^\s*criteria\s*=\s*\[(.+)\]\s*$")
+import tomllib
 
 
-def _parse_criteria_list(payload: str) -> str:
-    items = [
-        item.strip().strip("\"'")
-        for item in payload.split(",")
-        if item.strip()
-    ]
-    return ",".join(sorted(items))
+AWS_LC_DEPENDENCIES = {name: 'safe-to-deploy' for name in
+                       ('aws-lc-sys', 'aws-lc-fips-sys', 'untrusted', 'zeroize')}
 
 
-def exemption_entries(path: pathlib.Path) -> set[str]:
-    entries: set[str] = set()
-    current_name: str | None = None
-    current_version: str | None = None
-    current_criteria: str | None = None
+def load(path: Path) -> dict:
+    return tomllib.loads(path.read_text(encoding='utf-8'))
 
-    def flush_current() -> None:
-        nonlocal current_name, current_version, current_criteria
-        if current_name is not None:
-            version = current_version or "<missing-version>"
-            criteria = current_criteria or "<missing-criteria>"
-            entries.add(f"{current_name}@{version}#{criteria}")
-        current_name = None
-        current_version = None
-        current_criteria = None
 
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = EXEMPTION_HEADER.match(line)
-        if match:
-            flush_current()
-            current_name = match.group(1).strip().strip('"')
-            continue
-        if current_name is None:
-            continue
-        version_match = VERSION_LINE.match(line)
-        if version_match:
-            current_version = version_match.group(1).strip()
-            continue
-        criteria_string_match = CRITERIA_LINE_STRING.match(line)
-        if criteria_string_match:
-            current_criteria = criteria_string_match.group(1).strip()
-            continue
-        criteria_list_match = CRITERIA_LINE_LIST.match(line)
-        if criteria_list_match:
-            current_criteria = _parse_criteria_list(
-                criteria_list_match.group(1)
-            )
-            continue
-    flush_current()
-    return entries
+def criteria_set(value) -> set[str]:
+    values = [value] if isinstance(value, str) else value
+    if not isinstance(values, list) or not all(isinstance(item, str) for item in values):
+        raise ValueError('criteria must be a string or list of strings')
+    return set(values)
+
+
+def exemption_entries(path: Path) -> set[str]:
+    return {f'{name}@{row["version"]}#{",".join(sorted(criteria_set(row["criteria"])))}'
+            for name, rows in load(path).get('exemptions', {}).items() for row in rows}
+
+
+def implies(value, required: str, definitions: dict) -> bool:
+    pending = list(criteria_set(value))
+    seen = set()
+    while pending:
+        criterion = pending.pop()
+        if criterion == required or (criterion == 'safe-to-deploy' and required == 'safe-to-run'):
+            return True
+        if criterion not in seen:
+            seen.add(criterion)
+            pending.extend(criteria_set(definitions.get(criterion, {}).get('implies', [])))
+    return False
+
+
+def weak_policies(config: dict, audits: dict) -> set[str]:
+    result = set()
+    definitions = audits.get('criteria', {})
+    for package, policy in config.get('policy', {}).items():
+        composite = (package == 'aws-lc-rs'
+                     and policy.get('audit-as-crates-io') is True
+                     and policy.get('criteria') == 'aws-lc-upstream-reviewed'
+                     and policy.get('dependency-criteria') == AWS_LC_DEPENDENCIES)
+        for field, required in [('criteria', 'safe-to-deploy'), ('dev-criteria', 'safe-to-run')]:
+            if field not in policy or (composite and field == 'criteria'):
+                continue
+            if not implies(policy[field], required, definitions):
+                result.add(f'{package}.{field}={json.dumps(policy[field], sort_keys=True)}')
+        for dependency, criteria in policy.get('dependency-criteria', {}).items():
+            if not implies(criteria, 'safe-to-deploy', definitions):
+                result.add(f'{package}.dependency-criteria.{dependency}={json.dumps(criteria)}')
+    return result
+
+
+def audit_definitions(path: Path | None, config: Path) -> dict:
+    if path is not None:
+        return load(path)
+    adjacent = config.parent / 'audits.toml'
+    return load(adjacent) if adjacent.exists() else {}
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Compare cargo-vet exemption counts between two config files."
-    )
-    parser.add_argument("--base", required=True, type=pathlib.Path)
-    parser.add_argument("--head", required=True, type=pathlib.Path)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--base', required=True, type=Path)
+    parser.add_argument('--head', required=True, type=Path)
+    parser.add_argument('--base-audits', type=Path)
+    parser.add_argument('--head-audits', type=Path)
+    parser.add_argument('--policy-only', action='store_true',
+                        help='Check policy weakening without the separately justified exemption gate')
     args = parser.parse_args()
-
-    base_exemptions = exemption_entries(args.base)
-    head_exemptions = exemption_entries(args.head)
-    base_count = len(base_exemptions)
-    head_count = len(head_exemptions)
-    added = sorted(head_exemptions - base_exemptions)
-    print(f"cargo-vet exemption count: base={base_count} head={head_count}")
-
-    if added:
-        print(
-            "net-new cargo-vet exemptions are blocked: " + ", ".join(added),
-            file=sys.stderr,
-        )
-        print(
-            "add real audits or get an "
-            "explicit cargo-vet-exemption-justification PR comment",
-            file=sys.stderr,
-        )
+    try:
+        base_exemptions = exemption_entries(args.base)
+        head_exemptions = exemption_entries(args.head)
+        added = sorted(head_exemptions - base_exemptions)
+        if args.policy_only:
+            added = []
+        weak = sorted(weak_policies(load(args.head), audit_definitions(args.head_audits, args.head))
+                      - weak_policies(load(args.base), audit_definitions(args.base_audits, args.base)))
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f'invalid cargo-vet policy: {error}', file=sys.stderr)
         return 1
-    return 0
+    print(f'cargo-vet exemption count: base={len(base_exemptions)} head={len(head_exemptions)}')
+    if added:
+        print('net-new cargo-vet exemptions are blocked: ' + ', '.join(added), file=sys.stderr)
+    if weak:
+        print('weakened cargo-vet policy is blocked: ' + ', '.join(weak), file=sys.stderr)
+    return int(bool(added or weak))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

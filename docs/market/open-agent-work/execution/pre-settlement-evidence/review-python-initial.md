@@ -1,6 +1,6 @@
 # Independent Python execution-evidence review
 
-Reviewed read-only in `/home/connor/backbay/arc-funded-integration` at HEAD `ad3dedbf37dfe732771d4458721156fc543fd524` with the current uncommitted files. Base supplied by the task: `df2e7ef0ed`. No repository edits, Cargo commands, commits, historical evidence mutations, or external messages were performed.
+Reviewed read-only in `$REPO` at HEAD `ad3dedbf37dfe732771d4458721156fc543fd524` with the current uncommitted files. Base supplied by the task: `df2e7ef0ed`. No repository edits, Cargo commands, commits, historical evidence mutations, or external messages were performed.
 
 Reviewed file hashes:
 

@@ -11,12 +11,16 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${PWD}/target/aws-lc-audit}"
 # the independently reviewed fork, its authenticated reconstruction and every
 # deployment resolution before accepting the registry/transitive audit graph.
 python3 scripts/tests/check-supply-chain-workflows.test.py
+python3 scripts/tests/check-cargo-vet-policy.test.py
+bash scripts/tests/check-cargo-vet-exemptions.test.sh
 python3 scripts/tests/render-vcpkg-release.test.py
 python3 scripts/tests/check-aws-lc-fork.test.py
 python3 scripts/tests/check-aws-lc-lints.test.py
 python3 scripts/check-aws-lc-fork.py "$@"
 python3 scripts/check-aws-lc-lints.py
 cargo vet --locked
+python3 scripts/tests/check-research-workspaces.test.py
+python3 scripts/check-research-workspaces.py --vet
 cargo test --locked --manifest-path third_party/aws-lc-rs-chio/Cargo.toml \
   --features legacy-des --test des_parity_regression
 cargo test --locked --manifest-path third_party/aws-lc-rs-chio/Cargo.toml \

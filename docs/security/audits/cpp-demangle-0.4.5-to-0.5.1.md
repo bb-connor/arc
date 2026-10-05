@@ -29,7 +29,7 @@ contains the `0.4.5` safe-to-deploy exemption.
 ## Source identity
 
 Both source trees were read under
-`/home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/`.
+`$LOCAL_TOOL_PATH`.
 Every regular file in each cached published archive was compared byte for byte
 with its corresponding extracted tree: 22 files per version, zero mismatches.
 

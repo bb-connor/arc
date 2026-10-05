@@ -935,7 +935,7 @@ fn verify_payment_terminal_record(
             .ok_or_else(|| invariant("waived payment has no resolution authority"))?;
         if financial.cost_charged != 0
             || financial.settlement_status
-                != chio_core::receipt::economics::SettlementStatus::Failed
+                != chio_core::receipt::economics::SettlementStatus::Settled
             || financial
                 .cost_breakdown
                 .as_ref()

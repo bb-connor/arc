@@ -8,12 +8,12 @@ Start with [escrow fit](01-escrow-fit.md), [contract draft](02-contract-draft.md
 
 ## Candidate source and included changes
 
-Original source: `/home/connor/backbay/arc`, branch `paper/roadmap-phase-0-1`,
+Original source: `$REPO`, branch `paper/roadmap-phase-0-1`,
 HEAD `2b3b5af8cbfbc6f16ce6005de3f97cd149803b81`. The initial checkout had
 78 modified tracked files and 3,610 untracked files, represented by 123 short
 status entries. A worktree at HEAD alone would omit the research implementation.
 
-Execution uses `/home/connor/backbay/arc-funded-work`, branch
+Execution uses `$REPO`, branch
 `research/funded-work-baseline`. Its source-input checkpoint is
 `ec9189e79c545eb30b783cafaa1e1bc67aa6bfeb`; the exact two-fixture dependency
 repair is `905583e951b66db2a3223afffad9dc5de5b0ef5f`. The new model and escrow

@@ -312,6 +312,7 @@ if [[ "${mode}" == "--release" ]]; then
   export CHIO_KEYLOG_AUDIT="$CARGO_TARGET_DIR/debug/chio-keylog-audit"
   run_tests "confined native broker MCP, process death and terminal cage receipts" yes "$(cat <<'EOF'
 process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
+process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime
 process_boundary_tests::native::cutpoints::confined_broker_process_cutpoints_preserve_provider_and_quota_observations
 process_boundary_tests::native::keyring::recovery::confined_broker_public_keyring_startup_recovers_exact_activation_after_auditor_and_receipt_loss
 process_boundary_tests::native::process_host::confined_broker_process_host_exports_original_call_and_replays_after_restart

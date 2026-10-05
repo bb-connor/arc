@@ -25,7 +25,7 @@ The paper plan executes first through architecture-manuscript completion. Its fi
 10. Envoy and provider observation surfaces have narrower authority boundaries. Work support is negotiated by dimension and tested in the existing protocol inventory.
 11. The old publication checker requires a foundational/economic breakthrough. The new architecture profile is explicit and separately tested; old open gates remain unchanged.
 12. Beta terminology is ahead of the existing alpha release plan. Candidate convergence must record version/scope deliberately and preserve existing required release gates.
-13. The active recovery agent is on the owner's Mac. The plan consumes PR #1172 and requires its actual landing commit before integration rather than citing an older local recovery branch.
+13. The recovery implementation is not qualified by this planning record. The plan consumes PR #1172 and requires its actual landing commit before integration rather than citing an older local recovery branch.
 14. Current source inventories include documentation outside the paper. Paper execution must preserve source-qualified historical evidence; new planning files cannot silently be counted as already tested native inputs.
 15. A mandatory new full comparator would recreate the earlier experimental churn. Beta requires two-application reuse and honest responsibility/cost reporting. Quantitative superiority is claimed only if its matched evidence is actually produced; otherwise it remains unestablished without blocking the bounded architecture claim.
 
@@ -35,7 +35,7 @@ AW01 through AW20 each map to a named task in the architecture specification. W1
 
 Every plan has a goal, architecture, specification reference, global constraints, review focus, concrete file ownership, interfaces or evidence contracts, and checkable acceptance steps. Commands in implementation plans are instructions to the future implementer, not results observed during planning.
 
-Unresolved external dependencies are explicit: the Mac recovery implementation's actual landing APIs/SHA, the security lane's final accepted candidate, native/hosted release evidence, and a real independent operator for any claim of independent administration. None prevents completing this planning package. None is represented as already satisfied.
+Unresolved external dependencies are explicit: the recovery implementation's actual landing APIs/SHA, the security lane's final accepted candidate, native/hosted release evidence, and a real independent operator for any claim of independent administration. None prevents completing this planning package. None is represented as already satisfied.
 
 ## Validation boundary
 

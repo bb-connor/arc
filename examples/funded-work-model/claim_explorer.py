@@ -83,6 +83,31 @@ def violation(ledger):
     return None
 
 
+def refusal(job, action, now):
+    """Public contract refusal, including guard order, for a denied model step."""
+    op = action["op"]
+    if op in ("submit", "pay") and action["actor"] != job.terms.recipient:
+        return "UnauthorizedCaller"
+    if op == "submit":
+        if job.commitment:
+            return "ConflictingClaim"
+        return "WrongState" if job.state != "Funded" else "SubmissionExpired"
+    if op == "decide":
+        if not job.decision:
+            if job.state != "Submitted":
+                return "WrongState"
+            if not job.terms.challenge_until < now <= job.terms.resolve_by:
+                return "OutsideResolutionWindow"
+        if action["actor"] != job.terms.verifier:
+            return "InvalidSignature"
+        return "ConflictingDecision"
+    if op in ("refund", "expire"):
+        return "WrongState" if job.state not in ("Funded", "Submitted") else "RefundNotDue"
+    if op == "pay":
+        return "WrongState"
+    raise ValueError("unmodeled refusal: " + op)
+
+
 def explore(*, broken_expiry=False):
     initial = ClaimLedger({"A": 3, "B": 2})
     assert initial.fund("parent", Terms("A", "B", "V", 3, 2, 4, 6, 8), now=0)
@@ -110,6 +135,8 @@ def explore(*, broken_expiry=False):
             transitions += 1
             after = candidate.jobs[action["job"]].state
             step = dict(action, time=now, ok=ok, expected=snapshot(candidate))
+            if not ok:
+                step["revert"] = refusal(ledger.jobs[action["job"]], action, now)
             path = prefix + [step]
             problem = violation(candidate)
             if not problem and any(job.execution_unknown and not candidate.jobs[name].execution_unknown
@@ -122,7 +149,8 @@ def explore(*, broken_expiry=False):
                 break
             # Financial edge representatives become actual bytecode replay cases.
             if action["op"] != "unknown":
-                edge = (action["job"], action["op"], before, after, ok, action.get("accepted"))
+                edge = (action["job"], action["op"], before, after, ok, action.get("accepted"),
+                        now > ledger.jobs[action["job"]].terms.refund_after, step.get("revert"))
                 representatives.setdefault(edge, dict(op=action["op"], before=before, after=after,
                                                       ok=ok, steps=path))
             key = state_key(candidate, now)

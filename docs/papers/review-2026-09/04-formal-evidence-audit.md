@@ -1,5 +1,11 @@
 # Formal Evidence Audit
 
+Evidence correction (2026-10-05): scratch Lean files and their raw terminal
+outputs cited below were not retained. Those execution/axiom observations are
+unverified historical review notes. Reproduction and release claims must use
+the checked-in proof sources, formal inventory and exact-candidate formal CI;
+this document alone does not qualify those scratch runs.
+
 Finders FORM (Lean theorems cited by either paper, axioms checked with `#print axioms`, proof depth) and HARN (the non-Lean estate: Kani, Creusot, Aeneas, Apalache and TLA+, Loom, fuzzing, mutation, differential and conformance tests), each adversarially verified. This document answers three questions: what the cited theorems actually prove, what the repository could prove about this path that the papers do not use, and what the papers assert that no harness supports.
 
 ## What the cited theorems prove

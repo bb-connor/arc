@@ -2,13 +2,14 @@
 use super::{checkpoint_files, evidence, peer_verifier as peer, verifier_operator::Enrollment};
 use crate::common::{self, Result};
 use chio_core_types::canonical_json_bytes;
+use rustls::pki_types::{pem::PemObject, CertificateDer};
 use rustls::{
     crypto::aws_lc_rs, pki_types::ServerName, ClientConfig, ClientConnection, RootCertStore,
     StreamOwned,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{self, Cursor, Read, Write},
+    io::{self, Read, Write},
     net::{SocketAddr, TcpStream},
     path::Path,
     sync::Arc,
@@ -127,7 +128,7 @@ pub(super) fn exchange(
     }
     let ca = crate::https::public_certificates(endpoint.ca_pem.as_bytes())?;
     let mut roots = RootCertStore::empty();
-    for cert in rustls_pemfile::certs(&mut Cursor::new(ca)) {
+    for cert in CertificateDer::pem_slice_iter(ca.as_bytes()) {
         roots.add(cert?)?;
     }
     let mut tls = ClientConfig::builder_with_provider(Arc::new(aws_lc_rs::default_provider()))

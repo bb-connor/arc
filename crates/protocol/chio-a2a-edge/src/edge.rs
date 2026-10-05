@@ -401,9 +401,18 @@ impl ChioA2aEdge {
         Ok(())
     }
 
-    fn ensure_deferred_task_capacity(&mut self, now: ClockReading) -> Result<(), A2aEdgeError> {
+    fn ensure_deferred_task_capacity(
+        &mut self,
+        now: ClockReading,
+        execution: &A2aKernelExecutionContext,
+    ) -> Result<(), A2aEdgeError> {
         self.prune_deferred_tasks(now)?;
-        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS {
+        let subject_tasks = self.tasks.values().filter(|task| {
+            task.request.capability.subject == execution.capability.subject
+        }).count();
+        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS
+            || subject_tasks >= MAX_DEFERRED_A2A_TASKS_PER_SUBJECT
+        {
             return Err(A2aEdgeError::TaskCapacity);
         }
         Ok(())
@@ -603,7 +612,7 @@ impl ChioA2aEdge {
         let binding = self.resolve_skill_binding(skill_id)?;
         let now = kernel.authority_clock_reading()?;
         let deadline = AuthorityDeadline::for_timeout_ms(now, DEFERRED_A2A_TASK_TTL_MILLIS)?;
-        self.ensure_deferred_task_capacity(now)?;
+        self.ensure_deferred_task_capacity(now, execution)?;
         let task_id = self.next_task_id()?;
         let kernel_request_id =
             request_id.map_or_else(|| format!("a2a-stream-{task_id}"), str::to_string);

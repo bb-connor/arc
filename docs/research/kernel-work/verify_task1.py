@@ -17,6 +17,8 @@ def require(condition, message):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-cache", type=Path)
+    parser.add_argument("--paper-at-checkpoint", action="store_true",
+                        help="verify the historical G0 paper checkpoint, without qualifying today's manuscript")
     args = parser.parse_args()
     package = Path(__file__).resolve().parent
     repo = package.parents[2]
@@ -102,17 +104,20 @@ def main():
             require((path.parent / target).exists(), "missing local link: " + destination)
     paper = "docs/papers/verifiable-work"
     expected_tree = register["baseline"]["frozen_paper_tree"]
-    require(git("rev-parse", "HEAD:" + paper).decode().strip() == expected_tree,
+    paper_revision = register["baseline"]["paper_checkpoint"] if args.paper_at_checkpoint else "HEAD"
+    require(git("rev-parse", paper_revision + ":" + paper).decode().strip() == expected_tree,
             "committed paper changed")
-    require(not git("status", "--porcelain", "--untracked-files=all", "--", paper),
-            "paper working tree changed")
+    if not args.paper_at_checkpoint:
+        require(not git("status", "--porcelain", "--untracked-files=all", "--", paper),
+                "paper working tree changed")
     git("diff", "--check")
     git("diff", "--cached", "--check")
     print(json.dumps({"result": "pass", "recovery_documents_verified": len(baseline["documents"]),
         "requirements": len(ids), "crosswalk_groups": len(groups), "claims": len(register["claims"]),
         "primary_documents_catalogued": len(document_ids),
         "primary_document_hashes_verified": len(document_ids) if args.source_cache else 0,
-        "paper_tree": expected_tree, "scientific_validity_proved": False}, indent=2))
+        "paper_tree": expected_tree, "paper_scope": "historical G0 checkpoint" if args.paper_at_checkpoint else "current tree",
+        "scientific_validity_proved": False}, indent=2))
 
 
 if __name__ == "__main__":

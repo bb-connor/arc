@@ -67,7 +67,7 @@ fn selection(
                 WorkOffer {
                     slot_id: id.into(),
                     allocation_hash: store.allocation_digest(id)?,
-                    contract_hash: binding_digest(&slot(id, 2, 60, 2))?,
+                    contract_hash: binding_digest(&store.slot(id)?)?,
                     receiver: key(receiver).public_key(),
                     effect: Effect {
                         server: "research".into(),
@@ -134,6 +134,47 @@ fn nested_holders_allocate_without_copying_parent_capacity() -> Result {
             1000
         )
         .is_err());
+    Ok(())
+}
+
+#[test]
+fn rejected_permit_sealing_does_not_claim_the_allocation() -> Result {
+    let (_dir, store) = setup()?;
+    let mut large = slot("large", 2, 60, 2);
+    large.contract.acceptance.clauses.push(Clause::Equals {
+        pointer: "/large".into(),
+        value: json!("x".repeat(63_650)),
+    });
+    store.subdivide(
+        &Signed::sign(
+            Subdivision {
+                parent_id: "root".into(),
+                parent_allocation_hash: store.allocation_digest("root")?,
+                child: large,
+            },
+            &key(1),
+        )?,
+        1000,
+    )?;
+    let qualified = [key(3).public_key(), key(4).public_key()];
+    store.select(&selection(&store, "large", 3, 0)?, 1000, &qualified)?;
+    let result = store.seal_dispatch(&binding("large", 3), 1000, &key(1));
+    assert!(
+        matches!(&result, Err(DelegationError::Invalid(reason)) if reason == "envelope byte limit"),
+        "{result:?}"
+    );
+    // Rejected sealing must leave the selected provider replaceable.
+    store
+        .select(&selection(&store, "large", 4, 1)?, 1000, &qualified)
+        .map_err(|error| format!("provider replacement after refused sealing: {error}"))?;
+    // A separate small allocation still seals, with byte-identical retries.
+    child(&store, "small", 40)?;
+    store.select(&selection(&store, "small", 3, 0)?, 1000, &qualified)?;
+    let permit = store.seal_dispatch(&binding("small", 3), 1000, &key(1))?;
+    assert_eq!(
+        permit,
+        store.seal_dispatch(&binding("small", 3), 1001, &key(1))?
+    );
     Ok(())
 }
 
@@ -460,6 +501,9 @@ fn sealed_allocation_is_portable_and_cannot_be_reassigned() -> Result {
 #[test]
 fn provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_id() -> Result {
     let dir = tempfile::tempdir()?;
+    let original = DelegationStore::open(dir.path().join("original.db"))?;
+    original.create_root(slot("leaf", 2, 60, 2))?;
+    let prior_terms = selection(&original, "leaf", 3, 0)?;
     let store = DelegationStore::open(dir.path().join("other.db"))?;
     let mut substituted = slot("leaf", 2, 60, 2);
     substituted.contract.acceptance = Acceptance {
@@ -469,13 +513,17 @@ fn provider_offer_cannot_be_transplanted_to_different_terms_with_the_same_slot_i
         }],
     };
     store.create_root(substituted)?;
-    assert!(store
-        .select(
-            &selection(&store, "leaf", 3, 0)?,
-            1000,
-            &[key(3).public_key()]
-        )
-        .is_err());
+    assert!(matches!(
+        store.select(&prior_terms, 1000, &[key(3).public_key()]),
+        Err(DelegationError::Conflict)
+    ));
+    // A fresh offer for the changed terms is valid; rejection did not consume
+    // the selection revision or forbid the qualified provider.
+    store.select(
+        &selection(&store, "leaf", 3, 0)?,
+        1000,
+        &[key(3).public_key()],
+    )?;
     Ok(())
 }
 

@@ -2041,7 +2041,7 @@ fn treaty_runtime_fixture_with_signers(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["bilateral_dsse", "bilateral_invocation", "receipt_lineage"],
         ),
     );
@@ -2050,7 +2050,7 @@ fn treaty_runtime_fixture_with_signers(
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             vec!["bilateral_dsse", "bilateral_invocation", "receipt_lineage"],
         ),
     );
@@ -2090,7 +2090,7 @@ fn treaty_runtime_fixture_with_signers(
         continuation_sha256: continuation_sha256.clone(),
         lineage_statement_sha256: String::new(),
         action_class_id: continuation.action_class_id.clone(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         capability_id: continuation.capability_id.clone(),
         request_sha256: tool_args_sha256(&serde_json::json!({
             "record": "vendor-ledger-7",

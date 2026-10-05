@@ -1833,12 +1833,12 @@ rust_symbols = [
   "ChioKernel::validate_completed_durable_receipt",
   "ChioKernel::finalize_durable_tool_return_with_security_release",
 ]
-normalized_sha256 = "8d048f91eddaf0c4346dcd59b3b889cee375308cb61a15b1a9dca9c4254aab11"
+normalized_sha256 = "0b9429eb3437b693391d8222d24759350719df315a4a53f990a29b2869d10e4d"
 symbol_sha256 = [
-  { symbol = "ChioKernel::record_durable_tool_return", sha256 = "c05544811e4d81f28c0332d1c8578cbb74eddf6303d78c0ef297c3548b0882ae" },
+  { symbol = "ChioKernel::record_durable_tool_return", sha256 = "c29d402fb900a0c29bc3c71a8c2660df5588a747aeab8a496f433f55958fea6c" },
   { symbol = "ChioKernel::completed_durable_tool_response", sha256 = "38de873614d2076b3209ae48874b46211fb19a5fb654039151ce9eb3a1c724b4" },
   { symbol = "ChioKernel::validate_completed_durable_receipt", sha256 = "cff3aa1e96ac3a3e802b5cbd2da1fc82fe8c7fbe2718662416c73e783751d6cc" },
-  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "1b4bbe1736fbd94cadc259f2cf7be1e3f6705774b603700e7c1c57eb17913cf8" },
+  { symbol = "ChioKernel::finalize_durable_tool_return_with_security_release", sha256 = "d35a8575a62d41b667fada0f78341fec1b2514fda53b88703bb4c98add5ad8e0" },
 ]
 
 [[mirror]]
@@ -1847,9 +1847,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/payment_receipt.rs"
 rust_symbols = ["verify_replayed_financial"]
-normalized_sha256 = "a453c8724cd6966e72b5f821cb009199a869419bea5254c546c3889982e75072"
+normalized_sha256 = "1725e420efeb688c3943253860d287b140ecb937ec88d5ff34ef7d83ca5c281a"
 symbol_sha256 = [
-  { symbol = "verify_replayed_financial", sha256 = "af8f9d8808bfb598c15c2a38ef083c4ea28e8bca41c8038e85c8602a18d88a44" },
+  { symbol = "verify_replayed_financial", sha256 = "5a4e0bc121e2a50c47e1ace686da1771ce0cc71b1423b5db51f2f3d22d6947da" },
 ]
 
 [[mirror]]
@@ -3868,9 +3868,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs"
 rust_symbols = ["ChioKernel::reconcile_recoverable_admissions"]
-normalized_sha256 = "7aaad32c3ef6a765dbf301a7b80b984be0d0729c6603a6c480723da0d07ac855"
+normalized_sha256 = "f72f8967dfd7f2931652f99697626c4f26bd6d523b2a04e6929182166855ed60"
 symbol_sha256 = [
-  { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "6566d7735f4e362e0363110e5a4bb9aae60a82b9622936d3a72d63c77a441235" },
+  { symbol = "ChioKernel::reconcile_recoverable_admissions", sha256 = "8fa3484e34c6329f9943553ddb3e40f4a41b943d15bd354069121d90a53df7c9" },
 ]
 
 [[mirror]]

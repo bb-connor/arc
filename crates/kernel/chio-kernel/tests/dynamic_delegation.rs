@@ -6,6 +6,9 @@ use serde_json::json;
 use std::sync::{atomic::Ordering, Arc};
 use support::Result;
 
+#[path = "dynamic_delegation/lifecycle.rs"]
+mod lifecycle;
+
 #[test]
 fn receiver_executes_with_allocator_offline_and_rejects_another_receiver() -> Result {
     let dir = tempfile::tempdir()?;

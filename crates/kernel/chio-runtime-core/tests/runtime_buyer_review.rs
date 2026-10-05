@@ -304,7 +304,7 @@ fn buyer_fixture() -> Result<BuyerFixture, Box<dyn std::error::Error>> {
         accepted: true,
         failure_code: None,
         mode: "receipt_backed".to_string(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         co_sign: "bilateral_required".to_string(),
         co_sign_quorum: None,
         required_evidence: vec![
@@ -352,7 +352,7 @@ fn buyer_fixture() -> Result<BuyerFixture, Box<dyn std::error::Error>> {
         continuation_sha256: lineage.continuation_sha256.clone(),
         lineage_statement_sha256: String::new(),
         action_class_id: "workflow.destructive.vendor_call".to_string(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         capability_id: "cap-live-1".to_string(),
         request_sha256: tool_args_sha256(&serde_json::json!({
             "record": "vendor-ledger-7",

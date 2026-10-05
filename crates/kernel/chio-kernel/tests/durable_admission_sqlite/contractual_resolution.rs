@@ -453,7 +453,7 @@ fn capture_waiver_fixture(expired_only: bool) -> Result<(), Box<dyn Error>> {
     );
     assert_eq!(financial["budget_remaining"], serde_json::json!(95));
 
-    assert_eq!(financial["settlement_status"], serde_json::json!("failed"));
+    assert_eq!(financial["settlement_status"], serde_json::json!("settled"));
     assert_eq!(calls.captures.load(Ordering::SeqCst), 1);
     assert_eq!(calls.releases.load(Ordering::SeqCst), 0);
     assert_eq!(

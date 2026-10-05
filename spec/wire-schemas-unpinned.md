@@ -76,8 +76,6 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:45` `CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION` = `chio_attestation_binding_v1`
 - `crates/kernel/chio-kernel/src/payment.rs:546` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
 - `crates/kernel/chio-kernel/src/payment.rs:547` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
-- `crates/kernel/chio-kernel/src/payment/unknown_release.rs:24` `UNKNOWN_PAYMENT_RELEASE_SCHEMA` = `chio.unknown-payment-release.v1`
-- `crates/kernel/chio-kernel/src/payment/unknown_release.rs:443` `UNKNOWN_PAYMENT_RELEASE_RECEIPT_SCHEMA` = `chio.unknown-payment-release-receipt.v1`
 - `crates/kernel/chio-kernel/src/receipt_store.rs:1082` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`
@@ -91,7 +89,6 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:43` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:44` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome.rs:87` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome/execution_evidence.rs:6` `SCHEMA` = `chio.execution-evidence-projection.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome/security_release.rs:34` `SCHEMA` = `chio.security-release-checkpoint.v1`
 
 ## crates/kernel/chio-kernel-core (1)

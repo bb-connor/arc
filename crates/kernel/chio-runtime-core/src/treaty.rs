@@ -781,9 +781,9 @@ pub fn ladder_mode_rank(mode: &str) -> Result<u8, ChioRuntimeError> {
 }
 pub fn bilateral_dsse_consistency_model(model: &str) -> Result<&'static str, ChioRuntimeError> {
     match model {
-        "crdt_commutative" | "crdt-commutative" => Ok("crdt-commutative"),
-        "totally_ordered" | "totally-ordered" => Ok("totally-ordered"),
-        "single_kernel" | "single-kernel" => Ok("single-kernel"),
+        "crdt-commutative" => Ok("crdt-commutative"),
+        "totally-ordered" => Ok("totally-ordered"),
+        "single-kernel" => Ok("single-kernel"),
         "quorum-required" => Ok("quorum-required"),
         _ => rejected(
             "chio_ladder_invalid_consistency_model",

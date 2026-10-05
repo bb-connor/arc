@@ -44,12 +44,55 @@ fn seed(data: &Value, id: &str, count: usize) -> Result<(State, Oracle), String>
     }
     Ok((s, oracle))
 }
-fn invariants(old: &State, s: &State, old_oracle: &Oracle, oracle: &Oracle) -> bool {
+fn invariants(
+    old: &State,
+    s: &State,
+    old_oracle: &Oracle,
+    oracle: &Oracle,
+    command: &Command,
+) -> bool {
     if s.allocated() > s.wallet
         || s.recovery_spent > 3
         || (s.knowledge & old.knowledge) != old.knowledge
+        || s.epoch < old.epoch
+        || (s.reads > old.reads && !old.read)
     {
         return false;
+    }
+    if s.releases > old.releases {
+        let Command::Release {
+            channel,
+            recipient,
+            bounded,
+            claims,
+        } = command
+        else {
+            return false;
+        };
+        if *recipient != 5
+            || (channel == "result" && !old.read)
+            || (channel == "return" && !bounded)
+            || claims.len() > 16
+            || ![
+                "seed", "return", "result", "error", "metadata", "log", "payment", "approval",
+            ]
+            .contains(&channel.as_str())
+        {
+            return false;
+        }
+        for owner in 0..4 {
+            if old.knowledge & (1 << owner) != 0
+                && !claims.iter().any(|claim| {
+                    claim.principal == owner
+                        && claim.role == model::Role::Confidentiality
+                        && claim.version == 1
+                        && claim.channel == *channel
+                        && claim.recipient == *recipient
+                })
+            {
+                return false;
+            }
+        }
     }
     if s.view()["exposure"].as_u64().is_none_or(|n| n > 10) {
         return false;
@@ -90,6 +133,7 @@ fn invariants(old: &State, s: &State, old_oracle: &Oracle, oracle: &Oracle) -> b
     }
     true
 }
+
 struct Counts {
     transitions: u64,
     violations: u64,
@@ -158,7 +202,7 @@ fn visit(
         let n = serde_json::to_vec(&next).map_err(|e| e.to_string())?;
         let bn = serde_json::to_vec(&b_next).map_err(|e| e.to_string())?;
         counts.max_state = counts.max_state.max(n.len());
-        let safety = invariants(s, &next, oracle, &next_o);
+        let safety = invariants(s, &next, oracle, &next_o, &event.command);
         let parity = allow == b_allow && n == bn && next_o.effects == next_bo.effects;
         trace.push(json!({"command":event.command,"fault":event.fault}));
         if !safety {
@@ -393,4 +437,107 @@ pub fn explore() -> Result<Value, String> {
     Ok(
         json!({"schema":"chio.kernel-work.model-results.v1","profile":"KW1","transitions":total,"violations":violations,"divergences":divergences,"scenarios":scenarios,"schedules":schedules,"counterexamples":counterexamples,"arbitrary_trace_theorem":false,"native_correspondence_proved":false,"independent_operation":false}),
     )
+}
+
+#[cfg(test)]
+mod invariant_controls {
+    use super::*;
+
+    #[test]
+    fn removing_knowledge_rejection_must_change_state_and_violate_safety() -> Result<(), String> {
+        let old = State::new("E1", &json!({}))?;
+        let mut changed = old.clone();
+        let oracle = Oracle::default();
+        model::apply(
+            &mut changed,
+            &Command::ClearKnowledge,
+            true,
+            &Fault::default(),
+            &mut Oracle::default(),
+        );
+        assert_ne!(
+            old.knowledge, changed.knowledge,
+            "seeded bad admission was a no-op"
+        );
+        assert!(!invariants(
+            &old,
+            &changed,
+            &oracle,
+            &oracle,
+            &Command::ClearKnowledge
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn removing_result_audience_rejection_must_violate_safety() -> Result<(), String> {
+        let mut old = State::new("E1", &json!({}))?;
+        old.read = false;
+        let mut changed = old.clone();
+        let oracle = Oracle::default();
+        model::apply(
+            &mut changed,
+            &Command::ReadResult { op: 0 },
+            true,
+            &Fault::default(),
+            &mut Oracle::default(),
+        );
+        assert_eq!(changed.reads, old.reads + 1);
+        assert!(!invariants(
+            &old,
+            &changed,
+            &oracle,
+            &oracle,
+            &Command::ReadResult { op: 0 }
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn release_invariant_detects_seeded_binding_and_audience_bypasses() -> Result<(), String> {
+        let release = json!({"kind":"release", "channel":"result", "recipient":5,
+        "bounded":true, "claims":[
+            {"principal":0,"role":"confidentiality","channel":"result","recipient":5,"version":1},
+            {"principal":1,"role":"confidentiality","channel":"result","recipient":5,"version":1}
+        ]});
+        for mutation in [
+            "none",
+            "read",
+            "recipient",
+            "claim_recipient",
+            "version",
+            "owner",
+            "channel",
+        ] {
+            let mut old = State::new("E1", &json!({}))?;
+            let mut value = release.clone();
+            match mutation {
+                "read" => old.read = false,
+                "recipient" => value["recipient"] = json!(6),
+                "claim_recipient" => value["claims"][0]["recipient"] = json!(6),
+                "version" => value["claims"][0]["version"] = json!(2),
+                "owner" => value["claims"][0]["principal"] = json!(3),
+                "channel" => value["channel"] = json!("unregistered"),
+                _ => {}
+            }
+            let command: Command =
+                serde_json::from_value(value).map_err(|error| error.to_string())?;
+            let mut changed = old.clone();
+            let oracle = Oracle::default();
+            model::apply(
+                &mut changed,
+                &command,
+                true,
+                &Fault::default(),
+                &mut Oracle::default(),
+            );
+            assert_eq!(changed.releases, 1);
+            assert_eq!(
+                invariants(&old, &changed, &oracle, &oracle, &command),
+                mutation == "none",
+                "{mutation}"
+            );
+        }
+        Ok(())
+    }
 }

@@ -18,8 +18,7 @@
     }
   ],
   "recovery_implementation": {
-    "location": "Owner Mac accessed by its agent over Tailscale",
-    "status": "active, confirmed by owner",
+    "status": "implementation not qualified by this source snapshot",
     "implementation_sha": null,
     "visible_contract_pr": 1172
   },

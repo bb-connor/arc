@@ -16,7 +16,7 @@ It is not accurate to say that finishing these features alone proves beta readin
 | Active security source a99437b3ea8ef7ea03c7d2926049b27cb140b3c5 | packet/3-retention-accounting; untracked output directory | Newer security continuation; output directory was not inspected or modified |
 | Security PR #1160 at f25cd61f49fbf9a15a70396da82d9808ba4e1da2 | Open PR, older checkpoint | Do not equate its head with the latest local security work |
 | Recovery PR #1172 at de84fc306efbb4c8dd6de748d0ad2a8d695fd30e | Architecture revision 3, 111 requirements, P0-P6 | Normative contract for the parallel recovery implementation |
-| Mac recovery agent | Owner confirms it is executing that PR's spec over Tailscale | Active implementation; current SHA/phase acceptance not observed here |
+| Recovery implementation | PR #1172 is the pinned design contract | Implementation SHA and phase acceptance require independent qualification |
 | Main checkout | docs/nvidia-stack-research at 666274baef7a503a6bf4791816483cbc6eb1b4ed | Not the current integration candidate |
 
 GitHub PR state in this table was refreshed with gh during the initial planning pass. The second review refreshed the local work/security heads and retained the same pinned recovery contract. The paper and active security histories diverge; neither is the union of all active work.

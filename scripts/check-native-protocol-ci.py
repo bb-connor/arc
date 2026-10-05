@@ -51,6 +51,12 @@ POSTGRES_RUN = (
     '"$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/qualification"'
 )
 POSTGRES_CLAIM_NAME = "Lose a committed claim response and recover without redispatch"
+BROKER_LIFETIME_NAME = "Confined broker survives preparation runtime retirement"
+BROKER_LIFETIME_RUN = '''set -euo pipefail
+test_name=process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime
+"$CHIO_BROKER_TEST_BINARY" --list --exact "$test_name" > "$RUNNER_TEMP/broker-preparation.list"
+sudo env CHIO_CAGE_TEST_HELPER="$CHIO_CAGE_INIT" CHIO_BROKER_MCP_TOOL="$CHIO_BROKER_MCP_TOOL" "$CHIO_BROKER_TEST_BINARY" --exact "$test_name" --nocapture 2>&1 | tee "$RUNNER_TEMP/broker-preparation.log"
+python3 scripts/check-exact-cargo-test-inventory.py --label "confined broker preparation lifetime" --allow-filtered --list-output "$RUNNER_TEMP/broker-preparation.list" --run-output "$RUNNER_TEMP/broker-preparation.log" "$test_name"'''
 POSTGRES_CLAIM_RUN = (
     '"$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"'
 )
@@ -254,6 +260,13 @@ def validate(
         and {**claim, "run": claim.get("run", "").strip()}
         == {"name": POSTGRES_CLAIM_NAME, "run": POSTGRES_CLAIM_RUN},
         "PostgreSQL qualification must execute both native consumers in order without authority overrides",
+    )
+    lifetime_index, lifetime = named_step(job, BROKER_LIFETIME_NAME)
+    require(
+        lifetime_index == claim_index + 1
+        and {**lifetime, "run": lifetime.get("run", "").strip()}
+        == {"name": BROKER_LIFETIME_NAME, "run": BROKER_LIFETIME_RUN},
+        "confined preparation lifetime must execute its exact unignored test and validate the inventory",
     )
     digest = hashlib.sha256(
         json.dumps(action, sort_keys=True, separators=(",", ":")).encode()

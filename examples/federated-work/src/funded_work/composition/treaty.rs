@@ -52,7 +52,7 @@ pub(in crate::funded_work) fn attach(
             action_class_id: action.into(),
             mode: "receipt_backed".into(),
             destructive: false,
-            consistency_model: "totally_ordered".into(),
+            consistency_model: "totally-ordered".into(),
             co_sign: "bilateral_required".into(),
             co_sign_quorum: None,
             evidence_required: vec![
@@ -103,7 +103,7 @@ pub(in crate::funded_work) fn attach(
         continuation_sha256: digest(&continuation)?,
         lineage_statement_sha256: String::new(),
         action_class_id: action.into(),
-        consistency_model: "totally_ordered".into(),
+        consistency_model: "totally-ordered".into(),
         capability_id: request.capability.id.clone(),
         request_sha256: tool_args_sha256(&request.arguments)?,
         outcome_sha256: digest(&"permission to perform review; no completed output asserted")?,

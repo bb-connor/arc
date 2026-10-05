@@ -117,6 +117,17 @@ pub fn open_with_layout(
     clock: Option<Arc<dyn Clock>>,
     layout: delegated_work::DelegatedWorkLayout,
 ) -> Result<(ChioKernel, Arc<AtomicUsize>)> {
+    open_configured(root, receiver, bad, clock, layout, |_| {})
+}
+
+pub fn open_configured(
+    root: &Path,
+    receiver: u8,
+    bad: bool,
+    clock: Option<Arc<dyn Clock>>,
+    layout: delegated_work::DelegatedWorkLayout,
+    configure: impl FnOnce(&mut ChioKernel),
+) -> Result<(ChioKernel, Arc<AtomicUsize>)> {
     let dir = root.join(format!("receiver-{receiver}"));
     std::fs::create_dir_all(dir.join("locks"))?;
     #[cfg(unix)]
@@ -171,6 +182,7 @@ pub fn open_with_layout(
         calls: calls.clone(),
         bad,
     }));
+    configure(&mut kernel);
     kernel.reconcile_durable_admission_startup()?;
     Ok((kernel, calls))
 }

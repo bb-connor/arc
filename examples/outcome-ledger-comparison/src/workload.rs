@@ -54,24 +54,27 @@ impl ToolServerConnection for Publisher {
 }
 
 pub(crate) fn configured_kernel(directory: &Path, keypair: Keypair) -> Result<ChioKernel> {
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair,
-        ca_public_keys: Vec::new(),
-        max_delegation_depth: 5,
-        policy_hash: sha256_hex(b"identical-comparison-policy"),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-    });
+    let mut kernel = ChioKernel::new_with_clock(
+        KernelConfig {
+            keypair,
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 5,
+            policy_hash: sha256_hex(b"identical-comparison-policy"),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            allow_ephemeral_receipt_log: true,
+            allow_ephemeral_revocation_store: true,
+        },
+        Arc::new(chio_security_types::clock::FixedClock::new(NOW / 1000)),
+    );
     let receipts =
         chio_store_sqlite::SqliteReceiptStore::open(directory.join("kernel-receipts.sqlite"))?;
     receipts.wait_for_writer_ready(std::time::Duration::from_secs(5))?;
@@ -107,8 +110,7 @@ pub(crate) fn invoke_authorized(
     arguments: Value,
     id: &str,
 ) -> Result<ToolCallResponse> {
-    let _clock =
-        chio_kernel::scope_fixed_runtime_for_current_thread(NOW / 1000, [format!("receipt-{id}")]);
+    let _receipt_ids = chio_kernel::scope_receipt_ids_for_current_thread([format!("receipt-{id}")]);
     let agent = Keypair::generate();
     // The whole comparison uses one fixed logical clock, including the
     // receiver-issued capability. `issue_capability` uses wall-clock time.

@@ -152,8 +152,11 @@ impl Host {
                     };
                     let value: Value = serde_json::from_reader(request.as_reader())
                         .unwrap_or_else(|error| panic!("{error:?}"));
+                    let bytes =
+                        serde_json::to_vec(&value).unwrap_or_else(|error| panic!("{error:?}"));
                     let response = edge
-                        .handle_jsonrpc(value, &kernel, execution)
+                        .handle_jsonrpc(&bytes, &kernel, execution)
+                        .unwrap_or_else(|error| panic!("{error:?}"))
                         .into_value()
                         .unwrap_or_else(|| panic!("missing fixture value"));
                     serde_json::to_string(&response).unwrap_or_else(|error| panic!("{error:?}"))

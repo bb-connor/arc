@@ -2,7 +2,8 @@
 //!
 //! Every non-terminal operation left by a previous coordinator is either
 //! terminalized with an unknown outcome, compensated before dispatch, or
-//! finalized from its durable tool return. Nothing here redispatches.
+//! finalized from its durable tool return. A current output denial retains the
+//! return and exposure for a later authorized finalization. Nothing redispatches.
 
 use super::*;
 use crate::budget_store::BudgetReverseHoldRequest;
@@ -337,9 +338,22 @@ impl ChioKernel {
                                 audit_fault = "admission_recovery_finalization_unresolved",
                                 "failed to finalize a recoverable admission"
                             );
-                            deferred_failure.get_or_insert(error);
-                            continue;
+                            if matches!(&error, KernelError::GuardDenied(_)) {
+                                // A current release denial cannot authorize a
+                                // financial rewrite or another dispatch. Retain
+                                // the return and hold without blocking unrelated
+                                // admissions. The claim still checks the store,
+                                // operation version and current serving fence.
+                                let _mutation_guard = runtime.lock_mutations()?;
+                                let now = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
+                                self.claim_admission_recovery(&admission.operation, now)?;
+                            } else {
+                                deferred_failure.get_or_insert(error);
+                                continue;
+                            }
                         }
+                        // A successfully claimed withheld return is quiescent
+                        // for this sweep and must not starve a later page.
                         reconciled = reconciled.checked_add(1).ok_or_else(|| {
                             KernelError::DurableAdmission(
                                 "admission recovery count overflow".to_owned(),

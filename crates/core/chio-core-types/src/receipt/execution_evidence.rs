@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::body::ChioReceipt;
 use super::kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel};
-use super::signing::{ChioReceiptSigningBody, CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY};
+use super::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY;
 use crate::crypto::PublicKey;
 
 /// Receipt semantics for native execution before its financial successor.
@@ -133,17 +133,9 @@ pub fn verify_pre_settlement_execution_receipt(
     receipt: &ChioReceipt,
     admitted_kernel_keys: &[PublicKey],
 ) -> Result<ExecutionEvidenceMetadata, ExecutionEvidenceError> {
-    let body = receipt.body();
-    let signing_body =
-        ChioReceiptSigningBody::from_body_and_bbs(&body, receipt.bbs_signature.as_ref());
-    if !matches!(receipt.verify_signature(), Ok(true))
-        || !matches!(
-            receipt
-                .kernel_key
-                .verify_canonical_strict(&signing_body, &receipt.signature),
-            Ok(true)
-        )
-    {
+    // The receipt verifier authenticates its canonical signing body with
+    // strict Ed25519 verification, including weak-key rejection.
+    if !matches!(receipt.verify_signature(), Ok(true)) {
         return Err(ExecutionEvidenceError::ReceiptSignatureInvalid);
     }
     if !admitted_kernel_keys.contains(&receipt.kernel_key) {
@@ -539,7 +531,7 @@ mod tests {
         receipt.signature = crate::crypto::Signature::from_hex(
             "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
         ).unwrap();
-        assert!(receipt.verify_signature().unwrap());
+        assert!(!receipt.verify_signature().unwrap());
         assert_eq!(
             verify_pre_settlement_execution_receipt(&receipt, &[weak]),
             Err(ExecutionEvidenceError::ReceiptSignatureInvalid)

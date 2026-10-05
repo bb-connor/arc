@@ -248,8 +248,9 @@ def main() -> int:
     leaf_carried = census("carried (classify f)")
     leaf_possible = census("!refusedByProfile (classify f)")
 
-    predicate = read(
-        f"crates/kernel/chio-runtime-core/tests/{PREDICATE_TEST}.rs"
+    predicate = "\n".join(
+        read(f"crates/kernel/chio-runtime-core/tests/{path}")
+        for path in (f"{PREDICATE_TEST}.rs", f"{PREDICATE_TEST}/field_rules.rs")
     )
 
     def const_block(name: str) -> str:

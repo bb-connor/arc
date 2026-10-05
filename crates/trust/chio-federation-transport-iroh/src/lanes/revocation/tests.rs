@@ -1384,8 +1384,8 @@ impl RevokedSubjectSource for FixedSubjects {
 #[test]
 fn view_sink_installs_the_root_epoch_hash_and_issue_time() {
     let signer = signer("did:chio:oracle", SEED_A);
-    let view = Arc::new(RevocationView::new());
-    let sink = RevocationViewSink::new(Arc::clone(&view));
+    let sink = RevocationViewSink::new(signer.verifier());
+    let view = sink.view();
 
     let root = signed_root(&signer, 7);
     sink.merge_batch(std::slice::from_ref(&root))
@@ -1402,10 +1402,35 @@ fn view_sink_installs_the_root_epoch_hash_and_issue_time() {
 }
 
 #[test]
+fn view_sink_rejects_foreign_epochs_without_refreshing_the_original_signer() {
+    let origin = signer("did:chio:oracle", SEED_A);
+    let foreign = signer("did:chio:other", SEED_B);
+    let sink = RevocationViewSink::new(origin.verifier());
+    let view = sink.view();
+    sink.merge_root(&signed_root(&origin, 7))
+        .expect("origin root");
+    let before = view.load();
+    for batch in [
+        vec![signed_root(&foreign, 1000)],
+        vec![signed_root(&origin, 8), signed_root(&foreign, 1)],
+    ] {
+        let result = sink.merge_batch(&batch);
+        assert!(
+            matches!(result, Err(RevocationLaneError::BadSignature(_))),
+            "{result:?}"
+        );
+        assert!(Arc::ptr_eq(&before, &view.load()));
+    }
+    sink.merge_root(&signed_root(&origin, 8))
+        .expect("origin can advance");
+    assert_eq!(view.current_epoch(), 8);
+}
+
+#[test]
 fn view_sink_installs_only_the_highest_epoch_of_a_batch() {
     let signer = signer("did:chio:oracle", SEED_A);
-    let view = Arc::new(RevocationView::new());
-    let sink = RevocationViewSink::new(Arc::clone(&view));
+    let sink = RevocationViewSink::new(signer.verifier());
+    let view = sink.view();
 
     // Out of order on purpose: one monotone compare-and-swap for the batch,
     // never a partial walk that leaves an intermediate epoch installed.
@@ -1427,9 +1452,9 @@ fn view_sink_installs_only_the_highest_epoch_of_a_batch() {
 #[test]
 fn view_sink_stamps_the_locally_materialised_leaf_set() {
     let signer = signer("did:chio:oracle", SEED_A);
-    let view = Arc::new(RevocationView::new());
-    let sink = RevocationViewSink::new(Arc::clone(&view))
+    let sink = RevocationViewSink::new(signer.verifier())
         .with_subject_source(Arc::new(FixedSubjects("cap-revoked")));
+    let view = sink.view();
 
     sink.merge_root(&signed_root(&signer, 3))
         .expect("root merges");

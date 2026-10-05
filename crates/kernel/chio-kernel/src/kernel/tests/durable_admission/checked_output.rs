@@ -117,7 +117,7 @@ fn ordinary_output_rejection_has_no_zero_charge_authority() {
     assert!(error.to_string().contains("private checker detail"));
     assert_eq!(
         store.operation().state(),
-        AdmissionOperationState::Finalizing
+        AdmissionOperationState::DispatchCommitted
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert!(actions.lock().expect("no settlement actions").is_empty());

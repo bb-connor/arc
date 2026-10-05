@@ -96,7 +96,7 @@ directly, alongside \PSBilateralReplayCases{} bilateral and
 \begin{table}[!tb]
 \centering
 \small
-\caption{A receiver composed from \PSBaseParts{} parts an operator already has, driven under two wirings against the threat table of this paper, case by case where the composition has an analogue. The parts are a tool-call server, a peer identity pinned out of band, a policy engine that evaluates a local rule set and signs its decision, and a receiver-side replay table. \emph{Composed} wires each part the way it documents itself; \emph{hardened} adds checks no part requires and nothing in the composition records, among them a denylist over the context names the receiver owns and a replay table keyed by the identifier inside the signed bytes rather than one the caller picks. It is the wiring we wrote, not a bound on the wiring an operator could write. Admissions are over the \PSBaseNegativeAttacks{} attacks the corpus drives, as \PSBaseNegativeDistinctDrives{} distinct experiments. Chio's own record is at most \PSBaseStorageRatioUpperBound{} times heavier per call, a bound rather than a measurement, since the two stores are read by two procedures, and its side is read from the run above rather than re-measured here.}
+\caption{A receiver composed from \PSBaseParts{} existing parts under two selected wirings. \emph{Hardened} adds receiver-owned context checks and signed-identifier replay protection. Counts cover \PSBaseNegativeAttacks{} eligible attacks in \PSBaseNegativeDistinctDrives{} distinct experiments. Two agreement-version cases lack a paired Chio control; a wrong-agreement denial caused incidentally by approval lookup is also excluded. This is a comparison of the implemented wirings, not a bound on conventional composition.}
 \label{tab:baseline}
 \begin{tabular}{@{}lll@{}}
 \toprule
@@ -108,22 +108,21 @@ Single use & holds, weakened & holds \\
 Audience binding & holds & holds \\
 \midrule
 Attacks admitted & \PSBaseComposedAdmits{} & \PSBaseHardenedAdmits{} \\
-Durable bytes per call & \PSBaseBytesPerCall{} & \PSBaseHardenedBytesPerCall{} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:baseline} prices what an operator adds. Hardening closes
-\PSBaseClosedByHardening{} attacks and carries \PSBasePropsHoldHardened{} of the
-four properties. Attacks divide by what closes them: a check over fields the
-request carries, or a field it does not have. Only the second is about the
-format: \PSBaseSubstNotCarriedRows{} of the \PSBaseSubstRows{} substitution rows
-have no carrier at all, one of them the report digest Chio never compares
-either. The residual witness, an unmodified admissible call against a receiver
-whose record for that agreement has advanced a version, is closed by a version
-field; the leaf enumeration of Section~\ref{sec:formal} counts the rest, so the
-carrier is settled by the decision, not added to it. Hardening is not free:
-the last row prices the second durable write it makes.
+Hardening closes \PSBaseClosedByHardening{} eligible attacks and satisfies
+\PSBasePropsHoldHardened{} of the four tested properties. Its three residual
+cases substitute arguments, resource or task handle under the selected wiring.
+The earlier agreement-version witness is withdrawn from the comparison because
+no paired Chio case establishes that rejection. The field inventory identifies
+\PSBaseSubstNotCarriedRows{} of \PSBaseSubstRows{} substitution rows without a
+standard carrier, including the report digest Chio also omits. Operators can
+supply additional signed fields and receiver checks; this experiment measures
+neither an expressiveness limit nor their integration cost. The October 5
+correction retains the corpus results separately and disqualifies its timing
+samples because the source was dirty and the host loaded.
 
 \paragraph{Verification by someone who was not there.}
 The \PSProofPackageKiB{} KiB evidence package for the refund workflow verifies

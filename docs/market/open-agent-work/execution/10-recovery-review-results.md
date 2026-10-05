@@ -1,7 +1,7 @@
 # Review and durable recovery of funded work
 
 Date: 2026-09-14. Branch: `research/funded-work-baseline`, isolated at
-`/home/connor/backbay/arc-funded-work`. Implementation commits:
+`$REPO`. Implementation commits:
 
 - `59f1dec0fb4180757ef52c6613ddd7865e5c94b4`: reserve pending custody decisions.
 - `db4023876d5a4d113a4b138e79317b1c1c3f5d12`: load pinned verifier source bytes.

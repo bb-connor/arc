@@ -691,13 +691,13 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::erro
         treaty_action_class(
             "receipt_backed",
             true,
-            "totally_ordered",
+            "totally-ordered",
             evidence_required.clone(),
         ),
     );
     let vendor = treaty_manifest(
         "kernel.vendor-b",
-        treaty_action_class("receipt_backed", true, "totally_ordered", evidence_required),
+        treaty_action_class("receipt_backed", true, "totally-ordered", evidence_required),
     );
     let signer_a = dispatch_counter::origin_kernel_keypair();
     let signer_b = dispatch_counter::receiver_kernel_keypair();
@@ -743,7 +743,7 @@ fn treaty_fixture(evidence: Evidence) -> Result<TreatyFixture, Box<dyn std::erro
         continuation_sha256: continuation_sha256.clone(),
         lineage_statement_sha256: String::new(),
         action_class_id: continuation.action_class_id.clone(),
-        consistency_model: "totally_ordered".to_string(),
+        consistency_model: "totally-ordered".to_string(),
         capability_id: continuation.capability_id.clone(),
         request_sha256: tool_args_sha256(&tool_arguments())?,
         outcome_sha256: "5".repeat(64),

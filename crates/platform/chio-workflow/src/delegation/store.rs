@@ -274,9 +274,15 @@ impl DelegationStore {
         now: u64,
         issuer: &Keypair,
     ) -> Result<Signed<DispatchPermit>> {
-        let admission = self.claim_dispatch(binding, now)?;
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let row = required(&tx, &binding.slot_id)?;
+        let allocation_hash = allocation_digest(&tx, &row)?;
+        let selection = row.selection.ok_or(Error::Conflict)?;
+        if selection.body.offer.body.allocation_hash != allocation_hash {
+            return Err(Error::Conflict);
+        }
+        validate_dispatch(&row.slot, &selection, binding, now)?;
         let existing: Option<String> = tx
             .query_row(
                 "SELECT body FROM work_dispatch_permits_v1 WHERE slot_id=?1",
@@ -288,13 +294,12 @@ impl DelegationStore {
             serde_json::from_str::<Signed<DispatchPermit>>(&body)
                 .map_err(|e| Error::Invalid(e.to_string()))?
         } else {
-            let row = required(&tx, &binding.slot_id)?;
             let permit = Signed::sign(
                 DispatchPermit {
-                    allocation_hash: allocation_digest(&tx, &row)?,
+                    allocation_hash: allocation_hash.clone(),
                     root_id: row.root,
-                    slot: admission.slot,
-                    selection: admission.selection,
+                    slot: row.slot,
+                    selection,
                     issued_at: now,
                 },
                 issuer,
@@ -305,11 +310,16 @@ impl DelegationStore {
             )?;
             permit
         };
-        if permit.body.allocation_hash != allocation_digest(&tx, &required(&tx, &binding.slot_id)?)?
-        {
+        if permit.body.allocation_hash != allocation_hash {
             return Err(Error::Conflict);
         }
         verify_dispatch_permit(&permit, binding, now, &[issuer.public_key()])?;
+        // Sealing and allocation custody are one commit. A size, signing,
+        // verification or insertion failure leaves the selection replaceable.
+        tx.execute(
+            "UPDATE work_slots_v1 SET dispatched=1 WHERE id=?1",
+            [&binding.slot_id],
+        )?;
         tx.commit()?;
         Ok(permit)
     }

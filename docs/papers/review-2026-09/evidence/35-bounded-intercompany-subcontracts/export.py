@@ -6,7 +6,9 @@ import sqlite3
 import subprocess
 import sys
 
-repo = Path('/home/connor/backbay/arc')
+repo = Path(subprocess.check_output(
+    ['git', '-C', str(Path(__file__).resolve().parent), 'rev-parse', '--show-toplevel'],
+    text=True).strip())
 sys.path.insert(0, str(repo / 'examples/federated-work/python_buyer'))
 import client
 import protocol as p

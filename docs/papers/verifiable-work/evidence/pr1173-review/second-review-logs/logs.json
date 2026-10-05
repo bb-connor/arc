@@ -1,0 +1,179 @@
+{
+  "scope": "Local diagnostic campaigns from the additional PR1173 review. Earlier failures are retained separately from corrected runs. These logs do not establish final-SHA hosted acceptance. The current native profile uses its separate source-bound qualification.json.",
+  "logs": [
+    {
+      "log": "review-runtime-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 41969,
+      "sha256": "899c6f309a50301fb7d70838409cb704cf06b45d42ccef30025b3b7d8eccdbc4"
+    },
+    {
+      "log": "review-funded-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 15372,
+      "sha256": "df8757b7655cf8e6db2e7adadf07adf4626099cd5ce6179aaa75fb7915b84144"
+    },
+    {
+      "log": "review-sqlite-followup.log.gz",
+      "observed_result": "passed",
+      "bytes": 5424,
+      "sha256": "23429779e314c30d09fa1ba3abff7bee236a32503f9f020cecd87a981a7cbbe4"
+    },
+    {
+      "log": "review-workflow-followup.log.gz",
+      "observed_result": "passed",
+      "bytes": 5112,
+      "sha256": "aaec2ac0081c17d382b426547b214495fedc7fc4a606b842f17a3e9431cdb466"
+    },
+    {
+      "log": "review-iroh-followup.log.gz",
+      "observed_result": "passed",
+      "bytes": 21210,
+      "sha256": "75d7549e5de327b09987128db96ac6d865ebd05e4f5f9b3948cd6cbdc84c8b78"
+    },
+    {
+      "log": "review-post-transform-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 3819,
+      "sha256": "47c792b46efefa35e94131b30a10f760ec759492e308e8f7da7d7f1a8b8f3c76"
+    },
+    {
+      "log": "review-production-clippy-corrected.log.gz",
+      "observed_result": "passed",
+      "bytes": 3439,
+      "sha256": "e1cb297ada0be7aab696c5062c913d87b722bdd7a7a6dc835dfdcf5ff2765756"
+    },
+    {
+      "log": "review-broker-clippy-corrected.log.gz",
+      "observed_result": "passed",
+      "bytes": 1780,
+      "sha256": "a0a7b7c4b6cc1bd60f322781e06252df6277cb015d9f05964252e7ae8551dfa9"
+    },
+    {
+      "log": "review-funded-clippy-corrected.log.gz",
+      "observed_result": "passed",
+      "bytes": 2175,
+      "sha256": "51616200ab78004a81cd9265b0275c1a6e7838f82e7af3cee0618559dee26a68"
+    },
+    {
+      "log": "review-a2a-module-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 13708,
+      "sha256": "ddfeb234d2be84d1aa1bb79e69b521dc312496e25d91ef3ecfb3db41a9defbfc"
+    },
+    {
+      "log": "review-trust-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 151,
+      "sha256": "1c1a2d0b35016bcfa7281e2ec31981a598da3a0a5ce7cb6ad4044c2128e5dbcd"
+    },
+    {
+      "log": "review-trust-boundaries-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 91,
+      "sha256": "9a334b9220b5881cd096d13ed51133424d48653bf6265f2eac6fb7a4c6edb8a0"
+    },
+    {
+      "log": "review-security-ci-controls-corrected.log.gz",
+      "observed_result": "passed",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "review-native-callsite-routing-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 212,
+      "sha256": "a02cabb3ee7fb904095f27c928d4dc262331e82108f9826e8414ed619f8dad6a"
+    },
+    {
+      "log": "review-subcontract-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 2356,
+      "sha256": "47ec178776dffc0f45f9fc44ffcef8eeb0057d9c55c6b2c0fffcf21e64d1e720"
+    },
+    {
+      "log": "review-evidence-crosses-build-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 52679,
+      "sha256": "9def671136b6ba07f6aa252728cf1766ead1303e5d0dd4bc7e83f090bc04a1da"
+    },
+    {
+      "log": "review-deny-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 1085,
+      "sha256": "21200d34498015e78ebba368b29b12f456f76a7726c5924b21dad8224d589672"
+    },
+    {
+      "log": "review-native-callsite-actionlint.log.gz",
+      "observed_result": "passed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "review-lifecycle-store-final.log.gz",
+      "observed_result": "failed",
+      "bytes": 480821,
+      "sha256": "b31fedd8918fe662b3879938e79ec2a2b84da2cf286573a6f31656c83c8476b0"
+    },
+    {
+      "log": "review-transport-final.log.gz",
+      "observed_result": "failed",
+      "bytes": 48188,
+      "sha256": "7ecd00d37185402746ce3214219f35ddb2341c7672fda054602f074659c28d61"
+    },
+    {
+      "log": "review-post-transform-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 10864,
+      "sha256": "35273c9755d894a7d3accc9287ee755980d7838dabc1196939ae2101be1b4163"
+    },
+    {
+      "log": "review-production-clippy.log.gz",
+      "observed_result": "failed",
+      "bytes": 7501,
+      "sha256": "9b5c26f5c005dc475f6a2177cb5d15927a6f94652bbb52c3eb4c6f980b1d5892"
+    },
+    {
+      "log": "review-broker-clippy.log.gz",
+      "observed_result": "failed",
+      "bytes": 20572,
+      "sha256": "b5ccd2ef9e251578a476302700a5d1c12cb2d399018ea641dac5fdb31fed7b70"
+    },
+    {
+      "log": "review-funded-clippy.log.gz",
+      "observed_result": "failed",
+      "bytes": 9026,
+      "sha256": "641a9393f1298769b6267ff0d40aae764f3bfa06c24f97352adf98f93e0f8e30"
+    },
+    {
+      "log": "review-trust-controls.log.gz",
+      "observed_result": "failed",
+      "bytes": 5319,
+      "sha256": "08e7f1fae6b7ec9c8975ce10bc6d18db6e966f1d93d625f3378b877d3a41895e"
+    },
+    {
+      "log": "review-security-ci-controls-final.log.gz",
+      "observed_result": "failed",
+      "bytes": 1207,
+      "sha256": "9a25f71a257be730a4220486d02e8c8b1f83ff97799757a0406dcfd7811c8045"
+    },
+    {
+      "log": "review-native-callsite-routing-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 1208,
+      "sha256": "a041c5c44e53fbd2ea9111ed33cb8a72908fe768e05f0e9ab463cb3698243d8b"
+    },
+    {
+      "log": "review-actionlint-final.log.gz",
+      "observed_result": "failed",
+      "bytes": 394,
+      "sha256": "c576b649db61f480b123e0040927d043436c4b035686ac276ddb706110360c51"
+    },
+    {
+      "log": "review-targeted-followups.log.gz",
+      "observed_result": "failed",
+      "bytes": 37070,
+      "sha256": "0517a8a6aa264559389d202236f63d036e2136b173a349c32bf3b924151f082d"
+    }
+  ]
+}

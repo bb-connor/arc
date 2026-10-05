@@ -407,10 +407,11 @@ mod retention {
         let current_size = store.db_size_bytes().unwrap();
         assert!(current_size > 0, "DB should have nonzero size");
 
-        // retention_days = u64::MAX disables the time threshold (time_cutoff
-        // saturates to 0), so only the size threshold can trigger.
+        // A representable duration longer than the Unix epoch makes the time
+        // cutoff zero, so only the size threshold can trigger. Overflow is an
+        // invalid configuration, not an alternative way to disable retention.
         let config = RetentionConfig {
-            retention_days: u64::MAX,
+            retention_days: 100_000,
             max_size_bytes: current_size.saturating_sub(1),
             archive_path: archive_path.to_str().unwrap().to_string(),
             tenant_id: None,

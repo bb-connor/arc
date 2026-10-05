@@ -97,12 +97,7 @@ pub(super) fn verify_replayed_financial(
             || financial.cost_charged != if resolved { 0 } else { expected_cost }
             || financial.currency != journal.currency
             || financial.payment_reference.as_ref() != payment_reference
-            || financial.settlement_status
-                != if resolved {
-                    SettlementStatus::Failed
-                } else {
-                    SettlementStatus::Settled
-                }
+            || financial.settlement_status != SettlementStatus::Settled
             || financial.delegation_depth
                 != u32::try_from(request.capability.delegation_chain.len()).unwrap_or(u32::MAX)
             || financial.root_budget_holder != request.capability.issuer.to_hex()

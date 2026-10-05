@@ -2,10 +2,14 @@
 //! private Unix socket, so there is no plaintext TCP endpoint to bypass TLS.
 use crate::common::*;
 use base64::Engine;
+use rustls::pki_types::{
+    pem::{PemObject, SectionKind},
+    CertificateDer, PrivateKeyDer,
+};
 use rustls::{crypto::aws_lc_rs, ServerConfig};
 use std::{
     fs,
-    io::{Cursor, Read},
+    io::Read,
     net::SocketAddr,
     os::unix::{fs::FileTypeExt, net::UnixListener},
     path::{Path, PathBuf},
@@ -109,10 +113,11 @@ pub(crate) fn public_certificates(bytes: &[u8]) -> Result<String> {
     }
     let mut roots = rustls::RootCertStore::empty();
     let mut public = String::new();
-    for item in rustls_pemfile::read_all(&mut Cursor::new(bytes)) {
-        let rustls_pemfile::Item::X509Certificate(certificate) = item? else {
+    for item in <(SectionKind, Vec<u8>)>::pem_slice_iter(bytes) {
+        let (SectionKind::Certificate, der) = item? else {
             return Err("public enrollment cannot carry private keys or other PEM objects".into());
         };
+        let certificate = CertificateDer::from(der);
         roots.add(certificate.clone())?;
         let encoded = base64::engine::general_purpose::STANDARD.encode(certificate.as_ref());
         public.push_str("-----BEGIN CERTIFICATE-----\n");
@@ -135,10 +140,9 @@ pub(crate) fn listen_bounded(
     config: HttpsConfig<'_>,
     body_limit: usize,
 ) -> Result<HttpsListener> {
-    let certificates = rustls_pemfile::certs(&mut Cursor::new(read_pem(config.certificate)?))
+    let certificates = CertificateDer::pem_slice_iter(&read_pem(config.certificate)?)
         .collect::<std::result::Result<Vec<_>, _>>()?;
-    let private_key = rustls_pemfile::private_key(&mut Cursor::new(read_pem(config.private_key)?))?
-        .ok_or("TLS private key is missing")?;
+    let private_key = PrivateKeyDer::from_pem_slice(&read_pem(config.private_key)?)?;
     let mut tls = ServerConfig::builder_with_provider(Arc::new(aws_lc_rs::default_provider()))
         .with_protocol_versions(&[&rustls::version::TLS13])?
         .with_no_client_auth()
@@ -173,7 +177,7 @@ pub(crate) fn listen_bounded(
     let acceptor = TlsAcceptor::from(Arc::new(tls));
     runtime.spawn(async move {
         let slots = Arc::new(Semaphore::new(32));
-        while let Ok((stream, _)) = listener.accept().await {
+        while let Ok((stream, _)) = accept_connection(|| listener.accept()).await {
             let Ok(permit) = slots.clone().try_acquire_owned() else {
                 drop(stream);
                 continue;
@@ -191,6 +195,24 @@ pub(crate) fn listen_bounded(
         origin: advertised,
         runtime,
     })
+}
+
+async fn accept_connection<T, F, Fut>(mut accept: F) -> std::io::Result<T>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = std::io::Result<T>>,
+{
+    loop {
+        match accept().await {
+            Ok(connection) => return Ok(connection),
+            Err(_) => {
+                // Resource exhaustion and aborted connections do not retire a
+                // live listener. Back off to avoid spinning while it recovers;
+                // runtime shutdown cancels this wait along with the listener.
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
 }
 
 async fn forward(
@@ -219,6 +241,29 @@ async fn forward(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn listener_survives_transient_accept_failures() -> Result<()> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()?;
+        let attempts = std::cell::Cell::new(0);
+        let accepted = runtime.block_on(accept_connection(|| {
+            let attempt = attempts.get();
+            attempts.set(attempt + 1);
+            async move {
+                match attempt {
+                    0 => Err(std::io::Error::from(std::io::ErrorKind::Interrupted)),
+                    1 => Err(std::io::Error::from(std::io::ErrorKind::ConnectionAborted)),
+                    2 => Err(std::io::Error::from(std::io::ErrorKind::OutOfMemory)),
+                    _ => Ok("accepted connection"),
+                }
+            }
+        }))?;
+        assert_eq!(accepted, "accepted connection");
+        assert_eq!(attempts.get(), 4);
+        Ok(())
+    }
 
     #[test]
     fn public_enrollment_rejects_keys_and_malformed_certificates() {

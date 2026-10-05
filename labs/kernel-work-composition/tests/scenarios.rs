@@ -17,6 +17,20 @@ fn variant(id: &str) -> Result<Value, Box<dyn std::error::Error>> {
     }
     Err(format!("missing fixture {id}").into())
 }
+
+#[test]
+fn lost_ack_partial_fixtures_refine_through_authenticated_evidence()
+-> Result<(), Box<dyn std::error::Error>> {
+    for id in ["F06_partial", "F14_refinement"] {
+        for arm in [Arm::Candidate, Arm::Baseline] {
+            let report = run(&variant(id)?, arm)?;
+            assert_eq!(report["steps"][5]["outcomes"][0], "unknown", "{id} {arm:?}");
+            assert_eq!(report["steps"][6]["outcomes"][0], "partial", "{id} {arm:?}");
+            assert_eq!(report["view"]["outcomes"][0], "partial", "{id} {arm:?}");
+        }
+    }
+    Ok(())
+}
 fn check_family(id: &str, arm: Arm) -> Result<(), Box<dyn std::error::Error>> {
     let data = fixtures()?;
     let family = data["cases"]

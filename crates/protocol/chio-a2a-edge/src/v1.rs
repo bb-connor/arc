@@ -204,11 +204,6 @@ impl ChioA2aEdge {
         let parsed: V1SendRequest = serde_json::from_value(params)
             .map_err(|error| v1_invalid(format!("invalid SendMessage request: {error}")))?;
         let (message_id, request, deferred, output_mode) = parsed.into_internal()?;
-        self.prune_deferred_tasks(kernel.authority_clock_reading()?)?;
-        // Include terminal records in this limit because v1 retains blocking results too.
-        if self.tasks.len() >= MAX_DEFERRED_A2A_TASKS {
-            return Err(v1_invalid("too many retained A2A tasks"));
-        }
         let task = self.handle_stream_message_with_request_id(
             &message_id,
             &skill,
@@ -226,7 +221,12 @@ impl ChioA2aEdge {
             })));
         }
         let response = self.complete_task(&task.id, kernel, execution, id);
-        self.v1_project_response(response, true)
+        let projected = self.v1_project_response(response, true);
+        // Blocking responses transfer their terminal result directly to the
+        // caller. Only explicitly deferred requests retain polling custody.
+        // Cleanup also covers execution and projection errors.
+        self.tasks.remove(&task.id);
+        projected
     }
 
     fn v1_project_response(

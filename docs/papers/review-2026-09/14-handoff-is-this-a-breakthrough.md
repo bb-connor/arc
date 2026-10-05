@@ -14,7 +14,7 @@ Answer that. Be willing to say no. A false yes is worth nothing to anyone.
 
 ## Where everything is
 
-Repository `/home/connor/backbay/arc`, branch `paper/roadmap-phase-0-1`.
+Repository `$REPO`, branch `paper/roadmap-phase-0-1`.
 
 | What | Where |
 | --- | --- |

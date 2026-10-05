@@ -281,7 +281,7 @@ fn count_approved_ignores_denied_rows() {
                 reason: None,
                 approver: approver.public_key(),
                 token: tok_a,
-                received_at: 10,
+                received_at: 1000,
             },
         )
         .test_unwrap();
@@ -308,7 +308,7 @@ fn count_approved_ignores_denied_rows() {
                 reason: None,
                 approver: approver.public_key(),
                 token: tok_b,
-                received_at: 11,
+                received_at: 1001,
             },
         )
         .test_unwrap();

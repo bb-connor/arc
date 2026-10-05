@@ -116,3 +116,21 @@ source-level diagnostic counts, not comparable CPU work or production latency.
 The two implementations may expose the same abstraction and reuse any correct
 library. Scientific success remains the preregistered systems result, not parity
 or a large test count. The flagship paper stays frozen pending later gates.
+
+## October 5 review correction
+
+The historical explorer did not independently check result release permission or
+release-claim audience, and its admitted `ClearKnowledge` transition was a no-op.
+Its reported zero violations therefore did not qualify those properties. The
+current explorer checks permission and exact owner/channel/recipient/version
+bindings on each release, and an incorrectly admitted knowledge clear now changes
+the state and violates monotonicity. Seeded bypasses calibrate both boundaries.
+`Rollback` applies its proposed epoch, so a bypass is observable. Payload GC is
+still abstract: the lab has no payload storage and establishes no GC implementation
+claim. Initial knowledge labels are supplied facts, not an arbitrary read model.
+
+The F06/F14 lost-ack fixtures reach `Partial` through their subsequent authenticated
+E1 evidence command. Their initial send correctly remains `Unknown`; an explicit
+stepwise regression covers both arms without changing that uncertainty rule.
+The provenance command checks the frozen G0 paper at its pinned checkpoint. It
+makes no statement about the current manuscript.

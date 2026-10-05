@@ -821,8 +821,6 @@ dependencies = [
 [[package]]
 name = "aws-lc-rs"
 version = "1.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b281d307588d634de920874890732659e2e7672f72b5e10e81badc1a8a83621e"
 dependencies = [
  "aws-lc-fips-sys",
  "aws-lc-sys",
@@ -1484,8 +1482,8 @@ dependencies = [
  "chio-swarm-authority",
  "chio-workflow",
  "rusqlite",
+ "rustix",
  "rustls",
- "rustls-pemfile",
  "serde",
  "serde_json",
  "tempfile",
@@ -5460,9 +5458,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.37"
+version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758025cb5fccfd3bc2fd74708fd4682be41d99e5dff73c377c0646c6012c73a4"
+checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -5484,15 +5482,6 @@ dependencies = [
  "rustls-pki-types",
  "schannel",
  "security-framework",
-]
-
-[[package]]
-name = "rustls-pemfile"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]
@@ -5534,9 +5523,9 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.13"
+version = "0.103.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -7748,3 +7737,47 @@ name = "zmij"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
+
+[[patch.unused]]
+name = "cmpv2"
+version = "0.2.0"
+
+[[patch.unused]]
+name = "crmf"
+version = "0.2.0"
+
+[[patch.unused]]
+name = "enumflags2_derive"
+version = "0.7.12"
+
+[[patch.unused]]
+name = "ignore"
+version = "0.4.32"
+
+[[patch.unused]]
+name = "nono"
+version = "0.53.0"
+
+[[patch.unused]]
+name = "regress"
+version = "0.11.1"
+
+[[patch.unused]]
+name = "seccompiler"
+version = "0.5.0"
+
+[[patch.unused]]
+name = "sigstore-crypto"
+version = "0.6.6"
+
+[[patch.unused]]
+name = "sigstore-merkle"
+version = "0.6.6"
+
+[[patch.unused]]
+name = "sigstore-trust-root"
+version = "0.6.3"
+
+[[patch.unused]]
+name = "sigstore-verify"
+version = "0.6.3"

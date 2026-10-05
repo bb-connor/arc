@@ -1,4 +1,9 @@
-// Included inside the existing test module to reuse its kernel fixtures.
+//! V1 wire projection and retained task custody, using shared kernel fixtures.
+
+use super::*;
+use crate::tests::{capability_for_tool, test_kernel_config, test_manifest, test_server};
+use chio_core::crypto::Keypair;
+use chio_test_support::prelude::*;
 
 fn v1_execution(issuer: &Keypair) -> A2aKernelExecutionContext {
     let subject = Keypair::generate();
@@ -28,6 +33,81 @@ fn v1_request() -> Value {
             "configuration": {"returnImmediately": true}
         }
     })
+}
+
+#[test]
+fn v1_blocking_completion_releases_task_custody_on_success_and_failure() {
+    for registered in [true, false] {
+        let config = test_kernel_config();
+        let execution = v1_execution(&config.keypair);
+        let mut kernel = ChioKernel::new(config);
+        if registered {
+            kernel.register_tool_server(Box::new(test_server()));
+        }
+        let mut edge =
+            ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+        for index in 0..4 {
+            let mut request = v1_request();
+            request["params"]["message"]["messageId"] = json!(format!("blocking-{index}"));
+            request["params"]["configuration"] = json!({"returnImmediately": false});
+            let response = edge
+                .handle_jsonrpc(
+                    &serde_json::to_vec(&request).test_unwrap(),
+                    &kernel,
+                    &execution,
+                )
+                .test_unwrap();
+            if registered {
+                assert_eq!(
+                    response["result"]["task"]["status"]["state"],
+                    "TASK_STATE_COMPLETED"
+                );
+            } else {
+                assert_eq!(
+                    response["result"]["task"]["status"]["state"],
+                    "TASK_STATE_FAILED"
+                );
+            }
+            assert!(
+                edge.tasks.is_empty(),
+                "blocking completion retained task custody"
+            );
+        }
+    }
+}
+
+#[test]
+fn v1_deferred_capacity_is_bounded_per_subject() {
+    let config = test_kernel_config();
+    let mut owner = v1_execution(&config.keypair);
+    let other = v1_execution(&config.keypair);
+    let kernel = ChioKernel::new(config);
+    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    for index in 0..128 {
+        let mut request = v1_request();
+        request["params"]["message"]["messageId"] = json!(format!("deferred-{index}"));
+        let response = edge
+            .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
+            .test_unwrap();
+        assert_eq!(
+            response["result"]["task"]["status"]["state"],
+            "TASK_STATE_WORKING"
+        );
+    }
+    // Display-name changes cannot bypass the authenticated subject's quota.
+    owner.agent_id = "renamed-owner".into();
+    let bytes = serde_json::to_vec(&v1_request()).test_unwrap();
+    let denied = edge.handle_jsonrpc(&bytes, &kernel, &owner).test_unwrap();
+    assert!(
+        matches!(denied.local_error(), Some(A2aEdgeError::TaskCapacity)),
+        "{denied:?}"
+    );
+    let allowed = edge.handle_jsonrpc(&bytes, &kernel, &other).test_unwrap();
+    assert_eq!(
+        allowed["result"]["task"]["status"]["state"],
+        "TASK_STATE_WORKING"
+    );
+    assert_eq!(edge.tasks.len(), 129);
 }
 
 #[test]
@@ -238,17 +318,23 @@ fn v1_output_negotiation_is_retained_when_polling() {
     kernel.register_tool_server(Box::new(test_server()));
     let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
     let mut request = v1_request();
-    request["params"]["configuration"] = json!({"acceptedOutputModes": ["text/plain"]});
-    let result = edge
+    request["params"]["configuration"] =
+        json!({"acceptedOutputModes": ["text/plain"], "returnImmediately": true});
+    let started = edge
         .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
         .test_unwrap()
         .into_value()
         .test_unwrap();
-    let task = &result["result"]["task"];
+    let get = json!({"jsonrpc": "2.0", "id": 2, "method": "GetTask", "params": {"id": started["result"]["task"]["id"]}});
+    let result = edge
+        .handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
+        .test_unwrap()
+        .into_value()
+        .test_unwrap();
+    let task = &result["result"];
     assert_eq!(task["status"]["state"], "TASK_STATE_COMPLETED");
     assert!(task["artifacts"][0]["parts"][0]["text"].is_string());
     assert!(task["artifacts"][0]["parts"][0].get("data").is_none());
-    let get = json!({"jsonrpc": "2.0", "id": 2, "method": "GetTask", "params": {"id": task["id"]}});
     assert_eq!(
         edge.handle_jsonrpc(&serde_json::to_vec(&get).test_unwrap(), &kernel, &owner)
             .test_unwrap()

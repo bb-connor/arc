@@ -12,7 +12,7 @@
 
 ## Constraints and design rulings
 
-- Work only in `/home/connor/backbay/arc-funded-integration` on the existing funded branch, starting at `5257f963d869d89c7a54384ea88628cf727c32c8`.
+- Work only in `$REPO` on the existing funded branch, starting at `5257f963d869d89c7a54384ea88628cf727c32c8`.
 - Preserve the original paper checkout and other agents' worktrees. Review committed security deltas read-only before selecting any prerequisite.
 - No external chain, real money, push, PR, merge or deployment. Local commits and disposable owned fixture processes are authorized.
 - A refund is not a successful capture. Keep original capture intent, raw outcome, pricing and positive budget reconciliation. Do not reuse unknown release or contractual zero-charge semantics.

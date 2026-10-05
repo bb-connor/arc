@@ -1,6 +1,6 @@
 # Independent Python execution-evidence re-review
 
-Bounded read-only re-review of the four findings in `python-review.md`, in `/home/connor/backbay/arc-funded-integration`. No repository edits or Cargo commands.
+Bounded read-only re-review of the four findings in `python-review.md`, in `$REPO`. No repository edits or Cargo commands.
 
 Reviewed hashes:
 

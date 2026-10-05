@@ -2,7 +2,7 @@
 
 Date: 2026-09-14. Implementation:
 `331bd1bf8cd347c3b2cc70aaee459894bc5218df` on
-`research/funded-work-baseline`, isolated in `/home/connor/backbay/arc-funded-work`.
+`research/funded-work-baseline`, isolated in `$REPO`.
 The [manifest](13-lifecycle-results.json) records source/evidence hashes,
 commands, exact outcomes and the current integration rehearsal.
 

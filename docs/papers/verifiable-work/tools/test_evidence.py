@@ -49,9 +49,21 @@ class EvidenceTests(unittest.TestCase):
         for gate in release['gates']:
             gate['status'] = 'passed'
         release.update(publish_ready=True, breakthrough_established=True)
-        self.assertEqual(check.verify_publication(release), [])
+        self.assertTrue(check.verify_publication(release),
+                        'status edits alone cannot establish publication evidence')
         release['gates'].append(dict(release['gates'][0]))
         self.assertIn('duplicate publication gate: manuscript', check.verify_publication(release))
+
+    def test_publication_cannot_freeze_its_own_authority(self):
+        for writer in ('--freeze', '--refresh'):
+            script = ('import check,sys; from unittest.mock import patch; '
+                      f'sys.argv=["check.py","{writer}","--publication"]; '
+                      'p=patch("check.derived",side_effect=AssertionError("unsafe CLI accepted")); '
+                      'p.start(); check.main()')
+            result = subprocess.run(['python3', '-c', script],
+                                    cwd=Path(check.__file__).parent, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('not allowed with argument', result.stderr)
 
     def test_changed_evidence_fails_closed(self):
         self.assertIsNotNone(verify_files, 'evidence verifier missing')
@@ -69,6 +81,51 @@ class EvidenceTests(unittest.TestCase):
         self.assertIsNotNone(verify_files, 'evidence verifier missing')
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(verify_files(Path(d), {'../outside': 'a'*64}), ['outside root: ../outside'])
+
+class PublicationEvidenceTests(unittest.TestCase):
+    def test_frozen_named_evidence_and_claims_are_required(self):
+        import copy
+        import hashlib
+        import json
+        from publication import CLAIM_REQUIREMENTS, REQUIRED_GATES, verify
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'result.json').write_text('{"verified":true}')
+            claim_statuses = {}
+            for requirements in CLAIM_REQUIREMENTS.values():
+                for name, status in requirements.items():
+                    claim_statuses.setdefault(name, set()).add(status)
+            claims = {'claims': [dict(claim_id=name, status=sorted(statuses),
+                                     evidence_paths=['result.json'])
+                                  for name, statuses in claim_statuses.items()]}
+            release = dict(publish_ready=True, breakthrough_established=True,
+                           gates=[dict(id=name, status='passed', acceptance='criterion',
+                                       result='observed', evidence='result.json')
+                                  for name in sorted(REQUIRED_GATES)])
+            (root / 'PUBLICATION.json').write_text(json.dumps(release))
+            (root / 'CLAIMS.json').write_text(json.dumps(claims))
+            manifest = {'files': {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                  for p in root.iterdir()}}
+            def check(r=release, c=claims, m=manifest):
+                return verify(r, c, m, root=root, paper=root)
+            self.assertEqual(check(), [])
+            for name in ('result.json', 'PUBLICATION.json', 'CLAIMS.json'):
+                missing = copy.deepcopy(manifest)
+                del missing['files'][name]
+                self.assertTrue(check(m=missing), name)
+            unsupported = copy.deepcopy(claims)
+            unsupported['claims'][0]['status'] = ['hypothesis']
+            self.assertTrue(check(c=unsupported))
+            absent = copy.deepcopy(release)
+            absent['gates'][0].pop('evidence')
+            self.assertTrue(check(r=absent))
+            absent['gates'][0]['evidence'] = '../outside'
+            self.assertTrue(check(r=absent))
+            (root / 'result.json').write_text('{"verified":false}')
+            self.assertTrue(check())
+            (root / 'result.json').unlink()
+            self.assertTrue(check())
+
 
 if __name__ == '__main__':
     unittest.main()

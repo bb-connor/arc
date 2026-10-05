@@ -73,6 +73,17 @@ fn run_native_delivery_with_cutpoint(
     fault: Option<mcp::CompletionFault>,
     crash: Option<cutpoints::Point>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    run_native_delivery_case(route, fault, crash, false)
+}
+
+fn run_native_delivery_case(
+    route: DeliveryRoute,
+    fault: Option<mcp::CompletionFault>,
+    crash: Option<cutpoints::Point>,
+    retire_preparation_runtime: bool,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    #[cfg(not(feature = "real-linux-enforcement"))]
+    assert!(!retire_preparation_runtime);
     let mcp_route = route != DeliveryRoute::Direct;
     let directory = crate::private_tempdir()?;
     let kernel_directory = crate::private_tempdir()?;
@@ -166,8 +177,10 @@ fn run_native_delivery_with_cutpoint(
         DeliveryRoute::ConfinedMcp => {
             let confined = confined.as_ref().ok_or("confined delivery absent")?;
             (
-                Some(confined.tool.clone()
-                    as Arc<dyn crate::kernel_admission::BrokerMcpToolConnection>),
+                Some(confined::preparation_connection(
+                    confined.tool.clone(),
+                    retire_preparation_runtime,
+                )),
                 confined.registry.clone(),
             )
         }
@@ -185,7 +198,7 @@ fn run_native_delivery_with_cutpoint(
             #[cfg(feature = "real-linux-enforcement")]
             confined_router: confined
                 .as_ref()
-                .filter(|_| cutpoint.is_none())
+                .filter(|_| cutpoint.is_none() && !retire_preparation_runtime)
                 .map(|confined| confined.tool.fresh()),
         },
         execution_request(port, credential.clone(), &issuer, &caller),
@@ -289,10 +302,7 @@ fn run_native_delivery_with_cutpoint(
             .load_unambiguous_retained_tool_request(
                 &AdmissionIdentifier::try_new("request", &host.request.request_id)?,
                 &host.authority.mutation_fence(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)?
-                    .as_millis()
-                    .try_into()?,
+                host.kernel.authority_clock_reading()?.unix_millis().get(),
             )?;
         eprintln!(
             "native broker final state: {:?}",
@@ -368,10 +378,7 @@ fn run_native_delivery_with_cutpoint(
     let store = host.authority.admission_operation_store();
     let fence = host.authority.mutation_fence();
     let now_ms = || -> std::result::Result<u64, Box<dyn std::error::Error>> {
-        Ok(SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_millis()
-            .try_into()?)
+        Ok(host.kernel.authority_clock_reading()?.unix_millis().get())
     };
     let (operation, _) = store
         .load_unambiguous_retained_tool_request(
@@ -471,7 +478,12 @@ fn run_native_delivery_with_cutpoint(
             "options" => changed.request.options.timeout_ms -= 1,
             _ => changed.proof.body.nonce.push_str("-replayed"),
         }
-        assert!(client.execute(&changed).is_err(), "{substitution}");
+        let rejected = client.execute(&changed);
+        assert!(
+            matches!(&rejected, Err(crate::BrokerError::AuthorizationDenied(code))
+                if code == "authorization_denied"),
+            "{substitution}: {rejected:?}"
+        );
     }
     let death_socket = client.connect_authenticated()?;
     let broker_output = broker.kill_and_output();
@@ -545,26 +557,30 @@ fn run_native_delivery_with_cutpoint(
     )?;
     let mut changed = public.clone();
     changed.capture.authority_commit_index += 1;
-    assert!(changed
-        .verify(
+    assert!(matches!(
+        changed.verify(
             operation.binding(),
             &host.execute,
             &response,
             &broker_key.public_key(),
             now_ms()?
-        )
-        .is_err());
+        ),
+        Err(crate::BrokerError::AuthorizationDenied(reason))
+            if reason == "broker request differs from installed kernel authority"
+    ));
     let mut changed = public;
     changed.registration.authority_metadata_digest = "00".repeat(32);
-    assert!(changed
-        .verify(
+    assert!(matches!(
+        changed.verify(
             operation.binding(),
             &host.execute,
             &response,
             &broker_key.public_key(),
             now_ms()?
-        )
-        .is_err());
+        ),
+        Err(crate::BrokerError::AuthorizationDenied(reason))
+            if reason == "broker request differs from installed kernel authority"
+    ));
     let (after_verification, _) = store
         .load_unambiguous_retained_tool_request(
             &AdmissionIdentifier::try_new("request", &host.request.request_id)?,

@@ -63,6 +63,12 @@ struct DelegatedWorkGuard {
     layout: DelegatedWorkLayout,
 }
 
+#[derive(Clone, Copy)]
+enum PermitUse {
+    LiveDispatch,
+    OutputContract,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Arguments {
@@ -83,7 +89,7 @@ fn denied(message: impl std::fmt::Display) -> KernelError {
 }
 
 impl DelegatedWorkGuard {
-    fn admit(&self, ctx: &GuardContext<'_>) -> Result<Admission, KernelError> {
+    fn admit(&self, ctx: &GuardContext<'_>, usage: PermitUse) -> Result<Admission, KernelError> {
         let request = ctx.request;
         let args: Arguments = match self.layout {
             DelegatedWorkLayout::Arguments => {
@@ -127,7 +133,14 @@ impl DelegatedWorkGuard {
         if per_call.currency != total.currency {
             return Err(denied("currency mismatch"));
         }
-        let now = self.clock.unix_millis().map_err(denied)?.get() / 1000;
+        let now = match usage {
+            PermitUse::LiveDispatch => self.clock.unix_millis().map_err(denied)?.get() / 1000,
+            // Dispatch already required a live permit. Its signed output
+            // contract survives execution and replay; checking it at issuance
+            // preserves all signature and binding checks without minting fresh
+            // invocation authority after expiry.
+            PermitUse::OutputContract => args.allocation.body.issued_at,
+        };
         verify_dispatch_permit(
             &args.allocation,
             &DispatchBinding {
@@ -156,14 +169,14 @@ impl Guard for DelegatedWorkGuard {
         "dynamic-work-delegation-v2"
     }
     fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
-        self.admit(ctx)?;
+        self.admit(ctx, PermitUse::LiveDispatch)?;
         Ok(GuardDecision::allow())
     }
     fn requires_dispatch_revalidation(&self) -> bool {
         true
     }
     fn revalidate_before_dispatch(&self, ctx: &GuardContext<'_>) -> Result<(), KernelError> {
-        self.admit(ctx)?;
+        self.admit(ctx, PermitUse::LiveDispatch)?;
         Ok(())
     }
     fn validate_output_before_release(
@@ -171,7 +184,7 @@ impl Guard for DelegatedWorkGuard {
         ctx: &GuardContext<'_>,
         output: &ToolServerOutput,
     ) -> Result<(), KernelError> {
-        let admission = self.admit(ctx)?;
+        let admission = self.admit(ctx, PermitUse::OutputContract)?;
         let ToolServerOutput::Value(value) = output else {
             return Err(denied("JSON return required"));
         };
@@ -188,6 +201,6 @@ impl Guard for DelegatedWorkGuard {
     fn output_rejection_is_zero_charge(&self, ctx: &GuardContext<'_>) -> bool {
         // This installed profile prices the receiver-signed offer on acceptance.
         // Invalid evidence cannot opt a request into this pricing authority.
-        self.admit(ctx).is_ok()
+        self.admit(ctx, PermitUse::OutputContract).is_ok()
     }
 }

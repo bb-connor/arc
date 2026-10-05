@@ -2,7 +2,7 @@
 
 Date: 2026-09-14. Implementation commit:
 `028347541e4d480b0deed01f4017fa2a12f6b02f`, on
-`research/funded-work-baseline` in `/home/connor/backbay/arc-funded-work`.
+`research/funded-work-baseline` in `$REPO`.
 The [execution manifest](09-w0-results.json) records source hashes, commands,
 public artifacts, expected failures and the refreshed native integration gate.
 

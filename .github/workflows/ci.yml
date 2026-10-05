@@ -25,7 +25,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'packet/**', 'integration/**']
     types: [opened, synchronize, reopened, unlabeled]
 
 concurrency:
@@ -127,6 +127,8 @@ jobs:
           run_gate python3 ./scripts/check-rust-toolchain-parity.py
           run_gate bash ./scripts/tests/check-rust-toolchain-parity.test.sh
           run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --check
+          run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --proof-room --check
+          run_gate python3 scripts/tests/check-registered-work-schemas.py
           run_gate python3 scripts/check-docker-build-contexts.py
           run_gate python3 scripts/tests/check-docker-build-contexts.test.py
           run_gate bash ./scripts/tests/check-sidecar-docker-context.test.sh

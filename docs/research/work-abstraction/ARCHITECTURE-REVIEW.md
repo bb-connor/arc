@@ -20,7 +20,7 @@ Source abbreviations below refer to exact commits in [SOURCES.json](SOURCES.json
 - Security: a99437b3ea8ef7ea03c7d2926049b27cb140b3c5.
 - Recovery contract: de84fc306efbb4c8dd6de748d0ad2a8d695fd30e, PR #1172.
 
-Work and security checkout heads were refreshed during this review and still matched these pins. The recovery implementation remains active on the owner's Mac; its accepted source/API landing is not visible here. That contract remains a dependency, not evidence of shipped code.
+Work and security checkout heads were refreshed during this review and still matched these pins. The recovery implementation is not qualified by this planning record. That contract remains a dependency, not evidence of shipped code.
 
 Priority P1 means resolve the design before implementing the affected boundary. P2 means a required API/quality correction in its owning task. Neither labels a newly demonstrated exploit in the active security candidate.
 

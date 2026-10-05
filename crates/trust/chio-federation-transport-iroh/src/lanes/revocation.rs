@@ -363,16 +363,20 @@ impl RevokedSubjectSource for NoLocalRevokedSubjects {
 #[derive(Debug)]
 pub struct RevocationViewSink {
     view: Arc<RevocationView>,
+    verifier: Ed25519RootVerifier,
     subjects: Arc<dyn RevokedSubjectSource>,
 }
 
 impl RevocationViewSink {
-    /// Bridge verified roots into `view`, materialising no leaves (root and
-    /// freshness only). See [`Self::with_subject_source`] to supply a leaf set.
+    /// Create an empty view for exactly one pinned revocation signer. Epochs
+    /// and freshness from independent signers are not comparable. Multi-origin
+    /// admission needs separate views and an explicit aggregation policy.
+    /// Materialises no leaves until [`Self::with_subject_source`] is supplied.
     #[must_use]
-    pub fn new(view: Arc<RevocationView>) -> Self {
+    pub fn new(verifier: Ed25519RootVerifier) -> Self {
         Self {
-            view,
+            view: Arc::new(RevocationView::new()),
+            verifier,
             subjects: Arc::new(NoLocalRevokedSubjects),
         }
     }
@@ -412,10 +416,20 @@ impl RevocationViewSink {
 
 impl RevocationRootSink for RevocationViewSink {
     fn merge_root(&self, signed: &SignedEpochRoot) -> Result<(), RevocationLaneError> {
+        signed
+            .verify(&self.verifier)
+            .map_err(|_| RevocationLaneError::BadSignature(self.verifier.signer_id().to_owned()))?;
         self.install(&signed.root)
     }
 
     fn merge_batch(&self, roots: &[SignedEpochRoot]) -> Result<(), RevocationLaneError> {
+        // Check the whole batch before choosing an epoch. A foreign lower
+        // epoch is still a domain mismatch and cannot hide behind a valid max.
+        for signed in roots {
+            signed.verify(&self.verifier).map_err(|_| {
+                RevocationLaneError::BadSignature(self.verifier.signer_id().to_owned())
+            })?;
+        }
         let Some(highest) = roots
             .iter()
             .map(|signed| &signed.root)

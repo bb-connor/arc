@@ -34,7 +34,7 @@ class FundedResolution(unittest.TestCase):
             self.assertEqual(report['chain']['payerBalance'], '1000')
             self.assertEqual(report['killedSignal'], None if fault == 'none' else 9)
             self.assertEqual(report['financial']['cost_charged'], 0)
-            self.assertEqual(report['financial']['settlement_status'], 'failed')
+            self.assertEqual(report['financial']['settlement_status'], 'settled')
             self.assertEqual(report['financial']['cost_breakdown']['payment']['recorded_units'], 100)
             with sqlite3.connect(f'file:{directory}/authority.sqlite?mode=ro', uri=True) as db:
                 self.assertEqual(db.execute('SELECT count(*) FROM admission_operations').fetchone()[0], 1)

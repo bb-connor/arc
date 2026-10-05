@@ -4,8 +4,13 @@ Chio implements capability evaluation, guarded tool dispatch and receipt signing
 in its Rust runtime. Delegation allocators and protected stores retain resource
 assignments; the swarm authority verifier checks task graphs and continuations;
 treaty admission governs cooperation between receivers. The work-commitment
-construction binds these mechanisms to durable execution records and the
-funded-settlement adapter through the checks in Section~\ref{sec:contract}.
+construction binds these mechanisms to durable execution records and funding.
+In the evaluated implementation, the example adapter's \texttt{Bindings} guard
+joins task identity, allocation digest and amount, receiver identity and request
+context. Its current program and allocation dimension are fixed, with a 100-unit
+parent contract. These cross-record joins have not yet been promoted into the
+public runtime admission API. The W1 runtime plan specifies that generalization;
+the present results qualify the fixed profile.
 The concrete profiles and their encodings are specified in
 Appendix~\ref{app:profiles}.
 
@@ -75,8 +80,11 @@ The rejection tests present authenticated but inconsistent records. A re-signed
 graph that changes an issued continuation is rejected. A sealed allocation
 cannot select a different invocation. Missing treaty evidence, a capability
 from another receiver, and a signed route naming another receiver are rejected
-before the funding check or tool execution. Removing the route check causes
-its regression test to fail by reaching the funding check.
+before the funding check or tool execution. The example adapter supplies the
+missing-treaty and foreign-capability prechecks and the cross-record route join;
+these cases do not establish the same guarantees for arbitrary callers of the
+shipped runtime hook. Removing the adapter's route check causes its regression
+test to fail by reaching the funding check.
 
 Recovery tests return recorded output after process loss, allow independent
 siblings to proceed, and preserve unfinished work through a graph extension.
@@ -84,7 +92,7 @@ A fresh request using a consumed continuation is rejected. When two extensions
 compete for the same graph head, only one commits. These cases exercise the
 state and reference checks used in the preservation argument.
 
-The current qualification records 21 terminal commands, including the composed
+The current qualification records \NativeCommands{} terminal commands, including the composed
 run and four existing child-payment crash and transaction-recovery cases.
 Six optional chain regressions are exercised separately. Exact counts,
 ignored cases and retained initial failures are recorded in

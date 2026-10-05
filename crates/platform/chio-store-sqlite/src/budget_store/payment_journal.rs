@@ -386,6 +386,8 @@ fn payment_journal_state(value: &str) -> Result<PaymentJournalState, rusqlite::E
         "settling" => Ok(PaymentJournalState::Settling),
         "settled" => Ok(PaymentJournalState::Settled),
         "closed" => Ok(PaymentJournalState::Closed),
+        "resolving" => Ok(PaymentJournalState::Resolving),
+        "resolved" => Ok(PaymentJournalState::Resolved),
         "reconcile_failed" => Ok(PaymentJournalState::ReconcileFailed),
         _ => Err(invalid_payment_column("state")),
     }
@@ -441,6 +443,7 @@ fn payment_release_authority_kind(
         "transport_not_accepted" => Ok(PaymentReleaseAuthorityKind::TransportNotAccepted),
         "contractual_zero_charge" => Ok(PaymentReleaseAuthorityKind::ContractualZeroCharge),
         "mutually_agreed_unknown" => Ok(PaymentReleaseAuthorityKind::MutuallyAgreedUnknown),
+        "contractual_capture_waiver" => Ok(PaymentReleaseAuthorityKind::ContractualCaptureWaiver),
         _ => Err(invalid_payment_column("release_authority_kind")),
     }
 }
@@ -455,4 +458,28 @@ fn invalid_payment_column(field: &'static str) -> rusqlite::Error {
         rusqlite::types::Type::Text,
         format!("invalid payment journal {field}").into(),
     )
+}
+
+#[cfg(test)]
+mod codec_tests {
+    use super::*;
+
+    #[test]
+    fn successor_journal_values_round_trip() -> Result<(), rusqlite::Error> {
+        for state in [
+            PaymentJournalState::Resolving,
+            PaymentJournalState::Resolved,
+        ] {
+            assert_eq!(
+                payment_journal_state(payment_journal_state_text(state))?,
+                state
+            );
+        }
+        let kind = PaymentReleaseAuthorityKind::ContractualCaptureWaiver;
+        assert_eq!(
+            payment_release_authority_kind(payment_release_authority_kind_text(kind))?,
+            kind
+        );
+        Ok(())
+    }
 }

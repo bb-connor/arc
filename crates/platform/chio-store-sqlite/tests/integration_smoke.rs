@@ -31,8 +31,12 @@ fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEven
 
 #[test]
 fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
-    let primary_path = unique_db_path("chio-authority-primary");
-    let replica_path = unique_db_path("chio-authority-replica");
+    let primary_directory =
+        chio_test_support::private_tempdir().test_expect("private primary directory");
+    let replica_directory =
+        chio_test_support::private_tempdir().test_expect("private replica directory");
+    let primary_path = primary_directory.path().join("authority.sqlite3");
+    let replica_path = replica_directory.path().join("authority.sqlite3");
     let primary =
         SqliteCapabilityAuthority::open(&primary_path).test_expect("open primary authority");
     let replica =
@@ -87,7 +91,8 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
 
 #[test]
 fn sqlite_capability_authority_rejects_snapshot_with_invalid_public_key() {
-    let path = unique_db_path("chio-authority-invalid-snapshot");
+    let directory = chio_test_support::private_tempdir().test_expect("private authority directory");
+    let path = directory.path().join("authority.sqlite3");
     let authority = SqliteCapabilityAuthority::open(&path).test_expect("open authority");
     let mut snapshot = authority.snapshot().test_expect("snapshot authority");
     snapshot.public_key_hex = "deadbeef".to_string();

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { ethers } from "ethers";
-import { fixture, digest, states } from "./work-claim-fixture.mjs";
+import { fixture, digest, states, rejected } from "./work-claim-fixture.mjs";
 
 const corpus = JSON.parse(fs.readFileSync(new URL("../../examples/funded-work-model/claim-traces.json", import.meta.url), "utf8"));
 
@@ -33,7 +33,10 @@ test("model edge representatives agree with actual claim states and token balanc
         }
         if (method) {
           if (step.ok) await (await method(...args)).wait();
-          else await assert.rejects(() => method.staticCall(...args));
+          else {
+            assert.equal(typeof step.revert, "string", "every denial names its expected error");
+            await rejected(f.escrow, step.revert, () => method.staticCall(...args));
+          }
         }
         for (const [name, expected] of Object.entries(step.expected)) {
           const actual = await f.escrow.getWork(ids[name]);

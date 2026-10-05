@@ -40,6 +40,9 @@ pub trait PaymentAdapter: Send + Sync {
     /// Implementations must be idempotent by `request.reference`: repeating the
     /// same request returns the same authorization and creates at most one
     /// rail-side hold or prepayment.
+    /// `Declined` and `InsufficientFunds` assert that no authorization was
+    /// created. An ambiguous outcome (including a lost reply) must instead
+    /// return `Unavailable` or `RailError` so recovery retains exposure.
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,

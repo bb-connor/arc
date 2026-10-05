@@ -71,10 +71,8 @@ fn any_dispatched(
 }
 
 const ADMISSION_BINDING_WITNESSES: &[&str] = &[
-    "asserted-version-matches-receiver-record",
     "arguments-differ-from-authorized-call",
     "token-replay-under-fresh-message-id",
-    "wrong-live-agreement",
     "superseded-agreement",
 ];
 
@@ -107,7 +105,7 @@ pub fn evaluate(results: &[NegativeResult]) -> Result<Vec<PropertyResult>, Strin
         step: "no step. The fields the composed receiver does check resolve identifiers in its own tables (steps 20, 26 and 30), compare a claim against the channel or against another claim (steps 16 to 19), or compare a claim against a clock (step 14); the one comparison against a receiver-held record is step 24, and the value it compares was chosen by the caller",
         weakened_to: Some("the call is bound to a workload the receiver's trust bundle names, to a credential issued for this receiver by an issuer it pinned, and to an agreement identifier and an approval identifier that resolve in the receiver's own tables; nothing binds it to the state of those records at the moment the authority was granted, and nothing binds the credential to the call it arrived with"),
         witnesses: ADMISSION_BINDING_WITNESSES.to_vec(),
-        note: "This is the one property the composition cannot reach by hardening, and the reason is structural. Eight of the fifteen binding fields have no field anywhere in the set, so for those facts there is nothing to compare. For the two that come closest, the hardened wiring does write the comparison: it refuses a retired agreement, and it refuses a credential whose scope asserts a version other than the one the receiver holds. Both comparisons are against values the caller's own authorization server minted, so an adversary asserts the version the receiver holds and passes, which is the case that dispatches under both wirings. The carrier ledger drives the same move once more with the operator's own invented field, and it ends the same way.",
+        note: "The selected wiring does not bind the concrete request and resource to receiver-owned admission context. The driven argument and resource cases demonstrate that limit here. Unpaired agreement-version cases and incidental approval denials do not establish a Chio advantage. Other application wiring can add authenticated bindings; this experiment establishes no impossibility for conventional components.",
     });
 
     // Receiver locality.

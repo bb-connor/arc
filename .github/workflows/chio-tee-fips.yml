@@ -3,8 +3,8 @@ name: chio-tee-fips
 on:
   workflow_call:
   pull_request:
-    # Main PRs run through CI's required reusable call.
-    branches-ignore: [main]
+    # These PRs run through CI's required reusable call.
+    branches-ignore: [main, 'packet/**', 'integration/**']
     paths:
       - .github/workflows/chio-tee-fips.yml
       - crates/trust/chio-tee/**

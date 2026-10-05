@@ -105,3 +105,7 @@ mod nonce_preflight_tests;
 #[cfg(test)]
 #[path = "tests/boundaries.rs"]
 mod boundary_tests;
+
+#[cfg(test)]
+#[path = "tests/v1.rs"]
+mod v1_tests;

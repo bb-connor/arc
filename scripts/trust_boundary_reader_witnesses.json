@@ -433,12 +433,16 @@
       "reader": "seal_dispatch",
       "api_label": "private::delegation_permit_canonical_producer+issuer_reverification",
       "required_source_expressions": [
-        "\\blet\\s+admission\\s*=\\s*self\\.claim_dispatch\\(binding,\\s*now\\)\\?",
+        "\\btransaction_with_behavior\\(TransactionBehavior::Immediate\\)\\?",
+        "\\blet\\s+row\\s*=\\s*required\\(&tx,\\s*&binding\\.slot_id\\)\\?",
+        "\\blet\\s+allocation_hash\\s*=\\s*allocation_digest\\(&tx,\\s*&row\\)\\?",
+        "\\bvalidate_dispatch\\(&row\\.slot,\\s*&selection,\\s*binding,\\s*now\\)\\?",
         "\\bserde_json::from_str::<Signed<DispatchPermit>>\\(&body\\)",
         "\\blet\\s+permit\\s*=\\s*Signed::sign\\(",
         "\\bencode\\(&permit\\)\\?",
-        "\\bif\\s+permit\\.body\\.allocation_hash\\s*!=\\s*allocation_digest\\(&tx,\\s*&required\\(&tx,\\s*&binding\\.slot_id\\)\\?\\)\\?\\s*\\{\\s*return\\s+Err\\(",
-        "\\bverify_dispatch_permit\\(&permit,\\s*binding,\\s*now,\\s*&\\[issuer\\.public_key\\(\\)\\]\\)\\?"
+        "\\bif\\s+permit\\.body\\.allocation_hash\\s*!=\\s*allocation_hash\\s*\\{\\s*return\\s+Err\\(",
+        "\\bverify_dispatch_permit\\(&permit,\\s*binding,\\s*now,\\s*&\\[issuer\\.public_key\\(\\)\\]\\)\\?",
+        "\\bverify_dispatch_permit\\([^;]+\\)\\?;\\s*tx\\.execute\\(\\s*,\\s*\\[&binding\\.slot_id\\],\\s*\\)\\?;\\s*tx\\.commit\\(\\)\\?"
       ],
       "required_owner_witnesses": [
         {
@@ -476,7 +480,7 @@
         }
       ],
       "producer_relationships": [],
-      "review_note": "Only the protected allocator's previously written canonical permit is reparsed; return is gated by issuer/holder/offer signatures and exact live dispatch binding."
+      "review_note": "Owner-local canonical permit readback still verifies allocation, signature and issuer. Signing, bounded encoding, verification and dispatch claim now share one immediate transaction; failure rolls back selection custody. The regression checks rejected oversized sealing, replacement and exact replay. These lexical anchors are not a transaction or authentication proof."
     },
     {
       "path": "crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs",

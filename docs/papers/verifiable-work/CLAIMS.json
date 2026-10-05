@@ -161,20 +161,24 @@
       ],
       "limitation": "Not all model transitions; no public finality.",
       "claim_id": "C07",
-      "exact_claim": "118 selected model traces are replayed against actual escrow bytecode.",
+      "exact_claim": "270 selected model traces are replayed against actual escrow bytecode.",
       "evidence_paths": [
-        "contracts/scripts/work-claim-model.test.mjs",
-        "docs/papers/verifiable-work/evidence/contracts.log"
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/qualification.json",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/traces.json",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/comparison.json",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/bytecode.stdout",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/mutation.stdout"
       ],
-      "profile": "118 selected model traces on compiled Solidity with private Ganache",
+      "profile": "270 selected model traces on compiled Solidity with private Ganache",
       "adversary": "Selected role, timing, replay and terminal-state schedules",
-      "supporting_source_version": "7755d3762baa5e0fda0d171835a9000c26de9033",
+      "supporting_source_version": "Source inventory in docs/papers/verifiable-work/evidence/claim-replay-20261005/qualification.json",
       "counterexample": "A model/bytecode snapshot mismatch or skipped trace falsifies this replay claim; 132192 transitions were not all replayed.",
-      "baseline_result": "SQL matches the same 118 traces; upstream ERC-8183 has its own selected paired scenarios.",
+      "baseline_result": "SQL matches the same 270 traces; upstream ERC-8183 has its own selected paired scenarios.",
       "next_decisive_test": "Independently authored transition corpus and additional fault injection against the exact deployed profile.",
       "original_hypotheses": [
         "H1"
-      ]
+      ],
+      "review_scope": "Source-bound corrected replay checks exact rejection reasons, including post-deadline Payable and Paid states. The prior 118-trace campaign remains historical evidence."
     },
     {
       "status": [
@@ -186,14 +190,17 @@
       ],
       "limitation": "Not a full networked alternative or independent authorship.",
       "claim_id": "C08",
-      "exact_claim": "Ordinary SQL matches 312 steps along the same 118 monetary traces.",
+      "exact_claim": "Ordinary SQL matches 738 steps along the same 270 monetary traces.",
       "evidence_paths": [
-        "docs/papers/verifiable-work/evidence/comparison.json",
-        "docs/papers/verifiable-work/tools/compare.py"
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/qualification.json",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/traces.json",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/comparison.json",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/bytecode.stdout",
+        "docs/papers/verifiable-work/evidence/claim-replay-20261005/mutation.stdout"
       ],
       "profile": "In-memory sequential SQLite escrow, authenticated symbolic roles",
       "adversary": "Duplicate and conflicting operations in the retained corpus; no Byzantine SQL owner",
-      "supporting_source_version": "3363ac67ec12304e6ed782f4e13fe6a3aaf21225",
+      "supporting_source_version": "Source inventory in docs/papers/verifiable-work/evidence/claim-replay-20261005/qualification.json",
       "counterexample": "A divergent state, denied-operation mutation or broken balance invariant falsifies trace equivalence. Full networked integration was not compared.",
       "baseline_result": "This is the successful ordinary baseline result, not evidence of Chio superiority.",
       "next_decisive_test": "Build and measure the full ordinary cross-company composition with the same rail, checker and authority guarantees.",
@@ -201,7 +208,8 @@
         "H1",
         "H3",
         "H5"
-      ]
+      ],
+      "review_scope": "Source-bound corrected replay checks exact rejection reasons, including post-deadline Payable and Paid states. The prior 118-trace campaign remains historical evidence."
     },
     {
       "status": [
@@ -660,7 +668,7 @@
         "docs/research/dynamic-delegation/evidence/qualification.json",
         "examples/federated-work/test_evolving_work.py"
       ],
-      "limitation": "One administrator, deterministic easy-to-check work, one composed parent-kill cut. First collection retains a missing remote co-signer diagnostic; local execution and payment do not establish final bilateral delivery.",
+      "limitation": "One administrator, deterministic easy-to-check work, one composed parent-kill cut. First collection retains a missing remote co-signer diagnostic; local execution and payment do not establish final bilateral delivery. Cross-record task, allocation, receiver and funded-request joins are implemented by the example Bindings guard with a fixed program, xts_base_units dimension and 100-unit parent contract. W1 promotion into the reusable runtime remains planned.",
       "counterexample": "Would falsify: graph growth refreshes an old continuation, replay changes original operation or payment identity, parent refund removes an earned child claim, or any receiver executes twice.",
       "baseline_result": "No unique conservation or earned-payment claim; SQL and ERC-8183 parity remains. Full integration advantage is unmeasured.",
       "next_decisive_test": "Independently implemented receiver under separate administration, followed by held-out useful work and matched integration cost."
@@ -690,7 +698,7 @@
         "crates/kernel/chio-kernel/src/kernel/tests/durable_admission/execution_evidence.rs",
         "docs/research/evolving-funded-work/REVIEW.md"
       ],
-      "limitation": "Receiver-side checks are not a proof of honest remote computation or final bilateral delivery. Security-release and caller-delivery outcomes remain unsupported by this exporter.",
+      "limitation": "Receiver-side checks are not a proof of honest remote computation or final bilateral delivery. Security-release and caller-delivery outcomes remain unsupported by this exporter. Cross-record task, allocation, receiver and funded-request joins are implemented by the example Bindings guard with a fixed program, xts_base_units dimension and 100-unit parent contract. W1 promotion into the reusable runtime remains planned.",
       "counterexample": "Would falsify: a valid foreign-target route reaches funding observation, missing context downgrades admission, or export performs a tool/payment action.",
       "baseline_result": "Standard capability and transaction systems can implement equivalent conditions; reusable integration remains the proposed value.",
       "next_decisive_test": "Outside receiver reproduction using the published original public artifact definitions."

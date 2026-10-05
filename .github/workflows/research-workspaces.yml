@@ -1,0 +1,74 @@
+name: Research workspace qualification
+
+on:
+  pull_request:
+    paths:
+      - 'examples/federated-work/**'
+      - 'examples/composed-baseline/**'
+      - 'examples/outcome-ledger-comparison/**'
+      - 'labs/kernel-work-composition/**'
+      - 'labs/kernel-work-families/**'
+      - 'crates/**'
+      - 'third_party/**'
+      - 'supply-chain/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'scripts/*research-workspaces*'
+      - 'scripts/research_workspaces.py'
+      - 'scripts/tests/check-research-workspaces.test.py'
+      - '.github/workflows/research-workspaces.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  research:
+    name: Research / ${{ matrix.workspace }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - examples/federated-work
+          - examples/composed-baseline
+          - examples/outcome-ledger-comparison
+          - labs/kernel-work-composition
+          - labs/kernel-work-families
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target/research-ci
+      CHIO_CHECKOUT_ROOT: ${{ github.workspace }}
+      RESEARCH_WORKSPACE: ${{ matrix.workspace }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - run: rustup show active-toolchain
+      - uses: ./.github/actions/apt-install
+        with:
+          packages: protobuf-compiler
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          key: research-${{ matrix.workspace }}
+      - name: Verify locked source policy
+        run: |
+          python3 scripts/tests/check-research-workspaces.test.py
+          python3 scripts/check-research-workspaces.py --workspace "$RESEARCH_WORKSPACE"
+      - name: Build, lint and test retained evidence workspaces
+        run: |
+          cargo fmt --manifest-path "$RESEARCH_WORKSPACE/Cargo.toml" -- --check
+          cargo build --locked --manifest-path "$RESEARCH_WORKSPACE/Cargo.toml" --all-targets
+          cargo clippy --locked --manifest-path "$RESEARCH_WORKSPACE/Cargo.toml" --all-targets -- -D warnings
+          cargo test --locked --manifest-path "$RESEARCH_WORKSPACE/Cargo.toml" --all-targets
+      - name: Test the Python participant and isolation probe
+        if: matrix.workspace == 'examples/federated-work'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/research-python"
+          "$RUNNER_TEMP/research-python/bin/python" -m pip install --require-hashes --only-binary=:all: -r examples/federated-work/python_buyer/requirements.txt
+          "$RUNNER_TEMP/research-python/bin/python" -B -m unittest discover -s examples/federated-work/python_buyer -p 'test_*.py'

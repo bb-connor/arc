@@ -1,0 +1,461 @@
+bigint: Failed to load bindings, pure JS will be used (try npm run rebuild?)
+This version of µWS is not compatible with your Node.js build:
+
+Error: Cannot find module '../binaries/uws_linux_arm64_137.node'
+Require stack:
+- /home/connor/backbay/arc-agentic-work-plan/contracts/node_modules/.pnpm/@trufflesuite+uws-js-unofficial@20.30.0-unofficial.0/node_modules/@trufflesuite/uws-js-unofficial/src/uws.js
+- /home/connor/backbay/arc-agentic-work-plan/contracts/node_modules/.pnpm/ganache@7.9.2/node_modules/ganache/dist/node/core.js
+Falling back to a NodeJS implementation; performance may be degraded.
+
+
+▶ model edge representatives agree with actual claim states and token balances
+  ✔ 0: submit Funded -> Submitted (true) (246.196714ms)
+  ✔ 1: submit Funded -> Funded (false) (248.991848ms)
+  ✔ 2: decide Funded -> Funded (false) (216.157404ms)
+  ✔ 3: decide Funded -> Funded (false) (242.591376ms)
+  ✔ 4: pay Funded -> Funded (false) (225.724211ms)
+  ✔ 5: pay Funded -> Funded (false) (185.712251ms)
+  ✔ 6: refund Funded -> Funded (false) (192.779646ms)
+  ✔ 7: expire Funded -> Funded (false) (187.912702ms)
+  ✔ 8: submit Funded -> Submitted (true) (189.708192ms)
+  ✔ 9: submit Funded -> Funded (false) (216.447725ms)
+  ✔ 10: decide Funded -> Funded (false) (243.630381ms)
+  ✔ 11: decide Funded -> Funded (false) (176.349645ms)
+  ✔ 12: pay Funded -> Funded (false) (158.848156ms)
+  ✔ 13: pay Funded -> Funded (false) (131.059857ms)
+  ✔ 14: refund Funded -> Funded (false) (139.129657ms)
+  ✔ 15: expire Funded -> Funded (false) (158.177273ms)
+  ✔ 16: submit Submitted -> Submitted (true) (460.997312ms)
+  ✔ 17: submit Submitted -> Submitted (false) (551.746966ms)
+  ✔ 18: submit Submitted -> Submitted (false) (415.142282ms)
+  ✔ 19: decide Submitted -> Submitted (false) (341.452792ms)
+  ✔ 20: decide Submitted -> Submitted (false) (342.635678ms)
+  ✔ 21: pay Submitted -> Submitted (false) (378.608779ms)
+  ✔ 22: pay Submitted -> Submitted (false) (379.563663ms)
+  ✔ 23: refund Submitted -> Submitted (false) (465.507455ms)
+  ✔ 24: expire Submitted -> Submitted (false) (423.258762ms)
+  ✔ 25: submit Submitted -> Submitted (true) (411.023181ms)
+  ✔ 26: submit Submitted -> Submitted (false) (355.254661ms)
+  ✔ 27: submit Submitted -> Submitted (false) (452.545029ms)
+  ✔ 28: decide Submitted -> Submitted (false) (387.682304ms)
+  ✔ 29: decide Submitted -> Submitted (false) (419.595384ms)
+  ✔ 30: pay Submitted -> Submitted (false) (409.078171ms)
+  ✔ 31: pay Submitted -> Submitted (false) (441.582054ms)
+  ✔ 32: refund Submitted -> Submitted (false) (358.142196ms)
+  ✔ 33: expire Submitted -> Submitted (false) (483.970707ms)
+  ✔ 34: submit Funded -> Funded (false) (175.752121ms)
+  ✔ 35: submit Funded -> Funded (false) (204.813947ms)
+  ✔ 36: decide Submitted -> Payable (true) (1146.81363ms)
+  ✔ 37: decide Submitted -> Rejected (true) (1193.252263ms)
+  ✔ 38: decide Submitted -> Submitted (false) (529.714696ms)
+  ✔ 39: decide Submitted -> Payable (true) (860.543595ms)
+  ✔ 40: decide Submitted -> Rejected (true) (1152.450979ms)
+  ✔ 41: decide Submitted -> Submitted (false) (607.975369ms)
+  ✔ 42: submit Payable -> Payable (true) (1471.323817ms)
+  ✔ 43: submit Payable -> Payable (false) (1182.303728ms)
+  ✔ 44: submit Payable -> Payable (false) (1098.85303ms)
+  ✔ 45: decide Payable -> Payable (true) (1640.536346ms)
+  ✔ 46: decide Payable -> Payable (false) (1401.672548ms)
+  ✔ 47: decide Payable -> Payable (false) (1176.440099ms)
+  ✔ 48: decide Payable -> Payable (false) (1435.586799ms)
+  ✔ 49: pay Payable -> Paid (true) (1878.865741ms)
+  ✔ 50: pay Payable -> Payable (false) (1552.323344ms)
+  ✖ 51: refund Payable -> Payable (false) (1052.141115ms)
+  ✖ 52: expire Payable -> Payable (false) (1603.058038ms)
+  ✔ 53: submit Rejected -> Rejected (true) (1364.100881ms)
+  ✔ 54: submit Rejected -> Rejected (false) (1507.540479ms)
+  ✔ 55: submit Rejected -> Rejected (false) (1337.864309ms)
+  ✔ 56: decide Rejected -> Rejected (false) (1456.071181ms)
+  ✔ 57: decide Rejected -> Rejected (true) (1731.109081ms)
+  ✔ 58: decide Rejected -> Rejected (false) (1382.184371ms)
+  ✔ 59: pay Rejected -> Rejected (false) (1394.772794ms)
+  ✔ 60: pay Rejected -> Rejected (false) (1509.695731ms)
+  ✔ 61: refund Rejected -> Refunded (true) (2767.90016ms)
+  ✔ 62: expire Rejected -> Rejected (false) (1313.205865ms)
+  ✔ 63: submit Payable -> Payable (true) (1451.471718ms)
+  ✔ 64: submit Payable -> Payable (false) (1449.224947ms)
+  ✔ 65: submit Payable -> Payable (false) (1250.982754ms)
+  ✔ 66: decide Payable -> Payable (true) (1636.601447ms)
+  ✔ 67: decide Payable -> Payable (false) (1245.592686ms)
+  ✔ 68: decide Payable -> Payable (false) (1773.327612ms)
+  ✔ 69: decide Payable -> Payable (false) (1404.690724ms)
+  ✔ 70: pay Payable -> Paid (true) (2551.332914ms)
+  ✔ 71: pay Payable -> Payable (false) (1357.855849ms)
+  ✖ 72: refund Payable -> Payable (false) (1502.156933ms)
+  ✖ 73: expire Payable -> Payable (false) (1161.675186ms)
+  ✔ 74: submit Rejected -> Rejected (true) (1951.268585ms)
+  ✔ 75: submit Rejected -> Rejected (false) (1258.042388ms)
+  ✔ 76: submit Rejected -> Rejected (false) (1781.053531ms)
+  ✔ 77: decide Rejected -> Rejected (false) (1583.688982ms)
+  ✔ 78: decide Rejected -> Rejected (true) (1562.055834ms)
+  ✔ 79: decide Rejected -> Rejected (false) (1580.400246ms)
+  ✔ 80: pay Rejected -> Rejected (false) (1600.713867ms)
+  ✔ 81: pay Rejected -> Rejected (false) (2220.581096ms)
+  ✔ 82: refund Rejected -> Refunded (true) (2796.358344ms)
+  ✔ 83: expire Rejected -> Rejected (false) (1627.20164ms)
+  ✔ 84: submit Paid -> Paid (true) (2361.493243ms)
+  ✔ 85: submit Paid -> Paid (false) (2232.603636ms)
+  ✔ 86: submit Paid -> Paid (false) (2949.261311ms)
+  ✔ 87: decide Paid -> Paid (true) (2883.21882ms)
+  ✔ 88: decide Paid -> Paid (false) (2525.961668ms)
+  ✔ 89: decide Paid -> Paid (false) (2268.550337ms)
+  ✔ 90: decide Paid -> Paid (false) (3008.832849ms)
+  ✔ 91: pay Paid -> Paid (false) (2492.304659ms)
+  ✔ 92: pay Paid -> Paid (false) (2237.082819ms)
+  ✔ 93: refund Paid -> Paid (false) (2063.579309ms)
+  ✔ 94: expire Paid -> Paid (false) (2546.702613ms)
+  ✔ 95: submit Refunded -> Refunded (true) (2582.735953ms)
+  ✔ 96: submit Refunded -> Refunded (false) (1863.854628ms)
+  ✔ 97: submit Refunded -> Refunded (false) (2203.093129ms)
+  ✔ 98: decide Refunded -> Refunded (false) (2593.600648ms)
+  ✔ 99: decide Refunded -> Refunded (true) (2297.371203ms)
+  ✔ 100: decide Refunded -> Refunded (false) (2073.876322ms)
+  ✔ 101: pay Refunded -> Refunded (false) (2392.480759ms)
+  ✔ 102: pay Refunded -> Refunded (false) (2557.023985ms)
+  ✔ 103: refund Refunded -> Refunded (false) (2383.242833ms)
+  ✔ 104: expire Refunded -> Refunded (false) (2360.88128ms)
+  ✔ 105: submit Paid -> Paid (true) (2672.381603ms)
+  ✔ 106: submit Paid -> Paid (false) (2286.87939ms)
+  ✔ 107: submit Paid -> Paid (false) (2199.761073ms)
+  ✔ 108: decide Paid -> Paid (true) (3119.358206ms)
+  ✔ 109: decide Paid -> Paid (false) (2433.826967ms)
+  ✔ 110: decide Paid -> Paid (false) (2739.962543ms)
+  ✔ 111: decide Paid -> Paid (false) (2611.670859ms)
+  ✔ 112: pay Paid -> Paid (false) (2762.079693ms)
+  ✔ 113: pay Paid -> Paid (false) (2300.039656ms)
+  ✔ 114: refund Paid -> Paid (false) (2499.272375ms)
+  ✔ 115: expire Paid -> Paid (false) (2343.963116ms)
+  ✔ 116: submit Refunded -> Refunded (true) (2480.979804ms)
+  ✔ 117: submit Refunded -> Refunded (false) (2310.855671ms)
+  ✔ 118: submit Refunded -> Refunded (false) (2413.772507ms)
+  ✔ 119: decide Refunded -> Refunded (false) (2150.238385ms)
+  ✔ 120: decide Refunded -> Refunded (true) (2429.632987ms)
+  ✔ 121: decide Refunded -> Refunded (false) (2591.283637ms)
+  ✔ 122: pay Refunded -> Refunded (false) (2217.669843ms)
+  ✔ 123: pay Refunded -> Refunded (false) (2479.515277ms)
+  ✔ 124: refund Refunded -> Refunded (false) (2140.809138ms)
+  ✔ 125: expire Refunded -> Refunded (false) (2194.96517ms)
+  ✔ 126: submit Funded -> Funded (false) (238.079834ms)
+  ✔ 127: submit Funded -> Funded (false) (329.013891ms)
+  ✔ 128: decide Funded -> Funded (false) (307.332942ms)
+  ✔ 129: decide Funded -> Funded (false) (297.753813ms)
+  ✔ 130: pay Funded -> Funded (false) (194.310175ms)
+  ✔ 131: pay Funded -> Funded (false) (294.784199ms)
+  ✔ 132: refund Funded -> Refunded (true) (1619.664565ms)
+  ✔ 133: expire Funded -> TimedOut (true) (394.989462ms)
+  ✔ 134: submit Funded -> Funded (false) (370.734819ms)
+  ✔ 135: submit Funded -> Funded (false) (195.994863ms)
+  ✔ 136: decide Funded -> Funded (false) (315.17818ms)
+  ✔ 137: decide Funded -> Funded (false) (367.822605ms)
+  ✔ 138: pay Funded -> Funded (false) (162.674376ms)
+  ✔ 139: pay Funded -> Funded (false) (239.23124ms)
+  ✔ 140: refund Funded -> Refunded (true) (923.14195ms)
+  ✔ 141: expire Funded -> TimedOut (true) (422.60844ms)
+  ✔ 142: submit Refunded -> Refunded (false) (1655.563465ms)
+  ✔ 143: submit Refunded -> Refunded (false) (1805.483056ms)
+  ✔ 144: decide Refunded -> Refunded (false) (1593.613354ms)
+  ✔ 145: decide Refunded -> Refunded (false) (1415.121659ms)
+  ✔ 146: pay Refunded -> Refunded (false) (1602.622439ms)
+  ✔ 147: pay Refunded -> Refunded (false) (1504.537107ms)
+  ✔ 148: refund Refunded -> Refunded (false) (2011.698371ms)
+  ✔ 149: expire Refunded -> Refunded (false) (1859.627809ms)
+  ✔ 150: submit TimedOut -> TimedOut (false) (493.253074ms)
+  ✔ 151: submit TimedOut -> TimedOut (false) (482.259939ms)
+  ✔ 152: decide TimedOut -> TimedOut (false) (541.494316ms)
+  ✔ 153: decide TimedOut -> TimedOut (false) (550.13076ms)
+  ✔ 154: pay TimedOut -> TimedOut (false) (387.184822ms)
+  ✔ 155: pay TimedOut -> TimedOut (false) (480.890492ms)
+  ✔ 156: refund TimedOut -> Refunded (true) (1170.833793ms)
+  ✔ 157: expire TimedOut -> TimedOut (true) (454.604601ms)
+  ✔ 158: submit Refunded -> Refunded (false) (1067.205914ms)
+  ✔ 159: submit Refunded -> Refunded (false) (1310.314452ms)
+  ✔ 160: decide Refunded -> Refunded (false) (1520.269826ms)
+  ✔ 161: decide Refunded -> Refunded (false) (1933.470019ms)
+  ✔ 162: pay Refunded -> Refunded (false) (1451.691122ms)
+  ✔ 163: pay Refunded -> Refunded (false) (1543.605743ms)
+  ✔ 164: refund Refunded -> Refunded (false) (1272.850025ms)
+  ✔ 165: expire Refunded -> Refunded (false) (1295.401258ms)
+  ✔ 166: submit TimedOut -> TimedOut (false) (460.773111ms)
+  ✔ 167: submit TimedOut -> TimedOut (false) (527.986288ms)
+  ✔ 168: decide TimedOut -> TimedOut (false) (631.636049ms)
+  ✔ 169: decide TimedOut -> TimedOut (false) (451.030943ms)
+  ✔ 170: pay TimedOut -> TimedOut (false) (376.207847ms)
+  ✔ 171: pay TimedOut -> TimedOut (false) (599.673128ms)
+  ✔ 172: refund TimedOut -> Refunded (true) (1237.367247ms)
+  ✔ 173: expire TimedOut -> TimedOut (true) (626.348302ms)
+  ✔ 174: submit Submitted -> Submitted (true) (534.202599ms)
+  ✔ 175: submit Submitted -> Submitted (false) (538.876503ms)
+  ✔ 176: submit Submitted -> Submitted (false) (489.006053ms)
+  ✔ 177: decide Submitted -> Submitted (false) (528.412251ms)
+  ✔ 178: decide Submitted -> Submitted (false) (531.759188ms)
+  ✔ 179: pay Submitted -> Submitted (false) (617.384017ms)
+  ✔ 180: pay Submitted -> Submitted (false) (497.417175ms)
+  ✔ 181: refund Submitted -> Refunded (true) (1411.655921ms)
+  ✔ 182: expire Submitted -> TimedOut (true) (468.686871ms)
+  ✔ 183: submit Submitted -> Submitted (true) (565.105435ms)
+  ✔ 184: submit Submitted -> Submitted (false) (435.129743ms)
+  ✔ 185: submit Submitted -> Submitted (false) (437.527875ms)
+  ✔ 186: decide Submitted -> Submitted (false) (556.834314ms)
+  ✔ 187: decide Submitted -> Submitted (false) (471.915767ms)
+  ✔ 188: pay Submitted -> Submitted (false) (504.449731ms)
+  ✔ 189: pay Submitted -> Submitted (false) (644.630074ms)
+  ✔ 190: refund Submitted -> Refunded (true) (1628.615089ms)
+  ✔ 191: expire Submitted -> TimedOut (true) (575.440247ms)
+  ✔ 192: submit Refunded -> Refunded (true) (1752.696072ms)
+  ✔ 193: submit Refunded -> Refunded (false) (1810.980685ms)
+  ✔ 194: submit TimedOut -> TimedOut (true) (797.838443ms)
+  ✔ 195: submit TimedOut -> TimedOut (false) (586.850544ms)
+  ✔ 196: submit Payable -> Payable (true) (1126.877173ms)
+  ✔ 197: submit Payable -> Payable (false) (1312.666545ms)
+  ✔ 198: submit Payable -> Payable (false) (1195.721998ms)
+  ✔ 199: decide Payable -> Payable (true) (1533.548053ms)
+  ✔ 200: decide Payable -> Payable (false) (1420.007404ms)
+  ✔ 201: decide Payable -> Payable (false) (1929.771881ms)
+  ✔ 202: decide Payable -> Payable (false) (1468.340366ms)
+  ✔ 203: pay Payable -> Paid (true) (2491.90078ms)
+  ✔ 204: pay Payable -> Payable (false) (1801.038155ms)
+  ✖ 205: refund Payable -> Payable (false) (1191.026775ms)
+  ✖ 206: expire Payable -> Payable (false) (1238.325292ms)
+  ✔ 207: submit Rejected -> Rejected (true) (1950.367304ms)
+  ✔ 208: submit Rejected -> Rejected (false) (1502.550018ms)
+  ✔ 209: submit Rejected -> Rejected (false) (1766.983304ms)
+  ✔ 210: decide Rejected -> Rejected (false) (1450.295075ms)
+  ✔ 211: decide Rejected -> Rejected (true) (1797.170136ms)
+  ✔ 212: decide Rejected -> Rejected (false) (1763.080565ms)
+  ✔ 213: pay Rejected -> Rejected (false) (1509.085891ms)
+  ✔ 214: pay Rejected -> Rejected (false) (1075.910597ms)
+  ✔ 215: refund Rejected -> Refunded (true) (2226.919852ms)
+  ✔ 216: expire Rejected -> Rejected (false) (1649.198833ms)
+  ✔ 217: submit Refunded -> Refunded (true) (1903.982872ms)
+  ✔ 218: submit Refunded -> Refunded (false) (1810.305122ms)
+  ✔ 219: submit TimedOut -> TimedOut (true) (890.553548ms)
+  ✔ 220: submit TimedOut -> TimedOut (false) (746.382344ms)
+  ✔ 221: submit Payable -> Payable (true) (1141.602727ms)
+  ✔ 222: submit Payable -> Payable (false) (1536.022946ms)
+  ✔ 223: submit Payable -> Payable (false) (1254.899576ms)
+  ✔ 224: decide Payable -> Payable (true) (1674.819002ms)
+  ✔ 225: decide Payable -> Payable (false) (1557.838935ms)
+  ✔ 226: decide Payable -> Payable (false) (1641.768476ms)
+  ✔ 227: decide Payable -> Payable (false) (1438.854099ms)
+  ✔ 228: pay Payable -> Paid (true) (2093.312462ms)
+  ✔ 229: pay Payable -> Payable (false) (1180.08452ms)
+  ✖ 230: refund Payable -> Payable (false) (1305.963472ms)
+  ✖ 231: expire Payable -> Payable (false) (1069.191044ms)
+  ✔ 232: submit Rejected -> Rejected (true) (1514.781599ms)
+  ✔ 233: submit Rejected -> Rejected (false) (1529.216472ms)
+  ✔ 234: submit Rejected -> Rejected (false) (1205.528968ms)
+  ✔ 235: decide Rejected -> Rejected (false) (1752.918754ms)
+  ✔ 236: decide Rejected -> Rejected (true) (1470.692978ms)
+  ✔ 237: decide Rejected -> Rejected (false) (1310.813977ms)
+  ✔ 238: pay Rejected -> Rejected (false) (1122.24235ms)
+  ✔ 239: pay Rejected -> Rejected (false) (1451.812963ms)
+  ✔ 240: refund Rejected -> Refunded (true) (1954.854047ms)
+  ✔ 241: expire Rejected -> Rejected (false) (1637.968898ms)
+  ✔ 242: submit Paid -> Paid (true) (2387.9341ms)
+  ✔ 243: submit Paid -> Paid (false) (2538.456495ms)
+  ✔ 244: submit Paid -> Paid (false) (2301.987549ms)
+  ✔ 245: decide Paid -> Paid (true) (2589.467672ms)
+  ✔ 246: decide Paid -> Paid (false) (2857.861138ms)
+  ✔ 247: decide Paid -> Paid (false) (2906.180661ms)
+  ✔ 248: decide Paid -> Paid (false) (2103.267553ms)
+  ✔ 249: pay Paid -> Paid (false) (2600.065965ms)
+  ✔ 250: pay Paid -> Paid (false) (2164.511339ms)
+  ✔ 251: refund Paid -> Paid (false) (2548.930909ms)
+  ✔ 252: expire Paid -> Paid (false) (2515.081739ms)
+  ✔ 253: decide Refunded -> Refunded (false) (2377.607449ms)
+  ✔ 254: decide Refunded -> Refunded (true) (2829.271715ms)
+  ✔ 255: decide Refunded -> Refunded (false) (2623.631003ms)
+  ✔ 256: submit Paid -> Paid (true) (2630.787199ms)
+  ✔ 257: submit Paid -> Paid (false) (3027.50103ms)
+  ✔ 258: submit Paid -> Paid (false) (2627.513463ms)
+  ✔ 259: decide Paid -> Paid (true) (2627.918585ms)
+  ✔ 260: decide Paid -> Paid (false) (2621.315072ms)
+  ✔ 261: decide Paid -> Paid (false) (3190.800969ms)
+  ✔ 262: decide Paid -> Paid (false) (2758.035998ms)
+  ✔ 263: pay Paid -> Paid (false) (2681.796135ms)
+  ✔ 264: pay Paid -> Paid (false) (2038.473188ms)
+  ✔ 265: refund Paid -> Paid (false) (2823.030724ms)
+  ✔ 266: expire Paid -> Paid (false) (3041.4159ms)
+  ✔ 267: decide Refunded -> Refunded (false) (2102.188867ms)
+  ✔ 268: decide Refunded -> Refunded (true) (2819.808668ms)
+  ✔ 269: decide Refunded -> Refunded (false) (2188.205659ms)
+✖ model edge representatives agree with actual claim states and token balances (392636.269781ms)
+ℹ {"modelStates":5508,"modelTransitions":132192,"bytecodeTraceRepresentatives":270}
+ℹ tests 271
+ℹ suites 0
+ℹ pass 262
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 405757.005608
+
+✖ failing tests:
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 51: refund Payable -> Payable (false) (1052.141115ms)
+  AssertionError [ERR_ASSERTION]: execution reverted (unknown custom error)
+  + actual - expected
+  
+  + 'RefundNotDue'
+  - 'WrongState'
+  
+      at Object.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:53:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'RefundNotDue',
+    expected: 'WrongState',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 52: expire Payable -> Payable (false) (1603.058038ms)
+  AssertionError [ERR_ASSERTION]: execution reverted (unknown custom error)
+  + actual - expected
+  
+  + 'RefundNotDue'
+  - 'WrongState'
+  
+      at Object.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:53:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'RefundNotDue',
+    expected: 'WrongState',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 72: refund Payable -> Payable (false) (1502.156933ms)
+  AssertionError [ERR_ASSERTION]: execution reverted (unknown custom error)
+  + actual - expected
+  
+  + 'RefundNotDue'
+  - 'WrongState'
+  
+      at Object.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:53:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'RefundNotDue',
+    expected: 'WrongState',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 73: expire Payable -> Payable (false) (1161.675186ms)
+  AssertionError [ERR_ASSERTION]: execution reverted (unknown custom error)
+  + actual - expected
+  
+  + 'RefundNotDue'
+  - 'WrongState'
+  
+      at Object.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:53:12)
+      at expectedException (node:assert:578:17)
+      at expectsError (node:assert:703:21)
+      at strict.rejects (node:assert:769:3)
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'RefundNotDue',
+    expected: 'WrongState',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 205: refund Payable -> Payable (false) (1191.026775ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 206: expire Payable -> Payable (false) (1238.325292ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 230: refund Payable -> Payable (false) (1305.963472ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at contracts/scripts/work-claim-model.test.mjs:19:13
+✖ 231: expire Payable -> Payable (false) (1069.191044ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async rejected (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-fixture.mjs:52:3)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:38:13)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async TestContext.<anonymous> (file:///home/connor/backbay/arc-agentic-work-plan/contracts/scripts/work-claim-model.test.mjs:19:5)
+      at async Test.run (node:internal/test_runner/test:1313:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'rejects',
+    diff: 'simple'
+  }

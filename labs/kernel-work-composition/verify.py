@@ -20,6 +20,8 @@ def sources():
     files += [p.relative_to(ROOT) for p in (ROOT / LAB / 'tests').rglob('*.rs')]
     files += [LAB / name for name in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'README.md', 'verify.py']]
     files += [Path('docs/research/kernel-work') / name for name in ['MODEL.md', 'fixtures.json', 'WITNESS.md', 'G1-DECISION.md', 'task3-sources.json', 'recovery-baseline.json']]
+    files += [Path('docs/research/kernel-work') / name for name in
+              ['verify_task1.py', 'claim-register.json', 'recovery-crosswalk.md', 'task1-sources.json']]
     return {str(p): digest(p) for p in sorted(files)}
 
 def check():
@@ -51,7 +53,7 @@ def record():
         ('format', ['cargo', 'fmt', '--manifest-path', str(LAB / 'Cargo.toml'), '--', '--check']),
         ('clippy', ['cargo', 'clippy', *cargo, '--all-targets', '--', '-D', 'warnings']),
         ('explorer', ['cargo', 'run', *cargo, '--bin', 'explore']),
-        ('provenance', ['python3', 'docs/research/kernel-work/verify_task1.py']),
+        ('provenance', ['python3', 'docs/research/kernel-work/verify_task1.py', '--paper-at-checkpoint']),
     ]
     for name, argv in commands:
         start = time.monotonic()

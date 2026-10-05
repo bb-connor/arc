@@ -2,7 +2,7 @@
 
 This is the third Chio workstream, alongside the active security and recovery roadmaps. The accepted thesis is that a work commitment becomes a reusable programming abstraction across independent owners.
 
-The package is a plan, not an implementation-completion or beta-release claim. It was prepared from exact code snapshots on October 3, 2026. The recovery implementation is active on the owner's Mac; the visible contract is PR #1172.
+The package is a plan, not an implementation-completion or beta-release claim. It was prepared from exact code snapshots on October 3, 2026. The recovery implementation is not qualified by this planning record.
 
 ## Start here
 

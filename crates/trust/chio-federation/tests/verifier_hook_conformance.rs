@@ -1145,7 +1145,7 @@ impl Fixture {
             continuation_sha256: continuation_sha256.clone(),
             lineage_statement_sha256: String::new(),
             action_class_id: ACTION_CLASS.to_string(),
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             capability_id: CAPABILITY_ID.to_string(),
             request_sha256: request_sha256.clone(),
             outcome_sha256: OUTCOME_SHA256.to_string(),
@@ -1177,7 +1177,7 @@ impl Fixture {
         };
         let lineage_bundle_sha256 = sha256_hex(&canonical_json_bytes(&lineage_bundle)?);
 
-        let consistency_model = bilateral_dsse_consistency_model("totally_ordered")?.to_string();
+        let consistency_model = bilateral_dsse_consistency_model("totally-ordered")?.to_string();
         let envelope = sign_chio_bilateral_dsse_envelope(
             &receipt,
             &origin_key,
@@ -1360,7 +1360,7 @@ fn ladder_manifest(kernel_id: &str) -> GovernanceLadderManifest {
             action_class_id: ACTION_CLASS.to_string(),
             mode: "receipt_backed".to_string(),
             destructive: true,
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             co_sign: "bilateral_required".to_string(),
             co_sign_quorum: None,
             evidence_required: vec![

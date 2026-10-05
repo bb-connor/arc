@@ -1,53 +1,57 @@
 
+running 3 tests
+test exploration::invariant_controls::release_invariant_detects_seeded_binding_and_audience_bypasses ... ok
+test exploration::invariant_controls::removing_knowledge_rejection_must_change_state_and_violate_safety ... ok
+test exploration::invariant_controls::removing_result_audience_rejection_must_violate_safety ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 36 tests
+running 37 tests
 test baseline_f01 ... ok
-test baseline_f10 ... ok
-test baseline_f05 ... ok
-test baseline_f08 ... ok
-test baseline_f02 ... ok
-test baseline_f07 ... ok
 test baseline_f03 ... ok
+test baseline_f08 ... ok
 test baseline_f12 ... ok
-test baseline_f04 ... ok
-test baseline_f15 ... ok
-test baseline_f16 ... ok
+test baseline_f11 ... ok
+test baseline_f02 ... ok
+test baseline_f05 ... ok
 test baseline_f09 ... ok
 test baseline_f06 ... ok
-test baseline_f11 ... ok
+test baseline_f07 ... ok
+test baseline_f10 ... ok
+test baseline_f16 ... ok
+test candidate_f03 ... ok
+test candidate_f01 ... ok
+test candidate_f02 ... ok
 test baseline_f14 ... ok
 test baseline_f13 ... ok
-test candidate_f02 ... ok
-test candidate_f01 ... ok
-test candidate_f03 ... ok
-test candidate_f05 ... ok
-test candidate_f07 ... ok
+test baseline_f15 ... ok
 test candidate_f09 ... ok
-test candidate_f08 ... ok
-test candidate_f06 ... ok
+test candidate_f05 ... ok
 test candidate_f10 ... ok
-test candidate_f11 ... ok
+test candidate_f08 ... ok
+test candidate_f07 ... ok
+test baseline_f04 ... ok
+test candidate_f06 ... ok
 test candidate_f12 ... ok
 test candidate_f14 ... ok
-test candidate_f13 ... ok
-test candidate_f04 ... ok
-test candidate_f15 ... ok
 test candidate_f16 ... ok
+test candidate_f15 ... ok
+test candidate_f13 ... ok
+test candidate_f11 ... ok
+test candidate_f04 ... ok
 test controls_fail_for_progress_and_safety_respectively ... ok
 test opaque_histories_have_identical_controller_views ... ok
+test lost_ack_partial_fixtures_refine_through_authenticated_evidence ... ok
 test removals_have_named_counterexamples ... ok
 test bounded_schedules_preserve_safety_and_match_b1 ... ok
 
-test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.32s
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.93s
 
 
 running 0 tests

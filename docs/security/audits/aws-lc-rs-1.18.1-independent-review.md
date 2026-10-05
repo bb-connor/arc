@@ -11,12 +11,13 @@ inspected, rather than implying those repaired bytes retain the defects.
 
 Native source roots used:
 
-- `/home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.45.0/aws-lc`
-- `/home/connor/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-fips-sys-0.14.2/aws-lc`
+- `$CARGO_HOME/registry/src/<registry>/aws-lc-sys-0.45.0/aws-lc`
+- `$CARGO_HOME/registry/src/<registry>/aws-lc-fips-sys-0.14.2/aws-lc`
 
-The retained `review-progress.md` under
-`/tmp/arc-security-launch/output/process-security-20260915/resume-20260921/aws-lc`
-was read first. Its prior tests and provenance checks were not rerun or relabeled
+A temporary `review-progress.md` was consulted during the source review.
+That scratch file is not retained in this repository and is not independently
+verifiable evidence. The committed source pins, patch reconstruction, audit
+records and retained memcheck logs provide the reproducible audit boundary. Its prior tests and provenance checks were not rerun or relabeled
 as new evidence. This review ran no Cargo builds, tests, native compilation,
 sanitizers, or audit-certification commands. The only file written by this agent
 is this report.

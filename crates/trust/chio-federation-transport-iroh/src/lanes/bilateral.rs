@@ -206,7 +206,7 @@ enum WireReply {
         schema: String,
         org_a_signature: Signature,
     },
-    /// Org A refused (WITHOUT signing). `detail` carries the offending id / reason.
+    /// Org A refused without signing. `detail` is a fixed public reason.
     Err { code: WireErrorCode, detail: String },
 }
 
@@ -259,23 +259,17 @@ impl WireReply {
 
     /// Encode a server-side rejection as a typed error frame (no signature).
     fn err(error: &BilateralCoSigningError) -> Self {
-        let (code, detail) = match error {
-            BilateralCoSigningError::UnsupportedSchema(schema) => {
-                (WireErrorCode::UnsupportedSchema, schema.clone())
-            }
-            BilateralCoSigningError::UnknownPeer(peer) => {
-                (WireErrorCode::UnknownPeer, peer.clone())
-            }
-            BilateralCoSigningError::PeerExpired(peer) => {
-                (WireErrorCode::PeerExpired, peer.clone())
-            }
-            BilateralCoSigningError::OrgBSignatureInvalid => {
-                (WireErrorCode::OrgBSignatureInvalid, String::new())
-            }
-            // Everything else is surfaced to the peer as a rejection with context.
-            other => (WireErrorCode::PeerRejected, other.to_string()),
+        let code = match error {
+            BilateralCoSigningError::UnsupportedSchema(_) => WireErrorCode::UnsupportedSchema,
+            BilateralCoSigningError::UnknownPeer(_) => WireErrorCode::UnknownPeer,
+            BilateralCoSigningError::PeerExpired(_) => WireErrorCode::PeerExpired,
+            BilateralCoSigningError::OrgBSignatureInvalid => WireErrorCode::OrgBSignatureInvalid,
+            _ => WireErrorCode::PeerRejected,
         };
-        Self::Err { code, detail }
+        Self::Err {
+            code,
+            detail: code.as_reason().to_owned(),
+        }
     }
 
     /// Client-side: fold a receipt-profile reply frame back into the contract's

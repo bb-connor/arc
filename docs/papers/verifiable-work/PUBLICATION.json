@@ -13,10 +13,14 @@
     },
     {
       "id": "artifact",
-      "status": "passed",
+      "status": "open",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
-      "evidence": "artifact-manifest.json",
-      "result": "The 19-page PDF, bibliography, source references and artifact hashes agree. The integrated PR review candidate has fresh source-bound evidence for all 21 native qualification commands, including parent loss and child collection replay. Targeted review regressions, six separately executed opt-in chain tests, and historical F1 source pins retain their declared scopes. Initial failures, interrupted campaigns and default-suite skips remain recorded."
+      "evidence": [
+        "paper.pdf",
+        "results.tex",
+        "ARTIFACT.md"
+      ],
+      "result": "The revised candidate requires a fresh 21-command native source qualification and rebuilt artifact inventory. Historical records remain retained; no publication promotion follows from their success."
     },
     {
       "id": "funded-security-integration",

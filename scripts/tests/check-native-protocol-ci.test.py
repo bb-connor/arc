@@ -39,6 +39,24 @@ CONSUMERS = (
 
 
 class NativeProtocolCiTests(unittest.TestCase):
+    def test_postgres_lane_executes_the_confined_preparation_lifetime_regression(self):
+        name = "Confined broker survives preparation runtime retirement"
+        job = LIVE[5]["jobs"]["native"]
+        index, _ = CHECKER.named_step(job, name)
+        for mutation in ("remove", "conditional", "soft_fail", "ignored", "empty"):
+            with self.subTest(mutation=mutation):
+                changed = copy.deepcopy(LIVE)
+                steps = changed[5]["jobs"]["native"]["steps"]
+                if mutation == "remove":
+                    del steps[index]
+                elif mutation == "ignored":
+                    steps[index]["run"] += " --ignored"
+                elif mutation == "empty":
+                    steps[index]["run"] = "true"
+                else:
+                    steps[index]["if" if mutation == "conditional" else "continue-on-error"] = True
+                self.rejected(changed, "confined preparation lifetime|Confined broker survives preparation runtime retirement")
+
     def test_cpp_conformance_requires_qualified_native_fixture(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text())
         CHECKER.validate_consumer(

@@ -159,8 +159,11 @@ impl ChioKernel {
         context.validate_binding(admission, request)?;
         let matched_grant_index = context.matched_grant_index;
         let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
-        // Retain the authenticated return before output evaluation. Recording it
-        // does not authorize output release or payment capture.
+        // An ordinary rejection has no terminal settlement authority. Leave it
+        // at DispatchCommitted so recovery can retain unknown exposure without
+        // repeatedly attempting to finalize an unreleasable return. Contractual
+        // denials are retained for the checked-output settlement path below.
+        self.check_guarded_output(request, matched_grant_index, output, false, true)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
@@ -1502,7 +1505,7 @@ impl ChioKernel {
                     delegation_depth: crate::receipt_support::checked_receipt_count(request.capability.delegation_chain.len(), "delegation depth")?,
                     root_budget_holder: request.capability.issuer.to_hex(),
                     payment_reference,
-                    settlement_status: if payment.journal.state == crate::payment::PaymentJournalState::Resolved { SettlementStatus::Failed } else { SettlementStatus::Settled },
+                    settlement_status: SettlementStatus::Settled,
                     cost_breakdown: Some(serde_json::json!({
                         "payment": {
                             "rail": payment.journal.rail,

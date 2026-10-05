@@ -331,7 +331,7 @@ impl TreatyArtifacts {
             continuation_sha256: continuation_sha256.clone(),
             lineage_statement_sha256: String::new(),
             action_class_id: ACTION_CLASS_ID.to_string(),
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             capability_id: CAPABILITY_ID.to_string(),
             request_sha256: tool_args_sha256(args)?,
             outcome_sha256: "5".repeat(64),
@@ -534,7 +534,7 @@ fn treaty_manifest(kernel_id: &str) -> GovernanceLadderManifest {
             action_class_id: ACTION_CLASS_ID.to_string(),
             mode: "receipt_backed".to_string(),
             destructive: true,
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             co_sign: "bilateral_required".to_string(),
             co_sign_quorum: None,
             evidence_required: vec![

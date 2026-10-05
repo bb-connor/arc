@@ -15,7 +15,7 @@
 ### 1. Freeze and baseline the candidate
 
 - [x] Verify committed M4 local acceptance, clean source and current PR/local identity. Retain the hosted/release limitations.
-- [x] Create `/home/connor/backbay/arc-funded-integration`, branch `integration/funded-work-m4`, at the M4 checkpoint. Preserve research and security worktrees.
+- [x] Create `$REPO`, branch `integration/funded-work-m4`, at the M4 checkpoint. Preserve research and security worktrees.
 - [x] Recompute merge-tree from the exact committed inputs: nine code conflicts and one generated coverage conflict; shared ancestor `f5566d9a765c21cb36652a99c79de64968a656bf`.
 - [x] Run a fresh native-store provisioning baseline before modifying Rust source. Use a dedicated target on `/home` with three jobs, incremental disabled and debug info disabled for these selected checks; record that profile.
 

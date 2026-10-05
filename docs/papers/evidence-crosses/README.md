@@ -123,3 +123,15 @@ Makefile               build and the five gates
 ## Authors
 
 The Chio Project, https://github.com/bb-connor/chio. Not anonymized.
+
+## October 5 comparison correction
+
+The comparison table uses the corrected
+[baseline corpus](../programmable-sovereignty/bench/review-20261005/README.md).
+Unpaired agreement-version cases and an incidental approval denial are excluded;
+three hardened-wiring admissions remain. No general impossibility or integration
+cost advantage follows. The diagnostic rerun supplies no qualified timing result.
+The older benchmark files remain historical and are not rewritten.
+Derived structural counts follow the current source; retained workloads remain
+attributed to their original commits. This rebuild does not requalify historical
+timing results.

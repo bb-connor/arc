@@ -7,16 +7,22 @@ Current native evidence and historical experiments retain separate source
 inventories. The PDF build verifies the derived results and frozen artifacts.
 
 \subsection{Current native qualification}
-The current campaign records 21 terminal commands, 36,556 unchanged source
-inputs and 48 hashed outputs. Rust pass counts by boundary are 54 workflow,
-10 native delegation labels, five existing native composition, 453
-swarm/runtime, 11 execution-export, 25 durable SQLite and 91 default standalone
+The current campaign records \NativeCommands{} terminal commands,
+\NativeSources{} unchanged source inputs and \NativeOutputs{} hashed outputs.
+Rust pass counts by boundary are \NativeWorkflow{} workflow,
+\NativeDelegation{} native delegation labels, \NativeComposition{} existing
+native composition, \NativeEvolution{} swarm/runtime,
+\NativeExecutionExport{} execution-export, \NativeDurable{} durable SQLite and
+\NativeFunded{} default standalone
 cases. The delegation count includes its subprocess worker.
-One pre-existing workflow doctest is ignored. The default standalone run
-ignores six opt-in chain cases; a separate run passes all six against the
-identical source inventory, exercising 97 standalone cases in total.
+The workflow run ignores \NativeWorkflowIgnored{} doctests. The default
+standalone run ignores \NativeFundedIgnored{} opt-in chain cases.
+The separately retained \HistoricalChainTests{}-case chain campaign belongs to
+source inventory \texttt{\HistoricalChainSource}, whose full SHA-256 is recorded in
+\texttt{chain-regressions.json}. It is historical evidence and is not added
+to the current default-suite count.
 
-The campaign includes three Node wire/pin tests, 13 artifact tests, the evolving
+The campaign also includes Node wire/pin tests, artifact tests, the evolving
 funded execution, four existing earned-child crash subcases, four strict
 Clippy commands, three format commands, the delegation example and the funded
 binary build. This qualifies the affected local boundaries, not the full
@@ -55,6 +61,15 @@ transitions. It compares state, commitments, decisions and actual balances.
 A deliberately weakened model permits an earned claim to refund; the explorer
 finds the counterexample. An in-memory mutation of the escrow produces the
 corresponding intended test failure.
+
+A subsequent source-bound review campaign replays \CurrentClaimTraces{}
+representatives against the current escrow bytecode, including refund and expiry
+attempts in both \textsf{Payable} and \textsf{Paid} after the deadline. Every
+rejection checks its exact contract error. Its \CurrentClaimTests{} bytecode
+tests pass, and SQL matches \CurrentClaimSteps{} non-time steps. The
+expire-payable mutation produces \CurrentClaimMutationFailures{} intended
+failures. The record in \texttt{evidence/claim-replay-20261005} preserves these
+commands and source hashes separately from the historical table above.
 
 The Lean specification proves conservation over finite account traces,
 paid-plus-refunded bounds, persistence of earned states, and noninterference

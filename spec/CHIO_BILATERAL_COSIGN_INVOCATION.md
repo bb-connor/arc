@@ -250,9 +250,14 @@ identifier, receiver kernel identifier, pre-authentication bytes, receiver
 signature). The origin MUST check that the transport-authenticated peer
 resolves, through its own verified directory, to the declared receiver kernel
 identifier, and MUST verify the receiver's signature over those exact bytes
-before signing. It then returns its own signature over the same bytes. The
-origin signs the bytes it was handed and does not re-derive or parse them. The
-receiver verifies the origin's signature and assembles the two-signature
+before signing. The origin MUST parse the bounded DSSE PAE, decode the in-toto
+statement, and check both kernel identities and passport fingerprints against
+its independently verified directory. It MUST reconstruct the canonical
+statement and its PAE and require byte-for-byte equality with the received
+preimage. Malformed or substituted preimages MUST be refused without a
+signature (`dsse.malformed` or `peer.identity_mismatch`). Only then may the
+origin sign the reconstructed bytes. The receiver verifies the origin's
+signature and assembles the two-signature
 envelope. Store: the receiver, under evidence kind `bilateral_dsse_envelope`.
 Enters before the request. See section 4.4 for what this second signature
 establishes and what it does not.
@@ -431,13 +436,12 @@ The receiver authors the bytes and the peer signs them. It follows that:
 
 5. **The signature is not evidence that the peer evaluated its own policy.**
    The predicate's `policy_evaluation_summary.server_a_verdict` is written by
-   the receiver and signed by the peer over bytes the peer does not parse. The
-   co-signing protocol transfers pre-authentication bytes and a signature and
-   defines no payload parse on the responder. A verifier MUST NOT read
-   `server_a_verdict` as evidence of an independent evaluation by Org A. A
-   deployment that wants that property MUST specify a responder profile in
-   which Org A decodes the Statement and evaluates the named policy before
-   signing; no such profile is specified here.
+   the receiver. The peer parses and reconstructs the Statement and validates
+   its party bindings before signing, but does not evaluate that asserted
+   verdict against Org A's policy. A verifier MUST NOT read `server_a_verdict`
+   as evidence of an independent policy evaluation by Org A. A deployment
+   requiring that property MUST specify an additional responder policy
+   evaluation profile; reconstruction alone does not establish it.
 
 ---
 
@@ -995,7 +999,7 @@ hook admits in these cases.** Each is a resolution the hook does not perform.
 | Capability lease not in the registry | `capability.lease_expired_or_unknown` | The hook compares `lease_refs` against the lease identifier its own admission bundle names and does not resolve the lease record, so issuer and expiry are not checked here. |
 | Governance record not in the store | `governance.receipt_required_missing` | The hook compares `governance_refs` against its own admission bundle and does not re-derive the record's digest. |
 | Tool name not in the verifier's action-class table | `governance.unknown_action_class` | The table is verifier-owned and its unknown-class policy is reject. The hook reads the class out of the ladder intersection it computed itself. |
-| Peer passport revoked at the pinned epoch | `peer.revoked_at_epoch` | Revocation reaches the kernel through its revocation view, not through this hook. |
+| Peer passport revoked at the pinned epoch | `peer.revoked_at_epoch` | Passport revocation is enforced by removing the peer from the verified transport directory. The kernel revocation view checks capability identifiers; it does not revoke passports. An activated agreement retaining the key is insufficient to enforce passport revocation at this hook. |
 | Pinned peer carries no ladder manifest reference | `ladder.manifest_missing` | The hook activates both manifests itself and checks the intersection it stored, not a per-peer manifest reference. |
 | Pinned peer's ladder manifest reference is stale | `ladder.manifest_stale` | Freshness is measured against the verifier's pinned epoch, which the hook does not hold; the hook bounds the same material through the validity window of the intersection it stored. |
 | Origin's passport key rotated in the agreement but not in the pin set | `peer.unpinned_or_keyid_mismatch` | The hook verifies the envelope under the keys the **agreement** carries, so it admits under the rotated key the pin set has not received. |

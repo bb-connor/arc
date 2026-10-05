@@ -653,7 +653,7 @@ impl TreatyBase {
         )?;
         let remote_receipt_sha256 = sha256_hex(&canonical_json_bytes(&receipt)?);
         let dsse_consistency_model =
-            bilateral_dsse_consistency_model("totally_ordered")?.to_string();
+            bilateral_dsse_consistency_model("totally-ordered")?.to_string();
         Ok(Self {
             scope,
             scope_sha256,
@@ -692,7 +692,7 @@ impl TreatyBase {
             continuation_sha256: continuation_sha256.clone(),
             lineage_statement_sha256: String::new(),
             action_class_id: ACTION_CLASS_ID.to_string(),
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             capability_id: CAPABILITY_ID.to_string(),
             request_sha256: self.request_sha256.clone(),
             outcome_sha256: self.receipt.content_hash.clone(),
@@ -871,7 +871,7 @@ fn treaty_manifest(kernel_id: &str) -> GovernanceLadderManifest {
             action_class_id: ACTION_CLASS_ID.to_string(),
             mode: "receipt_backed".to_string(),
             destructive: true,
-            consistency_model: "totally_ordered".to_string(),
+            consistency_model: "totally-ordered".to_string(),
             co_sign: "bilateral_required".to_string(),
             co_sign_quorum: None,
             evidence_required: vec![

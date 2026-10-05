@@ -82,12 +82,37 @@ fn the_null_case_is_admitted_under_both_wirings() -> TestResult {
     Ok(())
 }
 
-/// Four attacks survive the hardened wiring, and each is a fact no field of the
-/// four formats carries in a form the receiver can resolve: a version the
-/// caller asserts, arguments no credential covers, an instance no scope names,
-/// and a receiver-minted handle nothing consumes. If a change makes any of them
-/// deny, or adds a fifth survivor, the comparison's central result has moved
-/// and the paper's text must move with it.
+#[test]
+fn comparison_excludes_unpaired_versions_and_incidental_denials() -> TestResult {
+    let dir = work_dir("comparison-scope")?;
+    let keys = Keys::fixed();
+    let (composed, hardened) = wirings(&keys, &dir);
+    for result in negative::run(&composed, &hardened)? {
+        if [
+            "agreement-version-advanced-in-flight",
+            "asserted-version-matches-receiver-record",
+            "wrong-live-agreement",
+        ]
+        .contains(&result.baseline_case_id)
+        {
+            let record = serde_json::to_value(&result)?;
+            assert_eq!(
+                record["comparison_eligible"], false,
+                "{}",
+                result.baseline_case_id
+            );
+            if result.baseline_case_id != "wrong-live-agreement" {
+                assert_eq!(result.chio_expected_code, "n/a");
+                assert_eq!(record["analogue"], "none");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Three paired attacks survive this selected hardened wiring. Unpaired version
+/// claims and an incidental approval denial are excluded from comparison counts.
+/// This does not prove that another composition cannot implement the checks.
 #[test]
 fn hardening_does_not_close_the_structural_gaps() -> TestResult {
     let dir = work_dir("structural")?;
@@ -96,7 +121,7 @@ fn hardening_does_not_close_the_structural_gaps() -> TestResult {
     let results = negative::run(&composed, &hardened)?;
     let mut surviving: Vec<&str> = results
         .iter()
-        .filter(|result| result.role == CaseRole::Attack)
+        .filter(|result| result.role == CaseRole::Attack && result.comparison_eligible)
         .filter(|result| {
             result
                 .hardened
@@ -110,7 +135,6 @@ fn hardening_does_not_close_the_structural_gaps() -> TestResult {
         surviving,
         vec![
             "arguments-differ-from-authorized-call",
-            "asserted-version-matches-receiver-record",
             "call-unbound-to-its-resource",
             "task-handle-reused-across-calls",
         ]

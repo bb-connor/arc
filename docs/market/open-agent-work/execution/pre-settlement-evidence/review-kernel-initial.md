@@ -1,6 +1,6 @@
 # Core, kernel and SQLite execution evidence review
 
-Reviewed worktree: `/home/connor/backbay/arc-funded-integration`.
+Reviewed worktree: `$REPO`.
 Base: `df2e7ef0ed1e1ba3ba5ef244e2247347b2c0f3e0`.
 HEAD: `ad3dedbf37dfe732771d4458721156fc543fd524`, including the uncommitted execution-evidence implementation read during this review.
 

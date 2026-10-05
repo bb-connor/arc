@@ -281,13 +281,61 @@ request-on-send / response-on-recv correlation with no app-level request IDs.
    (algorithm-agnostic, above iroh), re-checks the rotation window (`PeerExpired`)
    and trust (`UnknownPeer`); on any failure it writes a typed error mirroring
    `BilateralCoSigningError` and resets WITHOUT signing.
-5. On success Org A signs the SAME `pae_bytes` and writes `DsseCoSigningResponse {
-   schema, org_a_signature }` on the recv half of the same stream.
+5. Org A MUST parse DSSE PAE, decode the bounded bilateral statement, bind both
+   identities and passport fingerprints to its directory, and reconstruct the
+   PAE byte for byte. A mismatch MUST refuse without signing. This reconstruction
+   does not evaluate the receiver's asserted `server_a_verdict`.
+6. On success Org A signs the reconstructed `pae_bytes` and writes the success
+   reply on the recv half of the same stream.
 
 An iroh-stream impl of this replaces the in-process co-signer; the
 `BilateralCoSigningProtocol` request/response contract
 ([bilateral.rs](../../../crates/trust/chio-federation/src/bilateral.rs)) is
 unchanged above the transport.
+
+
+### 4.3 Bilateral receipt co-sign profile
+
+The receipt profile uses the distinct ALPN
+`chio/federation/bilateral-receipt-cosign/1`. It MUST NOT accept DSSE preimages.
+The DSSE profile uses `chio/federation/bilateral-dsse-cosign/1` and MUST NOT
+accept receipt co-signing bodies. Both use one request and one reply per
+bidirectional stream, each prefixed with a four-byte unsigned big-endian payload
+length. Each payload MUST be at most 4,194,304 bytes; the receiver MUST enforce
+that bound before allocation. The sender finishes its stream after the frame.
+
+The receipt request is a closed JSON object with these exact fields:
+
+| Field | Representation |
+| --- | --- |
+| `schema` | `chio.federation-bilateral-cosigning.v1` |
+| `orgAKernelId` | Origin kernel identifier |
+| `orgBKernelId` | Receiver kernel identifier |
+| `bodyBytes` | JSON array of integers in 0..255 containing RFC 8785 canonical `CoSigningBody` bytes |
+| `orgBSignature` | Existing algorithm-tagged Chio signature hex encoding over `bodyBytes` |
+
+The DSSE request has the same identity fields, schema
+`chio.bilateral.dsse-cosigning.v1`, and `paeBytes` in place of `bodyBytes`.
+Request field names use camelCase. Signature serialization MUST preserve its
+algorithm tag; an Ed25519-only byte conversion is not an alternative encoding.
+
+The responder MUST verify the transport peer's directory binding to Org B,
+its admission and rotation interval, the local Org A identity, both pinned
+passport keys, and Org B's strict signature. For the receipt profile it MUST
+parse `CoSigningBody` and its contained receipt, validate both party identifiers, and
+reconstruct the entire canonical body. Any byte disagreement MUST refuse
+without signing. Only a validated preimage of the selected ALPN may be signed.
+Both roles are checked again at response consumption.
+
+The reply is `{"result":"ok","schema":<profile schema>,"org_a_signature":<signature>}`
+or `{"result":"err","code":<stable code>,"detail":<fixed public reason>}`.
+Reply fields use snake_case. A refusal is an in-band typed outcome, not a
+successful co-signature. The stable codes are `unsupported_schema`, `unknown_peer`, `peer_expired`,
+`org_b_signature_invalid`, and `peer_rejected`. Their public reasons replace
+underscores with hyphens.
+`detail` MUST be the fixed public reason for that code; it MUST NOT include
+parser input, peer-controlled strings, internal paths, or local error chains.
+Local diagnostics may retain typed causes separately.
 
 ## 5. Admission and Binding Design
 

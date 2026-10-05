@@ -43,7 +43,7 @@ pub enum Analogue {
     /// A weaker attack: the composition carries something adjacent, and the
     /// note says what the attack loses in translation.
     Partial,
-    /// No format in the set carries a field the attack could touch.
+    /// No matched Chio experiment exists, or no baseline field carries the attack.
     None,
 }
 
@@ -55,6 +55,8 @@ pub struct NegativeResult {
     pub baseline_case_id: &'static str,
     pub role: CaseRole,
     pub analogue: Analogue,
+    /// Paired Chio behavior exists and the observed denial is attributable.
+    pub comparison_eligible: bool,
     pub attack: &'static str,
     pub note: &'static str,
     /// The experiment this case ran: the drive and the receiver state it ran
@@ -487,11 +489,11 @@ fn specs() -> Vec<Spec> {
         },
         Spec {
             threat_id: "PS-TH-02",
-            chio_case_id: "stale-treaty",
-            chio_expected_code: "chio_treaty_stale",
+            chio_case_id: "none",
+            chio_expected_code: "n/a",
             baseline_case_id: "agreement-version-advanced-in-flight",
             role: CaseRole::Attack,
-            analogue: Analogue::Direct,
+            analogue: Analogue::None,
             attack: "a call whose credential asserts the version it was prepared under is presented against a receiver whose own record has moved to a later version",
             note: "The hardened wiring closes this one, and it is worth being exact about how: the only place a version can travel is a scope value, and the check compares what the caller's authorization server asserted with what the receiver holds. Against a caller that reports its stale read honestly, the comparison works. The next case is the same attack from a caller that does not.",
             variant: StateVariant::AgreementVersionAdvanced,
@@ -500,13 +502,13 @@ fn specs() -> Vec<Spec> {
         },
         Spec {
             threat_id: "PS-TH-02",
-            chio_case_id: "stale-treaty",
-            chio_expected_code: "chio_treaty_stale",
+            chio_case_id: "none",
+            chio_expected_code: "n/a",
             baseline_case_id: "asserted-version-matches-receiver-record",
             role: CaseRole::Attack,
-            analogue: Analogue::Direct,
+            analogue: Analogue::None,
             attack: "the caller obtains a credential asserting the version the receiver currently holds and sends the call it prepared under the previous one",
-            note: "The structural failure, in its sharpest form. Every value that reaches this receiver was minted by the caller or by the caller's own authorization server, so a check against receiver-held state is a comparison with an assertion, and the assertion is the adversary's to choose. No wiring of these formats closes it: to bind the version the receiver would need a value it minted itself inside the signed credential, and the token exchange request has no parameter to carry one.",
+            note: "The structural failure, in its sharpest form. Every value that reaches this receiver was minted by the caller or by the caller's own authorization server, so a check against receiver-held state is a comparison with an assertion, and the assertion is the adversary's to choose. This selected wiring does not bind the earlier version. No executed Chio counterpart advances the receiver version, so this case is excluded from paired comparison counts and establishes no general limitation of token exchange or a Chio advantage.",
             variant: StateVariant::AgreementVersionAdvanced,
             drive_name: "drive_asserted_version_matches",
             drive: Some(drive_asserted_version_matches),
@@ -848,6 +850,13 @@ pub fn run(composed: &Runner<'_>, hardened: &Runner<'_>) -> Result<Vec<NegativeR
             baseline_case_id: spec.baseline_case_id,
             role: spec.role,
             analogue: spec.analogue,
+            comparison_eligible: spec.drive.is_some()
+                && !matches!(
+                    spec.baseline_case_id,
+                    "agreement-version-advanced-in-flight"
+                        | "asserted-version-matches-receiver-record"
+                        | "wrong-live-agreement"
+                ),
             attack: spec.attack,
             note: spec.note,
             drive_id: spec

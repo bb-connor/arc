@@ -329,7 +329,7 @@ async fn mismatched_org_b_kernel_id_is_rejected_without_signing() {
     assert_eq!(
         result,
         Err(BilateralCoSigningError::UnknownPeer(
-            "did:chio:evil-impersonator".to_string()
+            "unknown-peer".to_string()
         )),
         "the authenticated endpoint must match the claimed org_b_kernel_id"
     );
@@ -1052,7 +1052,7 @@ async fn receipt_cosign_rejects_an_org_b_that_claims_another_kernel_id() {
     assert_eq!(
         result.err(),
         Some(BilateralCoSigningError::UnknownPeer(
-            impersonated.to_string()
+            "unknown-peer".to_string()
         ))
     );
 }
@@ -1323,4 +1323,34 @@ fn dsse_cosign_refuses_a_receipt_signing_preimage() {
         "a receipt signing preimage is not a DSSE pre-authentication encoding and \
          must never be signed, got {refusal:?}"
     );
+}
+#[test]
+fn refusal_wire_details_are_fixed_for_both_profiles() {
+    let secret = "PRIVATE-peer-schema-reconstruction-detail";
+    for error in [
+        BilateralCoSigningError::UnsupportedSchema(secret.into()),
+        BilateralCoSigningError::UnknownPeer(secret.into()),
+        BilateralCoSigningError::PeerExpired(secret.into()),
+        BilateralCoSigningError::PeerRejected(secret.into()),
+        BilateralCoSigningError::TransportFailure(secret.into()),
+        BilateralCoSigningError::CanonicalJson(secret.into()),
+    ] {
+        let reply = WireReply::err(&error);
+        let bytes = serde_json::to_vec(&reply).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains(secret));
+        let WireReply::Err { code, detail } = reply else {
+            panic!("refusal signed")
+        };
+        assert_eq!(detail, code.as_reason());
+        for receipt_profile in [false, true] {
+            let reply: WireReply = serde_json::from_slice(&bytes).unwrap();
+            let error = if receipt_profile {
+                reply.into_receipt_result().err()
+            } else {
+                reply.into_result().err()
+            }
+            .expect("refusal retained");
+            assert_eq!(bilateral_reason(&error), code.as_reason());
+        }
+    }
 }

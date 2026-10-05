@@ -436,7 +436,7 @@ pub fn apply(s: &mut State, c: &Command, allowed: bool, fault: &Fault, oracle: &
                 }
             }
         }
-        Command::Rollback { .. } => {}
+        Command::Rollback { epoch } => s.epoch = *epoch,
         Command::Lookup { .. } => {
             s.recovery_spent += 1;
         }
@@ -466,7 +466,7 @@ pub fn apply(s: &mut State, c: &Command, allowed: bool, fault: &Fault, oracle: &
                 s.child_knowledge |= s.knowledge;
             }
         }
-        Command::ClearKnowledge => {}
+        Command::ClearKnowledge => s.knowledge = 0,
         Command::Translate { mapping } => {
             s.translated = (0..4)
                 .filter(|i| s.knowledge & (1 << i) != 0)

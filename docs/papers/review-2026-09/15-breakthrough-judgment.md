@@ -254,13 +254,12 @@ that each count was asserted.
   at line 198 resolves only the treaty scope. Lease and governance registry
   intervals remain owed. The general interval type is not evidence those
   resolutions happen on live calls.
-- Scratchpad driver logs support 100 admitted calls with 100 dispatches, seven
-  denial classes with 140 calls and zero dispatches, and the reported clock
-  offset. Their environment identifies receiver commit `1ad7544b3d`; that run
-  stopped at the concurrent stage before the race and revocation stages.
-  The source is the `twohost-evidence` directory under
-  `/tmp/claude-1000/-home-connor-backbay-arc/2e82cf84-fc5d-4334-82be-c0e56c6ff488/scratchpad/`.
-  I inspected these historical records; I did not rerun the remote experiment.
+- An earlier private scratchpad reportedly recorded 100 admitted calls and
+  seven denial classes at receiver commit `1ad7544b3d`. The raw two-host
+  artifacts are not retained or hash-pinned in this repository. Those counts,
+  clock measurements and the reported interruption are unverified historical
+  observations and MUST NOT be used as publication or release qualification.
+  No new remote experiment was run for this correction.
 - The paper's actual checked-in `federated-pair.json` still identifies one
   host at `041aa18374`. Its sustained-load input still records the older serial
   3,543-call run at `a7f4897852`. Thus the newer work and the publishable artifact

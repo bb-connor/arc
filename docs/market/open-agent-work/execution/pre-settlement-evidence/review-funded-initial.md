@@ -1,6 +1,6 @@
 # Funded execution integration review
 
-Reviewed checkout: `/home/connor/backbay/arc-funded-integration`.
+Reviewed checkout: `$REPO`.
 Base: `df2e7ef0ed1e1ba3ba5ef244e2247347b2c0f3e0`.
 HEAD: `ad3dedbf37dfe732771d4458721156fc543fd524`, including the working changes available during review.
 

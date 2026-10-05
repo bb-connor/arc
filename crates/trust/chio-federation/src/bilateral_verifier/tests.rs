@@ -1936,7 +1936,11 @@ fn envelope_layer_message_prefixes_select_a_code_and_fall_closed() {
         ),
         (
             "predicate.schema_invalid: strict Chio requires independent Org A and Org B signer keys",
-            RejectionCode::SignerIndependenceRequired,
+            RejectionCode::PredicateSchemaInvalid,
+        ),
+        (
+            "hostile value requires independent Org A and Org B signer keys",
+            RejectionCode::CanonicalJsonInvalid,
         ),
         (PRESENTED_DETAIL, RejectionCode::CanonicalJsonInvalid),
         ("", RejectionCode::CanonicalJsonInvalid),

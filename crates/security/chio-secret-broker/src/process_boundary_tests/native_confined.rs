@@ -27,6 +27,99 @@ fn native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts() -
     run_native_delivery(DeliveryRoute::ConfinedMcp, None)
 }
 
+#[test]
+#[cfg_attr(
+    not(target_arch = "x86_64"),
+    ignore = "requires Linux x86_64 cage enforcement"
+)]
+fn confined_broker_mcp_survives_retirement_of_its_preparation_runtime() -> TestResult {
+    // Calls the production NativeBrokerMcpTool preparation entrypoint, then
+    // retires every Tokio worker before the real TLS invocation. Restoring
+    // spawn_blocking at that entrypoint kills the child through PDEATHSIG.
+    run_native_delivery_case(DeliveryRoute::ConfinedMcp, None, None, true)
+}
+
+pub(super) fn preparation_connection(
+    tool: Arc<crate::native_mcp::NativeBrokerMcpTool>,
+    retire_runtime: bool,
+) -> Arc<dyn crate::kernel_admission::BrokerMcpToolConnection> {
+    if retire_runtime {
+        Arc::new(RetiredPreparationRuntime(tool))
+    } else {
+        tool
+    }
+}
+
+struct RetiredPreparationRuntime(Arc<crate::native_mcp::NativeBrokerMcpTool>);
+
+#[async_trait::async_trait]
+impl crate::kernel_admission::BrokerMcpToolConnection for RetiredPreparationRuntime {
+    async fn prepare_broker_delivery(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+        stream: UnixStream,
+    ) -> std::result::Result<(), chio_kernel::KernelError> {
+        let tool = self.0.clone();
+        let context = context.clone();
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .thread_keep_alive(Duration::from_millis(10))
+                .build()
+                .map_err(|error| chio_kernel::KernelError::ToolServerError(error.to_string()))?;
+            let result = runtime.block_on(tool.prepare_broker_delivery(&context, stream));
+            drop(runtime);
+            result
+        })
+        .join()
+        .map_err(|_| {
+            chio_kernel::KernelError::ToolServerError("preparation test worker panicked".into())
+        })?
+    }
+}
+
+#[async_trait::async_trait]
+impl chio_kernel::ToolServerConnection for RetiredPreparationRuntime {
+    fn server_id(&self) -> &str {
+        self.0.server_id()
+    }
+    fn tool_names(&self) -> Vec<String> {
+        self.0.tool_names()
+    }
+    fn prepared_native_launch_receipt(
+        &self,
+    ) -> Option<chio_core_types::receipt::body::ChioReceipt> {
+        self.0.prepared_native_launch_receipt()
+    }
+    async fn invoke(
+        &self,
+        tool: &str,
+        arguments: serde_json::Value,
+        bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> std::result::Result<serde_json::Value, chio_kernel::KernelError> {
+        self.0.invoke(tool, arguments, bridge).await
+    }
+    async fn prepare_delivery(
+        &self,
+        context: &chio_kernel::ToolDispatchContext,
+    ) -> std::result::Result<(), chio_kernel::KernelError> {
+        self.0.prepare_delivery(context).await
+    }
+    async fn invoke_with_cost_and_context(
+        &self,
+        context: &chio_kernel::ToolInvocationContext,
+        arguments: serde_json::Value,
+        bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> std::result::Result<
+        (serde_json::Value, Option<chio_kernel::ToolInvocationCost>),
+        chio_kernel::KernelError,
+    > {
+        self.0
+            .invoke_with_cost_and_context(context, arguments, bridge)
+            .await
+    }
+}
+
 pub(super) struct ConfinedDelivery {
     pub tool: Arc<crate::native_mcp::NativeBrokerMcpTool>,
     pub registry: Arc<VerifiedManifestRegistry>,

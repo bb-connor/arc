@@ -38,6 +38,8 @@ MANIFESTS = (
     Path("Cargo.toml"), Path("fuzz/Cargo.toml"),
     Path("sdks/lambda/chio-lambda-extension/Cargo.toml"),
     Path("crates/tooling/chio-conformance/verdict_matrix/Cargo.toml"),
+    Path("examples/federated-work/Cargo.toml"),
+    Path("examples/outcome-ledger-comparison/Cargo.toml"),
 )
 
 

@@ -220,8 +220,22 @@ impl Worker {
             b"{\"socket\":\"/state/egress.sock\"}",
         )?;
         let tunnel = Tunnel::start(&state.join("egress.sock"), &self.config.origin)?;
-        let probe = self.invoke(state, &["probe-sandbox", "/state", &self.config.origin])?;
+        // The host creates and verifies a real file outside the mounted child
+        // state. A machine-specific path that never existed proves nothing.
+        let canary = self.root.with_file_name("worker-host-isolation-canary");
+        retain(&canary, b"chio.worker-host-canary.v1\n")?;
+        let canary = fs::canonicalize(canary)?;
+        let probe = self.invoke(
+            state,
+            &[
+                "probe-sandbox",
+                "/state",
+                &self.config.origin,
+                canary.to_str().ok_or("host canary path is not UTF-8")?,
+            ],
+        )?;
         if probe["directTcpConnected"] != false
+            || probe["parentFilesystemReadable"] != false
             || probe["agentKey"] != self.delegate.public_key().to_hex()
         {
             return Err("subcontract worker isolation check failed".into());
@@ -350,10 +364,21 @@ fn retain(path: &Path, bytes: &[u8]) -> Result<()> {
             file.sync_all()?;
         }
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            // The worker can write this directory. Inspect the opened inode,
+            // never a pre-open path check, and never wait for a FIFO writer.
+            let file = fs::File::from(rustix::fs::open(
+                path,
+                rustix::fs::OFlags::RDONLY
+                    | rustix::fs::OFlags::NOFOLLOW
+                    | rustix::fs::OFlags::NONBLOCK
+                    | rustix::fs::OFlags::CLOEXEC,
+                rustix::fs::Mode::empty(),
+            )?);
+            if !file.metadata()?.is_file() {
+                return Err("retained child state is not a regular file".into());
+            }
             let mut prior = Vec::new();
-            fs::File::open(path)?
-                .take(1024 * 1024 + 1)
-                .read_to_end(&mut prior)?;
+            file.take(1024 * 1024 + 1).read_to_end(&mut prior)?;
             if prior != bytes {
                 return Err("retained child state binds another authority or disclosure".into());
             }
@@ -484,5 +509,67 @@ impl Drop for Tunnel {
             let _ = thread.join();
         }
         let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(test)]
+mod retained_file_tests {
+    use super::*;
+
+    #[test]
+    fn retained_state_rejects_symlinks_without_following_them() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let source = dir.path().join("source");
+        let link = dir.path().join("link");
+        fs::write(&source, b"same authority")?;
+        std::os::unix::fs::symlink(&source, &link)?;
+        let result = retain(&link, b"same authority");
+        assert!(
+            result.is_err(),
+            "a symlink cannot supply retained authority"
+        );
+        assert_eq!(fs::read(source)?, b"same authority");
+        Ok(())
+    }
+
+    #[test]
+    fn retained_state_rejects_a_fifo_without_waiting_for_a_writer() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let fifo = dir.path().join("fifo");
+        rustix::fs::mkfifoat(
+            rustix::fs::CWD,
+            &fifo,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )?;
+        let (send, receive) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let result = retain(&fifo, b"authority").map_err(|error| error.to_string());
+            let _ = send.send(result);
+        });
+        let result = receive
+            .recv_timeout(Duration::from_secs(2))
+            .map_err(|_| "retained FIFO open blocked the provider")?;
+        worker
+            .join()
+            .map_err(|_| "retained state worker panicked")?;
+        assert_eq!(
+            result.err().as_deref(),
+            Some("retained child state is not a regular file")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn retained_regular_state_requires_exact_existing_bytes() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("state");
+        retain(&path, b"authority")?;
+        retain(&path, b"authority")?;
+        let result = retain(&path, b"substitution");
+        assert_eq!(
+            result.err().map(|error| error.to_string()).as_deref(),
+            Some("retained child state binds another authority or disclosure")
+        );
+        Ok(())
     }
 }

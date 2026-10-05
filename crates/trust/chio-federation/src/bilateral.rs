@@ -519,9 +519,9 @@ impl BilateralCoSigningError {
 
 /// Envelope-layer failures share the `CanonicalJson` variant; the message
 /// prefix written by the envelope verifier and signer names the check that
-/// failed and selects the code. The signer-independence phrase is tested
-/// first, so a message that carries both it and a prefix keeps the
-/// independence code the negative corpus names. A message that matches
+/// failed and selects the code. Only the exact locally generated independence
+/// diagnostic selects its code; embedded presenter text cannot override a
+/// typed prefix. A message that matches
 /// neither falls closed to `canonical_json.invalid`.
 fn canonical_json_rejection_code(message: &str) -> RejectionCode {
     const PREFIXES: &[(&str, RejectionCode)] = &[
@@ -546,14 +546,14 @@ fn canonical_json_rejection_code(message: &str) -> RejectionCode {
             RejectionCode::SubjectDigestMismatch,
         ),
     ];
-    if message.contains("requires independent Org A and Org B signer keys") {
-        return RejectionCode::SignerIndependenceRequired;
-    }
     if let Some((_, code)) = PREFIXES
         .iter()
         .find(|(prefix, _)| message.starts_with(prefix))
     {
         return *code;
+    }
+    if message == "strict Chio requires independent Org A and Org B signer keys" {
+        return RejectionCode::SignerIndependenceRequired;
     }
     RejectionCode::CanonicalJsonInvalid
 }

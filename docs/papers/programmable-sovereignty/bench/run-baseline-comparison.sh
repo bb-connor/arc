@@ -701,14 +701,15 @@ def timing(value):
 
 negative = baseline["negativeCorpus"]
 driven = [entry for entry in negative if entry.get("composed") is not None]
-no_analogue = [entry for entry in negative if entry.get("composed") is None]
+no_analogue = [entry for entry in negative if entry["analogue"] == "none"]
 # Only a case the corpus marks as an attack is counted as one. The null case is
 # a call that must be admitted, and an informational case is driven to record a
 # difference between the wirings that is not a security difference; counting
 # either as an attack would inflate every count taken over the attack set.
-attacks = [entry for entry in driven if entry["role"] == "attack"]
+unpaired = [entry for entry in driven if entry["role"] == "attack" and not entry["comparison_eligible"]]
+attacks = [entry for entry in driven if entry["role"] == "attack" and entry["comparison_eligible"]]
 informational = [entry for entry in driven if entry["role"] == "informational"]
-if len(driven) != len(attacks) + len(informational) + 1:
+if len(driven) != len(attacks) + len(unpaired) + len(informational) + 1:
     raise SystemExit(
         "the driven cases do not partition into attacks, informational cases "
         "and one null case"
@@ -902,6 +903,7 @@ document = {
         "composedAdmits": len(composed_admits),
         "hardenedAdmits": len(hardened_admits),
         "closedByHardening": len(hardening_closes),
+        "excludedUnpairedOrIncidental": [entry["baseline_case_id"] for entry in unpaired],
         "composedAdmittedCaseIds": [entry["baseline_case_id"] for entry in composed_admits],
         "hardenedAdmittedCaseIds": [entry["baseline_case_id"] for entry in hardened_admits],
         "noAnalogueCaseIds": [entry["baseline_case_id"] for entry in no_analogue],

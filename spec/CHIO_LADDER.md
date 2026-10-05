@@ -255,7 +255,7 @@ manifests against this schema before signature verification.
         },
         "consistency_model": {
           "type": "string",
-          "enum": ["crdt-commutative", "totally-ordered", "quorum-required"]
+          "enum": ["crdt-commutative", "totally-ordered", "single-kernel", "quorum-required"]
         },
         "consistency_anchor": {
           "type": "string",

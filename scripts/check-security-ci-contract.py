@@ -4888,13 +4888,15 @@ def validate_nonce_fips_contract(root: Path) -> None:
         or events["workflow_call"] != ""
         or events["workflow_dispatch"] != ""
         or set(events["pull_request"]) != {"branches-ignore", "paths"}
-        or events["pull_request"]["branches-ignore"] != ["main"]
+        or events["pull_request"]["branches-ignore"] != ["main", "packet/**", "integration/**"]
         or set(events["push"]) != {"branches", "paths"}
         or events["push"]["branches"] != ["project/**"]
         or events["pull_request"]["paths"] != events["push"]["paths"]
         or events["push"]["paths"] != EXPECTED_NONCE_FIPS_PATHS
         or ci.get("on", {}).get("push", {}).get("branches") != ["main"]
-        or ci.get("on", {}).get("pull_request", {}).get("branches") != ["main"]
+        or ci.get("on", {}).get("pull_request", {}).get("branches")
+        != ["main", "packet/**", "integration/**"]
+        or set(ci.get("on", {}).get("pull_request", {})) != {"branches", "types"}
     ):
         raise ContractError("nonce/FIPS triggers lose coverage or duplicate required CI")
     if (

@@ -591,7 +591,7 @@ def main(args):
                     return {"readable": True}
             except OSError:
                 return {"readable": False}
-        case ["probe-sandbox", state, origin]:
+        case ["probe-sandbox", state, origin, host_canary]:
             host, port = https_origin(origin)
             connected = False
             try:
@@ -600,7 +600,7 @@ def main(args):
             except OSError:
                 pass
             return {"directTcpConnected": connected, "agentKey": key(state).public_key().public_bytes_raw().hex(),
-                    "parentFilesystemReadable": Path("/home/connor/backbay/arc").exists()}
+                    "parentFilesystemReadable": main(["probe", host_canary])["readable"]}
         case ["snapshot", state]:
             return snapshot(state)
         case ["enroll", state, provider, origin, enrollment]:
