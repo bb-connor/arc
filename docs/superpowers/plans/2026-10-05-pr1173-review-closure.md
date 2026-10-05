@@ -180,6 +180,24 @@ under their existing owner. Renew source-bound qualification after these
 workflow repairs, then regenerate the artifact without changing the paper's
 open publication gates.
 
+The later security-nextest result also reproduces a broker availability defect:
+strict audit decoding returns `UntrustedInput`, but the audit worker treats that
+client error as fatal and shuts down all service sockets. Reuse the narrow
+classification repair already committed by the security lane at
+`d0496c14d824a327f00b98576132834306ff6694`. Exercise ordinary wrong-endpoint
+input, malformed JSON, duplicate keys and invalid UTF-8 before an actual
+governed provision. Require both provisioning and SIGTERM/restart cases, the
+full affected broker targets and strict Clippy. Storage, invariant and authority
+failures must retain their existing fatal behavior.
+
+Final enterprise acceptance also requires a coherent handoff of the security
+lane's workflow definition and supporting source. The newly authorized
+definition invokes closed-shard controls not yet present in this candidate.
+Do not copy only their test file, bypass their producer validation or import
+an incomplete protected capture update to claim a passing aggregate. Reconcile
+the reviewed source closure when the owning lane finalizes its package;
+preserve that lane's authority variables and qualification responsibility.
+
 The `28842e598e` candidate exposed additional failures in actual hosted and
 local qualification. Complete these repairs before the next source freeze:
 

@@ -747,7 +747,8 @@ impl BrokerPrivilegedAuditEndpoint {
             Err(error)
                 if matches!(
                     &error,
-                    BrokerError::InvalidRequest(_)
+                    BrokerError::UntrustedInput(_)
+                        | BrokerError::InvalidRequest(_)
                         | BrokerError::AuthorizationDenied(_)
                         | BrokerError::Conflict(_)
                 ) =>
