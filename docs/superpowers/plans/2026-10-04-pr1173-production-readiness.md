@@ -316,3 +316,38 @@ until the owned selector validates the complete inventory. The runner creates
 remove unselected executables without changing file ownership or permissions.
 Two additional red/green workflow controls exercise those integration contracts.
 The 60/120-second inputs remain the upstream action's total sampling budgets.
+
+### Reuse the active security lane's native lifetime repair
+
+Fresh comparison with `integration/process-security-m4` found that source
+`49a21b1a7e9dc76e96edb3b2bbd53488005034ef` already repairs the same native
+PostgreSQL timing boundary and a subsequent parent-thread lifetime failure.
+Port its invocation-owned `LaunchOwner` and four Linux process regressions,
+including the existing exact inventory gate. Preserve the 64-thread capacity,
+cleanup ordering and armed Linux parent-death signal. The creating thread must
+outlive child shutdown and terminal receipt persistence, including cancellation
+and preparation failure; it cannot belong to a retiring Tokio blocking pool.
+Keep the existing broker transport and custody interfaces.
+
+The local advancing-clock probe reproduces the dispatch-policy expiry on the
+fourth egress call. An arithmetic-only optimization does not repair it, and is
+not adopted. Reuse the security lane's existing `docker-release` CLI profile
+for the PostgreSQL workflow, retaining the same ten-second policy window and
+all authority, confinement, receipt and crash-recovery assertions. Require the
+workflow to copy that exact built profile. The separate resource adapter in
+this branch already passes its TLS connection and broker-value boundaries;
+do not replace it with the other lane's alternative fixture composition.
+
+Acceptance: demonstrate that the original retiring-thread behavior fails the
+child-lifetime regression, then pass all four lifecycle controls, the broker
+library suite and strict Clippy. Exercise build/staging mutations in the native
+workflow contract. Both actual PostgreSQL trajectories must pass on this
+branch's final x86 candidate; the security lane's component results are useful
+integration evidence, not this candidate's qualification.
+
+The Linux [PR_SET_PDEATHSIG manual](https://man7.org/linux/man-pages/man2/PR_SET_PDEATHSIG.2const.html)
+confirms that this lifetime belongs to the creating thread. The local pooled
+implementation fails the runtime-retirement regression; the imported owner
+passes all 200 broker library tests with the native gate's serialized test
+configuration and strict all-target Clippy. The parallel debug campaign's five
+timeout failures remain retained, distinct from that successful run.

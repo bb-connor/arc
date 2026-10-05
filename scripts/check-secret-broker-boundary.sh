@@ -215,6 +215,14 @@ EOF
 )" cargo test --locked -p chio-secret-broker --lib authority_rpc_completion_
 
 if [[ "$(uname -s)" == "Linux" ]]; then
+  run_tests "native broker launch thread custody" yes "$(cat <<'EOF'
+native_mcp::launch_owner::tests::cancellation_during_preparation_reaps_the_child_on_its_live_launch_thread
+native_mcp::launch_owner::tests::capacity_remains_reserved_until_prepared_ownership_ends
+native_mcp::launch_owner::tests::preparation_failure_reaps_the_child_before_releasing_its_launch_thread
+native_mcp::launch_owner::tests::prepared_child_survives_retirement_of_the_callers_async_runtime
+EOF
+)" cargo test --locked -p chio-secret-broker --features native-mcp --lib native_mcp::launch_owner::tests::
+
   run_tests "prepared broker descriptor binding and deadlines" yes "$(cat <<'EOF'
 service::ipc::prepared::tests::prepared_connection_expiry_eof_and_trickle_release_capacity
 service::ipc::prepared::tests::prepared_connection_lifetime_respects_capability_and_nonce_expiry

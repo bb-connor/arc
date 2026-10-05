@@ -72,13 +72,13 @@ jobs:
           cargo test --locked -p chio-finding-market-store-postgres --example agent_jobs
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
-          cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
+          cargo build --locked --profile docker-release -p chio-cli --features real-linux-enforcement --bin chio
       - name: Install the process package and create a dedicated TLS fixture
         run: |
           umask 077
           job_root=$(mktemp -d /tmp/chio-pg-jobs-XXXXXX)
           echo "CHIO_JOB_FIXTURE_ROOT=$job_root" >> "$GITHUB_ENV"
-          cp target/debug/chio "$job_root/chio"
+          cp target/docker-release/chio "$job_root/chio"
           cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
           chmod 700 "$job_root/chio" "$job_root/agent-jobs"
           uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"

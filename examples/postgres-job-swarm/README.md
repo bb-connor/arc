@@ -15,6 +15,14 @@ fix the worker/operator role and tenant. Only those adapters receive the
 production worker database credential. Migration and initial job creation use
 separate roles before the host starts.
 
+The native qualification builds the enforcing CLI with the existing
+`docker-release` production profile. Preparation and dispatch retain their
+original deadlines; the unoptimized CLI can consume the policy window while
+revalidating signed state. The workflow stages that exact production binary.
+A bounded launch owner retains each caged child's creating thread through
+shutdown and terminal receipt persistence, including across async-runtime
+retirement. Linux parent-death protection remains armed.
+
 ## Run the native qualification
 
 Requires Linux x86_64, Docker, OpenSSL, Rust and uv. Run from the repository root.
@@ -31,11 +39,11 @@ resets another database. Choose a private output directory with ancestry that
 passes Chio's native launch checks.
 
 ```sh
-cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
+cargo build --locked --profile docker-release -p chio-cli --features real-linux-enforcement --bin chio
 cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
 umask 077
 job_root=$(mktemp -d)
-cp target/debug/chio "$job_root/chio"
+cp target/docker-release/chio "$job_root/chio"
 cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
 chmod 700 "$job_root/chio" "$job_root/agent-jobs"
 uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"

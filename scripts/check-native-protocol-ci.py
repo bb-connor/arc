@@ -41,6 +41,10 @@ SDK_COMMANDS = (
     CPP_RUN.splitlines()[0],
     "CHIO_CPP_LIVE_CONFORMANCE=1 " + CPP_RUN.splitlines()[1],
 )
+POSTGRES_BUILD = (
+    "cargo build --locked --profile docker-release -p chio-cli "
+    "--features real-linux-enforcement --bin chio"
+)
 POSTGRES_NAME = "Exercise the public worker role and actual native process host"
 POSTGRES_RUN = (
     'python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"\n'
@@ -238,8 +242,8 @@ def validate(
         build_index < copy_index < consumer_index - 1
         and "if" not in build and "continue-on-error" not in build
         and "if" not in copy and "continue-on-error" not in copy
-        and build.get("run", "").strip().splitlines()[-1:] == [CPP_RUN.splitlines()[0]]
-        and 'cp target/debug/chio "$job_root/chio"' in copy.get("run", "").splitlines(),
+        and build.get("run", "").strip().splitlines()[-1:] == [POSTGRES_BUILD]
+        and 'cp target/docker-release/chio "$job_root/chio"' in copy.get("run", "").splitlines(),
         "PostgreSQL enforcing CLI must be built before copying the consumer binary",
     )
     claim_index, claim = named_step(job, POSTGRES_CLAIM_NAME)

@@ -214,7 +214,7 @@ class NativeProtocolCiTests(unittest.TestCase):
                 changed = copy.deepcopy(LIVE)
                 _, step = CHECKER.named_step(changed[5]["jobs"]["native"], "Build the real gateway and kernel")
                 step["run"] = step["run"].replace(
-                    "cargo build --locked -p chio-cli", prefix + "cargo build --locked -p chio-cli", 1
+                    CHECKER.POSTGRES_BUILD, prefix + CHECKER.POSTGRES_BUILD, 1
                 )
                 self.rejected(changed, "PostgreSQL enforcing CLI")
         for consumer, command in (
@@ -233,6 +233,19 @@ class NativeProtocolCiTests(unittest.TestCase):
         prepare, _ = CHECKER.named_step(job, "Install the process package and create a dedicated TLS fixture")
         job["steps"][build], job["steps"][prepare] = job["steps"][prepare], job["steps"][build]
         self.rejected(changed, "PostgreSQL enforcing CLI")
+
+    def test_postgres_requires_production_build_and_stages_that_same_binary(self):
+        CHECKER.validate(*LIVE)
+        for mutation in ("debug_build", "debug_copy"):
+            changed = copy.deepcopy(LIVE)
+            if mutation == "debug_build":
+                _, step = CHECKER.named_step(changed[5]["jobs"]["native"], "Build the real gateway and kernel")
+                step["run"] = step["run"].replace(" --profile docker-release", "")
+            else:
+                _, step = CHECKER.named_step(changed[5]["jobs"]["native"], "Install the process package and create a dedicated TLS fixture")
+                step["run"] = step["run"].replace("cp target/docker-release/chio ", "cp target/debug/chio ")
+            with self.subTest(mutation=mutation):
+                self.rejected(changed, "PostgreSQL enforcing CLI")
 
     def test_postgres_claim_loss_cannot_reorder_skip_or_override_authority(self):
         for mutation in ("move", "skip", "soft_fail", "authority"):
