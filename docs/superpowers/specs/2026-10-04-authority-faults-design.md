@@ -36,6 +36,8 @@ From round 1 of the PR #1174 review (dispositions at the end of this spec):
 - **Integrity faults get their own block (round 2).** The classifier output is tagged as `FaultKind::Authority(class)` or `FaultKind::Integrity`. Spec 11's `InsufficientIntegrity` emits its own `IntegrityFaultV1` block and projects to `ExplanationFactKind::Integrity`. `AuthorityFaultClass` stays closed at four, and `AuthorityFaultV2` is unchanged (R1, section 5).
 - **A dead successor can be replaced.** Uniqueness now covers the *open* successor and the one successor that *captures*. A successor cancelled without capture frees the slot, up to a bound (sections 6.2 and 6.4).
 
+- **The continuation binding is non-recursive (independent review R-2-01).** Revision 3 put `action_intent_digest` in the new capability's constraint. `ActionIntentV1` hashes the capability's signing body (W: `chio-security-types/src/recovery/authorization.rs:69-90`; `issuance.rs:76-83`), and that body includes the constraint (W: `chio-core-types/src/capability/token.rs:219-242`), so no valid capability could exist. The constraint now names identities fixed before the capability is built: a successor continuation derived from the predecessor workflow and a successor ordinal, the request namespace, the request id and the argument digest. `ActionIntentV1` is then derived from the completed capability, unchanged (section 6.2, "Continuation identity").
+
 ## Revision 3 changes
 
 - **Integration point corrected.** Implemented recovery never consumes deny receipts. It observes native flow state (W: `chio-kernel/src/recovery/ports.rs:115-123`; effect facts are "never derived from a receipt verdict", W: `chio-security-types/src/recovery/observation.rs:76`). The fault class now enters as a planner fact. The deny-receipt block stays as audit and client evidence.
@@ -266,7 +268,7 @@ capability_unsatisfied ->
 
 **Template.**
 - `RecoveryTemplateV1` gains `AuthorityContinuation`.
-- A workflow of that template is created with `CreateWorkflow { template: AuthorityContinuation, request_seed, .. }`, where the seed is a `ToolCallRequest` carrying the new capability.
+- A workflow of that template is created with `CreateWorkflow { creation_key, template: AuthorityContinuation, request_seed }`, where the seed is a `ToolCallRequest` carrying the new capability. The `creation_key` is not free: it is the successor key derived from the predecessor and a successor ordinal ("Continuation identity" below).
 - Its record also carries `predecessor_workflow: WorkflowId` and `predecessor_fault: AuthorityFaultClass`. Host setup writes both from the predecessor's observation, and the incoming command cannot choose either.
 
 **Store validation at creation**, in addition to W:'s existing `validate_seed` rules:
@@ -276,6 +278,7 @@ capability_unsatisfied ->
    - **Bound.** A predecessor admits at most `max_successors_per_predecessor` successors in total (default 4), counting retired ones. The bound applies on top of recovery intake quotas.
 2. The new seed's `server_id`, `tool_name` and canonical argument hash equal the predecessor seed's, which also equal the fault's `parameter_hash`. The subject is unchanged.
 3. The new seed's capability passes section 6.3 steps 1, 2 and 4.
+4. **Binding matches the derived identity.** The store recomputes, from the record alone, the successor creation key for `(predecessor_workflow, successor_ordinal)`, then the workflow id, continuation id and request id by W:'s existing rules, and the request namespace digest and argument digest. When D1 is not installed, it compares them field by field with the seed capability's `RecoveryContinuationBinding`. Any mismatch refuses `CreateWorkflow` with `binding_mismatch`. The ordinal must be the next unused one for the predecessor and within `max_successors_per_predecessor`. Ordinals are never reused, matching W:'s rule that closed identities are retained and never recycled (W: `commands.rs:95-97`).
 
 **Execution.** After creation, the workflow is an ordinary recovery workflow:
 - the store pin (`issuance.rs:76-81`) binds every action to the new capability;
@@ -291,13 +294,37 @@ Any information-flow obligations the continuation needs are approved as today.
 
 **Binding the new authority to exactly one continuation:**
 - **D1 installed.** The sealed permit already binds the exact capability, request id and arguments (V: `dynamic-delegation-design.md:116-121`).
-- **D1 not installed.** The new capability's single grant carries `max_invocations == Some(1)` and `Constraint::RecoveryContinuationBinding { request_namespace_digest, request_id, action_intent_digest }`, set to the linked workflow's predicted continuation identity.
+- **D1 not installed.** The new capability's single grant carries `max_invocations == Some(1)` and this constraint:
+
+  ```rust
+  Constraint::RecoveryContinuationBinding {
+      continuation_id: ContinuationId,               // the linked workflow's continuation
+      request_namespace_digest: RequestNamespaceDigest,
+      request_id: RequestId,                         // the continuation's process request id
+      parameter_hash: Digest32,                      // canonical arguments; equals the fault's parameter_hash
+  }
+  ```
+
+  Every field is fixed before the capability is built, and none depends on it ("Continuation identity" below). The constraint never contains an `ActionIntentV1` digest.
   - The constraint is preserved by equality under delegation, like `OutputDigestSha256` (M: `scope.rs:591`).
   - Its enforcer is the recovery capture participant. That is the KG4 decision at M: `authority.rs:102`.
   - Ordinary admission of a capability carrying it denies unless the request is the bound continuation.
   - The portable core fails closed on it (M: `crates/kernel/chio-kernel-core/src/evaluate.rs:129-130`).
 
   Implemented recovery binds the continuation only through `ActionIntentV1.semantic_request`, the finalized request envelope and grant v2. None of these constrains the capability itself, so without this constraint the new capability could be presented on an ordinary path (N8).
+
+**Continuation identity (non-recursive).** This answers which identity the binding names, how it survives replay, and why it is not circular.
+- **Why not the action intent.** `ActionIntentV1` carries `capability_body`, the hash of the capability's signing body (W: `chio-security-types/src/recovery/authorization.rs:69-90`), and the store checks that hash against the seed capability (W: `chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs:76-83`). The signing body includes the grant scope and so the constraint (W: `chio-core-types/src/capability/token.rs:219-242`). Naming the action-intent digest inside the capability would require `x = H(ActionIntent(capability_body = H(Capability(.. x ..))))`, which has no constructible solution.
+- **The identity chain.** Each value is computed from the previous ones and from deployment facts, never from the capability:
+  1. `successor_creation_key = "authority-successor:" + hex(SHA-256("chio.recovery.authority-successor.v1" || predecessor_workflow || successor_ordinal))`. `predecessor_workflow` is written by host setup (above); `successor_ordinal` is the next unused ordinal for that predecessor.
+  2. `workflow_id = "workflow:" + sha256_hex(scope, successor_creation_key)`, W:'s existing rule (W: `recovery/commands.rs:73-77`).
+  3. `continuation_id = "continuation:" + sha256_hex(scope, workflow_id)`, W:'s existing rule (`commands.rs:97-104`).
+  4. `request_id = "process:" + digest(process_namespace, process_id, "recovery:" + continuation_id)`, the request id materialization already uses (W: `chio-control-plane/src/recovery/materialize.rs:28-30`, `:76-81`; `chio-process/src/lib.rs:294-305`).
+  5. `request_namespace_digest = H(authenticated_tenant_id, coordinator_authority_id)` (W: `chio-kernel/src/admission_operation/identity.rs:158-178`).
+  6. `parameter_hash`, the canonical argument hash of the predecessor seed, which store step 2 requires to be unchanged.
+- **Construction order.** The resolver computes steps 1-6, mints and signs the capability carrying the constraint, then submits `CreateWorkflow` with `successor_creation_key`. Materialization later derives `ActionIntentV1` from the completed capability exactly as today, including `capability_body`. The dependency graph is acyclic: identity, then capability, then action intent, then offer, approval and grant v2.
+- **Replay.** Steps 1-5 are deterministic, so a retried creation recomputes the same key and the same binding. W: returns the existing record for the same creation key and seed, and refuses a different seed as a conflict (`commands.rs:84-88`). A retried capability mint for the same ordinal yields a token with the same binding, and only one of them can become the seed. A different predecessor or ordinal yields a different continuation, which store step 4 and capture step 3 refuse.
+- **Verification.** Store step 4 checks the binding against the recomputed identity at creation. Ordinary admission of a capability carrying the constraint denies unless the request's namespace digest, request id and canonical argument hash equal the bound values. Capture (section 6.3 step 3) also checks that the workflow's `continuation_id` equals the bound one. The issuance pin and the `ActionIntentV1` checks run unchanged afterwards.
 
 ### 6.3 Capture-time checks for linked workflows
 
@@ -307,7 +334,7 @@ These run in the recovery capture participant for `AuthorityContinuation` workfl
 2. **Subset.**
    - For `Delegator`, chain validation proves the new authority is a subset of the delegator's grant (M: `attenuation.rs:224`).
    - For `ReceiverIssuer`, the issuing key was an active head at issuance (M: issuer-lifecycle design `:11-12`).
-3. **Binding.** The continuation's subject equals the fault's subject, and its canonical argument hash equals the fault's `parameter_hash`. When the fault carries `security_binding_digest`, the current trusted selection produces the same digest.
+3. **Binding.** The continuation's subject equals the fault's subject, and its canonical argument hash equals the fault's `parameter_hash`. When the fault carries `security_binding_digest`, the current trusted selection produces the same digest. When D1 is not installed, the capability's `RecoveryContinuationBinding` equals the workflow's `continuation_id`, request namespace digest, request id and `parameter_hash`.
 
    3a. **Sibling (predecessor) revocation.** Deny if the predecessor seed's `capability_id` is revoked, or if any capability id in that capability's own delegation chain is revoked. Use the same revocation snapshot as the rest of capture.
    - **Why it is needed.** The new capability is a sibling of the denied one, issued by the resolver, not a descendant. W:'s fresh revocation predicate covers the linked workflow's own seed capability, not the predecessor's.
@@ -393,20 +420,22 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
 | New authority wrong shape, not a subset, or from a non-active issuer key | `CHIO-KERNEL-AUTHORITY-REMEDY-REJECTED` (`shape`, `subset`) |
 | Predecessor capability or its chain revoked, suspended, frozen, or predecessor cancelled at capture | `...-REJECTED` (`revoked`, `suspended`, `frozen`, `cancelled`) |
 | `RecoveryContinuationBinding` presented outside its bound continuation | deny at admission |
+| Linked-workflow creation whose binding differs from the identity derived for `(predecessor_workflow, successor_ordinal)`, or that reuses an ordinal | `CreateWorkflow` refused (`binding_mismatch`) |
+| Capture where the workflow's continuation differs from the bound continuation | `...-REJECTED` (`binding_mismatch`) |
 | Capture uncertain | recovery reconciliation; never a fresh identity (REC-11) |
 | Portable core receives the constraint | `ConstraintError` deny |
 
 ## 8. Protocol, schema and wire impact
 
 - `spec/PROTOCOL.md`:
-  - **Section 5:** add the `recovery_continuation_binding` constraint (shape, equality preservation, enforcer) and the `GovernedApprovalRequired` classification.
+  - **Section 5:** add the `recovery_continuation_binding` constraint (fields `continuation_id`, `request_namespace_digest`, `request_id`, `parameter_hash`; equality preservation; enforcer) and the `GovernedApprovalRequired` classification.
   - **Section 6:** define the `authority_fault` v2 block and the tagged fault kinds. Admit the `integrity_fault` block (`chio.integrity-fault.v1`, spec 11 I19) as the sibling kind.
   - **Section 8:** state that recoverable authority denials carry the block.
 - **Recovery generated schemas** (W: closed, generated vocabulary; R: `11-contract-catalog.md`):
   - `ExplanationRemedyKind::Authority`;
   - `ExplanationAssessmentV1::RequiresAuthority`;
   - `RecoveryTemplateV1::AuthorityContinuation`;
-  - the `predecessor_workflow` and `predecessor_fault` record fields;
+  - the `predecessor_workflow`, `predecessor_fault` and `successor_ordinal` record fields, and the `authority-successor` creation-key derivation;
   - the optional annotation on the `Capability` fact.
 
   Each needs negative vectors. Closed enums mean old readers refuse new values rather than misreading them.
@@ -449,7 +478,10 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
   - predecessor mismatch, a second open successor, the successor bound, and changed tool or arguments are refused;
   - a successor cancelled without capture (for example after its capability expired during approval) frees the slot, and a corrected successor is accepted;
   - a second capture for the same predecessor is refused by the `successor_captures` key;
-  - the seed pin (`issuance.rs:76-81`) still holds for the linked workflow.
+  - the seed pin (`issuance.rs:76-81`) still holds for the linked workflow;
+  - **non-D1 construction and verification:** derive the identity chain for `(predecessor, 1)`, mint a capability carrying the binding, create the workflow, materialize `ActionIntentV1` and capture. Each step is accepted. The capability's signing body contains no action-intent digest, and `ActionIntentV1.capability_body` equals the hash of the completed capability's signing body;
+  - **binding to a different continuation is refused:** a capability bound to `(predecessor, 2)`, or to another predecessor, is refused at creation of the `(predecessor, 1)` workflow with `binding_mismatch`. The same capability presented on an ordinary path with matching arguments but a different request id or namespace is denied at admission;
+  - a retried creation with the same key and seed returns the existing workflow; the same key with a different capability is refused as a conflict; a reused ordinal is refused.
 - **Proptest.** For random chains and resolver scopes, a linked workflow accepted at capture:
   - is a subset of the resolver's grant;
   - authorizes one invocation of the faulted tool with the faulted arguments;
@@ -496,6 +528,7 @@ Open decisions:
 4. **Linked workflow versus relaxing the seed pin.** This spec chooses linked workflows. Relaxing `issuance.rs:76-81` to allow a capability swap would touch every recovery invariant that assumes one capability per workflow. Rejected unless the linked-workflow cost (an extra deployment per sibling scope) proves prohibitive.
 5. **Historical freeze windows.** Deny remedies whose issuance falls inside a recorded freeze window. This needs historical freeze queries from active defense.
 6. **Resources and prompts.** Make `OutOfScopeResource` and `OutOfScopePrompt` classifiable in v2.
+7. **Which identity the binding names (resolved).** The successor continuation derived from `(predecessor_workflow, successor_ordinal)`, together with the request namespace, request id and argument digest (section 6.2, "Continuation identity"). It is fixed before the capability exists, survives replay because each step is deterministic, and never hashes the capability.
 
 ## Review disposition
 
@@ -511,6 +544,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180839016 (with spec 11) | Define an integrity-specific fault payload | Fixed now. The classifier returns a tagged `FaultKind` (`Authority(AuthorityFaultClass)` or `Integrity`). Each kind has its own block: `AuthorityFaultV2` unchanged, and `IntegrityFaultV1` defined in spec 11 I19. Each kind has its own planner projection (`Capability` and `Integrity`), and A1-A5 cover both (A6) | Section 4 table; R1; R5; section 5; section 8; section 10 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-2-01 | The new capability must contain a digest that hashes that same capability | Fixed. Verified the cycle in W: (`authorization.rs:69-90`, `issuance.rs:76-83`, `token.rs:219-242`, `materialize.rs:285-286`). `RecoveryContinuationBinding` now names `continuation_id`, `request_namespace_digest`, `request_id` and `parameter_hash`, all derived before the capability from `(predecessor_workflow, successor_ordinal)` through W:'s existing workflow, continuation and request-id rules. `ActionIntentV1` is derived afterwards, unchanged. The store and capture check the binding against the recomputed identity. Construction and negative tests added | Revision 4 changes; section 6.2 template, store step 4, binding, "Continuation identity"; section 6.3 step 3; section 7; section 8; section 10; open decision 7 |
 
 ## Appendix A. FTL reference
 

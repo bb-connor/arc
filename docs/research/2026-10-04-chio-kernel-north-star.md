@@ -32,18 +32,18 @@ The nine specs kept finding one pattern: **one concept implemented N times**.
 
 The internal assessment measured what that costs.
 
-- **Proof sits where the code is smallest.** `chio-kernel-core` is about 11K lines. It carries the Aeneas-extracted functions (20), the Kani harnesses (about 55) and 149 Lean declarations (`M:docs/formal/CURRENT_STATE.md`). The code that decides real effects is different:
-  - a 133K-line orchestration shell (`chio-kernel` non-test source on M:);
+- **Proof sits where the code is smallest.** `chio-kernel-core` is about 11K lines. The formal inventory is 20 Aeneas-extracted functions, 55 Kani harnesses and 149 Lean declarations (`M:docs/formal/CURRENT_STATE.md:15-31`). Most of it targets the core, but not all: the 55 harnesses are 14 internal, 25 core-public and 16 other-public, so some lie outside `chio-kernel-core`. The code that decides real effects is different:
+  - an orchestration shell of roughly 125K-147K non-test lines. `chio-kernel/src` on M: has 208,300 Rust physical lines; excluding paths that contain "test" gives 124,798, and excluding only `/tests/` directories gives 146,978. Neither strips `cfg(test)` blocks. Earlier drafts said 133K without a recipe, so treat that figure as approximate;
   - over a 299K-line SQLite store behind one writer (it was 188K lines when ADR-0022 was written; `M:docs/adr/ADR-0022-store-and-kernel-decomposition.md:9-13`).
 
   That code is tested, not proven.
-- **Mediation costs more than the work it mediates.**
-  - Process-mediated calls have medians of 220-357 ms, against handler times of 0.54-0.60 ms (`M:sdks/typescript/packages/ai-sdk-process/BENCHMARK.md:175-191`).
-  - Each call costs about 50 fsyncs at about 2.3 ms each after the anchor fix, and about 40 after folding recovery claims. Eleven authority commits remain (`BENCHMARK.md:79-100`; `M:docs/architecture/AGENT_PROCESS_DIRECTION.md:150-167`).
-  - Sustained throughput on one writer is 59 calls per second, and receipts grow about 11.9 KB per call (`B:docs/papers/programmable-sovereignty/bench/results/bilateral-admission-sustained-load.json`).
+- **Mediation costs more than the work it mediates.** Every figure below is a historical measurement with its own harness. None is a current-source qualification, and spec 10 section 2.8 keeps the same distinctions.
+  - **Latency.** Historical process-host tables show mediated-call medians such as 220-357 ms against handler times of 0.54-0.60 ms. Those are selected examples: the same table also has `send_findings` at 409 ms and `spawn` at 728 and 817 ms. A later historical run puts the optimized `read` median at 130 ms. The benchmark itself labels these tables historical and not qualification of the current source (`M:sdks/typescript/packages/ai-sdk-process/BENCHMARK.md:76-77`, `:143-149`, `:175-191`).
+  - **Fsyncs.** In the historical trace (33 mediated invocations), authority, anchor, receipt and `process.db` fsyncs average about 26.5 per call, excluding setup. Including setup and unattributed calls it is about 40, and before the anchor fix about 85 (`BENCHMARK.md:79-115`). The trace recorded eleven authority commits; the current M: code inventory for a side-effecting call is ten (spec 10 section 2.1).
+  - **Throughput and receipts.** A sustained-load harness ran 59 calls per second, with receipts growing about 11.9 KB per call (`B:docs/papers/programmable-sovereignty/bench/results/bilateral-admission-sustained-load.json`). That harness gives every worker its own kernel and SQLite receipt store, and its admission store is in memory (`B:crates/kernel/chio-runtime-core/examples/treaty_sustained_load.rs:17-23`). It is not a one-writer or shared-writer baseline. Spec 10 phase 0 measures that baseline before any throughput target is judged.
 - **Evidence trails ambition.**
-  - 985 of 1,587 security requirements are open-acceptance.
-  - No commit after `f25cd61f49` has run in hosted CI (`M:docs/reviews/2026-10-01-execution-review.md`).
+  - 986 of 1,583 security requirements are open-acceptance (recomputed from `M:docs/security/landing-ledger.json` at `19df31ad9`).
+  - As of the 2026-10-01 execution review, no commit after `f25cd61f49` had run in hosted CI (`M:docs/reviews/2026-10-01-execution-review.md`). That records acceptance debt at that review, not a claim about every later run.
   - The quickstart begins with a release build of a 636-package CLI (`M:README.md:257-265`).
 
 The tagline is "the kernel your agents answer to". Today that kernel is too large, too slow and too unproven to answer for itself. **Its shape is right; its size, uniformity and proof are not.**
@@ -56,10 +56,10 @@ Five properties, each measurable:
 
 | Property | Target | Today |
 |---|---|---|
-| **Small** | Trusted orchestration under about 30K lines behind a closed, layered ABI (spec 1). Everything else is a component behind a polarity-classified seam | 133K-line shell; 407-package kernel closure |
+| **Small** | Trusted orchestration under about 30K lines behind a closed, layered ABI (spec 1). Everything else is a component behind a polarity-classified seam | A shell of roughly 125K-147K non-test lines; a 407-package kernel closure (an archived measurement on main `f5a9d2ab2` for one target, not an integrated M:/V:/W: count) |
 | **Proven** | The code that decides effects is generated from, or refinement-checked against, one machine-checked model | Proofs cover the pure core only |
-| **Fast** | Two durable commits per mediated call; group commit; mediation overhead in single-digit milliseconds | About 40-50 fsyncs; 220-357 ms; 59 calls/s |
-| **Agent-safe** | Untrusted data cannot cause a consequential tool call, enforced by the kernel for any framework | Labels exist (P4); admission ignores them |
+| **Fast** | Three durable commits per side-effecting call and two for eligible reads (spec 10); group commit; a shared-writer throughput target measured against a phase-0 baseline | Historical: about 26.5 attributed fsyncs per call (about 40 with setup); `read` median 130 ms; no shared-writer throughput baseline yet |
+| **Agent-safe** | Unbounded or unknown external influence cannot authorize a consequential tool call except through an exact endorsement, enforced by the kernel for any framework. Bounded quarantine returns are an explicit allowance (spec 11 section 11) | Labels exist (P4); admission ignores them |
 | **Verifiable by others** | Receipts in publicly witnessed logs; confinement and execution evidence in standard formats; optionally, proof-carrying verdicts | Signed receipts, local checkpoints |
 
 ## 3. The bets
@@ -118,15 +118,15 @@ Commits stay separate only for participants in other stores (remote budget, paym
 **Around it:**
 - a group-commit WAL writer that batches many operations' crossings into one fsync, sharded per tenant or authority domain;
 - a Merkle-batch-signed, slim receipt log, as Certificate Transparency does, with inclusion proofs returned asynchronously;
-- read-only calls get a one-commit path that still writes a receipt, which also retires defect D1.
+- eligible read-only calls outside durable coverage get a check-only dispatch plus a release write that carries the receipt. D1's closure stays with spec 3 phase 1.
 
 **Why.**
 - Signatures are not the bottleneck: 0.23 ms against a 13.9 ms kernel-only allow (`B:.../bilateral-admission-components.csv`). Commits and the single writer are.
-- The expected gain is about 5x fewer fsyncs and 3-5x lower latency, with throughput multiples under concurrency (internal brief; inference from 2.3 ms per fsync).
+- **The expected gain, from the arithmetic.** Narrowly scoped fsyncs fall from about 22.7 to 5 per side-effecting call (about 4.5x fewer). Counting `process.db`, they fall from about 26.5 to about 8.8 (about 3x). Latency gains are smaller, because non-fsync time stays. Spec 10's `read` target of 95 ms or less against the historical 130 ms median is about 1.37x, and its model predicts about 87 ms (about 1.5x). Earlier drafts claimed 3-5x lower latency; these inputs do not support that. Throughput under concurrency has no baseline yet and must be measured on spec 10's shared-writer fixture.
 - One primitive also means one place for the specs' safety predicates. Brainstorm candidate 9 (name every crossing) becomes code.
 
 **From the specs.**
-- Spec 3's discharge token, spec 4's dispatch-commit fence and spec 8's tier-2 check all live inside the same two transactions.
+- Spec 3's discharge token, spec 4's dispatch-commit fence and spec 8's tier-2 check all live inside the crossing transactions.
 - Spec 4's crossing table is the primitive's inventory.
 
 **First step.**
@@ -147,19 +147,20 @@ The refusal is a classified fault with a recovery remedy (spec 2), not a dead en
 - The field has converged on enforcement outside the model. In-model defenses fall to adaptive attacks above 50% success ([arXiv 2503.00061](https://arxiv.org/abs/2503.00061)).
 - CaMeL enforces this guarantee in a custom Python interpreter ([arXiv 2503.18813](https://arxiv.org/abs/2503.18813)), and FIDES in one planner ([arXiv 2505.23643](https://arxiv.org/abs/2505.23643)).
 - Chio already has the primitives at the OS layer:
-  - P5 is CaMeL's quarantined LLM, enforced by a cage with `FullyEnforced` evidence;
-  - P4's monotone join is FIDES's context label;
-  - P3 `Withhold` and endorsement are FIDES's hide and endorse.
+  - P5 plays the role of CaMeL's quarantined LLM, enforced by a cage with `FullyEnforced` evidence;
+  - P4's monotone join plays the role of FIDES's context label;
+  - P3 `Withhold` and endorsement play the roles of FIDES's hide and endorse.
 
   The missing piece is admission consulting the label.
-- **The result is the guarantee for any framework, in any language, enforced outside the agent.**
+- **The result is spec 11's property for any framework, in any language, enforced outside the agent.** Unbounded or unknown external influence cannot authorize a gated call except through an exact endorsement. A quarantine return under a bounded requirement is an explicit allowance: its bits can still select the action, unless an action-selection contract limits the selectable set (spec 11 I22a).
+- The analogies to CaMeL and FIDES describe where enforcement happens. They do not import those systems' guarantees, which come from their own dataflow models and evaluations. Chio's property needs its own composition argument, given in spec 11 section 11.
 
 **Honesty.**
 - Taint at process granularity is sound but coarse. Finer taint is heuristic (NeuroTaint, [arXiv 2604.23374](https://arxiv.org/abs/2604.23374)).
 - Utility costs are real: CaMeL solves 77% of tasks against 84% undefended.
 - Publish adaptive evaluations (AgentDojo, AgentDyn), not static benchmarks.
 
-**First step.** Add `required_integrity` to `ToolGrant` and a deny-only `IntegrityGuard` that reads the P4 join. Ship a typed-quarantine library of enum, number and bounded-string return contracts for P5.
+**First step.** Add `Constraint::RequiredIntegrity` (spec 11) and a deny-only `IntegrityGuard` that reads the P4 join. Ship a typed-quarantine library of enum, number and bounded-string return contracts for P5.
 
 **Cost.** Medium.
 
@@ -366,3 +367,12 @@ The top three are now specced as PROPOSED drafts: `2026-10-04-pure-admission-mac
 3. **Integrity-gated admission** (bet 3). The most differentiated agent guarantee, built mostly from shipped P3, P4 and P5 parts.
 
 Bets 6 (C2SP witnessing) and 11 (60-second first receipt) are small enough to go straight to implementation plans.
+
+## Review disposition
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-0-01 | The north-star diagnosis mislabels the benchmark topology and mixes historical baselines | Fixed. Each figure now names its harness and historical status. 59 calls/s is labelled a per-worker private-kernel harness with an in-memory admission store, not a shared-writer baseline. Latency figures are labelled selected historical examples, with the 130 ms `read` median. The fsync figures are re-derived (about 26.5 attributed per call). The 3-5x latency claim is replaced by the derived ratios (95 ms target about 1.37x; model about 1.5x). The "Fast" target is now three commits per side-effecting call and two for eligible reads. Also corrected: the ledger count (986 of 1,583), the formal inventory (some harnesses are non-core), the shell size (a range with its recipe), the archived 407-package closure, and the hosted-CI statement's date | section 1; section 2 table; bet 2 |
+| R-11-02 (north-star part) | A bounded return does not establish the claimed zero-injection guarantee | Fixed. The "Agent-safe" target and bet 3 state spec 11's property: unbounded or unknown influence needs an exact endorsement, and bounded returns are an explicit allowance. The CaMeL and FIDES analogies no longer import their guarantees | section 2 table; bet 3 |

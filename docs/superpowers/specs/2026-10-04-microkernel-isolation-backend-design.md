@@ -271,6 +271,8 @@ Rules, carried from revision 1:
 6. Projection never upgrades a native state.
 7. `output_channels` records which result channels can leave the confined domain. When a return contract claims channel discipline (P5's `ReturnContractV1`), every channel the contract does not enable must be `Enforced`, or the record cannot be `FullyEnforced`. It uses P5's closed `ConfinedChannelV1` vocabulary (W:`chio-security-types/src/confinement.rs:14-25`), each channel `Enforced` (withheld or bounded by a contract) or `NotEnforced` (raw). A tool-lane cage leaves its result channels to the kernel's ordinary output guards. Its projection records them as `NotEnforced` with observer `HostParent`, because the cage itself does not withhold them. This is honest, and it is the axis on which a confined reader differs from a caged tool.
 
+8. **`attempt_id` is the lane's launch identity** (section 7 rule 3). For a `LinuxCage` tool-lane record it is the id of the cage enforcement receipt, which names one spawn. For any other tool-lane backend it is the `attempt_id` carried by `confinement_launch` (rule 5.1.6). For a worker-lane record it is the runner's launch attempt, `worker_profile.launch_attempt` (6.3). It is never `chio_process.attempt`, which numbers retries of one operation (M:`chio-process/src/lib.rs:455-461`), not launches.
+
 Mapping per backend:
 
 | Field | `LinuxCage` (tool lane) | `LinuxCage` (worker lane, `confined_reader`) | `FirecrackerGuest` | `ProcessContainer` |
@@ -350,13 +352,14 @@ The existing `chio_process` attribution object (M:`lib.rs:458-479`) gains one ho
 
 ```json
 "worker_profile": { "kind": "direct | container | split_domain | confined_reader",
-                    "launch_ref": { "record_id": "...", "record_sha256": "..." } }
+                    "launch_ref": { "record_id": "...", "record_sha256": "..." },
+                    "launch_attempt": "..." }
 ```
 
 Rules:
 
 1. The value comes from host configuration bound to the attempt, the way `native_launch` comes from host launch receipts. The worker cannot supply or change it.
-2. `launch_ref` is required for `container`, `split_domain`, and `confined_reader`. A host attribution that differs from the runner's per-attempt record denies, mirroring the `native_launch` mismatch rule.
+2. `launch_ref` and `launch_attempt` are required for `container`, `split_domain`, and `confined_reader`. `launch_attempt` is the runner's launch attempt for the worker, the `attempt` of the container launch record (5.3) or the boundary's launch for `confined_reader`. It is distinct from `chio_process.attempt`, which numbers retries of one operation. A host attribution that differs from the runner's per-attempt record denies, mirroring the `native_launch` mismatch rule.
    - For `confined_reader`, `record_id` is the boundary's `EvidenceRef`, and `record_sha256` is the retained `launch` digest (W:`.../knowledge/confinement/launch.rs:125-127`).
    - It is attached to receipts the parent produces after the return is admitted, and to the exported evidence of section 6.4.
 3. An absent `worker_profile` renders as `direct` (no claim).
@@ -365,7 +368,7 @@ Rules:
    - **Qualification.** The fact is `Verified(kind)` only when every condition holds:
      - the host attribution equals the runner's per-attempt record (rule 2);
      - the referenced launch record verifies: pinned signer, canonical digest equal to `launch_ref.record_sha256`, and state `FullyEnforced` (for `confined_reader`, `EnforcedRunning` or later);
-     - the record's attempt equals the context's process attempt;
+     - the record's attempt equals `launch_attempt` (rule 2), which the runner binds per launch;
      - the kind's own predicate holds: for `container`, the run plan pins every input, the image digest, the task input and the seeds; for `split_domain`, S1-S5.
    - **Where it is checked.** The host verifies the fact once, when the process's knowledge scope is created. It commits the resulting initial influence in the serving writer in the same transaction (spec 11 rule I7). Crossings read the committed state and never re-derive it from attribution.
    - **Failure behavior.** Any of these yields `Unverified`, which is treated exactly as `direct`: an absent field, an unverifiable or mismatched record, a record lookup that fails, or a kind predicate that does not hold. The context then starts at `unknown = true`, which no integrity requirement satisfies. A failure can only make the starting state less trusted, never more.
@@ -373,7 +376,8 @@ Rules:
 
 ```text
 attribution.worker_profile.kind in {container, split_domain} ->
-  verified(launch_record(launch_ref)) and launch_record.attempt = attribution.attempt
+  verified(launch_record(launch_ref))
+  and launch_record.attempt = attribution.worker_profile.launch_attempt
 
 attribution.worker_profile.kind = split_domain ->
   plan_binds(controller_digest, execution_server_ids)
@@ -414,13 +418,13 @@ Verifiable work names confinement as a host assumption (V:`delegated_work.rs:4-5
    - `claims` carries those records and their native-record digests.
    - The envelope is signed by the operator's runtime-attestation authority and appraised by the appraisal authority the verifier pins.
 2. **Tier ceiling.** Confinement-only evidence resolves to at most `RuntimeAssuranceTier::Basic`. `Attested` and `Verified` stay reserved for hardware-rooted attestation, which local trust policy decides. See open decision 1.
-3. **Binding to the work (backend-neutral).** Inside `RuntimeAssuranceBacking`, every production receipt in the agreement's confinement scope must map to exactly one attested record. The evaluator already receives the production receipts (V:`verify.rs:1467-1473`).
-   - **Scope.** Every receipt whose tool server is an execution tool server named in the run plan, plus every receipt attributed to the worker attempt.
-   - **References.** The map uses only kernel-bound or runner-bound references in the signed receipt, whatever the backend:
-     - tool lane, `LinuxCage`: `native_launch` (5.1);
-     - tool lane, any other backend: `confinement_launch` (rule 5.1.6);
-     - worker lane (`ProcessContainer`, `confined_reader`, or a `split_domain` controller): `chio_process.worker_profile.launch_ref` together with the attribution's `attempt` (6.3).
-   - **Match.** The record matched must have `native_record_digest` equal to the reference's digest and `attempt_id` equal to the reference's attempt. A receipt in scope with no reference, zero matching records, or more than one fails the facet.
+3. **Binding to the work (backend-neutral, per lane).** Inside `RuntimeAssuranceBacking`, every production receipt in the agreement's confinement scope must map to exactly one attested record **for each lane that applies to it**. The evaluator already receives the production receipts (V:`verify.rs:1467-1473`).
+   - **Applicable lanes.** The tool lane applies to a receipt whose tool server is an execution tool server named in the run plan. The worker lane applies to a receipt attributed to the worker attempt (`chio_process` attribution carrying `worker_profile`). Both can apply to one receipt: a `container` worker that invokes a caged execution tool produces a receipt naming two distinct launches, and both must verify. Choosing either one alone would let an agreement that requires both boundaries pass with one.
+   - **References and attempt binding, per lane.** The map uses only kernel-bound or runner-bound references in the signed receipt, whatever the backend. Each reference has its own attempt binding (rule 5.2.8):
+     - tool lane, `LinuxCage`: `native_launch { receipt_id, receipt_sha256 }` (5.1). It carries no separate attempt field. Its attempt identity is `receipt_id`, the cage enforcement receipt that names one spawn, so the matched record has `native_record_digest = receipt_sha256` and `attempt_id = receipt_id`. A long-lived adapted server references one spawn from many receipts, which all map to that one record;
+     - tool lane, any other backend: `confinement_launch { record_schema, record_sha256, attempt_id }` (rule 5.1.6), matched on `record_sha256` and its own `attempt_id`;
+     - worker lane (`ProcessContainer`, `confined_reader`, or a `split_domain` controller): `chio_process.worker_profile.launch_ref.record_sha256` and `worker_profile.launch_attempt` (6.3), never `chio_process.attempt`.
+   - **Match, keyed by (receipt, lane).** For each applicable lane, exactly one attested record must have `lane` equal to that lane, `native_record_digest` equal to that lane's reference digest, and `attempt_id` equal to that lane's attempt binding. The facet fails when an applicable lane has no reference, zero matching records, or more than one matching record in that lane, or when a reference matches only a record of the other lane.
    - **No substitution.** A disclosed `tool_origin` never substitutes for a reference in scope. Only receipts outside the scope, such as in-process `ChioInternal` tools the agreement permits, fall back to the disclosure table. A record attested for an attempt that no in-scope receipt references vouches for nothing.
 4. **Requiring it.** An agreement or finding requires confinement by setting `runtime_assurance_tier = Basic` and adding a trust-policy rule that accepts the schema. Verifiers deny unless the evidence is present (`Unavailable` and `Asserted` never pass a required facet; V:`report.rs:107-110`). The paper's host premise becomes a negotiated, checkable term. No facet is added.
 5. **Scope.** Execution evidence attests local execution only (V:`execution_evidence.rs:1`). A confinement record attests the exporter's own launches, never a remote owner's.
@@ -475,7 +479,8 @@ Output: `docs/research/2026-10-ftl-isolation-spike.md`.
 | Container inspection differs from the fixed profile | Signed `Rejected` record. The start is never issued. No unsigned record |
 | Container start fails, or the post-start inspection does not confirm | Container stopped and removed. Signed `BootstrapFailed` record. Attempt never ready, and no worker call is admitted |
 | Signing the container success record fails after the start | Container stopped. Attempt recorded `BootstrapFailed`. No call is admitted |
-| An in-scope production receipt has no kernel-bound or runner-bound reference, or matches zero or several attested records | Facet fails, whatever its `tool_origin` |
+| An in-scope production receipt lacks a reference for an applicable lane, or matches zero or several attested records in that lane, or matches only a record of the other lane | Facet fails, whatever its `tool_origin` |
+| A receipt to which both lanes apply verifies in only one lane | Facet fails |
 | The verifier's appraisal layer does not know the confinement attestation schema | `UnsupportedSchema`. Facet fails |
 | The `worker_profile` fact is unverified (absent, mismatched, unverifiable, lookup failed) | The context starts at `unknown` (spec 11 rule I7). Integrity-gated calls deny |
 | Projection error (unknown schema, missing surface) | No record. A facet requiring it is `Unavailable`, which denies |
@@ -518,7 +523,9 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
 - **Verifier:** a finding with `runtime_assurance_tier = Basic` is denied without the confinement attestation, passes with it, and fails when:
   - a production receipt references an unattested launch;
   - an in-scope receipt carries no reference, even under a permitted `tool_origin`;
-  - two attested records match one receipt;
+  - two attested records match one receipt in the same lane;
+  - a receipt to which both lanes apply (a `container` worker calling a caged execution tool) passes with one record per lane, and fails when either lane's record is omitted;
+  - a record whose `attempt_id` differs from the lane's attempt binding (wrong spawn, wrong `confinement_launch.attempt_id`, or `chio_process.attempt` used in place of `launch_attempt`) is rejected;
   - the verifier predates the appraisal registration (`UnsupportedSchema`).
 - **Confined reader:** an export of an admitted P5 return projects to a worker-lane record with `inherited_authority = Absent` and `output_channels` showing only `Value`. An export whose retained evidence differs from the pinned helper or image digest is rejected. An export of a `Cancelled` boundary carries no return evidence.
 - **Adversarial (worker lane):** in a `container` worker, a workload subprocess reads the credential and invokes a tool. The call succeeds and is recorded under `container`, which demonstrates why `split_domain` exists. In a `split_domain` attempt, the execution domain has no socket or credential to read.
@@ -559,6 +566,12 @@ Refinements to the review directives, recorded with evidence:
 | 4180389993 | Bind non-cage confinement records to production receipts | Fixed now. Every in-scope receipt must map to exactly one record through `native_launch`, `confinement_launch` or `worker_profile.launch_ref`; `tool_origin` never substitutes | Rule 5.1.6; section 7 rule 3; section 10 |
 | 4180435350 | Sign container launch evidence after start succeeds | Fixed now. Inspect, start, confirm, then sign. A failed start signs a distinct `BootstrapFailed` record, and no call is admitted before the success record | Section 5.3 |
 | 4180731791 | Treat worker profile as an authorization fact | Fixed now. A verified fact with explicit qualification, checked once at scope creation, and fail-closed to `unknown`. Spec 11 rule I7 now cites it | Rule 6.3.5; spec 11 rule I7 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-7-01 | Exactly one confinement record per receipt rejects calls covered by both lanes | Fixed. The match is now exactly one record per applicable lane, keyed by (receipt, lane), and both are required when both lanes apply. Each reference has its own attempt binding: `native_launch` uses its cage enforcement `receipt_id` as the attempt identity, `confinement_launch` carries `attempt_id`, and the worker lane uses a new runner-bound `worker_profile.launch_attempt`, because `chio_process.attempt` numbers operation retries, not launches (M:`chio-process/src/lib.rs:455-461`) | Section 7 rule 3; rule 5.2.8; section 6.3 rules 2 and 5; section 10; section 13 |
 
 ## Appendix A. FTL reference
 

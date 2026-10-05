@@ -1,8 +1,8 @@
 # Design: integrity-gated admission
 
-- Status: PROPOSED (revision 2, 2026-10-05, after Codex review on PR #1174; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
+- Status: PROPOSED (revision 3, 2026-10-05, after the independent review and Codex review on PR #1174; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
 - Date: 2026-10-04
-- Scope: make "untrusted data cannot cause a consequential tool call" a property the kernel enforces for any agent framework. It is built from the shipped and implemented knowledge (P4), semantic (P3) and confinement (P5) surfaces:
+- Scope: make "unbounded or unknown external influence cannot authorize a consequential tool call, except through an exact endorsement" a property the kernel enforces for any agent framework (the precise property is in section 11). It is built from the shipped and implemented knowledge (P4), semantic (P3) and confinement (P5) surfaces:
   - grants declare a required integrity;
   - the kernel records the influence of every output it delivers into a mediated context;
   - an early deny-only guard checks the calling context's influence, and the authoritative check runs inside the intent commit;
@@ -33,6 +33,13 @@
   - the umbrella `2026-10-04-ftl-lessons-program-design.md`;
   - the program specs: `closed-kernel-abi`, `authority-faults`, `typed-reservations`, `authority-space-teardown`, `unified-event-queue`, `opaque-adapter-context`, `microkernel-isolation-backend`, `durable-stop-epoch`;
   - the north-star specs `2026-10-04-pure-admission-machine-design.md` (A) and `2026-10-04-crossing-primitive-design.md` (B).
+
+## Revision 3 changes
+
+From the independent review on PR #1174:
+- **Endorsement is part of the authoritative predicate (R-11-01).** Revision 2 required `satisfies(state, requirement)` unconditionally at the intent commit, so the I21 endorsement it promised could never pass. The check now admits when the context satisfies the requirement **or** when a verified exact endorsement applies. The endorsement must be bound to the exact action, to the current influence commitment, to the current deployment, and to a single-use continuation. It is carried in the crossing plan and consumed in the same transaction. The early guard defers a presented endorsement to that check and never accepts it on its own (I13, I15a).
+- **The guarantee is stated precisely (R-11-02).** `BoundedExternal` admits a bounded channel that attacker-controlled content can influence. A one-bit return can choose between publish and delete. The spec no longer claims that external content cannot steer a bounded context. Section 11 states the enforceable property. A new optional requirement, `BoundedSelection`, binds a bounded requirement to an operator-signed action-selection contract, for deployments that need zero unauthorized action selection (I22a).
+- **Deny receipts no longer disclose the commitment (R-11-03).** Allow and deny receipts have separate disclosure rules. A caller-visible deny carries neither the commitment nor `satisfied_by`. Allow receipts carry a blinded, per-receipt commitment reference. The raw audit basis goes to an operator-audience record (I25, I25a).
 
 ## Revision 2 changes
 
@@ -107,7 +114,7 @@ This design closes all three:
 Goals:
 - A grant can require that its call come from a context with no unendorsed external influence, and the kernel enforces it for every framework running as a mediated process.
 - Influence tracks what actually entered a context: tool outputs, mailbox messages, artifact reads, model-context restores and confined returns.
-- Refusals are recoverable through endorsement or quarantine without weakening the guarantee.
+- Refusals are recoverable through endorsement or quarantine without weakening the property of section 11. A quarantined continuation is admitted only under the bounded allowance its requirement names.
 - The guarantee is measured under adaptive attack, and published.
 
 Non-goals:
@@ -176,6 +183,10 @@ pub enum IntegrityRequirementV1 {
     Trusted,                                      // no external origin, known provenance
     BoundedExternal { max_bits: u16 },            // only ExternalBounded origins, total <= max_bits
     ProviderOnly { providers: BoundedSet<ProviderId, 8> }, // Trusted plus listed providers
+    BoundedSelection {                            // BoundedExternal, plus an action-selection contract (I22a)
+        max_bits: u16,
+        contract: ActionSelectionContractDigest,
+    },
 }
 ```
 
@@ -185,8 +196,9 @@ Normative rules:
    - `Trusted` requires empty origins.
    - `BoundedExternal { n }` requires every origin to be `ExternalBounded` and `bounded_bits_total <= n`.
    - `ProviderOnly(ps)` requires every origin to be `ModelProvider { p }` with `p` in `ps`.
+   - `BoundedSelection { n, c }` requires what `BoundedExternal { n }` requires. Its action condition is checked by crossing check 4 (I22a), because `satisfies` reads state only.
 2. **I2. Monotone.** Joins only move up the order, and nothing in this design moves a context down, so `satisfies` can only go from true to false within one context.
-3. **I3. Requirement order.** For attenuation: `Trusted` is stronger than `BoundedExternal { n }`, which is stronger than `BoundedExternal { m }` when `n < m`. `ProviderOnly(ps)` is stronger than `ProviderOnly(qs)` when `ps` is a subset of `qs`. `Trusted` is stronger than every `ProviderOnly`.
+3. **I3. Requirement order.** For attenuation: `Trusted` is stronger than `BoundedExternal { n }`, which is stronger than `BoundedExternal { m }` when `n < m`. `ProviderOnly(ps)` is stronger than `ProviderOnly(qs)` when `ps` is a subset of `qs`. `Trusted` is stronger than every `ProviderOnly`. `BoundedSelection { n, c }` is stronger than `BoundedExternal { m }` when `n <= m`, and stronger than `BoundedSelection { m, d }` when `n <= m` and `c`'s authorized action set is a subset of `d`'s. `Trusted` is stronger than every `BoundedSelection`.
 
 ## 5. Output influence joins
 
@@ -239,7 +251,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
    - A `receive` payload inherits the sender's influence state, recorded at `send` in the same transaction, when the channel has `attest_senders` (M: `MAILBOXES.md:33`).
    - Without sender attestation, its origin is `External`.
 7. **I7. Initial influence of a context.** It comes from the **verified** worker-profile fact (`2026-10-04-microkernel-isolation-backend-design.md` rule 6.3.5), never from the raw attribution.
-   - **Qualification.** The fact is `Verified(kind)` only when the host attribution equals the runner's per-attempt record, the referenced launch record verifies (pinned signer, digest, enforcement state), its attempt equals the context's attempt, and the kind's own predicate holds (spec 7 rule 6.3.5).
+   - **Qualification.** The fact is `Verified(kind)` only when the host attribution equals the runner's per-attempt record, the referenced launch record verifies (pinned signer, digest, enforcement state), the record's attempt equals spec 7's runner-bound `worker_profile.launch_attempt` for this context (spec 7 rule 5.2.8), and the kind's own predicate holds (spec 7 rule 6.3.5).
    - **Failure behavior.** Any failure (absent, mismatched, unverifiable, lookup failed, predicate false) is `Unverified` and is treated as `direct` below. A failure can only make the start less trusted.
    - **Committed once.** The host verifies the fact when the context's knowledge scope is created. In the same writer transaction, it writes the context-creation record and inserts the initial observation keyed by it (`source_kind = initial`, I4a), whether the outcome is `Verified` or `Unverified`. A scope cannot exist without its initial observation. Crossings read the committed state and never re-derive it, and a later attribution can only add influence (I2).
 
@@ -283,6 +295,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
     - **Missing context.** It always denies. Unlike `FlowPreInvocationGuard`, there is no `MissingContextPolicy::Allow`, because the requirement is signed into the grant.
     - **Unavailable port.** It denies.
     - **Revalidation.** It sets `requires_dispatch_revalidation() = true` and repeats the read before dispatch (M: `kernel/mod.rs:882`).
+    - **Presented endorsement.** When the request carries an `EndorsementRef` (I15a) and the context does not satisfy the requirement, the guard does not deny on influence alone. It checks only structure: the reference names a recovery workflow continuation for this request's scope. If that check passes, it defers the decision to crossing check 4. It never treats a reference as satisfying the requirement, and it denies when the structure check fails.
 14. **I14. Advisory only.** The early read and the revalidation are best-effort latency savers. Neither decides an effect (section 8).
 
 ## 8. Authoritative check: crossing check 4
@@ -290,8 +303,19 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
 A join and a capture can race. A tool output can be delivered into the same context, and commit its join, between the guard's read and the dispatch. P4 already resolves the analogous confidentiality race by serializing capture and join in one writer (W: `p4/OPERATIONS.md:107-113`). Integrity uses the same point.
 
 15. **I15. Inside the intent commit.** Spec B's crossing primitive evaluates `CrossingCheck::KnowledgeIntegrity { key, requirement }` inside the intent commit's writer transaction, before `DispatchCommitted`. A gated call always runs in a tracked context (I4b), so it is never check-only or `NonDurable`. It takes spec B's durable read path and is checked in that path's intent commit. Spec B's check-only dispatch crossing still carries the check, reading the committed influence head in the writer without writing, but under I4b it never meets a gated grant in a tracked context. `satisfies` is computed from the influence state as committed in that same transaction.
-    - **Join first:** a join that commits first makes the intent commit fail with `InsufficientIntegrity`.
+    - **Join first:** a join that commits first makes the intent commit fail with `InsufficientIntegrity`, unless a verified endorsement over the post-join commitment applies (I15a).
     - **Intent first:** the effect proceeds, and the later join affects only later calls.
+
+    **I15a. Endorsed admission.** Crossing check 4 admits when either condition holds inside the crossing's writer transaction:
+    - **By context.** `satisfies(state, requirement)` holds for the committed state of the call's key. For `BoundedSelection`, I22a's action condition also holds. The receipt records `satisfied_by = context`, or `bounded` when the satisfying origins are `ExternalBounded`.
+    - **By endorsement.** The crossing plan carries `EndorsementRef { workflow_id, continuation_id }`, and every check below passes in this transaction. The receipt records `satisfied_by = endorsement`.
+      - **Recorded and verified.** The approval is recorded on that recovery workflow record in the same writer. Its signatures and coverage were verified when it was submitted (W: `admission_operation_store/recovery/validation.rs:274-286`, `validate_approval`).
+      - **Fresh deployment.** `fresh_basis` holds now: deployment, policy and contract digests unchanged (W: `validation.rs:287-300`).
+      - **Integrity authority.** Its `obligations` include `IntegrityEndorsement { principal }`, and `principal` is on the deployment's integrity roster (W: `recovery/authorization.rs:40-45`).
+      - **Exact action.** Its `ActionIntentV1` names this call's request id, request namespace and semantic request digest (W: `authorization.rs:69-90`). An endorsement for another action never applies.
+      - **Current influence.** Its `influence_basis` equals the commitment of the call's key state as committed in this transaction, not the state when the approval was made. Any join after approval makes it stale.
+      - **Single use.** The continuation has not been consumed by another operation. W: binds each recovery workflow to exactly one native operation, through `native_link`, set in the same writer when the continuation's operation begins (W: `admission_operation_store/recovery/native.rs:49-86`, which also re-runs `fresh_basis`). The crossing that carries the call (`RecoveryCapture`, or `SemanticCapture` for P3 connectors) sets or verifies that link in this same transaction. A different operation naming the same continuation fails the check, and a replay of the same operation returns its bound terminal result.
+    - **Otherwise** the check refuses with `InsufficientIntegrity`. A refused endorsement is not a new fault (I18). The recovery actor learns the reason at resolution: `stale`, `consumed`, `wrong_action`, `deployment_changed` or `unrecorded`.
 16. **I16. Summary rows.** W:'s `observed_influence` scans up to 4,096 join records per call (W: `security_participant_state/knowledge.rs:64-75`). This design adds `knowledge_influence_heads(tenant, isolation_epoch, key_subset, key_values) -> InfluenceHeadV1`. `key_subset` is one of the seven non-empty subsets of {principal, lineage, session}. Each head holds exact counters over the observations whose key values match on that subset: a `u64` bit sum, a count per origin class, an unknown count, an observation count and the additive set-hash value.
     - **Update.** A newly inserted observation (I4a) adds its terms to the seven heads of its key triple, in the same transaction. A duplicate insert changes nothing.
     - **Read.** Crossing check 4 computes the state of `P union L union S` (I17) exactly, by inclusion-exclusion over the seven heads of the call's triple, for every counter and for the set hash. That is seven row reads, which is O(1), and an observation reachable through several keys counts once. A class is in `origins` when its resulting count is positive. `bounded_bits_total` saturates only after the exact sum. The resulting set hash is the receipt `commitment` (I25).
@@ -302,7 +326,13 @@ A join and a capture can race. A tool output can be delivered into the same cont
 ```text
 committed(join(ctx, s)) before intent_commit(op) and key(op) = ctx and not satisfies(s', req(op))
   -> not DispatchCommitted(op)                     (s' = state after the join)
-DispatchCommitted(op) -> satisfies(state_at(intent_commit(op)), req(op))
+DispatchCommitted(op) -> satisfies(state_at(intent_commit(op)), req(op)) and action_ok(op)
+                         or endorsed(op, intent_commit(op))                       (I15a)
+endorsed(op, t)        -> exact_action(approval(op), op)
+                          and influence_basis(approval(op)) = commitment(state_at(t))
+                          and fresh_deployment(approval(op), t)
+                          and consumed_exactly_once(continuation(op), t)
+action_ok(op)          -> req(op) is not BoundedSelection, or action(op) in authorized(contract(op))   (I22a)
 forall ctx: state(ctx) only increases              (I2; SEC-05)
 ```
 
@@ -312,7 +342,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
     - Spec 2's classifier output is tagged: `FaultKind = Authority(AuthorityFaultClass) | Integrity` (`2026-10-04-authority-faults-design.md` section 4, rule R1). Each kind has its own block.
     - `AuthorityFaultClass` stays closed at four variants, and `AuthorityFaultV2` is unchanged. No integrity denial has to fill its capability, subject, tool, parameter or principal-path fields, and the `Capability` projection never sees an integrity denial.
     - The integrity kind is classified from the typed refusal `KernelError::InsufficientIntegrity { surface }`, which `IntegrityGuard` (I13) and crossing check 4 (I15) return. It is never classified from `GuardDenied`, which stays never-resolvable.
-    - A request that presents an integrity endorsement (I21) never yields this fault. That avoids fault-on-fault loops (spec 2 R5).
+    - A request that presents an integrity endorsement (I21) never yields this fault, even when I15a refuses the endorsement. That avoids fault-on-fault loops (spec 2 R5).
 19. **I19. The integrity fault block and its anti-oracle rule.** The block is written under receipt metadata key `integrity_fault`, and MCP carries it as `_meta["chio/integrityFault"]`:
 
     ```rust
@@ -334,7 +364,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
 
     - **Configuration-blind remedies.** `remedy_classes` is a function of the caller's own requirement, never of deployment configuration (spec 2 A5):
       - `Trusted` and `ProviderOnly` list `[IntegrityEndorsement]`;
-      - `BoundedExternal` lists `[IntegrityEndorsement, QuarantinedContinuation]`, because a quarantined successor can satisfy only a bounded requirement (I22).
+      - `BoundedExternal` and `BoundedSelection` list `[IntegrityEndorsement, QuarantinedContinuation]`, because a quarantined successor can satisfy only a bounded requirement (I22).
 
       Whether a remedy is actually available is disclosed only to the recovery actor at resolution.
     - **Never carried.** The block never carries origin classes, bit totals, the commitment, or which delivery caused the taint. With session-wide keys (I17), the cause may be another process's delivery in the same runtime, so revealing it would leak cross-process activity.
@@ -345,6 +375,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
 
     No other remedy kind may address it, and the planner returns `NoRegisteredRemedy` otherwise.
 21. **I21. Endorsement.** An approver on the deployment's integrity roster signs an exact approval whose `AuthorizationRequirementsV1.obligations` contains `IntegrityEndorsement { principal }`. Its `influence_basis` equals the context's committed influence digest (W: `authorization.rs:44`, `:55`). The approval authorizes exactly one continuation despite the influence.
+    - **Admission.** Crossing check 4 accepts it under I15a. The approval binds the exact action, the current commitment, the deployment and one continuation, and it is consumed in the same transaction.
     - **History.** The context's state is unchanged (SEC-05). The next consequential call needs its own endorsement.
     - **Semantic connectors.** For P3 connectors, the existing `ScopedEndorsementV1` over `ExactAction` (W: `semantic/evidence.rs:84-87`) is the same rule, already implemented, and satisfies the crossing check for that action.
 22. **I22. Quarantined continuation.** The remedy that recovers utility without a human:
@@ -353,7 +384,26 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
     3. The readers' typed returns join the successor as `ExternalBounded` (I8).
     4. The successor performs the consequential call under a `BoundedExternal { n }` requirement.
 
-    This is the Design Patterns paper's dual-LLM and action-selector patterns, enforced by the kernel rather than by framework discipline.
+    This follows the Design Patterns paper's dual-LLM and action-selector patterns, enforced by the kernel rather than by framework discipline.
+
+    **What it does not guarantee.** The successor's call is admitted on a bounded channel that external content influences. The readers saw untrusted artifacts, and their returned values pass to the successor. A one-bit boolean that a framework uses to choose between publishing and deleting is admitted under `BoundedExternal { n: 1 }` with no endorsement. `BoundedExternal` is therefore an explicit policy allowance of up to `n` attacker-influenced bits. It is not a guarantee that external content cannot select the action.
+
+    **I22a. Action-selection contract (optional).** A deployment that needs zero unauthorized action selection uses `BoundedSelection { max_bits, contract }`. The contract is operator-signed:
+
+    ```rust
+    pub struct ActionSelectionContractV1 {
+        pub schema: String,                                               // "chio.action-selection-contract.v1"
+        pub return_contracts: BoundedList<ReturnContractDigest, 8>,       // typed returns allowed to select
+        pub selector: SelectorTableV1,                                    // typed return values -> action template
+        pub authorized_actions: BoundedSet<ActionTemplateDigest, 64>,     // every action the selector can produce
+    }
+    ```
+
+    - An action template fixes the tool, the server and every argument, except arguments the selector fills from trusted inputs.
+    - Crossing check 4 computes the expected action from the committed typed return values, through the selector. It uses the host's canonical projections (I23), never model text.
+    - It admits the call only when the call's exact action equals that expected action and is in `authorized_actions`. Otherwise it refuses with `InsufficientIntegrity`.
+    - A value outside the selector's domain is already refused at projection (I23).
+    - **The property.** External content can choose only among `authorized_actions`; it can never reach an unauthorized action. Which authorized action it chooses remains influenced, and the operator accepts that when signing the set.
 
 ## 10. Typed return contracts (generalizing P5)
 
@@ -375,7 +425,14 @@ pub enum ConfinedReturnTypeV1 {
 
 ## 11. Granularity and utility
 
-- **Soundness.** It holds at context granularity. A context that never received an unbounded external join cannot be steered by external content through Chio-mediated channels. Influence at finer grain is heuristic and out of scope.
+- **The enforceable property.** It holds at context granularity, over Chio-mediated channels. For a gated call that crossing check 4 admits:
+  - **By context, under `Trusted`.** No external or unknown influence reached the context.
+  - **By context, under `ProviderOnly`.** Only the listed providers did.
+  - **By context, under `BoundedExternal { n }`.** At most `n` bits of external influence reached the context, each through a typed confined return. Those bits may select the action: this is a policy allowance, not a no-steering guarantee.
+  - **By context, under `BoundedSelection`.** The same bit bound holds, and the action is one of the contract's authorized actions (I22a).
+  - **By endorsement.** A roster principal approved this exact action against the context's current commitment, once (I15a).
+
+  Unbounded or unknown influence can therefore authorize a gated call only through an exact endorsement. Influence at finer grain than a context is heuristic and out of scope.
 - **Over-taint.** W:'s keys join principal, lineage and session, and process calls use the runtime id as session (M: `chio-process/src/security.rs:28-46`). One process's untrusted delivery therefore taints every process in that runtime.
   - This is conservative, and correct while processes can exchange data through mailboxes, blobs and spawn inputs.
   - Narrowing to lineage requires every inter-process channel to carry influence (I6 does so for attested mailboxes). Open decision 2.
@@ -393,14 +450,16 @@ pub enum ConfinedReturnTypeV1 {
 
 ## 13. Receipts and evidence
 
-25. **I25. Receipt metadata.** Every receipt for a grant with a requirement or floor carries `chio_runtime.integrity`:
-    - `required`;
-    - `satisfied_by`: `context`, `endorsement` or `bounded`;
-    - the `context_generation`;
-    - the opaque influence `commitment`;
-    - the floor source, when a floor applied.
+25. **I25. Receipt metadata.** Every receipt for a grant with a requirement or floor carries `chio_runtime.integrity`. Allow and deny receipts disclose different fields, because with session-wide keys (I17) the commitment changes when another context in the same runtime receives a delivery.
+    - **Allow receipts** carry:
+      - `required`;
+      - `satisfied_by`: `context`, `bounded` or `endorsement`;
+      - the action contract digest under `BoundedSelection`;
+      - `commitment_ref = HMAC(audit_key, commitment || request_id)`. The ref is blinded per receipt, so two receipts cannot be compared for equality without the audit key;
+      - the floor source, when a floor applied.
+    - **Caller-visible deny receipts** carry only `required`, `outcome: denied` and the floor source, plus the `integrity_fault` block (I19). They carry no `commitment`, `commitment_ref`, `context_generation` or `satisfied_by`.
 
-    Deny receipts carry the `integrity_fault` block (I19). Auditors can join any consequential effect to the influence commitment that admitted it.
+    **I25a. Audit basis.** The raw `commitment`, the `context_generation` and the head digests used by crossing check 4 are written to `integrity_admission_audit(request_id, decision, commitment, context_generation, heads_digest)`, in the admission writer, in the decision's transaction (for a guard-only deny, in the deny receipt's transaction). The table is operator audience: it is exported only through operator-authenticated audit and SIEM paths, never to the caller. An auditor joins any consequential effect to the commitment that admitted it by recomputing `commitment_ref` with the audit key.
 
 ## 14. Evaluation plan
 
@@ -423,7 +482,9 @@ pub enum ConfinedReturnTypeV1 {
   - Endorsements per task.
   - Mediation overhead.
 - **Success criteria.**
-  - Zero successful injections that cause a gated consequential call without an endorsement. The property holds by construction, and the evaluation confirms the implementation.
+  - Zero gated consequential calls admitted from unbounded or unknown influence without an exact endorsement. This holds by construction (section 11), and the evaluation confirms the implementation.
+  - Calls admitted under `BoundedExternal` are reported separately, with their attack success rate. A bounded channel is an allowance, so injections that succeed through it are counted, not excluded.
+  - Under `BoundedSelection`, zero admitted calls outside the contract's authorized actions.
   - Utility within 10 points of undefended with quarantine templates.
   - The methodology, seeds and traces are published.
 - **Honesty.** Static-benchmark "0 percent" claims are not reported.
@@ -443,7 +504,11 @@ pub enum ConfinedReturnTypeV1 {
 | Unbound route output | Joins `External` (I5) |
 | Manifest digest changed under an operator binding | The binding is void; output joins `External` |
 | Join commits before the intent commit | Intent commit fails `InsufficientIntegrity` (I15) |
-| Endorsement `influence_basis` stale (context gained influence since) | The endorsement does not apply; deny |
+| Endorsement `influence_basis` stale (context gained influence since) | The endorsement does not apply; deny (I15a) |
+| Endorsement's continuation already consumed (reuse) | Deny; the first admission's consumption stands (I15a) |
+| Endorsement for a different action, request or namespace | Deny (I15a) |
+| Endorsement after a deployment, policy or contract change | Deny (I15a) |
+| `BoundedSelection` call whose action is not the selector's output, or not authorized | Deny (I22a) |
 | Portable core receives the constraint | `ConstraintError` deny (I11) |
 | Typed return outside its type | Return refused; no fallback (I23) |
 
@@ -457,7 +522,8 @@ pub enum ConfinedReturnTypeV1 {
   - `chio.integrity-fault.v1`;
   - `chio.influence-state.v1`;
   - `chio.integrity-deployment-binding.v1`;
-  - `chio.confined-return-type.v1`.
+  - `chio.confined-return-type.v1`;
+  - `chio.action-selection-contract.v1`.
 - Changes to W: closed enums: `ExplanationFactKind::Integrity`, the `QuarantinedContinuation` template, and `InfluenceOriginV1`. These are additive.
 - Process ABI: no new op. Influence travels in existing invoke and receive outcomes.
 
@@ -478,7 +544,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Head maintenance: incremental heads equal heads rebuilt from rows. Inclusion-exclusion over the seven heads equals a direct scan of `P union L union S`.
   - `satisfies` is antitone in state.
   - Attenuation never weakens a requirement (I9).
-- **Loom.** A join racing an intent commit on the same context gives exactly one order. A post-join intent fails (I15).
+- **Loom.** A join racing an intent commit on the same context gives exactly one order. A post-join intent fails (I15). A join racing an endorsed intent makes the endorsement stale exactly when the join commits first (I15a).
 - **Kani.** `satisfies` is total, and `unknown` always fails.
 - **Unit.**
   - Unbound routes join `External`.
@@ -491,6 +557,17 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - An injected tool output followed by a consequential call is denied.
   - The quarantined continuation succeeds under `BoundedExternal`.
   - A same-principal endorsement replayed after new influence is refused.
+  - Endorsement cases (I15a):
+    - **fresh:** an exact endorsement over the current commitment admits the call once, with `satisfied_by = endorsement`;
+    - **stale:** a join committed after approval makes the same endorsement fail;
+    - **reused:** a second call naming the consumed continuation is refused;
+    - **wrong action:** an endorsement for a different request, namespace or semantic digest is refused.
+
+    The early guard defers each case to the crossing and never admits on the reference alone.
+  - **Adversarial one-bit action selector.** An attacker-controlled document flips a boolean return that the framework uses to choose publish or delete.
+    - Under `BoundedExternal { n: 1 }`, the delete is admitted with `satisfied_by = bounded`, and the evaluation counts it as an attack success through the allowance.
+    - Under `BoundedSelection` with only publish authorized, the delete is refused (I22a).
+  - **Whole-response anti-oracle differential.** Two runs differ only in which other context in the runtime received a tainting delivery, and when. Their caller-visible deny responses are byte-identical, including the body, `_meta` and all receipt metadata, except request id, timestamps and signatures (I19, I25).
   - MCP-edge gated grants deny.
   - A cross-process taint in one runtime denies, with no cause disclosed.
   - Two contexts in one tenant and isolation epoch read the same artifact version. The second context's gated call is denied (I4a).
@@ -502,7 +579,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
 Residual risks:
 - Channels outside mediation (a `direct` worker reading the network) are the reason such contexts start at `unknown`. A misdeclared worker profile would break the premise, so I7 consumes only the verified fact, and an unverified profile starts at `unknown` (spec 7 rule 6.3.5).
 - Operator-bound `Trusted` routes are a trust decision. A wrong binding admits injection through that route.
-- Bounded returns still carry information, up to `max_bits`. `Identifier` returns of 64 characters can encode short strings, so grants choose `n`.
+- Bounded returns still carry information, up to `max_bits`, and that information can select the action (section 11). `Identifier` returns of 64 characters can encode short strings, so grants choose `n`. Only `BoundedSelection` limits which actions can be selected (I22a).
 - Session-wide keys over-taint (section 11).
 
 Open decisions:
@@ -529,6 +606,26 @@ Open decisions:
 | 4180839016 (with spec 2) | Define an integrity-specific fault payload | Fixed now. Spec 2's classifier output is tagged (`FaultKind::Authority(class)` or `FaultKind::Integrity`). The integrity kind has its own `IntegrityFaultV1` block with only the request id, the caller's requirement, the surface and configuration-blind remedy classes, and it projects to `ExplanationFactKind::Integrity`. `AuthorityFaultClass` stays at four | I18; I19; I20; sections 13 and 16; spec 2 sections 4, 5, 8 and 10 |
 | 4180839013 (spec 10 side handled there) | Persist influence joins before check-only output release | Fixed here for spec 11. A call in a tracked context is not check-only eligible, so its `OutcomeCommit` writes the join before delivery. Gating requires tracking | I4b; I15; section 15 |
 
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933157 | Define an ID for unverified initial observations | Fixed now. The initial observation is keyed by the durable context-creation record, which records the worker-profile outcome (the verified launch record digest, or the `Unverified` reason). Every context gets a stable initial id, including on verification failure, and scope creation commits it in the same transaction | I4a; I7 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-11-01 | The integrity check rejects the endorsement remedy it promises to accept | Fixed. Crossing check 4 admits by context **or** by a verified exact endorsement, checked in the crossing's transaction. The endorsement must be recorded and verified on the workflow record, `fresh_basis` must hold, it must carry the `IntegrityEndorsement` obligation from a roster principal, its action intent must match this call's request id, namespace and semantic digest, and its `influence_basis` must equal the commitment as committed now. Its continuation is bound once, through W:'s one-operation `native_link`, in that transaction. The guard defers a presented reference without accepting it. Predicates and tests updated (fresh, stale, reused, wrong action) | I13; I15a; I15; section 8 predicates; I18; I21; section 15; section 18 |
+| R-11-02 | A bounded return does not establish the claimed zero-injection guarantee | Fixed. Section 11 states the enforceable property per requirement. `BoundedExternal` is named an explicit allowance of attacker-influenced bits that may select the action. New optional `BoundedSelection` with an operator-signed `ActionSelectionContractV1` (selector plus authorized action set) gives zero unauthorized action selection. Success criteria count bounded-channel successes. A one-bit action-selector adversarial test is added. Appendix A no longer imports CaMeL's or FIDES's guarantees | scope line; section 4 (requirement, I1, I3); I22; I22a; section 11; section 14; section 18; section 19; Appendix A |
+| R-11-03 | Deny receipts expose the commitment that the anti-oracle rule withholds | Fixed. Allow and deny receipts have separate disclosure rules. Caller-visible denies carry no commitment, ref, generation or `satisfied_by`. Allow receipts carry a per-receipt blinded `commitment_ref`. The raw basis goes to the operator-audience `integrity_admission_audit` table. A whole-response differential anti-oracle test is added | I25; I25a; section 18 |
+
+### Codex review (PR #1174, round 5)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180993951 | A verified exact endorsement must satisfy both checks | Fixed, together with R-11-01. The early guard no longer denies on influence alone when a request presents an `EndorsementRef` that passes its structure check: it defers to crossing check 4 and never admits on the reference itself. Crossing check 4 then validates, in one writer transaction, the recorded and verified approval, the roster principal's `IntegrityEndorsement` obligation, the exact action (request id, namespace, semantic digest), `influence_basis` equal to the current commitment, and a fresh deployment. It binds the continuation to exactly one operation through W:'s `native_link`, so the endorsement admits exactly one call | I13; I15a; I21; section 18 endorsement cases |
+
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 
 | | CaMeL | FIDES | Chio (this design) |
@@ -543,10 +640,4 @@ Open decisions:
 - into the kernel's writer, for the check;
 - into a cage, for the quarantine.
 
-Here the analogy holds exactly.
-
-### Codex review (PR #1174, round 4)
-
-| Comment | Title | Disposition | Where |
-|---|---|---|---|
-| 4180933157 | Define an ID for unverified initial observations | Fixed now. The initial observation is keyed by the durable context-creation record, which records the worker-profile outcome (the verified launch record digest, or the `Unverified` reason). Every context gets a stable initial id, including on verification failure, and scope creation commits it in the same transaction | I4a; I7 |
+The analogy holds for where enforcement happens. It does not transfer guarantees. CaMeL's and FIDES's results come from their own dataflow models and evaluations. Chio's guarantee is only the property in section 11, argued from its own mechanisms. A quarantine return under `BoundedExternal` is an allowance that can still select an action.

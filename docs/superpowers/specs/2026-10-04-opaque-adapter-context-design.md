@@ -9,7 +9,7 @@
   - `W:` = the uncommitted working tree of `arc-worktrees/recoverable-agent-runtime-20261002` (recovery P0-P5, built on #1160 checkpoint `f25cd61f4`). Its line refs reflect the working tree on 2026-10-04 and may drift.
 
   All are treated as shipped for this revision. The fabric contract is byte-identical on `main`, `M:`, `V:`, and `W:` except for the `bridge_security` field (section 5.1).
-- Scope: the `chio-tool-call-fabric` lift/lower contract and its provider adapters. No kernel, receipt, or `ToolCallRequest` change.
+- Scope: the `chio-tool-call-fabric` lift/lower contract, its provider adapters and the kernel's provider-verdict shim. No kernel evaluation or `ToolCallRequest` change. Receipts gain one host-supplied, kernel-signed metadata block, `chio_fabric_binding`, through the existing extra-metadata channel (rule 7).
 - Owners: `chio-tool-call-fabric` (contract), `chio-anthropic-tools-adapter`, `chio-openai-adapter`, `chio-bedrock-converse-adapter`, `chio-gemini-tools-adapter`, `chio-ollama-tools-adapter` (implementers), `chio-provider-conformance` (evidence)
 - Related: `spec/schemas/chio-wire/v1/provenance/README.md` (provenance stamp and verdict link), `2026-07-12-admission-operation-design.md` (request identity), `spec/errors/registry.yaml` (fabric error codes)
 - Origin: lessons from the FTL (nuta/ftl) review
@@ -20,6 +20,8 @@
 - **The result is bound, not only the verdict.** `ToolResult` was unbound bytes, so a host could pass invocation and verdict B with result A, and every check passed. `lower_bound` now takes a `BoundToolResult` that carries the binding digest, and an `Allow` verdict carries `result_sha256`: the signed receipt's `content_hash` over the canonical output (M: `receipt_support/receipt_content.rs:8-16`). Lowering refuses any result whose bytes or binding do not match (rule 9).
 - **The verdict binding comes from the signed receipt.** `verdict_result_from_response(invocation, response)` accepts the two values independently (M: `crates/kernel/chio-kernel/src/provider_verdict.rs:149-180`), so stamping the digest afterward in the bridge would vouch for a mis-paired response. A new kernel-side constructor, `bound_verdict_from_response`, first verifies the receipt's signature and checks that its signed request id, tool name, server and parameter hash match the invocation. Only then does it build the `VerdictResult` and the `BoundToolResult` (rule 10). The old function is deprecated.
 - **Synthesized ids are unique across payloads.** `build_tool_call_request` copies `provenance.request_id` into `ToolCallRequest.request_id` (M: `provider_verdict.rs:107`; `main` `:55`), and durable admission retains that replay key for the namespace lifetime. An index restarting on every lift is therefore not enough. Rule 1 adds a per-payload `lift_id`, or a host-supplied conversation and turn, and section 11's open "host mapping" item is resolved.
+
+- **Independent review and Codex round 5.** The fabric owns `BoundVerdictSource` and `BoundOutcome`, so the stream gate never calls the kernel (no dependency cycle). The optional permit and model-context digests are sealed in a `SubmissionRecord` before evaluation and submitted as kernel-signed `chio_fabric_binding` receipt metadata, which the trusted constructor must match (rules 5, 7, 10 and 11).
 
 ## Revision 3 changes
 
@@ -140,7 +142,7 @@ In the enforced profile, the labeled model context is the sanctioned provider-co
 
 - A kernel-carried or session-carried opaque cookie (section 4).
 - Verdict authenticity against a hostile host. `VerdictResult` is unsigned. Its binding inputs come from the receipt the kernel shim verifies (rule 10), so mis-pairing is detected. A malicious host that forges the `VerdictResult` object itself is out of scope (section 11).
-- Changing `ToolCallRequest`, `OperationContext`, receipts, or `request_binding_hash`.
+- Changing `ToolCallRequest`, `OperationContext`, the receipt schema, or `request_binding_hash`. The one receipt addition is a host-supplied `chio_fabric_binding` metadata block carried by the existing extra-metadata channel (rule 7).
 - Changing hosted MCP session persistence.
 - **Semantic connectors.**
   - `PinnedSemanticConnector` is an effect-side `ToolServerConnection` (W:`crates/platform/chio-control-plane/src/semantic/connector.rs:183`) with no dependency on `chio-tool-call-fabric`. The fabric is model-side.
@@ -238,27 +240,83 @@ pub trait ProviderAdapter: Send + Sync {
         -> Result<ProviderResponse, ProviderError>;
 }
 
-// chio-kernel::provider_verdict (the shim already depends on the fabric)
+/// Fabric-owned outcome of a kernel decision (rule 5). Constructed above the fabric
+/// (normally by the kernel shim); the fabric checks it, it never calls the kernel.
+pub struct BoundOutcome {
+    pub verdict: VerdictResult,                 // invocation_digest set; result_sha256 set for an observed value
+    pub result: Option<BoundToolResult>,        // Some for a kernel-observed value output
+    pub released_block_sha256: Option<String>,  // plain SHA-256 of the exact stream block the shim verified
+}
 
-/// Replaces `verdict_result_from_response`, which is deprecated (rule 10).
-pub fn bound_verdict_from_response(
+/// Fabric-owned callback, implemented above the fabric (rule 5). The stream gate and
+/// replay ask it for a decision; the kernel-backed implementation wraps
+/// `bound_verdict_from_response`.
+#[async_trait]
+pub trait BoundVerdictSource: Send + Sync {
+    async fn bound_verdict(
+        &self,
+        binding: &InvocationBinding<'_>,
+        block: Option<&[u8]>,                   // the buffered stream block, when the gate holds one
+    ) -> Result<BoundOutcome, ProviderError>;
+}
+
+// chio-kernel::provider_verdict. The dependency runs kernel -> fabric only
+// (M: crates/kernel/chio-kernel/Cargo.toml:93). The fabric depends on chio-core-types,
+// chio-manifest and chio-security-types, and nothing in the fabric calls the kernel.
+
+/// Sealed when the kernel request is built, before evaluation (rule 11). Private fields;
+/// no Clone, Default or Deserialize.
+pub struct SubmissionRecord {
+    request_namespace_digest: String,    // the authenticated namespace the host submits under
+    kernel_request_id: String,           // == ToolCallRequest.request_id
+    invocation_digest: InvocationDigest,
+    delegation_permit_sha256: Option<String>,
+    model_context_sha256: Option<String>,
+    governed_intent_hash: Option<String>, // binding hash of the submitted governed intent, when present
+    binding_digest: InvocationDigest,     // computed once, from the fields above
+    bound_receipt_id: Option<ReceiptId>,  // set once, by rule 10
+}
+
+/// Host-owned table of sealed submissions, keyed by (request_namespace_digest, kernel_request_id).
+pub struct SubmissionTable { /* private */ }
+
+/// Replaces `build_tool_call_request` for bound use: builds the request, seals its record,
+/// and returns the receipt metadata the request must be evaluated with (rule 7).
+pub fn build_bound_tool_call_request(
+    table: &SubmissionTable,
+    namespace: &RequestNamespace,
     binding: &InvocationBinding<'_>,
+    /* the existing build_tool_call_request inputs */
+) -> Result<BoundSubmission, ProviderVerdictError>;
+
+pub struct BoundSubmission {
+    pub request: ToolCallRequest,
+    /// `{ "chio_fabric_binding": { binding_digest, invocation_digest,
+    ///    delegation_permit_sha256?, model_context_sha256? } }`, passed as `extra_metadata`.
+    pub receipt_metadata: serde_json::Value,
+}
+
+/// Replaces `verdict_result_from_response`, which is deprecated (rule 10). It takes no
+/// optional digests from the caller: they come only from the sealed record.
+pub fn bound_verdict_from_response(
+    table: &SubmissionTable,
+    namespace: &RequestNamespace,
+    invocation: &ToolInvocation,
     response: &ToolCallResponse,
     trusted_kernel_keys: &[PublicKey],
-) -> Result<BoundKernelOutcome, ProviderVerdictError>;
-
-pub struct BoundKernelOutcome {
-    pub verdict: VerdictResult,           // invocation_digest and result_sha256 set
-    pub result: Option<BoundToolResult>,  // Some for a kernel-observed value output
-}
+    block: Option<&[u8]>,
+) -> Result<BoundOutcome, ProviderVerdictError>;
 
 pub enum ProviderVerdictError {
     // existing variants unchanged
     ResponseBindingMismatch { check: ResponseBindingCheck },
+    /// A different binding is already sealed for this (namespace, request id).
+    SubmissionConflict,
 }
 
 pub enum ResponseBindingCheck {
-    ReceiptSignature, KernelKey, RequestId, ToolName, ToolServer, ParameterHash, ContentHash,
+    ReceiptSignature, KernelKey, SubmissionRecord, RequestId, InvocationDigest, SignedBinding,
+    GovernedIntent, ToolName, ToolServer, ParameterHash, ContentHash, ReceiptAlreadyBound,
 }
 ```
 
@@ -279,7 +337,7 @@ The digest covers every field of `ToolInvocation` except `arguments`, which ente
 
 When the delegated-work layout is installed, the sealed D1 permit travels in the governed intent at `governed_intent.context.chioDelegation` (`V:docs/superpowers/specs/2026-10-02-evolving-funded-work-design.md:22`), not in `ToolInvocation`. The verdict binding therefore extends to optional digests that live outside the invocation. Revision 2 defined a permit-only `binding.v1` form, which revision 3 replaces with the `binding.v2` form below, before any implementation.
 
-`lower_bound` takes `InvocationBinding { invocation: &ToolInvocation, delegation_permit_sha256: Option<String>, model_context_sha256: Option<String> }` in place of the bare invocation. The host that submitted the governed request supplies the permit digest. Under enforced knowledge it also supplies the canonical digest of the selected `ModelContextV1` (section 2.4.1). `VerdictResult.invocation_digest` carries `binding_digest`, extended so that each present optional digest is appended in field order under the same domain separator:
+`lower_bound` takes `InvocationBinding { invocation: &ToolInvocation, delegation_permit_sha256: Option<String>, model_context_sha256: Option<String> }` in place of the bare invocation. The host that submitted the governed request supplies the permit digest. Under enforced knowledge it also supplies the canonical digest of the selected `ModelContextV1` (section 2.4.1). These optional digests are sealed into the `SubmissionRecord` when the kernel request is built (rule 11), and the verdict's binding digest comes only from that record (rule 10). At `lower_bound` the host passes its binding again, and rule 3 compares the two, so a mis-paired binding at either end is refused. `VerdictResult.invocation_digest` carries `binding_digest`, extended so that each present optional digest is appended in field order under the same domain separator:
 
 ```text
 binding_digest = hex(SHA256("chio.tool-invocation-binding.v2\0"
@@ -306,9 +364,23 @@ When both optional digests are absent, `binding_digest = invocation_digest`, so 
 2. **No correlation from tool output.** `lower_bound` MUST take correlation (provider call id, function or tool name, batch index) only from `invocation`. It MUST NOT read correlation keys from `ToolResult` bytes. `ToolResult` is tool output only, restoring `adapter.rs:18-23`.
 3. **Digest required.** `lower_bound` MUST recompute the binding digest from its `InvocationBinding` (section 5.1: the invocation digest alone, or the `binding.v2` digest when a delegation permit digest or model-context digest is present) and compare it with the verdict's `invocation_digest`. A missing or different digest returns `VerdictBindingMismatch`, and nothing is lowered. The result is checked against the same digest (rule 9).
 4. **Provider and version match.** `lower_bound` MUST check `invocation.provider == self.provider()` and that `invocation.provenance.api_version` equals the adapter's configured version (extending the existing `ensure_supported_api_version` checks).
-5. **Who sets the digest.** A kernel decision becomes a `VerdictResult` only through `bound_verdict_from_response` (rule 10), which derives the binding from the verified receipt before it stamps `invocation_digest`. A host bridge never stamps a digest onto a verdict it built itself. The stream gate in `chio-tool-call-fabric/src/stream.rs` calls the same constructor with the `&ToolInvocation` it holds. The replay harness calls it with the recorded receipt and the stored invocation.
+5. **Who sets the digest, without a dependency cycle.** A kernel decision becomes a `VerdictResult` only through `bound_verdict_from_response` (rule 10), which derives the binding from the verified receipt and the sealed submission record before it stamps `invocation_digest`. A host bridge never stamps a digest onto a verdict it built itself.
+   - **The fabric never calls the kernel.** `chio-kernel` depends on the fabric (M: `crates/kernel/chio-kernel/Cargo.toml:93`), and the stream gate deliberately leaves verdict requests to the layer above it (M: `crates/protocol/chio-tool-call-fabric/src/stream.rs:88-94`). The fabric therefore owns the interface, `BoundVerdictSource` returning `BoundOutcome`, and the layer above implements it. The kernel-backed implementation, `KernelBoundVerdictSource` in `chio-kernel::provider_verdict`, evaluates through the kernel and calls `bound_verdict_from_response`. The dependency stays kernel to fabric.
+   - **The stream gate releases only a checked `BoundOutcome`.** After `FinishBlock`, the gate holds the block and calls `BoundVerdictSource::bound_verdict(binding, Some(block))`. It enters `Emitting` only through `StreamGate::release(outcome: BoundOutcome)`, which checks, using only fabric-owned primitives:
+     - `outcome.verdict.invocation_digest` equals the binding digest the gate recomputes from the `InvocationBinding` it holds (rule 3);
+     - for `Allow`, `outcome.released_block_sha256 = Some(SHA256(block))` over the exact buffered bytes. The kernel shim set that value only after it verified those bytes against the receipt's stream digest (rule 10 check 5);
+     - for `Deny`, the block is discarded and only the deny is lowered.
+
+     Any failure returns `VerdictBindingMismatch` or `ResultBindingMismatch`, discards the block, and emits no final frame. There is no `release` overload that takes a bare `VerdictResult`.
+   - **Replay.** The replay harness implements `BoundVerdictSource` over the recorded receipt and the stored invocation, through the same kernel constructor.
+   - **What the fabric does not check.** `BoundOutcome` has a public constructor, so the fabric's checks catch unbound and mis-paired outcomes, not a hostile host that forges one. That remains the residual risk of section 11.
+
 6. **Same rules for inherent methods.** Inherent lowering methods that take a free correlation string (`lower_tool_result_block`, `lower_tool_message`, `lower_function_response`) gain `_bound` variants taking `&ToolInvocation`. The string forms are deprecated on the same schedule as `lower`.
-7. **Kernel unaffected.** No adapter correlation material is added to `ToolCallRequest`, receipts, or logs. `invocation_digest` is a fabric-local value. It is not a receipt field and plays no part in authorization.
+7. **The binding is signed, not interpreted.** No adapter correlation material is added to `ToolCallRequest` or to logs, and the kernel's evaluation is unchanged. The binding does enter the signed receipt, as host-supplied metadata:
+   - the request is evaluated through the existing extra-metadata channel, `evaluate_tool_call_with_metadata` or its security-context variant (M: `kernel/evaluation/evaluation_entry.rs:113-127`, which the process host already uses for `chio_process` attribution), with `BoundSubmission.receipt_metadata`;
+   - that value is `chio_fabric_binding { binding_digest, invocation_digest, delegation_permit_sha256?, model_context_sha256? }`, taken from the sealed record (rule 11);
+   - the kernel signs it into the receipt metadata of the allow or deny receipt it produces for that request. That makes the optional digests authenticated: the kernel's signature attests which binding was submitted with that request id, before evaluation;
+   - `chio_fabric_binding` grants nothing, no guard or policy reads it, and the kernel does not interpret it. `reject_reserved_receipt_metadata` keeps it out of the reserved set, so ordinary hosts pass it through unchanged.
 8. **Lowering under enforced knowledge is a release.** When a process-hosted bridge runs with durable knowledge enforced (section 2.4.1), `lower_bound` produces a `ProviderResponse` but does not deliver it.
    - The host delivers it to the provider only through a knowledge-joined release to `ArtifactSinkV1::Model { context }`, whose context digest equals the binding's `model_context_sha256`.
    - A host that has no committed release intent for that context MUST NOT send the lowered bytes.
@@ -323,12 +395,22 @@ When both optional digests are absent, `binding_digest = invocation_digest`, so 
    Any mismatch returns `ResultBindingMismatch`, and nothing is lowered. Passing invocation and verdict B with result A therefore fails: A's binding digest differs, and A's bytes do not hash to B's signed `content_hash`.
 10. **The kernel response is bound before the verdict exists.** `bound_verdict_from_response` checks in this order, and constructs nothing until every check passes:
     1. `response.receipt` verifies, and its `kernel_key` is in `trusted_kernel_keys`.
-    2. The receipt's signed `metadata.receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:138-145`) and `response.request_id` both equal `binding.invocation.provenance.request_id`.
+    2. The receipt's signed `metadata.receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:138-145`) and `response.request_id` both equal `invocation.provenance.request_id`. The constructor then looks up the sealed record by `(namespace, signed request id)` (rule 11). The caller never chooses the record. A missing record fails `SubmissionRecord`. The invocation digest recomputed from `invocation` must equal the record's (`InvocationDigest`). When the record holds a governed-intent hash, the receipt's signed `governed_transaction.intent_hash` (M: `receipt_support/receipt_metadata.rs:563-585`) must equal it (`GovernedIntent`). That compares the D1 permit, which travels inside the governed intent, against kernel-signed evidence.
+    3a. The receipt's signed `metadata.chio_fabric_binding` is present and equals the sealed record field by field: `binding_digest`, `invocation_digest`, and each optional digest, including its absence (`SignedBinding`). A receipt without the block, from a request evaluated without its `BoundSubmission.receipt_metadata`, fails. Both the signed value and the sealed record must match before any outcome is built, so neither a caller-supplied binding nor a record sealed for another submission can be stamped onto this receipt.
     3. The signed `tool_name` equals the invocation's, and the signed `tool_server` equals the server admitted by `invocation.bridge_security` (the value `build_tool_call_request` checked).
     4. The signed `action.parameter_hash` equals the hash of the canonical arguments, decoded exactly as `build_tool_call_request` decodes `invocation.arguments`.
     5. For an `Allow` with a value output, `SHA256(canonical_json(output))` equals the signed `content_hash` (M: `receipt_support/receipt_content.rs:8-16`). The shim builds the `ToolResult` from those bytes, wraps it in a `BoundToolResult` carrying the binding digest, and sets `result_sha256`. For a streamed output, the shim recomputes the stream digest with the receipt's own function (`receipt_content.rs:29`), and the stream gate emits the final frame only on a match.
 
-    Any failure returns `ResponseBindingMismatch`. If concurrent response B is paired with invocation A, check 2 or 4 fails, and no verdict carrying A's digest is ever produced. `verdict_result_from_response` is deprecated on the schedule of `lower`.
+    6. The verdict's `invocation_digest` and the `BoundToolResult`'s `binding_digest` are the record's `binding_digest`, never a digest computed from optional values the caller passes at this point. The record is then bound to this receipt id. A later call with a different receipt for the same record fails `ReceiptAlreadyBound`. A replay of the same receipt returns the same outcome.
+
+    Any failure returns `ResponseBindingMismatch`. If concurrent response B is paired with invocation A, check 2 or 4 fails, and no verdict carrying A's digest is ever produced. If a bridge passes a binding that names model context or permit B for a response submitted under A, the constructor ignores it, check 3a confirms A from the signed receipt, and it stamps A's binding, so `lower_bound`'s rule 3 comparison with B fails. A record that names B for a receipt signed under A fails check 3a. `verdict_result_from_response` is deprecated on the schedule of `lower`.
+11. **Sealed submission records.** The optional digests are fixed when the request is submitted, not when the verdict is built:
+    - `build_bound_tool_call_request` builds the `ToolCallRequest` exactly as `build_tool_call_request` does (M: `provider_verdict.rs:105-124`). It then seals a `SubmissionRecord` into the host's `SubmissionTable` under `(request_namespace_digest, request_id)`, before the request is evaluated, and returns the `chio_fabric_binding` metadata the request must be evaluated with (rule 7). `KernelBoundVerdictSource` always evaluates with it. The record holds the invocation digest, the permit and model-context digests, the governed-intent binding hash when the request carries a governed intent, and the binding digest computed once from them.
+    - **One binding per request id.** Sealing an identical binding again under the same key (a retried `LiftContext` turn) is idempotent. Sealing a different binding fails `SubmissionConflict`, and the request is not evaluated. This matches durable admission's changed-body conflict for the same replay key.
+    - **Permit evidence at seal time.** When the request carries a governed intent with `context.chioDelegation`, the permit digest in the binding must equal the digest of that permit, or sealing fails. Rule 10's `GovernedIntent` check later ties the receipt to the same intent.
+    - **Model context.** The model-context digest is authenticated by the kernel's signature over `chio_fabric_binding` (rule 7), which records what the host submitted before evaluation. Rule 10 check 3a compares it with the sealed record, and rule 8 additionally requires the delivering `ReleaseIntent` to name the same `model_context_sha256`.
+    - **Durable replay.** A replayed terminal result returns the original receipt, whose signed block names the original binding. A retry whose sealed record differs therefore fails check 3a and is never lowered.
+    - **Retention.** A record lives as long as the host can receive a terminal result for its request id, including a durable replay. Under durable admission the host persists it with its provider-correlation record (section 2.4.1). A response whose record was evicted fails `SubmissionRecord`, and nothing is lowered.
 
 ### 5.3 Safety predicates
 
@@ -353,11 +435,22 @@ lowered(response, binding, verdict, result) ->
   and (verdict = Allow { result_sha256: Some(h) } -> sha256(result.bytes) == h)
   and (verdict = Deny -> result.bytes is empty)
 
-constructed(verdict, binding, kernel_response r) ->
+constructed(verdict, invocation, kernel_response r) ->
   verified(r.receipt) and r.receipt.kernel_key in trusted_kernel_keys
-  and r.receipt.request_id == binding.invocation.provenance.request_id
-  and r.receipt.tool_name == binding.invocation.tool_name
-  and r.receipt.action.parameter_hash == sha256(canonical(binding.invocation.arguments))
+  and r.receipt.request_id == invocation.provenance.request_id
+  and rec = submissions[(namespace, r.receipt.request_id)] exists
+  and rec.invocation_digest == invocation_digest(invocation)
+  and (rec.governed_intent_hash present -> r.receipt.governed_transaction.intent_hash == rec.governed_intent_hash)
+  and r.receipt.tool_name == invocation.tool_name
+  and r.receipt.action.parameter_hash == sha256(canonical(invocation.arguments))
+  and r.receipt.metadata.chio_fabric_binding == signed_projection(rec)
+  and verdict.invocation_digest == rec.binding_digest
+
+sealed(namespace, request_id, b1) and sealed(namespace, request_id, b2) -> b1 == b2
+
+stream_gate_emits_final_frame(block) ->
+  released via a BoundOutcome o with o.verdict.invocation_digest == binding_digest(gate.binding)
+  and o.released_block_sha256 == sha256(block)
 
 for lifts L1 != L2 in one namespace (not one LiftContext turn):
   ids(L1) and ids(L2) are disjoint
@@ -383,7 +476,10 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Duplicate `request_id` within a batch | `lift_batch` fails `Malformed`; no invocation is returned |
 | CSPRNG unavailable when minting a `lift_id` | Lift fails; no invocation is returned |
 | `BoundToolResult` binding digest differs, its bytes do not hash to `result_sha256`, or a `Deny` carries output bytes | `ResultBindingMismatch`; nothing lowered |
-| Kernel response fails any rule 10 check (signature, key, request id, tool, server, parameter hash, content hash) | `ResponseBindingMismatch`; no `VerdictResult` is constructed |
+| Kernel response fails any rule 10 check (signature, key, submission record, request id, invocation digest, signed binding, governed intent, tool, server, parameter hash, content hash, receipt already bound) | `ResponseBindingMismatch`; no `VerdictResult` is constructed |
+| A different binding is sealed for an existing (namespace, request id) | `SubmissionConflict`; the request is not evaluated |
+| Receipt lacks `chio_fabric_binding`, or its signed value differs from the sealed record | `ResponseBindingMismatch { SignedBinding }`; no verdict is constructed |
+| Stream gate receives an outcome whose digest or `released_block_sha256` does not match | Block discarded; no final frame; `VerdictBindingMismatch` or `ResultBindingMismatch` |
 | `request_id` over 2048 bytes | `InvalidIdentity`; lift fails |
 | Provider or api_version drift between lift and lower | Existing api-version error; nothing lowered |
 | Legacy `lower` called with envelope keys | Behaves as today until removal; emits a deprecation metric |
@@ -395,7 +491,8 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 - **`spec/PROTOCOL.md`:** none. The fabric contract is not specified there.
 - **Wire compatibility:**
   - `VerdictResult` gains two optional, skip-if-absent fields (`invocation_digest`, `result_sha256`), so existing serialized verdicts and replay fixtures still parse.
-  - New verdicts are readable by old deserializers only if those use `deny_unknown_fields`. They do not today (`types.rs:240-242`).
+  - Old deserializers accept the added fields only when they permit unknown fields. The current fabric types do: none of them sets `deny_unknown_fields` (M: `crates/protocol/chio-tool-call-fabric/src/types.rs`).
+- **Receipt metadata:** one new host-supplied block, `chio_fabric_binding`, carried in signed receipt metadata through the existing extra-metadata channel (rule 7). It is additive; verifiers that do not know it ignore it, and only the provider-verdict shim relies on it.
 - **Errors:** `VerdictBindingMismatch` and `ResultBindingMismatch` need fabric error-code entries in `spec/errors/registry.yaml` beside the existing `chio-tool-call-fabric` entries (`registry.yaml:494`, `registry.yaml:640`). `ResponseBindingMismatch` is a kernel shim error.
 - **Provenance wire schema:** `spec/schemas/chio-wire/v1/provenance/verdict-link.schema.json` is unchanged. It binds verdicts by `requestId`, and rule 1 makes that id unique across payloads in the namespace.
 - **No negotiation is needed.** The change is crate-local; hosts opt in by calling `lower_bound`.
@@ -404,10 +501,10 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 
 1. **Phase 1.**
    - Add `InvocationDigest`, `invocation_digest()`, the optional verdict field, `VerdictBindingMismatch`, `lift_batch`, and `lower_bound` with default implementations that delegate to each adapter's inherent `_bound` method.
-   - Add `BoundToolResult`, `result_sha256`, `ResultBindingMismatch`, `LiftContext`, and `bound_verdict_from_response`, and deprecate `verdict_result_from_response`.
+   - Add `BoundToolResult`, `result_sha256`, `ResultBindingMismatch`, `LiftContext`, `BoundOutcome` and `BoundVerdictSource` (fabric), plus `SubmissionRecord`, `SubmissionTable`, `build_bound_tool_call_request`, `bound_verdict_from_response` and `KernelBoundVerdictSource` (kernel shim). Deprecate `verdict_result_from_response`.
    - Fix the Gemini and Ollama id minting (rule 1).
    - Add the length cap.
-2. **Phase 2.** Have the stream gate call `bound_verdict_from_response`, and migrate `chio-provider-conformance` replay to pair by invocation and call `lower_bound`. Captured fixtures must lower byte-identically, because the lowered provider bytes do not include the digest. The harness re-lifts captured payloads with a fixed `LiftContext`, so synthesized ids reproduce.
+2. **Phase 2.** Have the stream gate obtain a `BoundOutcome` from the host's `BoundVerdictSource` and release only through `StreamGate::release` (rule 5), and migrate `chio-provider-conformance` replay to pair by invocation and call `lower_bound`. Captured fixtures must lower byte-identically, because the lowered provider bytes do not include the digest. The harness re-lifts captured payloads with a fixed `LiftContext`, so synthesized ids reproduce.
 3. **Phase 3.** Remove envelope-key parsing (`tool_use_id`, `call_id`, `tool_call_id`, `toolUseId`) from `ToolResult`, remove `lower` and the string-correlated inherent methods, and update the SDK bridges that call them.
 
 ## 10. Tests and conformance evidence
@@ -421,7 +518,11 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
   - invocation and verdict B lowered with result A are refused with `ResultBindingMismatch`, for both the binding-digest and the content-hash check;
   - a `Deny` carrying output bytes is refused;
   - `bound_verdict_from_response` refuses response B paired with invocation A (request id, tool, server and parameter-hash cases), a receipt with a bad signature, and an untrusted kernel key;
-  - a verdict bound to one `ModelContextV1` digest is refused for another, and an enforced deployment refuses a binding without one.
+  - a verdict bound to one `ModelContextV1` digest is refused for another, and an enforced deployment refuses a binding without one;
+  - **altered optional fields:** the same invocation and the same receipt, with a binding whose permit or model-context digest differs from the sealed record, never produce a verdict carrying the altered digest. `bound_verdict_from_response` stamps the binding the receipt signs, `lower_bound` with the altered binding fails rule 3, sealing the altered binding under the same request id fails `SubmissionConflict`, and a record whose optional digests differ from the receipt's signed `chio_fabric_binding` fails `SignedBinding`. A receipt evaluated without the block also fails `SignedBinding`;
+  - a receipt whose signed `governed_transaction.intent_hash` names a different permit than the sealed record fails `GovernedIntent`; a response whose record is missing fails `SubmissionRecord`; a second, different receipt for a bound record fails `ReceiptAlreadyBound`;
+  - **stream gate:** the final frame is never emitted from an unbound outcome. An outcome with no `invocation_digest`, a digest for another binding, a `released_block_sha256` that differs from the buffered block, or a `Deny` all leave the gate without emitting, and a `compile_fail` doctest shows that `StreamGate::release` accepts no bare `VerdictResult`;
+  - **dependency direction:** a `cargo metadata` check in CI asserts that `chio-tool-call-fabric` has no dependency path to `chio-kernel`.
 - **Proptest in `chio-tool-call-fabric`:**
   - the digest is stable across serde round-trips of `ToolInvocation`;
   - any single-field change (`tool_name`, any provenance field, any argument byte) changes the digest;
@@ -433,7 +534,7 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 
 ## 11. Residual risks and open decisions
 
-- **Verdict authenticity (open, narrowed).** Rule 10 derives the binding from the verified receipt, so mis-pairing is caught, and `result_sha256` is the receipt's signed content hash. What remains open is a hostile host that forges the `VerdictResult` object passed to `lower_bound`. The stronger form has `lower_bound` itself verify the receipt, which would make the fabric depend on receipt verification keys. That depends on how `2026-10-04-closed-kernel-abi-design.md` defines the verdict surface. Recommendation: decide there, not here.
+- **Verdict authenticity (open, narrowed).** Rule 10 derives the binding from the verified receipt, so mis-pairing is caught, and `result_sha256` is the receipt's signed content hash. What remains open is a hostile host that forges the `VerdictResult` or `BoundOutcome` object passed to `lower_bound` or the stream gate. The stronger form has `lower_bound` itself verify the receipt, which would make the fabric depend on receipt verification keys. That depends on how `2026-10-04-closed-kernel-abi-design.md` defines the verdict surface. Recommendation: decide there, not here.
 - **Host mapping of request ids (resolved in revision 4).** The shipped shim already maps `provenance.request_id` into `ToolCallRequest.request_id` (M: `provider_verdict.rs:107`; `main` `:55`), so a reused id collides on the admission replay key `(request_namespace_digest, request_id)`: the same arguments dedupe to the first receipt, and different arguments conflict. Rule 1 therefore requires uniqueness across payloads in the namespace, not only within one.
 - **Who selects the model context (open).** Under P4, the host selects `ModelContextV1` for restore and release. This spec assumes the bridge host that calls `lower_bound` is the same host that holds the selected context. If a deployment splits them, the context digest must travel from the knowledge runtime to the bridge as host configuration, never from the provider response.
 - **`received_at` in the digest (decided, revisitable).** Including it makes digests per-lift. Excluding it would let a host re-lift and still match, which weakens mis-pair detection for byte-identical repeated calls. Decision: include it.
@@ -450,6 +551,26 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | 4180389976 | Make synthesized request ids unique across payloads | Fixed now. The synthesized id gains a per-payload `lift_id`, from a CSPRNG or from a host `LiftContext` | Rule 1; section 11 "Host mapping" resolved |
 | 4180731770 | Bind the kernel response before constructing the verdict | Fixed now. `bound_verdict_from_response` verifies the receipt and its signed request id, tool, server and parameter hash before it builds the verdict. `verdict_result_from_response` is deprecated | Section 5.1; rules 5 and 10 |
 
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933155 | Namespace provider-supplied request IDs | Fixed now. Provider call ids are namespaced with the payload's `lift_id` (`{provider}_p_{lift_id}_{hash}`), so a provider id reused in a later turn never replays or conflicts with an earlier admission. Retries of the same turn stay stable under a host `LiftContext`. The original id is kept in `provenance.provider_call_id` for lowering | section 5.2 rule 1 |
+
+### Codex review (PR #1174, round 5)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180993943 | Authenticate the optional binding digests | Fixed now, with R-6-02. The full binding (`binding_digest`, `invocation_digest`, and the permit and model-context digests) is submitted as `chio_fabric_binding` receipt metadata through the existing extra-metadata channel, so the kernel's signature covers it. Rule 10 check 3a requires that signed value to equal the sealed submission record before any outcome is built. Rule 7 is revised accordingly | Rules 7, 10 (check 3a) and 11; sections 5.1, 5.3, 7, 8 and 10 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-6-01 | The stream-gate instruction creates a kernel/fabric dependency cycle | Fixed. The fabric owns `BoundVerdictSource` and `BoundOutcome`, and the layer above implements them (`KernelBoundVerdictSource` wraps the kernel constructor). The stream gate releases only through `StreamGate::release(BoundOutcome)`, which checks the binding digest and a plain SHA-256 of the buffered block with fabric-owned primitives. A CI check asserts the fabric has no path to `chio-kernel` | Section 5.1; rule 5; section 5.3; section 7; section 9; section 10 |
+| R-6-02 | The trusted constructor can restamp a receipt for a different model context or permit | Fixed. `build_bound_tool_call_request` seals a `SubmissionRecord` (namespace, request id, invocation digest, permit and model-context digests, governed-intent hash) before evaluation. The request is evaluated with that binding as kernel-signed receipt metadata, `chio_fabric_binding` (rule 7). The constructor looks the record up by the signed request id, requires the signed block to equal the record, compares the signed `governed_transaction.intent_hash`, stamps only that binding, and binds the record to one receipt. A different binding under the same request id fails `SubmissionConflict` | Section 5.1; rules 7, 10 and 11; section 5.3; sections 7, 8 and 10 |
+| R-6-03 | The backward-deserialization condition is reversed | Fixed. Old deserializers accept the added fields because the fabric types do not set `deny_unknown_fields` | Section 8 |
+
 ## Appendix A: FTL reference
 
 **What FTL does:**
@@ -462,9 +583,3 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 - **Who sits in the middle.** In FTL the kernel is the only party between the trapping app and the personality, so the cookie must transit the kernel. In Chio the host sits between the adapter's lift and lower, and the kernel is in-process. The cookie therefore travels with the host (as `ToolInvocation`), never through the kernel.
 - **Trust.** FTL trusts the cookie as a raw pointer because the app, LX, and the cookie share one trust domain. Chio cannot trust adapter correlation for authority, which is why this design binds verdicts by digest instead of trusting the carried value.
 - **Granularity.** FTL's cookie is per thread, which is session-like. The Chio residual gap is per invocation.
-
-### Codex review (PR #1174, round 4)
-
-| Comment | Title | Disposition | Where |
-|---|---|---|---|
-| 4180933155 | Namespace provider-supplied request IDs | Fixed now. Provider call ids are namespaced with the payload's `lift_id` (`{provider}_p_{lift_id}_{hash}`), so a provider id reused in a later turn never replays or conflicts with an earlier admission. Retries of the same turn stay stable under a host `LiftContext`. The original id is kept in `provenance.provider_call_id` for lowering | section 5.2 rule 1 |

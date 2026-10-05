@@ -203,7 +203,7 @@ When the fence store and the admission store are different writers (a configurat
 
 ### 4.2 Dispatch-revalidating guards (check-then-act paths)
 
-5. **`ProcessLivenessGuard`** is a deny-only guard. It denies when the invoking process or any ancestor is `Cancelled`, or when its lineage carries a closure fence.
+5. **`ProcessLivenessGuard`** is a deny-only guard. It denies when the invoking process or any ancestor is `Cancelled`, or when any process on its path (its section 4.1 rule 1 `process_tree` refs) carries a `ProcessTree` closure fence. It never consults the root-wide security lineage for this.
    - It sets `requires_dispatch_revalidation() = true`, so it is re-checked at M: `dispatch.rs:806`.
    - Its source is the process registry's read-only state, which it reads only.
    - A lookup failure denies.
@@ -324,7 +324,7 @@ pub struct AuthoritySpaceClosureV1 {
 | `CapabilitySubtree` | Revoke root with write plus readback (AP8 backend, M: `admin/revocation_batch.rs:48`); fence row on the root id | Root only; descendants die by chain walk |
 | `Session`, hosted MCP | AP8 `POST /admin/sessions/{id}/trust` (session-wide revocation with readback, M: `admin.rs:24-27`); then kernel session forced close (latch, rotate anchor, drain, `close_persisted`); fence row on the session | Every capability issued to that session |
 | `Session`, in-process kernel | Forced close only; fence row on the session | Nothing |
-| `ProcessTree` | `ProcessRuntime::cancel(root)` (M: `chio-process/src/lib.rs:570`); fence row on the lineage; `ProcessLivenessGuard` | Nothing; the runner revokes worker credentials |
+| `ProcessTree` | `ProcessRuntime::cancel(root)` (M: `chio-process/src/lib.rs:570`); fence row `(process_tree, root_process_id)`, keyed on the requested process id (section 4.1 rule 1), never on the security lineage. On M: that lineage is the tree root's capability id (`chio-process/src/lib.rs:419-431`), so a lineage fence would also stop the requested process's siblings and ancestors. `ProcessLivenessGuard` | Nothing; the runner revokes worker credentials |
 | `SwarmGraph` | Tombstone checked at continuation consumption (V: `admission_hook/swarm_authority.rs:12`) and inside `extend_swarm_authority_bundle` (V: `swarm_authority_bundles.rs:88`), so a closed graph cannot grow; deny code `chio_swarm_graph_closed` | Nothing |
 | `DelegationRoot` | Fence row in the D1 allocator database; `subdivide`, `select` and `seal_dispatch` (V: `delegation/store.rs:112`, `:176`, `:271`) reject under a fenced ancestor in their immediate transaction | Nothing |
 
@@ -457,19 +457,23 @@ The accounting has two snapshots. Both are evidence only.
 
 This proposes a closure extension to the Proposition (V: `docs/papers/verifiable-work/sections/05-composition.tex:62-76`), to answer the scope gap at `08-limits.tex:5-6`.
 
-> **Proposition (preservation under closure).** Assume the premises of the Proposition. In addition, assume that closure fences are committed in the same protected store as durable dispatch commits, or are revalidated before dispatch. Every finite interleaving of the Proposition's transitions together with closure operations (fence, drain, withdraw, close) preserves:
+> **Proposition (preservation under closure).** Assume the premises of the Proposition. In addition, assume that every closure fence is either committed in the same protected store (the same writer) as durable dispatch commits, or, for `early_only` backends, revalidated before dispatch (section 4.2). Every finite interleaving of the Proposition's transitions together with closure operations (fence, drain, withdraw, close) preserves:
 > 1. delegation and graph allocations remain within their original bounds, and paid plus refunded funds do not exceed deposited backing;
 > 2. a sealed invocation retains its receiver, capability, input, tool operation and request;
 > 3. an earned child claim retains its terms and remains payable or paid.
 >
 > It also adds:
-> 4. after a closure fence commits, no durable operation bound to the space commits dispatch;
+> 4. after a closure fence that is checked in the dispatch transaction's writer commits, no durable operation bound to the space commits dispatch;
+> 4'. (weaker, `early_only` fences in a different writer) after such a fence commits, no durable operation bound to the space commits dispatch unless its pre-dispatch revalidation read the fence store before the fence committed. Such an operation is reported as `dispatched_after_fence_unlinearized` (section 4.1);
 > 5. closure releases no reserve and no sealed allocation.
+>
+> Sealed D1 permits are outside properties 4 and 4'. They stay dispatchable and are listed as `sealed_outstanding` (section 6.2 rule 2).
 
 **Proof sketch:**
 - Closure adds fence rows and terminal records only. It never mutates an allocation, seal, graph allocation or claim, so properties 1-3 follow from the Proposition.
 - The drain performs only pre-dispatch compensation, which is an existing recovery transition, plus operation halts and session-request latches (spec 3 `LatchScope::Operation` and `LatchScope::SessionRequest`). It never sets the kernel-wide evidence latch.
-- Property 4 is section 4.1's CAS ordering.
+- Property 4 is section 4.1's CAS ordering. It holds only because the fence and the dispatch CAS share one writer, which serializes them.
+- Property 4' follows from section 4.2's revalidation. A check that reads before a remote fence commits, followed by a local dispatch CAS, satisfies the weaker premise but not property 4. That interleaving is the reason the premise is split.
 - Property 5 is section 5 rule 2 plus section 7.
 
 This is a proposal. No Lean coverage is claimed.
@@ -525,12 +529,14 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
 - **Apalache.** `formal/apalache/AuthoritySpaceClosure.tla` composes `RevocationCutCompleteness.tla` with `PostAdmissionDropGuard.tla` and a fence variable.
   - Invariants: no dispatch commit after a co-located fence; no output release after a co-located fence (rule 3a); no dispatch or release of a `legacy_unindexed` operation once a fence exists (rule 1a); no compensation after dispatch commit or committed capture; no hold release outside {`PreDispatchNoEffect`, `TransportNotAccepted`}; `Closed` implies a terminal ledger.
   - Mutants: drop the `NOT EXISTS` clause; drop it from the release check; drop the legacy predicate; compensate a `DispatchCommitted` operation.
+  - Negative example for property 4 under an `early_only` fence: guard check reads the remote fence store, the remote fence commits, then the local dispatch CAS commits. The model must report property 4 violated and property 4' satisfied, with the operation flagged `dispatched_after_fence_unlinearized`.
 - **Loom.** Race fence commit against the `DispatchCommitted` CAS, and against the release-bearing finalization commit; exactly one order wins and the loser reclassifies.
 - **Kani.** The shared classifier is total and never maps a post-dispatch or capture-committed state to compensation.
 - **Proptest.** Random trees, process cancels, D1 subdivisions and seals, and S1 extensions under closure. Sealed permits and earned claims are unchanged, and the stranded ledger matches the store.
 - **Unit.**
   - Overlay revalidation denies after a late suspension.
   - `ProcessLivenessGuard` denies a cancelled subtree.
+  - Subtree closure noninterference: root R has children A and B, and A has a child A1. A `ProcessTree(A)` closure fences operations of A and A1, which carry `process_tree = A` refs. Operations of R and B still dispatch, because the fence is keyed on `process_tree = A` and not on the root-wide lineage.
   - A `ProcessTree` closure containing a confined child terminates the native confined record through `NativeConfinedRuntime::cancel`. A return staged before the activity read is withheld, and pins remain.
   - A space closure issues `CancelWorkflow` for a bound recovery workflow, and a delayed original submission is fenced by the tombstone.
   - `extend_swarm_authority_bundle` rejects a tombstoned graph.
@@ -594,3 +600,10 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180933163 | Index process-tree ancestors for closure fences | Fixed now. Each operation records one `process_tree` ref for every process on its path, root first, from the path chio-process already loads at admission. A `ProcessTree(p)` fence on `p` therefore matches every descendant's operations by an exact join, and the dispatch CAS cannot commit a descendant after the closure. The rule 1a backfill derives the same rows | section 4.1 rule 1 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-4-01 | The process-tree fence table still names the superseded lineage key | Fixed. The `ProcessTree` row fences `(process_tree, root_process_id)` on the requested process id and explains why the root-wide security lineage would over-fence. `ProcessLivenessGuard` checks the `process_tree` refs on its path. A subtree noninterference test is added (siblings and ancestors still dispatch) | section 6.2 table; section 4.2 rule 5; section 16 |
+| R-4-02 | The closure lemma claims atomic ordering for the explicitly weaker backend | Fixed. Property 4 is restricted to fences checked in the dispatch transaction's writer. A weaker property 4' covers `early_only` fences, with `dispatched_after_fence_unlinearized` reporting. Sealed D1 permits are excluded from both. The check, remote fence, local commit interleaving is a negative Apalache example | section 11; section 16 |

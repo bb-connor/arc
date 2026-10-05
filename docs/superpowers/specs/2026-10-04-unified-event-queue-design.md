@@ -208,8 +208,15 @@ Rules:
      - Pending actions capture their cause when queued. `EdgeAction::RefreshRoots` gains `cause: Option<InboundSeq>`, and processing the action sets the cell from it. A refresh queued at restore (`runtime.rs:318`) has no cause, so it is never attributed to the first request after restore.
      - The writer is driven synchronously from the edge worker thread (M: `session_core.rs:1094-1110`), and the edge changes the cell only between whole lines. The value `next_event` reads is therefore exactly the cause of the line it is publishing. `RemoteSessionEvent` gains `cause: Option<InboundSeq>`.
    - **A1b. Server requests with no request slot.** A server-to-client request caused by a notification, by a client response, by a request whose slot has already closed, or by nothing (background tasks, restore, late events) is never routed to a request slot:
-     - with a GET notification stream attached, it is delivered there, live;
+     - with a GET notification stream attached, it is pushed to that attachment's **GET server-request queue** (A1d), never to the broadcast;
      - with none, the writer answers it locally at once with a JSON-RPC error (`-32603`, "no client stream for an uncorrelated server request") through the session input and increments `chio_mcp_remote_server_request_unroutable_total`. The edge takes its existing error path; for a roots refresh that is the `roots_refresh_failed` log (`runtime_flow.rs:96-107`).
+   - **A1d. GET server-request queue.** Today both GET branches skip every event that is not a notification (M: `http_service.rs:810-812`, `:853`), so routing a server request to the GET stream through the broadcast would drop it at once. A1b instead delivers through a non-lossy queue owned by the GET attachment, with the same guarantees a POST slot gives in A2 and A2a:
+     - **Ownership.** `try_attach_notification_stream` creates the queue together with the attachment, and dropping `NotificationStreamAttachment` closes it. The writer reads the attachment and pushes in one step under the session's attachment lock, so a request is either queued on a live attachment or takes the no-GET path. It is never pushed to a queue that has already closed.
+     - **Bound.** The queue is bounded by `max_pending_server_requests`. On overflow the writer answers the excess request locally with the A2 error and increments `chio_mcp_remote_server_request_overflow_total`.
+     - **Delivery tracking.** Each entry is `queued` until the GET stream yields it, then `delivered`. A delivered request stays answerable, because client responses bypass the request lock and reach the session input directly.
+     - **Detach and disconnect.** When the attachment drops, every `queued` entry is answered locally at once with "client stream closed before the server request was delivered". A `delivered` entry with no answer is answered locally after `orphaned_server_request_grace`, as A2a does. Each local answer increments `chio_mcp_remote_server_request_orphaned_total`. Later uncorrelated requests take the no-GET path.
+     - **Lag.** The queue is not the broadcast, so broadcast lag cannot skip a server request. A GET consumer that lags on notifications gets the A7 resync, and its queued server requests are unaffected.
+     - **Replay.** Server requests are not retained in the replay window, which holds notifications only. A request that was still `queued` when the previous GET connection dropped was already answered locally at detach, so a reconnect with `Last-Event-ID` cannot silently miss one.
    - **A1c. Notification POSTs keep today's buffered response.** A notification POST that obtains the free lock (M: `http_service.rs:386-420`) registers a **notification slot** for its own sequence. The slot has no `response`, and it ends when the edge goes idle, as `collect_session_events_until_idle` does today. Server requests the notification causes, for example `roots/list` after `notifications/roots/list_changed`, still ride that POST's `post_notification_sse` response. A notification POST that finds the lock busy registers nothing and returns `202` as today, and A1b routes what it causes.
    - **Serialization was rejected.** Making notification POSTs wait for the request lock would also correlate correctly. But cancellations and client responses must bypass the lock: a cancellation must reach the active call, and a nested flow waits on a client response (M: `http_service.rs:364-366`; `nested_flow.rs:207-226`). Every other notification would then wait for the full duration of an in-flight tool call.
 2. **A2. Non-lossy.** `response` is a `oneshot`, so it cannot overflow. `server_requests` is bounded by `max_pending_server_requests` (default 16). On overflow the writer never drops silently: it answers the excess server request locally with a JSON-RPC error (`-32603`, "server request queue full") through the session input, so the tool sees its elicitation or sampling request fail, and it increments `chio_mcp_remote_server_request_overflow_total`.
@@ -240,11 +247,11 @@ Rules:
 ### 4.3 Subscription order
 
 - **A5. POST.** The POST handler subscribes to the broadcast after acquiring `active_request_stream` and immediately before `session.send` (replacing `http_service.rs:425-426`). A queued request no longer receives the events of the request ahead of it. Request-correlated events never come from the broadcast (A1), so a broadcast lag on a POST stream can only skip notifications.
-- **A6. GET replay.** The GET replay branch subscribes **before** it takes the replay snapshot (moving `http_service.rs:839` above `:829`). The existing `event.seq <= delivered_through` filter (`:853`) removes the overlap. The live branch is unchanged.
+- **A6. GET replay.** The GET replay branch subscribes **before** it takes the replay snapshot (moving `http_service.rs:839` above `:829`). The existing `event.seq <= delivered_through` filter (`:853`) removes the overlap. Both the live branch and the replay branch keep their notifications-only broadcast filter (`:810-812`, `:853`). Each also selects over the attachment's GET server-request queue (A1d), the only path by which a server request reaches a GET stream.
 
 ### 4.4 Lag: resync, never silent
 
-After A1, lag can skip only notifications. Notifications are re-read hints (list changed, resource updated) plus advisory progress and log messages. Revision 4 answers lag with a resync in standard MCP vocabulary instead of terminating streams, because termination with a 64-notification window almost always yields `409` and a reconnect loop against the per-IP rate limiter (S5-12).
+After A1 and A1d, lag can skip only notifications. Correlated responses and server requests ride POST slots, and uncorrelated server requests ride the GET server-request queue; neither depends on the broadcast. Notifications are re-read hints (list changed, resource updated) plus advisory progress and log messages. Revision 4 answers lag with a resync in standard MCP vocabulary instead of terminating streams, because termination with a 64-notification window almost always yields `409` and a reconnect loop against the per-IP rate limiter (S5-12).
 
 1. **A7. Resync request.** On `RecvError::Lagged(n)` at `:517`, `:702`, `:817` or `:860`, the consumer increments `chio_mcp_remote_stream_lag_total`, calls `session.request_resync(n)`, and keeps going. A resync request is a coalesced flag: at most one is pending per session, and further lags add to its skipped count.
 2. **A8. Resync burst.** The edge runtime, which owns the kernel session, services a pending resync on its next loop iteration by emitting through the normal writer:
@@ -332,9 +339,10 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 
 | Failure | Behavior |
 |---|---|
-| Broadcast lag on any stream | Metric, coalesced resync request, burst of re-read notifications (A7-A9). Responses and server requests are unaffected (A1) |
+| Broadcast lag on any stream | Metric, coalesced resync request, burst of re-read notifications (A7-A9). Responses and server requests are unaffected (A1, A1d) |
 | Correlated server-request overflow | Excess request answered locally with a JSON-RPC error; never dropped silently (A2) |
-| Server request caused by a notification, a client response, a closed request or background work | GET stream if attached, otherwise answered locally with an error; never routed to the active request slot (A1b) |
+| Server request caused by a notification, a client response, a closed request or background work | The GET server-request queue if a GET stream is attached, otherwise answered locally with an error; never routed to the active request slot (A1b, A1d) |
+| GET server-request queue overflow, or GET stream detaches | Excess or undelivered requests answered locally at once; a delivered one after `orphaned_server_request_grace`; never dropped silently (A1d) |
 | Inbound sequence exhausted | Session terminated fail closed (unreachable in practice) (A1a) |
 | HTTP client disconnects mid-call | Stream dropped; the slot keeps the lock until the terminal response (A2b); completion task records the credential outcome (section 4.2) |
 | HTTP client disconnects while the tool waits on a server request | Undelivered and later server requests answered locally with an error at once; a delivered one after `orphaned_server_request_grace`; the tool returns and the call terminalizes (A2a) |
@@ -354,7 +362,7 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 - **`spec/WIRE_PROTOCOL.md` section 3.2** gains:
   - a lagged stream MUST NOT drop events silently; the server emits a resync burst of re-read notifications (A8);
   - a terminal response and its correlated server requests MUST NOT be lost to lag (A1);
-  - a server-to-client request is delivered only on the POST stream of the request or notification that caused it, or on the GET stream. A client that wants server requests caused by its own lock-contended notifications (for example `roots/list` after `notifications/roots/list_changed`) keeps a GET stream open (A1b, A1c);
+  - a server-to-client request is delivered only on the POST stream of the request or notification that caused it, or on the GET stream. A server request that cannot be delivered is answered locally with a JSON-RPC error, never dropped silently (A1d). A client that wants server requests caused by its own lock-contended notifications (for example `roots/list` after `notifications/roots/list_changed`) keeps a GET stream open (A1b, A1c);
   - sequences MUST be monotonic across restore (section 5);
   - the client action after `409` (A11);
   - the retry rule (section 4.6).
@@ -378,6 +386,11 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
     - When X returns, the edge emits `roots/list` stamped with the notification's cause.
     - With a GET stream attached it arrives on the GET stream. Without one it is answered locally, `roots_refresh_failed` is logged and the unroutable metric increments.
     - It never appears on X's stream or Y's stream. Today's filter (`http_service_auth.rs:1-14`) emits it on Y's stream.
+  - **GET-bound server requests (A1d).** In each case a `notifications/roots/list_changed` POST finds the lock busy, so the `roots/list` it causes has no slot and is GET-bound:
+    - ordinary delivery: with a GET stream attached, `roots/list` arrives on the GET stream exactly once, and the client's answer reaches the edge. Fails on current code, whose live filter (`http_service.rs:810-812`) drops it;
+    - lag: with broadcast capacity 8, a GET consumer lags on notifications while `roots/list` is queued. The request is still delivered, and a resync burst follows;
+    - detach: the GET stream drops while `roots/list` is queued. It is answered locally at once, `roots_refresh_failed` is logged and the orphaned metric increments. A delivered but unanswered request is answered locally at the grace bound (test clock);
+    - overflow: `max_pending_server_requests + 1` GET-bound requests yield one local overflow error;
   - **id reuse (A1).** Two sequential POSTs reuse one JSON-RPC id. A response stamped with the first POST's cause never fills the second slot;
   - **free lock (A1c).** `notifications/roots/list_changed` on an idle session still returns `post_notification_sse` carrying the `roots/list` request;
   - **receiver loss (A2a), credential session.** A tool blocks on `sampling/createMessage`, then the HTTP client disconnects:
@@ -766,6 +779,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180839023 | Serialize notification POSTs with active request slots | Fixed now. Confirmed on M: and `main`: notification POSTs and client responses are sent without the request lock, and the serial edge handles a deferred notification after the active call, so temporal correlation misroutes what it causes. Server requests are now routed by explicit causal identity. Uncorrelated ones go to the GET stream or are answered locally, and a lock-holding notification POST keeps its buffered response. Serialization was rejected because cancellations and client responses must bypass the lock | A1, A1a, A1b, A1c, A2b, section 8, section 9, section 10 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-5-01 | Round-2 GET routing bypasses the non-lossy server-request path | Fixed. Confirmed on M: that both GET branches filter to notifications (`http_service.rs:810-812`, `:853`). GET-bound server requests now ride a bounded, non-lossy queue owned by the GET attachment, with delivery tracking, a local error on overflow, local answers on detach (immediate for undelivered, after the grace window for delivered), and no dependence on the broadcast. The live and replay filters stay notifications-only and also select the queue. The lag claim is restated. Tests cover ordinary delivery, lag, detach and overflow | A1b; A1d; A6; section 4.4; sections 8, 9, 10 |
 
 ## Appendix A. FTL reference
 

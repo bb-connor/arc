@@ -294,6 +294,7 @@ pub enum UnknownHold {
     None,                                 // no hold, or the operation did not end outcome-unknown
     Frozen,                               // entered with Terminal(OutcomeUnknownAfterDispatch) while a hold is retained
     Releasing { authority: UnknownOutcomeRelease, evidence: Digest }, // ReleaseHold emitted, not yet acknowledged; never persisted
+    ReleaseSubmitted { authority: UnknownOutcomeRelease, idempotency_key: Digest }, // rail-held release prepared durably; outcome at the rail unknown
     Released(UnknownOutcomeRelease),      // set only by the acknowledgement of the ReleaseHold for this authority
 }
 
@@ -443,9 +444,15 @@ pub enum ReceiptDecision {
      - It moves `unknown_hold` to `Releasing { authority, evidence }` and emits `ReleaseHold { authority, evidence, expected_version }`.
      - **Acknowledged.** `EffectAcknowledged { effect: ReleaseHold, .. }` in `Releasing { authority, .. }` sets `unknown_hold = Released(authority)`. No other event records a release, so a release that failed is never recorded as done.
      - **Failed.** `CommitFailed` for the `ReleaseHold` returns `unknown_hold` to `Frozen` with `Retain`, and a later `ReleaseAuthorized` may retry. `VersionConflict` re-projects first. A refused `ExternalPrepare { Settle }` ahead of a rail-held release counts as a failure.
-     - **Unknown.** `CommitOutcomeUnknown` for the `ReleaseHold` yields `HaltOperation { CommitOutcomeUnknown }` and keeps `Releasing`. Re-projection then resolves it from the store: a committed release entry for this operation gives `Released(kind)`, and its absence gives `Frozen`.
+     - **Unknown.** `CommitOutcomeUnknown` for the `ReleaseHold` yields `HaltOperation { CommitOutcomeUnknown }` and keeps `Releasing`. Re-projection then resolves it from the store. For a writer-held hold, a committed release entry gives `Released(kind)` and its absence gives `Frozen`. For a rail-held hold, a `release_submitted` row without completion gives `ReleaseSubmitted`, which is reconciled at the rail as described under persistence below. It is never treated as `Frozen`.
      - **Repeats.** While `Releasing`, a `ReleaseAuthorized` with the same authority and evidence yields `Retain` and emits no second effect. One with a different authority or evidence is illegal (M2). After `Released`, a duplicate yields `Retain`. In any other phase, or with no frozen hold, the event is illegal and releases nothing.
-     - **Persistence.** `Releasing` is never persisted. The `ReleaseHold` member (spec 10 X17b) writes the payment-journal release entry and the operation's released fact in one writer transaction, keyed by `operation_id`, so at most one release exists per frozen hold. Projection yields only `Frozen` or `Released`.
+     - **Persistence, writer-held holds.** `Releasing` is never persisted. The `ReleaseHold` member (spec 10 X17b) writes the payment-journal release entry and the operation's released fact in one writer transaction, keyed by `operation_id`, so at most one release exists per frozen hold. Because the release is a single local transaction, absence of the entry after an unknown outcome proves it did not commit, and projection yields `Frozen` or `Released`.
+     - **Persistence, rail-held holds.** A release that needs an external rail call is two-phase, and absence of a local completion never means "not released":
+       - **Prepare.** An `ExternalPrepare { Settle }` crossing commits a durable `release_submitted` row before the external call, with `idempotency_key = H("chio.unknown-release.v1" || operation_id || authority || evidence)`. Projection of that row yields the persisted `ReleaseSubmitted { authority, idempotency_key }`.
+       - **External call.** The rail call carries the idempotency key. Spec 10 X17b requires a rail adapter used for unknown-outcome releases to support either idempotent submission by key or an authoritative status query by key.
+       - **Completion.** The completion commit writes the payment-journal release entry and sets `Released(authority)`.
+       - **Unknown or crash.** From `ReleaseSubmitted`, `UnknownReleaseDriver` queries the rail by key, or re-submits with the same key. The answer decides the outcome. An authoritative "released" commits the completion. An authoritative "not released" commits a `release_abandoned` record and returns to `Frozen`. No answer keeps `ReleaseSubmitted` with bounded backoff and an operator incident.
+       - **No re-release.** While `ReleaseSubmitted` holds, a new `ReleaseAuthorized` is illegal (M2), so no second release is ever submitted without the key.
      - The driver verifies the evidence (the counterparty's signed agreement, or the contract's capture-waiver term) before it feeds the event. The machine checks only the phase and the hold fact.
      - This is how a hold frozen by M7, M12 or the cut table is released after migration. It never moves money on the machine's own authority (T4, T6).
 8. **M8. Cuts.** A `Cut` event is classified only by the normative table of section 6.1.
@@ -486,7 +493,9 @@ pub enum ReceiptDecision {
     - **Totality.** Every `CommitFailure` reason has a row here for every post-effect effect, so none reaches M2's illegal-event arm.
       - `Terminalize`, `Compensate` and `ReleaseHold` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project) and `CommitOutcomeUnknown` (M12) can fail them. A failed or unknown `ReleaseHold` follows M7a: back to `Frozen`, or `HaltOperation` while `Releasing`.
       - Every `Retain` above has a re-feed source. The `FinalizingRetryDriver` (section 7) feeds `Tick` when the stop is resumed and with bounded backoff. `StartupReconciler` covers restart.
-    - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that.
+    - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that. Whether a retry is safe differs by class:
+      - **Read-only (check-only).** The call is eligible only when `can_redispatch_unknown_read` holds (section 4.4), so a retry after resume is safe. The driver returns `OutputWithheld { retry: AfterResume }` (spec 8).
+      - **`NonDurable`.** The effect has executed and nothing binds a retry to it. A retry would redispatch the side effect, as spec 5 confirms for non-durable calls. The `Withheld` receipt therefore records `effect_executed: true`, and its stop block sets `retryable_after_resume: false` (spec 8 S15). The driver returns the terminal `OutputWithheld { retry: Never, effect_executed: true }`, and the result is final for that request. `KernelStopped` is temporary only for refusals before dispatch. A deployment that cannot accept dropped output must not run `Monetary` or development `Off` modes (spec 3 open decision 1).
 12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect yields `HaltOperation { CommitOutcomeUnknown }`, with no compensation, no dispatch and no state change.
     - This is the machine form of spec 3's `BoundaryFailure::CommitUnconfirmed`: every hold and credential is retained.
     - When the unknown commit is pre-dispatch (an `IntentCommit` or a slow-path dispatch-commit step), a second group signs the ambiguous `SignReceipt(Deny)` with retained markers, as M: does today (M: `kernel/evaluation/dispatch_commit_failure.rs:40-75`).
@@ -907,6 +916,13 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 |---|---|---|---|
 | 4180886724 | Treat a committed capture as post-dispatch at a cut | Fixed now. Under `AuthorityCut`, `CapturePending` with capture `Committed` is post-dispatch with holds frozen: `HaltOperation`, no `IntentCommit`, never `Compensate`, and, when owned, `Terminalize(OutcomeUnknownAfterDispatch)` as a restrictive, non-crossing commit. Two new M10 rows cover a refused intent remainder from that state (`KernelStopped` retains; other policy reasons take the same post-dispatch path) and take precedence over the generic slow-path compensation row | section 6.1 table; M10 |
 | 4180886727 (spec 10) | Recheck revocation before releasing tool output | Fixed in spec 10 section 4.2. The post-effect `Revoked` row of M11 already maps a refused release to `DeniedAfterDelivery` | M11 (unchanged); spec 10 section 4.2, X16 |
+
+### Codex review (PR #1174, round 5)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180993960 | Make stopped non-durable effects terminal to retries | Fixed now. A `NonDurable` call whose release is refused by a stop has executed its effect, so its `Withheld` receipt records `effect_executed: true` and `retryable_after_resume: false`. The driver returns the terminal `OutputWithheld { retry: Never }`. Only check-only reads, which are redispatch-safe by eligibility, get `retry: AfterResume` | M11 "Classes with no row"; spec 8 S15 and `OutputWithheld`; spec 10 X16 |
+| 4180993966 | Reconcile an external hold release before retrying it | Fixed now. Rail-held releases are two-phase. A durable `release_submitted` row with an idempotency key commits before the external call, and projects to the persisted `ReleaseSubmitted`. `UnknownReleaseDriver` resolves it only from an authoritative rail answer by key, and a new `ReleaseAuthorized` is illegal meanwhile. Writer-held releases stay single-transaction, so absence still proves non-commit there | `UnknownHold`; M7a persistence and unknown rules |
 
 ## Appendix A. External and FTL precedent
 

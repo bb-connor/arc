@@ -96,8 +96,8 @@ Targets (section 14):
 | Measure | Baseline | Target |
 |---|---|---|
 | Authority commits per side-effecting call | 10 | 3 |
-| Anchor syncs per side-effecting call | about 10.5 | 2 |
-| On-path authority, anchor and receipt fsyncs | about 22.7 | 5 or fewer |
+| Synchronous anchor syncs per side-effecting call | about 10.5 | 2, plus at most 1 lag anchor on a delayed return (X7a) |
+| On-path authority, anchor and receipt fsyncs | about 22.7 | 5 or fewer on the ideal path; 6 on an isolated delayed return |
 | Process-mediated `read` median | 130 ms | 95 ms or less (p95 125 ms or less) |
 | Throughput at 16 callers on a new shared-writer kernel benchmark | phase 0 baseline | at least 4x, with no regression at concurrency 1 |
 
@@ -355,6 +355,9 @@ Rules:
    - every crossing-authorizing commit anchors the whole chain prefix, because the anchor records the chain head;
    - a lost return record leaves `DispatchCommitted`, which recovery terminalizes as outcome-unknown with holds frozen. That is the conservative branch.
 7. **X7. Bounded lag.** Progress-only commits are anchored when a crossing-authorizing or restrictive commit follows, or after `anchor_lag_commits` (default 32) or `anchor_lag_ms` (default 100), whichever comes first. A batch boundary alone does not force a sync.
+   - **X7a. Synchronous and lag anchors.** A **synchronous anchor** is the sync that a crossing-authorizing or restrictive commit's acknowledgement waits on. A **lag anchor** is a sync the writer loop runs because `anchor_lag_commits` or `anchor_lag_ms` fired. No member's acknowledgement waits on it, but it is a real fsync and is counted.
+   - A side-effecting fast-path call always costs 2 synchronous anchors, for the intent and the outcome. It costs 1 more lag anchor when its return record ages past `anchor_lag_ms`, or past `anchor_lag_commits` intervening commits, before the outcome commit anchors it. That is the isolated delayed-return case.
+   - Restore safety does not depend on which kind of sync covers a commit. Section 14 counts the two kinds separately and never trades a lag anchor away to meet a number.
 8. **X8. Trusted time.** A restore can regress the trusted-time high-water mark by at most the anchor lag, because every crossing re-anchors the floor. The fallible authority clock and its fences (M: `docs/security/trusted-time.md`) are unchanged.
 9. **X9. Custody check.** The writer no longer compares the database to the anchor on every transaction.
    - The owner keeps an in-memory expected head: admission and global commit sequence, chain digests, and `data_version`, updated after each commit it writes.
@@ -459,7 +462,7 @@ Rules:
     | `Overloaded` | Not produced for post-effect members (X17b). If received, the driver re-submits; never compensates |
     | `Unavailable` | The fused outcome commit's preconditions no longer hold (for example, an external rail capture). Spec 9 re-plans the settlement as slow-path steps, with an `ExternalPrepare { Settle }` crossing, then the rest of the outcome commit (spec 9 M11) |
 
-    For a check-only read or a `NonDurable` call, refusal yields the signed `withheld` receipt (X13a), `KernelStopped` included. No custody holds the output. `HaltOperation` halts one operation; it never closes the kernel to new dispatch (spec 3's `LatchScope::Operation`).
+    For a check-only read or a `NonDurable` call, refusal yields the signed `withheld` receipt (X13a), `KernelStopped` included. No custody holds the output. A check-only read is redispatch-safe, so it returns `OutputWithheld { retry: AfterResume }`. A `NonDurable` effect has already executed, so its result is terminal: `OutputWithheld { retry: Never, effect_executed: true }`, with `retryable_after_resume: false` (spec 9 M11, spec 8 S15). `HaltOperation` halts one operation; it never closes the kernel to new dispatch (spec 3's `LatchScope::Operation`).
 
 ## 7. Slow paths keep their semantics
 
@@ -511,15 +514,15 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
       - A full queue therefore cannot keep an operator from stopping the kernel.
       - Under X21, a lost transaction answers `Retry`, and the lane re-runs first. A stop that cannot become durable (for example on `SQLITE_FULL`) is covered by spec 8's fsynced stop-intent latch, written before the transaction. Boot honors that latch until a durable head supersedes it.
     - **X17b. Post-effect members bypass the queue bound.** `Overloaded` applies only to members that would start new work: intent commits, check-only dispatches, slow-path pre-dispatch steps, and non-admission writes such as budget administration.
-      - Post-effect members are never refused with `Overloaded`: return records, outcome commits, release crossings, `Terminalize`, `Compensate` and `ReleaseHold`. Refusing one would turn a known outcome into an unknown one, or strand a hold.
+      - Post-effect members are never refused with `Overloaded`: return records, outcome commits, release crossings, `Terminalize`, `Compensate` and `ReleaseHold`. A rail adapter used for an unknown-outcome `ReleaseHold` must support idempotent submission or an authoritative status query by the release's idempotency key (spec 9 M7a). Refusing one would turn a known outcome into an unknown one, or strand a hold.
       - Their number is bounded by operations already admitted. Each dispatched operation has at most one post-effect member queued, so admitting them past the bound cannot grow the queue without limit.
 18. **X18. No added latency at low load.** The loop never waits to fill a batch. At concurrency 1, latency is unchanged.
 19. **X19. Linearization.** Members execute serially in dequeue order, each seeing earlier members' effects. Every CAS keeps its meaning.
 20. **X20. Fairness.** Members dequeue FIFO, after the X17a priority lane, with a per-tenant cap of a quarter of a contended batch. The cap reorders across tenants only, and X19's order is the dequeue order after the cap. In the single-tenant process host (`LOCAL_SYSTEM_TENANT_ID`) the cap is inert.
 21. **X21. Savepoint failure protocol.**
-    - After any non-refusal SQLite error, the loop checks `sqlite3_get_autocommit()`. SQLite rolls back the whole transaction on `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM`.
+    - After any non-refusal SQLite error, the loop checks `sqlite3_get_autocommit()` and acts on what it reports. On `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM`, SQLite may roll back the whole transaction automatically, or may leave it active with only the failing statement rolled back (SQLite, "Response To Errors Within A Transaction"). The loop never assumes either outcome.
     - If the transaction is gone, every member gets `Retry` (known not committed) and re-queues. No member ever runs outside the batch transaction.
-    - **If the transaction is still active,** the error was statement-scoped. Before anything else, the loop runs `ROLLBACK TO` and then `RELEASE` for that member's savepoint, discarding every write the member made. Then:
+    - **If the transaction is still active,** SQLite kept it open, whatever the error code. Before anything else, the loop runs `ROLLBACK TO` and then `RELEASE` for that member's savepoint, discarding every write the member made. Then:
       - a uniqueness or CAS-guard constraint answers `Refused(VersionConflict)`, which spec 9 re-projects;
       - any other error answers that member `Retry`, known not committed. After `member_fault_retries` (default 2) consecutive failures of the same planned member, it is answered `Refused(Unavailable)` instead and a store incident is raised. Spec 9 never compensates on either reason by itself (M10, M11);
       - the next member runs only after the savepoint rollback succeeds, so no member executes against a partially applied predecessor.
@@ -610,9 +613,10 @@ Measured on the steady process-host run (M: `BENCHMARK.md`) on its machine class
 | Measure | Baseline | Target | Gate |
 |---|---|---|---|
 | Authority commits per fast-path side-effecting call | 10 (M: head, section 2.1) | 3 | Deterministic (store hook) |
-| Anchor syncs per fast-path side-effecting call | about 10.5 (348/33) | 2 | Deterministic |
+| Synchronous anchor syncs per fast-path side-effecting call (X7a) | about 10.5 (348/33) | 2 | Deterministic, under a fixture with no lag trigger: return-to-outcome under `anchor_lag_ms` and fewer than `anchor_lag_commits` intervening commits |
+| Total anchor syncs per fast-path side-effecting call, including lag anchors | about 10.5 | 2 on the ideal path; 3 on an isolated delayed return | Reported, with synchronous and lag anchors listed separately |
 | Synchronous `receipts.db` fsyncs per durable call (with the gate on) | about 1.2 | 0 | Deterministic |
-| On-path authority, anchor and receipt fsyncs per side-effecting call | about 22.7 | 5 or fewer | Deterministic |
+| On-path authority, anchor and receipt fsyncs per side-effecting call | about 22.7 | 5 or fewer on the ideal path (3 WAL + 2 synchronous anchors); 6 on an isolated delayed return (plus one lag anchor) | Deterministic under the no-lag-trigger fixture; reported otherwise |
 | On-path fsyncs per call including `process.db`, excluding setup | about 26.5 | 9 or fewer | Reported |
 | Authority commits per two-commit read (`All`, eligible) | 10 | 2 | Deterministic |
 | fsyncs per check-only read (non-durable, eligible) | 1 `receipts.db` (plus a budget commit only for quota grants, which are ineligible) | 1 `receipts.db`, 0 authority | Deterministic |
@@ -624,7 +628,7 @@ Measured on the steady process-host run (M: `BENCHMARK.md`) on its machine class
 **Derivation of the `read` target.**
 - Non-fsync time is about 69 ms (section 2.8).
 - A two-commit read issues 2 authority commits, 2 anchor syncs and about 3.8 `process.db` fsyncs. That is about 7.8 fsyncs, or about 18 ms, for a predicted median of about 87 ms.
-- The three-commit path predicts about 89 ms.
+- The three-commit path predicts about 89 ms on the ideal path. A delayed return adds one lag anchor, about 2.3 ms (X7a).
 - The target leaves margin for variance.
 - Going further requires reducing non-fsync CPU time, which is out of scope (section 3).
 
@@ -816,3 +820,17 @@ Where the analogy breaks:
 |---|---|---|---|
 | 4180886727 | Recheck revocation before releasing tool output | Fixed now. Every release crossing (`OutputRelease`, `ArtifactRelease`, `ConfinedReturn`, `ExternalEvaluation`) rechecks revocation before bytes leave Chio custody. The effect has happened, so a refusal withholds the output and never compensates: X16's `Revoked` row (shared with closure and integrity) terminalizes as `DeniedAfterDelivery` through spec 9 M11, and P4 and P5 keep their pins and consumption | section 4.2; X16 |
 | 4180886724 (spec 9) | Treat a committed capture as post-dispatch at a cut | Fixed in spec 9 section 6.1 and M10 | spec 9 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-10-02 | The deterministic two-anchor target conflicts with bounded-lag anchoring | Fixed. X7a separates synchronous anchors, which acknowledgements wait on, from lag anchors fired by `anchor_lag_commits` or `anchor_lag_ms`. The deterministic gate is 2 synchronous anchors under a fixture with no lag trigger. Total anchors are reported separately. The fsync target states the 5-fsync ideal path and the 6-fsync isolated delayed-return case. Restore safety is unchanged | X7a; section 1 table; section 14 |
+| Reconciliation note on 4180933166 | The X21 opening sentence overstates automatic rollback | Fixed. Per SQLite, `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM` may roll back the whole transaction or leave it active. The loop never assumes either outcome and branches on `sqlite3_get_autocommit()` | X21 |
+
+### Codex review (PR #1174, round 5)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180993960 (spec 9) | Make stopped non-durable effects terminal to retries | Fixed with spec 9 M11. X16 now separates the redispatch-safe check-only read (`retry: AfterResume`) from the terminal `NonDurable` effect (`retry: Never`, `effect_executed: true`) | X16 |
+| 4180993966 (spec 9) | Reconcile an external hold release before retrying it | Fixed with spec 9 M7a. X17b requires rail adapters used for unknown-outcome releases to support idempotent submission or status query by key | X17b |

@@ -111,8 +111,8 @@ This does not replace:
 | Owner services run outside the kernel | V: `2026-10-03-work-owner-services-design.md:9-13`, inside `chio-control-plane` |
 | Component op enums | M: `chio-keyring/src/ipc.rs:323` (`WitnessServiceOperation`), `:543` (`AuditServiceOperation`); M: `chio-secret-broker/src/authority_ipc.rs:42` (`AuthorityOperation`) |
 | Security seams in the kernel | M: `kernel/mod.rs:214` (`CapabilityIssuanceAdmissionAuthority`), `:334` (`SecurityInvocationContextAuthority`), `:344` (`SecurityPreDispatchPolicy`), `:403` (`SecurityPreDispatchHook`); `chio-security-kernel` is `forbid(unsafe_code)` (M: `src/lib.rs:15`) |
-| TCB closure on `main` (`cargo tree -p chio-kernel -e normal`, aarch64-apple-darwin) | 407 distinct names (434 name/version pairs). Paths: alloy via `chio-settle` default `web3` (V: `chio-settle/Cargo.toml:15-23`, `default = ["web3"]`) **and** via `chio-core` to `chio-web3` to `alloy-primitives`; `reqwest`/`hyper` via `chio-link`, `chio-settle`, `chio-egress-contract`; sigstore via `chio-weights` to `chio-attest-verify`; `ureq` direct |
-| Shrink paths (edge removal over the resolved `main` graph) | Cut `chio-weights` to `chio-attest-verify`: 310 names. Also cut the `reqwest` edges of `chio-link`, `chio-settle`, `chio-egress-contract`: 281, with no `reqwest`/`hyper`/sigstore. Also cut `chio-settle`'s `web3` edges: 262, with one alloy crate left through `chio-core` to `chio-web3`. Revision 1's "285 of 407, none banned" ignored alloy |
+| TCB closure on `main` (`cargo tree -p chio-kernel -e normal`, aarch64-apple-darwin) | **Archived measurement** on `main` at `f5a9d2ab2`, not reproduced for the M:/V:/W: integrated closure: 407 distinct names (434 name/version pairs). Paths: alloy via `chio-settle` default `web3` (V: `chio-settle/Cargo.toml:15-23`, `default = ["web3"]`) **and** via `chio-core` to `chio-web3` to `alloy-primitives`; `reqwest`/`hyper` via `chio-link`, `chio-settle`, `chio-egress-contract`; sigstore via `chio-weights` to `chio-attest-verify`; `ureq` direct |
+| Shrink paths (edge removal over the resolved `main` graph) | **Archived measurement** on `main` at `f5a9d2ab2` (same target and command), not reproduced for the integrated closure. Cut `chio-weights` to `chio-attest-verify`: 310 names. Also cut the `reqwest` edges of `chio-link`, `chio-settle`, `chio-egress-contract`: 281, with no `reqwest`/`hyper`/sigstore. Also cut `chio-settle`'s `web3` edges: 262, with one alloy crate left through `chio-core` to `chio-web3`. Revision 1's "285 of 407, none banned" ignored alloy |
 | Existing gates on M | H11 `scripts/check-dependency-budget.py`: one musl target (`:26`), `Budget` (`:30`), `COMMON_DENY` (`:41`), `HELPER_DENY` (`:55`), `chio-cage-init` ceiling 72 (`:81-87`), broker ceiling 481 (`:89-97`), CI `ci.yml:204`. `scripts/check-trust-boundaries.py` (catalog `:16`, CI `ci.yml:193`), "a source inventory, not a Rust/SQL verifier" (`:4`). H8 deferred (M: hardening spec `:317`, `:510`). **GT1: none of these gates runs in hosted CI** (`:514`). Mechanism D gate specified (M: unrepresentable-defects `:440`) and never built (RP6, `:516`) |
 | Emergency stop | Process-local and not persisted (M: `construction.rs:369`). Ledger rows `2026-10-01-compliance-product-truth-review:EV11` and `2026-10-01-execution-review-accounting-clocks:AC6` are `open-acceptance` (M: `docs/security/landing-ledger.json`). No stop check in M: `validation/issuance.rs` |
 
@@ -162,11 +162,12 @@ Normative rules (R1-R10 from revision 1 are retained and now apply per layer):
    - The persistence gap is tracked as ledger EV11/AC6. This rule records the dispositions; it does not make the stop durable.
    - **R5a. Multiplexed entry points.** An L0 entry point that dispatches an L3 enum (`execute_recovery_command`) declares its disposition per L3 variant, and the generated test asserts per variant. For `RecoveryControl`: `InspectWorkflow` and `CancelWorkflow` are `allow` (observation and closure must work during a stop), and every other variant is `deny`.
    - **R5b. Per-entry-point dispositions.** An op whose entry points differ in direction (begin versus observe), or in authority profile (agent versus control), declares a disposition per entry point. Three ops use it:
-     - `CallerExecution`: `reserve_` and `start_` are `deny`, and `reconcile_caller_execution*` plus authenticated reports are `allow`, because the effect already happened.
+     - `CallerExecution`: `reserve_` and `start_` are `deny`, and `reconcile_caller_execution*` plus authenticated reports are `allow`, because the effect already happened. `reconcile_caller_execution*` is an entry point of `CallerExecution` only; the `Reconcile` op does not list it (R1).
      - `IssueCapability`: ordinary issuance is `deny`; control-profile issuance (direct tokens whose subject is a roster principal, never an agent scope) is `allow` once spec 8's identity prerequisite (S28) lands.
      - `RecoveryControl`: `authenticate_recovery_actor`, `read_recovery_workflow`, `load_recovery_request_custody` and `observe_recovery_capability_liveness` are `allow`; `reserve_recovery_review` and `acknowledge_recovery_reservation` are `deny`; `execute_recovery_command` follows R5a.
      - The complete disposition table, including L1, L2 and L3 inheritance and the durable enforcement of every `deny`, is `2026-10-04-durable-stop-epoch-design.md` section 7.
      - Splitting `CallerExecution` into two ops is the alternative. That spec's open decision 3 records the choice.
+     - **Generated test under R5b.** For an op with per-entry-point dispositions, the generated test asserts per entry point: refusal while stopped for each `deny` entry point, and no stop refusal for each `allow` entry point. The census generates the inventory and these tests from one table, so an entry point has exactly one op and exactly one disposition.
 6. **R6. Entry-point budget.** Each op records `max_entry_points`, and growth requires raising the row in the same PR.
 7. **R11. Semantics default downward.** A capability expressible as a native tool behind an existing op must be expressed that way: L1 `invoke`, which reaches L0 `EvaluateToolCall`. A new op at any layer requires a spec argument that it cannot be lowered. This generalizes the worker protocol's existing rule (M: `WORKER_PROTOCOL.md:59-66`) and FTL's pass-through rule.
 8. **R12. Layer descent.** Each L1-L3 op row lists the L0 ops it may drive. For example:
@@ -214,8 +215,8 @@ Revision 1's entry-point table still holds for the `main` surface. Changes for t
 
 | Op | New entry points on M ∪ V | Disposition |
 |---|---|---|
-| `CallerExecution` | `reserve_caller_execution*`, `start_caller_execution*` (M: `caller_execution.rs:170-374`) | `deny` |
-| `Reconcile` | adds `reconcile_caller_execution*` (`:419`) and the active-response recovery methods | `allow` (recovery must run during a stop) |
+| `CallerExecution` | `reserve_caller_execution*`, `start_caller_execution*` (M: `caller_execution.rs:170-374`) and `reconcile_caller_execution*` (`:419`) | per entry point (R5b): `reserve_` and `start_` `deny`; `reconcile_caller_execution*` and authenticated reports `allow` |
+| `Reconcile` | adds the active-response recovery methods. `reconcile_caller_execution*` belongs to `CallerExecution`, not here (R1: one op per entry point) | `allow` (recovery must run during a stop) |
 | `ExportExecutionEvidence` | `export_durable_execution_evidence` (V: `execution_evidence.rs:18`) | `allow`: it signs a historical fact and creates no authority |
 | `EvaluateToolCall` | the `*_with_security_context` and caller-capability variants. Process calls use `evaluate_tool_call_with_metadata[_and_security_context]` | `deny` |
 | `IssueCapability` | the M issuance entry points (M: `validation/issuance.rs:10`) | per entry point (R5b): ordinary issuance `deny`; control-profile issuance `allow` after spec 8 S28. No stop check exists today (section 2) |
@@ -380,7 +381,8 @@ H11 measures name/version pairs. Revision 1's numbers were distinct names; this 
    - Remove or narrow the four handle exports.
    - Decide every `allow` disposition. A change to `deny` is batched into one `KERNEL_ABI_VERSION` 2.0.
 
-   Measured on `main`, the first two cuts reach 281 distinct names with no `reqwest`, `hyper` or sigstore. Adding the `chio-settle` web3 cut reaches 262. The facade and R13 cuts remove the remaining alloy crate and `ureq`; they still need to be measured.
+   Measured on `main` at `f5a9d2ab2` (aarch64-apple-darwin, `cargo tree -p chio-kernel -e normal`; an archived measurement, not reproduced for the M:/V:/W: integrated closure), the first two cuts reach 281 distinct names with no `reqwest`, `hyper` or sigstore. Adding the `chio-settle` web3 cut reaches 262. The facade and R13 cuts remove the remaining alloy crate and `ureq`; they still need to be measured.
+   - **Re-measurement.** Phase 0 re-measures every closure and cut count on the gated tree with a retained script and a retained resolved graph (`cargo metadata` output, target and feature set recorded). Those re-measured values, not the archived ones, become the R13 budgets.
 4. **Phase 3 (L2 pinning).** When W1 code lands, replace the contract-anchor rows with exact variants and descent lists. L3 is already pinned to W:; its rows move with any change to the recovery template or command enums (today one template, `SupportTicketPublicIssue`).
 
 The phases are order-independent with respect to merging #1160 and #1173, because the inventory is regenerated against whatever is on `main`.
@@ -432,6 +434,13 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180274510 | Generate the phase 0 inventory from landed code | Fixed now. Phase 0 generates the inventory from the gated tree. Ops 28-29, the W: rows, the L3 rows and the v4 L1 row join in the recovery merge that lands their symbols (1.1). The 254-name union is a target, not a precondition | Section 10 phase 0; section 5 version note |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| Numbers check | Closure and edge-cut counts lack provenance for the integrated tree | Fixed. The 407/434 closure and the 310/281/262 cut counts are labelled as archived measurements on `main` at `f5a9d2ab2` (aarch64-apple-darwin, `cargo tree -p chio-kernel -e normal`), not reproduced for the M:/V:/W: integrated closure. Phase 0 re-measures them with a retained script and resolved graph, and those values become the budgets | Section 2 rows; section 10 phase 2 note |
+| R-1-01 | Caller reconciliation belongs to two different ABI operations | Fixed. `reconcile_caller_execution*` is an entry point of `CallerExecution` only, with a per-entry-point `allow` under R5b. It is removed from the `Reconcile` row. R5b now states that the generated test asserts per entry point, so the inventory and the stop tests come from one table. Spec 8 S13 and its disposition row agree | R5b; union entry-point table (section 5) |
 
 ## Appendix: FTL reference
 

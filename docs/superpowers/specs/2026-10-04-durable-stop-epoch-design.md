@@ -196,6 +196,16 @@ pub struct StopEpochV1 {
     pub previous: Sha256Digest,              // digest of this scope's prior record, or zero
     pub allow_containment: bool,             // section 7.1, S12
     pub requested_via: StopRequestPath,      // Route { host_id } | ControlSocket | OfflineCli | Migration
+    pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax and Migration
+    pub contributors: Vec<StopRequestRecord>,    // every request of the applied generation, at most 2 (S25); authorizer and reason_commitment above are contributors[0]
+}
+
+pub struct StopIntentRef { pub intent_id: [u8; 16], pub generation: u64 }
+pub struct StopRequestRecord {
+    pub request_id: [u8; 16],
+    pub authorizer: StopAuthorizer,
+    pub reason_commitment: Sha256Digest,
+    pub decided_at: DecisionTime,
 }
 
 pub enum DecisionTime {
@@ -328,7 +338,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 - **S9. Heads first, then the sweep.** Startup runs in this order:
    1. Open the store as serving owner. The anchor is reconciled (M: `rollback_anchor.rs:106-130`).
    2. Check the stop chain table under the schema gate (section 13a). A table that is absent before migration is created by the migration in the same step. A table that is missing when the schema version claims it means not ready, with reason `stop_chain_missing`.
-   3. Read the stop-intent journal (S25). Verify S2 for every scope chain. Install `StopHeads` as the verified heads, overlaid with every unsuperseded intent entry, one per scope.
+   3. Read the stop-intent journal (S25). Verify S2 for every scope chain. Install `StopHeads` as the verified heads, overlaid with every intent entry that its scope's anchored head does not satisfy (S25), one per scope.
    4. Run reconciliation. `reconcile_durable_admission_startup` (M: `recovery.rs:108`) is many transactions, not one. Each finalization or release step consults the installed heads:
       - a `KernelStopped` refusal is **Retain**: the operation stays `Finalizing` with output withheld, and the sweep does not record a `deferred_failure` for it;
       - any other error keeps today's behavior.
@@ -378,7 +388,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | `allow` | `SessionOpen`, `SessionRequest`, `SessionEventRelay`, `SessionClose` | no effect of their own; every effect-bearing request reaches a denied Admit op; clients must still connect, cancel, and learn of the stop |
 | `allow` | `RevokeCapability`, `EmergencyControl`, `Reconcile`, `ObserveSettlement`, `Shutdown` | narrow authority, control the stop, or settle the past |
 | `allow` unless `allow_containment = false` (S12) | `AdmitGovernedActiveResponse` | every `GovernedResponseEffect` narrows authority |
-| per entry point (S13) | `CallerExecution` | `reserve_` and `start_` deny; the authenticated report is a progress-only return record and is allowed (S27); release is `OutputRelease` (`Withhold`); `reconcile_caller_execution*` allow |
+| per entry point (S13) | `CallerExecution` | `reserve_` and `start_` deny; the authenticated report is a progress-only return record and is allowed (S27); release is `OutputRelease` (`Withhold`); `reconcile_caller_execution*` allow. `reconcile_caller_execution*` is an entry point of `CallerExecution` only, never of `Reconcile` (spec 1 R1, R5b) |
 | per entry point (S13, R5a) | `RecoveryControl` | see the next table |
 
 `RecoveryControl` entry points (spec 1 section 5 lists seven):
@@ -428,11 +438,11 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - **Two-commit read** (spec 10 X14, no return record):
       - a `KernelStopped` refusal of the outcome commit rolls back the savepoint, then writes a progress-only return record that holds the bytes;
       - the operation is then `Finalizing` with output withheld, so recovery never signs `OutcomeUnknownAfterDispatch` for it and the process runtime never re-dispatches the read.
-    - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed_epoch } }`:
-      - on JSON-RPC surfaces, an error with code `output_withheld` and data `{ operation_id, scope, observed_epoch, retry: "after_resume" }`;
+    - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed_epoch }, retry: AfterResume | Never, effect_executed: bool }`:
+      - on JSON-RPC surfaces, an error with code `output_withheld` and data `{ operation_id, scope, observed_epoch, retry, effect_executed }`;
       - on the process ABI, `invoke` returns status `withheld` with the same fields.
-
-      After resume, a replay with the same request id (or the same process operation key) returns the released output through the bound durable result. A surface without that replay path delivers the outcome only through the terminal receipt and is named in the claim limit.
+      - **`retry: AfterResume`** applies to durable operations (the output stays in release custody) and to check-only reads (no effect, so a retry is safe). After resume, a replay with the same request id (or the same process operation key) returns the released output through the bound durable result. A surface without that replay path delivers the outcome only through the terminal receipt and is named in the claim limit.
+      - **`retry: Never`, with `effect_executed: true`,** applies to a `NonDurable` side-effecting call whose release a stop refused (spec 9's `NonDurable` class, spec 10 X13c). Its effect has already run, and no custody holds the output or a replay key, so a retry after resume would dispatch the effect again (spec 5 confirms that a non-durable retry redispatches). The client must treat the call as executed with its output lost.
 - **S15. Stop refusals per path.** `KernelStopped` is a temporary refusal. It never writes a deny tombstone, and it burns a request id only where M: does today.
 
     | Path | Where refused | Result | Request id |
@@ -444,8 +454,9 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     | `Parked` (approval) | the resume intent commit | **Retain** in `Parked`; no compensation (S16) | unchanged; resumes after resume |
     | Post-dispatch (`Finalizing`, a release) | the release crossing | `Withhold` (S14) | unchanged |
     | Caller report | never stop-checked (S27) | return record persisted | unchanged |
+    | `NonDurable` side-effecting call, release refused | the release crossing, after the effect ran | signed withheld receipt with `retryable_after_resume: false`; `OutputWithheld { retry: Never, effect_executed: true }`. **Terminal, not temporary**: there is no custody to resume from | terminal for that call; a retry is a new, deliberate dispatch |
 
-    - A stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, retryable_after_resume: true }`. It is evidence of a refused attempt, not a terminal admission record.
+    - A stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, retryable_after_resume }`. It is `true` on every row above except the `NonDurable` effect row, where it is `false` because the effect already ran. A receipt with `true` is evidence of a refused attempt, not a terminal admission record.
     - Under process retries, a process retries with the same request id (M: `chio-process/ARCHITECTURE.md:40-45`).
       - On the tier-1, fused and check-only paths, the retry after resume proceeds.
       - On the slow path with a begin row, the id is terminal. The retained call slot then belongs to a dead logical operation, so the worker must use a new operation key. The process tier-1 check before slot commit makes this path rare.
@@ -542,6 +553,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - `Relax` widens `allow_containment` from `false` to `true`. It is authorized like a resume (S19).
     - Every record carries `expected_epoch`. `Resume` and `Relax` refuse with `StopHeadMoved { head_epoch }` when the head has moved, so a delayed resume can never clear a newer stop issued for a different incident.
     - `Stop` and `Restrict` never refuse on a moved head. They apply to the current head.
+    - `Resume` and `Relax` also refuse with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25). `expected_epoch` protects against a moved head; this protects against an intent that is recorded but not yet committed.
 - **S32. Recovery-scope stop authority.**
     - A recovery scope may be stopped or restricted by kernel operators, by the owning tenant's operators, or by a recovery actor authenticated through `authenticate_recovery_actor` with a new `RecoveryPermission::Stop` in the deployment's actor assignment (W: `recovery/ports.rs:223-234`; W: `recovery/records.rs:52-69`).
     - A recovery actor can never resume or relax. Resuming a recovery scope follows S19 with the tenant's roster.
@@ -571,7 +583,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - A signing failure or timeout rolls the transaction back. The head stays `Stopped`, and the route returns `ResumeRefused { reason: EvidenceUnavailable }`.
       - Holding the writer for at most `stop_sign_timeout` is acceptable for a rare, operator-driven transition that runs in the priority lane (S36).
     - **No resume over missing evidence.**
-      - `Resume` and `Relax` refuse with `StopEvidencePending` while any earlier record of the scope has a pending obligation.
+      - `Resume` and `Relax` refuse with `StopEvidencePending` while any earlier record of the scope has a pending obligation, and with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25).
       - A scope whose stop evidence is unsigned therefore stays `Stopped`, and the kernel never returns to `ready` for that scope until reconciliation signs the stop.
       - Only a signed resume can make a head `Running`, so a running head's whole chain is backed by signed artifacts.
 - **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, epoch, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
@@ -645,11 +657,23 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - **Upgrade.** The migration that bumps the version creates the stop tables in the same transaction. "Absent before migration" is a normal upgrade. "Missing after migration" means not ready (S9).
 - **S25. Stop-intent journal.**
     - Before a stop or restrict transaction begins, the stopping process records its intent in `stop-intent`, a two-slot file in the lock root. The file uses the anchor's slot discipline: write the whole journal to the inactive slot with a sequence number and checksum, fsync it, then make it current.
-    - **One entry per scope.** The journal is a keyed set: `scope_key -> { authority_id, scope, intended_epoch, transition: Stop | Restrict, allow_containment, credential_id_hash or principal }`. Each entry is that scope's intent latch.
-      - A second intent for a scope that already has an entry merges into it: the higher `intended_epoch` and the narrower `allow_containment` win.
+    - **One entry per scope: the scope's single pending transition.** The journal is a keyed set: `scope_key -> { intent_id, generation, authority_id, scope, allow_containment, contributors: [PendingStopRequest; 1..=2] }`. Each entry is that scope's intent latch, and it represents exactly one future transition: the next one.
+      - The entry stores no transition kind and no epoch. The writer computes both when it applies the entry, from the durable head at that moment: over a `Running` head it appends a `Stop` at `head.epoch + 1`; over a `Stopped` head it appends a narrowing `Restrict` at `head.epoch + 1`. The intended epoch is therefore always the next one, and an entry can never name an epoch the chain cannot reach.
+      - `intent_id` is 128 random bits chosen when the entry is created. `generation` is the number of contributing requests.
+      - **Contributors.** A request that would change the scope's state relative to its durable head plus the pending entry becomes a contributor. Only two states are reachable through stops (`Stopped` with containment allowed, then `Stopped` with containment refused), so an entry has at most two contributors: the request that created it, and at most one later request that narrows `allow_containment` to `false`, which raises `generation` to 2.
+      - A request that would change nothing is an idempotent no-op, as in S2. It returns the pending entry's status (`stop_not_durable` with `latch_only` until the entry applies), and its authorizer and reason go to the trace and to `admission_operation_stop_notes`, not to the journal.
+      - **Applying.** The appended record carries the entry's final, most restrictive state: the entry's `allow_containment`, `satisfies_intent = { intent_id, generation }` for the generation it was built from, and `contributors` listing every request of that generation, with each request's authorizer and reason commitment.
+      - **Why the application is always a valid S2 transition.** Every `Stop` and `Restrict` record of a scope applies that scope's entry, and `Resume` and `Relax` are refused while an entry is pending (below). So the head cannot reach the entry's state by any other record, and the application is either a `Stop` over `Running` or a narrowing `Restrict` over `Stopped`.
       - An intent for one scope never overwrites another scope's entry. With tenant A's stop pending as `latch_only` under `SQLITE_FULL`, a stop for tenant B adds a second entry, and a crash restores both.
-    - **Removal.** An entry is removed only after a durable head for the same scope, with epoch at or above the entry's `intended_epoch`, is anchored. A crash between that anchor and the removal leaves a superseded entry. Boot ignores it and then removes it.
-    - **Boot.** Every entry whose `intended_epoch` exceeds its scope's durable head epoch makes that scope `Stopped`, with `durability: latch_only`. The first write after verification appends one matching record per such scope.
+    - **Satisfaction.** An entry is satisfied only by proof, never by an epoch number. `satisfied(entry, head)` holds when the scope's anchored head:
+      - is `Stopped`;
+      - carries `satisfies_intent = { intent_id: entry.intent_id, generation: g }` with `g >= entry.generation`, so its `contributors` cover the entry's merged set;
+      - has `allow_containment` no wider than the entry's (`false` when the entry says `false`).
+
+      A record built from an older generation does not satisfy the entry. The writer then applies the entry again, which over the now-`Stopped` head is a narrowing `Restrict` built from the current generation.
+    - **Removal.** An entry is removed only after an anchored head satisfies it. A crash between that anchor and the removal leaves a satisfied entry, which boot verifies against the head and then removes. An unrelated same-scope record never retires an entry.
+    - **Boot.** Every entry that the anchored head does not satisfy is honored, whatever the head's epoch: the scope is `Stopped` with the narrower of the head's and the entry's `allow_containment`, and `durability: latch_only`. The first write after verification applies each such entry as above.
+    - **Resume and relax wait for pending intents.** `Resume` and `Relax` refuse with `StopIntentPending { scope }` while the scope has any unsatisfied entry. The check runs under the journal mutex, which the writer holds from the check through the commit and anchor sync of the resume or relax. A stop or restrict intent that arrives meanwhile waits for the mutex, then records its entry and applies over the resulting head. A resume can therefore never commit between an intent's fsync and that intent's own record.
     - **Bound.** The journal holds at most `stop_intent_max_entries` entries (default 4096). Each entry is at most 512 bytes, so a slot stays under 2 MiB.
       - When the journal is full, a new scope's intent is not recorded. The route returns `stop_not_durable` with `durability: process_only` and reason `stop_intent_journal_full`, and readiness reports it.
       - Existing entries are never evicted to make room.
@@ -682,6 +706,9 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | Serving shard loses the origin | Its lease expires within `shard_origin_lease`. It latches the kernel scope `Stopped` and reports `not_ready` with `stop_origin_stale` (S37) |
 | Stops for several scopes pending at once | Each scope keeps its own intent entry, and a crash restores every one (S25) |
 | Intent journal full | `stop_not_durable` with `process_only` and `stop_intent_journal_full`; no entry is evicted (S25) |
+| Resume or relax while a same-scope stop or restrict intent is pending | Refused with `StopIntentPending`; the intent applies first (S25, S31) |
+| A committed stop record is wider than, or older than, the merged intent | The entry is not retired; the writer applies it again as a `Restrict` built from the current generation. A crash in between restores the narrower policy at boot (S25) |
+| A latch-only stop, then a narrowing request for the same scope, then a crash | The entry holds both contributors at generation 2. Boot honors it as `Stopped` with containment refused; the first write appends one `Stop` at `head.epoch + 1` that carries both contributors (S25) |
 | Artifact signing fails for a stop or restrict | The stop stays committed and enforced, and the route returns `stop_durable` with `evidence: pending`. The obligation is retried, and re-driven at boot. Resume and relax refuse with `StopEvidencePending` (S38) |
 | Artifact signing fails or times out for a resume or relax | The transaction rolls back, and the head stays `Stopped`. The route returns `ResumeRefused { EvidenceUnavailable }` (S38) |
 | Database-only restore behind the stop | Anchor refuses; not ready (S34) |
@@ -761,6 +788,9 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - Write the intent latch, kill before the stop commit, restart: `ready_stopped` with `latch_only`, then the record is appended (S25).
   - Two pending stop intents (tenant A `latch_only` under `SQLITE_FULL`, then tenant B), kill, restart: both scopes come up stopped, and each entry is removed only after its own scope's record is anchored (S25).
   - Commit a stop, kill before its artifact is signed, restart: the stop is enforced, the obligation is re-driven, and a resume refuses with `StopEvidencePending` until it is signed (S38).
+  - **Queued resume versus a restrict intent (R-8-01).** Signed stopped head E with containment allowed; a resume expecting E is queued; a restrict intent (containment off) is fsynced. The resume refuses with `StopIntentPending`. In the variant where the resume held the journal mutex first, it commits and anchors E+1, the restrict entry is then recorded and applied as a `Stop` with containment off; kill between that anchor and the next transaction, restart: the scope is `Stopped` with containment off, never `Running` (S25, S31).
+  - **Two pending stops for one scope (R-8-01).** Two stop requests for the same scope merge, the second narrowing containment (generation 2). The first, wider record commits carrying generation 1 and is anchored; kill before the follow-up `Restrict`, restart: the entry is unsatisfied, so the scope comes up `Stopped` with containment off and `latch_only`, and the first write appends a `Restrict` carrying generation 2 (S25).
+  - **Latch-only stop, then a narrowing request, then a crash (Codex round 5).** The head is `Running` at epoch 4. A stop under `SQLITE_FULL` is recorded as `latch_only` (generation 1); a narrowing request (containment off) joins the entry (generation 2) before any record commits. Kill, restart: the scope is `Stopped` with containment off; the first write appends exactly one `Stop` at epoch 5 with containment off, `satisfies_intent` generation 2 and both contributors; the entry is then removed. No `Restrict` is ever appended over the running head (S2, S25).
   - **S8-01:** stop with caller-executed, native and ordinary operations in `Finalizing`; kill; restart. The host serves `ready_stopped`, status answers, resume succeeds, and the outputs are released exactly once.
 - **Failure injection.**
   - Stop under `Overloaded` and per-tenant caps: committed through the priority lane.
@@ -875,6 +905,20 @@ Open decisions:
 | 4180390001 | Define a cooldown origin for clockless stops | Already addressed in revision 2; tightened now | S19: the cooldown starts at the first authority-time observation after the stop, stored durably in `admission_operation_stop_observations` and re-driven at boot; break-glass covers a clock that never recovers. Now also: resume must match the stored origin, and a lost row only restarts the cooldown |
 | 4180731762 | Persist outstanding stop intents per scope | Fixed now | S25: the intent file is a keyed journal, one entry per scope; entries merge within a scope, never across scopes, and are removed only after that scope's matching transition is anchored; bounded, with no eviction |
 | 4180731782 | Continuously fence shards that lose the stop origin | Fixed now | S37: a renewable origin-freshness lease on the shard's monotonic clock; a shard that is behind or loses the origin latches the kernel scope `Stopped` and goes not ready; the acknowledgement reports `enforced` or `fenced_by_lease` |
+
+### Codex review (PR #1174, round 5)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180993960 (spec 9) | Make stopped non-durable effects terminal to retries | Fixed here for spec 8's wire and receipt surface. `OutputWithheld` gains `retry: AfterResume \| Never` and `effect_executed`. A `NonDurable` side-effecting call whose release a stop refused returns `retry: Never` with `effect_executed: true`, and its stop receipt has `retryable_after_resume: false`. S15's per-path table lists that path as terminal, not temporary | S14 client-visible result; S15 |
+| 4180993957 | Preserve every pending transition for a scope | Fixed now. Each scope's pending requests collapse into one next transition. The journal entry stores no transition kind or epoch. At apply time the writer appends a `Stop` at `head.epoch + 1` over a running head, or a narrowing `Restrict` at `head.epoch + 1` over a stopped head, always with the entry's final state (narrowest containment, every contributor). An entry has at most two contributors, because only two states are reachable through stops, and a non-narrowing request is an idempotent no-op. `satisfies_intent` plus `contributors` cover the merged set, matching the R-8-01 retirement rule. A crash test covers a latch-only `Stop` followed by a narrowing request | `StopEpochV1.contributors`; S25; section 14; section 17 |
+
+### Independent review (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-8-01 | An unrelated same-scope epoch can erase a pending stop or restriction | Fixed. Each journal entry has a durable `intent_id` and a `generation` that counts its contributing requests. Stop and Restrict records carry `satisfies_intent`. An entry retires only when an anchored head proves it was applied (matching id, current generation, containment no wider), never by epoch number. Boot honors every unsatisfied entry. Resume and relax refuse with `StopIntentPending` under the journal mutex, so a resume cannot commit between an intent's fsync and its record. A `Restrict` that finds a running head applies as a `Stop`. Both counterexamples are crash tests | `StopEpochV1.satisfies_intent`; S25; S31; S38; S9 step 3; section 14 failure rows; section 17 |
+| R-1-01 (spec 1) | Caller reconciliation belongs to two different ABI operations | Fixed in spec 1. The S13 `CallerExecution` row here now states that `reconcile_caller_execution*` belongs to `CallerExecution` only | section 7 S13 row |
 
 ## Appendix A. FTL reference
 
