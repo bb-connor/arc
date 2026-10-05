@@ -40,7 +40,7 @@
 - [x] Pin every executable Kani consumer to 0.68.0, validate the installed version, and update the mutation tool version assertions.
 - [x] Run the existing proof-runner and mutation-control tests; prove stale/mismatched versions and empty harness selection still fail.
 - [x] Run both real Kani PR sweeps with the pinned, narrowly repaired compiler on a supported host, retaining proof outcomes rather than only successful compilation. `scripts/kani-toolchain.py` binds the exact release, upstream repair and cached compiler bytes; its real controls require proof success and rejection of reachable unsupported code.
-- [ ] Rerun the affected crypto workflow commands and confirm exact test counts. Commit the independently verified changes.
+- [x] Rerun the affected crypto workflow commands and confirm exact test counts. Commit the independently verified changes.
 
 ### Task 2: Remediate dependency advisories
 
@@ -52,7 +52,7 @@
 - [x] Update each affected dependency through its package manager, reviewing unrelated lock changes. For unpatched transitive packages, identify the owning feature and specify a bounded removal or source repair before editing it.
 - [x] Run the full affected guard backend suite, component examples and Clippy. Exercise the affected TypeScript SDK and conformance package suites.
 - [x] Run the same Cargo Audit and OSV selections as CI. Require no non-ignored vulnerabilities and no additions to the ignore policy.
-- [ ] Commit validated dependency and compatibility changes with retained scanner outputs.
+- [x] Commit validated dependency and compatibility changes with retained scanner outputs.
 
 ### Task 3: Complete source-backed supply-chain review
 
@@ -64,7 +64,7 @@
 - [x] Review the completed source audit's coverage of FFI ownership/lengths, key generation/parsing, AEAD and nonce behavior, zeroization, thread safety, build scripts and ambient authority. Preserve its findings, source identity and deployment limits.
 - [x] Run the combined gate on the merged candidate: exact source reconstruction and six deployment resolutions, default/FIPS lint inventories, Cargo Vet, DES parity, AES initialization and FIPS wrong-key rejection. Historical full default/FIPS suites remain attributed to the prerequisite.
 - [x] Reconcile new dependency audit obligations from Task 2 using trusted imports or documented source review, without exemptions.
-- [ ] Add certifications only for completed reviews; run `cargo vet --locked` and retain its successful result. Commit the review evidence and records.
+- [x] Add certifications only for completed reviews; run `cargo vet --locked` and retain its successful result. Commit the review evidence and records.
 
 ### Task 4: Qualify confined PostgreSQL work and crash recovery
 
@@ -175,3 +175,17 @@ workflow negative controls. The actual confined PostgreSQL and SIGKILL
 trajectories and the x86 evidence image remain required hosted checks. No local
 aarch64 result substitutes for those checks. The final source-bound paper
 qualification and terminal hosted acceptance follow the integration commits.
+
+### Final workflow review
+
+The path-scoped formal lane omitted registered `chio-open-market` and
+`chio-security-types` PR harnesses, and its wiring test still expected the old
+version-only cache probe. Restore both trigger paths and lane classification.
+The existing wiring test now exercises the real shell classifier for every PR
+crate discovered from the harness manifest and workspace, including each crate
+manifest and source. A removed security-types classifier route must fail the
+control. Run this cheap contract in the formal scope job itself.
+
+The tracked acceptance ledger is
+`docs/papers/verifiable-work/evidence/pr1173-review/REVIEW.md`. It records final
+source-bound and hosted results separately from these implementation checkpoints.
