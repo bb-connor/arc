@@ -594,9 +594,10 @@ Receipts are classified by spec 9 M20's signed `chio_runtime.identity_dispositio
 - **`Terminal` receipts bind the request id.** Examples are a compensated `Prepared`-intent or slow-path stop denial, a deny tombstone, every terminal outcome, a `NonDurable` withheld effect, and the ambiguous deny of an unconfirmed non-durable invocation capture (rule 22). They are counted by every predicate above, so a stop denial on the slow path is not excluded.
 
 ```text
-terminal_receipts(request_id) = { r : identity_disposition(r) = Terminal }
-|terminal_receipts(request_id)| <= 1
-retained(r) -> eventually (exists t in terminal_receipts(request_id(r))) or proven_uncommitted(request_id(r))
+replay_identity(r) = (request_namespace_digest(r), request_id(r))
+terminal_receipts(ns, id) = { r : identity_disposition(r) = Terminal and replay_identity(r) = (ns, id) }
+forall (ns, id): |terminal_receipts(ns, id)| <= 1
+retained(r) -> eventually (exists t in terminal_receipts(replay_identity(r))) or proven_uncommitted(replay_identity(r))
 ```
 
 ### 4.12 Division with specs 9 and 10
@@ -927,6 +928,12 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-6-07 (counting side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. Rule 4's `CommitUnconfirmed` deny carries `Retained`. Section 4.11 counts only `Terminal` receipts per request, so the ambiguous deny and the recovery terminal no longer both count. A `Retained` receipt is followed by the terminal or by a proof that nothing committed. An unconfirmed non-durable capture's deny stays `Terminal`, because no durable operation will be terminalized | rule 4; rule 22; section 4.11 |
+
+### Codex review (PR #1174, round 14)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186767784 | Scope terminal receipts to the replay identity | Fixed now. The predicate filters by `replay_identity(r) = (request_namespace_digest, request_id)`. At most one `Terminal` receipt exists per replay identity, and legal reuse of a request id across namespaces is not conflated | section 4.11 |
 
 ## Appendix A. FTL reference
 

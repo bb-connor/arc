@@ -367,7 +367,7 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 | Restore: expired after construction | Terminal record with epoch `g`, accepted (A18) |
 | Generation at `2^32 - 1`, or low bits exhausted | Retained inactive, or terminated fail closed (A17, A22) |
 | Subscribe persist fails | Subscribe returns an error; registry unchanged (A24) |
-| Subscription fails re-authorization at restore | Dropped; catch-up hint still posted; re-read fails visibly (A25, A26) |
+| Subscription fails re-authorization at restore | Terminalized into an `Ended` marker with the failing reason; `SubscriptionEnded` is queued and persisted until emitted; no catch-up update is sent for it (A25, A26, H5a) |
 | A re-sign would lower a `v3` record to `v2` | Refused fail closed; session retained inactive (A28) |
 | `v3` record fails `v3` verification, or a `v2` record carries `subscriptions` | Malformed; existing deletion path; never retried under `v2` (A29) |
 | Enforced `inspect` | Redacted snapshot without `storage` (P6) |
@@ -418,7 +418,7 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
   - **D4, fails on current code:** restore, restore again with no intervening write, then emit at least as many notifications as the stale cursor's sequence; replay with the stale cursor returns `409` with the fix, and a negative control that forces seed 0 shows the aliased replay;
   - expired-after-construction restore succeeds and persists the terminal record (A18);
   - generation persist failure retains that session inactive and restores the others (A19);
-  - subscribe, restart, upstream resource update: the client receives `resources/updated`; a catch-up hint arrives right after restore; a subscription whose capability expired during downtime is dropped (A24-A26);
+  - subscribe, restart, upstream resource update: the client receives `resources/updated`; a catch-up hint arrives right after restore; a subscription whose capability expired during downtime is terminalized: the client receives `SubscriptionEnded { Expired }` and no catch-up update for it, and the marker survives a second restart until emitted (A24-A26, H5a);
   - **subscriptions across two restarts (A17, A28, A29):** restore with subscriptions, restart, restart again. After each restart the record verifies under `v3`, `subscriptions` is intact and re-authorized, and `resume_generation` has advanced by one per restart. A negative control that re-signs the bumped record under `v2` fails verification at the next boot, and a `v2`-named record with non-empty `subscriptions` is rejected;
   - **envelope floor (A28):** a `v2` record with no subscriptions stays `v2` under `resume_record_envelope_floor = v2` and becomes `v3` under the default; a `v3` record whose last subscription was removed stays `v3`.
 - **`chio-mcp-edge` (A1a):**
@@ -898,6 +898,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186619810 | Preserve ended subscriptions during restore | Fixed now. A25 branches on the tag. `Ended` markers are re-queued and never re-authorized. A `Live` entry that fails re-authorization is terminalized into an `Ended` marker with its `SubscriptionEnded`, not dropped. A26 sends catch-up updates only for `Live` entries that passed | A25; A26 |
+
+### Codex review (PR #1174, round 14)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186767776 | Reconcile the restore failure contract | Fixed now. The failure-table row and the restore test now require terminalization: an `Ended` marker with the reason, `SubscriptionEnded` queued and persisted until emitted, and no catch-up update | section 8 failure table; section 10 tests |
 
 ## Appendix A. FTL reference
 

@@ -341,11 +341,14 @@ Rules:
 
        ```text
        key(written(s, c, m))       = (s, c, 0, m)
-       key(check_only(s, c, k))    = (s, c, 1, k)
+       key(check_only(s, c, k))    = (s, c, 1, k)    where k = (store_owner_epoch, owner_check_counter)
        ```
 
      - Every check that observed head `c` therefore sorts after every crossing written at `c`, whatever its `member_ordinal`, and before anything written at `c + 1`. The two ordinal domains never collide, because the discriminator separates them.
-     - `check_ordinal` orders only checks that observed the same head.
+     - `check_ordinal` orders only checks that observed the same head, and it is restart-stable. It is the pair `(store_owner_epoch, owner_check_counter)`:
+       - `store_owner_epoch` is the serving owner's persisted fence epoch, the one already written with every global commit (M: `global_commit_chain.rs:43-77`). It strictly increases on each owner acquisition.
+       - `owner_check_counter` is a per-owner in-memory counter that starts at 0.
+       - A restarted owner that observes the same head `c` therefore has a higher epoch, and no two check-only receipts share a key.
    - **Comparison.**
      - Orders compare only within one `store_uuid`.
      - `commit_sequence` continues across owner changes, because it is the store's own table key, not an owner counter.
@@ -907,3 +910,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186619818 | Give check-only crossings a true after-commit order | Fixed now. Written and check-only positions compare through a discriminated key: `(s, c, 0, member_ordinal)` for written crossings and `(s, c, 1, check_ordinal)` for checks. A check that observed head `c` sorts after everything written at `c` and before `c + 1`, and the two ordinal domains cannot collide | X4 check-only crossings |
+
+### Codex review (PR #1174, round 14)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186767763 | Make check ordinals restart-stable | Fixed now. `check_ordinal` is `(store_owner_epoch, owner_check_counter)`. The persisted owner fence epoch strictly increases on each acquisition, so a restarted owner observing the same head can never reuse a key | X4 check-only crossings |

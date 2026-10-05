@@ -266,7 +266,10 @@ Rules:
    |---|---|
    | `Prepared` through `ReadyToDispatch`, or `ApprovalRequired` | Compensate (M: `admission_coordinator.rs:1607`) with cause `authority-cut`; latch the session request if one exists (spec 9 `LatchRequest`) |
    | `CapturePending` | Look up by operation. No capture: compensate. Capture committed: post-dispatch |
-   | `DispatchCommitted`, `Finalizing`, `AwaitingCallerReport` | Halt the operation (spec 9 `HaltOperation`); cooperative transport cancel where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`); if owned, terminalize `DispatchCommitted` as outcome-unknown with holds frozen (W: precedent); never redispatch, release or compensate. When the coordinator later attempts the output release, that release meets the fence (section 4.1 rule 3a) and the operation terminalizes as `DeniedAfterDelivery`, with output withheld |
+   | `DispatchCommitted`, owned by the drain | Halt the operation (spec 9 `HaltOperation`) and cancel the transport cooperatively where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`). Then follow spec 9 section 6.1's `X` row: with a `NotAccepted` proof, `NotAcceptedAfterDispatchCommit`; with a recoverable durable return, `Finalizing`, whose release then meets the fence (below); otherwise `OutcomeUnknownAfterDispatch` with holds frozen. Exactly one terminal; never redispatch, release or compensate |
+   | `DispatchCommitted`, still owned by a live coordinator | Halt and defer: the drain never steals the lease. The coordinator either terminalizes it under the same `X` row or reaches `Finalizing`, and then follows the next row |
+   | `Finalizing` | The release meets the fence (section 4.1 rule 3a), and the operation terminalizes as `DeniedAfterDelivery` with output withheld (spec 9 M11). It is never terminalized as outcome-unknown, because its return is recorded |
+   | `AwaitingCallerReport` | `HaltOperation { UnsettledCallerCustody }` plus the fault (spec 9 section 6.1). A later authenticated report records the return and moves the operation to `Finalizing`, so its release meets the fence and terminalizes as `DeniedAfterDelivery` |
    | Recovery workflow bound to the space | `CancelWorkflow` by the closure actor (section 6.5); the same-writer tombstone fences begin and capture |
    | Confined child in the space | `NativeConfinedRuntime::cancel`: native disposition first, then process cancel and pidfd termination (W: `crates/platform/chio-control-plane/src/confinement.rs:258-274`). A plain `ProcessRuntime::cancel` alone would leave the native confined record unterminated |
    | Security operation model, dispatch `NotStarted` | That model's own compensation path |
@@ -607,3 +610,9 @@ Where the analogy breaks:
 |---|---|---|---|
 | R-4-01 | The process-tree fence table still names the superseded lineage key | Fixed. The `ProcessTree` row fences `(process_tree, root_process_id)` on the requested process id and explains why the root-wide security lineage would over-fence. `ProcessLivenessGuard` checks the `process_tree` refs on its path. A subtree noninterference test is added (siblings and ancestors still dispatch) | section 6.2 table; section 4.2 rule 5; section 16 |
 | R-4-02 | The closure lemma claims atomic ordering for the explicitly weaker backend | Fixed. Property 4 is restricted to fences checked in the dispatch transaction's writer. A weaker property 4' covers `early_only` fences, with `dispatched_after_fence_unlinearized` reporting. Sealed D1 permits are excluded from both. The check, remote fence, local commit interleaving is a negative Apalache example | section 11; section 16 |
+
+### Codex review (PR #1174, round 14)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186767792 | Remove the impossible second terminalization | Fixed now. The drain table is split by phase and matches spec 9's cut table. An owned `DispatchCommitted` gets exactly one terminal under the `X` row. Only `Finalizing`, including a caller report that reached it, terminalizes as `DeniedAfterDelivery` when its release meets the fence. No operation is terminalized twice | section 5 drain table |

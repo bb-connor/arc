@@ -745,7 +745,11 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       - When the journal is full, a new scope's intent is not recorded. The route returns `stop_not_durable` with `durability: process_only` and reason `stop_intent_journal_full`, and readiness reports it.
       - Existing entries are never evicted to make room.
     - **Writer.** The serving owner, which holds the lock root, serializes journal writes. The offline CLI takes the same owner lock (S30).
-    - A failed intent write leaves only the process latch (`process_only`). The route reports it.
+    - A failed intent write leaves only the process latch (`process_only`), and the route reports it. This applies only to a serving host, whose process keeps the latch.
+    - **Offline CLI.** The offline CLI never reports `process_only`, because its process exits and no latch survives. With the host down and the owner lock held (S30), it appends the durable stop record itself:
+      - when the journal is full or the intent write fails, it skips the journal and appends the stop record directly, since a down host has no queue to overload;
+      - success requires the record committed and anchored, and the CLI reports `stop_durable`;
+      - if that append also fails, the CLI exits non-zero and reports `stop_not_in_force`. It states that no stop is recorded and that the operator must keep the host down or retry. It never claims a stop is in force.
     - This extends AC6's "publish first" rule from memory to durability.
 
 ## 14. Failure modes
@@ -1071,6 +1075,12 @@ Open decisions:
 |---|---|---|---|
 | 4186619802 | Require exact origin equality when recovering the lease | Fixed now. Recovery from `stop_origin_stale` requires a newly accepted challenge response showing the origin head equal to the replica head by position and digest. A replica behind catches up first, and a replica ahead latches `stop_origin_regressed` | S37 lost origin |
 | 4186619834 | Verify the witnessed stop-chain digest | Fixed now. `stop_epoch_floor_check` reads the witnessed `(StopEpochId, record_digest)` and requires that exact pair in the local chain ancestry. A forked chain that reaches the same position through a different sequence is not ready | section 13a whole-volume restore |
+
+### Codex review (PR #1174, round 14)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186767809 | Do not rely on a process latch for offline stops | Fixed now. The offline CLI never falls back to a process latch. On a full journal or a failed intent write it appends the durable stop record directly. If that also fails it exits non-zero with `stop_not_in_force`, stating that no stop is recorded | S25 writer; S30 |
 
 ## Appendix A. FTL reference
 
