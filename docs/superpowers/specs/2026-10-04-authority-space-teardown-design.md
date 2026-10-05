@@ -227,6 +227,11 @@ Rules:
    - **`CapturePending`.** W: compensates it directly, relying on the compensation CAS to lose against a committed capture. The unified function keeps that form when the capture authority shares the admission writer, and adds the lookup-by-operation step when it does not.
    - **`DispatchCommitted`.** W: terminalizes it immediately (`terminalize_dispatch_committed_admission`). The drain does the same once it owns the operation, which yields the conservative outcome-unknown terminal with holds frozen. Without ownership it latches and defers to the coordinator.
 
+   **Normative source.** The single normative cut and drain table is the cut function of `2026-10-04-pure-admission-machine-design.md` (spec 9), evaluated with `CutCause::AuthorityCut`. The table below is an informative summary of this spec's intent. Where the two differ, spec 9 governs, and a change to the drain behavior is made there, not here. Spec 9 revision 2 records the review of the differences (S9-06), including:
+   - `Parked` compensates under `AuthorityCut`;
+   - the `Effect::CancelTransport` and `Effect::QueryParticipant` effects;
+   - the governed economic mutation rows.
+
    | Observed state | Action |
    |---|---|
    | `Prepared` through `ReadyToDispatch`, or `ApprovalRequired` | Compensate (M: `admission_coordinator.rs:1607`) with cause `authority-cut`; latch the session request if one exists |

@@ -71,7 +71,7 @@ The bets are ranked by leverage. The first two are the keystone: almost every ot
 **What.** Replace the three classifiers, two operation models and sixteen evaluators with one sans-IO transition function over one operation model:
 
 ```rust
-fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState, Vec<Effect>)
+fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState, EffectList)
 ```
 
 - Every evaluator, recovery's original-operation closure, the spec 4 drain, spec 8's stop and startup reconciliation become drivers of it. A driver performs `Effect`s (commit, sign, dispatch) against ports.
