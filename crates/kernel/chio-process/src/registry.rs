@@ -63,7 +63,12 @@ impl ProcessRegistry {
                 .ok_or(ProcessError::Configuration(
                     "a qualified durable admission store is required",
                 ))?;
-        let store = Store::open(path.as_ref(), authority, &kernel.public_key().to_hex())?;
+        let store = Store::open(
+            path.as_ref(),
+            authority,
+            &kernel.public_key().to_hex(),
+            kernel.authority_clock(),
+        )?;
         let namespace = store.namespace.clone();
         Ok(Self {
             store: Arc::new(Mutex::new(store)),

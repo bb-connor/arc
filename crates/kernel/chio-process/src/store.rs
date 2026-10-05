@@ -1,8 +1,9 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core_types::capability::token::CapabilityToken;
-use chio_kernel::ToolCallRequest;
+use chio_kernel::{authority::Clock, ToolCallRequest};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde_json::Value;
 
@@ -19,11 +20,17 @@ pub(crate) const JOURNAL_VERSION: u32 = 2;
 
 pub(crate) struct Store {
     connection: Connection,
+    clock: Arc<dyn Clock>,
     pub namespace: String,
 }
 
 impl Store {
-    pub fn open(path: &Path, authority: &str, kernel_key: &str) -> Result<Self, ProcessError> {
+    pub fn open(
+        path: &Path,
+        authority: &str,
+        kernel_key: &str,
+        clock: Arc<dyn Clock>,
+    ) -> Result<Self, ProcessError> {
         let path = private_file(path)?;
         let mut connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
@@ -61,6 +68,7 @@ impl Store {
         tx.commit()?;
         Ok(Self {
             connection,
+            clock,
             namespace,
         })
     }

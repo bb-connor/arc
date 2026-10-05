@@ -10,6 +10,9 @@ use chio_process::{ChildSubmission, ProcessError, ProcessRegistry, ProcessRuntim
 use serde_json::{json, Value};
 use support::Result;
 
+#[path = "child_submission/caller_clock.rs"]
+mod caller_clock;
+
 struct Probe(Arc<Mutex<Vec<ToolInvocationContext>>>);
 
 #[async_trait::async_trait]

@@ -55,7 +55,7 @@ impl Store {
     }
 
     pub fn caller(&self, context: &ToolInvocationContext) -> Result<ProcessSnapshot, ProcessError> {
-        caller(&self.connection, context)
+        caller(&self.connection, context, self.clock.as_ref())
     }
 
     pub fn submit_child(
@@ -79,7 +79,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let parent = caller(&tx, submission.context)?;
+        let parent = caller(&tx, submission.context, self.clock.as_ref())?;
         let hash = digest(&(
             &parent.id,
             submission.context.server_id(),
@@ -226,7 +226,7 @@ impl Store {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let parent = caller(&tx, context)?;
+        let parent = caller(&tx, context, self.clock.as_ref())?;
         for id in children {
             let child = read_process(&tx, id)?.ok_or_else(|| ProcessError::NotFound(id.clone()))?;
             require_running(&child)?;
@@ -258,6 +258,7 @@ impl Store {
 fn caller(
     db: &Connection,
     context: &ToolInvocationContext,
+    clock: &dyn Clock,
 ) -> Result<ProcessSnapshot, ProcessError> {
     let mut statement =
         db.prepare("SELECT id FROM processes WHERE json_extract(capability,'$.id')=?1")?;
@@ -278,9 +279,11 @@ fn caller(
     }
     let process = matched.ok_or(ProcessError::Unauthenticated)?;
     require_running(&process)?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| ProcessError::Invalid("clock precedes Unix epoch"))?
+    // Sample the kernel's fenced authority clock after taking the store lock
+    // and locating the caller. Independently opened registries share this fence.
+    let now = clock
+        .unix_millis()
+        .map_err(chio_kernel::KernelError::from)?
         .as_secs();
     if now < process.capability.issued_at || now >= process.capability.expires_at {
         return Err(ProcessError::Unauthenticated);
