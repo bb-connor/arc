@@ -25,20 +25,43 @@ workbench duplicates are closed as superseded. The verified open count is 22.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1587 ledger requirements, including 201 carried review records and four new
-foundation findings from the October 5 independent reviews.
+1590 ledger requirements, including 201 carried review records, four findings
+from the October 5 independent reviews and three subsequent repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+Source `75f2a51c9daecd6852939d2490b289a4f54997c6` closes five reproduced
+weak-key attack paths in kernel DPoP and broker authority. Both DPoP versions
+use strict signatures before nonce custody. Broker provisioning rejects weak
+caller and issuer keys, and capability and request proofs use strict signatures.
+All 84 kernel DPoP tests and all 177 broker library tests pass, with no ignored
+tests. Owning all-target Clippy, format, formal mirrors and proof coverage pass.
+
+Source `dad90af0fc4f185035ee1133bca71e0f77d00664` supplies the existing qualified
+native fixture and enforcing CLI to the SDK parity workflow. Its hosted failure
+correctly refused an absent `CHIO_CAGE_INIT`; the extended workflow contract
+reproduces that omission and passes all 13 methods after repair. Native execution
+of the repaired lane is still required. The
+[kernel, broker and native workflow evidence](audits/foundation-kernel-broker-qualification-20261005.json.gz)
+preserves the original failures and bounded component results separately.
+
+GitHub Codex reports no major issues for `69435a1a5b` in
+[its completed review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5986922987).
+The committed Swift package passes on that source in PR run `37254058490`;
+push run `37254049495` also passes the package and framework rebuild. Neither
+record qualifies the subsequent kernel, broker or workflow changes. Final review,
+terminal hosted checks, Linux/native/trusted evidence and protected merge remain
+open.
 
 Source `6428fac61a1bcb18b1d764f9a74591a8e226610d` carries the rebuilt Swift
 framework and the next independent-review repairs. Source `60ec98d6fd` passed
 all five native Swift consumer tests in rebuild job `111582101361`, run
 `37252196996`. Artifact `11321617698` was downloaded with its GitHub ZIP digest,
 manifest and installed file hashes verified. The separate old committed-package
-job failed, so the overall run remains failed. The installed candidate still
-requires its own passing package check and final independent review.
+job failed, so the overall run remains failed. The later passing committed SDK
+checks are recorded above; final foundation acceptance remains open.
 
 Codex's review of `60ec98d6fd` found incomplete Swift dependency triggers and
 weak Ed25519 sender constraints. The workflow now covers all workspace crates,

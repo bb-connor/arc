@@ -129,9 +129,10 @@ foundation merge with post-merge source verification.
   Preserve the profile, required checks and useful demo source.
 - The current local host and Docker daemon are ARM64. The required trusted
   Linux x86_64 campaign and hosted provenance remain separate acceptance.
-- Mobile source wrappers now match the current FFI. The checked-in Apple
-  framework and supported native Swift/Kotlin build matrix still need rebuilding
-  and qualification; TypeScript and host Rust FFI results cannot replace them.
+- Mobile source wrappers now match the current FFI. The rebuilt Apple framework
+  and committed package pass the native Swift checks on `69435a1a5b`. The supported
+  Kotlin consumer matrix and final foundation qualification remain open;
+  TypeScript and host Rust FFI results cannot replace them.
 
 ## Independent review follow-up (October 5)
 
@@ -164,8 +165,10 @@ Neither a completed review with findings nor a self-authored repair reply is app
 The rebuilt SDK from `60ec98d6fd` passes all five native tests in run
 `37252196996`, job `111582101361`; the artifact's exact ZIP and installed-file
 hashes are retained. Source `6428fac61a` installs that tested bundle. The old
-committed-package job failed separately, so the run remains failed. The final
-committed candidate needs its own passing package tests.
+committed-package job failed separately, so the run remains failed. The committed
+package and push rebuild later pass on `69435a1a5b` in runs `37254058490` and
+`37254049495`. That source also receives a completed Codex review reporting no
+major issues, without a formal GitHub approval or final foundation qualification.
 
 The independent review of `60ec98d6fd` adds two P1 obligations. Source
 `6428fac61a` expands Swift triggers to all local Rust sources and rejects weak
@@ -178,6 +181,14 @@ Six source comparisons for #1029 are recorded in
 current cumulative-approval and retry owners while retaining unresolved
 transcript and credit-path composition obligations. This is a partial semantic
 comparison, with all unmatched valuable source still open.
+
+The adjacent authority audit then reproduces five weak-key failures in kernel
+DPoP and broker proofs. Repair `75f2a51c9d` passes 84 kernel DPoP tests, all 177
+broker library tests, owning all-target Clippy and structural proof checks.
+Repair `dad90af0fc` supplies the missing qualified fixture and enforcing CLI
+to SDK parity. Its reproduced contract failure passes with all 13 hostile
+workflow-contract methods afterward. Both repairs need fresh independent review
+and exact-candidate hosted/native qualification.
 
 ## Execution rulings
 

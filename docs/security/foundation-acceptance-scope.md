@@ -90,7 +90,8 @@ OpenAPI discovery ceiling and borrowed recursive JSON subtrees. These local
 repairs do not close their broader original requirements. Mobile wrappers now
 match the current FFI. Source `6428fac61a` installs a rebuilt Apple framework
 that passes five native tests, with exact source and artifact hashes retained.
-The final committed-package check and supported Kotlin matrix remain open. The authoritative
+The committed package and rebuild subsequently pass on `69435a1a5b`; the
+supported Kotlin matrix and final foundation qualification remain open. The authoritative
 [repair ledger](landing-ledger.md#foundation-repair-batch-after-consolidation)
 records each component result and remaining acceptance.
 
