@@ -27,12 +27,51 @@ it has an explicit separate R&D disposition and no foundation landing slot.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1595 ledger requirements, including 201 carried review records, four findings
-from the October 5 independent reviews and eight subsequent repair obligations.
+1600 ledger requirements, including 201 carried review records, the October 5
+independent findings and subsequent qualification repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+Repair `49a21b1a7e9dc76e96edb3b2bbd53488005034ef` retains a bounded native launch thread through delivery
+shutdown, fixing a child SIGKILL caused by retirement of its creating Tokio
+worker. It also reconciles all flow/keyring inventories, repairs private
+certification fixtures and the expiry-test clock, and completes the manifest-v2
+documentation correction from review PR7. The [retained evidence](audits/foundation-native-lifecycle-qualification-20261005.json.gz)
+contains the original failures and the repaired results separately.
+
+Local results: all 706 selected flow tests across 69 targets have successful
+execution evidence across retained runs and focused reruns; the original full
+gate remains failed. The complete keyring gate passes 93 tests, the native-MCP
+broker library passes 206, release recovery passes 25, and certification passes
+13 with one existing ignored timing test. Four process-lifetime regressions,
+strict owning Clippy, current source contracts and the README doctest pass.
+
+Both complete PostgreSQL native scenarios pass on the isolated x86_64 enforcing
+host after repairing its leaf certificate, kernel output projection and native
+child lifetime. The CLI uses the existing production profile; deadlines and
+isolation stay enforced. That component run retains the previous debug broker
+helper and static tool, so final exact-candidate hosted and trusted acceptance
+remain required. Reports and signed receipts are retained; the owned worker is
+stopped.
+
+Source `68cff8cd6a` received a completed positive GitHub Codex review with all
+eight inline threads resolved. Its Swift, JVM/Kotlin, C++, worker recovery and
+SDK parity workflows pass, while CI and PostgreSQL remain failed. The CI failure
+includes four certification fixture errors and two stale inventories. The old
+authorized image attempts and two queued controller expiries remain unsuccessful.
+Authorization still names `68cff8cd6a` until the new source is reviewed. No final
+capture, signed publication or protected merge is claimed.
+
+#1029 now has 16 bounded source comparisons across nine commits in the
+[legacy reconciliation](legacy-integration-reconciliation-20261005.json).
+Its 219 distinct patches and 78 original review threads remain preserved.
+Unique interval compaction and provenance timestamp work stay open. Current
+replacement owners still require their stated regression and compatibility
+evidence; these comparisons do not authorize retirement.
+
+### Earlier source and component records
 
 The foundation remains unmerged. Repair `18a35fed79be5d9780b09d8964859dcb363d44dc`
 retains the original signed CA package as a bounded, read-only build input after
@@ -64,8 +103,6 @@ original provenance remains intact. Fresh candidate review and full hosted,
 native and trusted qualification remain open, followed by strict trusted-context
 activation and protected merge. Android and live framework acceptance remain
 separate product work.
-
-### Earlier source and component records
 
 Source `6d18cf0a572bdf6dcee0ea2775a45941eddf37ce` implements caller-bound PostgreSQL resource mediation.
 The [retained evidence](audits/foundation-postgres-mediation-20261005.json.gz)

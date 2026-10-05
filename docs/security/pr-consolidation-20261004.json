@@ -2675,8 +2675,8 @@
       "head_in_foundation": false,
       "semantic_reconciliation": {
         "path": "docs/security/legacy-integration-reconciliation-20261005.json",
-        "sha256": "6c24ebd218c11d97a8a408b83b9f0ca4925d5012631f91abb60c0e049c380de9",
-        "status": "six bounded semantic assessments; original 219 patch-unique commits and 78 threads remain preserved and unretired"
+        "sha256": "3d4259a2511ede4a36e5183c3eb0f88d575508ab8296d07b7392d64cdaf59f48",
+        "status": "16 bounded source comparisons across nine original commits. 219 distinct non-merge patches and 78 original threads in #1029 remain preserved; no PR retirement or whole-commit equivalence follows."
       }
     },
     {
