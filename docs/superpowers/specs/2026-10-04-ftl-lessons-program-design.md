@@ -13,7 +13,9 @@
   - `R:` = `origin/research/openappa-recovery-20261001` at `de84fc306` (#1172): the recovery design docs.
   - `W:` = the **uncommitted** working tree at `standalone/arc-worktrees/recoverable-agent-runtime-20261002`. It implements recovery P0-P5 and is built on the #1160 checkpoint `f25cd61f4`. Line references reflect the working tree on 2026-10-04 and may drift. Several R: doc names (a signed `RemedyOfferV1`, the `recovery_deliveries` outbox and its cursors, an `ExplainIntent` command, emergency revocation that withdraws approvals) are not implemented in W:. The child specs use W:'s implemented names.
   - `P:` = `feat/process-command-experience-20260924` at `e24596543`: a portable CLI runner with no kernel change.
-- Follow-on: `docs/research/2026-10-04-ftl-lessons-brainstorm.md`.
+- Follow-on:
+  - `docs/research/2026-10-04-ftl-lessons-brainstorm.md`: candidates on the shipped baseline.
+  - `docs/research/2026-10-04-chio-kernel-north-star.md`: the kernel north star, eleven bets that fold these specs into a small, proven, fast and agent-safe kernel.
 
 ## Revision history
 
