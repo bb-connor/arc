@@ -325,3 +325,44 @@ retaining 48 outputs and unchanged before/after source hashes. The review
 manifest authenticates 199 diagnostic streams. Every hosted success remains
 attributed to its actual candidate; final acceptance requires terminal checks
 on the final pushed PR revision.
+
+### Hosted bootstrap boundaries
+
+Candidate `41c33618d7` also passes the complete native x86 crypto-floor job.
+The PostgreSQL lane passes native enforcement, the real TLS worker/fence API
+and the repaired broker readiness barrier. It then fails before provisioning:
+the example omitted the kernel-required aggregate invocation budget. Source
+`c96b8b1fed` binds initialization and process-tree limits to the same existing
+100-call value. A real CLI probe reproduces the original rejection and confirms
+that the corrected initializer passes that boundary; its deliberately invalid
+policy prevents host provisioning. This is configuration evidence, not native
+execution qualification. Both full PostgreSQL trajectories remain required.
+
+The Kani manifest lane fails before proofs because the cold release setup lacks
+compiler-private Rust components. The explicit toolchain override bypasses the
+pinned upstream source's component list. Source `62118f904e` provisions that
+exact nightly and its four build components before reconstruction. The new
+failure regression first fails on the missing provisioning step, then passes
+with the repair and requires no compiler replacement or acceptance marker after
+prerequisite failure. An actual empty `RUSTUP_HOME` installation resolves
+`rustc_abi`, `rustc_driver`, `rustc_public_bridge` and `tempfile`. The existing
+compiler still proves the positive control and rejects reachable unsupported
+catch-unwind. Version and workflow controls pass. No proof is weakened or
+removed; both hosted sweeps remain required.
+
+The qualification started on `c96b8b1fed` was intentionally interrupted with
+exit 143 to include the newly observed Kani repair. Its partial outputs remain
+in the normal evidence history and are not a successful qualification. The
+replacement profile uses frozen source `62118f904e`. The review manifest now
+authenticates 216 diagnostic streams, including the two hosted failures, the
+real budget probe, cold-toolchain controls and the interrupted campaign.
+
+Frozen source `62118f904e` passes all 21 terminal qualification commands against
+37,264 source files, retaining 48 outputs with unchanged source hashes. The
+funded suite reports 92 passed and six explicitly ignored; the separate native
+parent-loss and four child-payment interruption cases pass. The completed prior
+x86 runtime mutation campaign tests 77 mutants: 69 caught and eight unviable,
+with no survivors. All 218 retained diagnostic streams authenticate correctly.
+A separate inline review of the final prerequisite and budget repairs finds no
+additional P0/P1/P2 issue. The PostgreSQL end-to-end scenarios, both Kani sweeps
+and terminal CI must still pass on the replacement pushed candidate.

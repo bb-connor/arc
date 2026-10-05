@@ -1,0 +1,22 @@
+
+running 98 tests
+test funded_work::finding_acceptance::tests::context_admission_checks_independent_role_pins_and_time ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_aliased_receipt_checkpoint_and_status_keys ... ok
+test funded_work::finding_acceptance::tests::asserted_w0_has_exact_derived_facets_and_no_backing_upgrade ... ok
+test funded_work::finding_acceptance::tests::changed_trust_profile_and_standing_fail_closed ... ok
+test funded_work::peer_https::tests::receiver_source_cannot_prepare_or_broadcast_through_an_available_socket ... ok
+test funded_work::tests::allocation_matches_the_independent_contract_vector ... ok
+test funded_work::tests::allocation_rejects_lossy_or_ambiguous_money ... ok
+test funded_work::finding_acceptance::tests::missing_required_and_unsupported_facets_deny ... ok
+test funded_work::finding_acceptance::tests::changed_claim_and_optional_failed_facet_deny ... ok
+test funded_work::finding_acceptance::tests::execution_context_pins_external_keys_and_requires_receipts_before_agreement ... ok
+test funded_work::finding_acceptance::tests::trust_time_and_authentication_cannot_be_refreshed_by_evaluator ... ok
+test funded_work::finding_acceptance::tests::invented_evidence_digest_cannot_be_authorized_by_resigning ... ok
+test funded_work::finding_acceptance::tests::invented_optional_verified_facet_cannot_be_authorized_by_resigning ... ok
+test funded_work::finding_acceptance::tests::raw_ingress_and_relabelled_assessment_deny ... ok
+test funded_work::finding_acceptance::tests::retained_assessment_uses_historical_authority_window ... ok
+test funded_work::finding_acceptance::tests::execution_context_rejects_extra_and_foreign_standing_and_legacy_profile_mixing ... ok
+test funded_work::tests::authority_enrollment::every_pair_of_authority_roles_must_be_distinct ... ok
+test funded_work::finding_acceptance::tests::execution_evidence_is_required_and_assessment_replays_exact_bundle ... ok
+test funded_work::tests::authority_enrollment::valid_foreign_governance_signature_cannot_replace_selected_public_authority ... ok
+test funded_work::tests::authority_enrollment::substituted_public_roles_cannot_provision_native_authority ... ok

@@ -1206,6 +1206,120 @@
       "observed_result": "passed-source-d6dbdf1c5d",
       "bytes": 539,
       "sha256": "e994dd665da5c3aa8de08b4c755a20bc91701877a7c726652f3552cbc5e20d00"
+    },
+    {
+      "log": "readiness-41c3-crypto-floor.log.gz",
+      "observed_result": "passed-native-x86-crypto-floor-41c33618d7",
+      "bytes": 411659,
+      "sha256": "9ac654f664981a3e24e364310c71cc7eaac7391d6c648b17284f5fa4f99676a8"
+    },
+    {
+      "log": "readiness-41c3-postgres-failure.log.gz",
+      "observed_result": "failed-required-aggregate-budget-41c33618d7",
+      "bytes": 363007,
+      "sha256": "20ef7042990454a80a4d51f6faa7a040b8f5f458acb7c279d140b763c225b726"
+    },
+    {
+      "log": "readiness-41c3-kani-manifest-failure.log.gz",
+      "observed_result": "failed-cold-compiler-prerequisites-before-proofs-41c33618d7",
+      "bytes": 68079,
+      "sha256": "207f514e42ddcd85a5841e7247f6f53a3931098f4aee0dc0802dd15aa2e47444"
+    },
+    {
+      "log": "readiness-cli-budget-reproduction-build.log.gz",
+      "observed_result": "passed-real-cli-build",
+      "bytes": 14253,
+      "sha256": "35ad276ed13b7ca0d964a71647370013247b4bf933ffc01a9c9ffe0a934b1023"
+    },
+    {
+      "log": "readiness-probe-init-budget.py.gz",
+      "observed_result": "probe-source-real-cli-no-host-provisioned",
+      "bytes": 3802,
+      "sha256": "af5094cc5dc0bb3b25e789718c369bd8bc9c931a6476d0b110b1d024960b4203"
+    },
+    {
+      "log": "readiness-init-budget-red.log.gz",
+      "observed_result": "reproduced-missing-budget-with-real-cli",
+      "bytes": 1285,
+      "sha256": "0763999c4e476e8b54b986b18789c7d39a80ca5bc5fe99b599d8e7b9479a0e5a"
+    },
+    {
+      "log": "readiness-init-budget-green.log.gz",
+      "observed_result": "passed-budget-boundary-no-native-execution",
+      "bytes": 1347,
+      "sha256": "f111161ae13f4da617d9af4e6c3473a0be48fa0793b348ada37fe52513e6d276"
+    },
+    {
+      "log": "readiness-init-budget-provenance.json.gz",
+      "observed_result": "probe-source-and-cli-binary-identities",
+      "bytes": 780,
+      "sha256": "f71c82f9674a31b28bfe4953970b226014f0d736801d94edadb25c771284b283"
+    },
+    {
+      "log": "readiness-postgres-budget-python.log.gz",
+      "observed_result": "passed-two-existing-python-tests",
+      "bytes": 100,
+      "sha256": "fe008aab760eb03ccac7578e2b84665b1b50b0d7f855b17a0c7a8d039435b658"
+    },
+    {
+      "log": "readiness-native-qualification-postgres-budget.log.gz",
+      "observed_result": "interrupted-exit-143-for-kani-source-repair",
+      "bytes": 299,
+      "sha256": "0039cc5a882f9a4bf196e7ef3154ccefc00983d5ad3ffb4e0366a8341265b613"
+    },
+    {
+      "log": "readiness-kani-cold-prerequisite-red.log.gz",
+      "observed_result": "failed-missing-prerequisite-provisioning-regression",
+      "bytes": 1982,
+      "sha256": "e3b6955c9d058059b7db2f825a309db8dfb16c93bbe0d20aa9a6b754ab50578a"
+    },
+    {
+      "log": "readiness-kani-cold-prerequisite-green.log.gz",
+      "observed_result": "passed-three-installer-regressions",
+      "bytes": 101,
+      "sha256": "2c37d50a88147ca2ebd5197d74ee37d462dab650d793512e849814c28d5a38f0"
+    },
+    {
+      "log": "readiness-kani-cold-toolchain-probe.py.gz",
+      "observed_result": "probe-source-empty-rustup-home",
+      "bytes": 1382,
+      "sha256": "ca0cc655b5fa5ddd6942ea85750818e0f2756773dc56c212ec87d0d225dd2155"
+    },
+    {
+      "log": "readiness-kani-cold-toolchain-probe.log.gz",
+      "observed_result": "passed-real-cold-provisioning-and-private-crate-compilation",
+      "bytes": 979,
+      "sha256": "a25928eb517eea28d08987b11d51dac3e6d2afd45f6007d4e9b3c86145b79656"
+    },
+    {
+      "log": "readiness-kani-repaired-semantic-controls.log.gz",
+      "observed_result": "passed-real-positive-and-reachable-unsupported-code-controls",
+      "bytes": 46578,
+      "sha256": "943f5cfa53e16f87f4b7fe7583a53ed0bd029000f1d14e54d30e1272e72e6213"
+    },
+    {
+      "log": "readiness-kani-cold-workflow-controls.log.gz",
+      "observed_result": "passed-formal-workflow-controls",
+      "bytes": 39,
+      "sha256": "ef4928c704e54506c3368bde07c627c61597511a2b83830e5342685da386652f"
+    },
+    {
+      "log": "readiness-kani-cold-version-controls.log.gz",
+      "observed_result": "passed-version-controls",
+      "bytes": 29,
+      "sha256": "cea8eec24c4a85818d5fa4cca2ec0d87013bca2671be3a8c7249808e605c4c23"
+    },
+    {
+      "log": "readiness-native-qualification-cold-kani.log.gz",
+      "observed_result": "passed-21-checks-source-62118f904e",
+      "bytes": 539,
+      "sha256": "e994dd665da5c3aa8de08b4c755a20bc91701877a7c726652f3552cbc5e20d00"
+    },
+    {
+      "log": "readiness-41c3-runtime-mutants.log.gz",
+      "observed_result": "passed-77-tested-69-caught-8-unviable-41c33618d7",
+      "bytes": 136080,
+      "sha256": "7567d8c9d148ad1bc352e9d17159d13b500afe9ad86e3dc696bfcc00c22fc4f6"
     }
   ]
 }
