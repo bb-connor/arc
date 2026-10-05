@@ -1,6 +1,6 @@
 # Design: authority fault classification for the recovery lane
 
-- Status: PROPOSED (revision 3, re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
+- Status: PROPOSED (revision 4, 2026-10-05, after PR #1174 review round 1; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
 - Date: 2026-10-04
 - Scope:
   - Classify recoverable authority denials (missing scope, exhausted budget, expired capability, required approval) into a closed, kernel-signed fault class with anti-oracle rules.
@@ -28,6 +28,12 @@
   - Recovery doc features with no code in W: are marked "doc-only". V: W1-W4 work APIs remain contract anchors.
 - Origin: lessons from the FTL (nuta/ftl) review
 - Siblings: `2026-10-04-ftl-lessons-program-design.md` (umbrella), `2026-10-04-closed-kernel-abi-design.md`, `2026-10-04-typed-reservations-design.md`, `2026-10-04-authority-space-teardown-design.md`, `2026-10-04-unified-event-queue-design.md`, `2026-10-04-opaque-adapter-context-design.md`, `2026-10-04-microkernel-isolation-backend-design.md`
+
+## Revision 4 changes
+
+From round 1 of the PR #1174 review (dispositions at the end of this spec):
+- **R6 no longer gates emission.** Active-defense lookups never run on the classification path. Whether a block is emitted no longer depends on whether the suspension or issuance-freeze authority is installed or online, which A5 requires. The fail-closed checks stay where authority would be granted: linked-workflow creation and capture (section 6.3 step 4).
+- **A dead successor can be replaced.** Uniqueness now covers the *open* successor and the one successor that *captures*. A successor cancelled without capture frees the slot, up to a bound (sections 6.2 and 6.4).
 
 ## Revision 3 changes
 
@@ -139,12 +145,14 @@ Non-goals:
 3. **R3. Expiry.** `CapabilityExpired` is detected before revocation (`:239` precedes `:251`). On the fault path the kernel MUST also run the revocation, delegation and subject checks against the expired token; any failure yields a plain deny with that error.
 4. **R4. Budget.** `BudgetExhausted` is emitted only when it is the final selected error, no candidate grant recorded a guard or governed denial, and no runtime reservation was retained. This closes the precedence at `:716`.
 5. **R5. No fault on a fault.** A request carrying `RecoveryContinuationBinding`, a D1 permit for a recovery continuation, or a capability issued for an `AuthorityContinuation` workflow never yields a fault.
-6. **R6. Active defense.** With active-defense authorities installed, a plain deny results if:
-   - the faulted capability id is suspended;
-   - an issuance freeze covers its tenant and lineage; or
-   - either authority is unavailable.
+6. **R6. Active defense acts at resolution, never at emission.** Classification never consults the suspension or issuance-freeze authority. For a given selected error, whether a block is emitted is the same whether those authorities are absent, installed, online, unavailable or holding history (A5).
+   - **Fail closed where authority is granted.** Active defense is enforced at the two points where new authority could take effect:
+     - linked-workflow creation (section 6.2, store validation step 3, which runs section 6.3 step 4);
+     - capture (section 6.3 step 4).
 
-   The response is indistinguishable from any other non-classified deny.
+     Both refuse when the predecessor capability is suspended, a freeze covers its tenant and lineage, or either authority is unavailable. A successor capability is also ordinary issuance, so it meets the issuance freeze when it is minted.
+   - **A block is an offer, not a promise.** A refusal by active defense is disclosed only to the authenticated recovery actor, as `CHIO-KERNEL-AUTHORITY-REMEDY-REJECTED` with sub-reason `suspended`, `frozen` or `unavailable`. It is never disclosed to the caller through block presence.
+   - **The kernel's own denials are unchanged.** If evaluation itself denies the call because of a suspension or an unavailable authority, the selected error is that denial. It is in the never-resolvable list, so it yields no block. The caller already sees that outcome through `KernelError::report` (A3), so R6 adds no new signal.
 7. **R7. Caller-executed start.** Denials at the authenticated start of a caller-executed tool never classify (M: `2026-09-07-caller-dispatch-commitment-design.md`).
 
 ## 5. Fault block, planner fact, and anti-oracle rules
@@ -243,7 +251,10 @@ capability_unsatisfied ->
 - Its record also carries `predecessor_workflow: WorkflowId` and `predecessor_fault: AuthorityFaultClass`. Host setup writes both from the predecessor's observation, and the incoming command cannot choose either.
 
 **Store validation at creation**, in addition to W:'s existing `validate_seed` rules:
-1. The predecessor exists in the same `authority_domain` and tenant. Its observation recorded the matching unsatisfied `Capability` fact, and it has no successor yet: one successor per predecessor, enforced by a unique index.
+1. The predecessor exists in the same `authority_domain` and tenant. Its observation recorded the matching unsatisfied `Capability` fact.
+   - **One open successor.** At most one successor per predecessor that is not *retired without capture*, enforced by a partial unique index over `predecessor_workflow`.
+   - **What retires a successor.** Its control is `Cancelled` (W: `chio-security-types/src/recovery/observation.rs:164-169`) and the store holds no capture for it. A successor whose seed capability expired during approval, or was revoked before capture, can never capture (section 6.3 steps 1 and 3a). A recovery actor cancels it, which allowed `CancelWorkflow` does, and that frees the slot for a corrected successor.
+   - **Bound.** A predecessor admits at most `max_successors_per_predecessor` successors in total (default 4), counting retired ones. The bound applies on top of recovery intake quotas.
 2. The new seed's `server_id`, `tool_name` and canonical argument hash equal the predecessor seed's, which also equal the fault's `parameter_hash`. The subject is unchanged.
 3. The new seed's capability passes section 6.3 steps 1, 2 and 4.
 
@@ -297,8 +308,9 @@ Each failure is a plain deny with stable code `CHIO-KERNEL-AUTHORITY-REMEDY-REJE
 
 ### 6.4 Single use
 
-Single use comes from the implemented machinery:
-- one successor per predecessor (unique index);
+Single use comes from the implemented machinery plus one capture-time row:
+- at most one open successor per predecessor (partial unique index, section 6.2);
+- at most one successor per predecessor that ever captures. Capture inserts a `successor_captures(predecessor_workflow)` row, under a unique key, in the same serving-writer transaction as the capture. A second successor's capture therefore refuses with sub-reason `cancelled`, even if an earlier successor was retired by mistake;
 - one selected continuation per workflow;
 - `reserve_recovery_call` and `finalize_recovery_call` consume the process slot exactly once (W: `chio-process/src/recovery.rs:83`, `:110`).
 
@@ -355,9 +367,10 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
 | Classifier sees an unknown error | plain deny |
 | Expired token fails revocation, delegation or subject on the fault path | plain deny with that error |
 | Budget denial with a sibling guard denial or a retained reservation | plain deny |
-| Suspended, frozen, or active-defense authority unavailable at classification | plain deny, no block |
+| Faulted capability suspended or frozen, or an active-defense authority unavailable, at classification time | Block emission unchanged (R6, A5). Resolution refuses at creation and capture with `...-REJECTED` (`suspended`, `frozen`, `unavailable`) |
 | No recovery authority installed (`AdmissionOperationStore::recovery_authority()` is `None`), no deployment for the scope, or no registered `Authority` template | block written; planner returns `BlockedByCapability`; plain deny semantics |
-| Linked-workflow creation with a mismatched predecessor, a second successor, or a changed tool or arguments | `CreateWorkflow` refused |
+| Linked-workflow creation with a mismatched predecessor, a second open successor, more than `max_successors_per_predecessor`, or a changed tool or arguments | `CreateWorkflow` refused |
+| Capture by a second successor of the same predecessor | `...-REJECTED` (`cancelled`); the `successor_captures` unique key refuses it |
 | New authority wrong shape, not a subset, or from a non-active issuer key | `CHIO-KERNEL-AUTHORITY-REMEDY-REJECTED` (`shape`, `subset`) |
 | Predecessor capability or its chain revoked, suspended, frozen, or predecessor cancelled at capture | `...-REJECTED` (`revoked`, `suspended`, `frozen`, `cancelled`) |
 | `RecoveryContinuationBinding` presented outside its bound continuation | deny at admission |
@@ -411,7 +424,9 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
   - with an inaccessible template the public result is identical to having no template (P2 filtering);
   - no non-`Authority` kind ever addresses a `Capability` fact.
 - **Store:**
-  - predecessor mismatch, second successor, and changed tool or arguments are refused;
+  - predecessor mismatch, a second open successor, the successor bound, and changed tool or arguments are refused;
+  - a successor cancelled without capture (for example after its capability expired during approval) frees the slot, and a corrected successor is accepted;
+  - a second capture for the same predecessor is refused by the `successor_captures` key;
   - the seed pin (`issuance.rs:76-81`) still holds for the linked workflow.
 - **Proptest.** For random chains and resolver scopes, a linked workflow accepted at capture:
   - is a subset of the resolver's grant;
@@ -431,6 +446,7 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
 - **Anti-oracle.**
   - The block's field set equals the caller-held set (A1).
   - Blocks and explanation projections are identical with and without resolvers configured (A5).
+  - Repeating one classifiable request with active-defense authorities absent, available, unavailable, and holding a suspension of the faulted capability yields the same block every time (R6, A5). Only the recovery actor's resolution result differs.
 - **Process.** A host-side sibling-spawn resolution end to end, with a sibling deployment. The worker cannot drive recovery. The faulted process's history is unchanged.
 - **Fuzz.** An `authority_fault_v2` decode target.
 
@@ -457,6 +473,15 @@ Open decisions:
 4. **Linked workflow versus relaxing the seed pin.** This spec chooses linked workflows. Relaxing `issuance.rs:76-81` to allow a capability swap would touch every recovery invariant that assumes one capability per workflow. Rejected unless the linked-workflow cost (an extra deployment per sibling scope) proves prohibitive.
 5. **Historical freeze windows.** Deny remedies whose issuance falls inside a recorded freeze window. This needs historical freeze queries from active defense.
 6. **Resources and prompts.** Make `OutOfScopeResource` and `OutOfScopePrompt` classifiable in v2.
+
+## Review disposition
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180274506 | Keep fault-block emission independent of authority availability | Fixed now. Classification no longer consults active defense. Fail-closed checks stay at linked-workflow creation and capture, and refusals are disclosed only to the recovery actor | R6; section 7; section 10 anti-oracle tests |
+| 4180731799 | Allow replacement of an unused failed successor | Fixed now. Uniqueness covers the open successor and the one successor that captures. A successor cancelled without capture frees the slot, up to `max_successors_per_predecessor` | Section 6.2 store validation step 1; section 6.4; section 7; section 10 store tests |
 
 ## Appendix A. FTL reference
 

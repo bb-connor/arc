@@ -1,6 +1,6 @@
 # Design: integrity-gated admission
 
-- Status: PROPOSED (revision 1, baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
+- Status: PROPOSED (revision 2, 2026-10-05, after Codex review on PR #1174; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
 - Date: 2026-10-04
 - Scope: make "untrusted data cannot cause a consequential tool call" a property the kernel enforces for any agent framework. It is built from the shipped and implemented knowledge (P4), semantic (P3) and confinement (P5) surfaces:
   - grants declare a required integrity;
@@ -33,6 +33,12 @@
   - the umbrella `2026-10-04-ftl-lessons-program-design.md`;
   - the program specs: `closed-kernel-abi`, `authority-faults`, `typed-reservations`, `authority-space-teardown`, `unified-event-queue`, `opaque-adapter-context`, `microkernel-isolation-backend`, `durable-stop-epoch`;
   - the north-star specs `2026-10-04-pure-admission-machine-design.md` (A) and `2026-10-04-crossing-primitive-design.md` (B).
+
+## Revision 2 changes
+
+- **The join is a real lattice join.** Revision 1's join summed `bounded_bits_total` and chained `H(s1.commitment, s2.commitment)`. So `join(s, s)` doubled the bits, the ordered hash was neither commutative nor associative, and replaying or rebuilding one delivery could push a context over its bound. A context's state is now a canonical, deduplicated set of observations with stable ids. Every field, the commitment included, is a function of that set, and join is set union (section 4, rule I4a).
+- **Summary rows stay exact under the new join.** Per-key heads are maintained for the seven key subsets, so crossing check 4 computes the union over principal, lineage and session by inclusion-exclusion, counting each observation once (I16).
+- **The worker profile is consumed as a verified fact.** Spec 7 rule 6.3.5 defines its qualification and fail-closed behavior. I7 uses only the verified fact and commits the initial influence once, as an observation, when the context's scope is created.
 
 ## 1. Decision summary
 
@@ -119,13 +125,28 @@ pub enum InfluenceOriginV1 {
     ModelProvider { provider: ProviderId },  // operator-bound provider responses
 }
 
-pub struct InfluenceStateV1 {
-    pub origins: BoundedSet<InfluenceOriginV1, 32>,  // union of observed classes; empty means trusted
-    pub bounded_bits_total: u32,                     // sum over ExternalBounded joins, saturating
-    pub unknown: bool,                               // provenance unknown anywhere in the context
-    pub commitment: CanonicalPayloadDigest,          // chains every joined ArtifactInfluenceV1
+/// One joined observation. Its id is stable across replay and rebuild of the same delivery (I4a).
+pub struct InfluenceObservationV1 {
+    pub observation_id: CanonicalPayloadDigest,
+    pub origin: Option<InfluenceOriginV1>,           // None: a trusted observation
+    pub unknown: bool,                               // provenance unknown for this observation
 }
+
+/// Derived entirely from the canonical deduplicated observation set O of a context.
+pub struct InfluenceStateV1 {
+    pub origins: BoundedSet<InfluenceOriginClass, 32>, // { class(o.origin) : o in O }; empty means trusted
+    pub bounded_bits_total: u32,                       // sum of max_bits over distinct ExternalBounded
+                                                       //   observations in O, saturated after exact sum
+    pub unknown: bool,                                 // some o in O has unknown
+    pub observation_count: u64,                        // |O|
+    pub commitment: CanonicalPayloadDigest,            // SetHash over { o.observation_id : o in O }
+}
+
+/// `class` drops `max_bits`: bits are tracked by `bounded_bits_total`.
+pub enum InfluenceOriginClass { External, ExternalBounded, ModelProvider { provider: ProviderId } }
 ```
+
+`SetHash` is an additive homomorphic set hash, such as LtHash or MuHash, over `SHA-256("chio.influence-set.v1\0" || observation_id)`. Its value depends only on the set, not on insertion order. The origin-class space is bounded by the deployment binding (I5): an `IntegrityDeploymentBindingV1` naming more than 30 providers is refused at configuration time, so `origins` never overflows at runtime.
 
 Projection from the implemented record:
 - `unknown` maps to `unknown`;
@@ -134,16 +155,15 @@ Projection from the implemented record:
 
 The proposed refinement adds `ExternalBounded` and `ModelProvider`. It is additive, as W: requires ("requires new native participant evidence before deployment").
 
-Order and join:
+Order and join. The abstract state of a context is its observation set `O`, keyed by `observation_id`, and `state(O)` derives every field above:
 
 ```text
-s1 <= s2  iff  s1.origins subset-of s2.origins
-               and s1.bounded_bits_total <= s2.bounded_bits_total
-               and (s1.unknown -> s2.unknown)
-join(s1, s2) = (origins: union, bounded_bits_total: saturating sum, unknown: or,
-                commitment: H(s1.commitment, s2.commitment))
-bottom = trusted (empty origins, 0 bits, known);  top = unknown
+state(O1) <= state(O2)       iff  O1 subset-of O2
+join(state(O1), state(O2))    =   state(O1 union O2)
+bottom = state({})                (trusted: empty origins, 0 bits, known)
 ```
+
+Join is set union, and every field (the commitment included) is a function of the set. So join is idempotent (`join(s, s) = s`: replaying or rebuilding a delivery adds nothing), commutative and associative. The order implies the field orders: `origins` only grows, `bounded_bits_total` only grows (a sum of non-negative terms over a superset, saturated after the exact sum), and `unknown` only moves from false to true. Two distinct deliveries of the same bounded return are two observations, and both count. One delivery replayed counts once.
 
 The requirement a grant declares:
 
@@ -177,6 +197,18 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
    - confined returns.
 
    The previously unproduced `ArtifactReleaseKindV1::CapturedOutput` becomes the release record for invoke results under enforced knowledge.
+
+   **I4a. Observation identity and dedupe.**
+   - `observation_id = SHA-256("chio.influence-observation.v1\0" || source_kind || "\0" || source_record_digest)`. The source record identifies the delivery, not its bytes:
+     - the output release record (operation id plus output digest), for invoke results and session tool results;
+     - the message id, for mailbox receives;
+     - the artifact version digest, for artifact reads;
+     - the restore record, for model-context restores;
+     - the confined-return record, which binds the child's influence `commitment` (I8), for confined returns;
+     - the verified launch record digest under `source_kind = initial`, for the initial-influence observation (I7).
+
+     A redelivery or a rebuild of one delivery yields the same id. Two deliveries of identical bytes yield two ids.
+   - Knowledge flow rows are unique on `(tenant, isolation_epoch, observation_id)`, and they carry the delivery's principal, lineage and session values. A join inserts with insert-or-ignore semantics. Only a newly inserted row changes the summary heads (I16), so a duplicate join changes nothing.
 5. **I5. Origin assignment.** Origins come from an operator-signed `IntegrityDeploymentBindingV1`, never from the output and never solely from the tool publisher:
    - **Default.** Every route's output origin is `External`. An unbound route is `External`, never trusted (fail closed).
    - **Operator trust.** An operator may bind a route as `Trusted`, for an internal deterministic tool over operator-controlled data, or as `ModelProvider { provider }`. The binding names the server, the tool and the tool server's manifest digest. A manifest change voids it.
@@ -185,14 +217,19 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
 6. **I6. Mailboxes.**
    - A `receive` payload inherits the sender's influence state, recorded at `send` in the same transaction, when the channel has `attest_senders` (M: `MAILBOXES.md:33`).
    - Without sender attestation, its origin is `External`.
-7. **I7. Initial influence of a context.** It comes from the host-sourced `worker_profile` attribution (`2026-10-04-microkernel-isolation-backend-design.md` section 6.3):
-   - **`direct`** starts at `unknown = true`. The worker can ingest anything outside mediation.
+7. **I7. Initial influence of a context.** It comes from the **verified** worker-profile fact (`2026-10-04-microkernel-isolation-backend-design.md` rule 6.3.5), never from the raw attribution.
+   - **Qualification.** The fact is `Verified(kind)` only when the host attribution equals the runner's per-attempt record, the referenced launch record verifies (pinned signer, digest, enforcement state), its attempt equals the context's attempt, and the kind's own predicate holds (spec 7 rule 6.3.5).
+   - **Failure behavior.** Any failure (absent, mismatched, unverifiable, lookup failed, predicate false) is `Unverified` and is treated as `direct` below. A failure can only make the start less trusted.
+   - **Committed once.** The host verifies the fact when the context's knowledge scope is created. In the same writer transaction, it inserts the initial observation (`source_kind = initial`, I4a). Crossings read the committed state and never re-derive it, and a later attribution can only add influence (I2).
+
+   Starting states by verified kind:
+   - **`direct`, or `Unverified`,** starts at `unknown = true`. The worker can ingest anything outside mediation.
    - **`container`** starts at trusted only when the run plan pins every input, the image digest, task input and seeds. Otherwise it starts at unknown.
    - **`split_domain`** starts the controller domain at trusted. Execution-domain results arrive as ordinary tool outputs, `External` unless bound otherwise.
    - **`confined_reader`** is not applicable: it has no tools.
 
    Kernel sessions (MCP edges) start at unknown (section 12).
-8. **I8. Confined returns are bounded, not cleared.** A P5 return joins `ExternalBounded { max_bits }` into the parent, where `max_bits` is the capacity of its return contract (section 10). It does not copy the observation's full influence as `External`, which is today's `returns.rs:383` behavior. The original influence is retained in `commitment`, so history is not reduced (SEC-05).
+8. **I8. Confined returns are bounded, not cleared.** A P5 return joins `ExternalBounded { max_bits }` into the parent, where `max_bits` is the capacity of its return contract (section 10). It does not copy the observation's full influence as `External`, which is today's `returns.rs:383` behavior. The original influence is retained, because the return's observation id binds the child's influence `commitment` (I4a), so the parent's set hash covers it. History is not reduced (SEC-05).
    - This is the one place where the class of a join differs from its source. It is justified because the parent receives only a host-recomputed value of at most `max_bits` bits, and every other channel is withheld (W: `confinement.rs:15-25`).
    - When the contract sets `require_integrity`, the return additionally needs its independently rooted endorsement, as today.
 
@@ -234,9 +271,11 @@ A join and a capture can race. A tool output can be delivered into the same cont
 15. **I15. Inside the intent commit.** Spec B's crossing primitive evaluates `CrossingCheck::KnowledgeIntegrity { key, requirement }` inside the intent commit's writer transaction, before `DispatchCommitted`. For a read-only call there is no intent commit. The same check runs inside spec B's check-only dispatch crossing, which reads the committed influence head in the writer without writing, so read-only tools gated by integrity are covered too. `satisfies` is computed from the influence state as committed in that same transaction.
     - **Join first:** a join that commits first makes the intent commit fail with `InsufficientIntegrity`.
     - **Intent first:** the effect proceeds, and the later join affects only later calls.
-16. **I16. Summary row.** W:'s `observed_influence` scans up to 4,096 join records per call (W: `security_participant_state/knowledge.rs:64-75`). This design adds `knowledge_influence_heads(tenant, isolation_epoch, scope_kind, scope_id) -> InfluenceStateV1`, updated in the same transaction as every join (I4).
-    - Crossing check 4 reads the principal, lineage and session rows and joins them, which is O(1).
-    - A startup check recomputes each row from the journal and refuses readiness on mismatch.
+16. **I16. Summary rows.** W:'s `observed_influence` scans up to 4,096 join records per call (W: `security_participant_state/knowledge.rs:64-75`). This design adds `knowledge_influence_heads(tenant, isolation_epoch, key_subset, key_values) -> InfluenceHeadV1`. `key_subset` is one of the seven non-empty subsets of {principal, lineage, session}. Each head holds exact counters over the observations whose key values match on that subset: a `u64` bit sum, a count per origin class, an unknown count, an observation count and the additive set-hash value.
+    - **Update.** A newly inserted observation (I4a) adds its terms to the seven heads of its key triple, in the same transaction. A duplicate insert changes nothing.
+    - **Read.** Crossing check 4 computes the state of `P union L union S` (I17) exactly, by inclusion-exclusion over the seven heads of the call's triple, for every counter and for the set hash. That is seven row reads, which is O(1), and an observation reachable through several keys counts once. A class is in `origins` when its resulting count is positive. `bounded_bits_total` saturates only after the exact sum. The resulting set hash is the receipt `commitment` (I25).
+    - **Rebuild.** A startup check recomputes every head from the flow rows and refuses readiness on mismatch. Each head is a function of the row set, so a rebuild reproduces it exactly.
+    - **Fallback.** If a deployment ever makes a key kind multi-valued per observation, the check sums the per-key heads instead. That is an upper bound, and it is sound because `satisfies` is antitone: it can only deny more, never less.
 17. **I17. Key semantics unchanged.** The check uses W:'s key semantics: the union of rows matching principal, lineage or session within tenant and isolation epoch. Narrowing is a later decision (section 11).
 
 ```text
@@ -301,7 +340,7 @@ pub enum ConfinedReturnTypeV1 {
 
 ## 12. Surfaces and framework independence
 
-- **Process workers.** These are any framework running as a Chio process (LangGraph, AI SDK, mini-SWE, coding-agent plugins). They get the full guarantee when the worker profile is `container` with pinned inputs, or `split_domain` (I7). The guarantee does not depend on the framework's language or interpreter.
+- **Process workers.** These are any framework running as a Chio process (LangGraph, AI SDK, mini-SWE, coding-agent plugins). They get the full guarantee when the verified worker profile is `container` with pinned inputs, or `split_domain` (I7; spec 7 rule 6.3.5). The guarantee does not depend on the framework's language or interpreter.
 - **Kernel sessions through MCP edges or the sidecar.** These start at `unknown`, because the client's model context includes inputs the kernel never saw.
   - Integrity-gated grants deny there, with `InsufficientIntegrity` and remedy class "run as a mediated process".
   - Grants without the constraint behave as today.
@@ -352,6 +391,8 @@ pub enum ConfinedReturnTypeV1 {
 | No security context for a gated grant | Deny (I13) |
 | Influence port or summary row unavailable | Deny |
 | Summary row mismatch at startup | Not ready (I16) |
+| The same delivery is joined twice (retry, replay, rebuild) | Insert ignored; state unchanged (I4a) |
+| Worker-profile fact unverified | Context starts at `unknown`; gated calls deny (I7) |
 | Unbound route output | Joins `External` (I5) |
 | Manifest digest changed under an operator binding | The binding is void; output joins `External` |
 | Join commits before the intent commit | Intent commit fails `InsufficientIntegrity` (I15) |
@@ -384,7 +425,8 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
 ## 18. Tests and conformance evidence
 
 - **Proptest.**
-  - Lattice laws: join is commutative, associative and idempotent, and monotone (I2).
+  - Lattice laws over generated observation sets that include duplicates and replays: join is commutative, associative and idempotent, and monotone (I2). The bit total and commitment of `join(s, s)` equal those of `s`.
+  - Head maintenance: incremental heads equal heads rebuilt from rows. Inclusion-exclusion over the seven heads equals a direct scan of `P union L union S`.
   - `satisfies` is antitone in state.
   - Attenuation never weakens a requirement (I9).
 - **Loom.** A join racing an intent commit on the same context gives exactly one order. A post-join intent fails (I15).
@@ -393,7 +435,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Unbound routes join `External`.
   - The operator binding is voided by a manifest change.
   - Attested mailbox inheritance.
-  - Initial influence per worker profile.
+  - Initial influence per verified worker profile. Each qualification failure starts at `unknown`.
   - Typed return capacity and projection rejection.
 - **Conformance.**
   - An injected tool output followed by a consequential call is denied.
@@ -406,7 +448,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
 ## 19. Residual risks and open decisions
 
 Residual risks:
-- Channels outside mediation (a `direct` worker reading the network) are the reason such contexts start at `unknown`. A misdeclared worker profile breaks the premise, so the attribution must be host-sourced (spec 7).
+- Channels outside mediation (a `direct` worker reading the network) are the reason such contexts start at `unknown`. A misdeclared worker profile would break the premise, so I7 consumes only the verified fact, and an unverified profile starts at `unknown` (spec 7 rule 6.3.5).
 - Operator-bound `Trusted` routes are a trust decision. A wrong binding admits injection through that route.
 - Bounded returns still carry information, up to `max_bits`. `Identifier` returns of 64 characters can encode short strings, so grants choose `n`.
 - Session-wide keys over-taint (section 11).
@@ -417,6 +459,15 @@ Open decisions:
 3. **MCP clients.** Allow an attested-client profile (a client attests complete mediation inside a TEE) to start trusted, or never?
 4. **Provider origins.** `ModelProvider` as a separate class, or always `External`?
 5. **P5 change.** I8 replaces the copied `External` with `ExternalBounded` on returns. The P5 owners must confirm this matches SEC-05 as intended, since history is retained in `commitment` but the class differs.
+
+## Review disposition
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180435333 | Define an idempotent integrity join | Fixed now. The state is a canonical deduplicated observation set with stable ids, and every field (an additive set hash for the commitment) derives from it, so join is set union. Heads use inclusion-exclusion for exact unions. The lattice-law tests now cover duplicates and replays | Section 4; I4a; I16; section 18 |
+| 4180731791 (with spec 7) | Treat worker profile as an authorization fact | Fixed now. I7 consumes only the verified fact defined by spec 7 rule 6.3.5, commits it once as an initial observation, and starts any unverified context at `unknown` | I7; section 15; section 19 |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

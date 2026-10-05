@@ -192,6 +192,16 @@ Rules:
 
    The per-session `active_request_stream` lock already serializes POST requests, so at most one slot is active, and every server-to-client request emitted during it correlates with it. The broadcast still carries every event for compatibility, but POST streams no longer read request-correlated events from it.
 2. **A2. Non-lossy.** `response` is a `oneshot`, so it cannot overflow. `server_requests` is bounded by `max_pending_server_requests` (default 16). On overflow the writer never drops silently: it answers the excess server request locally with a JSON-RPC error (`-32603`, "server request queue full") through the session input, so the tool sees its elicitation or sampling request fail, and it increments `chio_mcp_remote_server_request_overflow_total`.
+   - **A2a. Receiver loss is treated like overflow.** When the HTTP client disconnects, the POST stream drops the slot's receiving half. The receiver's `Drop` marks the slot `receiver_closed`, and the writer also checks the closed flag on every push. From that point, no server request correlated with the slot can wait forever on a client that is gone. The nested flow's `send_client_request` blocks on client input with no timeout of its own (M: `chio-mcp-edge/src/runtime/nested_flow.rs:207-226`).
+     - Every server request queued in `server_requests` but never yielded to the client is answered locally at once with a JSON-RPC error (`-32603`, "client stream closed before the server request was delivered") through the session input.
+     - Every later server request correlated with the slot is answered the same way when the writer routes it, without queueing.
+     - A server request already yielded to the client stays answerable, because client responses bypass the request lock and reach the session input directly (M: `http_service.rs:362-394`). If no answer arrives within `orphaned_server_request_grace` (default 30 s, measured on the session's monotonic clock), the session answers it locally with "client stream closed; no response within grace".
+     - Each local answer increments `chio_mcp_remote_server_request_orphaned_total`. A local answer is always an error, never a fabricated result.
+     - The nested flow takes its existing error path, so the tool sees its sampling or elicitation request fail and returns. The slot then receives its terminal response, and the completion task (section 4.2) terminalizes the call. A local error for each orphaned request is preferred over cancelling the parent call, because the tool decides whether it can finish without the nested result, as with overflow in A2.
+   - **A2b. The slot owns the request lock.** At registration, the `active_request_stream` guard moves from the stream into the slot. The slot releases it only when its terminal response has been routed, or when the session is cancelled (A12). The response is routed when it is handed to the stream or the completion task, or discarded because both receivers are gone.
+     - A POST that arrives after its predecessor's client disconnected therefore still queues behind the running call. Every server request emitted meanwhile correlates with the right slot (A1).
+     - A2a bounds that wait for a call blocked on the client to at most `orphaned_server_request_grace`.
+     - A call that never talks to the client waits exactly as long as the edge's serial runtime already makes it wait today: a new request is deferred while a nested flow is in flight (`nested_flow.rs:243-254`).
 3. **A3. The stream reads the slot.** The POST stream selects over the slot receiver, the broadcast receiver (notifications only), and the session cancellation token (section 4.5). It emits the terminal response from the slot, then ends. Credential sessions emit only the terminal response, as today.
 4. **A4. Initialize uses a slot.** The initialize handler registers a slot for the initialize request, so its response cannot be lost either.
 
@@ -201,6 +211,8 @@ Rules:
 
 - `register_request_slot` takes the pending credential call and spawns a **session-owned completion task**. The task awaits the terminal response from the slot, runs `finish_call` (through `spawn_blocking`, because it opens SQLite), applies `restrict_response`, and forwards the result to the stream through a second `oneshot`.
 - The task runs whether or not the HTTP consumer survives. A client that disconnects after dispatch therefore leaves the call `completed_unacknowledged`, and a retry with the same `chioRequestId` replays it (`session_credentials.rs:661-688`). Transport loss no longer produces the operator fence.
+- The task never depends on the departed client for progress. A2a fails the call's server requests once the stream's receiver is gone, so a tool blocked on sampling or elicitation returns and the terminal response arrives.
+- The task also selects on the session cancellation token (A12). If the session is cancelled before the terminal response, the task leaves the durable pending fence, which is the honest outcome-unknown case.
 - If `finish_call` fails, the behavior is today's: the task forwards the "credential outcome persistence failed; effect is uncertain" error and leaves the durable pending fence (`http_service.rs:486-493`). That fence now signals a real persistence failure, never a slow reader.
 - Non-credential slots spawn no task; the stream awaits the slot directly.
 
@@ -230,7 +242,12 @@ After A1, lag can skip only notifications. Notifications are re-read hints (list
 - **A13. POST stream on cancel.** A POST stream cancelled before its terminal response emits an explicit JSON-RPC error for its request id (`-32603`, "session ended before the response; outcome unknown") and ends. It never ends silently.
 - **A14. Initialize (`:608`).** The response comes from the slot (A4). A lag while buffering the notifications that precede it fails closed: the handler returns 5xx and runs the existing fail-closed session teardown (`fail_closed_session_after_persistence_error`); the session is never inserted.
 - **A15. Idle collector (`:702`).** A lag appends a resync request (A7) and the collector returns what it buffered. The burst reaches the client on its next stream.
-- **A16. Wedge.** With A1 and A12, a POST stream holding `active_request_stream` always ends: by its slot response, by session cancellation, or by the HTTP client disconnecting (which drops the stream and the lock). The session-owned completion task (section 4.2) is unaffected by the stream ending.
+- **A16. Wedge.** With A1, A2a, A2b and A12, the slot holding `active_request_stream` always completes, in one of three ways:
+  - its terminal response arrives;
+  - the session is cancelled;
+  - the HTTP client disconnects, and A2a fails the call's undelivered and future server requests at once and its delivered ones after the grace window, so the tool can return.
+
+  The stream ending does not release the lock by itself (A2b). The session-owned completion task (section 4.2) is unaffected by the stream ending.
 
 ### 4.6 Retry rule
 
@@ -296,7 +313,8 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 |---|---|
 | Broadcast lag on any stream | Metric, coalesced resync request, burst of re-read notifications (A7-A9). Responses and server requests are unaffected (A1) |
 | Correlated server-request overflow | Excess request answered locally with a JSON-RPC error; never dropped silently (A2) |
-| HTTP client disconnects mid-call | Stream and lock dropped; completion task records the credential outcome (section 4.2) |
+| HTTP client disconnects mid-call | Stream dropped; the slot keeps the lock until the terminal response (A2b); completion task records the credential outcome (section 4.2) |
+| HTTP client disconnects while the tool waits on a server request | Undelivered and later server requests answered locally with an error at once; a delivered one after `orphaned_server_request_grace`; the tool returns and the call terminalizes (A2a) |
 | Session terminates before a response | Explicit outcome-unknown error on the POST stream (A13) |
 | Lag during initialize | 5xx and fail-closed teardown; session never inserted (A14) |
 | `finish_call` persistence fails | Today's uncertain-effect error and durable fence (section 4.2) |
@@ -331,6 +349,11 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
   - a request queued behind a long streaming request receives none of the earlier request's events (A5);
   - GET replay with a notification injected between snapshot and subscribe (test hook): delivered exactly once (A6);
   - server-request overflow answers locally and increments the metric (A2);
+  - **receiver loss (A2a), credential session.** A tool blocks on `sampling/createMessage`, then the HTTP client disconnects:
+    - request not yet yielded: it is answered locally at once, the tool returns, the call ends `completed_unacknowledged`, and the next POST on the session proceeds;
+    - request already yielded: a client POST answer within the grace window reaches the tool; without one, the local error arrives at the grace bound (test clock);
+    - in both cases a later server request from the same call is answered locally without queueing;
+  - after a disconnect, a second POST waits for the first slot's terminal response, and no server request from the first call is routed to the second slot (A2b);
   - session termination mid-call yields the outcome-unknown error (A13); a later POST on the session is not blocked (A16);
   - lag during initialize returns 5xx and the session is absent from the ledger (A14);
   - **D4, fails on current code:** restore, restore again with no intervening write, then emit at least as many notifications as the stale cursor's sequence; replay with the stale cursor returns `409` with the fix, and a negative control that forces seed 0 shows the aliased replay;
@@ -404,7 +427,7 @@ pub enum HintOwnerRef { Session(SessionId), Process(ProcessId), Operation(Admiss
 
 ### 11.3 Rules
 
-Rules H1-H9 bind every surface:
+Rules H1-H10 bind every surface:
 
 1. **H1. Not inputs.** No kernel, guard, policy, budget, recovery or approval path may branch on a hint. Decisions read authoritative stores only. Enforcement (S5-24):
    - an xtask dependency check forbids kernel-core, guard, policy, budget and recovery-decision modules from importing the hint module;
@@ -413,7 +436,7 @@ Rules H1-H9 bind every surface:
 2. **H2. Commit, then hint, per commit class.** A source posts only after its authoritative state commits, through the trailing group (section 11.2).
    - After a crossing-authorizing or restrictive commit (spec 10 section 5), `Committed` implies anchored, so re-reading observes at least the hinted change, across restore.
    - After a progress-only commit (for example a return record), the hint follows `Committed`, but a `Restore(k)` within the anchor lag can undo the hinted change. Consumers re-read and treat an absent change as a resync, never as an error.
-   - A source outside the admission writer (approval store, recovery chain, stop heads) posts after its own commit returns.
+   - A source outside the delivering structure's own transaction (admission store, recovery chain, stop heads, revocation head) posts after its own commit returns. That in-process post is only a latency fast path; delivery is guaranteed by the durable source cursor (H10).
 3. **H3. One pending per subscription, by precedence.** A pending hint is replaced in place by precedence: `SubscriptionEnded` > `ThresholdCrossed` > `Changed`. The pending entry keeps its first sequence number and a coalesce counter. Delivery re-arms.
 4. **H4. Subscribe, then check.** Subscribing inserts an armed entry first. The caller then reads the source level and calls `fire_if_dirty(id, level)`, which posts if the level is already dirty. A post that lands between insertion and the read is captured by the entry; a duplicate hint is acceptable. `SourceLevel` is defined per subject (Operation: terminal recorded; Approval: resolved; Capability: revoked or expired; Budget: threshold crossed; Recovery and Stop: revision or epoch above the caller's last seen; Elicitation: completed). `Resource` and the catalogs have no level: they are edge-triggered and carry no H4 guarantee.
 5. **H5. Reserve on subscribe.** Capacity for one pending hint is reserved before a subscription exists. An explicit subscription that cannot reserve is denied with a typed capacity error. Posting never allocates: pending entries live in a pre-sized ring of capacity `max_subscriptions` (S5-27).
@@ -424,6 +447,25 @@ Rules H1-H9 bind every surface:
    - It may name an artifact only by an audience-scoped opaque handle, never by digest (W: `docs/architecture/recoverable-agent-runtime/06-artifacts-memory.md:9`, `:80`, ART-10).
    - A hint about a confined child is withheld from the parent unless the child's isolation boundary enables a contract-approved status projection (W: `07-confined-returns.md:39`). The P5 profile enables none.
    - A knowledge-protected change never produces a hint and never advances a revision (S5-20).
+10. **H10. Durable source cursors.** Every source that commits outside the delivering structure's own transaction is read through a durable monotonic cursor in its own store, so no crash between a commit and a post loses a hint. The design needs no new outbox, because each source already has a monotonic sequence:
+
+    | Subjects | Durable cursor |
+    |---|---|
+    | `Operation` and `Approval` | The admission store's global commit sequence, `authority_global_commits.commit_sequence` (M: `chio-store-sqlite/src/serving_owner/global_commit_chain.rs:43-50`, projection kind `admission`) |
+    | `Capability` (revocation) | The same chain, projection kind `revocation` |
+    | `Recovery` | `admission_operation_recovery_events.sequence` (W: `admission_operation_recovery.sql:30`) |
+    | `Stop` | The stop chain epoch, through the shared `StopHeads` (spec 8 S1, S24) |
+
+    The rules:
+    - **Tail.** The delivering process holds one in-memory cursor per source and store. It advances the cursor by tailing records above it, every `hint_source_poll_ms` (default 250) and immediately on the in-process notify. Each tailed record maps to its audience and posts. If the source process crashes after its commit and before its notify, the tail still delivers the hint.
+    - **Restore.** If the delivering process crashes, it loses its cursors, and restore re-arms them in this order:
+      1. read each source head;
+      2. post one catch-up `Changed` on every restored subscription;
+      3. tail from the heads read in step 1.
+
+      A change committed before step 1 is covered by the consumer's re-read after the catch-up. A change committed after step 1 is tailed. A change between steps 1 and 2 may arrive twice, which H3 coalesces and H1 makes harmless.
+    - **Subscriptions persist.** When Part B lands, `PersistedSubscription` (A24) generalizes from `uri` to `subject`, under the same persist-before-acknowledge rule. Control subscriptions therefore survive restore and receive the catch-up, exactly as resource subscriptions do (A26).
+    - **Processes.** No cursor is needed: both process sources advance `hint_revision` in the same journal transaction as the change (P1).
 
 ```text
 bounded(s)          -> |pending(s)| <= |subscriptions(s)| + 1
@@ -433,7 +475,7 @@ no_silent_loss(sub) -> committed(c, source(sub)) and c after last_delivery(sub)
 not_authority(h)    -> forall decisions d: h not in inputs(d)
 ```
 
-`no_silent_loss` is scoped to sources that commit in a store the delivering process can observe after a crash (section 12.2 rule P1, section 12.5).
+`no_silent_loss` holds across a crash of either the source or the delivering process. Process revisions commit with their change (P1), and every other source is read through a durable cursor with catch-up on restore (H10). Only sources outside these stores remain uncovered, namely cross-owner hints (section 14).
 
 ## 12. Projection per surface
 
@@ -538,7 +580,7 @@ The recovery lane's durable truth is the hash-chained `admission_operation_recov
 2. **Audience mapping.** A workflow's scope names its original operation. The audience is the session that owns that operation's request namespace (`HintOwnerRef::Operation` resolved per section 11.2). Processes receive no recovery hints (P1).
 3. **Re-read.** The consumer re-reads with `read_recovery_workflow` under its own actor revalidation (W: `recovery_runtime.rs:325-334`). It never issues a recovery command for a hint re-read, because commands consume permanent quota and a repeated `command_id` returns a stale cached response (S5-07). Re-reads are rate-limited per consumer (`min_reread_interval_ms`, default 250); coalescing (H3) already bounds pending hints to one.
 4. **Control states.** `WorkflowControlV1::CancelRequested`, `Cancelled` and `Quarantined` post `Changed` on `Recovery`. A terminal disposition posts no session `Terminal`.
-5. **Crash.** Recovery hints in flight are lost on a crash. On reconnect, a consumer compares the workflow `revision` it last saw with a fresh read (H8). A startup scan from the chain's `sequence` watermark can repost hints for sessions that survive restore.
+5. **Crash.** Recovery hints are delivered by tailing the chain's `sequence` (H10). A recovery component that crashes after committing an event and before notifying is covered by the tail. A delivering host that crashes is covered by the restore catch-up, after which tailing resumes from the head read before the catch-up. A consumer that reconnects still compares the workflow `revision` it last saw with a fresh read (H8).
 6. **Outbox.** If recovery adds the documented outbox, hints project from it instead, with its per-delivery audience recheck. An unavailable hint sink never triggers execution or refund (R: `08:94`).
 
 ### 12.4 Work: hint to re-query
@@ -554,13 +596,13 @@ A `Work { handle_ref }` hint means "re-query `WorkQueryV1::Work`". It is posted 
 
 1. **MCP edge.** Standard subjects keep their `notifications/*` methods and peer gates (`runtime_flow.rs:397`). Coalescing preserves MCP semantics, because those notifications are re-read hints. Control subjects require `chioEvents` (section 12.1 rule 7).
 2. **Terminal ends the stream.** A session `Terminal` hint is written, then the session cancellation token (A12) closes every stream. Later requests follow the WIRE_PROTOCOL 3.3 terminal-state rules.
-3. **A2A.** No change. Any later A2A status push sources from the hint model and inherits H1-H9.
+3. **A2A.** No change. Any later A2A status push sources from the hint model and inherits H1-H10.
 
 ## 14. Cross-owner hints: known gap
 
 In multi-owner work, cross-owner state is poll-only through the W2 work query (assumed shipped, contract anchor). Child accepted, verifier decision recorded, graph head advanced and bilateral co-sign pending have no channel. The P2P push lanes today are revocation epoch roots on iroh lane b (V: `crates/trust/chio-federation-transport-iroh/src/lanes/revocation.rs:1-40`) and an experimental pheromone-only fan-out on lane c (V: `src/lanes/fanout.rs:1-10`).
 
-Direction (not v1): a hint-only direct lane per treaty party reusing the lane admission gate and verified directory (payloads `{subject, kind, owner_revision}`, never authoritative; V: `docs/papers/verifiable-work/PROTOCOL.md:22-25`), or a W2 subscription endpoint with R:'s outbox semantics. Either must hold H1-H9 and must not depend on lane c.
+Direction (not v1): a hint-only direct lane per treaty party reusing the lane admission gate and verified directory (payloads `{subject, kind, owner_revision}`, never authoritative; V: `docs/papers/verifiable-work/PROTOCOL.md:22-25`), or a W2 subscription endpoint with R:'s outbox semantics. Either must hold H1-H10 and must not depend on lane c.
 
 ## 15. Failure modes (Part B)
 
@@ -577,7 +619,9 @@ Direction (not v1): a hint-only direct lane per treaty party reusing the lane ad
 | Host shutdown during a wait | Waiter woken with the current snapshot |
 | Hint about a confined child or a protected change | Withheld (H9) |
 | Second ready session on an edge runtime | Refused |
-| Edge, host or transport crash | Hints in flight are lost; consumers resync from authoritative state (H1, H8) |
+| Source crashes after its commit, before its notify | The delivering process's tail of the source's durable cursor posts the hint (H10) |
+| Delivering host crashes | Restore reads source heads, posts one catch-up `Changed` per restored subscription, then tails from those heads (H10) |
+| Transport loss | Explicit resync: burst, `409` or revision jump (H8) |
 | Forged or tampered hint | Harmless to safety (H1); it can only prompt a re-read |
 
 ## 16. Protocol, schema and wire impact (Part B)
@@ -613,6 +657,10 @@ Part B starts only after Part A ships and a second surface commits to consuming 
 - **`chio-process`:** `inspect` with `after_revision` below current returns immediately; a wait returns on cancel and on a tree threshold crossing; register-before-read never misses a commit between read and wait; a wait ends at credential expiry; over-bound waits return `waited: false` with `retry_after_ms`; shutdown wakes waiters; a disconnected peer's wait is abandoned; waits consume no call budget and produce no receipt; enforced reads perform no write after the first; an old host rejects the new fields and the client falls back to plain `inspect`.
 - **Audience (H9):** no hint reveals confined-child progress or completion; an artifact hint carries no digest; a protected change advances no revision; recovery hints follow chain revisions and a skipped revision forces a `read_recovery_workflow` re-read that issues no command.
 - **Stop:** a stop committed by one kernel produces `Changed` on `Stop` in every session of a host sharing the store.
+- **Crash safety (H10):**
+  - commit an approval and a recovery event, then kill the notifying component before its in-process post: the tail delivers `Changed` within `hint_source_poll_ms`;
+  - kill the delivering host after a source commit and before delivery, then restore: each restored subscription receives a catch-up `Changed`, and a change committed after restore's head read is tailed;
+  - DST over crash points between source commit, notify, tail and catch-up: `no_silent_loss` holds in every interleaving.
 - **chio-conformance:** `chioEvents` negotiated versus not; a revoked capability yields a delivered `SubscriptionEnded`; exactly one terminal per session; a process sees its own cancellation through `inspect` without spending budget.
 
 ## 19. Residual risks and open decisions
@@ -669,6 +717,14 @@ Open decisions:
 | S5-27 | Nit | Applied: pre-sized pending ring (H5); loom target note (18) |
 | S5-28 | Nit | Applied: plain-`inspect` fallback allowed for reads (P5); option A rejection reworded to latency (12.2) |
 | (new) GET replay gap | Found in revision | Applied: subscribe before snapshot (A6) and a test |
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180389985 | Make subscription arming atomic with source changes | Already addressed in revision 4. `subscribe` takes no caller-sampled level. It inserts the armed entry first, then the caller reads the level and calls `fire_if_dirty`, so a post in the window is captured and a post before insertion is visible in the later level read. `Resource` is edge-triggered by declaration | H4; section 12.1 `subscribe`/`fire_if_dirty`; section 18 unit and loom cases |
+| 4180435337 | Make external-source hint posting crash-safe | Fixed now. Processes already had no gap in revision 4 (P1 commits the revision in the change's journal transaction). Sessions now read every outside source through an existing durable monotonic cursor, with restore re-arming in the order heads, then catch-up, then tail | H2, new H10, `no_silent_loss` scope, 12.3(5), section 15, section 18 |
+| 4180731777 | Cancel nested requests when their POST stream disappears | Fixed now. Losing the receiver is treated like overflow: undelivered and later server requests fail locally at once, delivered ones after a grace bound. The slot owns the request lock until its terminal response, so correlation holds and the completion task terminalizes | A2a, A2b, section 4.2, A16, section 8, section 10 |
 
 ## Appendix A. FTL reference
 

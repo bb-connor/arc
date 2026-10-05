@@ -10,7 +10,7 @@
   - It adds no revocation, no closure, and no automatic stop policy.
 - Owners:
   - `chio-kernel`: stop heads, dispositions, readiness, typed `KernelStopped`, the stop-aware reconciliation sweep.
-  - `chio-store-sqlite`: stop chain table, stop-intent latch file, in-transaction checks.
+  - `chio-store-sqlite`: stop chain table, stop-intent journal file, signing obligations, in-transaction checks.
   - `chio-control-plane`, `chio-api-protect` and `chio-mcp-remote`: mounted stop, restrict, resume and status routes; one shared `StopHeads` per store.
   - `chio-cli`: process-host control socket, operator CLI, offline stop.
   - `chio-http-core`: DTOs and handlers.
@@ -69,6 +69,8 @@ The adversarial review (1 Blocker, 15 Major, 11 Minor, 3 Nit) found that revisio
   - Test cases are added for every gap the review found.
   - The Kani totality claim is withdrawn in favor of compiler exhaustiveness plus spec 1's census. Loom models only the writer loop and the heads.
 - **Rollout (S8-24).** Phase 1 is the minimal honest phase that closes EV11 (section 16). Phase 2 is spec 10's `StopEpoch` `CrossingCheck`. The spec 9 dependency is named.
+
+**Codex review (PR #1174, round 1).** S6 lets a stop or restrict fill the last slot, so exhaustion always ends `Stopped`. S19 binds the resume to the stored cooldown origin. S25 keys the intent journal by scope. S37 adds an origin-freshness lease for serving shards. New S38 defines the signing obligation.
 
 ## 1. Decision summary
 
@@ -241,7 +243,8 @@ Normative rules:
    - Stopping a recovery scope never depends on whether a semantic registry is installed. The `installation(&tx, scope)` precondition (W: `semantic.rs:375-376`) applies only to the legacy write path, which migration retires.
 - **S6. Bounds and headroom.**
    - A record is at most 4 KiB, and a scope keeps at most 65,536 records (`bound`).
-   - Every transition other than `Stop` refuses once the scope holds `bound - 1` records. A running head therefore always has room for one `Stop`.
+   - `Resume` and `Relax` refuse once the scope holds `bound - 1` records. `Stop` and `Restrict` may append up to `bound`, because both leave the head `Stopped`.
+   - Only `Resume` produces a `Running` head, and it never takes the last slot, so a running head always has room for one durable `Stop`. Exhaustion therefore always ends `Stopped`. It can never leave a `Running` durable head with a stop that only tier 1 holds.
    - A scope that reaches `bound` is stopped, and stays stopped, until a chain rollover. Readiness reports `stop_chain_exhausted`.
    - A chain rollover is an offline CLI operation authorized like a resume (S19). It archives the chain and seeds a new chain generation whose genesis record's `previous` is the archived chain's final digest.
 
@@ -296,7 +299,7 @@ Rules:
 
 - **S7. Tier 2 decides.** A crossing transaction that observes an effective `Stopped` state for a `Deny` or `Withhold` kind fails with the typed `KernelStopped { scope, epoch, observed_via }`, and makes no state change.
    - The caller follows the path for its disposition and phase (section 8, S15). Every store-level refusal is typed `KernelStopped`, never a generic reason string (S35).
-   - A `Settle` crossing passes only when every effect it completes or settles has a crossing index (`batch_index`, `writer_epoch`) earlier than the stop head's commit. A `Settle` crossing with no prior committed subject is a new authorization and is refused.
+   - A `Settle` crossing passes only when every effect it completes or settles has a crossing index (`batch_index`, `writer_epoch`) earlier than the stop head's commit. A `Settle` crossing with no prior committed subject is a new authorization and is refused. The same subject-before-cut test applies to the closure-fence and revocation checks of `Settle` kinds (spec 10 section 4.2), so a revocation or closure that lands after the effect committed never blocks its settlement.
    - An `AllowIfContainment` crossing passes only when every applicable `Stopped` head has `allow_containment = true` and no host latch applies (S20).
    - P5: a stop committed after the `admit_confined_return` commit and before `sink.deliver` is caught best-effort. The final serialized activity read (spec 10 X5a, kept for cancellation) also consults tier 1 (`durable_heads ∪ process_latches`). The claim limit names this window as tier 1 only.
 - **S8. Issuance is defense in depth.** Capability issuance does not run in the admission writer, so under spec 10 X3 it is `early_only`. A capability minted in the race window still cannot cross, because every crossing is fenced by S7. Every mint path is listed:
@@ -325,7 +328,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 - **S9. Heads first, then the sweep.** Startup runs in this order:
    1. Open the store as serving owner. The anchor is reconciled (M: `rollback_anchor.rs:106-130`).
    2. Check the stop chain table under the schema gate (section 13a). A table that is absent before migration is created by the migration in the same step. A table that is missing when the schema version claims it means not ready, with reason `stop_chain_missing`.
-   3. Read the stop-intent latch (S25). Verify S2 for every scope chain. Install `StopHeads` as the verified heads, overlaid with any unsuperseded intent.
+   3. Read the stop-intent journal (S25). Verify S2 for every scope chain. Install `StopHeads` as the verified heads, overlaid with every unsuperseded intent entry, one per scope.
    4. Run reconciliation. `reconcile_durable_admission_startup` (M: `recovery.rs:108`) is many transactions, not one. Each finalization or release step consults the installed heads:
       - a `KernelStopped` refusal is **Retain**: the operation stays `Finalizing` with output withheld, and the sweep does not record a `deferred_failure` for it;
       - any other error keeps today's behavior.
@@ -480,7 +483,9 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - **Single operator.** A deployment may configure `SamePrincipalAfter { cooldown >= 300 s }` explicitly in signed deployment configuration.
       - The cooldown starts at the first successful authority-time observation at or after the stop commit.
       - A supervised task retries `observe_authority_time` while a stopped head lacks that observation. On success it writes `admission_operation_stop_observations(scope_key, epoch, first_observed_at)` as a progress-only commit.
-      - A stop committed with `DecisionTime::Unavailable` therefore gains a start point as soon as the clock recovers.
+      - A stop committed with `DecisionTime::Unavailable` therefore gains a start point as soon as the clock recovers. The row survives restart, and the next boot's supervised task re-drives a missing one.
+      - The resume record copies the row into `SamePrincipalAfter.cooldown_started`. A resume whose `cooldown_started` does not equal the stored observation refuses.
+      - The row is a progress-only commit. A restore that loses it only restarts the cooldown at the next observation, so it can delay a resume but never shorten the cooldown.
     - **Break-glass.** When authority time is unavailable or below the persisted floor, so that an ordinary resume refuses (S4), a quorum artifact that also carries a signed time attestation may resume.
       - The time source is pinned in signed deployment configuration.
       - The resume is recorded with `DecisionTime::Attested` and `StopAuthorizer::BreakGlass`.
@@ -551,6 +556,24 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
 
 - **Artifact.** Each committed transition produces a signed `chio.stop-epoch.v1` artifact: the `StopEpochV1` body, signed by the serving authority's boot-installed receipt signer (M: `kernel-signing-authority.md:3`, `:29`).
   - In the remote durable profile, the control-plane serving authority that owns the store signs. The edge kernel that relayed the request is named in `requested_via`.
+- **S38. Signing obligation.** `SigningBackend::sign_bytes` is fallible (M: `crates/core/chio-core-types/src/crypto.rs:869`). A stop therefore never waits on the signer, and a resume never commits without its evidence.
+    - `record_digest` and `previous` cover the canonical `StopEpochV1` body without the signature. Attaching the signature later changes no chain digest.
+    - **Stop and Restrict commit first.**
+      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, epoch, state = pending)`.
+      - After the commit and anchor sync, the writer signs the body. It stores the artifact, and marks the obligation `signed`, in a progress-only commit.
+      - A signing failure leaves the stop committed and enforced. The route still returns `stop_durable`, with `evidence: pending`.
+    - **Reconciliation.**
+      - A supervised task retries pending obligations with backoff, and boot re-drives them after S9 step 3.
+      - The trace event and the SIEM export fire only for signed artifacts.
+      - The status route reports `evidence_pending` per scope.
+    - **Resume and Relax sign inside the transaction.**
+      - The writer builds the record and signs it while holding the write transaction, with a bounded timeout (`stop_sign_timeout`, default 2 s). It then commits the record and the signed artifact together.
+      - A signing failure or timeout rolls the transaction back. The head stays `Stopped`, and the route returns `ResumeRefused { reason: EvidenceUnavailable }`.
+      - Holding the writer for at most `stop_sign_timeout` is acceptable for a rare, operator-driven transition that runs in the priority lane (S36).
+    - **No resume over missing evidence.**
+      - `Resume` and `Relax` refuse with `StopEvidencePending` while any earlier record of the scope has a pending obligation.
+      - A scope whose stop evidence is unsigned therefore stays `Stopped`, and the kernel never returns to `ready` for that scope until reconciliation signs the stop.
+      - Only a signed resume can make a head `Running`, so a running head's whole chain is backed by signed artifacts.
 - **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, epoch, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
 - **Status route.** It returns `{ readiness, stopped, scope_heads: [...], host_latch, durability, stop_enforcement, withheld_operations, withheld_volatile }`. The existing `stopped`, `since` and `reason` fields stay as a projection of the kernel-scope head, with `reason` taken from the redacted note.
 - **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }`. Tier 1's epoch can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
@@ -601,20 +624,36 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - Shard readiness requires a replica epoch at or above the origin head epoch, read from the origin at boot. An unreachable origin means the shard is not ready.
     - New shards are seeded with the head before readiness.
     - The operator acknowledgement returns after the origin commit, with per-shard `enforced` status. It never blocks on a dead shard, so stopping stays easy. A shard that misses the fan-out cannot become ready until it catches up.
+    - **Origin-freshness lease.**
+      - A serving tenant shard holds a lease on the origin head.
+      - It renews the lease at least every `shard_origin_refresh` (default 250 ms), either by reading the origin's kernel-scope head epoch or by receiving a fan-out heartbeat that carries it.
+      - The lease lasts `shard_origin_lease` (default 1 s), measured on the shard's monotonic clock, never on authority time.
+    - **Behind.** When a renewal shows an origin head epoch above the replica epoch, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
+    - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds, and returns to service only after a fresh read shows its replica at or above the origin head.
+    - **Acknowledgement bound.**
+      - The origin reports a shard as `enforced` when its replica reaches the stop epoch. Otherwise it reports `fenced_by_lease`, with the time at which that shard's lease expires.
+      - Every shard therefore enforces a kernel stop within `shard_origin_lease` plus one renewal interval, whether or not it can reach the origin.
+    - A resume committed at the origin takes effect in a shard only after that shard replicates it, so a lagging shard errs toward stopped.
 
 ## 13a. Restore, upgrade and downgrade
 
 - **S34. Restore and version rules.**
     - **Anchored transitions.** Stop and resume are restrictive commits, anchored before acknowledgement (spec 10 section 5). A database-only restore to before a stop does not extend the anchor, so `reconcile_startup` refuses (M: `rollback_anchor.rs:106-130`) and the host fails closed.
-    - **Stop-intent latch.** It lives in the lock root beside the anchor (S25). A database-only restore therefore keeps the latch, and the boot honors it.
+    - **Stop-intent journal.** It lives in the lock root beside the anchor (S25). A database-only restore therefore keeps every scope's intent entry, and the boot honors them.
     - **Whole-volume restore.** A volume or VM snapshot that restores the database together with the anchor and the latch silently resurrects a running kernel. Later transitions then reuse epoch numbers, so two different signed artifacts can exist for the same `(authority_id, scope, epoch)`. This is a residual risk. Deployments may enable `stop_epoch_floor_check`: at boot, the head epoch per scope must be at or above the last epoch exported to SIEM or published to federation peers, read from a configured external witness. Otherwise the host is not ready.
     - **Schema version.** Phase 1 bumps the admission schema version from 34 (M: `admission_operation_store.rs:219`), so the open gate refuses older binaries (M: `schema.rs:63-72`). An older binary never runs against a store that has a stop table.
     - **Upgrade.** The migration that bumps the version creates the stop tables in the same transaction. "Absent before migration" is a normal upgrade. "Missing after migration" means not ready (S9).
-- **S25. Stop-intent latch.**
-    - Before the stop transaction begins, the stopping process writes and fsyncs a stop-intent record to a two-slot file, `stop-intent`, in the lock root, using the anchor's slot discipline.
-    - The record holds `{ authority_id, scope, intended_epoch, transition: Stop | Restrict, allow_containment, credential_id_hash or principal }`.
-    - At boot, an intent whose `intended_epoch` exceeds the durable head epoch for its scope makes that scope `Stopped` with `durability: latch_only`. The first write after verification appends the matching record.
-    - The intent is superseded, and its slot rewritten, only after a durable head with epoch at or above `intended_epoch` is anchored.
+- **S25. Stop-intent journal.**
+    - Before a stop or restrict transaction begins, the stopping process records its intent in `stop-intent`, a two-slot file in the lock root. The file uses the anchor's slot discipline: write the whole journal to the inactive slot with a sequence number and checksum, fsync it, then make it current.
+    - **One entry per scope.** The journal is a keyed set: `scope_key -> { authority_id, scope, intended_epoch, transition: Stop | Restrict, allow_containment, credential_id_hash or principal }`. Each entry is that scope's intent latch.
+      - A second intent for a scope that already has an entry merges into it: the higher `intended_epoch` and the narrower `allow_containment` win.
+      - An intent for one scope never overwrites another scope's entry. With tenant A's stop pending as `latch_only` under `SQLITE_FULL`, a stop for tenant B adds a second entry, and a crash restores both.
+    - **Removal.** An entry is removed only after a durable head for the same scope, with epoch at or above the entry's `intended_epoch`, is anchored. A crash between that anchor and the removal leaves a superseded entry. Boot ignores it and then removes it.
+    - **Boot.** Every entry whose `intended_epoch` exceeds its scope's durable head epoch makes that scope `Stopped`, with `durability: latch_only`. The first write after verification appends one matching record per such scope.
+    - **Bound.** The journal holds at most `stop_intent_max_entries` entries (default 4096). Each entry is at most 512 bytes, so a slot stays under 2 MiB.
+      - When the journal is full, a new scope's intent is not recorded. The route returns `stop_not_durable` with `durability: process_only` and reason `stop_intent_journal_full`, and readiness reports it.
+      - Existing entries are never evicted to make room.
+    - **Writer.** The serving owner, which holds the lock root, serializes journal writes. The offline CLI takes the same owner lock (S30).
     - A failed intent write leaves only the process latch (`process_only`). The route reports it.
     - This extends AC6's "publish first" rule from memory to durability.
 
@@ -635,18 +674,23 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | Tier 1 stale (in-process) | Only between `COMMIT` and acknowledgement; tier 2 decides (S24) |
 | Remote edge cannot refresh the head | Fail closed after `stop_head_max_staleness` (section 13) |
 | Crash after commit, before head swap | Restart loads the committed head; the kernel comes up stopped |
-| Chain at `bound - 1` | Resume refuses; a stop can still append (S6) |
+| Chain at `bound - 1` | Resume and relax refuse; a stop or restrict can still append, and the head ends `Stopped` (S6) |
 | Chain at `bound` | Scope stays stopped until offline rollover (S6) |
 | Delayed resume after a newer stop | Refused with `StopHeadMoved` (S31) |
 | Host latch set | Every crossing refuses `Deny` and `Withhold` kinds; containment refused (S20, S23) |
-| Shard misses the fan-out | That shard is not ready until its replica reaches the origin epoch (S37) |
+| Shard misses the fan-out | That shard latches the kernel scope `Stopped` at its next renewal, and is not ready until its replica reaches the origin epoch (S37) |
+| Serving shard loses the origin | Its lease expires within `shard_origin_lease`. It latches the kernel scope `Stopped` and reports `not_ready` with `stop_origin_stale` (S37) |
+| Stops for several scopes pending at once | Each scope keeps its own intent entry, and a crash restores every one (S25) |
+| Intent journal full | `stop_not_durable` with `process_only` and `stop_intent_journal_full`; no entry is evicted (S25) |
+| Artifact signing fails for a stop or restrict | The stop stays committed and enforced, and the route returns `stop_durable` with `evidence: pending`. The obligation is retried, and re-driven at boot. Resume and relax refuse with `StopEvidencePending` (S38) |
+| Artifact signing fails or times out for a resume or relax | The transaction rolls back, and the head stays `Stopped`. The route returns `ResumeRefused { EvidenceUnavailable }` (S38) |
 | Database-only restore behind the stop | Anchor refuses; not ready (S34) |
 | Whole-volume restore | Residual risk; optional external epoch floor (S34) |
 | Older binary | Refused by the schema gate (S34) |
 
 ## 15. Protocol, schema, and wire impact
 
-- **Schemas.** New `chio.stop-epoch.v1` and `chio.stop-control-quorum.v1` under `spec/schemas/`, with codegen and vectors. New store tables: `admission_operation_stop_epochs`, `admission_operation_stop_notes` and `admission_operation_stop_observations`. A schema version bump (S34). The lock-root `stop-intent` file format.
+- **Schemas.** New `chio.stop-epoch.v1` and `chio.stop-control-quorum.v1` under `spec/schemas/`, with codegen and vectors. New store tables: `admission_operation_stop_epochs`, `admission_operation_stop_notes`, `admission_operation_stop_observations` and `admission_operation_stop_signing` (S38). A schema version bump (S34). The lock-root `stop-intent` journal format, keyed by scope (S25).
 - **`spec/PROTOCOL.md` section 8.**
   - Mounted stop, restrict, relax, resume and status routes, with their credential and route results (S30).
   - The status response shape and readiness states (additive fields).
@@ -663,7 +707,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
    - Add a test that asserts the flag is published before `read_authority_time` (M: `construction.rs:1674-1681`), extending the Loom harness `loom_emergency_stop_arcswap` (M: `.loom/harnesses.toml:60`).
    - This spec preserves AC6. It does not close it.
 1. **Phase 1, the minimal honest phase for EV11** (bug-fix lane; legacy evaluator and reconciler; no dependency on specs 9 or 10).
-   - **Durable record.** The kernel-scope chain in the admission serving writer as a restrictive commit (S1, S2); the schema version bump (S34); resume headroom (S6); the stop-intent latch (S25).
+   - **Durable record.** The kernel-scope chain in the admission serving writer as a restrictive commit (S1, S2); the schema version bump (S34); resume headroom (S6); the per-scope stop-intent journal (S25); the signing obligation (S38).
    - **Boot.** Heads before the sweep, with stop-withheld operations retained (S9); `ready_stopped`, with routes served when not ready (S10); durable custody for withheld output (S26).
    - **Enforcement.**
      - Tier 1 at all eleven M: sites, read from `StopHeads` shared per store across every kernel in the host, including api-protect's proxy authority kernel (S11, S24).
@@ -709,16 +753,21 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
     - every `Settle` crossing after a stop references only subjects indexed before it;
     - every `AllowIfContainment` crossing during a stop has `allow_containment` and no host latch.
   - A shard offline during the fan-out, then restarted: it is not ready until caught up (S37).
+  - A serving shard partitioned from the origin, then a kernel stop at the origin: within `shard_origin_lease` the shard refuses `Deny` crossings and reports `stop_origin_stale`. After it reconnects, it serves again only once its replica holds the stop (S37).
 - **Crash injection** (store test hooks).
   - Commit a stop, kill before the head swap, restart: the kernel comes up stopped.
   - Kill mid-resume before commit, restart: still stopped.
   - Kill after the resume commit: running.
   - Write the intent latch, kill before the stop commit, restart: `ready_stopped` with `latch_only`, then the record is appended (S25).
+  - Two pending stop intents (tenant A `latch_only` under `SQLITE_FULL`, then tenant B), kill, restart: both scopes come up stopped, and each entry is removed only after its own scope's record is anchored (S25).
+  - Commit a stop, kill before its artifact is signed, restart: the stop is enforced, the obligation is re-driven, and a resume refuses with `StopEvidencePending` until it is signed (S38).
   - **S8-01:** stop with caller-executed, native and ordinary operations in `Finalizing`; kill; restart. The host serves `ready_stopped`, status answers, resume succeeds, and the outputs are released exactly once.
 - **Failure injection.**
   - Stop under `Overloaded` and per-tenant caps: committed through the priority lane.
   - Stop under `SQLITE_FULL`: `stop_not_durable` with `latch_only`; a restart is stopped.
   - Stop with an unknown commit outcome: `stop_outcome_unknown`; a restart is stopped.
+  - Stop with the signer failing: `stop_durable` with `evidence: pending`, and the stop is enforced. Resume with the signer failing or timing out: rolled back, still stopped (S38).
+  - A full intent journal: the next new-scope stop reports `process_only` and `stop_intent_journal_full`, and no existing entry is evicted (S25).
 - **Multi-kernel.**
   - A stop through one hosted MCP session's route denies tool calls in every other session's kernel.
   - A resume clears them all.
@@ -744,7 +793,8 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - Cooldown start on the first observation (S19).
   - Quorum artifact verification with fewer than `k`, duplicate principals, or a wrong roster digest (S29).
   - S5 migration of a legacy `semantic-stop` record without an installed registry.
-  - Resume headroom at `bound - 1` (S6).
+  - Resume headroom at `bound - 1`, and a stop or restrict filling the last slot ends `Stopped` (S6).
+  - Cooldown: a resume with a mismatched `cooldown_started` refuses, and a lost observation row restarts the cooldown (S19).
   - Constant-time credential comparison.
   - Host latch independence and its containment implication (S20).
   - Tenant attribution, including the `LOCAL_SYSTEM_TENANT_ID` refusal (S33).
@@ -814,6 +864,17 @@ Open decisions:
 | S8-28 | Applied. Citations corrected (`tests/semantic.rs:513`; reconciliation is many transactions; `issue_capability_with_security_context`; installation independence in S5). The spec 10 `:1598` citation is spec 10's to fix |
 | S8-29 | Applied. Trigger wording (S1); salted reason commitment with a separate note table |
 | S8-30 | Applied. Kani totality withdrawn in favor of compiler exhaustiveness and spec 1's census; Loom limited to the writer loop and heads; races through store hooks and DST |
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180274497 | Reserve durable capacity for a final stop | Already addressed in revision 2; tightened now | S6: resumes refuse at `bound - 1`, so a running head always has a slot for a durable stop. `Stop` and `Restrict` may fill the last slot, so exhaustion always ends `Stopped` |
+| 4180274500 | Allow containment to be disabled during an existing stop | Already addressed in revision 2 | S2 records a narrowing stop-over-stopped as `Restrict`; S31 defines `Restrict` (Stopped to Stopped, `allow_containment` true to false, authorized like a stop) |
+| 4180389997 | Define stop behavior when artifact signing fails | Fixed now | S38: a stop commits first with a durable signing obligation; a resume or relax signs inside its transaction or rolls back; resume refuses while any stop evidence is pending; failure-table rows and tests |
+| 4180390001 | Define a cooldown origin for clockless stops | Already addressed in revision 2; tightened now | S19: the cooldown starts at the first authority-time observation after the stop, stored durably in `admission_operation_stop_observations` and re-driven at boot; break-glass covers a clock that never recovers. Now also: resume must match the stored origin, and a lost row only restarts the cooldown |
+| 4180731762 | Persist outstanding stop intents per scope | Fixed now | S25: the intent file is a keyed journal, one entry per scope; entries merge within a scope, never across scopes, and are removed only after that scope's matching transition is anchored; bounded, with no eviction |
+| 4180731782 | Continuously fence shards that lose the stop origin | Fixed now | S37: a renewable origin-freshness lease on the shard's monotonic clock; a shard that is behind or loses the origin latches the kernel scope `Stopped` and goes not ready; the acknowledgement reports `enforced` or `fenced_by_lease` |
 
 ## Appendix A. FTL reference
 

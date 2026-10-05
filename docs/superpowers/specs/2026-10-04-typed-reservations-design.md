@@ -112,7 +112,7 @@ After `mark_dispatch_started` (M: `async_evaluation_core.rs:1711`), four groups 
 
 1. `outcome.record_released()?` for the security dispatch handle, **before finalization** (`:1727`). The security recorder can say `Released` for a call whose receipt is never written (umbrella N2).
 2. Credential commit, then `post_admission_drop_guard.disarm()` (`:1736-1740`). From here the guard's best-effort cancellation receipt in `Drop` (M: `kernel_drop_guard.rs:471`) is unreachable.
-3. `self.read_authority_time()?` (`:1956`). The recovery revalidation at `:1951` cannot fail on this path: finding-recovery grants force durable admission (`kernel/admission_coordinator.rs:564-581`), the durable branch returns at `:1944`, and on the only path that reaches `:1951` revalidation is `Ok(())` (`recovery_gate.rs:589-596`).
+3. `self.read_authority_time()?` (`:1956`). This read feeds only the recovery revalidation. The allow receipt is stamped with `now`, the authority time read at evaluation entry (`:32-33`, passed at `:1972`), so on M: a non-durable receipt's `timestamp` predates the tool's execution. The recovery revalidation at `:1951` cannot fail on this path: finding-recovery grants force durable admission (`kernel/admission_coordinator.rs:564-581`), the durable branch returns at `:1944`, and on the only path that reaches `:1951` revalidation is `Ok(())` (`recovery_gate.rs:589-596`).
 4. `finalize_ordinary_recovery_response` (`:1968`, defined at M: `evaluation_helpers.rs:219`). That function reaches:
    - stream limits and the post-invocation pipeline (M: `responses/finalization.rs:33`, `:34-40`);
    - receipt content (M: `responses/allow_responses.rs:69`) and receipt metadata (`:92`);
@@ -376,6 +376,7 @@ Rules:
    - `commit_terminal_receipt` checks `signed.request_id == binding.request_id`, the operation id (if any), and that the decision is a terminal decision this obligation may record (`Allow`, `DenyDelivery`, `Cancelled`, `Incomplete`, `Withheld`). A mismatch is a `PostEffectError` routed to `fail`, never a discharge.
    - It appends through `record_chio_receipt_during_trace_transition` and mints `ReceiptCommitted` immediately after `append_chio_receipt_with_timeout` returns `Ok` (M: `receipt_persistence.rs:385-400`). Everything after that point is a post-receipt step (rule 15).
    - A refused append returns `Undischarged`, so the caller must call `fail`. A timed-out append is `AppendOutcomeUnknown` (rule 28).
+   - **No transferable token.** `Discharged` is produced only by consuming the obligation it discharges, and it carries that obligation's `binding`. The evaluator runs the region through `run_post_effect(ob, returned)`, which copies `ob.binding` before the call and compares it with the returned `Discharged`'s binding. A mismatch can arise only if two obligations are live in one region, which the evaluator never does: nested child receipts are buffered, not discharged (rule 10). It is an invariant violation, and it fails closed. The output is withheld, the returned `Discharged` is not delivered, `audit_fault` is emitted, and the expected obligation's pre-built fault record sets `LatchScope::KernelEvidence`.
    - `record_durable_outcome` wraps `record_durable_tool_return` and mints `DurableOutcomeRecorded`. The saga and `finalize_durable_tool_return_with_security_release` own the rest. It does not duplicate `ToolOutcomeTerminalEvidenceV1`, which remains the saga's evidence.
 8. **Ownership.** The obligation is minted only by `enter_effect_boundary`. It replaces `mark_dispatch_started`, `disarm`, `mark_dispatch_credential_commit_failed` and `mark_durable_operation_terminalized`, which removes the early disarm at M: `async_evaluation_core.rs:1740` and `nested_flow_evaluation.rs:1495`.
    - The disarm there is partly forced by the borrow checker: the guard borrows `&budget_mutation` and `durable_admission` (`:1692-1710`), and later code moves `budget_mutation.into_charge_result()` (`:1975`) and takes `durable_admission.as_mut()` (`:1891`).
@@ -461,10 +462,11 @@ Rules:
     - attribution metadata;
     - the parameter hash (`allow_responses.rs:106-108`);
     - memory action classification;
-    - the authority-time read currently at `async_evaluation_core.rs:1956`, taken once, before the boundary (harmless, because recovery revalidation cannot fail on this path, section 2.2);
-    - a **pre-built, size-checked fault-receipt template**: the cancellation receipt body with retained markers, missing only the step, code and time fields.
+    - the evaluation-entry authority time (M: `async_evaluation_core.rs:32-33`), carried as receipt metadata `chio_runtime.evaluation_started_at`;
+    - a **pre-built, size-checked fault-receipt template**: the cancellation receipt body with retained markers, missing only the step, code and creation-time fields.
 
     Not hoisted, because they depend on the dispatch:
+    - **the receipt `timestamp`.** It is the time the receipt was created (`spec/HTTP-SUBSTRATE.md:352`). The region reads authority time once, at step `AuthorityTime`, just before receipt content and signing. That value is the receipt `timestamp`, and it also feeds the recovery revalidation at `:1951`, which cannot fail on this path (section 2.2). This corrects M:'s entry-time stamp (section 2.2 item 3) without losing the admission instant, which `evaluation_started_at` keeps. A clock failure here is a post-effect failure, never a pre-dispatch one: the fault receipt is timestamped by its own read at creation, and if that read also fails, the unsigned record of rule 16 is buffered and signed at flush with the flush-time authority time;
     - `extra_metadata["financial"]`, produced after the effect by reconcile and settlement (`receipt_support/receipt_metadata.rs:629-643`);
     - provenance carried in the metadata the post-invocation pipeline returns (`:644`; `responses/finalization.rs:73-113`);
     - the memory-read provenance lookup (`responses/allow_responses.rs:80-85`), which means something different before the tool runs.
@@ -504,7 +506,7 @@ pub enum LatchScope {
 Rules:
 
 16. When `fail` or `Drop` cannot persist its fault receipt and no durable operation covers the call:
-    - the kernel pushes the signed receipt, or an unsigned `PostEffectFaultRecord { observed_at, .. }` if signing failed, into a bounded `unrecorded_post_effect_receipts` buffer (capacity 256);
+    - the kernel places the signed receipt, or an unsigned `PostEffectFaultRecord { observed_at: Option<UnixMillis>, evaluation_started_at, monotonic_elapsed_ms, .. }` if signing failed, into the obligation's own reserved slot of the `unrecorded_post_effect_receipts` buffer (rule 18). `observed_at` is `None` when the authority-time read itself failed; `evaluation_started_at` plus `monotonic_elapsed_ms` then bound the observation instant;
     - it sets `LatchScope::KernelEvidence(record)` at the failure point;
     - it emits `audit_fault`.
 17. **A separate gate, a supervised flusher.**
@@ -513,7 +515,12 @@ Rules:
     - A supervised, single-flight flusher drains the buffer with exponential backoff, including while the kernel is idle. Requests never flush inline and never contend for `receipt_store_write_lock` under `receipt_append_budget` timeouts.
     - On flush, an unsigned record is signed at flush time and carries its original `observed_at` beside the signing time.
     - Readiness and status report `post_effect_fault_latched { buffered, oldest_observed_at }` beside spec 8's `host_latch` (spec 8 S20).
-18. The buffer can grow only from evaluations already past the gate, which is bounded by in-flight concurrency. Records beyond capacity are dropped, each with `audit_fault`. That is the only accepted silent-loss path.
+18. **Reserved evidence slots; no drop path.** The buffer never drops a record.
+    - Each kernel owns a fixed pool of `post_effect_evidence_slots` (default 1024, configurable, at least 1). The buffer's capacity equals the pool.
+    - A non-durable evaluation acquires one slot before `enter_effect_boundary`, as a ledger token (rule 21). If none is free, the call is denied before dispatch with the signed persistence deny and reason `post_effect_evidence_capacity`, and the ledger compensates. Durable calls take no slot, because the saga owns their evidence.
+    - The obligation owns its slot. The slot returns to the pool when the obligation discharges with a committed terminal or fault receipt, or after its buffered record flushes. `Drop` and `fail` buffer only into their own slot.
+    - Every evaluation past the boundary therefore holds a slot, and at most one record per slot can exist, so a buffered record always fits. The bound is per kernel, and so is the buffer. A host that builds one kernel per hosted session (M: `chio-mcp-remote` `session_core/factory.rs:381`) gets one pool and one buffer per session kernel, with no global session limit required.
+    - While a `KernelEvidence` latch is set, new non-durable dispatch is already denied (rule 17), so the pool drains as records flush.
 
 ### 4.9 Work-profile durability rule
 
@@ -537,6 +544,10 @@ entered_effect_boundary(e) and non_durable(e) ->
       terminal_receipt_committed(e),
       post_effect_fault_receipt_committed(e),
       post_effect_fault_buffered(e) and latched(KernelEvidence(record(e))))
+
+entered_effect_boundary(e) and non_durable(e) -> holds_evidence_slot(e)    (rule 18)
+buffered_records(kernel) <= post_effect_evidence_slots(kernel)
+receipt_timestamp(e) = authority_time_at_receipt_creation(e)              (rule 14)
 
 entered_effect_boundary(e) and durable(e) ->
     (durable_outcome_recorded(e) or admission_terminalized(e) or reconciliation_enqueued(e))
@@ -693,7 +704,8 @@ The gate inherits the hardening toolchain's GT1 limitation (hardening gates not 
 | Security `record_released` fails | `?` before finalization, guard armed | runs after the receipt; `DeliveryFailedAfterReceipt`, output withheld, receipt stands |
 | Credential commit fails after tool `Ok` | ambiguous receipt from guard `Drop` | `fail(CredentialCommit)`, synchronous |
 | Transport-failure arm cannot build its receipt | bare `Err` after disarm | `fail(TransportFailureReceipt)`: fault receipt from the template, else buffer and latch |
-| Authority time fails | bare `Err`, no receipt | hoisted before the boundary: pre-dispatch failure, compensates and denies |
+| Authority time fails at receipt creation | bare `Err`, no receipt | `fail(AuthorityTime)`: fault receipt timestamped by its own read; if that read also fails, the unsigned record goes into the call's reserved slot, the `KernelEvidence` latch is set, and the flusher signs it at flush time (rules 14, 16) |
+| No free evidence slot | not applicable | denied before dispatch with `post_effect_evidence_capacity`; the ledger compensates (rule 18) |
 | Post-invocation error, stream limit, output contract | bare `Err`, no receipt | deny-delivery receipt, retained markers |
 | Revocation seen at persistence | bare `Err`, no receipt | deny-delivery receipt |
 | Budget reconcile or payment settlement fails | bare `Err` or discarded release result | fault receipt carrying the reached financial and settlement state (rules 13, 27) |
@@ -712,6 +724,7 @@ The gate inherits the hardening toolchain's GT1 limitation (hardening gates not 
 - `spec/PROTOCOL.md` section 6 gains one sentence: a call that reached the effect boundary without durable admission yields its terminal receipt or a cancellation or deny-delivery receipt carrying `chio_runtime.post_effect_fault`.
 - One optional receipt metadata object, `chio_runtime.post_effect_fault = { step, code, retained_ids, original_receipt_id, observed_at }`. It needs no registry change, because `chio_runtime` keys are not registry-scoped. `observed_at` differs from the signing time only for records signed at flush.
 - One optional settlement field, `release_outcome`, on the two monetary finalization paths (rule 27).
+- One optional receipt metadata key, `chio_runtime.evaluation_started_at`. A non-durable receipt's `timestamp` becomes its creation time, as `spec/HTTP-SUBSTRATE.md:352` defines it, instead of M:'s evaluation-entry time (rule 14). Verifiers are unaffected, because the field's type is unchanged; consumers that ordered by admission time read `evaluation_started_at`.
 - `PostEffectRejection` codes come from the `chio-errors` registry, which also advances the parent design's one-registry goal (CA7).
 - Some calls that returned a bare error now return a signed `Deny`, `Cancelled` or `Withheld` response. `DeliveryFailedAfterReceipt`, `PostEffectFaultLatched` and `DurableOutcomePending` are new Rust API variants. Readiness gains `post_effect_fault_latched`.
 - No negotiation. Receipts stay valid under v1 verifiers.
@@ -767,6 +780,7 @@ Following the RFC-0002 precedent, each phase ships as the only behavior.
 - **loom** (`tests/loom_concurrency.rs`):
   - a latch set races a new-dispatch check, and a check ordered after the set must deny;
   - the flusher is single-flight under contending requests;
+  - slot acquisition races a latched flush: no evaluation passes the boundary without a slot, and a record always fits;
   - compensation and outbox recovery proceed while latched.
 - **Unit:**
   - each rule 13 row produces its decision, metadata and registered code;
@@ -774,6 +788,9 @@ Following the RFC-0002 precedent, each phase ships as the only behavior.
   - the ledger unwind order equals `handle_pre_dispatch_drop`;
   - the ledger-to-participant mapping (section 4.12) is total;
   - a tool output large enough to fail the terminal receipt cannot fail the fault receipt;
+  - a slow tool's receipt `timestamp` is at or after the tool's completion, and `evaluation_started_at` is at or before dispatch;
+  - slot exhaustion denies before dispatch with `post_effect_evidence_capacity`, and compensation runs;
+  - a `Discharged` whose binding differs from the region's obligation is never delivered and sets the `KernelEvidence` latch;
   - a panicking host observer during `Drop` does not abort;
   - a payment release failure is recorded in settlement metadata;
   - work-profile installers refuse without durable coverage and refuse `SideEffecting` with retention.
@@ -802,7 +819,7 @@ Residual risks:
 
 - Rust types are affine. `post_effect -> Discharged` closes the evaluator body, and the gate covers the obvious spellings of `forget` and leaks, but `Drop` remains a runtime backstop.
 - A crash in the non-durable post-effect region stays unrecorded. The latch buffer is in memory.
-- While latched, the buffer drops records beyond 256, each with `audit_fault`.
+- The buffer has no drop path, because every non-durable call past the boundary holds a reserved slot (rule 18). The cost is that slot exhaustion denies new non-durable dispatch before the boundary.
 - A post-receipt delivery failure leaves an `Allow` receipt for output the caller never received. That is by design: terminal truth is the decision, and `DeliveryFailedAfterReceipt` names the receipt for reconciliation.
 - A connection that misdeclares a mutating tool as `ReadOnly`, or a deployment that selects `Monetary`, still avoids durable admission outside work and process profiles. This design records those calls; only durable coverage makes them crash-safe.
 - GT1: the gate is local-only until the hardening gates run in hosted CI.
@@ -847,6 +864,15 @@ Open decisions:
 | S3-24 rule 19 denies reads on work-profile kernels | Minor | Applied: rule 19 side effect stated, installer requires `All`; spec 9 eligibility exclusion delegated to spec 9 (section 4.12) |
 | S3-25 stale cross-references | Nit | Applied here: 11 commits corrected to 10 (section 10). The references in specs 9, 10 and the umbrella are owned by those files; see the report to the parent |
 | S3-26 counts and paths | Nit | Applied: 16 `disarm()` calls including `kernel_drop_guard.rs:217`; proptest path `src/kernel/tests/drop_guard_proptest.rs` |
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180274493 | Propagate failures from the discharge step | Already addressed in revision 4. Security release runs after the receipt in `Discharged::deliver`, which returns `Result<ToolCallResponse, DeliveryFailedAfterReceipt>`; output is withheld and the receipt stands. `fail` records `OutcomeUnknownAfterDispatch` | Section 4.4; rules 9 and 15 |
+| 4180274494 | Preserve receipt creation time after tool execution | Fixed now. Authority time is no longer hoisted. The receipt `timestamp` is read at receipt creation (step `AuthorityTime`), which also corrects M:'s evaluation-entry stamp. The entry time travels as `chio_runtime.evaluation_started_at` | Section 2.2 item 3; rules 14 and 16; section 6; section 7 |
+| 4180274499 | Do not discard overflowed post-effect records | Fixed now. Each non-durable evaluation reserves an evidence slot before the boundary, or is denied before dispatch. The buffer's capacity equals the slot pool, so a record always fits and the drop path is gone | Rules 16 and 18; section 4.11; section 11 |
+| 4180274502 | Bind each discharge token to its obligation | Already addressed in revision 4: there is no free token. `Discharged` comes only from consuming its own obligation, and `commit_terminal_receipt` checks request id, operation id and decision. This round adds a fail-closed runtime binding check in `run_post_effect` | Rule 7; section 9 |
 
 ## Appendix A. FTL reference
 

@@ -195,7 +195,7 @@ On the same tree:
 | Sealed hierarchical ledger | Grant invocations, monetary caps, aggregate families, process shares, D1 slots, S1 pools, finding pool | One never-refunded ledger with `Commitment` entries (spec 3) and named release authorities |
 | Fence | Emergency and semantic stop, overlays, suspension, freeze, process, workflow and work cancel | A fence row checked by bet 2's crossing primitive. Reversible (stop, overlay) or terminal (closure) |
 | Hash-chained log | Receipt log, global commit chain, recovery events, keyring log, stop chain | One append-only log type with C2SP checkpoints (bet 6) |
-| Hint | Session late events, mailbox waits, recovery events, plus pheromone and SIEM for observability | Spec 5's `HintSubject` with rules H1-H9 |
+| Hint | Session late events, mailbox waits, recovery events, plus pheromone and SIEM for observability | Spec 5's `HintSubject` with rules H1-H10 |
 
 **Why.**
 - The user-visible concept count drops from about 40 to about 15 (internal brief section 5).

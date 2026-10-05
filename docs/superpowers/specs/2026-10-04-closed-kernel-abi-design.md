@@ -208,7 +208,7 @@ pub enum KernelOp {
 pub const KERNEL_ABI_VERSION: KernelAbiVersion = KernelAbiVersion { major: 1, minor: 0 };
 ```
 
-`KERNEL_ABI_VERSION` has not been published. Version 1.0 is defined as the first published set, which holds all 29 ops. If phase 0 lands before W: merges, 1.0 holds ops 1-27 and the W: merge adds 28 and 29 as 1.1, a minor bump under R3.
+`KERNEL_ABI_VERSION` has not been published. Version 1.0 is defined as the first published set. If phase 0 lands after W: merges, 1.0 holds all 29 ops. If it lands before, which is the expected order, 1.0 holds ops 1-27 and the W: merge adds 28 and 29 as 1.1, a minor bump under R3. Either way, the inventory holds only symbols present in the gated tree (section 10, phase 0).
 
 Revision 1's entry-point table still holds for the `main` surface. Changes for the union surface:
 
@@ -363,11 +363,11 @@ H11 measures name/version pairs. Revision 1's numbers were distinct names; this 
 
 ## 10. Rollout and migration
 
-1. **Phase 0 (registry).**
-   - Land `abi.rs` with 29 ops and the inventory classifying all 254 union names.
-   - L1 rows record `chio.process.abi.v4` for the M ∪ W union.
-   - L3 rows are pinned to W:'s `RecoveryCommandBodyV1`, endpoints and `RecoveryPermission`.
-   - L2 rows stay `assumed-shipped`, carrying the contract-anchor variant names, until W1 code lands.
+1. **Phase 0 (registry).** The inventory is generated from the tree being gated, never from the union. The census fails on "a catalog row with no symbol" (section 7.1), so a row joins in the same change that lands its symbol.
+   - **On the landing tree.** `abi.rs` declares only the ops whose entry points exist there. Landing before W: merges gives ops 1-27 as `KERNEL_ABI_VERSION` 1.0 (section 5), and the inventory classifies only the names present: the M: surface, plus V:'s if #1173 has merged. L1 rows record the process ABI that tree actually defines (M:'s `PROCESS_ABI` version 3, broker routes).
+   - **With the recovery merge.** The W: merge adds ops 28 and 29, their 24 live methods and one test-gated method, the L3 rows (W:'s `RecoveryCommandBodyV1`, endpoints and `RecoveryPermission`) and the L1 union row `chio.process.abi.v4`, all in the merge that lands those symbols. That is 1.1, a minor bump under R3.
+   - **The 254-name union** (section 5) is the target inventory for M ∪ V ∪ W. It is not a phase 0 precondition.
+   - L2 rows stay `assumed-shipped`, carrying the contract-anchor variant names, until W1 code lands. They are catalog-only and exempt from the symbol check until then, with the exemption listed on each row.
    - Add PROTOCOL 8.6.
    - Dispositions start as observed behavior. Admit ops with no stop check get `allow`, with rationale "current behavior, decision pending owner review".
 2. **Phase 1 (closure budgets).** The H11 extension and the two budgets at measured ceilings, with dated debt entries.
@@ -424,6 +424,14 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
 10. **Settlement and stop placement.**
     - Settlement and provider finality map to `Reconcile`, not a new op. They record facts about an already-dispatched continuation and must run during a stop. If owners want `Settle` independently budgeted, it becomes op 30 under a minor bump.
     - `set_semantic_emergency_stop` is a durable, scoped stop outside the kernel (W: `chio-store-sqlite/src/admission_operation_store/semantic.rs:355`). Should `EmergencyControl` adopt its persistence model (EV11/AC6), and should the census register it as a component control op?
+
+## Review disposition
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180274510 | Generate the phase 0 inventory from landed code | Fixed now. Phase 0 generates the inventory from the gated tree. Ops 28-29, the W: rows, the L3 rows and the v4 L1 row join in the recovery merge that lands their symbols (1.1). The 254-name union is a target, not a precondition | Section 10 phase 0; section 5 version note |
 
 ## Appendix: FTL reference
 

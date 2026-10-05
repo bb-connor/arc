@@ -1,6 +1,6 @@
 # Design: confinement evidence for tool servers and workers (microkernel backend exploratory)
 
-- Status: EXPLORATORY (revision 3, re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:)).
+- Status: EXPLORATORY (revision 4, 2026-10-05, after Codex review on PR #1174; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:)).
   - Sections 5, 6, and 7 are PROPOSED and can be reviewed for implementation.
   - Sections 8 and 9 (the microkernel backend and its spike) stay EXPLORATORY. No implementation is authorized there, and the spike is throwaway.
 - Date: 2026-10-04
@@ -35,6 +35,13 @@ Citation convention:
 | FTL | FTL checkout | |
 
 All five count as shipped for this revision. W1-W4 and R: APIs whose code does not exist are labeled "assumed shipped (contract anchor)".
+
+## Revision 4 changes
+
+- **The confinement attestation needs appraisal registration.** On the baseline, `derive_runtime_attestation_appraisal` accepts four schemas and returns `UnsupportedSchema` before local trust policy runs (`main`/V: `crates/economy/chio-appraisal/src/appraisal.rs:711-750`). A trust-policy rule alone could never accept confinement evidence. Section 7 rule 6 adds the verifier family, the inventory entries and an appraisal adapter that re-projects native records.
+- **Every in-scope production receipt binds to exactly one record, whatever the backend.** Revision 3 checked record identity only for receipts carrying `native_launch` and accepted any other receipt under a permitted `tool_origin`. A host could then attest an unrelated Firecracker or container launch. A backend-neutral `confinement_launch` reference covers non-cage tool lanes (rule 5.1.6), and worker-lane receipts bind through `worker_profile.launch_ref`. Section 7 rule 3 now requires exactly one match for every receipt in scope.
+- **The container launch record is signed only after the start succeeds.** A failed start yields a distinct signed `BootstrapFailed` record, and no worker call is admitted before the success record exists (section 5.3).
+- **`worker_profile` is a verified fact, not unqualified evidence.** Integrity admission (spec 11 rule I7) derives a context's initial influence from it, so rule 6.3.5 now defines qualification, the single place it is checked, and fail-closed behavior: any failure starts the context at `unknown`.
 
 ## Revision 3 changes
 
@@ -192,12 +199,13 @@ FTL's single container mixes both lanes in one domain. Its kernel accepts privil
 
 ### 5.1 `native_launch` is the binding
 
-1. A mediated tool-call receipt claims tool-server confinement only through `native_launch`, bound by the kernel from the connection's prepared receipt (M:`delivery_preparation.rs:27-58`). No other metadata field may claim it. Host attribution may repeat it, and any difference denies (existing behavior).
+1. A mediated tool-call receipt claims tool-server confinement only through a kernel-bound launch reference: `native_launch` for the Linux cage, or `confinement_launch` for any other backend (rule 6). The kernel binds either one from the connection's prepared receipt (M:`delivery_preparation.rs:27-58`). No other metadata field may claim it. Host attribution may repeat it, and any difference denies (existing behavior, extended to `confinement_launch`).
 2. **Absence disclosure.** A receipt without `native_launch` renders as "not confined by Chio" (ADR-0011 wording), never as unknown-but-safe. The reason comes from the receipt's existing `tool_origin`, so no new field is needed:
 
 | `native_launch` | `tool_origin` | Rendered disclosure |
 |---|---|---|
 | present, referenced cage receipt `FullyEnforced` | any | confined by Chio (Linux cage) |
+| absent, `confinement_launch` present and its record `FullyEnforced` | any | confined by Chio (named backend) |
 | absent | `ChioInternal` | in-process tool; not sandboxed by Chio |
 | absent | `CallerExecuted` | caller-executed; not sandboxed by Chio |
 | absent | `HostExecutedProviderReported`, `HostExecutedUnmediated` | host-executed; not sandboxed by Chio |
@@ -215,6 +223,8 @@ receipt.native_launch = ref ->
 
 absent(receipt.native_launch) -> disclosure(receipt) = not_confined(tool_origin)
 ```
+
+6. **Backend-neutral reference.** A tool-lane backend other than the Linux cage (`FirecrackerGuest` today) claims confinement only through `confinement_launch { record_schema, record_sha256, attempt_id }`. The kernel binds it from the connection's prepared delivery under rules 1, 3 and 5, exactly as it binds `native_launch`: only when the referenced record verifies, is `FullyEnforced`, and has not exited at dispatch readiness. Until a backend's dispatch path binds this reference, its records cannot cover production receipts (section 7 rule 3).
 
 ### 5.2 Confinement record (verifier-side projection)
 
@@ -276,13 +286,17 @@ Mapping per backend:
 
 The process-container profile (M:`PROCESS_CONTAINERS.md:44-57`) is enforced by Docker under a trusted engine and kernel, but nothing signed attests it. Its evidence lives in the private `runner.db`. So it cannot reach `FullyEnforced` today. Proposal:
 
-1. After the container is created and before the start request, the runner inspects the exact owned container ID it already commits (M:`PROCESS_CONTAINERS.md:76-80`). It compares the effective host configuration against the fixed profile:
+1. **Inspect before start.** After the container is created and before the start request, the runner inspects the exact owned container ID it already commits (M:`PROCESS_CONTAINERS.md:76-80`). It compares the effective host configuration against the fixed profile:
    - capabilities dropped and `no-new-privileges`;
    - seccomp profile and network mode;
    - read-only root and the mount set (exactly the socket inode plus the tmpfs mounts);
    - limits, user, and the rejected image volumes.
-2. If every field matches, the runner signs `chio.process.container-launch.v1 { process_id, attempt, image_id, container_id, engine_identity, profile_digest, inspected_config_digest, started_at }`. Any mismatch is a launch failure. There is no unsigned fallback.
-3. The record's state uses `CageEnforcementState`. A failed inspection maps to `Rejected`, and a start failure maps to `BootstrapFailed`.
+
+   Any mismatch signs a `Rejected` record (step 4), removes the container, and never issues the start.
+2. **Start, then confirm.** The runner issues the start for that exact container ID. It then inspects again and requires the same container ID, `State.Running`, an engine-reported `StartedAt`, and an `inspected_config_digest` equal to the pre-start one.
+3. **Sign success only after the start.** Only after step 2 confirms does the runner sign `chio.process.container-launch.v1 { process_id, attempt, image_id, container_id, engine_identity, profile_digest, inspected_config_digest, state: FullyEnforced, started_at }`. Here `started_at` is the engine-reported start time.
+4. **Distinct failure records.** A failed inspection, a failed start request, or a post-start inspection that does not confirm signs `chio.process.container-launch.v1 { process_id, attempt, image_id, container_id, engine_identity, profile_digest, state, failed_at, failure_class }` with no `started_at`. The state is `Rejected` for a pre-start mismatch and `BootstrapFailed` otherwise, using `CageEnforcementState`. The runner stops and removes a container that started but did not confirm. At most one signed record exists per `(process_id, attempt)`.
+5. **No admission before evidence.** The runner does not mark the attempt ready, and the process host refuses worker-protocol calls on the attempt's credential, until the success record is committed. If signing fails after the start, the container is stopped and the attempt is recorded `BootstrapFailed`. There is no unsigned fallback.
 
 The signer is open decision 2.
 
@@ -347,7 +361,15 @@ Rules:
    - It is attached to receipts the parent produces after the return is admitted, and to the exported evidence of section 6.4.
 3. An absent `worker_profile` renders as `direct` (no claim).
 4. `split_domain` may be recorded only when S5's plan binding exists and the execution tool server IDs in the plan are served under rule 5.1.3.
-5. The field is evidence, never authority. No guard or policy branches on it in v1.
+5. **A verified fact, never a grant.** `worker_profile` grants no authority, and no guard or policy branches on it, with one consumer: integrity admission (`2026-10-04-integrity-gated-admission-design.md` rule I7) uses it to choose a context's initial influence. That makes it an allow-affecting fact for that one purpose, so integrity admission consumes it only in verified form:
+   - **Qualification.** The fact is `Verified(kind)` only when every condition holds:
+     - the host attribution equals the runner's per-attempt record (rule 2);
+     - the referenced launch record verifies: pinned signer, canonical digest equal to `launch_ref.record_sha256`, and state `FullyEnforced` (for `confined_reader`, `EnforcedRunning` or later);
+     - the record's attempt equals the context's process attempt;
+     - the kind's own predicate holds: for `container`, the run plan pins every input, the image digest, the task input and the seeds; for `split_domain`, S1-S5.
+   - **Where it is checked.** The host verifies the fact once, when the process's knowledge scope is created. It commits the resulting initial influence in the serving writer in the same transaction (spec 11 rule I7). Crossings read the committed state and never re-derive it from attribution.
+   - **Failure behavior.** Any of these yields `Unverified`, which is treated exactly as `direct`: an absent field, an unverifiable or mismatched record, a record lookup that fails, or a kind predicate that does not hold. The context then starts at `unknown = true`, which no integrity requirement satisfies. A failure can only make the starting state less trusted, never more.
+   - **Never upgraded later.** A later attribution can only add influence (spec 11 rule I2).
 
 ```text
 attribution.worker_profile.kind in {container, split_domain} ->
@@ -361,6 +383,10 @@ attribution.worker_profile.kind = confined_reader ->
   exported(boundary(launch_ref.record_id)).state >= EnforcedRunning
   and launch_digest(retained_evidence) = launch_ref.record_sha256
   and boundary.limits = { launches: 1, tool_calls: 0, model_calls: 0 }
+
+initial_influence(ctx) is trusted ->
+  worker_profile_fact(ctx) = Verified(k) and k in {container with pinned plan, split_domain}
+worker_profile_fact(ctx) = Unverified -> initial_influence(ctx).unknown
 ```
 
 ### 6.4 Confined-reader evidence exporter (new requirement)
@@ -383,14 +409,28 @@ P5's evidence is complete, but it is review-custody only. The selected sink rece
 Verifiable work names confinement as a host assumption (V:`delegated_work.rs:4-5`). The finding verifier already has the right shape for a checkable claim: `RuntimeAssuranceBacking` is required whenever `runtime_assurance_tier` is set, and it demands a signed attestation, a signed appraisal, pinned authorities, and a local trust policy (V:`report.rs:101-103`, `verify.rs:1467-1520`).
 
 1. **Confinement attestation profile.**
-   - An exporter emits a `RuntimeAttestationEvidence` (V:`runtime_attestation.rs:25-47`) with `schema = "chio.confinement.record.v1"`.
+   - An exporter emits a `RuntimeAttestationEvidence` (V:`runtime_attestation.rs:25-47`) with `schema = "chio.runtime-attestation.chio-confinement.json.v1"`, registered by rule 6. The records inside its claims keep their own schema, `chio.confinement.record.v1`.
    - `evidence_sha256` covers the canonical `ConfinementRecord` set for the work: tool-lane records for every execution tool server, plus the worker-lane record. For a `confined_reader`, the worker-lane record is the projection of the P5 export (section 6.4), which is the one worker-lane source shipped with measured cage evidence today.
    - `claims` carries those records and their native-record digests.
    - The envelope is signed by the operator's runtime-attestation authority and appraised by the appraisal authority the verifier pins.
 2. **Tier ceiling.** Confinement-only evidence resolves to at most `RuntimeAssuranceTier::Basic`. `Attested` and `Verified` stay reserved for hardware-rooted attestation, which local trust policy decides. See open decision 1.
-3. **Binding to the work.** Inside `RuntimeAssuranceBacking`, the verifier checks that each production receipt carrying `native_launch` references a native record digest present in the attested record set. Every production receipt without it must fall under a disclosed `tool_origin` the agreement permits. The evaluator already receives the production receipts (V:`verify.rs:1467-1473`).
+3. **Binding to the work (backend-neutral).** Inside `RuntimeAssuranceBacking`, every production receipt in the agreement's confinement scope must map to exactly one attested record. The evaluator already receives the production receipts (V:`verify.rs:1467-1473`).
+   - **Scope.** Every receipt whose tool server is an execution tool server named in the run plan, plus every receipt attributed to the worker attempt.
+   - **References.** The map uses only kernel-bound or runner-bound references in the signed receipt, whatever the backend:
+     - tool lane, `LinuxCage`: `native_launch` (5.1);
+     - tool lane, any other backend: `confinement_launch` (rule 5.1.6);
+     - worker lane (`ProcessContainer`, `confined_reader`, or a `split_domain` controller): `chio_process.worker_profile.launch_ref` together with the attribution's `attempt` (6.3).
+   - **Match.** The record matched must have `native_record_digest` equal to the reference's digest and `attempt_id` equal to the reference's attempt. A receipt in scope with no reference, zero matching records, or more than one fails the facet.
+   - **No substitution.** A disclosed `tool_origin` never substitutes for a reference in scope. Only receipts outside the scope, such as in-process `ChioInternal` tools the agreement permits, fall back to the disclosure table. A record attested for an attempt that no in-scope receipt references vouches for nothing.
 4. **Requiring it.** An agreement or finding requires confinement by setting `runtime_assurance_tier = Basic` and adding a trust-policy rule that accepts the schema. Verifiers deny unless the evidence is present (`Unavailable` and `Asserted` never pass a required facet; V:`report.rs:107-110`). The paper's host premise becomes a negotiated, checkable term. No facet is added.
 5. **Scope.** Execution evidence attests local execution only (V:`execution_evidence.rs:1`). A confinement record attests the exporter's own launches, never a remote owner's.
+6. **Appraisal registration (required before rule 4 can pass).** On the baseline, `derive_runtime_attestation_appraisal` accepts four schemas and returns `UnsupportedSchema` for any other before local trust policy runs (`main`/V: `crates/economy/chio-appraisal/src/appraisal.rs:711-750`). The shared trust boundary repeats the closed list (V: `crates/core/chio-core-types/src/runtime_attestation.rs:65-110`), and so does the signed-artifact schema table (V: `signed_artifact.rs:1247-1250`). A trust-policy rule alone therefore cannot accept confinement evidence. One change adds:
+   - the schema constant `chio.runtime-attestation.chio-confinement.json.v1`, `AttestationVerifierFamily::ChioConfinement`, and the adapter id `chio_confinement` (`runtime_attestation.rs`);
+   - arms for them in `verifier_family_for_attestation_schema` and `derive_runtime_attestation_trust_material`;
+   - an arm in `derive_runtime_attestation_appraisal`. Its adapter re-projects every claimed `ConfinementRecord` from its native record (rule 5.2.1), verifies native-record signers against pinned kernel keys, and rejects on any mismatch. Its normalized assertions carry the record digests and cap the effective tier at `Basic` (rule 2) before local policy runs;
+   - the signed-artifact schema table entry, and the entry in the appraisal artifact inventory (`chio-appraisal/src/artifact_inventory.rs:7`).
+
+   The family enum stays closed, and the change is additive. An older verifier returns `UnsupportedSchema`, which fails the facet (fail closed). Carrying the claims under the existing `enterprise_verifier` schema was rejected, because that adapter does not re-project native records and so cannot enforce rule 5.2.1.
 
 ## 8. Microkernel or library-OS backend qualification (EXPLORATORY)
 
@@ -432,7 +472,12 @@ Output: `docs/research/2026-10-ftl-isolation-spike.md`.
 | Referenced cage receipt missing, digest mismatch, untrusted signer, or not `FullyEnforced` | Receipt renders not-confined. Verifier facet fails. Broker and adapted dispatch deny at preparation |
 | Adapted child `Exited` before dispatch | `prepare_delivery` errors. Dispatch denied |
 | Host attribution `native_launch` or `worker_profile` differs from the transport or runner record | Deny (existing rule for `native_launch`, extended) |
-| Container inspection differs from the fixed profile | Launch fails. No unsigned container record |
+| Container inspection differs from the fixed profile | Signed `Rejected` record. The start is never issued. No unsigned record |
+| Container start fails, or the post-start inspection does not confirm | Container stopped and removed. Signed `BootstrapFailed` record. Attempt never ready, and no worker call is admitted |
+| Signing the container success record fails after the start | Container stopped. Attempt recorded `BootstrapFailed`. No call is admitted |
+| An in-scope production receipt has no kernel-bound or runner-bound reference, or matches zero or several attested records | Facet fails, whatever its `tool_origin` |
+| The verifier's appraisal layer does not know the confinement attestation schema | `UnsupportedSchema`. Facet fails |
+| The `worker_profile` fact is unverified (absent, mismatched, unverifiable, lookup failed) | The context starts at `unknown` (spec 11 rule I7). Integrity-gated calls deny |
 | Projection error (unknown schema, missing surface) | No record. A facet requiring it is `Unavailable`, which denies |
 | A future backend reports a `SameDomain` surface | Cannot be `FullyEnforced`. Admission denies |
 | `split_domain` claimed without a plan binding | Attribution rejected. Attempt does not start |
@@ -442,8 +487,8 @@ Output: `docs/research/2026-10-ftl-isolation-spike.md`.
 ## 11. Protocol, schema, and wire impact
 
 - **`spec/PROTOCOL.md` section 6:** document `native_launch`, the verification procedure (5.1.5), the absence disclosure table (5.1.2), and the `chio_process.worker_profile` attribution field.
-- **New schemas under `spec/schemas/chio-wire/v1/security/`:** `confinement-record-v1`, `process-container-launch-v1`, and `confined-reader-evidence-v1` (section 6.4). Register `chio.confinement.record.v1` as a runtime-attestation schema identifier. Positive and negative vectors, plus codegen, follow hardening design 10.1.
-- **No new top-level receipt metadata key, no receipt kind, and no finding facet.** All additions are additive, and older verifiers ignore them.
+- **New schemas under `spec/schemas/chio-wire/v1/security/`:** `confinement-record-v1`, `process-container-launch-v1` (success and failure forms), and `confined-reader-evidence-v1` (section 6.4). Register `chio.runtime-attestation.chio-confinement.json.v1` as a runtime-attestation schema, with its verifier family and appraisal adapter (rule 7.6). `chio.confinement.record.v1` stays the schema of the records inside its claims. Positive and negative vectors, plus codegen, follow hardening design 10.1.
+- **One new metadata key, `confinement_launch`, beside `native_launch` and bound the same way (rule 5.1.6). No receipt kind and no finding facet.** All additions are additive. Older verifiers ignore the key, and they fail a required facet because they do not know the attestation schema.
 - **`spec/SECURITY.md` section 2.3:** list the disclosure and the worker profiles as controls. The residual-risk sentence stays for `direct` workers and unconfined origins.
 
 ## 12. Rollout
@@ -452,7 +497,7 @@ Output: `docs/research/2026-10-ftl-isolation-spike.md`.
 2. Container launch record (5.3) and the `worker_profile` attribution (6.3) with `direct` and `container`.
 3. The `confined_reader` export (6.4) and attribution. This lands after W: merges, and needs the cage port noted in section 14.
 4. The `split_domain` qualification (S1-S5) and its mini-SWE reference profile.
-5. Confinement record projections and the attestation profile (5.2, 7). The Firecracker projection lands with the finding-worker exporter.
+5. Confinement record projections, the attestation profile and its appraisal registration (5.2, 7). The Firecracker projection lands with the finding-worker exporter and its `confinement_launch` binding.
 6. Microkernel: only on a spike GO, as a separate PROPOSED design.
 
 Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-only stdio launch.
@@ -462,14 +507,19 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
 - **Unit:**
   - the adapted server returns its spawn receipt while alive, and preparation errors after `Exited`;
   - the disclosure table is rendered for every `ToolOrigin`;
-  - `worker_profile` mismatch denies.
+  - `worker_profile` mismatch denies;
+  - each `worker_profile` qualification failure (absent, mismatched, unverifiable record, failed lookup, unpinned `container` plan) yields `Unverified` and an `unknown` initial influence.
 - **Proptest:** projection determinism; `FullyEnforced` is rejected with any `NotEnforced` or `SameDomain` isolation surface, and with any withheld-by-contract channel that is not `Enforced`; native digest mismatch is rejected.
-- **Container:** the inspection comparator rejects each single-field deviation from the fixed profile (capabilities, seccomp, network, mounts, read-only root, limits).
+- **Container:** the inspection comparator rejects each single-field deviation from the fixed profile (capabilities, seccomp, network, mounts, read-only root, limits). A start failure yields a signed `BootstrapFailed` record and no success record. A worker call before the success record is committed is refused.
 - **chio-conformance:** extend `tool_server_escape` (M:`crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs`):
   - a receipt referencing an `Exited` or `BootstrapFailed` cage receipt fails verification;
   - an adapted-server call carries `native_launch`;
   - a `split_domain` attempt whose execution server lacks `native_launch` is rejected.
-- **Verifier:** a finding with `runtime_assurance_tier = Basic` is denied without the confinement attestation, passes with it, and fails when a production receipt references an unattested launch.
+- **Verifier:** a finding with `runtime_assurance_tier = Basic` is denied without the confinement attestation, passes with it, and fails when:
+  - a production receipt references an unattested launch;
+  - an in-scope receipt carries no reference, even under a permitted `tool_origin`;
+  - two attested records match one receipt;
+  - the verifier predates the appraisal registration (`UnsupportedSchema`).
 - **Confined reader:** an export of an admitted P5 return projects to a worker-lane record with `inherited_authority = Absent` and `output_channels` showing only `Value`. An export whose retained evidence differs from the pinned helper or image digest is rejected. An export of a `Cancelled` boundary carries no return evidence.
 - **Adversarial (worker lane):** in a `container` worker, a workload subprocess reads the credential and invokes a tool. The call succeeds and is recorded under `container`, which demonstrates why `split_domain` exists. In a `split_domain` attempt, the execution domain has no socket or credential to read.
 
@@ -498,6 +548,17 @@ Refinements to the review directives, recorded with evidence:
 - `ProcessContainer` is added as directed, but its evidence is currently unsigned and private (`runner.db`). It cannot be `FullyEnforced` until section 5.3 lands.
 - Revision 3 refines the directive "`confined_reader` is stronger than `split_domain`". It is stronger only on the authority axis: its execution domain holds nothing. It is not a substitute profile, because it cannot invoke tools. Section 6.2 keeps both.
 - Revision 3 refines the output-channel directive. The new `output_channels` surface does not let a tool-lane cage claim channel discipline it does not enforce. Tool-lane cages record `NotEnforced` there, so rule 5.2.2 still allows `FullyEnforced` for them only if `output_channels` is excluded from that rule. Rule 5.2.2 therefore applies to the six isolation surfaces. `output_channels` is reported, not gating, unless a return contract (as in P5) claims it.
+
+## Review disposition
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180389982 | Register the confinement schema with the appraisal layer | Fixed now. Adds a verifier family, trust-material and appraisal arms, inventory entries, and an adapter that re-projects records and caps the tier at `Basic`. The `enterprise_verifier` alternative is rejected | Section 7 rule 6; section 11 |
+| 4180389993 | Bind non-cage confinement records to production receipts | Fixed now. Every in-scope receipt must map to exactly one record through `native_launch`, `confinement_launch` or `worker_profile.launch_ref`; `tool_origin` never substitutes | Rule 5.1.6; section 7 rule 3; section 10 |
+| 4180435350 | Sign container launch evidence after start succeeds | Fixed now. Inspect, start, confirm, then sign. A failed start signs a distinct `BootstrapFailed` record, and no call is admitted before the success record | Section 5.3 |
+| 4180731791 | Treat worker profile as an authorization fact | Fixed now. A verified fact with explicit qualification, checked once at scope creation, and fail-closed to `unknown`. Spec 11 rule I7 now cites it | Rule 6.3.5; spec 11 rule I7 |
 
 ## Appendix A. FTL reference
 

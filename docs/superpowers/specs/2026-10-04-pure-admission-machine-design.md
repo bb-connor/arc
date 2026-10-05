@@ -132,6 +132,7 @@ pub struct AdmissionState {
     pub plan: ParticipantPlan,            // ordered participants required for this request (data)
     pub facts: ParticipantFacts,          // which participants are acknowledged, by digest
     pub capture: CaptureFact,             // NotRequired | NotCommitted | Committed | Unknown
+    pub unknown_hold: UnknownHold,        // None | Frozen | Released(UnknownOutcomeRelease); M7a
     pub version: u64,
 }
 
@@ -248,7 +249,7 @@ The cleanup-action queue (`Pending`, `Claimed`, `Completed`, with claim tokens) 
 ```rust
 pub enum AdmissionEvent {
     Begin { binding: BindingDigest, plan_inputs: PlanInputs, ids: IdentityPayload, now: AuthorityTime },
-    Replan { slow_path: bool },               // from Unbegun after spec 10 reports Unavailable
+    Replan { slow_path: bool },               // from Unbegun or Prepared (intent) or Finalizing (outcome) after spec 10 reports Unavailable
     ParticipantAcknowledged { participant: Participant, digest: Digest },
     CombinedAcknowledged { participants: ParticipantSet, digests: DigestSet }, // cumulative approval
     ParticipantRefused { participant: Participant, reason: RefusalCode },
@@ -271,6 +272,7 @@ pub enum AdmissionEvent {
     PostEffectStepFailed { step: PostEffectStep, cause: PostEffectCause },  // M16
     ReceiptAppendFailed { outcome: AppendFailure },                         // M16; spec 10 receipts append
     ReceiptReadBack { original_present: bool },                             // after AppendFailure::Unknown drains
+    ReleaseAuthorized { authority: UnknownOutcomeRelease, evidence: Digest }, // M7a: counterparty-authorized hold release
     Cut { cause: CutCause, facts: CutFacts, now: AuthorityTime },
     Tick { now: AuthorityTime },
 }
@@ -278,6 +280,17 @@ pub enum AdmissionEvent {
 pub enum CommitFailure {  // spec 10 CrossingRefused, plus two non-policy reasons
     KernelStopped, AuthoritySpaceClosed, Revoked, InsufficientIntegrity, ReservationConflict,
     VersionConflict, Unavailable, Overloaded,
+}
+
+pub enum UnknownOutcomeRelease {  // the counterparty-authorized release kinds (V: payment/journal.rs:88-96)
+    MutuallyAgreedUnknown,
+    ContractualCaptureWaiver,
+}
+
+pub enum UnknownHold {
+    None,                                 // no hold, or the operation did not end outcome-unknown
+    Frozen,                               // entered with Terminal(OutcomeUnknownAfterDispatch) while a hold is retained
+    Released(UnknownOutcomeRelease),      // after the ReleaseHold effect is acknowledged
 }
 
 pub enum AppendFailure {   // spec 10 reports the receipts append as Committed, Refused or Unknown
@@ -344,6 +357,7 @@ pub enum Effect {
     CancelTransport,                         // cooperative cancel where the transport supports it
     Compensate { cause: CompensationCause, release: Option<MachineRelease>, receipt: ReceiptPlan, expected_version: u64 },
     Terminalize { terminal: Terminal, release: Option<MachineRelease>, receipt: ReceiptPlan, expected_version: u64 },
+    ReleaseHold { authority: UnknownOutcomeRelease, evidence: Digest, expected_version: u64 }, // M7a; payment-journal port
     FlushChildReceipts,                      // nested flow, before the parent's receipt
     ReplayTerminal,                          // return the bound terminal result
     SignReceipt { decision: ReceiptDecision, metadata: ReceiptMetadataPlan }, // receipts not bound to a state change
@@ -393,7 +407,7 @@ pub enum ReceiptDecision {
 **Release authorities.**
 - The machine emits `PreDispatchNoEffect` (compensation), `TransportNotAccepted` (proven non-acceptance) and `ContractualZeroCharge`.
 - `ContractualZeroCharge` is emitted only in an `OutcomeCommit` or `Terminalize` whose recomputed amount is zero, or whose terminal is `DeniedAfterDelivery` (M: `terminal_payment.rs:121-125`).
-- Releases after an unknown outcome (`MutuallyAgreedUnknown`, `ContractualCaptureWaiver`) mutate the payment journal outside this machine. They never change an admission phase (spec 3; spec 4 section 5 rule 2).
+- Releases after an unknown outcome (`MutuallyAgreedUnknown`, `ContractualCaptureWaiver`) are counterparty-authorized, never machine-originated. They arrive as the typed event `ReleaseAuthorized` and drive the `ReleaseHold` effect (M7a). The payment-journal port executes it and records the release kind (V: `payment/journal.rs:88-96`). When the hold sits on an external rail, the port first runs an `ExternalPrepare { Settle }` crossing (spec 10). The admission phase never changes: `Terminal(OutcomeUnknownAfterDispatch)` stays absorbing, and only the `unknown_hold` fact moves from `Frozen` to `Released` (spec 3; spec 4 section 5 rule 2).
 
 **Compensation causes map to the legacy policy strings** bound into the no-effect proof:
 
@@ -418,34 +432,49 @@ pub enum ReceiptDecision {
 3. **M3. Prepared first.** No step that mutates a participant precedes the `Prepared` step of the same operation (saga rule 1). On the fast path both are in one `IntentCommit`.
 4. **M4. Commit before handoff.** `Dispatch` is emitted only in the transition consuming `DispatchCommitAcknowledged`. For the read-only and `NonDurable` classes it is emitted only on `CheckOnlyAcknowledged`.
 5. **M5. Plan order.** A participant is acknowledged only when every earlier participant in the plan is acknowledged, except through the combined cumulative-approval acknowledgement. `Authorized` is entered exactly when the plan is complete. `Ready` is entered exactly when `ReadyToDispatch` is persisted.
-6. **M6. Absorbing terminals.** No transition leaves a terminal phase. A terminal accepts `Tick` (`Retain`) and `Begin` (`ReplayTerminal`).
-7. **M7. Unknown stays unknown.** `TransportAmbiguous` after dispatch commit moves to `Terminal(OutcomeUnknownAfterDispatch)` with no release, and the receipt carries the typed `AmbiguityCause`. No `Dispatch` follows. Holds stay frozen, and any later release happens in the payment journal outside the machine.
+6. **M6. Absorbing terminals.** No transition leaves a terminal phase. A terminal accepts `Tick` (`Retain`) and `Begin` (`ReplayTerminal`). `Terminal(OutcomeUnknownAfterDispatch)` also accepts `ReleaseAuthorized` (M7a), which changes only the `unknown_hold` fact, never the phase.
+7. **M7. Unknown stays unknown.** `TransportAmbiguous` after dispatch commit moves to `Terminal(OutcomeUnknownAfterDispatch)` with no release, and the receipt carries the typed `AmbiguityCause`. No `Dispatch` follows. A retained hold sets `unknown_hold = Frozen`, and only M7a can release it.
+   - **M7a. Counterparty-authorized release.** `ReleaseAuthorized { authority, evidence }` is accepted only in `Terminal(OutcomeUnknownAfterDispatch)` with `unknown_hold = Frozen`.
+     - It emits `ReleaseHold { authority, evidence, expected_version }`, and the acknowledgement sets `unknown_hold = Released(authority)`.
+     - The driver verifies the evidence (the counterparty's signed agreement, or the contract's capture-waiver term) before it feeds the event. The machine checks only the phase and the hold fact.
+     - A duplicate after release yields `Retain`. In any other phase, or with no frozen hold, the event is illegal (M2) and releases nothing.
+     - This is how a hold frozen by M7, M12 or the cut table is released after migration. It never moves money on the machine's own authority (T4, T6).
 8. **M8. Cuts.** A `Cut` event is classified only by the normative table of section 6.1.
 9. **M9. Liveness protection.** `Prepared` with `nonce_issuance_live`, and `Ready` with `caller_reservation_live`, are retained under `StartupRecovery`, and under `RecoveryClosure` only while control is `Active` (M: `recovery.rs:206-221`; W: `recovery_runtime.rs:213-218`). No other cause is protected.
-10. **M10. Pre-dispatch commit failures.**
+10. **M10. Pre-dispatch commit failures.** Rows match on the failed effect, its starting phase and the reason. The reason is inspected before any generic row applies, so a non-policy reason (`Unavailable`, `VersionConflict`, `Overloaded`) never compensates. Every `CommitFailure` reason has a row for every pre-dispatch effect, so none reaches M2's illegal-event arm.
 
     | Failed effect | Reason | Next and effects |
     |---|---|---|
-    | `IntentCommit` (fused) | `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict` | `DenyTombstone` with the refusing reason, then `Terminal(CompensatedBeforeDispatch)`. The tombstone keeps the request id terminal (saga rule 4) |
-    | `IntentCommit` (fused) | `KernelStopped` | stay `Unbegun`; `SignReceipt(Deny { KernelStopped })` with the head's `observed_epoch`. No tombstone, so the request id stays usable after resume (M15) |
-    | `IntentCommit` | `Unavailable` | stay `Unbegun`; the driver feeds `Replan { slow_path: true }`, and the machine emits slow-path `ParticipantCommit` steps |
-    | any | `VersionConflict` | `Retain`; the driver re-projects from the store and re-feeds. Never compensates |
-    | `IntentCommit` | `Overloaded` | stay `Unbegun`; the driver returns the overload error with no receipt and no state, as a pre-admission refusal |
+    | `IntentCommit` (fused, from `Unbegun`) | `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict` | `DenyTombstone` with the refusing reason, then `Terminal(CompensatedBeforeDispatch)`. The tombstone keeps the request id terminal (saga rule 4). Nothing was acquired outside the savepoint, so nothing needs compensation |
+    | `IntentCommit` (fused, from `Unbegun`) | `KernelStopped` | stay `Unbegun`; `SignReceipt(Deny { KernelStopped })` with the head's `observed_epoch`. No tombstone, so the request id stays usable after resume (M15) |
+    | `IntentCommit` (from `Prepared`, spec 10 X10) | any policy reason, `KernelStopped` included | `Compensate { PreDispatchRefusal { reason }, PreDispatchNoEffect, receipt }` against the persisted operation. It releases every participant acquired against `Prepared` before the fused steps, including the nonce preflight and an operation-owned runtime hook (`RuntimeParticipantLedger`), as the slow path does; a hook held outside the writer is released in a first `ParticipantCommit` group. No deny tombstone is written, because the compensated row is the tombstone. The id is terminal, as on M: today |
+    | `IntentCommit` (from `Unbegun` or `Prepared`) | `Unavailable` | stay in the phase; the driver feeds `Replan { slow_path: true }`, and the machine emits slow-path `ParticipantCommit` steps. Never compensates |
+    | any pre-dispatch effect | `VersionConflict` | `Retain`; the driver re-projects from the store and re-feeds. Never compensates |
+    | `IntentCommit` (from `Unbegun`), `CheckOnlyCrossing` | `Overloaded` | stay `Unbegun`; the driver signs a deny receipt (`Overloaded`) before admission and persists no state (spec 10 X15); the request id stays usable. A `NonDurable` call first releases its in-memory ledger entries (`Compensate` against spec 3's ledger) |
+    | `IntentCommit` (from `Prepared`), slow-path `ParticipantCommit` or dispatch-commit step | `Overloaded`, or `Unavailable` on a step that has no fused form | `Retain`; the driver re-submits the same planned step with bounded backoff. If the caller abandons the call first, M17's before-acknowledgement rule compensates. Never compensates on its own |
     | slow-path dispatch-commit step from `Parked` (approval resume) | `KernelStopped` | `Retain` in `Parked`. Never compensates, so the pending approval survives the stop (M15) |
-    | slow-path dispatch-commit step, otherwise | any policy reason | `Compensate { PreDispatchNoEffect, receipt }`. The request id is terminal, as on M: today |
-    | `ParticipantCommit` | `ParticipantRefused` | `Compensate { PreDispatchNoEffect, receipt }` |
+    | slow-path `ParticipantCommit` or dispatch-commit step, otherwise | any policy reason | `Compensate { PreDispatchNoEffect, receipt }`. The request id is terminal, as on M: today |
+    | `ParticipantCommit` | the `ParticipantRefused` event | `Compensate { PreDispatchNoEffect, receipt }` |
     | `CheckOnlyCrossing` (read-only class) | any policy reason | `SignReceipt(Deny)` with the reason; nothing to compensate |
     | `CheckOnlyCrossing` (`NonDurable`) | any policy reason | `Compensate { PreDispatchRefusal, PreDispatchNoEffect, receipt }`, which the driver executes against spec 3's in-memory ledger; there is no row to project |
+    | `CheckOnlyCrossing` | `Unavailable`, `VersionConflict` | Not produced: the crossing writes nothing and plans no version (spec 10 X13). If received, it fails closed: `Fault { IllegalEvent }`, then the read-only and `NonDurable` policy rows above with reason `Unavailable` |
 
 11. **M11. Refusals after the effect.** For `ReturnRecord`, `OutcomeCommit` and the release crossings. Spec 9 owns these rows. Spec 3 rule 13 is the same mapping, implemented on the legacy evaluator in spec 3 phase 1.
     - **`KernelStopped`.** The release crossings carry spec 8's `Withhold` disposition (spec 10 section 4.2).
-      - From `Finalizing(stage)`: `Retain` with output withheld. The next `Tick` or `Cut` after the stop is resumed re-emits the commit (spec 8 S14).
+      - From `Finalizing(stage)`: `Retain` with output withheld. The next `Tick` or `Cut` after the stop is resumed re-emits the commit (spec 8 S14). `FinalizingRetryDriver` feeds that `Tick` from spec 8's `StopHeads` watch.
       - On the outcome commit of a two-commit read (spec 10 X14), from `DispatchCommitted` with no return record: emit `ReturnRecord` with the returned bytes, which moves the operation to `Finalizing(stage)` with output withheld. The driver returns `OutputWithheld { operation_id, reason: KernelStopped }` (spec 8). The read is never re-dispatched (S8-18).
       - `ReturnRecord` is progress-only and never stop-checked, so a stop cannot refuse it. That includes the caller report: `CallerReportAuthenticated` in `AwaitingCallerReport` emits `ReturnRecord` and moves to `Finalizing`. Only the later `OutputRelease` inside `OutcomeCommit` is stop-checked (S8-12).
       - The legacy startup reconciler adopts this rule in spec 8 phase 1, before this machine replaces it. The stop heads load before the sweep, and a `KernelStopped` finalization error during the sweep retains the operation instead of failing startup (S8-01; M: `kernel/admission_coordinator/recovery.rs:295-358`).
     - **`AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`.** `HaltOperation { RefusedAfterEffect(reason) }`, then `Terminalize(DeniedAfterDelivery)` with a `DenyDelivery` receipt naming the reason and retained markers. The release follows the terminal payment plan, and the terminal clears the halt.
+      - The `OutputRelease` closure-fence check is spec 4 section 4.1 rule 3a. For operations marked `legacy_unindexed` it includes spec 4 rule 1a's legacy predicate, so an operation admitted before the authority-ref index existed is still fenced.
+      - The mapping holds for every driver that emits the commit. When `StartupReconciler` or `FinalizingRetryDriver` re-emits a retained finalization and the release is refused with `AuthoritySpaceClosed`, the operation terminalizes as `DeniedAfterDelivery`. It is never retained indefinitely, and it is never compensated.
     - **`ReservationConflict`.** `HaltOperation { InvariantViolation }` and `Fault`. It is unreachable after the effect, because reservations commit in the intent commit, so reaching it is an invariant violation.
     - **`VersionConflict`.** Re-project.
+    - **`Overloaded`.** Not produced for post-effect members, because spec 10 X17b admits them past the queue bound. If received: `Retain`, and the driver re-submits the same plan. Never compensates.
+    - **`Unavailable`.** The fused outcome commit's preconditions no longer hold, for example because settlement needs an external rail capture. From `Finalizing`, the driver feeds `Replan { slow_path: true }`. The machine then emits the settlement as `ParticipantCommit` groups (spec 10 `ExternalPrepare { Settle }`), followed by the rest of the `OutcomeCommit`. On a two-commit read with no return record (spec 10 X14), `ReturnRecord` comes first.
+    - **Totality.** Every `CommitFailure` reason has a row here for every post-effect effect, so none reaches M2's illegal-event arm.
+      - `Terminalize`, `Compensate` and `ReleaseHold` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project) and `CommitOutcomeUnknown` (M12) can fail them.
+      - Every `Retain` above has a re-feed source. The `FinalizingRetryDriver` (section 7) feeds `Tick` when the stop is resumed and with bounded backoff. `StartupReconciler` covers restart.
     - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that.
 12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect yields `HaltOperation { CommitOutcomeUnknown }`, with no compensation, no dispatch and no state change.
     - This is the machine form of spec 3's `BoundaryFailure::CommitUnconfirmed`: every hold and credential is retained.
@@ -567,6 +596,8 @@ forall cause: Terminalize(OutcomeUnknownAfterDispatch) in classify(s, cause, f, 
 | `DrainDriver` (spec 4) | `Cut(AuthorityCut { trigger })` | as above |
 | `ReservationReconcileDriver` | settlement of a reserved authorization by nonce (M: `kernel/reconciliation.rs:148`) | as above |
 | `DropReconcileJob` | `Cut(DriverDropped)` for a driver dropped after its dispatch-commit acknowledgement (M17) | as above |
+| `FinalizingRetryDriver` | `Tick` to every operation retained in `Finalizing` (stop-withheld output, infrastructure fault, re-submitted plan). It fires on the `StopHeads` watch when a stop is resumed, and with bounded backoff otherwise (M11, M16) | `CrossingPort` |
+| `UnknownReleaseDriver` | `ReleaseAuthorized` after it verifies a counterparty agreement or contractual capture waiver for a frozen hold (M7a) | payment-journal port, `CrossingPort` |
 
 The rules for drivers:
 - Drivers own leases (the existing `mutation_sequencer.try_own_operation`), the clock, fact lookups, identity allocation, and every port call.
@@ -667,9 +698,9 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 | T1 `prepared_first` | no participant-mutating step precedes `Prepared` | saga rule 1 |
 | T2 `commit_before_dispatch` | `Dispatch` only on `DispatchCommitAcknowledged`, or on `CheckOnlyAcknowledged` for the read-only and `NonDurable` classes | saga rule 3 |
 | T3 `no_compensation_after_commit` | `Compensate` only from pre-dispatch phases with capture not committed | spec 4 section 5 |
-| T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`, and the last only on a zero recomputed amount or `DeniedAfterDelivery` | saga rule 6 |
-| T5 `terminal_absorbing` | no transition leaves a terminal phase | saga rule 4 |
-| T6 `unknown_stays_unknown` | no `Dispatch` and no machine release after `OutcomeUnknownAfterDispatch` | saga rule 6 |
+| T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`, and the last only on a zero recomputed amount or `DeniedAfterDelivery`; it emits `ReleaseHold` only on a `ReleaseAuthorized` event in `Terminal(OutcomeUnknownAfterDispatch)` with a frozen hold | saga rule 6 |
+| T5 `terminal_absorbing` | no transition leaves a terminal phase; `ReleaseAuthorized` changes only `unknown_hold` | saga rule 4 |
+| T6 `unknown_stays_unknown` | no `Dispatch` and no `MachineRelease` after `OutcomeUnknownAfterDispatch`; the only hold release is a counterparty-authorized `ReleaseHold` | saga rule 6 |
 | T7 `fence_dominance` | a policy refusal on any dispatch-commit step (fast or slow) or check-only crossing never leads to `Dispatch`; a refusal on an outcome or release commit never leads to an `Allow` receipt | spec 8 S7/S15, spec 4 section 4.1, spec 11 |
 | T8 `post_effect_discharge` | every post-dispatch phase has an enabled transition to the M14 discharge set, or to `HaltOperation`, under the named fair events; none returns to a pre-dispatch phase; each handed-off operation acknowledges exactly one discharge | spec 3 section 4.11 |
 | T9 `plan_order` | participants are acknowledged in plan order or by the combined acknowledgement; `Authorized` exactly when the plan is complete | both legacy orderings |
@@ -691,7 +722,7 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 **Trace validation.** Today's commit log retains digests, not states (section 2). Phase 1 validates that machine-produced states hash to the retained operation digests. Full replay of production histories needs per-version snapshots or an event log (open decision 6).
 
 **Deterministic simulation.**
-- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, and clock unavailability.
+- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, a refused fused intent from `Prepared` holding a runtime hook, a counterparty release of a frozen hold (including a duplicate), and clock unavailability.
 - The oracles are T1-T12 as runtime assertions, plus the legacy predicates during compatibility.
 
 ## 11. Performance
@@ -831,6 +862,15 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | S8-18 two-commit read re-dispatched after a stop | Minor | Applied: `ReturnRecord` on a stop-refused outcome commit; `OutputWithheld` (M11) |
 | S8-19 parked operation killed by a stop | Minor | Applied: `Parked` plus `KernelStopped` retains (M10); approvals refused at the edge without consumption (M15); T11 |
 | S8-24 spec 9 dependency of spec 8 phases unstated | Minor | Applied: section 9 phase 3 names spec 8 phase 1 (legacy, bug-fix lane) and phase 2 onward (on the machine) |
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180435329 | Route unavailable intent commits to the slow path | Already addressed in revision 2: `Unavailable` re-plans with `Replan { slow_path: true }` and never compensates. Tightened now: M10 matches the reason before any generic row, and covers `Unavailable`, `Overloaded` and `VersionConflict` on slow-path steps and from `Prepared`. No `CommitFailure` reason reaches the illegal-event arm | M10 |
+| 4180435341 | Handle outcome-commit failures after dispatch | Fixed now. Revision 3's M11 covered the policy reasons and `VersionConflict`; this round adds `Overloaded` and `Unavailable` (slow-path settlement re-plan), a totality rule, and the `FinalizingRetryDriver`, which re-feeds every retained `Finalizing` operation on stop resume and with backoff | M11, section 7 |
+| 4180435358 | Add events for counterparty-authorized releases | Fixed now. New `ReleaseAuthorized { authority, evidence }`, `UnknownOutcomeRelease`, the `unknown_hold` fact and the `ReleaseHold` effect, accepted only in `Terminal(OutcomeUnknownAfterDispatch)` with a frozen hold. The phase stays absorbing, and `UnknownReleaseDriver` verifies the evidence | sections 4.1, 5.1, 5.2; M6, M7a; T4-T6 |
+| 4180731780 (spec 10) | Compensate hooks acquired before the fused intent | Fixed now. A fused intent from `Prepared` refused for a policy reason compensates the persisted operation, releasing its hook and nonce, with no deny tombstone | M10; spec 10 X10 |
 
 ## Appendix A. External and FTL precedent
 

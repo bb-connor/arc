@@ -299,9 +299,9 @@ The Stop column carries spec 8's `StopDisposition`. Spec 8 section 5 is normativ
 | `ConfinedReturn` | `Withhold` | yes | no | P5 return contract | confined consumption | crossing-authorizing |
 | `ExternalEvaluation` | `Withhold` | yes | no | yes | none | crossing-authorizing |
 | `ExternalPrepare { Authorize }` | `Deny` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
-| `ExternalPrepare { Settle }` | `Settle` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+| `ExternalPrepare { Settle }` | `Settle` | subject before cut | subject before cut | where applicable | the participant's intent row | crossing-authorizing |
 | `MutationSubmit` | `Deny` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
-| `FederationCosign`, `ChannelReleasePublish` | `Settle` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+| `FederationCosign`, `ChannelReleasePublish` | `Settle` | subject before cut | subject before cut | where applicable | the participant's intent row | crossing-authorizing |
 | `ActiveResponseExecute` | `AllowIfContainment` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
 
 **The `StopEpoch` check.**
@@ -310,6 +310,12 @@ The Stop column carries spec 8's `StopDisposition`. Spec 8 section 5 is normativ
 - A process latch can only tighten the result. It never relaxes a durable head.
 - `Settle` requires the operation to have committed its effect, or its authorization, at an epoch before the current `Stopped` head. The crossing record carries that epoch.
 - Tier 1, spec 8's early check, reads the per-store shared `StopHeads` (spec 8 S8-08). It never reads a per-kernel field, and it is never authoritative.
+
+**Settlement and permanent fences.** A settlement kind (`ExternalPrepare { Settle }`, `FederationCosign`, `ChannelReleasePublish`) completes or settles an effect that already committed. It does not authorize new work.
+- The closure-fence and revocation checks therefore apply the same subject-before-cut test as `Settle` does for stop. The check passes when every subject the crossing settles committed at an admission chain position before the closure fence row or the revocation entry that would refuse it. That covers the captured or released hold, the co-signed admitted request, and the published release of earned funds.
+- A subject committed after the cut is refused. So is any crossing that would start a new authorization; that is `ExternalPrepare { Authorize }`, which keeps the plain checks.
+- The crossing record carries each subject's chain position, so an auditor can replay the test.
+- Closure and revocation therefore never strand earned work. This is spec 4 section 7 rule 1 ("payable work remains payable") and spec 4's escrow invariants. The stop half is spec 8 section 5.
 
 Capability issuance is not a crossing here. It runs in the capability authority store, so under X3 it is `early_only`: spec 8 S8 applies, with no anchor in this writer.
 
@@ -388,6 +394,8 @@ Preconditions for the fused intent commit:
 Rules:
 
 10. **X10. Intent from `Prepared`.** When a nonce preflight already committed `Prepared` (`kernel/admission_coordinator.rs:843`), the intent commit starts from that persisted operation. The plan flag is `from_prepared`, with the expected version, and fuses commits 2 to 6. An operation-owned runtime hook acquires against the persisted `Prepared` first, and the remaining steps fuse.
+    - **Refusal from `Prepared`.** The savepoint cannot roll back what was acquired against `Prepared` before the fused steps: the nonce preflight and the hook's reservation. A refused fused intent from `Prepared`, for any policy reason including `KernelStopped`, therefore writes no deny tombstone. Spec 9 M10 emits `Compensate { PreDispatchRefusal, PreDispatchNoEffect, receipt }` against the persisted operation. That releases the hook and the nonce through their participants, as the slow path does; a hook held outside this writer is released in a first group. Repeated refusals cannot strand runtime capacity.
+    - `Overloaded` from `Prepared` re-submits with bounded backoff (spec 9 M10).
 11. **X11. Return record binds evaluation inputs.** The return record freezes the evaluation time (its `recorded_at`), the post-return steps and the normalized context. The outcome commit verifies them. Recovery at cutpoint C4 re-runs from those inputs, never against current time or state, as the admission design requires.
 12. **X12. Fast-path eligibility census.** Phase 0 reports which profiles qualify. The steady process-host profile qualifies for the full fused path: no runtime hook, no swarm admission, and no nonces, as its read tools' bounded redispatch implies. Profiles with nonces or operation-owned hooks use X10. Everything else takes a slow path (section 7).
 
@@ -425,7 +433,7 @@ Rules:
 
 ### 6.3 Denials on the fast path
 
-15. **X15. Deny tombstones.** A policy refusal of a fused intent commit for `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity` or `ReservationConflict`, or a deny decided during evaluation of a durable-coverage call, writes a deny tombstone in one **restrictive** commit:
+15. **X15. Deny tombstones.** A policy refusal of a fused intent commit from `Unbegun` for `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity` or `ReservationConflict`, or a deny decided during evaluation of a durable-coverage call before any row exists, writes a deny tombstone in one **restrictive** commit. A refusal from `Prepared` compensates instead (X10). The tombstone holds:
     - an operation row in `CompensatedBeforeDispatch`, with the same replay key semantics as today;
     - the signed deny receipt, as its terminal evidence.
 
@@ -443,9 +451,11 @@ Rules:
     | Reason | Effect |
     |---|---|
     | `KernelStopped` | The savepoint rolls back. The operation stays `Finalizing` with output withheld in release custody (the return record holds the bytes) and resumes after the stop is lifted (spec 8 S14). A return record is never stop-checked, so this refusal reaches only the outcome commit and the release crossings. For the two-commit read see X14a |
-    | `AuthoritySpaceClosed` or `InsufficientIntegrity` | Spec 9 emits `HaltOperation` for that operation, then terminalizes it as the existing `DeniedAfterDelivery` with the refusing reason and retained markers (spec 9 M11; spec 3 rule 13 is the legacy phase 1 form). That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal, and spec 4's drain terminates |
+    | `AuthoritySpaceClosed` or `InsufficientIntegrity` | Spec 9 emits `HaltOperation` for that operation, then terminalizes it as the existing `DeniedAfterDelivery` with the refusing reason and retained markers (spec 9 M11; spec 3 rule 13 is the legacy phase 1 form). That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal, and spec 4's drain terminates. The `OutputRelease` closure-fence check is spec 4 section 4.1 rule 3a, which includes spec 4 rule 1a's legacy predicate for `legacy_unindexed` operations. The same row applies when spec 9's reconciler re-emits a retained finalization |
     | `ReservationConflict` | `HaltOperation` plus an incident. It should be unreachable, because capture amounts were reserved before dispatch |
     | `VersionConflict` | Re-project |
+    | `Overloaded` | Not produced for post-effect members (X17b). If received, the driver re-submits; never compensates |
+    | `Unavailable` | The fused outcome commit's preconditions no longer hold (for example, an external rail capture). Spec 9 re-plans the settlement as slow-path steps, with an `ExternalPrepare { Settle }` crossing, then the rest of the outcome commit (spec 9 M11) |
 
     For a check-only read or a `NonDurable` call, refusal yields the signed `withheld` receipt (X13a), `KernelStopped` included. No custody holds the output. `HaltOperation` halts one operation; it never closes the kernel to new dispatch (spec 3's `LatchScope::Operation`).
 
@@ -498,6 +508,9 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
       - They are never refused with `Overloaded`, and never counted against `max_batch`, `max_intent_members` or the per-tenant cap (X20).
       - A full queue therefore cannot keep an operator from stopping the kernel.
       - Under X21, a lost transaction answers `Retry`, and the lane re-runs first. A stop that cannot become durable (for example on `SQLITE_FULL`) is covered by spec 8's fsynced stop-intent latch, written before the transaction. Boot honors that latch until a durable head supersedes it.
+    - **X17b. Post-effect members bypass the queue bound.** `Overloaded` applies only to members that would start new work: intent commits, check-only dispatches, slow-path pre-dispatch steps, and non-admission writes such as budget administration.
+      - Post-effect members are never refused with `Overloaded`: return records, outcome commits, release crossings, `Terminalize`, `Compensate` and `ReleaseHold`. Refusing one would turn a known outcome into an unknown one, or strand a hold.
+      - Their number is bounded by operations already admitted. Each dispatched operation has at most one post-effect member queued, so admitting them past the bound cannot grow the queue without limit.
 18. **X18. No added latency at low load.** The loop never waits to fill a batch. At concurrency 1, latency is unchanged.
 19. **X19. Linearization.** Members execute serially in dequeue order, each seeing earlier members' effects. Every CAS keeps its meaning.
 20. **X20. Fairness.** Members dequeue FIFO, after the X17a priority lane, with a per-tenant cap of a quarter of a contended batch. The cap reorders across tenants only, and X19's order is the dequeue order after the cap. In the single-tenant process host (`LOCAL_SYSTEM_TENANT_ID`) the cap is inert.
@@ -517,8 +530,8 @@ ADR-0022 names the single-writer ceiling (M: `docs/adr/ADR-0022-store-and-kernel
 | # | Precondition |
 |---|---|
 | S1 | Every cross-tenant aggregate on the serving connection is listed and kept in an unsharded pool shard (slow path), or is forbidden under sharding. That covers the finding market, purchases, challenges and status, channels and release publisher, fiscal, FROST and the economic-state cache (`serving_owner.rs:628-690`) |
-| S2 | **Stops (spec 8 S8-13).** The kernel-scope stop chain originates in the pool shard. Each tenant shard holds a verified replica: the same record bytes and digests, appended in that shard as a restrictive commit, so its `StopEpoch` check is authoritative over the replica (X3). The operator acknowledgement returns after the origin commit, with an `enforced` status per shard. It does not block on a dead shard; a shard that is behind is reported, not waited for. **Revocations** use a durable fan-out outbox, with readback per the AP8 discipline (M: `docs/superpowers/specs/2026-10-03-transport-revocation-design.md`) |
-| S3 | **Readiness.** A shard is ready only when its replica's stop epoch is at or above the origin head epoch, read from the origin at boot. If the origin is unreachable, the shard is not ready. A new shard is seeded with the origin head before it serves. Revocation heads load the same way before readiness |
+| S2 | **Stops (spec 8 S8-13).** The kernel-scope stop chain originates in the pool shard. Each tenant shard holds a verified replica: the same record bytes and digests, appended in that shard as a restrictive commit, so its `StopEpoch` check is authoritative over the replica (X3). The operator acknowledgement returns after the origin commit, with a per-shard status of `enforced` (the replica holds the head) or `fenced_by_lease` (the shard has not confirmed, and will latch `Stopped` when its origin-freshness lease expires, S3). It does not block on a dead shard. The lease bounds how long any shard can keep serving after a kernel stop. **Revocations** use a durable fan-out outbox, with readback per the AP8 discipline (M: `docs/superpowers/specs/2026-10-03-transport-revocation-design.md`) |
+| S3 | **Readiness.** A shard is ready only when its replica's stop epoch is at or above the origin head epoch, read from the origin at boot. If the origin is unreachable, the shard is not ready. A new shard is seeded with the origin head before it serves. Revocation heads load the same way before readiness. **While serving**, a shard holds an origin-freshness lease on the monotonic clock: renewed every 250 ms, valid for 1 s. A shard that falls behind the origin head epoch, or loses the origin past the lease, latches the kernel scope `Stopped` and goes `not_ready` with `stop_origin_stale` (spec 8 S37) |
 | S4 | Capabilities are bound to one shard at issuance, or every revocation fans out |
 | S5 | Pool-scoped fences without a shard replica are reported `early_only` when checked from a tenant shard. Kernel-scope stops are checked against the replica (S2), and the replication window is what the `enforced` status reports |
 | S6 | The process registry's single `durable_admission_store_uuid` (M: `crates/kernel/chio-process/src/registry.rs:58-66`), receipt mover ordering, checkpoint ordering and relocation are defined per shard |
@@ -535,7 +548,7 @@ The existing path is kept and made asynchronous behind the gate `async-receipt-m
 | # | Rule |
 |---|---|
 | 23 | **Durable before allow.** The outcome commit holds the signed receipt in the terminal projection, as today, and allow is returned only after that anchored commit. The receipt is never deleted from the terminal tombstone, so replay keeps loading it from the authority store |
-| 24 | **Sequence before allow.** The outcome commit assigns the receipt's log sequence from a per-namespace counter in the authority writer. The namespace is the authority store's identity in the receipt store. `materialize_durable_admission_receipt` becomes the mover: it appends in sequence order, seeds the settlement attempt exactly once on first append as today, and folds receipts into checkpoint batches. Gaps and duplicates are audit faults surfaced to SIEM. These are ADR-0013's conditions, with the authority writer as its durable local WAL, so no ADR rule changes |
+| 24 | **Sequence before allow.** The outcome commit assigns the receipt's log sequence from a per-namespace counter in the authority writer. The namespace is the authority store's identity in the receipt store. `materialize_durable_admission_receipt` becomes the mover: it appends in sequence order, seeds the settlement attempt exactly once on first append as today, and folds receipts into checkpoint batches. **Moves are idempotent.** The receipt log has a unique key on `(namespace, log_sequence)` and on `receipt_id`, and an append is `INSERT ... ON CONFLICT DO NOTHING` followed by a digest comparison with the existing row. A crash after the `receipts.db` commit and before the mover advances therefore re-runs as a no-op: no second log entry and no second Merkle leaf. A conflicting digest is an audit fault that stops the mover and fails closed through rule 25. The mover's cursor is the highest `log_sequence` present in `receipts.db` for the namespace, so no separate moved marker can disagree with the log. Settlement seeding runs only when the insert actually inserted. Gaps and duplicates are audit faults surfaced to SIEM. These are ADR-0013's conditions, with the authority writer as its durable local WAL, so no ADR rule changes |
 | 25 | **Saturation fails closed.** A mover backlog above `receipt_backlog_max` (default 4,096) denies new mediated allows before admission. This succeeds today's `receipt_store_serving_closed` gate. Status reports a receipt `signed_but_not_durable` (ADR-0013 wording) until its `receipts.db` commit |
 | 26 | **Slim at rest.** Only substructures that no report queries are deduplicated into a content table by digest, for example capability snapshots and delegation chains, with references counted for retention and erasure. Phase 0 attributes the 11.9 KB per call and lists the `json_extract` paths before choosing. Fields the reports query stay in `raw_json`, or move to generated columns. `raw_json` is reconstituted byte-exactly on read |
 | 27 | **Signatures stay.** Checkpoint batches align with group-commit batches and emit C2SP-compatible checkpoint notes (north-star bet 6) |
@@ -570,6 +583,7 @@ These extend M: `native-restart-safety.md`'s matrix:
 | B1. Batch `COMMIT` outcome unknown | Unknown for every member | Owner poisoned; restart reconciles each member |
 | B2. Batch transaction lost before `COMMIT` | Nothing from the batch | Members get `Retry` (X21) |
 | R1. Receipt not yet materialized | Receipt in the terminal projection | The mover resumes; status `signed_but_not_durable` |
+| R1a. Crash after the `receipts.db` append, before the mover advances | Receipt in the log and in the terminal projection | The re-run append conflicts on `(namespace, log_sequence)` and `receipt_id`, the digests match, and nothing is appended (rule 24) |
 | R2. Check-only or `NonDurable` receipt append outcome unknown | The append may or may not commit | Spec 9 M16: `KernelEvidenceLatch` with a buffered fault record; read back the original id before appending any fault receipt (rule 28) |
 | P1. Stop committed while a two-commit read is in flight | `DispatchCommitted`, then the return record after the refused outcome commit | `Finalizing`, output withheld; released after resume (X14a) |
 
@@ -631,7 +645,7 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
 
 - **Apalache:** the model and mutants of section 12.
 - **Loom:** batch leader and followers; savepoint isolation; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
-- **DST:** crash injection at C1-C7, B1, B2, R2 and P1, plus restore-from-snapshot at random anchored prefixes, under random workloads. Stops are issued under `Overloaded` and under `SQLITE_FULL` injection. Under sharding, one shard is offline during a stop fan-out and then restarts; it must not serve until its replica catches up (S3). The properties are section 8's predicates.
+- **DST:** crash injection at C1-C7, B1, B2, R2 and P1, plus restore-from-snapshot at random anchored prefixes, under random workloads. Stops are issued under `Overloaded` and under `SQLITE_FULL` injection. Under sharding, one shard is offline during a stop fan-out and then restarts; it must not serve until its replica catches up (S3). A serving shard partitioned from the origin during a stop latches `Stopped` within its 1 s lease. A crash between the `receipts.db` append and the mover's advance re-runs as a no-op (rule 24). The properties are section 8's predicates.
 - **Differential:** generated workloads run through the legacy and fused paths must reach identical terminal states, receipts and release decisions. The two-commit read is compared under its own flag.
 - **Commit-budget gates:** these are deterministic, from store hooks, and scoped to fast-path-eligible plans:
 
@@ -653,7 +667,11 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
   - a two-commit read refused at its outcome commit returns `OutputWithheld` and is never re-dispatched;
   - a read-only or `NonDurable` call always yields a receipt or a buffered fault behind `KernelEvidenceLatch`;
   - a receipt append that times out and later commits yields exactly one terminal receipt;
-  - a crash after handoff yields outcome-unknown, never redispatch for side-effecting tools.
+  - a crash after handoff yields outcome-unknown, never redispatch for side-effecting tools;
+  - a fused intent from `Prepared` refused by a fence or revocation compensates and releases its runtime hook (X10);
+  - settlement of an effect committed before a revocation or closure passes those checks, and a new authorization after the cut is refused;
+  - an outcome commit under a full writer queue is never refused `Overloaded` (X17b);
+  - a re-run receipt move appends nothing (rule 24).
 
 ## 18. Alignment with sibling specs
 
@@ -745,6 +763,16 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | S8-19 | Applied: section 7 approval row; spec 9 M10 retains `Parked` |
 | S8-27 | Applied: `AllowIfContainment`; a host latch implies `allow_containment = false` |
 | S8-28 | Applied: `commit_durable_dispatch` cited at `:1560`. Also fixed three stale sub-rule labels from revision 2: the `Retry` comment and the restrictive-class row cited X15b, X12a and X13c for what are X21, X15 and X16. The label X13c now names the new `NonDurable` rule |
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180435355 | Make receipt-log moves idempotent | Fixed now. Revision 2 already assigned the log sequence in the outcome commit. This round adds unique keys on `(namespace, log_sequence)` and `receipt_id`, `ON CONFLICT DO NOTHING` with a digest comparison, and a cursor taken from the log itself, so a crash after the append re-runs as a no-op | rule 24; cutpoint R1a; section 17 |
+| 4180731780 | Compensate hooks acquired before the fused intent | Fixed now. A fused intent from `Prepared` refused for any policy reason compensates the persisted operation, releasing the hook and nonce through their participants, and writes no tombstone. X15's tombstone is scoped to refusals from `Unbegun` | X10, X15; spec 9 M10 |
+| 4180731789 | Exempt prior-effect settlement from permanent authority fences | Fixed now. The settlement kinds apply the subject-before-cut test to the closure-fence and revocation checks, as they do for stop. A new authorization after the cut is still refused | section 4.2; section 17 |
+| 4180731782 (spec 8) | Continuously fence shards that lose the stop origin | Fixed here for the sharding side. A serving shard holds a 250 ms / 1 s origin-freshness lease on the monotonic clock and latches `Stopped` with `stop_origin_stale` when it falls behind or loses the origin. The acknowledgement reports `enforced` or `fenced_by_lease` (spec 8 S37) | section 10 S2, S3; section 17 |
+| (related) | Post-effect `Overloaded` | Added with spec 9's 4180435341 fix: post-effect members bypass the queue bound | X17b, X16 |
 
 ## Appendix A. Precedent
 

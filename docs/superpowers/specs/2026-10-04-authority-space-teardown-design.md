@@ -1,6 +1,6 @@
 # Design: closing authority spaces (the closure rule for capabilities, sessions, processes, swarms, and delegated work)
 
-- Status: PROPOSED (revision 3, re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
+- Status: PROPOSED (revision 4, 2026-10-05, after PR #1174 review round 1; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
 - Date: 2026-10-04
 - Scope: the non-additive closure operation that Chio's additive composition rules leave undefined. It covers:
   - one shared drain for admitted work;
@@ -33,6 +33,13 @@
   - W: = the uncommitted working tree of `standalone/arc-worktrees/recoverable-agent-runtime-20261002` (branch `feat/recoverable-agent-runtime-20261002`; recovery P0-P5 implemented locally; built on #1160 checkpoint `f25cd61f4`). Line references reflect the working tree on 2026-10-04 and may drift.
   - All four are treated as shipped.
   - V: W1-W4 APIs have no code and are cited as "assumed shipped (contract anchor)". Recovery documents that describe something absent from W: are marked "doc-only, not implemented in W:". Integration must pin the landed signatures.
+
+## Revision 4 changes
+
+From round 1 of the PR #1174 review (dispositions at the end of this spec):
+- **Output release is fenced.** The caller-executed and native output-release checks, and the finalization commit of ordinary durable returns, now consult the closure fence (rule 3a and the section 4.3 table). A closure that commits after `DispatchCommitted` but before release now withholds the output. The operation then terminalizes as `DeniedAfterDelivery`, as in spec 9 M11 and spec 10 X16.
+- **Pre-migration operations are fenced.** A migration backfills and verifies authority refs. Any operation it cannot index stays `legacy_unindexed`, and a legacy predicate in the dispatch and release CAS refuses it once any closure fence exists (rule 1a).
+- **Stranded capacity has two snapshots.** One is taken at `Fenced` and one after the drain. The signed `Closed` artifact carries the final one (section 8).
 
 ## Revision 3 changes
 
@@ -158,16 +165,35 @@ Non-goals:
    - `process_lineage` and `principal` rows from the trusted `SecurityInvocationContextV1` (process calls supply runtime and lineage, M: `chio-process/src/security.rs:24-33`);
    - one `swarm_graph` row when a continuation was consumed;
    - one `delegation_root` row when the D1 guard admitted the call (V: `crates/kernel/chio-kernel/src/delegated_work.rs`).
+   1a. **Operations from before the index.** The migration that creates `admission_operation_authority_refs` and `closure_fences` also adds `admission_operations.authority_refs_state` (`indexed` or `legacy_unindexed`).
+   - **Backfill.** For every non-terminal operation whose persisted record holds its revocation set, session and security context, the migration writes the refs, re-derives them, compares the two, and marks the operation `indexed`.
+   - **What stays legacy.** Every other non-terminal operation stays `legacy_unindexed`. New operations are `indexed` in their insertion transaction.
+   - **Legacy predicate.** The dispatch CAS (rule 3) and the release check (rule 3a) refuse a `legacy_unindexed` operation when any row exists in `closure_fences`. Every fence row postdates every legacy operation, because the same migration creates the fence table. So this refuses dispatch only for closures that could have covered the operation, and it over-fences rather than under-fences. The coordinator compensates on its own path with `AuthoritySpaceClosed { closure_id }`, naming the earliest fence.
+   - **Why not the drain alone.** The drain cannot close this gap: it never steals a live lease (section 5 rule 3), and a coordinator holding the lease sees no refs.
+   - **Removal.** A later migration removes the legacy predicate only once `count(non-terminal and legacy_unindexed) = 0`.
 2. **Fence rows.** A closure writes `closure_fences(ref_kind, ref_id, closure_id, fence_commit)` into the same SQLite writer.
 3. **Fence check.** `commit_durable_dispatch` and `capture_and_commit_durable_dispatch` (M: `admission_coordinator.rs:1560`, `:1814`) add `NOT EXISTS` over the join of the operation's refs and `closure_fences` to their CAS.
    - A fenced operation fails the CAS with `AuthoritySpaceClosed { closure_id }`.
    - The coordinator then compensates on its own path.
-4. **Ordering.** Fence before dispatch commit means no dispatch. Dispatch commit before fence means the operation is post-dispatch and the drain retains it.
+
+   3a. **Release fence check.** Output can still leave Chio custody after `DispatchCommitted`. Every release that does so runs the same `NOT EXISTS` predicate over the operation's refs and `closure_fences`, plus rule 1a's legacy predicate, in the admission writer, in the same transaction as the finalization commit that releases the output. Three releases are affected:
+   - the caller-executed release check (M: `admission_coordinator/terminal.rs:118-131`, the stop and revocation checks at `:126` and `:131`);
+   - the native output release check (M: `admission_coordinator/native_output.rs:388-401`);
+   - the finalization commit of ordinary durable returns.
+
+   On M: these releases check stop and revocation, but not closure. Under spec 10 they become `OutputRelease` crossings, where Fence = yes, and this rule is that check.
+   - **Refusal.** A refused release is `AuthoritySpaceClosed { closure_id }`. Following spec 9 M11 and spec 10 X16, the operation halts and terminalizes as `DeniedAfterDelivery`, with output withheld and retained markers.
+   - **Why the drain terminates.** That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal.
+   - **Startup.** Startup reconciliation treats this refusal as that terminal transition, not as a reconciliation failure.
+4. **Ordering.** Fence before dispatch commit means no dispatch. Dispatch commit before fence means the operation is post-dispatch and the drain retains it. Its output release still meets the fence (rule 3a), so a closure that commits before release withholds the output.
 
 ```text
 committed(fence(c)) before cas(op -> DispatchCommitted) and refs(op) intersects space(c)
   -> not DispatchCommitted(op)
 DispatchCommitted(op) before committed(fence(c)) -> drain(op) = retain_post_dispatch
+committed(fence(c)) before release(op) and refs(op) intersects space(c)
+  -> not released(op) and terminal(op) = DeniedAfterDelivery
+legacy_unindexed(op) and exists closure_fences -> not DispatchCommitted_after(op) and not released_after(op)
 ```
 
 When the fence store and the admission store are different writers (a configuration with a remote revocation backend), rule 3 degrades to the guard check of section 4.2. The artifact then flags `dispatched_after_fence_unlinearized` when commit indices overlap.
@@ -191,6 +217,9 @@ Every crossing where bytes or effects leave Chio custody has one named ordering 
 | Crossing | Ordering point | Source |
 |---|---|---|
 | Tool dispatch (durable) | `DispatchCommitted` CAS, with the section 4.1 fence | M: `admission_coordinator.rs:1560`, `:1814` |
+| Output release, caller-executed (M3) | The release check during finalization of an authenticated caller report, with the rule 3a fence in the finalization commit (spec 10 `OutputRelease`) | M: `admission_coordinator/terminal.rs:118-131` |
+| Output release, native | The native output release authority check during finalization, with the rule 3a fence in the finalization commit (spec 10 `OutputRelease`) | M: `admission_coordinator/native_output.rs:388-401` |
+| Output release, ordinary durable return | The finalization commit that releases the recorded return, with the rule 3a fence (spec 10 `OutputRelease`) | M: `admission_coordinator/terminal.rs` (`finalize_durable_tool_return`) |
 | Recovery continuation | Same-writer tombstone at begin and capture | W: `admission_operation_store/recovery/native.rs:286-293` |
 | Confined return (P5) | The return-admission commit (`store.admit_confined_return`, spec 10 `ConfinedReturn`) is the stop and fence point. The final serialized journal activity read before sink I/O stays the cancellation ordering point: an earlier completed cancellation withholds bytes and retains the native join and consumption | W: `crates/platform/chio-control-plane/src/confinement.rs:214-226`, `:234-236` |
 | Artifact release (P4) | Commit of the knowledge join and `ReleaseIntent` before sink delivery | W: `docs/architecture/recoverable-agent-runtime/implementation/p4/OPERATIONS.md:98-106` |
@@ -236,7 +265,7 @@ Rules:
    |---|---|
    | `Prepared` through `ReadyToDispatch`, or `ApprovalRequired` | Compensate (M: `admission_coordinator.rs:1607`) with cause `authority-cut`; latch the session request if one exists (spec 9 `LatchRequest`) |
    | `CapturePending` | Look up by operation. No capture: compensate. Capture committed: post-dispatch |
-   | `DispatchCommitted`, `Finalizing`, `AwaitingCallerReport` | Halt the operation (spec 9 `HaltOperation`); cooperative transport cancel where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`); if owned, terminalize `DispatchCommitted` as outcome-unknown with holds frozen (W: precedent); never redispatch, release or compensate |
+   | `DispatchCommitted`, `Finalizing`, `AwaitingCallerReport` | Halt the operation (spec 9 `HaltOperation`); cooperative transport cancel where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`); if owned, terminalize `DispatchCommitted` as outcome-unknown with holds frozen (W: precedent); never redispatch, release or compensate. When the coordinator later attempts the output release, that release meets the fence (section 4.1 rule 3a) and the operation terminalizes as `DeniedAfterDelivery`, with output withheld |
    | Recovery workflow bound to the space | `CancelWorkflow` by the closure actor (section 6.5); the same-writer tombstone fences begin and capture |
    | Confined child in the space | `NativeConfinedRuntime::cancel`: native disposition first, then process cancel and pidfd termination (W: `crates/platform/chio-control-plane/src/confinement.rs:258-274`). A plain `ProcessRuntime::cancel` alone would leave the native confined record unterminated |
    | Security operation model, dispatch `NotStarted` | That model's own compensation path |
@@ -256,7 +285,7 @@ drain never performs release_hold(op) outside {PreDispatchNoEffect, TransportNot
 cut_commit(trigger) precedes every drain action for trigger
 ```
 
-**Enumeration.** The authority refs index (section 4.1) finds operations. Descendant sets for withdrawal and hint fan-out use `BlastRadiusPort` (M: `chio-security-types/src/ports/lineage.rs:277`). No production `CausalLineageStore` exists (defect D12). Until one exists over the `chio-store-sqlite` capability lineage, enumeration reports `Incomplete` and safety is unchanged. Operations from before the index migration are found by scanning recoverable rows, and counted as `legacy_unindexed`.
+**Enumeration.** The authority refs index (section 4.1) finds operations. Descendant sets for withdrawal and hint fan-out use `BlastRadiusPort` (M: `chio-security-types/src/ports/lineage.rs:277`). No production `CausalLineageStore` exists (defect D12). Until one exists over the `chio-store-sqlite` capability lineage, enumeration reports `Incomplete` and safety is unchanged. Operations that the migration could not index (section 4.1 rule 1a) are found by scanning recoverable rows and counted as `legacy_unindexed`. Their dispatch and release are fenced by rule 1a's legacy predicate, not by the drain.
 
 ## 6. Closure record and kinds
 
@@ -279,7 +308,8 @@ pub struct AuthoritySpaceClosureV1 {
     pub state: AuthoritySpaceClosureState, // Fencing, Fenced, Draining, Closed
     pub fence_commits: Vec<ClosureFenceCommit>,
     pub drain: DrainLedger,
-    pub stranded: StrandedCapacity,        // section 8
+    pub stranded_at_fence: StrandedCapacity,         // section 8: snapshot at Fenced
+    pub stranded_final: Option<StrandedCapacity>,    // section 8: recomputed after the drain; Some only in Closed
     pub enumeration: EnumerationCompleteness,
     pub batch_id: Option<AdmissionDigest>,
     pub version: u64,
@@ -316,7 +346,7 @@ Rules:
 3. CAS the record to `Fenced`.
 4. CAS to `Draining` and run the drain.
 5. Withdraw (section 6.5).
-6. When every ledger entry is terminal or incident-bound, sign the artifact, CAS to `Closed`, and emit exit hints.
+6. When every ledger entry is terminal or incident-bound, recompute `stranded_final` (section 8), sign the artifact, CAS to `Closed`, and emit exit hints.
 
 ```text
 fenced(c) and binds(op, space(c)) and durable(op) and fence_in_admission_store(c)
@@ -369,6 +399,7 @@ These are quoted from their sources and are normative for every closure kind:
    - Uncertain artifact releases stay pinned (W: `implementation/p4/OPERATIONS.md:143-153`).
    - A confined child's cancellation "does not remove pins, refund, or clear knowledge" (W: `implementation/p5/OPERATIONS.md:114-118`).
    - A parent's joined knowledge is never reset by closing the child or the parent's space.
+9. **Settlement passes the fence.** The settlement crossings `ExternalPrepare { Settle }`, `FederationCosign` and `ChannelReleasePublish` pass the closure fence and the revocation check when the subject they settle committed before the cut (spec 10 section 4.2). New authorizations in a closed space are refused. This keeps items 1 and 2 true after closure.
 
 ## 8. Stranded-capacity accounting
 
@@ -387,11 +418,19 @@ pub struct StrandedCapacity {
 }
 ```
 
-Each entry is computed from the owning store at `Fenced` time, and it is evidence only. A future reclamation design may take a `Closed` artifact as a precondition. This spec defines no reclamation.
+The accounting has two snapshots. Both are evidence only.
+- **`stranded_at_fence`** is computed from the owning stores at `Fenced`. It records what the fence cut off, and it is carried in the `Fenced` artifact.
+- **`stranded_final`** is recomputed after every ledger entry is terminal or incident-bound (section 6.3 step 6), immediately before the CAS to `Closed`, and it is carried in the `Closed` artifact. Recomputing matters because the drain changes the picture:
+  - an operation observed as `DispatchCommitted` at the fence can complete and settle under its live lease, or become outcome-unknown and freeze its hold;
+  - an in-flight knowledge operation can add a pin after the fence.
+
+  The snapshot at the fence cannot report these, so only `stranded_final` lists the final `frozen_holds` and `pinned_artifacts`.
+- **After closure.** Changes after `Closed`, such as a frozen hold later released under section 7.2, are recorded by their own evidence, not by amending the artifact.
+- **Reclamation.** A future reclamation design may take a `Closed` artifact's `stranded_final` as a precondition. This spec defines no reclamation.
 
 ## 9. Exit hints and evidence
 
-- **Kernel sessions.** Hints project onto the closed `HintSubject` vocabulary of `2026-10-04-unified-event-queue-design.md` (section 4):
+- **Kernel sessions.** Hints project onto the closed `HintSubject` vocabulary of `2026-10-04-unified-event-queue-design.md` (spec 5 Part B):
   - `Changed` on `Capability(id)` for every capability id in the closed lineage that a session holds. Lineage fan-out happens at post time, so a session subscribed to a descendant's own id is reached (spec 5 Part B, S5-14);
   - `Terminal` on `Lifecycle` for closed sessions;
   - `Changed` on `Operation` for drained operations the session owns.
@@ -403,7 +442,7 @@ Each entry is computed from the owning store at `Fenced` time, and it is evidenc
   - compensated operations with receipt ids;
   - post-dispatch operations with terminal or incident ids, and flags `admitted_before_cut` or `dispatched_after_fence_unlinearized`;
   - withdrawals;
-  - stranded capacity;
+  - stranded capacity: `stranded_at_fence` in the `Fenced` artifact, and `stranded_final` in the `Closed` artifact (section 8);
   - enumeration completeness.
 - **Trace.** Add `RuntimeTraceEvent::AuthoritySpaceClosureTransition` beside `RevocationCommitted` (M: `kernel/validation/revocation_trace.rs:15`).
 
@@ -469,7 +508,7 @@ This is a proposal. No Lean coverage is claimed.
 ## 15. Rollout
 
 1. **Phase 1.**
-   - Authority refs index; dispatch-commit fence; drain on the revocation trigger; `CapabilitySubtree` closure; artifact; operator authorization.
+   - Authority refs index with backfill and the legacy predicate (section 4.1 rule 1a); dispatch-commit and release fences (rules 3 and 3a); drain on the revocation trigger; `CapabilitySubtree` closure; artifact; operator authorization.
    - `ProcessLivenessGuard` and overlay revalidation (D6).
 2. **Phase 2.**
    - Hosted session closure over AP8; in-process forced close; `ProcessTree` closure; process, workflow and work triggers; delegator and holder authorization.
@@ -483,9 +522,9 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
 ## 16. Tests and conformance evidence
 
 - **Apalache.** `formal/apalache/AuthoritySpaceClosure.tla` composes `RevocationCutCompleteness.tla` with `PostAdmissionDropGuard.tla` and a fence variable.
-  - Invariants: no dispatch commit after a co-located fence; no compensation after dispatch commit or committed capture; no release outside {`PreDispatchNoEffect`, `TransportNotAccepted`}; `Closed` implies a terminal ledger.
-  - Mutants: drop the `NOT EXISTS` clause; compensate a `DispatchCommitted` operation.
-- **Loom.** Race fence commit against the `DispatchCommitted` CAS; exactly one order wins and the loser reclassifies.
+  - Invariants: no dispatch commit after a co-located fence; no output release after a co-located fence (rule 3a); no dispatch or release of a `legacy_unindexed` operation once a fence exists (rule 1a); no compensation after dispatch commit or committed capture; no hold release outside {`PreDispatchNoEffect`, `TransportNotAccepted`}; `Closed` implies a terminal ledger.
+  - Mutants: drop the `NOT EXISTS` clause; drop it from the release check; drop the legacy predicate; compensate a `DispatchCommitted` operation.
+- **Loom.** Race fence commit against the `DispatchCommitted` CAS, and against the release-bearing finalization commit; exactly one order wins and the loser reclassifies.
 - **Kani.** The shared classifier is total and never maps a post-dispatch or capture-committed state to compensation.
 - **Proptest.** Random trees, process cancels, D1 subdivisions and seals, and S1 extensions under closure. Sealed permits and earned claims are unchanged, and the stranded ledger matches the store.
 - **Unit.**
@@ -496,6 +535,9 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
   - `extend_swarm_authority_bundle` rejects a tombstoned graph.
   - D1 `seal_dispatch` rejects under a fenced root, while a previously sealed permit still verifies.
   - AP8 partial progress keeps the record in `Fencing`.
+  - A closure committed after `DispatchCommitted` and before release withholds the output, for caller-executed, native and ordinary durable returns, and the operation terminalizes as `DeniedAfterDelivery`. A restart between the refusal and the terminal completes the terminal.
+  - Migration backfill: indexed operations re-derive equal refs. A `legacy_unindexed` operation whose coordinator holds the lease fails its dispatch CAS once any closure fence exists.
+  - Stranded accounting: an operation that settles, or becomes outcome-unknown, during the drain, and a pin added after the fence, appear in `stranded_final` and not in `stranded_at_fence`.
 - **Conformance.**
   - Extend `chio-conformance` active-defense tests with "suspend after admission" and "process cancel during dispatch".
   - Add "close parent with earned child", in which the child claim stays `Payable` and the parent escrow follows its deadline.
@@ -520,6 +562,17 @@ Open decisions and pushback:
 5. **Emergency stop persistence.** Resolved by `2026-10-04-durable-stop-epoch-design.md`. It defines a hash-chained `StopEpochV1` in the admission writer, checked inside every crossing transaction from section 4.3, and loaded before readiness. A stop never closes, revokes or drains. Closure stays this spec's manual operation, and closure ops remain allowed while stopped (stop spec S17). Background follows (EV11/AC6). A shipped precedent exists in W:: `set_semantic_emergency_stop(scope, bool)` persists a scoped stop as a recovery `command` record, and capture and submission transactions check it (W: `admission_operation_store/semantic.rs:355-372`; `semantic/capture.rs:47`, `:294`, `:336`). A kernel-wide stop should reuse that shape: persisted in the serving writer, and checked inside each capture or dispatch-commit transaction.
 6. **Reclamation.** Should a future design permit reclamation of `d1_unsealed_remainder` after a `Closed` artifact proves no outstanding seals? Section 7 rule 4 forbids it today.
 7. **Federated drain defaults.** What should be the default for reactive drain on federated revocation, and how long should closure records be retained?
+
+## Review disposition
+
+### Codex review (PR #1174, round 1)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180274509 | Project workflow exit hints from the implemented event chain | Already addressed in revision 3 (wave 2 parent edit): workflows use the recovery event chain, whose global `sequence` column is the cursor. The R: outbox is not relied on | Section 9 |
+| 4180389987 | Fence ordinary output release during closure | Fixed now. Caller-executed, native and ordinary durable releases run the closure-fence predicate in the finalization commit. A refused release terminalizes as `DeniedAfterDelivery` with output withheld | Section 4.1 rules 3a and 4; section 4.3 table; section 5 drain row; section 16 |
+| 4180389999 | Recompute stranded capacity after the drain | Fixed now. `stranded_at_fence` goes in the `Fenced` artifact, and `stranded_final`, recomputed after the ledger is terminal, goes in the `Closed` artifact and is the reclamation precondition | Sections 6.1, 6.3 step 6, 8 and 9; section 16 |
+| 4180435346 | Backfill authority refs before enabling closure fences | Fixed now. The migration backfills and verifies refs. Operations it cannot index are `legacy_unindexed`, and a legacy predicate in the dispatch CAS and release check refuses them once any fence exists. The predicate is removed only when none remain | Section 4.1 rule 1a; section 5 enumeration; section 16 |
 
 ## Appendix A. FTL reference
 
