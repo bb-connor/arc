@@ -50,14 +50,17 @@ CARGO_TARGET_DIR="${TARGET_DIR}" cargo build --locked --release --lib --target x
 
 CARGO_TARGET_DIR="${TARGET_DIR}" cargo run --locked -p chio-kernel-mobile --example bindgen -- \
   generate --language swift --no-format --out-dir "${SWIFT_OUT}" "${UDL}"
-python3 - "${SWIFT_OUT}/chio_kernel_mobile.swift" <<'PY'
+python3 - "${SWIFT_OUT}/chio_kernel_mobile.swift" \
+  "${SWIFT_OUT}/chio_kernel_mobileFFI.h" \
+  "${SWIFT_OUT}/chio_kernel_mobileFFI.modulemap" <<'PY'
 from pathlib import Path
 import sys
-path = Path(sys.argv[1])
-# Normalize generated comments to the repository's documentation style.
-lines = (line.replace('\u2014', '-') if line.lstrip().startswith('//') else line
-         for line in path.read_text().splitlines())
-path.write_text('\n'.join(line.rstrip() for line in lines) + '\n')
+# Normalize generated text before packaging, hashing and native testing.
+for argument in sys.argv[1:]:
+    path = Path(argument)
+    lines = (line.replace('\u2014', '-') if line.lstrip().startswith('//') else line
+             for line in path.read_text().splitlines())
+    path.write_text('\n'.join(line.rstrip() for line in lines) + '\n')
 PY
 cp "${SWIFT_OUT}/chio_kernel_mobileFFI.h" "${HEADERS_OUT}/"
 # XCFramework consumers discover the C module only under this canonical name.
