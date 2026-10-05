@@ -183,6 +183,7 @@ pub enum StopTransition {
     Relax,     // Stopped -> Stopped, widening allow_containment; authorized like Resume
     Resume,    // Stopped -> Running
     Rollover,  // first record of a new chain generation; restates the head's state and allow_containment, changes nothing (S6)
+    Migration, // S5 only: (generation 1, epoch 1) of a Recovery scope with a legacy stopped value; yields Stopped
 }
 
 pub enum StopState { Stopped, Running }      // derived from the transition
@@ -227,7 +228,7 @@ pub struct StopRequestRecord {
 
 pub enum DecisionTime {
     Observed(UnixMillis),                    // observe_authority_time inside the write transaction
-    Unavailable,                             // Stop, Restrict and Rollover only (S4, S6)
+    Unavailable,                             // Stop, Restrict, Rollover and Migration only (S4, S5, S6)
     Attested(TimeAttestationRef),            // break-glass Resume (S19)
 }
 
@@ -264,7 +265,13 @@ Normative rules:
        - `state`, `allow_containment` and `expected_epoch` restate the previous generation's final record (its state, its containment flag, and its id).
        - `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" || canonical(expected_epoch) || previous)`. That is a fixed domain string plus the restated head id and digest, with no salt and no note row, because there is no operator text to protect. A verifier recomputes it.
        - `decided_at` is `Observed` when authority time is available, else `Unavailable`. A rollover never waits on the clock.
-     - **Migration** (S5). `contributors` is empty, `authorizer` is `LegacySemanticStop`, and `requested_via` is `Migration`.
+     - **`Migration`** (S5). The transition is `Migration`, never `Stop`, because no request exists. It is valid only as `(chain_generation 1, epoch 1)` of a `Recovery` scope with no earlier record, written by the S5 startup migration. A verifier refuses a `Migration` record at any other position, in any other scope kind, or after any other record.
+       - `state = Stopped`. `allow_containment` is the deployment's default for new stops (S12), recorded explicitly.
+       - `contributors` is empty, `satisfies_intent` is `None`, `authorizer` is `LegacySemanticStop`, and `requested_via` is `Migration`.
+       - `expected_epoch = (1, 0)`, and `previous` is zero.
+       - `reason_commitment = SHA-256("chio.stop-epoch.migration.v1\0" || legacy_key)`, where `legacy_key` is the UTF-8 bytes of the W: key `semantic-stop:{scope}`. It has no salt and no note row, and a verifier recomputes it.
+       - `decided_at` is `Observed` when authority time is available, else `Unavailable`. Migration never waits on the clock.
+       - No other transition may carry `LegacySemanticStop` or `requested_via: Migration`.
    - The table joins the global commit chain projection coverage, as W:'s recovery projection kind does.
 - **S3. Head.**
    - The head for a scope is its highest `StopEpochId`, which is always in its current chain generation. A scope with no record is `Running`.
@@ -274,7 +281,10 @@ Normative rules:
    - If time is unavailable, including when the wall clock is below the persisted floor (M: `schema/clock.rs:35-50`), a `Stop` or `Restrict` still commits with `DecisionTime::Unavailable`. This preserves the AC6 rule that stopping never depends on the clock.
    - A `Resume` or `Relax` without authority time refuses, unless it is the break-glass path (S19).
 - **S5. Migration of the template.**
-   - At startup, any existing W: `semantic-stop:{scope}` record whose value is `true` becomes a `Recovery` scope head. It is written as epoch 1 with authorizer `LegacySemanticStop` and `requested_via: Migration`.
+   - At startup, any existing W: `semantic-stop:{scope}` record whose value is `true` becomes a `Recovery` scope head. It is written as a `Migration` record at `(1, 1)` under S2's `Migration` field rules, so the scope comes up `Stopped`.
+   - The migration runs in S9 step 2, before the heads are installed in step 3, in the same transaction that creates the stop chain table. A legacy stopped scope is therefore never observed `Running`, even for one request.
+   - Like a stop, the `Migration` record takes the commit-first signing obligation (S38). A resume of the migrated scope refuses with `StopEvidencePending` until it is signed.
+   - A legacy value of `false`, or no legacy value, writes no record, and the scope is `Running` (S3).
    - The four W: check points call the unified `stop_state(tx, kind, &[Recovery(scope), Tenant(t), Kernel])` in place of `stopped(tx, scope)`.
    - `set_semantic_emergency_stop` becomes a thin wrapper that requires an authenticated actor (section 9) and takes the serving fence.
    - Stopping a recovery scope never depends on whether a semantic registry is installed. The `installation(&tx, scope)` precondition (W: `semantic.rs:375-376`) applies only to the legacy write path, which migration retires.
@@ -368,7 +378,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 
 - **S9. Heads first, then the sweep.** Startup runs in this order:
    1. Open the store as serving owner. The anchor is reconciled (M: `rollback_anchor.rs:106-130`).
-   2. Check the stop chain table under the schema gate (section 13a). A table that is absent before migration is created by the migration in the same step. A table that is missing when the schema version claims it means not ready, with reason `stop_chain_missing`.
+   2. Check the stop chain table under the schema gate (section 13a). A table that is absent before migration is created by the migration in the same step, which also writes S5's `Migration` records for legacy stopped scopes. A table that is missing when the schema version claims it means not ready, with reason `stop_chain_missing`.
    3. Read the stop-intent journal (S25). Verify S2 for every scope chain. Install `StopHeads` as the verified heads, overlaid with every intent entry that its scope's anchored head does not satisfy (S25), one per scope.
    4. Run reconciliation. `reconcile_durable_admission_startup` (M: `recovery.rs:108`) is many transactions, not one. Each finalization or release step consults the installed heads:
       - a `KernelStopped` refusal is **Retain**: the operation stays `Finalizing` with output withheld, and the sweep does not record a `deferred_failure` for it;
@@ -607,10 +617,10 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
   - In the remote durable profile, the control-plane serving authority that owns the store signs. The edge kernel that relayed the request is named in `requested_via`.
 - **S38. Signing obligation.** `SigningBackend::sign_bytes` is fallible (M: `crates/core/chio-core-types/src/crypto.rs:869`). A stop therefore never waits on the signer, and a resume never commits without its evidence.
     - `record_digest` and `previous` cover the canonical `StopEpochV1` body without the signature. Attaching the signature later changes no chain digest.
-    - **Stop and Restrict commit first.**
-      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, chain_generation, epoch, state = pending)`.
+    - **Stop, Restrict, Rollover and Migration commit first.**
+      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, chain_generation, epoch, state = pending)`. A `Rollover` or `Migration` record, appended by the writer with no request, gets the same obligation as an operator's stop.
       - After the commit and anchor sync, the writer signs the body. It stores the artifact, and marks the obligation `signed`, in a progress-only commit.
-      - A signing failure leaves the stop committed and enforced. The route still returns `stop_durable`, with `evidence: pending`.
+      - A signing failure leaves the record committed and enforced. For a stop or restrict, the route still returns `stop_durable`, with `evidence: pending`. A rollover or migration has no route caller, so the status route reports `evidence_pending` for the scope.
     - **Reconciliation.**
       - A supervised task retries pending obligations with backoff, and boot re-drives them after S9 step 3.
       - The trace event and the SIEM export fire only for signed artifacts.
@@ -620,9 +630,9 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - A signing failure or timeout rolls the transaction back. The head stays `Stopped`, and the route returns `ResumeRefused { reason: EvidenceUnavailable }`.
       - Holding the writer for at most `stop_sign_timeout` is acceptable for a rare, operator-driven transition that runs in the priority lane (S36).
     - **No resume over missing evidence.**
-      - `Resume` and `Relax` refuse with `StopEvidencePending` while any earlier record of the scope has a pending obligation, and with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25).
+      - `Resume` and `Relax` refuse with `StopEvidencePending` while any record of the scope's chain, in any chain generation and of any transition (`Stop`, `Restrict`, `Rollover`, `Migration`), has a pending obligation. They refuse with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25).
       - A scope whose stop evidence is unsigned therefore stays `Stopped`, and the kernel never returns to `ready` for that scope until reconciliation signs the stop.
-      - Only a signed resume can make a head `Running`, so a running head's whole chain is backed by signed artifacts.
+      - Only a signed resume can make a head `Running`, and it can commit only when every earlier record is signed. A running head's whole chain, across every generation, is therefore backed by signed artifacts.
 - **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, id: StopEpochId, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
 - **Status route.** It returns `{ readiness, stopped, scope_heads: [...], host_latch, durability, stop_enforcement, withheld_operations, withheld_volatile }`. The existing `stopped`, `since` and `reason` fields stay as a projection of the kernel-scope head, with `reason` taken from the redacted note.
 - **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }` and `chio_runtime.identity_disposition`, which always agree (S15, spec 9 M20). The `chio_runtime` block is kernel-reserved: caller-supplied metadata carrying it is rejected before evaluation. M: does not reserve it today (`kernel/mod.rs:151-159`), so this is a kernel change. `observed_epoch` is a `StopEpochId`. Tier 1's view can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
@@ -683,13 +693,16 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
           - the signature verifies against the pinned origin key;
           - `shard_id` is its own;
           - `nonce` is outstanding, and the shard consumes it on first use;
-          - `origin_head` is not behind the last head the shard accepted.
+          - `origin_head` is not behind the last head the shard accepted;
+          - `origin_head` equals the shard's replica head, **and** `origin_head_digest` equals the digest of the shard's local record at that position. Comparing positions alone is never enough.
+        - **Fork.** A response at the shard's position whose `origin_head_digest` differs from the local record's digest is a fork, for example after a whole-volume restore of the origin (S34) produced a different signed record at the same `(chain_generation, epoch)`. The shard latches as in "Lost origin" with `reason: stop_origin_forked` and never renews. Only operator reconciliation clears a fork. The same holds when catching up: a replicated record whose `previous` does not equal the digest of the shard's record before it is a fork.
+        - **Ahead.** A response whose `origin_head` is ahead of the replica head renews nothing. The shard takes the "Behind" path, and its lease renews only on a later response that matches its caught-up replica by position and digest.
         - **Lease extent.** An accepted response extends the lease to `sent_at(nonce) + shard_origin_lease`, measured from when the poll was sent, not when the response arrived. A delayed response can therefore never stretch the lease past its own challenge.
         - **Rejection.** A replayed, stale, foreign or unknown-nonce response is discarded and renews nothing. A response whose head is behind the last accepted head is a regression: the shard latches as in "Lost origin" with `reason: stop_origin_regressed`.
         - **Hints only.** Fan-out heartbeats and replicated records never renew the lease. A heartbeat that shows an origin head above the replica's triggers the "Behind" path and an immediate poll; nothing else.
       - The lease lasts `shard_origin_lease` (default 1 s), measured on the shard's monotonic clock, never on authority time.
       - **Bound under replay.** Replaying or delaying origin messages can only withhold renewals, so it can make the shard fail closed sooner. It can never extend the lease.
-    - **Behind.** When a renewal shows an origin head id above the replica's head id, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
+    - **Behind.** When a response or heartbeat shows an origin head id above the replica's head id, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
     - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds, and returns to service only after a fresh read shows its replica's head id at or above the origin's.
     - **Acknowledgement bound.**
       - The origin reports a shard as `enforced` when its replica reaches the stop record's id. Otherwise it reports `fenced_by_lease`, with the time at which that shard's lease expires.
@@ -762,6 +775,8 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | Resume or relax while a same-scope stop or restrict intent is pending | Refused with `StopIntentPending`; the intent applies first (S25, S31) |
 | A committed stop record is wider than, or older than, the merged intent | The entry is not retired; the writer applies it again as a `Restrict` built from the current generation. A crash in between restores the narrower policy at boot (S25) |
 | A latch-only stop, then a narrowing request for the same scope, then a crash | The entry holds both contributors at generation 2. Boot honors it as `Stopped` with containment refused; the first write appends one `Stop` at `head.epoch + 1` that carries both contributors (S25) |
+| Origin response at the shard's position with a different head digest | Fork (for example, a whole-volume restore at the origin): the shard latches the kernel scope `Stopped`, goes `not_ready { stop_origin_forked }`, and never renews. Operator reconciliation clears it (S37) |
+| Artifact signing fails for a rollover or migration record | The record stays committed and enforced. The obligation is retried and re-driven at boot. The status route reports `evidence_pending`, and resume and relax refuse with `StopEvidencePending` until it is signed (S38) |
 | Artifact signing fails for a stop or restrict | The stop stays committed and enforced, and the route returns `stop_durable` with `evidence: pending`. The obligation is retried, and re-driven at boot. Resume and relax refuse with `StopEvidencePending` (S38) |
 | Artifact signing fails or times out for a resume or relax | The transaction rolls back, and the head stays `Stopped`. The route returns `ResumeRefused { EvidenceUnavailable }` (S38) |
 | Database-only restore behind the stop | Anchor refuses; not ready (S34) |
@@ -835,6 +850,9 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - A shard offline during the fan-out, then restarted: it is not ready until caught up (S37).
   - A serving shard partitioned from the origin, then a kernel stop at the origin: within `shard_origin_lease` the shard refuses `Deny` crossings and reports `stop_origin_stale`. After it reconnects, it serves again only once its replica holds the stop (S37).
   - **Replayed freshness evidence (Codex round 8).** Capture a pre-stop origin response and a pre-stop fan-out heartbeat. Commit a kernel stop at the origin, cut the shard's polls, and replay both repeatedly. Neither renews the lease. The lease expires no later than `shard_origin_lease` after the shard's last fresh poll was sent, and the shard reports `stop_origin_stale`. Responses with a consumed nonce, an unknown nonce, another shard's id, a bad signature, or a head behind the last accepted head never renew. The last of these latches with `stop_origin_regressed`. A response delayed past its poll extends the lease only to `sent_at + shard_origin_lease` (S37).
+  - **Legacy migration (Codex round 9).** Seed a W: store with `semantic-stop:{scope} = true`, then upgrade and start. The scope's first record is a `Migration` at `(1, 1)`, `Stopped`, with empty `contributors`, `authorizer: LegacySemanticStop` and the fixed reason commitment. Recovery crossings for the scope deny from the first request. A verifier refuses a `Migration` record at `(1, 2)`, in a kernel scope, or after a `Stop`. A legacy `false` writes nothing.
+  - **Unsigned rollover or migration blocks resume (Codex round 9).** Make the signer fail during an automatic rollover, and separately during a migration. Each record commits with a pending obligation. A resume refuses with `StopEvidencePending` until reconciliation signs it, across the generation boundary.
+  - **Equal-position origin fork (Codex round 9).** A shard replica holds a `Running` record at `(1, 7)`. Restore the origin's whole volume from a snapshot and append a different `Stopped` record at `(1, 7)`. The shard's next challenge response carries a matching position, a fresh nonce and a valid signature, but a different `origin_head_digest`. The shard latches with `stop_origin_forked`, refuses `Deny` and `Withhold` crossings, and never renews.
   - **Rollover representability (Codex round 8).** An automatic rollover produces a record with empty `contributors`, `satisfies_intent: None`, `authorizer: ChainRollover { serving_owner, writer_epoch }`, `requested_via: SystemRollover`, and the fixed reason commitment, which verifies. A verifier rejects four records: a `Rollover` with a contributor; a `Rollover` whose reason commitment, state or `expected_epoch` does not restate the previous generation's final record; a `Stop` with authorizer `ChainRollover`; and a `Stop` whose authorizer differs from `contributors[0]` (S2 field rules).
 - **Crash injection** (store test hooks).
   - Commit a stop, kill before the head swap, restart: the kernel comes up stopped.
@@ -1001,6 +1019,14 @@ Open decisions:
 |---|---|---|---|
 | R-8-02 | Slow-path terminal stop denials are marked retryable after resume | Fixed. `retryable_after_resume` must equal spec 9 M20's `identity_disposition == Reusable`. It is `false` for compensated slow-path and `Prepared`-intent stop denials and for the `NonDurable` effect, and `true` only for tier-1, fused-from-`Unbegun` and check-only refusals. S15 gains the missing `Prepared` row. Per-path tests are separate for early, fused, prepared, slow, parked, post-effect, check-only and `NonDurable` | S15; section 10 deny receipts; section 17 |
 | R-6-05 / R-6-06 (cross-reference) | Kernel-reserved receipt metadata | Fixed. The `chio_runtime.stop` block, with `chio_runtime.identity_disposition`, is kernel-reserved, so caller metadata can never set or override it. This is a kernel change: M: reserves seven other keys (`kernel/mod.rs:151-159`) | section 10 deny receipts; S15 |
+
+### Codex review (PR #1174, round 9)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185756902 | Define an encodable legacy migration transition | Fixed now. `StopTransition::Migration` is a new variant with its own S2 field rules: valid only at `(1, 1)` of a `Recovery` scope with no earlier record; `Stopped`; empty `contributors`; `authorizer: LegacySemanticStop`; `requested_via: Migration`; `satisfies_intent: None`; a reason commitment over a fixed domain string and the legacy key. S5 writes it in S9 step 2, before the heads are installed, so a legacy stopped scope comes up `Stopped` | `StopTransition`; S2; S5; S9; section 17 |
+| 4185756924 | Create signing obligations for rollover records | Fixed now. `Rollover` and `Migration` take the commit-first signing obligation and reconciliation path, like `Stop` and `Restrict`. Resume and relax refuse with `StopEvidencePending` while any record of the scope's chain, in any generation, is unsigned | S38; section 14; section 17 |
+| 4185756940 | Reject equal-position origin forks before renewing the lease | Fixed now. Acceptance requires the origin head to equal the replica head by position **and** digest. An equal position with a different digest is a fork that latches `stop_origin_forked` and never renews. An origin head that is ahead renews nothing and takes the Behind path, and catch-up checks `previous` digests | S37; section 14; section 17 |
 
 ### Codex review (PR #1174, round 8)
 

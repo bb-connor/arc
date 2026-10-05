@@ -227,7 +227,16 @@ receipt.native_launch = ref ->
   and envelope.enforcement_record.state = FullyEnforced
   and not exited_before(dispatch_committed(operation_id))
 
-absent(receipt.native_launch) -> disclosure(receipt) = not_confined(tool_origin)
+receipt.confinement_launch = ref ->
+  sha256(canonical(record(ref))) = ref.record_sha256
+  and record(ref).schema = ref.record_schema
+  and signer(record) in verifier_pinned_kernel_keys
+  and record(ref).enforcement = FullyEnforced
+  and record(ref).attempt_id = ref.attempt_id
+  and not exited_before(dispatch_committed(operation_id))
+
+absent(receipt.native_launch) and absent(receipt.confinement_launch)
+  -> disclosure(receipt) = not_confined(tool_origin)
 ```
 
 6. **Backend-neutral reference.** A tool-lane backend other than the Linux cage (`FirecrackerGuest` today) claims confinement only through `confinement_launch { record_schema, record_sha256, attempt_id }`. The kernel binds it from the connection's prepared delivery under rules 1, 3 and 5, exactly as it binds `native_launch`: only when the referenced record verifies, is `FullyEnforced`, and has not exited at dispatch readiness. Until a backend's dispatch path binds this reference, its records cannot cover production receipts (section 7 rule 3).
@@ -603,6 +612,12 @@ Refinements to the review directives, recorded with evidence:
 |---|---|---|---|
 | R-7-02 | Worker-lane applicability is defined using the evidence whose absence should fail verification | Fixed. The verifier derives the required lanes and the expected worker identity from the agreement scope and signed run plan before reading receipt evidence. The worker lane is required for every in-scope receipt under the worker attempt, whether or not it carries `worker_profile`. A missing profile, a missing launch reference, or a profile that differs from the run plan fails the facet, and an unreferenced record never satisfies a required lane. Tests cover each single-lane omission and a fully absent profile | rule 6.3.3; section 7 rule 3; section 10; section 13 |
 | R-11-05 (spec 7 side) | Pinning bootstrap bytes is treated as proof that those bytes have no external influence | Fixed with spec 11 I7a. The `container` qualification predicate is now a boundary check (image digest equals the run plan), not input pinning. `Verified` attests only "no channel outside mediation". Bootstrap contributions are joined under I7a, and pinned ones are `External` without an operator-signed assertion. S1-S5 note that boundary qualification is not input trust | S1-S5 note; rule 6.3.5; section 6.3 formal block; section 10; section 13 |
+
+### Codex review (PR #1174, round 9)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185756917 | Exempt backend-neutral references from the absence predicate | Fixed now. A receipt is classified `not_confined` only when both `native_launch` and `confinement_launch` are absent. `confinement_launch` has its own verification predicate (record digest, schema, pinned signer, `FullyEnforced`, attempt id, not exited before dispatch), so valid Firecracker or other backend-neutral evidence is accepted | section 5.1 predicate; rule 6 |
 
 ## Appendix A. FTL reference
 
