@@ -793,7 +793,7 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 | T3 `no_compensation_after_commit` | `Compensate` only from pre-dispatch phases with capture not committed, and never while a submitted dispatch-commit crossing has no terminal reply | spec 4 section 5 |
 | T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`, and the last only on a zero recomputed amount or `DeniedAfterDelivery`; it emits `ReleaseHold` only on a `ReleaseAuthorized` event in `Terminal(OutcomeUnknownAfterDispatch)` with a frozen hold | saga rule 6 |
 | T5 `terminal_absorbing` | no transition leaves a terminal phase; `ReleaseAuthorized` changes only `unknown_hold` | saga rule 4 |
-| T6 `unknown_stays_unknown` | no `Dispatch` and no `MachineRelease` after `OutcomeUnknownAfterDispatch`; the only hold release is a counterparty-authorized `ReleaseHold`; `unknown_hold = Released(a)` only on the acknowledgement of the `ReleaseHold` for `a`, with at most one `ReleaseHold` outstanding per operation; `ReleaseSubmitted` returns to `Frozen` only on a definitive keyed rejection or a successful fence, and every release of one hold carries the same `hold_release_key` | saga rule 6 |
+| T6 `unknown_stays_unknown` | no `Dispatch` and no `MachineRelease` after `OutcomeUnknownAfterDispatch`; the only hold release is a counterparty-authorized `ReleaseHold`; `unknown_hold = Released(a)` only on the acknowledgement of the `ReleaseHold` for `a`, with at most one `ReleaseHold` outstanding per operation; `ReleaseSubmitted` returns to `Frozen` only on a definitive keyed rejection or a successful fence, and within one `attempt_generation` every release of the hold carries the same `hold_release_key`; `attempt_generation` increments only in the transaction that writes `release_abandoned` (definitive keyed rejection or successful fence), so a key rotates only after its request is provably dead | saga rule 6 |
 | T7 `fence_dominance` | a policy refusal on any dispatch-commit step (fast or slow) or check-only crossing never leads to `Dispatch`; a refusal on an outcome or release commit never leads to an `Allow` receipt | spec 8 S7/S15, spec 4 section 4.1, spec 11 |
 | T8 `post_effect_discharge` | every post-dispatch phase has an enabled transition to the M14 discharge set, or to `HaltOperation`, under the named fair events; none returns to a pre-dispatch phase; each handed-off operation acknowledges exactly one discharge | spec 3 section 4.11 |
 | T9 `plan_order` | participants are acknowledged in plan order or by the combined acknowledgement; `Authorized` exactly when the plan is complete | both legacy orderings |
@@ -1017,6 +1017,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 |---|---|---|---|
 | 4186194337 | Include committed captures in the outcome-unknown invariant | Fixed now. The predicate uses `effect_crossed(s, cause, f)`, which covers `DispatchCommitted` and, under `AuthorityCut`, `CapturePending` with a committed capture, matching the section 6.1 `X` row | section 6.1 predicates |
 | 4186194349 | Rotate the release key after proving non-acceptance | Fixed now. `hold_release_key` includes a persisted `attempt_generation`. It is incremented only in the same transaction as `release_abandoned`, which requires a definitive keyed rejection or a successful fence, so a replacement release gets a fresh key only after the old request is provably dead | M7a |
+
+### Codex review (PR #1174, round 12)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186364916 | Update T6 for per-attempt release keys | Fixed now. T6 scopes key equality to one `attempt_generation` and asserts that the generation increments only with `release_abandoned`, so the theorem matches M7a's rotation after proven non-acceptance | T6 |
 
 ## Appendix A. External and FTL precedent
 

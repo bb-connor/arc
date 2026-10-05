@@ -210,7 +210,7 @@ pub struct AuthorityFaultV2 {
 - A deny receipt carries at most one fault block.
 
 **Planner fact.**
-- When a recovery deployment covers the denied request's scope, the kernel also exposes the class through the recovery observation as the existing `ExplanationFactKind::Capability`, with value `false`. The fact gains an optional typed annotation `{ class, resolver_classes }` carrying the same values as the block.
+- When a recovery deployment covers the denied request's scope, the kernel also exposes the class through the recovery observation as the existing `ExplanationFactKind::Capability`, with value `false`. The fact gains an optional typed annotation `{ class, resolver_classes, security_binding_digest? }` carrying the same values as the block. `security_binding_digest` is the opaque digest of the trusted selection, computed by the native evaluation that produced the denial and recorded in native flow state, so the planner never needs the receipt for it.
 - The fact is derived from native flow state, not from the receipt, which keeps W:'s rule that facts never come from receipt verdicts.
 - The planner never reads the receipt.
 - `FaultKind::Integrity` projects to the new `ExplanationFactKind::Integrity`, with value `false` (spec 11 I20). Only spec 11 I20's two remedy paths may address it. The `Authority` remedy kind never addresses an `Integrity` fact, and no integrity remedy addresses a `Capability` fact.
@@ -334,7 +334,7 @@ These run in the recovery capture participant for `AuthorityContinuation` workfl
 2. **Subset.**
    - For `Delegator`, chain validation proves the new authority is a subset of the delegator's grant (M: `attenuation.rs:224`).
    - For `ReceiverIssuer`, the issuing key was an active head at issuance (M: issuer-lifecycle design `:11-12`).
-3. **Binding.** The continuation's subject equals the fault's subject, and its canonical argument hash equals the fault's `parameter_hash`. When the fault carries `security_binding_digest`, the current trusted selection produces the same digest. When D1 is not installed, the capability's `RecoveryContinuationBinding` equals the workflow's `continuation_id`, request namespace digest, request id and `parameter_hash`.
+3. **Binding.** The continuation's subject equals the fault's subject, and its canonical argument hash equals the fault's `parameter_hash`. When the fault carries `security_binding_digest`, the current trusted selection produces the same digest. The capture step reads the digest from the predecessor record's `predecessor_fault { class, security_binding_digest }`, copied from the native observation at linked-workflow creation. If the native observation recorded a trusted selection but the record lacks its digest, capture refuses (`binding_mismatch`), failing closed. When D1 is not installed, the capability's `RecoveryContinuationBinding` equals the workflow's `continuation_id`, request namespace digest, request id and `parameter_hash`.
 
    3a. **Sibling (predecessor) revocation.** Deny if the predecessor seed's `capability_id` is revoked, or if any capability id in that capability's own delegation chain is revoked. Use the same revocation snapshot as the rest of capture.
    - **Why it is needed.** The new capability is a sibling of the denied one, issued by the resolver, not a descendant. W:'s fresh revocation predicate covers the linked workflow's own seed capability, not the predecessor's.
@@ -550,6 +550,12 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-2-01 | The new capability must contain a digest that hashes that same capability | Fixed. Verified the cycle in W: (`authorization.rs:69-90`, `issuance.rs:76-83`, `token.rs:219-242`, `materialize.rs:285-286`). `RecoveryContinuationBinding` now names `continuation_id`, `request_namespace_digest`, `request_id` and `parameter_hash`, all derived before the capability from `(predecessor_workflow, successor_ordinal)` through W:'s existing workflow, continuation and request-id rules. `ActionIntentV1` is derived afterwards, unchanged. The store and capture check the binding against the recomputed identity. Construction and negative tests added | Revision 4 changes; section 6.2 template, store step 4, binding, "Continuation identity"; section 6.3 step 3; section 7; section 8; section 10; open decision 7 |
+
+### Codex review (PR #1174, round 12)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186364961 | Persist the selection digest in recovery state | Fixed now. The native planner fact's annotation carries `security_binding_digest` from native flow state. The predecessor record stores it in `predecessor_fault { class, security_binding_digest }` at linked-workflow creation, and capture step 3 compares against that record. Missing binding evidence refuses | section 5 planner fact; section 6.4 capture step 3 |
 
 ## Appendix A. FTL reference
 

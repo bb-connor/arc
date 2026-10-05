@@ -681,7 +681,10 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 - **S37. Sharding** (only together with spec 10 section 10).
     - The kernel-scope chain originates in the pool shard.
     - Each tenant shard holds a verified replica: the same record bytes and digests, appended as a restrictive commit in the shard. That replica is what spec 10 X3 needs for a tier-2 check in the shard's own writer.
-    - Shard readiness requires the replica's head id to be at or above the origin's head id, both compared as `(chain_generation, epoch)` and read from the origin at boot. An unreachable origin means the shard is not ready.
+    - Shard readiness requires the replica's head to equal the origin's head exactly, by `(chain_generation, epoch)` and by record digest, read from the origin at boot.
+      - **Replica behind.** It catches up first.
+      - **Replica ahead.** A shard never legitimately outruns its origin, so this is an origin regression, for example a whole-volume rollback. The shard latches `stop_origin_regressed`, latches the kernel scope `Stopped`, and does not serve.
+      - **Unreachable origin.** The shard is not ready.
     - A shard that holds an old generation's high epoch is behind a newer generation's low epoch, because generation compares first. It replicates the `Rollover` record and the new generation's records before it is ready, and its freshness check (below) treats it as behind until then.
     - New shards are seeded with the head before readiness.
     - The operator acknowledgement returns after the origin commit, with per-shard `enforced` status. It never blocks on a dead shard, so stopping stays easy. A shard that misses the fan-out cannot become ready until it catches up.
@@ -1047,6 +1050,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186194363 | Key cooldown observations by the full stop epoch | Fixed now. `admission_operation_stop_observations` is keyed by `(scope_key, chain_generation, epoch)`, and every insert, lookup and comparison uses the full `StopEpochId`. The resume record carries it, so an older generation's observation can never satisfy a new stop's cooldown | S19 |
+
+### Codex review (PR #1174, round 12)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186364947 | Require exact origin equality before shard readiness | Fixed now. Boot readiness requires an exact position and digest match with the origin head. A replica behind catches up. A replica ahead is an origin regression: the shard latches `stop_origin_regressed` and the kernel scope `Stopped`, and does not serve. Spec 10 S3 mirrors this | section 13 sharding; S37 |
 
 ## Appendix A. FTL reference
 

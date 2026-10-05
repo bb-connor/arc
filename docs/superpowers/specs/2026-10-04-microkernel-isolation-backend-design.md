@@ -206,7 +206,7 @@ FTL's single container mixes both lanes in one domain. Its kernel accepts privil
 ### 5.1 `native_launch` is the binding
 
 1. A mediated tool-call receipt claims tool-server confinement only through a kernel-bound launch reference: `native_launch` for the Linux cage, or `confinement_launch` for any other backend (rule 6). The kernel binds either one from the connection's prepared receipt (M:`delivery_preparation.rs:27-58`). No other metadata field may claim it. Host attribution may repeat it, and any difference denies (existing behavior, extended to `confinement_launch`).
-2. **Absence disclosure.** A receipt without `native_launch` renders as "not confined by Chio" (ADR-0011 wording), never as unknown-but-safe. The reason comes from the receipt's existing `tool_origin`, so no new field is needed:
+2. **Absence disclosure.** A receipt with neither `native_launch` nor a verified `confinement_launch` renders as "not confined by Chio" (ADR-0011 wording), never as unknown-but-safe. A receipt carrying a verified `confinement_launch` is confined under rule 6. The reason comes from the receipt's existing `tool_origin`, so no new field is needed:
 
 | `native_launch` | `tool_origin` | Rendered disclosure |
 |---|---|---|
@@ -632,6 +632,12 @@ Refinements to the review directives, recorded with evidence:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186194327 | Permit backend-neutral launches for split-domain profiles | Fixed now. Rule 6.3.4 now records `split_domain` when every planned execution server has a verified backend-appropriate reference, either rule 5.1.3 `native_launch` or rule 5.1.6 `confinement_launch`, matching the round 10 predicate | rule 6.3.4 |
+
+### Codex review (PR #1174, round 12)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186364937 | Qualify absence on both launch reference forms | Fixed now. Rule 2 classifies a receipt as unconfined only when it has neither `native_launch` nor a verified `confinement_launch`, matching the table and the formal predicate | section 5.1 rule 2 |
 
 ## Appendix A. FTL reference
 

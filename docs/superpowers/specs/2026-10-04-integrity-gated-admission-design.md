@@ -432,6 +432,12 @@ action_ok(op)          -> req(op).action_contract = None
                           or (inputs_bound(op)
                               and action(op) = selector(contract(op), values(selector_inputs(op)))
                               and action(op) in authorized(contract(op)))                     (I22a)
+                          or (no_input_ok(op)
+                              and action(op) = no_input_row(contract(op))
+                              and action(op) in authorized(contract(op)))                     (I22a, no typed return)
+no_input_ok(op)        -> no_input_row(contract(op)) is defined
+                          and |selector_inputs(op)| = 0
+                          and for each slot digest d: unconsumed(d, key(op)) = 0
 inputs_bound(op)       -> |selector_inputs(op)| = slots(contract(op))
                           and each input is a committed, slot-matching ExternalBounded return in key(op)
                           and for each digest d: unconsumed(d, key(op)) = slots_d(contract(op)), filled in commit order
@@ -828,6 +834,12 @@ Open decisions:
 |---|---|---|---|
 | 4185993940 | Exempt quarantined successors from parent-state inheritance | Fixed now. I7a gains one fail-closed exception for a child created by I22's verified isolation-epoch transition. It needs a verified `QuarantinedContinuation` remedy record naming the parent and the new epoch, a fresh epoch id, and no parent channel into the successor other than P5 returns. When it applies, the parent's observation set does not cross. Only P5 typed returns (`ExternalBounded`) and the successor's own classified bootstrap contributions do, and a parent-authored task joins as parent influence. Any failed condition falls back to full inheritance, and every other child keeps the never-less-tainted guarantee | I7a; I22 step 1; section 8 predicates; section 15; section 18 |
 | 4185993976 | Reject return types with an empty value domain | Fixed now. Every return type is validated at policy load, before any projection or capacity calculation. An `Enum` has at least one distinct variant. An `Integer` has `min <= max`, computed in 128-bit arithmetic. An `Identifier` has `1 <= min_len <= max_len <= 64` and a non-empty charset with no duplicates inside the restricted set. `N >= 1` always holds, and a malformed contract and every grant referencing it fail to load | I23; type comments; section 15; section 18 |
+
+### Codex review (PR #1174, round 12)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186364901 | Add the no-input case to action_ok | Fixed now. `action_ok` gains an explicit no-input branch: the contract defines a `no_input` row, the call binds zero inputs, no unconsumed return exists under any slot digest, and the action equals that row and is authorized. The normal trusted-context path therefore satisfies the admission invariant | section 8 predicates |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 
