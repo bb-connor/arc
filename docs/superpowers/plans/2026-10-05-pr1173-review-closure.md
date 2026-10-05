@@ -285,3 +285,39 @@ enforcement preflight, all actual broker/key-log binaries, exact test inventory
 and receipt assertions. A shell-boundary regression must observe the unchanged
 caller UID (the original step reproduces UID 0 instead of 1000). Require actual
 x86 lifetime execution before resolving its review thread.
+
+## A2A v1 execution contract follow-up
+
+Review thread `PRRT_kwDOR0fQBc6pOr0X` identifies a real lifecycle defect:
+`returnImmediately: true` accepts work that starts only on `GetTask`. A2A v1
+requires background processing for that execution mode. The existing edge
+borrows `&ChioKernel` per call and owns no background executor. Keep its bounded
+blocking projection; reject this unsupported mode before task creation with
+the standard `UnsupportedOperationError` (`-32004`). Do not detach a borrowed
+kernel, silently block an asynchronous request, or create another scheduler.
+
+- [x] Add real-kernel regressions for unsupported asynchronous requests: preserve
+  the request id, return `-32004`, retain no task, advance no task counter, invoke
+  no tool and write no receipt. Reuse the same message id in a supported blocking
+  request and require exactly one invocation and signed terminal result.
+- [x] Make v1 `GetTask` observe the stored state without starting work. Test a
+  legacy pending task, unchanged authority ownership, repeated observations,
+  and a terminal result produced through the existing slash-form lifecycle.
+  Preserve legacy deferred execution and authenticated-subject capacity limits.
+  Require standard v1 task errors (`-32001` for absent/inaccessible, `-32002`
+  for noncancelable terminal tasks), indistinguishable lookup responses and
+  typed local causes. Bind every legacy and v1 task access to both the retained
+  agent id and capability subject; overlapping host labels must not allow a
+  different subject to read, execute or cancel work. Keep the legacy slash-form
+  error contract unchanged.
+- [x] Align existing v1 and live client-edge tests with blocking-result retirement
+  and unsupported asynchronous mode. Test omitted and explicit `false` settings,
+  text and JSON output, terminal failures, restart identifiers and absence of
+  redispatch after a retired task is queried by a reconnected client.
+- [x] Correct the current crate documentation. Historical experiments remain
+  historical; do not rewrite their recorded protocol or execution evidence.
+- [x] Run full edge tests (116 passed, zero ignored), live conformance (three
+  real HTTP scenarios) and both strict affected Clippy commands.
+- [ ] Commit the source repair. Renew all 21 native qualification commands and
+  the artifact freeze only after the hosted-failure source review is closed.
+  Preserve the c510 interrupted campaign separately, with no aggregate pass.

@@ -199,7 +199,7 @@ impl Host {
 }
 
 #[tokio::test]
-async fn a2a_client_calls_kernel_edge_and_reads_bound_task() {
+async fn a2a_client_reads_signed_blocking_result_without_redispatching_retired_work() {
     let host = Host::start();
     let client = host.client("buyer");
     let output = client
@@ -227,14 +227,38 @@ async fn a2a_client_calls_kernel_edge_and_reads_bound_task() {
     let task_id = output["task"]["id"]
         .as_str()
         .unwrap_or_else(|| panic!("missing fixture value"));
-    // A new client instance resolves the task through its durable local registry.
+    // The client retains its local reference, but the blocking provider has
+    // transferred the result and retired task custody. Reconnecting cannot
+    // recreate or redispatch that completed work.
     let reconnected = host.client("buyer");
-    let polled = reconnected
+    let retired = reconnected
         .invoke("echo", json!({"get_task": {"id": task_id}}), None)
         .await
-        .unwrap_or_else(|error| panic!("{error:?}"));
-    assert_eq!(polled["task"], output["task"]);
+        .err()
+        .unwrap_or_else(|| panic!("retired task unexpectedly remained available"));
+    assert!(
+        matches!(retired, KernelError::ToolServerError(message) if message.contains("A2A JSON-RPC error -32001: task not found"))
+    );
     assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn a2a_client_receives_unsupported_async_mode_without_tool_dispatch() {
+    let host = Host::start();
+    let client = host.client("buyer");
+    let rejected = client
+        .invoke(
+            "echo",
+            json!({"message": "review payments", "return_immediately": true}),
+            None,
+        )
+        .await
+        .err()
+        .unwrap_or_else(|| panic!("unsupported asynchronous work was accepted"));
+    assert!(
+        matches!(rejected, KernelError::ToolServerError(message) if message.contains("A2A JSON-RPC error -32004: configuration.returnImmediately requires a background executor"))
+    );
+    assert_eq!(host.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]

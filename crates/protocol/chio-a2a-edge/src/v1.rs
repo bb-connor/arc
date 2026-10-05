@@ -75,10 +75,13 @@ fn v1_object_metadata(metadata: &Option<Value>) -> Result<(), A2aEdgeError> {
 }
 
 impl V1SendRequest {
-    fn into_internal(
-        self,
-    ) -> Result<(String, SendMessageRequest, bool, V1OutputMode), A2aEdgeError> {
+    fn into_internal(self) -> Result<(String, SendMessageRequest, V1OutputMode), A2aEdgeError> {
         let config = self.configuration.unwrap_or_default();
+        if config.return_immediately {
+            return Err(A2aEdgeError::UnsupportedOperation(
+                "configuration.returnImmediately requires a background executor; use false or omit it",
+            ));
+        }
         if config.history_length != 0 {
             return Err(v1_invalid("task history is not supported"));
         }
@@ -137,12 +140,7 @@ impl V1SendRequest {
         };
         // Validate before retaining a task, including duplicate data parts.
         extract_arguments_from_message(&request.message)?;
-        Ok((
-            message.message_id,
-            request,
-            config.return_immediately,
-            output_mode,
-        ))
+        Ok((message.message_id, request, output_mode))
     }
 }
 
@@ -203,7 +201,7 @@ impl ChioA2aEdge {
         let skill = self.resolve_jsonrpc_target_skill_id(&params)?;
         let parsed: V1SendRequest = serde_json::from_value(params)
             .map_err(|error| v1_invalid(format!("invalid SendMessage request: {error}")))?;
-        let (message_id, request, deferred, output_mode) = parsed.into_internal()?;
+        let (message_id, request, output_mode) = parsed.into_internal()?;
         let task = self.handle_stream_message_with_request_id(
             &message_id,
             &skill,
@@ -214,17 +212,10 @@ impl ChioA2aEdge {
         if let Some(retained) = self.tasks.get_mut(&task.id) {
             retained.v1_output_mode = Some(output_mode);
         }
-        if deferred {
-            return Ok(A2aJsonRpcResponse::response(json!({
-                "jsonrpc": "2.0", "id": id,
-                "result": {"task": v1_task(&task, output_mode)},
-            })));
-        }
         let response = self.complete_task(&task.id, kernel, execution, id);
         let projected = self.v1_project_response(response, true);
         // Blocking responses transfer their terminal result directly to the
-        // caller. Only explicitly deferred requests retain polling custody.
-        // Cleanup also covers execution and projection errors.
+        // caller. Cleanup also covers execution and projection errors.
         self.tasks.remove(&task.id);
         projected
     }
@@ -286,12 +277,27 @@ impl ChioA2aEdge {
             return Err(v1_invalid("task history is not supported"));
         }
         v1_object_metadata(&parsed.metadata)?;
+        let now = kernel.authority_clock_reading()?;
+        self.prune_deferred_tasks(now)?;
+        validate_execution_context(execution, &self.config.peer_capabilities)?;
+        // Inaccessible and absent tasks have the same public error. Neither
+        // observation nor lookup grants authority to start their execution.
+        let task = self
+            .tasks
+            .get(&parsed.id)
+            .filter(|task| task.is_owned_by(execution))
+            .ok_or_else(|| A2aEdgeError::TaskNotFound(parsed.id.clone()))?;
+        if method == "GetTask" {
+            let mode = task.v1_output_mode.unwrap_or(V1OutputMode::Json);
+            return Ok(A2aJsonRpcResponse::response(json!({
+                "jsonrpc": "2.0", "id": id, "result": v1_task(&task.response, mode),
+            })));
+        }
+        if task.response.status.is_terminal() && task.response.status != TaskStatus::Cancelled {
+            return Err(A2aEdgeError::TaskNotCancelable(parsed.id));
+        }
         let params = json!({"taskId": parsed.id});
-        let response = if method == "GetTask" {
-            self.handle_jsonrpc_task_get(id, params, kernel, execution)
-        } else {
-            self.handle_jsonrpc_task_cancel(id, params, kernel, execution)
-        };
+        let response = self.handle_jsonrpc_task_cancel(id, params, kernel, execution);
         self.v1_project_response(response, false)
     }
 }

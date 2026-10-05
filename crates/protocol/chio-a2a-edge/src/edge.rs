@@ -10,6 +10,13 @@ struct DeferredA2aTask {
     v1_output_mode: Option<V1OutputMode>,
 }
 
+impl DeferredA2aTask {
+    fn is_owned_by(&self, execution: &A2aKernelExecutionContext) -> bool {
+        self.owner_agent_id == execution.agent_id
+            && self.request.capability.subject == execution.capability.subject
+    }
+}
+
 /// The A2A edge server.
 ///
 /// Wraps a set of Chio tool manifests and exposes them as A2A skills.
@@ -313,6 +320,9 @@ impl ChioA2aEdge {
             A2aEdgeError::ToolNotFound(message) | A2aEdgeError::InvalidRequest(message) => {
                 (-32602, message.clone())
             }
+            A2aEdgeError::UnsupportedOperation(message) => (-32004, (*message).to_string()),
+            A2aEdgeError::TaskNotFound(_) => (-32001, "task not found".to_string()),
+            A2aEdgeError::TaskNotCancelable(_) => (-32002, "task is not cancelable".to_string()),
             other => (-32603, other.to_string()),
         };
 
@@ -773,14 +783,14 @@ impl ChioA2aEdge {
         }
 
         match self.resolve_task(&task_id, execution) {
+            Ok(response) if response.status == TaskStatus::Working => {
+                self.complete_task(&task_id, kernel, execution, id)
+            }
             Ok(response) => A2aJsonRpcResponse::response(json!({
                 "jsonrpc": "2.0",
                 "id": id,
                 "result": serde_json::to_value(&response).unwrap_or(Value::Null)
             })),
-            Err(A2aEdgeError::InvalidRequest(_)) if self.tasks.contains_key(&task_id) => {
-                self.complete_task(&task_id, kernel, execution, id)
-            }
             Err(error) => Self::jsonrpc_error_response(id, error),
         }
     }
@@ -801,7 +811,7 @@ impl ChioA2aEdge {
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
             );
         };
-        if task.owner_agent_id != execution.agent_id {
+        if !task.is_owned_by(execution) {
             return Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
@@ -886,7 +896,7 @@ impl ChioA2aEdge {
                 A2aEdgeError::ToolNotFound(task_id.to_string()),
             );
         };
-        if task.owner_agent_id != execution.agent_id {
+        if !task.is_owned_by(execution) {
             return Self::jsonrpc_error_response(
                 id,
                 A2aEdgeError::InvalidRequest("task is not owned by the current agent".to_string()),
@@ -930,16 +940,11 @@ impl ChioA2aEdge {
             .tasks
             .get(task_id)
             .ok_or_else(|| A2aEdgeError::ToolNotFound(task_id.to_string()))?;
-        if task.owner_agent_id != execution.agent_id {
+        if !task.is_owned_by(execution) {
             return Err(A2aEdgeError::InvalidRequest(
                 "task is not owned by the current agent".to_string(),
             ));
         }
-        match task.response.status {
-            TaskStatus::Working => Err(A2aEdgeError::InvalidRequest(
-                "task is pending deferred execution".to_string(),
-            )),
-            _ => Ok(task.response.clone()),
-        }
+        Ok(task.response.clone())
     }
 }

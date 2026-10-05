@@ -16,13 +16,20 @@ with standard untagged message parts, task states, and result envelopes.
 execution context supplies authority; message metadata cannot supply it.
 The older slash-form methods remain available for existing integrations.
 
-`SendMessage` blocks by default. With `configuration.returnImmediately: true`,
-it retains a task for execution on `GetTask`. Results and cancellations remain
-retrievable within the existing in-memory task TTL. The 1.0 path limits all
-retained tasks, including completed results. Each edge instance generates a
-fresh task namespace, so a restarted provider rejects old identifiers rather
-than resolving them to unrelated work. This is not durable provider recovery or
-deduplication of repeated `SendMessage` calls.
+`SendMessage` blocks until the kernel returns a terminal result and releases its
+temporary task custody after projection. Both omitted and explicit `false`
+execution modes are supported. `configuration.returnImmediately: true` returns
+`UnsupportedOperationError` (`-32004`) before task creation or kernel dispatch:
+the borrowed-kernel edge has no owned background executor. `GetTask` observes
+stored state and never starts execution. Task lookups return the same
+`TaskNotFoundError` (`-32001`) for inaccessible and absent tasks; cancellation of
+a completed or failed task returns `TaskNotCancelableError` (`-32002`).
+
+The older slash-form lifecycle retains its explicit execution-on-poll contract,
+capacity limits, result retrieval and cancellation within the in-memory TTL.
+Each edge instance generates a fresh task namespace, so a restarted provider
+rejects old identifiers rather than resolving them to unrelated work. Provider
+task recovery and repeated-send deduplication require a durable host lifecycle.
 
 The Agent Card advertises `text/plain` and `application/json`, and does not
 advertise SSE streaming. Multi-turn contexts, tenant routing, history, file
@@ -39,7 +46,8 @@ TLS and protocol-version header enforcement.
   `chio-cross-protocol`'s `CrossProtocolOrchestrator`, mapping kernel
   verdicts to A2A `TaskResponse`s.
 - Bound and prune the deferred task table by capacity and TTL, and restrict
-  polling or cancelling a task to its owning `agent_id`. Retained terminal
+  polling or cancelling a task to its owning `agent_id` and capability subject.
+  Retained terminal
   results count toward capacity; expiry uses the shared wall and monotonic clock.
 - Parse and validate the inbound JSON-RPC envelope, method params, and
   identifier fields before any skill resolution or kernel dispatch runs.

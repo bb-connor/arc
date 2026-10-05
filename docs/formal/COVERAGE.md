@@ -1275,7 +1275,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `1a45297b5a981a385d56d9ac4379e75274811e021faf3c2641f816e9f7eced64`
+- Input digest: `721eefa658b114d8037621f8d2793febeb36f6440b66371fb9532fce54dea068`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1433,7 +1433,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs`: `0aa97e077dc1495e29f6ca87dbb25fe710f74e461d93bed814fea3978603b27c`
 - `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs`: `7d5b306216f3163caad7c0c56cb17b87dda5f9efaef3567ff0adcab5abc7fd2c`
 - `crates/kernel/chio-kernel/src/kernel/tests/budget.rs`: `c3ea1460bd4c7616b9ae3b59dea46840f1b97a70582f2e5db357e6709d8e134d`
-- `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime.rs`: `4a6362d97542b622a62491083535fb81a78c7764c8048bf431b9babb331aa818`
+- `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/child_receipts.rs`: `0a891edf4f79f7158fddd3226a2f908d29aadc8ea89159adf5b63f383870b88c`
+- `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/post_dispatch_retention.rs`: `d4a778658edf1b1167ea00d2e7ba04324aa8c4695e69bf162924fff2ea39a096`
+- `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/pre_dispatch_cleanup.rs`: `12a61e60040ab853f7c3587bad75072ceae1468dab1f9d2720807c9cbe94ddd2`
 - `crates/kernel/chio-kernel/src/kernel/tests/drop_guard_proptest.rs`: `7d18d3aa3d727eb7170dcc29c9d6c20b7128ec06194b51b9f50060f481e72395`
 - `crates/kernel/chio-kernel/src/kernel/validation.rs`: `3f7f1034df0a02ae93b469e5081a1f08a9b597910dcc2f31f8295c5564658408`
 - `crates/kernel/chio-kernel/tests/dst_drop_injection.rs`: `e8bcf4fabef8849958ff7297ae8a0e6164dc9f999d42568a6586dcbc8b89e52a`
@@ -1494,7 +1496,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/apalache/_negative_tests/MCDropGuardSkipInvocationReversalBroken.cfg`: `ebcbd674fb0697fd0c3926386f7f813c12101598fc9a3183cbc1585423f8fa32`
 - `formal/apalache/_negative_tests/MCReceiptBeforeAllowBroken.cfg`: `3e23a139ce2fdae0376cb62c35c98350125d673d8da2e8dfdaa82bfe959854a4`
 - `formal/apalache/_negative_tests/MCRevocationCutCompletenessBroken.cfg`: `83d51064e2a31aab461c5f47e78ad924e65d6c450884f01c48071ae72d09a717`
-- `formal/apalache/_negative_tests/REGISTRY.toml`: `c91b8d60a13a69244492d2b9005bc18cf0e030999699205f5cf163e55bdbb81f`
+- `formal/apalache/_negative_tests/REGISTRY.toml`: `41127f7ed30b33703fb1f34304cc06e746fa73a16b56eb8abac7fbf3364864d0`
 - `formal/apalache/_negative_tests/ReceiptBeforeAllowBroken.tla`: `b7e376d87e4190165778cc15907414d9ab68485637a47a3d049ec4400fc48381`
 - `formal/apalache/_negative_tests/ResponseLifecycleAcknowledgeUnexecutedBroken.tla`: `df8732f4c9f246c4257dee6af6896393cfb8eb6d05ce8f948f36549e145bbde5`
 - `formal/apalache/_negative_tests/ResponseLifecycleActivateUnacknowledgedBroken.tla`: `2bd1af1614da89c290110973b97df8e442f7de77d7a47a23d2c3665d3758556e`
@@ -1550,7 +1552,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `7e0b3aa98015e26b13425608c29fc1a80b60af4f868094d23877c75659552177`
 - `fuzz/target-map.toml`: `c8b3aba1d0dc4c30c5d5445f25b7bad17b5a74eeee18fd1dc6d3e3f86676368e`
-- `git-worktree://rust-files`: `bdd9056a28cd3d27a9b30207261ca2bd78463a6f859e06b4916361c8984af454`
+- `git-worktree://rust-files`: `eda485397edf1069e7d284c2e6bdfa924f12d11ff0382bbb8fed078d0b8f859d`
 - `releases.toml`: `5b3807734b69abf8f4f16c6476a998134588c2cef671cd4e40b6ad3422cf4932`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
