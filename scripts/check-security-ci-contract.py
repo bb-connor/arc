@@ -60,7 +60,7 @@ EXPECTED_SECURITY_IMAGE_FROM = (
     "2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775"
 )
 EXPECTED_APK_LOCK_SHA256 = (
-    "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd"
+    "429a81dbf41fc8ffd14be10418985b9423d5fbfb1098735e7c9ce0d5fe36cbc6"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
     "c72d5b119e3303cbb6b99ca49ee3b0a7feba29a05c832d01ab25de980a27b366"
@@ -119,7 +119,8 @@ printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /us
 /bin/bash -p "${{temporal_runner}}"
 """.strip()
 EXPECTED_DIRECT_APK_PACKAGES = (
-    "/tmp/ca-certificates-20260611-r0.apk",
+    "/tmp/ca-certificates-20260909-r0.apk",
+    "ca-certificates-bundle=20260909-r0",
     "bash=5.2.37-r0",
     "build-base=0.5-r3",
     "cmake=3.31.7-r1",
@@ -129,11 +130,11 @@ EXPECTED_DIRECT_APK_PACKAGES = (
     "jq=1.8.2-r0",
     "linux-headers=6.14.2-r0",
     "libexpat=2.8.5-r0",
-    "openssl-dev=3.5.8-r0",
+    "openssl-dev=3.5.9-r0",
     "pkgconf=2.4.3-r0",
     "protobuf=29.4-r0",
     "protobuf-dev=29.4-r0",
-    "python3=3.12.14-r0",
+    "python3=3.12.15-r0",
     "util-linux=2.41.6-r1",
 )
 EXPECTED_TRUSTED_BOUNDARY_FILES = frozenset(
@@ -2007,16 +2008,16 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         raise ContractError("security execution image APK inventory copy changed")
 
     expected_apk = (
-        "wget -q -O /tmp/ca-certificates-20260611-r0.apk "
+        "wget -q -O /tmp/ca-certificates-20260909-r0.apk "
         "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/"
-        "ca-certificates-20260611-r0.apk",
-        "echo 'a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896 "
-        "/tmp/ca-certificates-20260611-r0.apk' | sha256sum -c -",
+        "ca-certificates-20260909-r0.apk",
+        "echo 'a1258993a229d2fdcc6d9665af75c9305184e4f5e5755c50b9ef0564b35138c4 "
+        "/tmp/ca-certificates-20260909-r0.apk' | sha256sum -c -",
         "apk add --no-cache " + " ".join(EXPECTED_DIRECT_APK_PACKAGES),
         "apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual",
         "cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
         f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
-        "rm /tmp/ca-certificates-20260611-r0.apk "
+        "rm /tmp/ca-certificates-20260909-r0.apk "
         "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
     )
     if shell_clauses(instructions[2][1]) != expected_apk:
@@ -4825,7 +4826,7 @@ def validate_isolated_execution_job(
 # pinned action and unprivileged job setting. Update only after reviewing the
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
-    "threshold-crypto-floor": "8e6a63eec8068921e5d63cd180f4357755c2b85d212edf055bb9826c4c285ed9",
+    "threshold-crypto-floor": "77ba506383be164f9871e4e5fe6c920a300fe4a9d7ef94b605b6ae8f0ebd1447",
     "session-reports": "16ad2e1401ffc2ea0361cc508047e837d6ee3c09a01fa863e9cb3f35a461defc",
     "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
 }

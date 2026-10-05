@@ -189,3 +189,30 @@ control. Run this cheap contract in the formal scope job itself.
 The tracked acceptance ledger is
 `docs/papers/verifiable-work/evidence/pr1173-review/REVIEW.md`. It records final
 source-bound and hosted results separately from these implementation checkpoints.
+
+### Hosted integration corrections
+
+The `eddd3e18c6` image build fails before compilation because Alpine replaced
+OpenSSL 3.5.8 and Python 3.12.14 in its repository. Resolve the pinned Rust 1.95
+x86 base against OpenSSL 3.5.9, Python 3.12.15 and the September 2026 certificate
+package and bundle. Review the entire installed inventory, including the musl
+and Alpine release versions inherited from the new base. Retain all 225 package
+identities, the complete inventory comparison, package signatures and the
+downloaded certificate archive hash. An ARM-native package resolver targeting
+the copied x86 package database can check resolution, but cannot qualify x86
+execution or package install scripts. Require the actual hosted image build.
+
+The same hosted candidate passes all 34 caller-execution tests, then rejects
+the workflow's 33-test inventory. Add the existing v34 schema-migration test to
+that exact inventory, matching `check-authenticated-caller-delivery.sh`. Review
+the one-line workflow addition before rebinding its structural contract. Run
+the corrected inventory and every remaining step of the crypto-floor job;
+preserve the original hosted failure and contract rejection.
+
+The subsequent cumulative-approval sweep exposes a fixture clock regression:
+it truncates wall time to seconds after the kernel has observed milliseconds.
+Install the scoped fixture clock before opening either authority owner, keep
+that scope alive, and advance to the issued nonce's exact expiry. Preserve the
+production monotonic fence, expired-nonce denial, prepared state and zero
+invocation assertions. Require the focused regression and complete nine-test
+cumulative-approval target to pass before continuing the remaining workflow.
