@@ -50,7 +50,7 @@ class GraphTests(unittest.TestCase):
             "receipt": {},
         }
         original = ToolMessage(
-            content=json.dumps({"isError": False, "structuredContent": encoded_body}),
+            content=json.dumps(encoded_body),
             tool_call_id="call",
             artifact={"chio": {"receipt_json": '{ "original": true }'}},
         )
@@ -59,7 +59,10 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(result["messages"][0].artifact, original.artifact)
         self.assertNotEqual(result["messages"][0].content, original.content)
         encoded_body["status"] = 500
-        invalid = original.model_copy(
+        invalid = original.model_copy(update={"content": json.dumps(encoded_body)})
+        with self.assertRaises(WorkerError):
+            graph.decode_prepared_messages({"messages": [invalid]})
+        wrapped = original.model_copy(
             update={
                 "content": json.dumps(
                     {"isError": False, "structuredContent": encoded_body}
@@ -67,7 +70,7 @@ class GraphTests(unittest.TestCase):
             }
         )
         with self.assertRaises(WorkerError):
-            graph.decode_prepared_messages({"messages": [invalid]})
+            graph.decode_prepared_messages({"messages": [wrapped]})
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

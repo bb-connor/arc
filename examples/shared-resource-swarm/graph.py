@@ -122,11 +122,8 @@ def decode_prepared_messages(result):
 
     messages = []
     for message in result["messages"]:
-        value = json.loads(message.content)
-        if value.get("isError") is not False:
-            raise ValueError("prepared resource did not return a result")
-        content = decode_broker_output(value["structuredContent"])
-        if content.get("isError") is not False:
+        content = decode_broker_output(json.loads(message.content))
+        if not isinstance(content, dict) or content.get("isError") is not False:
             raise ValueError("resource returned a tool error")
         messages.append(message.model_copy(update={"content": encoded(content)}))
     return {**result, "messages": messages}

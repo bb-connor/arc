@@ -267,3 +267,20 @@ host state. Require both complete hosted Kani sweeps on the final candidate.
 The source qualification started after the PostgreSQL budget fix was interrupted
 to incorporate this newly observed CI failure. Retain its partial outputs as
 interrupted evidence; run the complete profile after the source repair is frozen.
+
+### Consume the existing verified broker response contract
+
+The `2e296de197` PostgreSQL lane now reaches the first admitted tool result.
+The qualifier incorrectly expects an MCP wrapper around the kernel value.
+`BrokerMcpConnection` already consumes that transport wrapper, verifies the
+broker response, and returns `BrokerExecuteResponse` directly. The installed
+process and LangGraph clients preserve this value. Align both the PostgreSQL
+qualifier and shared prepared-resource graph decoder with that existing
+contract. Keep signature verification, confinement and broker custody unchanged.
+
+Reproduce the failure with the direct broker response shape before the repair.
+Require the decoder to preserve the original response and signed artifact,
+reject an extra wrapper or incomplete broker evidence, and refuse kernel or
+resource errors. Run the complete affected Python suites. Retain the failed
+hosted run separately, freeze the repaired source, and repeat the source-bound
+qualification and both complete x86 PostgreSQL trajectories.

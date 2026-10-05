@@ -18,10 +18,7 @@ from chio_process.invocation import invoke_recorded
 def value(response):
     if response["verdict"] != "allow":
         raise AssertionError("unexpected kernel denial")
-    output = response["output"]["value"]
-    if output.get("isError") is not False:
-        raise AssertionError("unexpected resource error")
-    resource = decode_broker_output(output["structuredContent"])
+    resource = decode_broker_output(response["output"]["value"])
     if not isinstance(resource, dict) or resource.get("isError") is not False:
         raise AssertionError("unexpected prepared resource error")
     return resource["structuredContent"]
