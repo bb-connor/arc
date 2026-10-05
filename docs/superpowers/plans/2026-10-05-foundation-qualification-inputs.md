@@ -163,3 +163,29 @@ only their exact derived paths. Do not append status prose after regeneration.
 The #1029 reconciliation now covers 29 source comparisons across 22 commits and
 all 219 unique commits in the path inventory. Preserve that PR and its remaining
 semantic, compatibility and execution obligations.
+
+### Independent review: computed publication-input paths
+
+GitHub Codex review `5993144649` identifies a P1 on `aa76f23b11`: literal source
+inspection cannot exclude a path assembled dynamically by a build script.
+A real Rust build regression reproduces the changed result after publication.
+
+Ruling: keep the three signed outputs outside candidate execution through the
+existing immutable Git source projection. Reject unknown entries, non-regular
+output modes and non-directory ancestors before materialization. Direct controls
+refuse the namespace before candidate code executes. The original signed files
+remain available to the separate committed-evidence verifier. This fixes the
+qualification boundary without expanding compiler privileges or parsing arbitrary
+Rust expressions as an authorization mechanism.
+
+All 16 focused tests pass, including actual cold Rust builds before and after
+publication. The complete checker fixture block, container controls, all 12
+committed-verifier tests, current CI contract and complete CI mutation suite pass.
+The host runner now has a reviewed full-source commitment, with two regression
+mutations covering projection bypass and unexpected output acceptance.
+
+The superseded native run retains one caught approval mutation and a successful
+baseline, then is cancelled after 1,723.704 seconds with a clean source checkout.
+It is partial component evidence only. The worker is stopped. Review the new
+composition before authorization; all 35 campaigns, terminal hosted checks,
+trusted publication and protected foundation landing remain required.

@@ -5441,9 +5441,36 @@ def prepare_enterprise_descriptor_control(
     environment.update(expected)
 
 
+def require_derived_outputs_absent_for_execution(root: Path) -> None:
+    """Execute only from a source view without signed publication outputs.
+
+    Static reference checks cannot prove what arbitrary build scripts or proc
+    macros read. The isolated runner omits this closed namespace from its Git
+    source projection. Direct invocations must fail before running candidate
+    code when the namespace is present; never delete a caller's signed evidence.
+    """
+    path = lexical_path_below_root(
+        root,
+        root / DERIVED_LINUX_EVIDENCE_ROOT,
+        "derived Linux evidence execution input",
+        allow_missing_parents=True,
+    )
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise EvidenceError("derived Linux evidence execution input cannot be inspected") from error
+    raise EvidenceError(
+        "derived Linux evidence is present during candidate execution; "
+        "use the isolated source projection"
+    )
+
+
 def run_control(
     root: Path, control: dict[str, Any], environment: dict[str, str]
 ) -> None:
+    require_derived_outputs_absent_for_execution(root)
     required_os = control.get("required_target_os")
     if required_os is not None and platform.system().lower() != required_os:
         raise EvidenceError(

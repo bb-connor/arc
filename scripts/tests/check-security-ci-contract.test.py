@@ -1234,6 +1234,24 @@ assert_boundary_file_rejected(
     "seccomp syscall contract changed",
 )
 assert_boundary_file_rejected(
+    "security runner exposes signed outputs to candidate builds",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once(
+        "execution_entries = candidate_execution_entries(entries)",
+        "execution_entries = entries",
+    ),
+    "trusted security container runner source commitment changed",
+)
+assert_boundary_file_rejected(
+    "security runner accepts unexpected publication inputs",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once(
+        "relative not in output_files or mode != 0o100644",
+        "False",
+    ),
+    "trusted security container runner source commitment changed",
+)
+assert_boundary_file_rejected(
     "security runner enables candidate network",
     Path("scripts/run-security-execution-container.py"),
     replace_once('"--network",\n        "none"', '"--network",\n        "bridge"'),

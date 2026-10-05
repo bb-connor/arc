@@ -33,6 +33,21 @@ audits/evidence/enterprise-linux/enterprise-migration-canary.json.sha256
 audits/evidence/enterprise-linux/enterprise-migration-binding-digest.txt
 ```
 
+Candidate compilation uses the trusted runner's source projection. Before
+materializing any source, the runner validates this closed namespace and omits
+these three regular output blobs. They are absent from both the read-only source
+mount and the candidate's isolated Git baseline. All other source blobs retain
+their bytes and modes. A build script or procedural macro cannot consume the
+publication outputs through a computed path in this execution context.
+
+Direct mutation controls refuse a checkout containing this namespace before
+executing candidate code. Use the isolated runner for an evidence-bearing
+checkout. The strict committed-evidence verifier still authenticates the three
+original committed files and their source policy outside candidate execution;
+projection does not grant signature authority or delete those files. Mutation
+evidence describes this projected execution, not arbitrary builds that expose
+additional inputs to build scripts.
+
 No private signing seed belongs in the repository, an uploaded evidence
 bundle, verifier arguments, or any candidate execution context. The seed is
 present only in the protected finalizer's single signing step environment and

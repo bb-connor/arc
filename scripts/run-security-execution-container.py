@@ -481,6 +481,10 @@ def read_git_blobs(
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             process.wait(timeout=5)
         raise
+    finally:
+        with contextlib.suppress(OSError):
+            process.stdin.close()
+        process.stdout.close()
     return blobs
 
 
@@ -505,10 +509,41 @@ def safe_parent(root: Path, relative: PurePosixPath) -> Path:
     return current
 
 
+def candidate_execution_entries(
+    entries: list[tuple[int, str, str]],
+) -> list[tuple[int, str, str]]:
+    """Keep signed publication outputs outside every candidate execution view.
+
+    The committed-evidence gate authenticates the original checkout separately.
+    Its three outputs cannot become build inputs after mutation qualification,
+    including through dynamic paths, proc macros or the isolated Git baseline.
+    Validate the closed namespace before omitting any entry from the copy.
+    """
+    output_root = PurePosixPath("audits/evidence/enterprise-linux")
+    output_files = {
+        output_root / "enterprise-migration-canary.json",
+        output_root / "enterprise-migration-canary.json.sha256",
+        output_root / "enterprise-migration-binding-digest.txt",
+    }
+    projected = []
+    for entry in entries:
+        mode, _object_id, path = entry
+        relative = PurePosixPath(path)
+        if relative in output_root.parents or relative == output_root:
+            raise BoundaryError("derived Linux evidence ancestor is not a directory")
+        if relative.is_relative_to(output_root):
+            if relative not in output_files or mode != 0o100644:
+                raise BoundaryError("derived Linux evidence output inventory is invalid")
+            continue
+        projected.append(entry)
+    return projected
+
+
 def materialize_private_copy(identity: RepositoryIdentity, destination: Path) -> None:
-    destination.mkdir(mode=0o700)
     entries = parse_tree(identity.root, identity.head)
-    blobs = read_git_blobs(identity.root, entries)
+    execution_entries = candidate_execution_entries(entries)
+    blobs = read_git_blobs(identity.root, execution_entries)
+    destination.mkdir(mode=0o700)
     for mode, path, data in blobs:
         relative = PurePosixPath(path)
         parent = safe_parent(destination, relative)

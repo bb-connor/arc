@@ -94,11 +94,14 @@ EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
 )
+EXPECTED_SECURITY_RUNNER_SHA256 = (
+    "3126309f83ff5920c66e55bfc9f988879b1b677b468b6ba1cc59368d535d285b"
+)
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
-    "dc476d75f72ea06bea8b5345a510f44b59ebe849fb102a5a65ebfcabfcaa6abb"
+    "c6552d29a356e634f2856669ce29d753da5aad986ed76ffae18b2022a31187fd"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "3d3015d880d2fb1c9532093cf6809eef78bec35a71898e98dad0f28caca3038d"
+    "8266d915f0b54c1eafcdc9db2f31f65be217ed9de87e142c0d9df770570ccf4e"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a"
@@ -4694,6 +4697,8 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         raise ContractError(
             "trusted security container runner exposes a host capability"
         )
+    if hashlib.sha256(runner.encode("utf-8")).hexdigest() != EXPECTED_SECURITY_RUNNER_SHA256:
+        raise ContractError("trusted security container runner source commitment changed")
 
     entrypoint = (
         root / "scripts/security-execution-container-entrypoint.py"

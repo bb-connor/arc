@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -20,6 +22,15 @@ if SPEC is None or SPEC.loader is None:
 CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
+
+BOUNDARY_SPEC = importlib.util.spec_from_file_location(
+    "derived_inputs_boundary", ROOT / "scripts/run-security-execution-container.py"
+)
+if BOUNDARY_SPEC is None or BOUNDARY_SPEC.loader is None:
+    raise RuntimeError("unable to load isolated execution boundary")
+BOUNDARY = importlib.util.module_from_spec(BOUNDARY_SPEC)
+sys.modules[BOUNDARY_SPEC.name] = BOUNDARY
+BOUNDARY_SPEC.loader.exec_module(BOUNDARY)
 
 
 class DerivedEvidenceInputs(unittest.TestCase):
@@ -131,6 +142,138 @@ class DerivedEvidenceInputs(unittest.TestCase):
         )
         with self.assertRaisesRegex(CHECKER.EvidenceError, "excluded generated or derived input"):
             self.digest()
+
+    def commit(self) -> str:
+        environment = os.environ.copy()
+        for key in tuple(environment):
+            if key.startswith("GIT_"):
+                environment.pop(key)
+        commands = [
+            ["git", "init", "--quiet"],
+            ["git", "-c", "core.hooksPath=/dev/null", "add", "--all"],
+            ["git", "-c", "core.hooksPath=/dev/null", "-c", "user.name=Evidence fixture",
+             "-c", "user.email=fixture@invalid", "commit", "--quiet", "--no-gpg-sign", "-m", "fixture"],
+        ]
+        for command in commands:
+            subprocess.run(command, cwd=self.root, env=environment, check=True, capture_output=True)
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=self.root, env=environment, text=True
+        ).strip()
+
+    def projection(self) -> Path:
+        head = self.commit()
+        identity = BOUNDARY.repository_identity(self.root, head, None)
+        temporary = tempfile.TemporaryDirectory(prefix="chio-derived-projection-")
+        self.addCleanup(temporary.cleanup)
+        destination = Path(temporary.name) / "source"
+        BOUNDARY.materialize_private_copy(identity, destination)
+        return destination
+
+    def add_dynamic_build(self) -> None:
+        (self.root / "Cargo.lock").write_text(
+            'version = 4\n\n[[package]]\nname = "fixture"\nversion = "0.1.0"\n'
+        )
+        (self.package / "build.rs").write_text(r'''
+use std::{env, fs, io, path::PathBuf};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join("../..");
+    let path = root.join("audits/evidence")
+        .join(["enterprise", "linux"].join("-"))
+        .join(concat!("enterprise-migration", "-canary.json"));
+    let value = match fs::read_to_string(path) {
+        Ok(value) => value,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => "absent".to_owned(),
+        Err(error) => return Err(error.into()),
+    };
+    fs::write(root.join("build-executed.marker"), "executed")?;
+    println!("cargo:rustc-env=DERIVED_INPUT_STATE={}", value.trim());
+    Ok(())
+}
+''')
+        self.source.write_text(
+            'pub fn permits() -> bool { env!("DERIVED_INPUT_STATE") == "absent" }\n'
+            '#[test]\nfn control() { assert!(permits()); }\n'
+        )
+
+    def cargo_environment(self) -> dict[str, str]:
+        environment = os.environ.copy()
+        for key in tuple(environment):
+            if key.startswith(("GIT_", "RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER")):
+                environment.pop(key)
+        target = tempfile.TemporaryDirectory(prefix="chio-derived-target-")
+        self.addCleanup(target.cleanup)
+        environment.update(CARGO_TARGET_DIR=target.name, CARGO_INCREMENTAL="0", CARGO_NET_OFFLINE="true")
+        return environment
+
+    def test_fragmented_build_input_is_unavailable_before_and_after_publication(self) -> None:
+        self.add_dynamic_build()
+        for published in (False, True):
+            with self.subTest(published=published):
+                if published:
+                    self.evidence.mkdir()
+                    (self.evidence / "enterprise-migration-canary.json").write_text("visible-after-publication\n")
+                projected = self.projection()
+                result = subprocess.run(
+                    ["cargo", "test", "--offline", "--locked", "--package", "fixture", "--lib"],
+                    cwd=projected, env=self.cargo_environment(), text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertIn("test result: ok. 1 passed;", result.stdout)
+
+    def test_projection_omits_only_the_three_regular_publication_outputs(self) -> None:
+        self.evidence.mkdir()
+        names = (
+            "enterprise-migration-canary.json",
+            "enterprise-migration-canary.json.sha256",
+            "enterprise-migration-binding-digest.txt",
+        )
+        for name in names:
+            (self.evidence / name).write_text("derived output\n")
+        sibling = self.evidence.with_name("source-input.json")
+        sibling.write_text("bound input\n")
+        projected = self.projection()
+        self.assertFalse((projected / "audits/evidence/enterprise-linux").exists())
+        self.assertEqual((projected / "audits/evidence/source-input.json").read_bytes(), sibling.read_bytes())
+        self.assertEqual((projected / "crates/fixture/src/lib.rs").read_bytes(), self.source.read_bytes())
+        for name in names:
+            self.assertEqual((self.evidence / name).read_text(), "derived output\n")
+
+    def test_projection_rejects_unexpected_outputs(self) -> None:
+        self.evidence.mkdir()
+        (self.evidence / "input.rs").write_text("pub fn input() {}\n")
+        with self.assertRaisesRegex(BOUNDARY.BoundaryError, "derived Linux evidence"):
+            self.projection()
+
+    def test_projection_rejects_executable_outputs(self) -> None:
+        self.evidence.mkdir()
+        output = self.evidence / "enterprise-migration-canary.json"
+        output.write_text("executable output\n")
+        output.chmod(0o755)
+        with self.assertRaisesRegex(BOUNDARY.BoundaryError, "derived Linux evidence"):
+            self.projection()
+
+    def test_projection_rejects_linked_outputs(self) -> None:
+        self.evidence.mkdir()
+        (self.evidence / "enterprise-migration-canary.json").symlink_to("../../../crates/fixture/src/lib.rs")
+        with self.assertRaisesRegex(BOUNDARY.BoundaryError, "derived Linux evidence"):
+            self.projection()
+
+    def test_projection_rejects_linked_output_ancestors(self) -> None:
+        self.evidence.parent.rmdir()
+        self.evidence.parent.symlink_to("../crates/fixture", target_is_directory=True)
+        with self.assertRaisesRegex(BOUNDARY.BoundaryError, "derived Linux evidence"):
+            self.projection()
+
+    def test_direct_control_refuses_outputs_before_build_execution(self) -> None:
+        self.add_dynamic_build()
+        self.evidence.mkdir()
+        (self.evidence / "enterprise-migration-canary.json").write_text("absent\n")
+        control = {key: value for key, value in self.control.items() if key != "required_target_os"}
+        with self.assertRaisesRegex(CHECKER.EvidenceError, "derived Linux evidence.*execution"):
+            CHECKER.run_control(self.root, control, self.cargo_environment())
+        self.assertFalse((self.root / "build-executed.marker").exists())
 
 
 if __name__ == "__main__":
