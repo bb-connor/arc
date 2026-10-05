@@ -311,7 +311,10 @@ mod tests {
             .authority_key
             .verify_canonical(&signing, &proof.signature)
             .test_expect("canonical signing input"));
-        assert!(verify_request_proof(&proof, &capability, &request, 21, 2).is_err());
+        assert!(matches!(
+            verify_request_proof(&proof, &capability, &request, 21, 2),
+            Err(BrokerError::AuthorizationDenied(_))
+        ));
     }
 
     #[test]

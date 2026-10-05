@@ -109,6 +109,7 @@ fn validate_arguments(arguments: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_core_types::canonical::UntrustedJsonError;
     use serde_json::json;
 
     fn route() -> HostResourceRoute {
@@ -117,6 +118,25 @@ mod tests {
             tenant: "one".into(),
             operation: "complete".into(),
         }
+    }
+
+    #[test]
+    fn resource_v1_wire_shape_is_stable() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let wire = concat!(
+            "{\"arguments\":{\"result\":{\"p95\":12.5}},",
+            "\"caller_capability_sha256\":",
+            "\"abababababababababababababababababababababababababababababababab\",",
+            "\"route\":{\"operation\":\"complete\",\"resource\":\"postgres-jobs\",\"tenant\":\"one\"},",
+            "\"schema\":\"chio.host-resource-invocation.v1\"}"
+        );
+        let invocation = route().decode(wire.as_bytes())?;
+        assert_eq!(invocation.caller_capability_sha256, "ab".repeat(32));
+        assert_eq!(invocation.arguments, json!({"result": {"p95": 12.5}}));
+        assert_eq!(
+            route().encode(&invocation.arguments, &invocation.caller_capability_sha256)?,
+            wire.as_bytes()
+        );
+        Ok(())
     }
 
     #[test]
@@ -129,22 +149,33 @@ mod tests {
         for field in ["resource", "tenant", "operation"] {
             let mut changed: Value = serde_json::from_slice(&bytes)?;
             changed["route"][field] = json!("other");
-            assert!(route
-                .decode(
-                    &serde_json::to_vec(&changed)
-                        .map_err(|_| { BrokerError::Invariant("test fixture encode".into()) })?
-                )
-                .is_err());
+            assert!(matches!(
+                route.decode(&serde_json::to_vec(&changed)?),
+                Err(BrokerError::AuthorizationDenied(_))
+            ));
         }
         let original = String::from_utf8(bytes)?;
+        assert!(matches!(
+            route.decode(original.replacen('{', "{\"extra\":1,", 1).as_bytes()),
+            Err(BrokerError::UntrustedInput(UntrustedJsonError::Decode(_)))
+        ));
         for changed in [
-            original.replacen('{', "{\"extra\":1,", 1),
             original.replace("\"p95\":12.5", "\"p95\":12.5,\"p95\":9"),
             original.replacen("\"schema\":", "\"schema\":\"other\",\"schema\":", 1),
         ] {
-            assert!(route.decode(changed.as_bytes()).is_err());
+            assert!(matches!(
+                route.decode(changed.as_bytes()),
+                Err(BrokerError::UntrustedInput(
+                    UntrustedJsonError::SignedInput(_)
+                ))
+            ));
         }
-        assert!(route.decode(&vec![b' '; MAX_BYTES + 1]).is_err());
+        assert!(matches!(
+            route.decode(&vec![b' '; MAX_BYTES + 1]),
+            Err(BrokerError::UntrustedInput(
+                UntrustedJsonError::TooLarge { .. }
+            ))
+        ));
         Ok(())
     }
 
@@ -152,12 +183,17 @@ mod tests {
     fn refuses_oversized_payloads_and_worker_identity_projection() {
         let route = route();
         let caller = "ab".repeat(32);
-        assert!(route
-            .encode(&json!({"text": "x".repeat(MAX_BYTES)}), &caller)
-            .is_err());
-        assert!(route
-            .encode(&json!({"_meta": {"caller": "forged"}}), &caller)
-            .is_err());
-        assert!(route.encode(&json!({}), "bad-digest").is_err());
+        assert!(matches!(
+            route.encode(&json!({"text": "x".repeat(MAX_BYTES)}), &caller),
+            Err(BrokerError::InvalidRequest(_))
+        ));
+        assert!(matches!(
+            route.encode(&json!({"_meta": {"caller": "forged"}}), &caller),
+            Err(BrokerError::InvalidRequest(_))
+        ));
+        assert!(matches!(
+            route.encode(&json!({}), "bad-digest"),
+            Err(BrokerError::InvalidRequest(_))
+        ));
     }
 }

@@ -119,11 +119,18 @@ impl Config {
                     preparation.payload,
                     super::payload::PayloadConfig::CallerBoundResource { .. }
                 );
-                let identity = (&credential.provider, &credential.credential_id, credential.version);
-                if credential_users.insert(identity, resource)
+                let identity = (
+                    &credential.provider,
+                    &credential.credential_id,
+                    credential.version,
+                );
+                if credential_users
+                    .insert(identity, resource)
                     .is_some_and(|previous| previous || resource)
                 {
-                    return Err(error("caller-bound resource routes require exclusive credentials"));
+                    return Err(error(
+                        "caller-bound resource routes require exclusive credentials",
+                    ));
                 }
             }
             if !servers.insert(&route.quota.server_id)

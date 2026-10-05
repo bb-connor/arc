@@ -180,7 +180,10 @@ mod tests {
         assert!(weak
             .verify_canonical(&input, &capability.signature)
             .test_expect("canonical signing input"));
-        assert!(verify_capability(&capability, &weak, "broker-service", 20, true).is_err());
+        assert!(matches!(
+            verify_capability(&capability, &weak, "broker-service", 20, true),
+            Err(BrokerError::InvalidRequest(_))
+        ));
     }
 
     #[test]
@@ -192,7 +195,10 @@ mod tests {
         let weak = PublicKey::from_bytes(&identity).test_expect("identity point");
         body.subject = weak.clone();
         body.proof.caller_public_key = weak;
-        assert!(issue_capability(body, &Ed25519Backend::new(signer), true).is_err());
+        assert!(matches!(
+            issue_capability(body, &Ed25519Backend::new(signer), true),
+            Err(BrokerError::InvalidRequest(_))
+        ));
     }
 
     #[test]

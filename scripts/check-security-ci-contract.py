@@ -62,6 +62,11 @@ EXPECTED_SECURITY_IMAGE_FROM = (
 EXPECTED_APK_LOCK_SHA256 = (
     "65c6ed6a7ec4e3c85fa27b46aa259ed217f93e2ce6f0ecb15b26fd5163c715ca"
 )
+SECURITY_CA_PACKAGE = Path("deploy/docker/ca-certificates-20260611-r0.apk")
+EXPECTED_CA_PACKAGE_BYTES = 129495
+EXPECTED_CA_PACKAGE_SHA256 = (
+    "a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896"
+)
 EXPECTED_CARGO_LOCK_SHA256 = (
     "ba7c9f9d95943ddf611aa55856dcaea42103531a68f7f1325e650a6f6b428612"
 )
@@ -1985,7 +1990,25 @@ def validate_supply_chain_contract_file(root: Path) -> None:
     )
 
 
+def validate_security_ca_package(root: Path) -> None:
+    path = root / SECURITY_CA_PACKAGE
+    try:
+        metadata = path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size != EXPECTED_CA_PACKAGE_BYTES:
+            raise ContractError("security CA package is not a bounded regular file")
+        with path.open("rb") as stream:
+            content = stream.read(EXPECTED_CA_PACKAGE_BYTES + 1)
+    except OSError as error:
+        raise ContractError("security CA package is unavailable") from error
+    if (
+        len(content) != EXPECTED_CA_PACKAGE_BYTES
+        or hashlib.sha256(content).hexdigest() != EXPECTED_CA_PACKAGE_SHA256
+    ):
+        raise ContractError("security CA package digest ratchet changed")
+
+
 def validate_security_dockerfile(root: Path, document: str) -> None:
+    validate_security_ca_package(root)
     apk_lock = root / "deploy/docker/security-evidence-apk.lock"
     apk_digest = require_exact_file_digest(
         apk_lock, EXPECTED_APK_LOCK_SHA256, "security APK inventory"
@@ -2030,17 +2053,15 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         raise ContractError("security execution image APK inventory copy changed")
 
     expected_apk = (
-        "wget -q -O /tmp/ca-certificates-20260611-r0.apk "
-        "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/"
-        "ca-certificates-20260611-r0.apk",
-        "echo 'a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896 "
+        f"--mount=type=bind,source={SECURITY_CA_PACKAGE},"
+        "target=/tmp/ca-certificates-20260611-r0.apk,readonly "
+        f"echo '{EXPECTED_CA_PACKAGE_SHA256} "
         "/tmp/ca-certificates-20260611-r0.apk' | sha256sum -c -",
         "apk add --no-cache " + " ".join(EXPECTED_DIRECT_APK_PACKAGES),
         "apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual",
         "cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
         f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
-        "rm /tmp/ca-certificates-20260611-r0.apk "
-        "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
+        "rm /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
     )
     if shell_clauses(instructions[2][1]) != expected_apk:
         raise ContractError("security execution image APK closure changed")

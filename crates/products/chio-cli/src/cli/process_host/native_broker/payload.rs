@@ -31,7 +31,9 @@ struct ModelQuery {
 impl PayloadConfig {
     pub fn validate(&self) -> Result<(), ProcessError> {
         if let Self::CallerBoundResource { route } = self {
-            route.validate().map_err(|error| ProcessError::Preparation(Box::new(error)))?;
+            route
+                .validate()
+                .map_err(|error| ProcessError::Preparation(Box::new(error)))?;
         }
         if let Self::MiniSweChat {
             model_id,
@@ -65,7 +67,8 @@ impl PayloadConfig {
         let value = match self {
             Self::Json => input.clone(),
             Self::CallerBoundResource { route } => {
-                return route.encode(input, caller)
+                return route
+                    .encode(input, caller)
                     .map_err(|error| ProcessError::Preparation(Box::new(error)));
             }
             Self::MiniSweChat {
@@ -126,10 +129,12 @@ mod tests {
             assert!(config.body_for_caller(&forged, &caller).is_err(), "{field}");
         }
         assert!(config.body_for_caller(&input, "not-a-digest").is_err());
-        let other: Value = serde_json::from_slice(
-            &config.body_for_caller(&input, &"cd".repeat(32))?,
-        )?;
-        assert_ne!(request["caller_capability_sha256"], other["caller_capability_sha256"]);
+        let other: Value =
+            serde_json::from_slice(&config.body_for_caller(&input, &"cd".repeat(32))?)?;
+        assert_ne!(
+            request["caller_capability_sha256"],
+            other["caller_capability_sha256"]
+        );
         Ok(())
     }
 

@@ -28,6 +28,11 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 
+subprocess.run(
+    [sys.executable, str(ROOT / "scripts/tests/security-image-inputs.test.py")],
+    check=True,
+)
+
 
 stable_dump_fixture = ast.parse("def fixture(value=None):\n    return value\n").body[0]
 stable_dump = CHECKER.stable_ast_dump(stable_dump_fixture)
@@ -117,6 +122,7 @@ CONTRACT_DOCUMENT = Path("docs/security/committed-linux-evidence.md")
 ACTIONLINT_CONFIG = Path(".github/actionlint.yaml")
 SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    Path("deploy/docker/ca-certificates-20260611-r0.apk"),
     Path("deploy/docker/security-evidence-apk.lock"),
     Path("deploy/docker/security-evidence-seccomp.json"),
     Path("crates/security/chio-cage/scripts/check-linux-enforcement.sh"),

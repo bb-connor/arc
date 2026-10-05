@@ -135,7 +135,10 @@ impl InvocationPreparer for Preparer {
                 // Only the original retained capability supplies caller identity.
                 // Recovery returns the original prepared envelope unchanged.
                 let caller = sha256_hex(&canonical_json_bytes(parent)?);
-                let body = route.config.payload.body_for_caller(input.arguments, &caller)?;
+                let body = route
+                    .config
+                    .payload
+                    .body_for_caller(input.arguments, &caller)?;
                 if body.len() as u64 > route.config.maximum_body_bytes {
                     return Err(ProcessError::Invalid(
                         "mapped provider request exceeds the installed bound",

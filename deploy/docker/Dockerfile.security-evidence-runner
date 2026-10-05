@@ -2,9 +2,8 @@ FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2
 
 COPY deploy/docker/security-evidence-apk.lock /tmp/security-evidence-apk.lock
 
-RUN wget -q -O /tmp/ca-certificates-20260611-r0.apk \
-      https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ca-certificates-20260611-r0.apk \
- && echo 'a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896  /tmp/ca-certificates-20260611-r0.apk' | sha256sum -c - \
+RUN --mount=type=bind,source=deploy/docker/ca-certificates-20260611-r0.apk,target=/tmp/ca-certificates-20260611-r0.apk,readonly \
+    echo 'a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896  /tmp/ca-certificates-20260611-r0.apk' | sha256sum -c - \
  && apk add --no-cache \
       /tmp/ca-certificates-20260611-r0.apk \
       bash=5.2.37-r0 \
@@ -26,7 +25,7 @@ RUN wget -q -O /tmp/ca-certificates-20260611-r0.apk \
  && apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual \
  && cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual \
  && echo '65c6ed6a7ec4e3c85fa27b46aa259ed217f93e2ce6f0ecb15b26fd5163c715ca  /tmp/security-evidence-apk.lock' | sha256sum -c - \
- && rm /tmp/ca-certificates-20260611-r0.apk /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual
+ && rm /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual
 
 RUN curl --proto '=https' --tlsv1.2 --fail --location \
       --output /tmp/clippy.tar.gz \

@@ -2810,6 +2810,11 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "1b9620751d"
 
 [[schema]]
+value = "chio.host-resource-invocation.v1"
+files = ["crates/security/chio-secret-broker/src/host_resource.rs"]
+first_seen = "6d18cf0a57"
+
+[[schema]]
 value = "chio.identity-interop-qualification-matrix.v1"
 files = ["crates/core/chio-core/src/identity_network/types.rs"]
 first_seen = "11e573d2d7"

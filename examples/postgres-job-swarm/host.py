@@ -77,6 +77,8 @@ def prepare(chio, gateway, tenant, directory, environment, *, resources=None):
                 directory / "host-config.json",
                 "--state",
                 directory / "host",
+                "--aggregate-invocations",
+                str(config["limits"]["max_calls"]),
             ],
             directory,
             env=environment,

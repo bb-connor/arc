@@ -1334,6 +1334,7 @@
     "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::resolve_budget_grant::from_wire",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::canonical::from_wire",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::decode::from_wire",
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/adapter.rs::serve::from_wire",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::canonical_input::from_wire",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::decode_native_durable::from_wire",
     "crates/platform/chio-finding-worker/src/protocol.rs::decode_original::from_wire",
@@ -1532,6 +1533,7 @@
     "crates/security/chio-secret-broker/src/docker_adapter.rs::json::from_wire",
     "crates/security/chio-secret-broker/src/docker_adapter/server.rs::execute_json::from_wire",
     "crates/security/chio-secret-broker/src/docker_adapter/server.rs::load::from_wire",
+    "crates/security/chio-secret-broker/src/host_resource.rs::decode::from_wire",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_wire",
     "crates/security/chio-secret-broker/src/kernel_admission.rs::verify_request::from_wire",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::read_message::from_wire",
@@ -6018,7 +6020,7 @@
       "classify::from_value"
     ],
     "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": [
-      "body::from_value"
+      "body_for_caller::from_value"
     ],
     "crates/products/chio-cli/src/cli/process_host/nonce_evidence.rs": [
       "operation_id::from_value",
@@ -9135,10 +9137,10 @@
     },
     "crates/products/chio-cli/src/cli/process_host/native_broker/payload.rs": {
       "kind": "validated-worker-input",
-      "contract": "Decodes an already bounded worker JSON Value into deny_unknown_fields ModelQuery. Checks the fixed host-selected model ID, schema, positive turn and bounded message count, strips worker metadata, then constructs provider options exclusively from validated host configuration. This mapping does not mint dispatch authority.",
+      "contract": "Decodes an already bounded worker JSON Value into deny_unknown_fields ModelQuery. Checks the fixed host-selected model ID, schema, positive turn and bounded message count, strips worker metadata, then constructs provider options exclusively from validated host configuration. This mapping does not mint dispatch authority. Caller-bound resource mapping rejects worker identity metadata and uses only the original parent capability digest supplied inside durable host preparation; the authenticated host channel and fixed route remain necessary authority.",
       "readers": [
         {
-          "reader": "body",
+          "reader": "body_for_caller",
           "decoders": [
             "from_value"
           ],
@@ -16183,6 +16185,7 @@
     "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::resolve_budget_grant::from_wire#1::decode_signed",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::canonical::from_wire#1::canonicalize",
     "crates/platform/chio-finding-hosted-edge/src/input.rs::decode::from_wire#1::decode_signed",
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/adapter.rs::serve::from_wire#1::decode_document",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::canonical_input::from_wire#1::canonicalize",
     "crates/platform/chio-finding-market-store-postgres/src/validation.rs::decode_native_durable::from_wire#1::decode_canonical",
     "crates/platform/chio-finding-worker/src/protocol.rs::decode_original::from_wire#1::canonicalize+decode_canonical",
@@ -16381,6 +16384,7 @@
     "crates/security/chio-secret-broker/src/docker_adapter.rs::json::from_wire#1::decode_signed",
     "crates/security/chio-secret-broker/src/docker_adapter/server.rs::execute_json::from_wire#1::decode_signed",
     "crates/security/chio-secret-broker/src/docker_adapter/server.rs::load::from_wire#1::decode_signed",
+    "crates/security/chio-secret-broker/src/host_resource.rs::decode::from_wire#1::decode_document",
     "crates/security/chio-secret-broker/src/ipc_client.rs::decode_canonical_response_with_limit::from_wire#1::decode_canonical",
     "crates/security/chio-secret-broker/src/kernel_admission.rs::verify_request::from_wire#1::decode_canonical",
     "crates/security/chio-secret-broker/src/prepared_mcp.rs::read_message::from_wire#1::decode_signed",
@@ -17913,6 +17917,9 @@
       "publish_inner::shared-reader::crates/platform/chio-finding-hosted-edge/src/server.rs::strict_canonical_body",
       "release_identity::shared-reader::crates/platform/chio-finding-hosted-edge/src/server.rs::authenticate",
       "strict_canonical_body::shared-reader::crates/platform/chio-finding-hosted-edge/src/input.rs::canonical"
+    ],
+    "crates/platform/chio-finding-market-store-postgres/examples/agent_jobs/adapter.rs": [
+      "serve::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-finding-market-store-postgres/src/aggregates.rs": [
       "aggregate_event_from_row::shared-reader::crates/platform/chio-finding-market-store-postgres/src/validation.rs::verify_payload",
@@ -20908,6 +20915,9 @@
     "crates/security/chio-secret-broker/src/docker_adapter/server.rs": [
       "execute_json::original-json-reader::UntrustedJsonText",
       "load::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/security/chio-secret-broker/src/host_resource.rs": [
+      "decode::original-json-reader::UntrustedJsonText"
     ],
     "crates/security/chio-secret-broker/src/ipc_client.rs": [
       "call_envelope#1::shared-reader::crates/security/chio-secret-broker/src/ipc_client.rs::exchange_ipc_envelope",
