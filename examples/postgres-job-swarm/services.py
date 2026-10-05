@@ -201,6 +201,7 @@ class Services(contextlib.AbstractContextManager):
                 "--exact",
                 "--nocapture",
                 "--test-threads=1",
+                "--format=terse",
             ],
             "broker-services",
             dict(

@@ -216,3 +216,12 @@ that scope alive, and advance to the issued nonce's exact expiry. Preserve the
 production monotonic fence, expired-nonce denial, prepared state and zero
 invocation assertions. Require the focused regression and complete nine-test
 cumulative-approval target to pass before continuing the remaining workflow.
+
+The x86 PostgreSQL attempt passes native confinement and the real TLS worker API,
+then times out before broker readiness. Rust's default test renderer prefixes
+the helper's first marker with its test name, so the strict line matcher cannot
+recognize it. A real Rust test subprocess reproduces the timeout; terse test
+output produces the exact marker and passes the same reader. Select terse output
+for the existing helper without changing its test selection, startup barrier or
+exact readiness check. Retain both the failed hosted attempt and the subprocess
+control, then rerun the actual ownership and response-loss scenarios.
