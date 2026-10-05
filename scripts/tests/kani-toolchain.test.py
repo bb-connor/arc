@@ -2,9 +2,11 @@
 """Regression controls for the pinned Kani compiler repair and cache identity."""
 
 import importlib.util
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -15,6 +17,31 @@ SPEC.loader.exec_module(KANI)
 
 
 class CompilerRepairTests(unittest.TestCase):
+    def test_failed_prerequisite_install_cannot_replace_or_accept_compiler(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "bundle"
+            compiler = bundle / "bin/kani-compiler"
+            compiler.parent.mkdir(parents=True)
+            compiler.write_bytes(b"original release compiler")
+
+            def fail_provisioning(arguments, **kwargs):
+                # No source reconstruction or compiler build may precede the
+                # cold toolchain's prerequisites. Fail at the external boundary.
+                self.assertEqual(arguments[:3], ["rustup", "toolchain", "install"])
+                self.assertIn("nightly-2026-08-21", arguments)
+                self.assertEqual(
+                    set(arguments[arguments.index("--component") + 1].split(",")),
+                    {"llvm-tools", "rustc-dev", "rust-src", "rustfmt"},
+                )
+                raise subprocess.CalledProcessError(1, arguments)
+
+            with patch.object(KANI, "run", side_effect=fail_provisioning):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    KANI.install(bundle, Path(temporary))
+            self.assertEqual(compiler.read_bytes(), b"original release compiler")
+            self.assertFalse((bundle / KANI.MARKER).exists())
+            self.assertFalse((bundle / "bin/kani-compiler.chio-new").exists())
+
     def test_exact_upstream_signature_repair(self):
         repaired = KANI.repair_intrinsics(KANI.ORIGINAL_SIGNATURE)
         self.assertEqual(repaired, KANI.REPAIRED_SIGNATURE)

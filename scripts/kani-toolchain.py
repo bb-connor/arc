@@ -21,6 +21,7 @@ VERSION = "0.68.0"
 REVISION = "0d2328a93f0e0ff66132d6bfa1a7d884877cf862"
 UPSTREAM_FIX = "e47388fd566662202ce194818719c21ef25660ba"
 CHARON_REVISION = "b250680abd40ff1aaa07081d0497dc2755ed112e"
+TOOLCHAIN = "nightly-2026-08-21"
 MARKER = "chio-compiler.json"
 ORIGINAL_SIGNATURE = (
     '"catch_unwind" => {\n'
@@ -72,6 +73,24 @@ def run(arguments: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(arguments, check=True, **kwargs)
 
 
+def install_build_toolchain() -> None:
+    # RUSTUP_TOOLCHAIN overrides the source's rust-toolchain.toml, including its
+    # component installation. Provision the reviewed source's build requirements
+    # explicitly; cargo kani setup installs only the release runtime.
+    run(
+        [
+            "rustup",
+            "toolchain",
+            "install",
+            TOOLCHAIN,
+            "--profile",
+            "minimal",
+            "--component",
+            "llvm-tools,rustc-dev,rust-src,rustfmt",
+        ]
+    )
+
+
 def qualify_compiler(directory: Path) -> None:
     """Check success and unsupported-code rejection using the actual compiler."""
     cases = (
@@ -117,6 +136,7 @@ def install(bundle: Path, work_directory: Path) -> None:
         return
     if not (bundle / "bin/kani-compiler").is_file():
         raise ValueError("Install kani-verifier 0.68.0 and run cargo kani setup first")
+    install_build_toolchain()
     with tempfile.TemporaryDirectory(
         prefix="kani-source-", dir=work_directory
     ) as scratch:
@@ -160,7 +180,7 @@ def install(bundle: Path, work_directory: Path) -> None:
             CARGO_TARGET_DIR=str(target),
             CARGO_INCREMENTAL="0",
             CARGO_PROFILE_DEV_DEBUG="0",
-            RUSTUP_TOOLCHAIN="nightly-2026-08-21",
+            RUSTUP_TOOLCHAIN=TOOLCHAIN,
         )
         # Caller build flags and toolchain overrides must not change the pinned
         # compiler build. The release source owns its cargo configuration.

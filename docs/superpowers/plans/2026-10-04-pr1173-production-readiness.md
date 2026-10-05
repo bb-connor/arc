@@ -251,3 +251,19 @@ budget check and the children's 40-percent shares. Reproduce the rejection with
 the real CLI before the repair and verify that the corrected initializer passes
 that boundary. This local configuration probe does not qualify native execution;
 both complete x86 PostgreSQL trajectories remain required.
+
+### Cold Kani compiler provisioning
+
+The hosted manifest lane installs the release runtime, then fails to rebuild
+the compiler because `rustc-dev` is absent. The explicit `RUSTUP_TOOLCHAIN`
+override bypasses the component list in the pinned upstream toolchain file.
+Provision that exact nightly with its four declared build components before
+reconstruction. Keep the source revisions, intrinsic repair and proof selection
+unchanged. A prerequisite failure must stop before any compiler replacement or
+acceptance marker. Exercise this failure boundary and provision an isolated Rust
+toolchain to verify that the compiler-private crates are available without prior
+host state. Require both complete hosted Kani sweeps on the final candidate.
+
+The source qualification started after the PostgreSQL budget fix was interrupted
+to incorporate this newly observed CI failure. Retain its partial outputs as
+interrupted evidence; run the complete profile after the source repair is frozen.
