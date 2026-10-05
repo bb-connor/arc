@@ -376,6 +376,7 @@ jobs:
             --run-output "${generated_vector_run_output}" \
             active_defense_schema_and_semantics_reject_mutation_corpus \
             generated_active_defense_types_decode_reencode_and_reject \
+            generated_response_plan_requires_exact_execution_binding \
             legacy_response_transition_canonical_digest_is_unchanged \
             native_receipt_types_reject_unsafe_json_integers
 
