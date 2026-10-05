@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import tomllib
 import unittest
@@ -15,14 +16,11 @@ BUILDERS = (".clusterfuzzlite/build.sh", "fuzz/oss-fuzz/build.sh")
 
 
 class BuilderTests(unittest.TestCase):
-    def build(self, builder=BUILDERS[0], *, selection=None, environment=None):
+    def build(self, builder=BUILDERS[0], *, environment=None):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             source = directory / "chio"
             (source / "fuzz").mkdir(parents=True)
-            (source / ".clusterfuzzlite").mkdir()
-            if selection is not None:
-                (source / ".clusterfuzzlite/selected-targets.txt").write_text(selection)
             output = directory / "output"
             output.mkdir()
             binaries = directory / "bin"
@@ -78,37 +76,6 @@ class BuilderTests(unittest.TestCase):
                 self.assertEqual(set(outputs), INVENTORY)
                 self.assertEqual(len(calls), len(INVENTORY))
 
-    def test_file_handoff_survives_a_clean_nested_container_environment(self):
-        result, calls, outputs = self.build(
-            selection="frost_round2_envelope\ncanonical_json\n"
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(set(outputs), {"frost_round2_envelope", "canonical_json"})
-        self.assertEqual(len(calls), 2)
-        for call in calls:
-            self.assertEqual(
-                call[1:], ["--features", "", "--release", "--sanitizer", "address"]
-            )
-
-    def test_invalid_file_selection_builds_nothing(self):
-        for selection in ("", " \n", "canonical_json\nunknown\n", "../other\n"):
-            with self.subTest(selection=selection):
-                result, calls, outputs = self.build(selection=selection)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(calls, [])
-                self.assertEqual(outputs, {})
-
-    def test_file_and_environment_selection_cannot_disagree(self):
-        for name in ("CHIO_CFLITE_TARGET", "CHIO_CFLITE_TARGETS"):
-            with self.subTest(name=name):
-                result, calls, outputs = self.build(
-                    selection="canonical_json\n",
-                    environment={name: "manifest_roundtrip"},
-                )
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(calls, [])
-                self.assertEqual(outputs, {})
-
     def test_local_environment_selection_preserves_required_features(self):
         result, calls, outputs = self.build(
             environment={
@@ -123,6 +90,78 @@ class BuilderTests(unittest.TestCase):
             self.assertEqual(
                 call[1:], ["--features", call[0], "--release", "--sanitizer", "address"]
             )
+
+
+class ExportSelectionTests(unittest.TestCase):
+    def select(self, selection=None, *, invalid_binary=None):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            output = directory / "build-out"
+            output.mkdir()
+            for name in INVENTORY:
+                binary = output / name
+                binary.write_text(name)
+                binary.chmod(0o755)
+            support = output / "canonical_json.options"
+            support.write_text("[libfuzzer]\n")
+            if invalid_binary == "missing":
+                (output / "frost_round2_envelope").unlink()
+            elif invalid_binary == "not_executable":
+                (output / "frost_round2_envelope").chmod(0o644)
+            elif invalid_binary == "symlink":
+                (output / "frost_round2_envelope").unlink()
+                (output / "frost_round2_envelope").symlink_to("canonical_json")
+            before = {path.name: path.read_bytes() for path in output.iterdir()}
+            arguments = [
+                sys.executable,
+                str(ROOT / ".clusterfuzzlite/select-targets.py"),
+                "--output",
+                str(output),
+            ]
+            if selection is not None:
+                selected = directory / "fired.txt"
+                selected.write_text(selection)
+                arguments += ["--selection", str(selected)]
+            result = subprocess.run(
+                arguments, capture_output=True, text=True, timeout=10
+            )
+            after = {path.name: path.read_bytes() for path in output.iterdir()}
+            return result, before, after
+
+    def test_default_requires_and_preserves_the_full_export(self):
+        result, before, after = self.select()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(before, after)
+
+    def test_subset_retains_exactly_the_requested_binaries_and_support_files(self):
+        result, _, after = self.select("frost_round2_envelope\ncanonical_json\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            set(after),
+            {"canonical_json", "frost_round2_envelope", "canonical_json.options"},
+        )
+
+    def test_invalid_selection_does_not_partially_prune_the_export(self):
+        for selection in (
+            "",
+            " \n",
+            "canonical_json\nunknown\n",
+            "../other\n",
+            "canonical_json\ncanonical_json\n",
+        ):
+            with self.subTest(selection=selection):
+                result, before, after = self.select(selection)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(before, after)
+
+    def test_incomplete_or_substituted_build_is_rejected_before_pruning(self):
+        for fault in ("missing", "not_executable", "symlink"):
+            with self.subTest(fault=fault):
+                result, before, after = self.select(
+                    "canonical_json\n", invalid_binary=fault
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(before, after)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,8 @@
 # binary into $OUT/<target>, plus a per-target seed corpus zip when one
 # exists under fuzz/corpus/<target>/. Set CHIO_CFLITE_TARGET to build a
 # single target or CHIO_CFLITE_TARGETS to build a newline/comma-separated
-# subset selected by the PR changed-target workflow.
+# subset for a local build. The GitHub action builds from its own clean clone;
+# the PR workflow selects the exported executables after that build finishes.
 #
 # Companion docs in docs/fuzzing/continuous.md (ClusterFuzzLite bridge section).
 #
@@ -58,22 +59,6 @@ TARGETS=(
     peers_lock_decode
     fuzz_tool_action
 )
-
-# The action builds in a nested container and does not forward arbitrary
-# step environment variables. The workflow puts this file in the Docker
-# source context; local builds can still use the explicit environment inputs.
-selection_file="$SRC/chio/.clusterfuzzlite/selected-targets.txt"
-if [ -e "$selection_file" ]; then
-    if [ -n "${CHIO_CFLITE_TARGETS:-}" ] || [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
-        echo "file and environment fuzz selections cannot be combined" >&2
-        exit 1
-    fi
-    CHIO_CFLITE_TARGETS="$(cat "$selection_file")"
-    if [ -z "$CHIO_CFLITE_TARGETS" ]; then
-        echo "fuzz selection file is empty" >&2
-        exit 1
-    fi
-fi
 
 selected_targets=("${TARGETS[@]}")
 if [ -n "${CHIO_CFLITE_TARGETS:-}" ] && [ -n "${CHIO_CFLITE_TARGET:-}" ]; then

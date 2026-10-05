@@ -49,8 +49,6 @@ fallback = "\n".join(
 )
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
-    (directory / ".clusterfuzzlite").mkdir()
-    handoff = directory / ".clusterfuzzlite/selected-targets.txt"
     for path in [
         "crates/guards/chio-data-guards/redactors/default/Cargo.toml",
         "crates/future/deep/new/member/Cargo.toml",
@@ -70,10 +68,6 @@ with tempfile.TemporaryDirectory() as temporary:
             text=True,
         )
         assert (directory / "fired.txt").read_text().splitlines() == inventory, path
-        assert handoff.is_file(), (
-            "selected targets never reach the nested build container"
-        )
-        assert handoff.read_text().splitlines() == inventory, path
     (directory / "changed.txt").write_text("docs/Cargo.toml.example\n")
     subprocess.run(
         [

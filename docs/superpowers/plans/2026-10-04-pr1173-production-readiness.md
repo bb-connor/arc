@@ -150,14 +150,19 @@ also found two independently reproducible selection defects: the pinned action
 does not forward `CHIO_CFLITE_TARGETS` into its nested builder, and the CFLite
 builder omits the mapped FROST round-two target.
 
-Pass the selection through a generated file in the existing Docker source
-context, reject conflicting or empty selection inputs, and restore builder
-inventory parity. Execute the real shell builder with only Cargo replaced at
-the expensive compiler boundary. Require the exact selected output set,
-unchanged sanitizer and feature flags, rejection before compilation for invalid
-selectors, and complete agreement with the owning target map. Exercise the
-actual workflow selector's file output as well. Run these controls in the fuzz
+The action also clones a clean checkout, so a generated file in the invoking
+checkout cannot carry the selection into its build. Keep the complete upstream
+build and select the exported executables immediately before fuzzing. Verify
+every mapped binary is a regular executable before removing any unselected
+binary; preserve corpora, options and shared runtime files. Reject empty,
+unknown and duplicated selections and incomplete or substituted build results.
+Restore builder inventory parity, including FROST. Execute the real shell
+builder with only Cargo replaced at the expensive compiler boundary, and test
+export selection against real files. Require unchanged sanitizer and feature
+flags and agreement with the owning target map. Run these controls in the fuzz
 workflow itself, including stacked PRs that do not select the main-only CI job.
+Correct the workflow comments: the upstream action defines `fuzz-seconds` as
+the total budget, not a per-target budget. Retain the configured 60/120 seconds.
 Require a terminal hosted build and fuzz run; local orchestration controls do
 not establish that the runner shutdown is resolved.
 
