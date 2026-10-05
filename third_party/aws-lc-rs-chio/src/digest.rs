@@ -81,6 +81,8 @@ impl Context {
     /// `new` panics if it fails to initialize an aws-lc digest context for the given
     /// algorithm.
     #[must_use]
+    // CHIO-LINT digest-new: Preserve documented infallible constructor; native initialization failure panics.
+    #[allow(clippy::unwrap_used)]
     pub fn new(algorithm: &'static Algorithm) -> Self {
         Self {
             algorithm,
@@ -93,8 +95,10 @@ impl Context {
     /// Updates the message to digest with all the data in `data`.
     ///
     /// # Panics
-    /// Panics if update causes total input length to exceed maximum allowed (`u64::MAX`).
+    /// Panics if input exceeds the algorithm limit or the native digest update fails.
     #[inline]
+    // CHIO-LINT digest-update: Preserve upstream update; excessive input or native update failure panics.
+    #[allow(clippy::expect_used)]
     pub fn update(&mut self, data: &[u8]) {
         Self::try_update(self, data).expect("digest update failed");
     }
@@ -133,6 +137,8 @@ impl Context {
     /// Panics if the digest is unable to be finalized
     #[inline]
     #[must_use]
+    // CHIO-LINT digest-finish: Preserve documented infallible finalization; native failure panics.
+    #[allow(clippy::expect_used)]
     pub fn finish(self) -> Digest {
         Self::try_finish(self).expect("EVP_DigestFinal failed")
     }

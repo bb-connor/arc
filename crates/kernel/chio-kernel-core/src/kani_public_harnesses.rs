@@ -10,8 +10,7 @@ use chio_core_types::capability::{
 };
 use chio_core_types::crypto::{PublicKey, Signature, SigningAlgorithm, SigningBackend};
 use chio_core_types::hashing::Hash;
-use chio_core_types::merkle::node_hash;
-use chio_core_types::merkle_fixtures::bounded_merkle_case;
+use chio_core_types::merkle::{node_hash, MerkleProof};
 use chio_core_types::merkle_steps::inclusion_step;
 use chio_core_types::receipt::{
     body::ChioReceiptBody, decision::Decision, decision::ToolCallAction, kinds::TrustLevel,
@@ -1641,13 +1640,6 @@ fn model_inclusion_root(
     (path_index == audit_path.len()).then_some(current)
 }
 
-fn perturb_symbolic_hash(hash: &mut Hash, first: u8, second: u8) {
-    let mut bytes = *hash.as_bytes();
-    bytes[0] ^= first;
-    bytes[1] ^= second;
-    *hash = Hash::from_bytes(bytes);
-}
-
 fn abstract_hash_options_equal(actual: Option<Hash>, model: Option<Hash>) -> bool {
     match (actual, model) {
         (None, None) => true,
@@ -1694,51 +1686,27 @@ fn abstract_hash_options_equal(actual: Option<Hash>, model: Option<Hash>) -> boo
 #[kani::proof]
 #[kani::unwind(5)]
 pub fn verify_oracle_inclusion_walk_parity() {
-    let tree_size = usize::from((kani::any::<u8>() & 7) + 1);
+    // Quantify over every path of length 0..=3, size 0..=8 and index 0..=8.
+    // This includes every former fixture and mutation (missing, extra, swapped
+    // siblings and invalid indices), without constructing all 36 tree fixtures
+    // as alternative heap objects in the solver. Hash bytes are fully symbolic;
+    // node hashing retains the existing ASSUME-SHA256 traversal abstraction.
+    let tree_size = usize::from(kani::any::<u8>());
     let leaf_index = usize::from(kani::any::<u8>());
-    kani::assume(leaf_index < tree_size);
-    let fixture = bounded_merkle_case(tree_size, leaf_index);
-    assert!(fixture.is_some());
-    let Some((mut leaf, _expected_root, mut proof)) = fixture else {
-        return;
+    let path_length = usize::from(kani::any::<u8>());
+    kani::assume(tree_size <= 8);
+    kani::assume(leaf_index <= 8);
+    kani::assume(path_length <= 3);
+    let leaf = Hash::from_bytes(kani::any());
+    let mut audit_path = Vec::with_capacity(3);
+    for _ in 0..path_length {
+        audit_path.push(Hash::from_bytes(kani::any()));
+    }
+    let proof = MerkleProof {
+        tree_size,
+        leaf_index,
+        audit_path,
     };
-    perturb_symbolic_hash(&mut leaf, kani::any(), kani::any());
-
-    if let Some(sibling) = proof.audit_path.get_mut(0) {
-        perturb_symbolic_hash(sibling, kani::any(), kani::any());
-    }
-    if let Some(sibling) = proof.audit_path.get_mut(1) {
-        perturb_symbolic_hash(sibling, kani::any(), kani::any());
-    }
-    if let Some(sibling) = proof.audit_path.get_mut(2) {
-        perturb_symbolic_hash(sibling, kani::any(), kani::any());
-    }
-
-    match kani::any::<u8>() % 6 {
-        1 => {
-            if proof.audit_path.pop().is_none() {
-                proof.tree_size = 0;
-            }
-        }
-        2 => {
-            if proof.audit_path.is_empty() {
-                proof.tree_size = 0;
-            } else {
-                proof.tree_size = 1;
-                proof.leaf_index = 0;
-            }
-        }
-        3 => {
-            if proof.audit_path.len() > 1 {
-                proof.audit_path.swap(0, 1);
-            } else {
-                proof.leaf_index = proof.tree_size;
-            }
-        }
-        4 => proof.tree_size = 0,
-        5 => proof.leaf_index = proof.tree_size,
-        _ => {}
-    }
 
     let model_index = u64::try_from(proof.leaf_index);
     let model_size = u64::try_from(proof.tree_size);
@@ -1748,7 +1716,17 @@ pub fn verify_oracle_inclusion_walk_parity() {
         return;
     };
     let model_root = model_inclusion_root(leaf, model_index, model_size, &proof.audit_path);
-    let actual_root = proof.compute_root_from_hash(leaf).ok();
+    // The rejection variant is fieldless. Assert that fact before excluding its
+    // generic destructor, whose other variants recursively own unrelated JSON
+    // errors. No allocated error payload or traversal check is assumed away.
+    let actual = core::mem::ManuallyDrop::new(proof.compute_root_from_hash(leaf));
+    let actual_root = match &*actual {
+        Ok(root) => Some(*root),
+        Err(error) => {
+            assert!(matches!(error, chio_core_types::Error::MerkleProofFailed));
+            None
+        }
+    };
     assert!(abstract_hash_options_equal(actual_root, model_root));
 }
 

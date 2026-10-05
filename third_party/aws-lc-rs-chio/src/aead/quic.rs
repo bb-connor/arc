@@ -21,6 +21,8 @@ pub struct HeaderProtectionKey {
 }
 
 impl From<hkdf::Okm<'_, &'static Algorithm>> for HeaderProtectionKey {
+    // CHIO-LINT quic-from-okm: Preserve upstream infallible From; native derivation or key initialization failure panics.
+    #[allow(clippy::unwrap_used)]
     fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
         let mut key_bytes = [0; super::MAX_KEY_LEN];
         let algorithm = *okm.len();

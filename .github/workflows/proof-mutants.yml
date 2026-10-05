@@ -183,6 +183,7 @@ jobs:
           cargo install cargo-mutants --version 25.3.1 --locked
           cargo install kani-verifier --version "${CHIO_KANI_VERSION}" --locked
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           cargo mutants --version
           cargo kani --version
 

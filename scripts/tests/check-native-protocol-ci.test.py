@@ -52,6 +52,19 @@ class NativeProtocolCiTests(unittest.TestCase):
         with self.assertRaisesRegex(CHECKER.ContractError, expected):
             CHECKER.validate(*documents)
 
+    def test_postgres_requires_prepared_broker_before_enforcement_fixture(self):
+        for mutation in ("remove", "conditional", "soft_fail", "move"):
+            changed = copy.deepcopy(LIVE)
+            job = changed[5]["jobs"]["native"]
+            index, step = CHECKER.named_step(job, "Build prepared native broker transports")
+            if mutation == "remove":
+                del job["steps"][index]
+            elif mutation == "move":
+                job["steps"].insert(0, job["steps"].pop(index))
+            else:
+                step["if" if mutation == "conditional" else "continue-on-error"] = True
+            self.rejected(changed, "prepared PostgreSQL broker")
+
     def test_live_contract(self):
         CHECKER.validate(*LIVE)
 

@@ -197,6 +197,24 @@ const REQUIRED_LEASE_INTERVAL_SOURCES: &[PresentationIntervalSource] = &[
     PresentationIntervalSource::CapabilityLease,
 ];
 
+/// Compare receiver-owned state with the signed reference independently of
+/// any store-specific validation. Neither source may substitute an identifier.
+fn lease_matches_record(
+    id: &str,
+    record: &chio_federation::bilateral_dsse::CapabilityLeaseRef,
+    lease: &chio_federation::bilateral_dsse::CapabilityLeaseRef,
+) -> bool {
+    !(record.lease_id != id
+        || lease.lease_id != id
+        || record.issuer != lease.issuer
+        || record.scope_digest != lease.scope_digest
+        || record
+            .scope_digest
+            .as_ref()
+            .is_some_and(|scope| scope.alg != "sha256" || !crate::is_sha256_hex(&scope.value))
+        || lease.expires_at_unix_ms > record.expires_at_unix_ms)
+}
+
 /// The intervals this receiver resolved for itself while deciding this call.
 ///
 /// Every reference must resolve independently of the statement. Missing or
@@ -234,17 +252,7 @@ fn resolved_presentation_intervals<S: RuntimeAdmissionStore>(
             .capability_lease_ref
             .as_ref()
             .ok_or_else(|| missing_record("statement lease reference"))?;
-        if record.lease.lease_id != id
-            || lease.lease_id != id
-            || record.lease.issuer != lease.issuer
-            || record.lease.scope_digest != lease.scope_digest
-            || record
-                .lease
-                .scope_digest
-                .as_ref()
-                .is_some_and(|scope| scope.alg != "sha256" || !crate::is_sha256_hex(&scope.value))
-            || lease.expires_at_unix_ms > record.lease.expires_at_unix_ms
-        {
+        if !lease_matches_record(id, &record.lease, lease) {
             return rejected(
                 "chio_treaty_unverified_required_evidence",
                 "capability lease does not match its receiver-owned record",
@@ -351,3 +359,7 @@ pub(super) fn treaty_participant_public_key<'a>(
             detail: "treaty participant public key is missing".to_string(),
         })
 }
+
+#[cfg(test)]
+#[path = "dsse/tests.rs"]
+mod tests;

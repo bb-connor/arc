@@ -16,7 +16,8 @@ passing evidence.
 
 1. Every selected CI test and proof must run. Exact inventories include the new
    pending-intent and typed-proposal regressions. Kani uses a pinned released
-   compiler compatible with workspace Rust 1.94; no MSRV bypass, smaller proof
+   compiler plus upstream PR 4819's signature repair, compatible with workspace
+   Rust 1.95; no MSRV bypass, smaller proof
    selection or weakened assertion is acceptable.
 2. Remediate the reported dependency vulnerabilities through supported patched
    versions, removal of unnecessary vulnerable dependencies, or a reviewed
@@ -42,9 +43,19 @@ passing evidence.
 ## Architecture decisions
 
 Repair existing gates in place. Kani 0.68.0 ships nightly-2026-08-21, avoiding the
-0.67.0 compiler/MSRV mismatch. Keep the shared proof runner and its nonempty
-selection checks. Upgrade the Wasmtime engine and WASI component pair together
-to a supported release containing both reported security fixes; retest the
+0.67.0 compiler/MSRV mismatch. The release has a compiler assertion defect fixed
+upstream in PR 4819. Rebuild only the compiler from the exact release with that
+one-line fix; retain rustc, CBMC, the proof selection and proof options. Bind the
+cache to the compiler hash and source revision. Require a successful proof and
+an unsupported-intrinsic rejection before accepting the installation.
+
+Reuse merged security prerequisite PR 1168, including its completed AWS-LC
+source review, exact repaired fork, authenticated reconstruction gate and
+Wasmtime 48.0.5 with Rust 1.95. Retain this branch's additional source patches,
+SDK membership, signed receipt verification and Docker source-closure checks.
+The two new npm tooling advisory dispositions in that prerequisite remain open
+for this task until repaired; inherited scanner success does not close them.
+There is no Wasmtime WASI dependency in the selected guard backend. Retest the
 existing guard boundary rather than changing its security model.
 
 For PostgreSQL, broadening native-standard-v1 is rejected: it would change every
@@ -65,6 +76,8 @@ acceptance boundaries and must remain accurately labelled.
 
 - [Kani 0.68.0 release](https://github.com/model-checking/kani/releases/tag/kani-0.68.0)
 - [Pinned Kani compiler](https://github.com/model-checking/kani/blob/kani-0.68.0/rust-toolchain.toml)
+- [Kani signature repair](https://github.com/model-checking/kani/pull/4819)
+- [Audited dependency prerequisite](https://github.com/bb-connor/arc/pull/1168)
 - [Wasmtime host allocation advisory](https://github.com/bytecodealliance/wasmtime/security/advisories/GHSA-jqpg-j7w6-42pr)
 - [Prepared broker connections](../../security/broker-prepared-connections.md)
 - [Supply-chain review policy](../../../supply-chain/README.md)

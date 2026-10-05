@@ -81,6 +81,8 @@ impl<P: Pointer> ManagedPointer<P> {
 
 impl<P: Pointer> DetachablePointer<P> {
     #[inline]
+    // CHIO-LINT pointer-borrow: Private state is Some while borrowable; only consuming detach or Drop takes it.
+    #[allow(clippy::unwrap_used)]
     pub fn as_mut_ptr(&mut self) -> *mut P::T {
         self.pointer.as_mut().unwrap().as_mut_ptr()
     }
@@ -105,6 +107,8 @@ impl<P: Pointer> DetachablePointer<P> {
     }
 
     #[inline]
+    // CHIO-LINT pointer-detach: Constructed attached and consumed by detach; a second detach cannot use the moved owner.
+    #[allow(clippy::unwrap_used)]
     pub fn detach(mut self) -> P {
         self.pointer.take().unwrap()
     }

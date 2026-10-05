@@ -35,12 +35,13 @@
   },
   "overrides": {
     "browserslist": "4.28.8",
-    "fast-uri": "3.1.6",
+    "fast-uri@3": "3.1.8",
+    "fast-uri@4": "4.1.5",
     "metro": "0.84.5",
     "metro-config": "0.84.5",
     "metro-transform-worker": "0.84.5",
     "miniflare": {
-      "undici": "7.29.0"
+      "undici": "7.29.1"
     },
     "next": {
       ".": "15.5.26",
@@ -48,14 +49,18 @@
     },
     "postcss": "8.5.26",
     "sharp": "0.35.4",
-    "undici": "7.29.0",
+    "undici": "7.29.1",
     "uuid": "11.1.1",
     "js-yaml": "4.3.2",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "braces": "$braces",
+    "node-forge": "$node-forge"
   },
   "devDependencies": {
     "next": "15.5.26",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "braces": "file:../../third_party/npm/braces-3.0.3-chio.1.tgz",
+    "node-forge": "file:../../third_party/npm/node-forge-1.4.0-chio.1.tgz"
   }
 }

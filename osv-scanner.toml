@@ -1,24 +1,7 @@
-# osv-scanner advisory exceptions for the CVE monitor (.github/workflows/cve-monitor.yml).
+# The CVE monitor discovers advisory dispositions beside their affected locks.
+# OSV 2.3.6 directory-local configs do not propagate to child directories.
+# Do not pass this file with --config: that overrides every directory's config.
 #
-# Scope: every entry below is a TRANSITIVE npm dependency in the scanned
-# TypeScript example, conformance, or SDK development lockfiles, not a bundled
-# dependency of a shipped runtime SDK. The Rust supply-chain gate (cargo-audit,
-# plus cargo-deny in ci.yml) is unaffected and stays fully blocking.
-#
-# Why these are suppressed rather than bumped: either no compatible patched
-# release exists, or the patched dependency line is outside the peer-test
-# package's supported range. These entries are intentionally narrow (by
-# advisory id) so a new, unrelated advisory still blocks. Revisit each entry
-# when its upstream dependency publishes a compatible fix.
-
-[[IgnoredVulns]]
-id = "GHSA-866g-f22w-33x8"
-reason = "@ai-sdk/provider-utils (dev-only peer test lock for ai-sdk wrapper); patched provider-utils line requires ai@6 while package peer range remains <6; track for peer-range upgrade"
-
-[[IgnoredVulns]]
-id = "GHSA-5p2g-fcmc-qvqq"
-reason = "image-size has no patched release; it is reachable only through Metro in the dev-only React Native peer test lock, and no shipped runtime SDK parses attacker-controlled images; remove when Metro adopts a fixed image-size release"
-
-[[IgnoredVulns]]
-id = "GHSA-w3rx-r6r6-pgpr"
-reason = "image-size has no patched release; it is reachable only through Metro in the dev-only React Native peer test lock, and no shipped runtime SDK parses attacker-controlled images; remove when Metro adopts a fixed image-size release"
+# The root Bun lock has no accepted advisories. TypeScript peer-tooling and
+# standalone ai-sdk peer-test dispositions live beside their package-lock.json.
+# The Rust cargo-audit and cargo-deny gates are unchanged.

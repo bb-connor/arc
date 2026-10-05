@@ -36,6 +36,7 @@ export interface InvokeOptions {
 export class ProcessClient {
   constructor(socketPath: string, credential: string, options?: { timeoutMs?: number });
   inspect(): Promise<ProcessSnapshot>;
+  prepareInvocation(operationKey: string, serverId: string, toolName: string, args: Json): Promise<{ [key: string]: Json }>;
   invoke(operationKey: string, serverId: string, toolName: string, args: Json, options?: InvokeOptions): Promise<ToolResult>;
   checkpoint(expectedRevision: string, value: Json): Promise<Checkpoint>;
   putBlob(value: Uint8Array): Promise<StateBlobRef>;

@@ -153,7 +153,7 @@ run_gate strict-clippy \
 run_gate codegen make codegen-check
 run_gate release-evidence cargo test -p chio-release-evidence --all-targets
 run_gate dependency-policy cargo deny check
-run_gate supply-chain cargo vet check --locked
+run_gate supply-chain bash scripts/check-supply-chain.sh
 
 kvm_evidence_sha256=""
 if [[ "${qualification_mode}" == "kvm-boundary" ]]; then

@@ -76,8 +76,9 @@ jobs:
     name: changed-target-sampling
     needs: budget-check
     runs-on: ubuntu-latest
-    # The 25-target full sweep has a 50-minute fuzz budget before build time.
-    timeout-minutes: 75
+    # Retained x86 evidence needs 66 minutes for a cold all-target ASan build.
+    # Preserve the full per-target fuzz duration and allow build/setup headroom.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:

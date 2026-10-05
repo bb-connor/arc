@@ -251,7 +251,6 @@ use crate::aws_lc::{
 };
 use crate::buffer::Buffer;
 use crate::error::{KeyRejected, Unspecified};
-use crate::hkdf;
 use crate::hkdf::KeyType;
 #[cfg(feature = "legacy-des")]
 use crate::iv::IV_LEN_64_BIT;
@@ -348,7 +347,10 @@ pub enum OperatingMode {
 }
 
 impl OperatingMode {
-    fn evp_cipher(&self, algorithm: &Algorithm) -> ConstPointer<'_, EVP_CIPHER> {
+    fn evp_cipher(
+        &self,
+        algorithm: &Algorithm,
+    ) -> Result<ConstPointer<'_, EVP_CIPHER>, Unspecified> {
         let alg = match (self, algorithm.id) {
             (OperatingMode::CBC, AlgorithmId::Aes128) => unsafe { EVP_aes_128_cbc() },
             (OperatingMode::CTR, AlgorithmId::Aes128) => unsafe { EVP_aes_128_ctr() },
@@ -399,7 +401,7 @@ impl OperatingMode {
                 unreachable!("DES does not support CTR or CFB128 modes")
             }
         };
-        unsafe { ConstPointer::new_static(alg).unwrap() }
+        unsafe { ConstPointer::new_static(alg).map_err(|()| Unspecified) }
     }
 }
 
@@ -762,16 +764,6 @@ impl Debug for UnboundCipherKey {
         f.debug_struct("UnboundCipherKey")
             .field("algorithm", &self.algorithm)
             .finish()
-    }
-}
-
-impl From<hkdf::Okm<'_, &'static Algorithm>> for UnboundCipherKey {
-    fn from(okm: hkdf::Okm<&'static Algorithm>) -> Self {
-        let mut key_bytes = [0; MAX_CIPHER_KEY_LEN];
-        let key_bytes = &mut key_bytes[..okm.len().key_len];
-        let algorithm = *okm.len();
-        okm.fill(key_bytes).unwrap();
-        Self::new(algorithm, key_bytes).unwrap()
     }
 }
 

@@ -24,7 +24,7 @@ pub mod daemon_runtime;
 pub mod docker_adapter;
 pub mod generic_https;
 #[cfg(target_os = "linux")]
-mod host_https;
+pub mod host_https;
 pub mod inherited_fd;
 pub mod ipc_client;
 #[cfg(feature = "kernel-admission")]

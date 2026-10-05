@@ -220,6 +220,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           cargo kani --version
 
       - name: Run chio-kernel-core lanes.pr + lanes.nightly_only Kani harnesses
@@ -379,6 +380,7 @@ jobs:
           set -euo pipefail
           cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
           sudo apt-get update
           sudo apt-get install -y opam
           opam init --disable-sandboxing --bare -y

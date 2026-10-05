@@ -5,6 +5,7 @@
 #![cfg_attr(not(clippy), allow(unexpected_cfgs))]
 #![cfg_attr(not(clippy), allow(unknown_lints))]
 #![allow(clippy::doc_markdown)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
 //! A [*ring*](https://github.com/briansmith/ring)-compatible crypto library using the cryptographic
 //! operations provided by [*AWS-LC*](https://github.com/aws/aws-lc). It uses either the
 //! auto-generated [*aws-lc-sys*](https://crates.io/crates/aws-lc-sys) or
@@ -313,6 +314,8 @@ pub fn init() {
 ///
 /// # Panics
 /// Panics if the underlying implementation is not FIPS.
+// CHIO-LINT fips-mode: Preserve documented panic when the backend is not FIPS; try_fips_mode returns errors.
+#[allow(clippy::unwrap_used)]
 pub fn fips_mode() {
     try_fips_mode().unwrap();
 }
@@ -338,6 +341,8 @@ pub fn try_fips_mode() -> Result<(), &'static str> {
 /// # Panics
 /// Panics if AWS-LC returns a version string that is not valid UTF-8.
 #[must_use]
+// CHIO-LINT awslc-version: Bundled native version is build-owned ASCII; preserve documented invalid-UTF8 panic.
+#[allow(clippy::expect_used)]
 pub fn awslc_version() -> &'static str {
     init();
     let full = unsafe { CStr::from_ptr(OpenSSL_version(OPENSSL_VERSION)) }
@@ -368,6 +373,8 @@ pub fn fips_version() -> Option<u32> {
 ///
 /// # Panics
 /// Panics if the underlying implementation is not using CPU jitter entropy.
+// CHIO-LINT fips-entropy: Preserve documented CPU jitter assertion; try_fips_cpu_jitter_entropy returns errors.
+#[allow(clippy::unwrap_used)]
 pub fn fips_cpu_jitter_entropy() {
     try_fips_cpu_jitter_entropy().unwrap();
 }
@@ -392,7 +399,7 @@ unsafe fn dump_error() {
     let func = ERR_GET_FUNC(err);
     let mut buffer = [0u8; 256];
     ERR_error_string(err, buffer.as_mut_ptr().cast());
-    let error_msg = CStr::from_bytes_with_nul_unchecked(&buffer);
+    let error_msg = CStr::from_bytes_until_nul(&buffer);
     eprintln!("Raw Error -- {error_msg:?}\nErr: {err}, Lib: {lib}, Reason: {reason}, Func: {func}");
 }
 

@@ -38,6 +38,8 @@ on:
       - "scripts/generate-lean-json-fixtures.py"
       - "scripts/check-kani-public-core.sh"
       - "scripts/check-kani-version.sh"
+      - "scripts/kani-toolchain.py"
+      - "scripts/tests/kani-toolchain.test.py"
       - "scripts/tests/check-kani-version.test.sh"
       - "scripts/check-rust-verification-gates.sh"
       - "scripts/run-kani-manifest.sh"
@@ -108,7 +110,7 @@ jobs:
           }
 
           workflow='^\.github/workflows/formal-pr-smoke\.yml$'
-          rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|scripts/check-kani-version\.sh|scripts/tests/check-kani-version\.test\.sh)$"
+          rust_common="${workflow}|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|scripts/check-kani-version\.sh|scripts/kani-toolchain\.py|scripts/tests/kani-toolchain\.test\.py|scripts/tests/check-kani-version\.test\.sh)$"
           set_output lean "${workflow}|^(formal/lean4/|formal/(proof-manifest\.toml|theorem-inventory\.json|assumptions\.toml)$|docs/reference/CLAIM_REGISTRY\.md$|scripts/(check-formal-proofs\.sh|lean-assumption-audit\.lean|generate-lean-json-fixtures\.py)$|scripts/tests/lean-assumption-audit\.test\.sh$|tests/bindings/vectors/canonical/v1\.json$)"
           set_output kani_core "${rust_common}|^(\.kani/harnesses\.toml$|formal/rust-verification/kani-public-harnesses\.toml$|scripts/check-kani-public-core\.sh$|crates/(kernel/chio-kernel-core|core/chio-core-types|trust/chio-revocation-oracle)/(src/|Cargo\.toml$))"
           set_output kani_manifest "${rust_common}|^(\.kani/harnesses\.toml$|scripts/run-kani-manifest\.sh$|crates/(economy/chio-anchor|economy/chio-credit|economy/chio-web3|trust/chio-attest-verify|trust/chio-weights)/(src/|Cargo\.toml$))"
@@ -253,7 +255,7 @@ jobs:
             ~/.cargo/bin/cargo-kani
             ~/.cargo/bin/kani
             ~/.kani
-          key: ${{ runner.os }}-kani-${{ env.CHIO_KANI_VERSION }}
+          key: ${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/kani-toolchain.py') }}
 
       - name: Install Kani
         env:
@@ -263,7 +265,10 @@ jobs:
           if ! bash scripts/check-kani-version.sh >/dev/null 2>&1; then
             cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           fi
+          python3 scripts/tests/kani-toolchain.test.py
+          bash scripts/tests/check-kani-version.test.sh
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
 
       - name: Verify Kani version
         run: bash scripts/check-kani-version.sh
@@ -314,7 +319,7 @@ jobs:
             ~/.cargo/bin/cargo-kani
             ~/.cargo/bin/kani
             ~/.kani
-          key: ${{ runner.os }}-kani-${{ env.CHIO_KANI_VERSION }}
+          key: ${{ runner.os }}-${{ runner.arch }}-kani-${{ env.CHIO_KANI_VERSION }}-${{ hashFiles('scripts/kani-toolchain.py') }}
 
       - name: Install Kani
         env:
@@ -324,7 +329,10 @@ jobs:
           if ! bash scripts/check-kani-version.sh >/dev/null 2>&1; then
             cargo install kani-verifier --locked --version "${CHIO_KANI_VERSION}"
           fi
+          python3 scripts/tests/kani-toolchain.test.py
+          bash scripts/tests/check-kani-version.test.sh
           cargo kani setup
+          python3 scripts/kani-toolchain.py install
 
       - name: Verify Kani version
         run: bash scripts/check-kani-version.sh

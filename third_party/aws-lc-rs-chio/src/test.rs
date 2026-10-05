@@ -242,6 +242,8 @@ impl TestCase {
 
     /// Returns the value of an attribute that is an integer, in decimal
     /// notation.
+    // CHIO-LINT test-consume-usize: Public test-vector helper intentionally panics on malformed input; compiled in the library.
+    #[allow(clippy::unwrap_used)]
     pub fn consume_usize(&mut self, key: &str) -> usize {
         let s = self.consume_string(key);
         s.parse::<usize>().unwrap()

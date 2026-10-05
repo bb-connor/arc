@@ -1517,6 +1517,8 @@ jobs:
           ci_run=''
           expected_run_name="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=${BASE_SHA} M=${MERGE_COMMIT_SHA}"
           list_matching_ci_runs() {
+            # Conditional callers disable errexit throughout this helper.
+            # Propagate every API, parsing, and validation failure explicitly.
             local page=1
             local query="event=pull_request&head_sha=${EVIDENCE_SHA}&"
             local runs='[]'
@@ -1525,18 +1527,18 @@ jobs:
               gh api \
                 -H "Accept: application/vnd.github+json" \
                 "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=1"
-            })"
-            total_count="$(jq -r '.total_count' <<< "${first_response}")"
-            [[ "${total_count}" =~ ^[0-9]+$ ]]
+            })" || return 1
+            total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
+            [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
             if test "${total_count}" -ge 1000; then
               query=''
               first_response="$({
                 gh api \
                   -H "Accept: application/vnd.github+json" \
                   "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?per_page=100&page=1"
-              })"
-              total_count="$(jq -r '.total_count' <<< "${first_response}")"
-              [[ "${total_count}" =~ ^[0-9]+$ ]]
+              })" || return 1
+              total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
+              [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
             fi
             while true; do
               if test "${page}" = 1; then
@@ -1546,23 +1548,22 @@ jobs:
                   gh api \
                     -H "Accept: application/vnd.github+json" \
                     "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=${page}"
-                })"
+                })" || return 1
               fi
-              page_total="$(jq -r '.total_count' <<< "${page_response}")"
-              [[ "${page_total}" =~ ^[0-9]+$ ]]
-              test "${page_total}" = "${total_count}"
-              page_runs="$(jq -cS '.workflow_runs' <<< "${page_response}")"
-              test "$(jq -r 'type' <<< "${page_runs}")" = array
-              runs="$(jq -cS -n --argjson collected "${runs}" --argjson page "${page_runs}" '$collected + $page')"
-              collected_count="$(jq -r 'length' <<< "${runs}")"
-              test "${collected_count}" -le "${total_count}"
+              page_total="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${page_response}")" || return 1
+              [[ "${page_total}" =~ ^[0-9]+$ ]] || return 1
+              test "${page_total}" = "${total_count}" || return 1
+              page_runs="$(jq -ceS '.workflow_runs | select(type == "array" and length <= 100 and all(.[]; type == "object" and (.id | type == "number" and . > 0 and floor == .)))' <<< "${page_response}")" || return 1
+              runs="$(jq -cS -n --argjson collected "${runs}" --argjson page "${page_runs}" '$collected + $page')" || return 1
+              collected_count="$(jq -r 'length' <<< "${runs}")" || return 1
+              test "${collected_count}" -le "${total_count}" || return 1
               if test "${collected_count}" = "${total_count}"; then
                 break
               fi
-              test "$(jq -r 'length' <<< "${page_runs}")" = 100
+              test "$(jq -r 'length' <<< "${page_runs}")" = 100 || return 1
               page="$((page + 1))"
             done
-            test "$(jq -r '[.[].id] | unique | length' <<< "${runs}")" = "${total_count}"
+            test "$(jq -r '[.[].id] | unique | length' <<< "${runs}")" = "${total_count}" || return 1
             jq -cS \
               --arg evidence_sha "${EVIDENCE_SHA}" \
               --arg expected_run_name "${expected_run_name}" \
@@ -1578,7 +1579,7 @@ jobs:
                 .head_sha == $evidence_sha and
                 .head_branch == $head_ref and
                 .head_repository.full_name == $repository
-              )] | sort_by(.id)' <<< "${runs}"
+              )] | sort_by(.id)' <<< "${runs}" || return 1
           }
           for _ in $(seq 1 480); do
             if ! matching_runs="$(list_matching_ci_runs)"; then
@@ -2347,6 +2348,7 @@ jobs:
           [[ "${EVIDENCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           [[ "${FINALIZER_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
           [[ "${FINALIZER_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          # shellcheck disable=SC2153
           [[ "${MERGE_COMMIT_SHA}" =~ ^[0-9a-f]{40}$ ]]
           [[ "${PUBLISHER_SHA}" =~ ^[0-9a-f]{40}$ ]]
           [[ "${SECURITY_DEFINITION_SHA}" =~ ^[0-9a-f]{40}$ ]]
@@ -2525,6 +2527,9 @@ jobs:
             test "$(jq -r '.base.repo.full_name' <<< "${live_pr}")" = "$(jq -r '.base.repository' <<< "${canonical_binding}")"
             test "$(jq -r '.base.ref' <<< "${live_pr}")" = "$(jq -r '.base.ref' <<< "${canonical_binding}")"
             test "$(jq -r '.base.sha' <<< "${live_pr}")" = "$(jq -r '.base.sha' <<< "${canonical_binding}")"
+            test "$(jq -r '.labels | any(.name == "refresh-linux-evidence")' <<< "${live_pr}")" = "false"
+            labels_json="$(jq -cS '[.labels[].name] | sort' <<< "${live_pr}")"
+            test "$(printf '%s' "${labels_json}" | sha256sum | cut -d' ' -f1)" = "$(jq -r '.labels_digest' <<< "${canonical_binding}")"
             merge_commit_sha="$(jq -r '.merge_commit_sha' <<< "${canonical_binding}")"
             merge_ref="$({
               curl \
@@ -2749,6 +2754,8 @@ jobs:
             expected_ci_run_name="CI N=${PR_NUMBER} E=${EVIDENCE_SHA} B=$(jq -r '.base.sha' <<< "${canonical_binding}") M=${MERGE_COMMIT_SHA}"
 
             list_matching_ci_runs() {
+              # Conditional callers disable errexit throughout this helper.
+              # Propagate every API, parsing, and validation failure explicitly.
               local page=1
               local query="event=pull_request&head_sha=${EVIDENCE_SHA}&"
               local ci_runs='[]'
@@ -2764,9 +2771,9 @@ jobs:
                   -H "Authorization: Bearer ${GH_TOKEN}" \
                   -H "X-GitHub-Api-Version: 2026-03-10" \
                   "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=1"
-              })"
-              total_count="$(jq -r '.total_count' <<< "${first_response}")"
-              [[ "${total_count}" =~ ^[0-9]+$ ]]
+              })" || return 1
+              total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
+              [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
               if test "${total_count}" -ge 1000; then
                 query=''
                 first_response="$({
@@ -2780,9 +2787,9 @@ jobs:
                     -H "Authorization: Bearer ${GH_TOKEN}" \
                     -H "X-GitHub-Api-Version: 2026-03-10" \
                     "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?per_page=100&page=1"
-                })"
-                total_count="$(jq -r '.total_count' <<< "${first_response}")"
-                [[ "${total_count}" =~ ^[0-9]+$ ]]
+                })" || return 1
+                total_count="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${first_response}")" || return 1
+                [[ "${total_count}" =~ ^[0-9]+$ ]] || return 1
               fi
               while true; do
                 if test "${page}" = 1; then
@@ -2799,23 +2806,22 @@ jobs:
                       -H "Authorization: Bearer ${GH_TOKEN}" \
                       -H "X-GitHub-Api-Version: 2026-03-10" \
                       "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?${query}per_page=100&page=${page}"
-                  })"
+                  })" || return 1
                 fi
-                page_total="$(jq -r '.total_count' <<< "${page_response}")"
-                [[ "${page_total}" =~ ^[0-9]+$ ]]
-                test "${page_total}" = "${total_count}"
-                page_runs="$(jq -cS '.workflow_runs' <<< "${page_response}")"
-                test "$(jq -r 'type' <<< "${page_runs}")" = array
-                ci_runs="$(jq -cS -n --argjson collected "${ci_runs}" --argjson page "${page_runs}" '$collected + $page')"
-                collected_count="$(jq -r 'length' <<< "${ci_runs}")"
-                test "${collected_count}" -le "${total_count}"
+                page_total="$(jq -er '.total_count | select(type == "number" and . >= 0 and floor == .)' <<< "${page_response}")" || return 1
+                [[ "${page_total}" =~ ^[0-9]+$ ]] || return 1
+                test "${page_total}" = "${total_count}" || return 1
+                page_runs="$(jq -ceS '.workflow_runs | select(type == "array" and length <= 100 and all(.[]; type == "object" and (.id | type == "number" and . > 0 and floor == .)))' <<< "${page_response}")" || return 1
+                ci_runs="$(jq -cS -n --argjson collected "${ci_runs}" --argjson page "${page_runs}" '$collected + $page')" || return 1
+                collected_count="$(jq -r 'length' <<< "${ci_runs}")" || return 1
+                test "${collected_count}" -le "${total_count}" || return 1
                 if test "${collected_count}" = "${total_count}"; then
                   break
                 fi
-                test "$(jq -r 'length' <<< "${page_runs}")" = 100
+                test "$(jq -r 'length' <<< "${page_runs}")" = 100 || return 1
                 page="$((page + 1))"
               done
-              test "$(jq -r '[.[].id] | unique | length' <<< "${ci_runs}")" = "${total_count}"
+              test "$(jq -r '[.[].id] | unique | length' <<< "${ci_runs}")" = "${total_count}" || return 1
               jq -cS \
                 --arg evidence_sha "${EVIDENCE_SHA}" \
                 --arg expected_run_name "${expected_ci_run_name}" \
@@ -2829,7 +2835,7 @@ jobs:
                   .display_title == $expected_run_name and
                   .head_sha == $evidence_sha and
                   .head_repository.full_name == $repository
-                )] | sort_by(.id)' <<< "${ci_runs}"
+                )] | sort_by(.id)' <<< "${ci_runs}" || return 1
             }
 
             get_current_ci_run() {

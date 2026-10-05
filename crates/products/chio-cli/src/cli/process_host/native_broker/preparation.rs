@@ -114,12 +114,6 @@ impl InvocationPreparer for Preparer {
                 "broker input exceeds the installed JSON object bound",
             ));
         }
-        let body = route.config.payload.body(input.arguments)?;
-        if body.len() as u64 > route.config.maximum_body_bytes {
-            return Err(ProcessError::Invalid(
-                "mapped provider request exceeds the installed bound",
-            ));
-        }
         let invocation_id = runtime.request_id(input.process, input.operation_key)?;
         let binding = sha256_hex(&canonical_json_bytes(&(
             "chio.process.broker-preparation.v1",
@@ -133,7 +127,9 @@ impl InvocationPreparer for Preparer {
             input.process,
             input.operation_key,
             &binding,
-            |parent, subject| route.issue(parent, subject, &binding, invocation_id, body),
+            |parent, subject| {
+                route.issue(parent, subject, &binding, invocation_id, input.arguments)
+            },
         )
     }
 }
@@ -145,7 +141,7 @@ impl Route {
         subject: &chio_core_types::Keypair,
         binding: &str,
         invocation_id: String,
-        body: Vec<u8>,
+        arguments: &Value,
     ) -> Result<Value, ProcessError> {
         use chio_core_types::capability::scope::Operation;
         let now = self
@@ -170,6 +166,15 @@ impl Route {
             .checked_add(self.config.lifetime_seconds)
             .ok_or(ProcessError::Invalid("preparation time overflow"))?
             .min(parent.expires_at);
+        let body = self
+            .config
+            .payload
+            .body_for_caller(arguments, &self.quota.tool_name, parent)?;
+        if body.len() as u64 > self.config.maximum_body_bytes {
+            return Err(ProcessError::Invalid(
+                "mapped provider request exceeds the installed bound",
+            ));
+        }
         let request = BrokerRequest {
             destination: self.config.destination.clone(),
             headers: vec![

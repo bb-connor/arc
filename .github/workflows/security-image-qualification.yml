@@ -1,0 +1,38 @@
+name: Security evidence image qualification
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - "third_party/**"
+      - "deploy/docker/Dockerfile.security-evidence-runner"
+      - "deploy/docker/security-evidence-*"
+      - "scripts/*security*"
+      - "scripts/check-cage*"
+      - "scripts/check-secret-broker-boundary.sh"
+      - "scripts/check-keyring-transparency.sh"
+      - "scripts/check-linux-enforcement-stack.py"
+      - ".github/workflows/security-image-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-evidence-image-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Pinned x86 security evidence image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Build the exact execution image without publishing
+        run: |
+          docker build --progress=plain --platform linux/amd64 \
+            --file deploy/docker/Dockerfile.security-evidence-runner \
+            --tag chio-security-evidence:qualification .

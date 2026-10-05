@@ -116,20 +116,49 @@ class BaselineTools:
         return {"messages": results}
 
 
-def chio_tools(connection, definitions=DEFINITIONS, namespace=NAMESPACE):
+def decode_prepared_messages(result):
+    """Decode model content while retaining the original signed response artifact."""
+    from chio_process.broker import decode_broker_output
+
+    messages = []
+    for message in result["messages"]:
+        value = json.loads(message.content)
+        if value.get("isError") is not False:
+            raise ValueError("prepared resource did not return a result")
+        content = decode_broker_output(value["structuredContent"])
+        if content.get("isError") is not False:
+            raise ValueError("resource returned a tool error")
+        messages.append(message.model_copy(update={"content": encoded(content)}))
+    return {**result, "messages": messages}
+
+
+class PreparedResourceTools:
+    def __init__(self, node):
+        self.node = node
+
+    def invoke(self, state, config):
+        return decode_prepared_messages(self.node.invoke(state, config))
+
+
+def chio_tools(
+    connection, definitions=DEFINITIONS, namespace=NAMESPACE, *, prepared_broker=False
+):
     from chio_langgraph import ChioProcessToolNode, ProcessTool
     from chio_process import ProcessClient
+    from chio_process.broker import BrokerProcessClient
 
     # The operator descriptor must contain exactly the definitions we advertise.
     supplied = {t["name"]: t for t in connection["tools"]}
     if any(supplied.get(t["name"]) != t for t in definitions):
         raise ValueError("host resource definitions differ from workload definitions")
-    return ChioProcessToolNode(
-        ProcessClient(connection["socket_path"], connection["credential"]),
+    client = BrokerProcessClient if prepared_broker else ProcessClient
+    node = ChioProcessToolNode(
+        client(connection["socket_path"], connection["credential"]),
         [ProcessTool(**t) for t in definitions],
         namespace=namespace,
         max_concurrency=1,
     )
+    return PreparedResourceTools(node) if prepared_broker else node
 
 
 def build(

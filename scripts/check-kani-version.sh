@@ -12,9 +12,9 @@ if ! version="$(cargo kani --version 2>&1)"; then
   echo 'Kani check requires a working cargo-kani installation' >&2
   exit 2
 fi
-pattern="${expected_version//./\\.}"
-if [[ ! "$version" =~ (^|[^0-9.])${pattern}([^0-9.]|$) ]]; then
+if [[ "${version%%$'\n'*}" != "Kani Rust Verifier $expected_version (cargo plugin)" ]]; then
   echo "Kani check requires $expected_version, found: $version" >&2
   exit 2
 fi
 printf '%s\n' "$version"
+python3 "$(dirname "$0")/kani-toolchain.py" check

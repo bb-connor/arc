@@ -1,0 +1,4 @@
+# Existing disposition, restricted to this standalone peer-test lock.
+[[IgnoredVulns]]
+id = "GHSA-866g-f22w-33x8"
+reason = "@ai-sdk/provider-utils in the standalone ai-sdk peer-test lock; patched provider-utils line requires ai@6 while package peer range remains <6; track for peer-range upgrade"

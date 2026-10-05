@@ -1256,7 +1256,7 @@ dependencies = [
  "bitflags 2.11.1",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1673,6 +1673,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-cage-plan"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "libc",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "chio-commerce-order"
 version = "0.1.0"
 dependencies = [
@@ -1799,6 +1810,7 @@ dependencies = [
 name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
+ "chio-core-types",
  "reqwest",
  "serde",
  "serde_json",
@@ -1830,6 +1842,8 @@ dependencies = [
 name = "chio-federation-authority"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
+ "chacha20poly1305",
  "chio-attest-buyer-core",
  "chio-core-types",
  "chio-federation",
@@ -1838,6 +1852,7 @@ dependencies = [
  "frost-ed25519",
  "hex",
  "rand_core 0.6.4",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -1920,6 +1935,7 @@ dependencies = [
  "chio-log-redact",
  "chio-manifest",
  "chio-metrics-spec",
+ "chio-response-model",
  "chio-security-types",
  "chio-settle",
  "chio-supervisor",
@@ -1927,6 +1943,7 @@ dependencies = [
  "chio-tool-call-fabric",
  "chio-underwriting",
  "chio-weights",
+ "chio-workflow",
  "chrono",
  "dashmap",
  "futures",
@@ -1952,6 +1969,7 @@ version = "0.1.0"
 dependencies = [
  "arc-swap",
  "chio-core-types",
+ "chio-security-types",
  "serde",
  "serde_json",
 ]
@@ -2026,6 +2044,7 @@ dependencies = [
 name = "chio-manifest"
 version = "0.1.0"
 dependencies = [
+ "chio-cage-plan",
  "chio-core",
  "chio-security-types",
  "jsonschema",
@@ -2080,6 +2099,18 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "chio-response-model"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "hex",
+ "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 
@@ -2147,6 +2178,7 @@ dependencies = [
  "hex",
  "reqwest",
  "secp256k1 0.31.1",
+ "secrecy",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -2227,6 +2259,7 @@ dependencies = [
  "async-trait",
  "chio-core-types",
  "chio-manifest",
+ "chio-security-types",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -2300,6 +2333,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-workflow-preflight",
+ "rusqlite",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3107,7 +3141,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4593,7 +4627,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5898,7 +5932,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5957,7 +5991,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6154,6 +6188,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcb913707158fadaf0d8702c2db0e857de66eb003ccfdda5924b5f5ac98efb38"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "secrecy"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
+dependencies = [
+ "serde",
+ "zeroize",
 ]
 
 [[package]]
@@ -6610,7 +6654,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6767,7 +6811,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7594,7 +7638,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

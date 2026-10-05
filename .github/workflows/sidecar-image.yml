@@ -10,6 +10,7 @@ on:
     paths:
       - ".cargo/**"
       - ".github/workflows/sidecar-image.yml"
+      - ".github/workflows/cargo-vet.yml"
       - "Cargo.lock"
       - "Cargo.toml"
       - "contracts/**"
@@ -19,6 +20,10 @@ on:
       - "fixtures/**"
       - "rust-toolchain.toml"
       - "scripts/tests/check-sidecar-image-workflow.test.sh"
+      - "scripts/check-supply-chain.sh"
+      - "scripts/check-aws-lc-fork.py"
+      - "scripts/tests/check-supply-chain-workflows.test.py"
+      - "supply-chain/**"
       - "spec/**"
       - "third_party/aws-lc-rs-chio/**"
       - "wit/**"
@@ -44,8 +49,16 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  supply-chain:
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    uses: ./.github/workflows/cargo-vet.yml
+
   build:
     name: Build sidecar image (${{ matrix.platform }})
+    needs: supply-chain
     strategy:
       fail-fast: false
       matrix:

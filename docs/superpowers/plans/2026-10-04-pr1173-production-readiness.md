@@ -6,7 +6,7 @@
 
 **Architecture:** Repair existing qualification gates and dependency boundaries, then compose PostgreSQL through existing mediated native execution. Preserve the kernel's admission, confinement, durable recovery and receipt contracts.
 
-**Tech Stack:** Rust 1.94, Kani, Cargo Vet, Wasmtime/WASI, Python process SDK, TypeScript SDK, PostgreSQL 17, Linux x86_64 cage, GitHub Actions.
+**Tech Stack:** Rust 1.95, Kani, Cargo Vet, Wasmtime, Python process SDK, TypeScript SDK, PostgreSQL 17, Linux x86_64 cage, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-10-04-pr1173-production-readiness.md`
 
@@ -35,11 +35,11 @@
 
 **Interfaces:** Keep the existing exact-test log checker, `check-kani-public-core.sh --lane pr` and `run-kani-manifest.sh --lane pr --exclude-crate chio-kernel-core`. No harness API changes are planned.
 
-- [ ] Retain the hosted failure logs and compare exact inventory failures to the source test names.
-- [ ] Add the omitted pending-intent and typed-proposal tests to the existing exact inventories.
-- [ ] Pin every executable Kani consumer to 0.68.0, validate the installed version, and update the mutation tool version assertions.
-- [ ] Run the existing proof-runner and mutation-control tests; prove stale/mismatched versions and empty harness selection still fail.
-- [ ] Run both real Kani PR sweeps with the released compiler on a supported host, retaining proof outcomes rather than only successful compilation.
+- [x] Retain the hosted failure logs and compare exact inventory failures to the source test names.
+- [x] Add the omitted pending-intent and typed-proposal tests to the existing exact inventories.
+- [x] Pin every executable Kani consumer to 0.68.0, validate the installed version, and update the mutation tool version assertions.
+- [x] Run the existing proof-runner and mutation-control tests; prove stale/mismatched versions and empty harness selection still fail.
+- [x] Run both real Kani PR sweeps with the pinned, narrowly repaired compiler on a supported host, retaining proof outcomes rather than only successful compilation. `scripts/kani-toolchain.py` binds the exact release, upstream repair and cached compiler bytes; its real controls require proof success and rejection of reachable unsupported code.
 - [ ] Rerun the affected crypto workflow commands and confirm exact test counts. Commit the independently verified changes.
 
 ### Task 2: Remediate dependency advisories
@@ -48,22 +48,22 @@
 
 **Interfaces:** Preserve the guard backend API and TypeScript package peer contracts. Consume the original scanner JSON retained from run 37184775249; produce locks with no newly suppressed advisory.
 
-- [ ] Enumerate affected versions and primary upstream fixes; select a supported Wasmtime/WASI pair containing both fixes.
-- [ ] Update each affected dependency through its package manager, reviewing unrelated lock changes. For unpatched transitive packages, identify the owning feature and specify a bounded removal or source repair before editing it.
-- [ ] Run the full affected guard backend suite, component examples and Clippy. Exercise the affected TypeScript SDK and conformance package suites.
-- [ ] Run the same Cargo Audit and OSV selections as CI. Require no non-ignored vulnerabilities and no additions to the ignore policy.
+- [x] Enumerate affected versions and primary upstream fixes; reuse the security prerequisite's Wasmtime 48.0.5 and Rust 1.95. There is no Wasmtime WASI dependency to upgrade in this backend.
+- [x] Update each affected dependency through its package manager, reviewing unrelated lock changes. For unpatched transitive packages, identify the owning feature and specify a bounded removal or source repair before editing it.
+- [x] Run the full affected guard backend suite, component examples and Clippy. Exercise the affected TypeScript SDK and conformance package suites.
+- [x] Run the same Cargo Audit and OSV selections as CI. Require no non-ignored vulnerabilities and no additions to the ignore policy.
 - [ ] Commit validated dependency and compatibility changes with retained scanner outputs.
 
 ### Task 3: Complete source-backed supply-chain review
 
-**Files:** `supply-chain/{audits.toml,imports.lock}`, new `supply-chain/reviews/aws-lc-rs-1.18.1.md`, any narrowly necessary new review records, `third_party/aws-lc-rs-chio/CHIO-PATCH.md` if the review finds a defect.
+**Files:** `supply-chain/{audits.toml,imports.lock,aws-lc-rs-fork.json,aws-lc-lint-exceptions.json}`, `docs/security/audits/aws-lc-rs-1.18.1-*.md`, `scripts/check-{supply-chain.sh,aws-lc-fork.py,aws-lc-lints.py}`, and the exact `third_party/aws-lc-rs-chio/` source from merged PR 1168.
 
-**Interfaces:** Registry review covers exactly aws-lc-rs 1.18.1; fork review covers `CHIO-PATCH.patch` and `CHIO-RESTORED-FIXTURES.sha256`. Cargo Vet's `safe-to-deploy` criterion remains unchanged.
+**Interfaces:** Reuse the completed upstream and fork reviews from PR 1168. The published wrapper has confirmed defects and is explicitly not certified safe to deploy. The non-implying upstream review criterion, exact corrected fork inventory and reconstruction, lint dispositions, locked deployment source/feature checks, native/transitive deployment audits and regressions form one mandatory gate. No new exemption is authorized.
 
-- [ ] Verify archive hash, upstream origin and the complete local fork delta, including restored test fixtures.
-- [ ] Review FFI ownership/lengths, key generation/parsing, AEAD and nonce behavior, zeroization, thread safety, build scripts and ambient authority. Record file/function findings and any limits.
-- [ ] Exercise meaningful boundary regressions and default/FIPS suites, fixing demonstrated defects before certification.
-- [ ] Reconcile new dependency audit obligations from Task 2 using trusted imports or documented source review, without exemptions.
+- [x] Verify archive hash, upstream origin and the complete local fork delta, including restored test fixtures.
+- [x] Review the completed source audit's coverage of FFI ownership/lengths, key generation/parsing, AEAD and nonce behavior, zeroization, thread safety, build scripts and ambient authority. Preserve its findings, source identity and deployment limits.
+- [x] Run the combined gate on the merged candidate: exact source reconstruction and six deployment resolutions, default/FIPS lint inventories, Cargo Vet, DES parity, AES initialization and FIPS wrong-key rejection. Historical full default/FIPS suites remain attributed to the prerequisite.
+- [x] Reconcile new dependency audit obligations from Task 2 using trusted imports or documented source review, without exemptions.
 - [ ] Add certifications only for completed reviews; run `cargo vet --locked` and retain its successful result. Commit the review evidence and records.
 
 ### Task 4: Qualify confined PostgreSQL work and crash recovery
@@ -72,9 +72,9 @@
 
 **Interfaces:** Preserve public worker lease API, tenant/owner/fence inputs, `qualify.py` and `qualify_claim_loss.py` evidence contracts, and signed receipt verification. Reuse the original admission authority.
 
-- [ ] Write and self-review a focused design/plan after tracing the existing prepared broker and resource adapter implementation; pin exact modules and custody interfaces before transport implementation.
+- [x] Write and self-review a focused design/plan after tracing the existing prepared broker and resource adapter implementation; pin exact modules and custody interfaces before transport implementation.
 - [ ] Add failing boundary tests for credential isolation, forged caller, wrong tenant/lease fence, denied direct networking and lost committed replies.
-- [ ] Implement the smallest mediated composition preserving these properties and the real TLS PostgreSQL resource.
+- [x] Implement the smallest mediated composition preserving these properties and the real TLS PostgreSQL resource.
 - [ ] Run the public worker API suite and both native qualification trajectories on Linux x86_64, including actual host termination and recovery without redispatch.
 - [ ] Verify receipts and nonsecret artifact contents, update operator documentation, run relevant Clippy and workflow contract tests, then commit.
 
@@ -88,3 +88,90 @@
 - [ ] Freeze source and run the existing 21-command native qualification, format and artifact checks. Preserve superseded evidence through the existing history mechanism.
 - [ ] Push the authorized branch and refresh all exact-SHA CI checks; diagnose and fix any remaining failed or cancelled required gate, then requalify changed boundaries.
 - [ ] Confirm local/remote/PR identity, clean worktree, exact terminal checks and draft state. Report production acceptance separately from research publication gates, merge and deployment.
+
+### Kani traversal resource bound
+
+The repaired compiler exposed a previously hidden solver cost: the inclusion
+walk fixture expanded 36 alternative heap allocations to 25 million variables
+and 111 million clauses, exceeding an ordinary CI runner's memory. The local
+run was terminated after exceeding 35 GiB, and is retained as interrupted.
+Quantify directly over the bounded path instead: every size and index 0..=8,
+every length 0..=3, and every 32-byte leaf/sibling value. This is a superset of
+the former valid fixtures and six mutation modes. Preserve the production walk,
+independent model, hash abstraction and enabled unwinding checks. Require the
+full proof and existing Merkle mutant-killer controls before acceptance.
+
+The direct-path run still expanded recursive `chio_core_types::Error` drop glue
+through unrelated JSON error variants and exceeded 19 GiB. Avoid eagerly
+constructing the fieldless rejection error on successful sibling lookups. The
+harness checks the returned error is exactly `MerkleProofFailed` before omitting
+the generic destructor with `ManuallyDrop`. This excludes no owned error payload;
+the valid traversal, invalid-path result, allocation checks and unwinding checks
+remain enabled. Preserve both interrupted runs and qualify the public method.
+
+The model-only quote harness also expanded unrelated recursive attestation error
+destructors. Its abstract validator now uses a fieldless model error vocabulary
+with the same rejection classes and precedence. This does not alter production
+quote verification or claim that the model proves the parser. The complete PR
+manifest sweep passes all 21 selected harnesses with the repaired compiler.
+
+The integrated source also carried stale formal mirrors. Review the reported
+source changes, follow moved validators and deadline helpers, and regenerate
+the anchors and coverage inventory only after that review. The review and model
+limits are recorded in `docs/formal/PR1173-SOURCE-REVIEW.md`.
+
+### Mutation coverage at the receiver record boundary
+
+The retained x86 run reported a surviving OR-to-AND mutation in the receiver's
+lease-reference comparison before its overall job was cancelled. SQLite's
+independent record checks reject the malformed record first, so an end-to-end
+SQLite fixture cannot isolate this defensive predicate. Extract the unchanged
+comparison into a private function and test independent substitution of either
+lease identifier, issuer, scope, hash algorithm and expiry. Retain the source
+check for every `RuntimeAdmissionStore` implementation. Prove an actual Boolean
+mutation is rejected, then rerun the existing integrated treaty suite.
+
+### Retained CI timeout dispositions
+
+The x86 changed-target ASan build completed after approximately 66 minutes,
+leaving less than nine minutes of its 75-minute job for unchanged fuzz budgets.
+Set that outer budget to 150 minutes, preserving every target and fuzz duration.
+The 73-mutant runtime slice exhausted its 45-minute job while still testing;
+set the outer PR budget to 120 minutes without changing selection, concurrency,
+per-mutant timeout, or score requirements. These are interrupted historical
+campaigns, not passing evidence; require terminal reruns on the new source.
+
+### Security execution image reconciliation
+
+The merged workspace requires Rust 1.95, but the evidence image still binds
+Rust 1.94.1 and the previous lockfile. Pin the official x86 Rust 1.95.0 Alpine
+3.22 image manifest and the Rust release manifest's Clippy/rustfmt archives.
+Retain the exact APK inventory, independent installed-component comparisons,
+read-only source mount, Cargo tool pins, and immutable authority entrypoints.
+Bind the reviewed final Cargo and toolchain files in both the image and its
+contract checker. Build the complete image on the x86 CI runner before accepting
+the transition. A local ARM execution-format failure is not image qualification.
+
+### Local acceptance before the next hosted candidate
+
+The selected 32 public-core and 21 manifest Kani harnesses passed. The actual
+Merkle leaf-boundary mutation failed its independent oracle and the restored
+walk passed all 963 checks. The real DSSE OR-to-AND mutation was rejected by
+the added predicate regression; restored tests passed. Compiler installation
+controls reject reachable unsupported catch-unwind and require a working proof.
+Version, empty-selection, inventory and proof-mutant runner controls passed.
+
+The combined AWS-LC gate passed on the integrated source: reconstruction, six
+deployment resolutions, reviewed lint inventories (37 default, 38 FIPS), locked
+Cargo Vet, three DES parity tests, AES schedule initialization and FIPS wrong-key
+rejection. Vet retained 730 existing exemptions; this work adds none. Cargo Audit
+and OSV passed their existing policies. The npm source repairs are authenticated
+against the original upstream packages, reconstructed exactly and checked for
+new advisories. Braces' upstream Bash-compatibility failures remain recorded.
+
+PostgreSQL adapter tests, the prepared-payload regressions, all 34 shared Python
+tests and TypeScript transport tests passed, as did affected Rust Clippy and
+workflow negative controls. The actual confined PostgreSQL and SIGKILL
+trajectories and the x86 evidence image remain required hosted checks. No local
+aarch64 result substitutes for those checks. The final source-bound paper
+qualification and terminal hosted acceptance follow the integration commits.

@@ -97,7 +97,9 @@ jobs:
     name: mutants-pr (${{ matrix.package }})
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # A 73-mutant PR slice exceeded 45 minutes with two test workers.
+    # Preserve the complete changed-line selection and per-mutant test bounds.
+    timeout-minutes: 120
     # continue-on-error is intentionally absent: the lane's advisory-vs-
     # blocking posture is driven by scripts/mutants-gate.sh (which reads
     # releases.toml). Setting it here would mask a non-zero gate exit and

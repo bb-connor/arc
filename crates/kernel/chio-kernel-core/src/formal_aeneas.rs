@@ -162,6 +162,7 @@ pub struct InclusionStep {
 #[allow(
     clippy::manual_is_multiple_of,
     clippy::needless_bool,
+    clippy::collapsible_match,
     reason = "Keep arithmetic in the explicit form consumed by the existing formal model. The explicit boolean is the form consumed by the formal extraction tool."
 )] // Aeneas scalar subset.
 pub fn inclusion_step(index: u64, size: u64) -> InclusionStep {

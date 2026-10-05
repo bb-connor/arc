@@ -224,6 +224,14 @@ def validate(
     )
     job = postgres["jobs"]["native"]
     consumer_index, step = named_step(job, POSTGRES_NAME)
+    require(
+        consumer_index >= 2
+        and job["steps"][consumer_index - 2] == {
+            "name": "Build prepared native broker transports",
+            "uses": "./.github/actions/prepared-native-broker",
+        },
+        "prepared PostgreSQL broker transports must precede the enforcing fixture unconditionally",
+    )
     build_index, build = named_step(job, "Build the real gateway and kernel")
     copy_index, copy = named_step(job, "Install the process package and create a dedicated TLS fixture")
     require(

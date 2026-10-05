@@ -12,3 +12,8 @@ releases/audit-reports/*.pdf binary
 
 # Mobile xcframework static archives are generated release artifacts.
 sdks/swift/Frameworks/ChioKernel.xcframework/**/*.a filter=lfs diff=lfs merge=lfs -text
+
+# Unified patch context represents an empty source line with one space.
+# The source-reconstruction gate verifies these exact authenticated bytes.
+third_party/npm/braces.patch whitespace=-blank-at-eol
+third_party/npm/node-forge.patch whitespace=-blank-at-eol

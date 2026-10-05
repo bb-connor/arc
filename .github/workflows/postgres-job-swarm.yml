@@ -11,6 +11,8 @@ on:
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
       - ".github/actions/enforced-native-fixture/**"
+      - ".github/actions/prepared-native-broker/**"
+      - "crates/security/chio-secret-broker/**"
       - "scripts/check-native-protocol-ci.py"
       - "scripts/tests/check-native-protocol-ci.test.py"
       - "scripts/prepare-enforced-native-fixture.py"
@@ -28,6 +30,8 @@ on:
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
       - ".github/actions/enforced-native-fixture/**"
+      - ".github/actions/prepared-native-broker/**"
+      - "crates/security/chio-secret-broker/**"
       - "scripts/check-native-protocol-ci.py"
       - "scripts/tests/check-native-protocol-ci.test.py"
       - "scripts/prepare-enforced-native-fixture.py"
@@ -47,7 +51,7 @@ jobs:
   native:
     name: Native PostgreSQL worker API and process ownership
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       CARGO_BUILD_JOBS: "2"
       CARGO_PROFILE_DEV_DEBUG: "0"
@@ -65,6 +69,7 @@ jobs:
         run: |
           cargo fmt -p chio-finding-market-store-postgres -- --check
           cargo test --locked -p chio-finding-market-store-postgres --lib
+          cargo test --locked -p chio-finding-market-store-postgres --example agent_jobs
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
           cargo build --locked -p chio-cli --features real-linux-enforcement --bin chio
@@ -79,8 +84,11 @@ jobs:
           uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"
           uv venv --python /usr/bin/python3 "$job_root/venv"
           uv pip install --python "$job_root/venv/bin/python" --no-deps "$job_root/wheels/chio_process-0.1.0-py3-none-any.whl"
+          "$job_root/venv/bin/python" -m unittest discover -s examples/postgres-job-swarm -p 'test_*.py'
           docker pull postgres:17.11
           python3 examples/postgres-job-swarm/postgres.py start --binary "$job_root/agent-jobs" --output "$job_root/database"
+      - name: Build prepared native broker transports
+        uses: ./.github/actions/prepared-native-broker
       - name: Qualify enforcing host and prepare native consumer fixture
         uses: ./.github/actions/enforced-native-fixture
       - name: Exercise the public worker role and actual native process host

@@ -1,4 +1,5 @@
 //! Fixed provider request mapping selected by the host, never by a worker.
+use chio_core_types::capability::token::CapabilityToken;
 use chio_process::ProcessError;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -7,6 +8,7 @@ use serde_json::{json, Value};
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum PayloadConfig {
     Json,
+    KernelMcpToolCall,
     MiniSweChat {
         model_id: String,
         model: String,
@@ -58,6 +60,11 @@ impl PayloadConfig {
     pub fn body(&self, input: &Value) -> Result<Vec<u8>, ProcessError> {
         let value = match self {
             Self::Json => input.clone(),
+            Self::KernelMcpToolCall => {
+                return Err(ProcessError::Invalid(
+                    "MCP payload requires the original caller capability",
+                ));
+            }
             Self::MiniSweChat {
                 model_id,
                 model,
@@ -88,11 +95,79 @@ impl PayloadConfig {
         };
         Ok(chio_core_types::canonical_json_bytes(&value)?)
     }
+
+    /// Bind resource-side caller metadata inside durable host preparation.
+    /// Worker input stays within `arguments`; it cannot choose the installed
+    /// tool identity or replace the capability held by the process registry.
+    pub fn body_for_caller(
+        &self,
+        input: &Value,
+        tool_name: &str,
+        parent: &CapabilityToken,
+    ) -> Result<Vec<u8>, ProcessError> {
+        if matches!(self, Self::KernelMcpToolCall) {
+            let caller =
+                chio_core_types::sha256_hex(&chio_core_types::canonical_json_bytes(parent)?);
+            Ok(chio_core_types::canonical_json_bytes(&json!({
+                "name": tool_name,
+                "arguments": input,
+                "_meta": {"chioCallerCapabilitySha256": caller},
+            }))?)
+        } else {
+            self.body(input)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mcp_mapping_binds_the_installed_tool_and_original_caller(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
+        use chio_core_types::{canonical_json_bytes, sha256_hex, Keypair};
+
+        let signer = Keypair::from_seed(&[41; 32]);
+        let parent = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "original-worker".into(),
+                issuer: signer.public_key(),
+                subject: signer.public_key(),
+                scope: Default::default(),
+                issued_at: 1,
+                expires_at: 100,
+                delegation_chain: vec![],
+                aggregate_invocation_budget: None,
+            },
+            &signer,
+        )?;
+        let config: PayloadConfig = serde_json::from_value(json!({"kind":"kernel_mcp_tool_call"}))?;
+        config.validate()?;
+        let input = json!({"job_id":"job", "name":"assign", "_meta":{"chioCallerCapabilitySha256":"forged"}});
+        let body: Value =
+            serde_json::from_slice(&config.body_for_caller(&input, "complete", &parent)?)?;
+        assert_eq!(body["name"], "complete");
+        assert_eq!(body["arguments"], input);
+        assert_eq!(
+            body["_meta"]["chioCallerCapabilitySha256"],
+            sha256_hex(&canonical_json_bytes(&parent)?)
+        );
+        assert!(config.body(&input).is_err());
+        let plain: Value = serde_json::from_slice(
+            &PayloadConfig::Json.body_for_caller(&input, "complete", &parent)?,
+        )?;
+        assert_eq!(plain, input);
+        let mut changed = parent.clone();
+        changed.id = "different-worker".into();
+        assert_ne!(
+            config.body_for_caller(&input, "complete", &changed)?,
+            config.body_for_caller(&input, "complete", &parent)?
+        );
+        Ok(())
+    }
+
     #[test]
     fn model_requests_cannot_select_provider_options_or_carry_worker_metadata(
     ) -> Result<(), Box<dyn std::error::Error>> {

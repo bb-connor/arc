@@ -166,6 +166,7 @@ def main():
                 bootstrap["connection"],
                 settings.get("tools", DEFINITIONS),
                 settings.get("namespace", NAMESPACE),
+                prepared_broker=settings.get("prepared_broker", False),
             )
         db = stack.enter_context(
             contextlib.closing(

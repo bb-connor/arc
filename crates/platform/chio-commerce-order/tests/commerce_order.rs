@@ -1282,6 +1282,43 @@ fn commerce_order_replay_accepts_full_normative_success_path() {
 }
 
 #[test]
+fn commerce_order_replay_validates_current_dispute_state() {
+    for status in ["none", "open", "resolved"] {
+        let mut bundle = load_bundle("offline-psp-valid");
+        mutate_event_log(&mut bundle, |event_log| {
+            event_log["events"]
+                .as_array_mut()
+                .test_expect("event log events array")
+                .push(serde_json::json!({
+                    "event_id": "event-commerce-001-dispute",
+                    "order_id": "order-commerce-001",
+                    "prior_state": "completed",
+                    "next_state": "disputed",
+                    "transition": "open_dispute",
+                    "occurred_at": "2026-06-10T00:09:00Z",
+                    "authority_receipt_ref": "receipt-dispute-commerce-001",
+                    "evidence_refs": ["payment-lifecycle-commerce-001"],
+                    "idempotency_key": "idem-event-commerce-001-dispute"
+                }));
+        });
+        mutate_payment_lifecycle(&mut bundle, |payment| {
+            payment["dispute_status"] = serde_json::json!(status);
+        });
+        bundle.order_context.current_state = "disputed".to_string();
+        let result = chio_commerce_order::verify_commerce_order(&bundle);
+        if status == "none" {
+            let error = result.test_expect_err("disputed order must retain its dispute status");
+            assert!(error
+                .to_string()
+                .contains("disputed order missing dispute state"));
+        } else {
+            let report = result.test_expect("open and resolved disputes must remain verifiable");
+            assert_eq!(report.current_state, "disputed");
+        }
+    }
+}
+
+#[test]
 fn commerce_order_replay_accepts_disputed_refunded_recovery_path() {
     let mut bundle = load_bundle("offline-psp-valid");
     mutate_event_log(&mut bundle, |event_log| {

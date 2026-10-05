@@ -81,7 +81,7 @@ class MsrvCacheTarget(unittest.TestCase):
         for name in target_steps:
             step = JOB.split(f'      - name: {name}\n', 1)[1].split('\n      - ', 1)[0]
             self.assertIn(target_line, step, name)
-        self.assertIn('toolchain: "1.94.1"\n          cache: "false"', JOB)
+        self.assertIn('toolchain: "1.95.0"\n          cache: "false"', JOB)
         self.assertEqual(JOB.count('uses: Swatinem/rust-cache@' + PIN), 1)
         self.assertIn('workspaces: ${{ steps.msrv-cache.outputs.workspace }}', JOB)
         self.assertLess(JOB.index('python3 scripts/tests/msrv-cache-target.test.py'),

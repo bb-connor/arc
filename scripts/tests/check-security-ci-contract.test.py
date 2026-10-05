@@ -1041,8 +1041,8 @@ assert_boundary_file_rejected(
     "security image loses digest-pinned Rust base",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "rust:1.94.1-alpine3.22",
+        "rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775",
+        "rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1050,9 +1050,9 @@ assert_boundary_file_rejected(
     "security image ignores a commented pinned-base decoy",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67",
-        "# FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67\n"
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22",
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775",
+        "# FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775\n"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22",
     ),
     "image has an unpinned build stage",
 )
@@ -1070,9 +1070,9 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         " && cmp \\\n"
-        "      /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
+        "      /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
         "bin/cargo-clippy \\\n"
-        "      /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/clippy-preview/"
+        "      /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/clippy-preview/"
         "bin/cargo-clippy \\\n",
         " && true \\\n",
     ),
@@ -1083,7 +1083,7 @@ assert_boundary_file_rejected(
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
         'test "$(cargo clippy --version)" = '
-        '"clippy 0.1.94 (e408947bfd 2026-03-25)"',
+        '"clippy 0.1.95 (59807616e1 2026-04-14)"',
         'test "$(cargo clippy --version | cut -d\' \' -f1)" = "clippy"',
     ),
     "image Rust component closure changed",

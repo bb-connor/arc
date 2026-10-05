@@ -59,12 +59,9 @@
 
 extern crate alloc;
 
-use alloc::string::ToString;
-
 use chio_core_types::crypto::PublicKey;
 
 use crate::quote::{expect_report_data, QuoteTcbStatus, QuoteVerificationContext};
-use crate::AttestError;
 
 /// Build a deterministic uncompressed-SEC1 P-256 public key fixture.
 ///
@@ -165,6 +162,15 @@ struct ModelQuoteOutcome {
     algorithm_tag_matches: bool,
 }
 
+/// Error classes of the bounded decision model. Runtime error payloads and
+/// their destructors are outside this model, just like cryptographic parsing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ModelQuoteError {
+    QuoteRejected,
+    Malformed,
+    ReportDataMismatch,
+}
+
 /// Algebra of a fail-closed `verify_quote` impl. A backend MUST reject
 /// when ANY of the three axes is unsatisfied:
 ///
@@ -196,19 +202,15 @@ struct ModelQuoteOutcome {
 /// backend-specific ordering between TCB and algorithm dispatch
 /// document and assert that ordering locally (see the TDX harness for
 /// algorithm-vs-report_data ordering).
-fn model_verify_quote(outcome: ModelQuoteOutcome) -> Result<(), AttestError> {
+fn model_verify_quote(outcome: ModelQuoteOutcome) -> Result<(), ModelQuoteError> {
     if !outcome.tcb_status.is_acceptable() {
-        return Err(AttestError::QuoteRejected(
-            "model: tcb rejected".to_string(),
-        ));
+        return Err(ModelQuoteError::QuoteRejected);
     }
     if !outcome.algorithm_tag_matches {
-        return Err(AttestError::Malformed(
-            "model: algorithm tag mismatch".to_string(),
-        ));
+        return Err(ModelQuoteError::Malformed);
     }
     if !outcome.report_data_matches {
-        return Err(AttestError::ReportDataMismatch);
+        return Err(ModelQuoteError::ReportDataMismatch);
     }
     Ok(())
 }
@@ -274,9 +276,9 @@ pub fn public_nitro_verify_quote_rejects_report_data_mismatch() {
     // (1) Fail-closed on unacceptable TCB (production checks TCB
     // collateral first, before report_data).
     if !tcb_acceptable {
-        assert!(matches!(result, Err(AttestError::QuoteRejected(_))));
+        assert!(matches!(result, Err(ModelQuoteError::QuoteRejected)));
     } else if !report_data_matches {
-        assert!(matches!(result, Err(AttestError::ReportDataMismatch)));
+        assert!(matches!(result, Err(ModelQuoteError::ReportDataMismatch)));
     } else {
         // (3) Both axes satisfied: the model accepts. The runtime
         // path adds cryptographic checks the model abstracts, so
@@ -334,7 +336,7 @@ pub fn public_sev_snp_verify_quote_rejects_unacceptable_tcb() {
     // `SevSnpVerifier::verify_collateral` path returns the same
     // variant before reaching the signature dispatch.
     if !acceptable {
-        assert!(matches!(result, Err(AttestError::QuoteRejected(_))));
+        assert!(matches!(result, Err(ModelQuoteError::QuoteRejected)));
     } else {
         // (2) Acceptable TCB + matching report-data + matching alg
         // tag: the model accepts. (Same caveat as the Nitro harness:
@@ -377,7 +379,7 @@ pub fn public_tdx_verify_quote_rejects_algorithm_mismatch() {
 
     // (1) Fail-closed on algorithm-tag mismatch.
     if !algorithm_tag_matches {
-        assert!(matches!(result, Err(AttestError::Malformed(_))));
+        assert!(matches!(result, Err(ModelQuoteError::Malformed)));
     } else {
         // (2) Matching tag + matching report-data + acceptable TCB:
         // the model accepts.
@@ -401,5 +403,5 @@ pub fn public_tdx_verify_quote_rejects_algorithm_mismatch() {
         algorithm_tag_matches: false,
     };
     let bad_result = model_verify_quote(bad_outcome);
-    assert!(matches!(bad_result, Err(AttestError::Malformed(_))));
+    assert!(matches!(bad_result, Err(ModelQuoteError::Malformed)));
 }

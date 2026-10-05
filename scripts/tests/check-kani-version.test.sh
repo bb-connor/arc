@@ -12,6 +12,19 @@ exit "${FAKE_KANI_EXIT:-0}"
 SH
 chmod +x "$temporary/cargo"
 export PATH="$temporary:$PATH"
+export KANI_HOME="$temporary/kani"
+python3 - <<'PY'
+import importlib.util
+import os
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("kani_toolchain", "scripts/kani-toolchain.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+bundle = Path(os.environ["KANI_HOME"]) / "kani-0.68.0"
+(bundle / "bin").mkdir(parents=True)
+(bundle / "bin/kani-compiler").write_bytes(b"compiler fixture")
+module.record_bundle(bundle)
+PY
 export FAKE_KANI_VERSION='Kani Rust Verifier 0.68.0 (cargo plugin)'
 bash scripts/check-kani-version.sh > "$temporary/output"
 grep -Fq '0.68.0' "$temporary/output"

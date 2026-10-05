@@ -6,7 +6,7 @@ import os
 import select
 import subprocess
 
-from chio_process.launch import provision_native_demo
+from chio_process import ProcessClient
 
 ROLES = ("superseded", "replacement")
 
@@ -24,7 +24,7 @@ def command(arguments, directory, *, env=None, input=None):
         [str(value) for value in arguments],
         capture_output=True,
         timeout=90,
-        env=env,
+        env=host_environment() if env is None else env,
         input=input,
     )
     if result.returncode:
@@ -34,59 +34,50 @@ def command(arguments, directory, *, env=None, input=None):
     return result.stdout
 
 
-def prepare(chio, gateway, tenant, directory, environment, *, operator_command=None):
-    chio = chio.resolve(strict=True)
-    gateway = gateway.resolve(strict=True)
-    (directory / "policy.yaml").write_text("""kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 2
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: jobs
-        tool: '*'
-        operations: [invoke, delegate]
-        ttl: 3600
-      - server: jobs-admin
-        tool: '*'
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-    servers = [
-        provision_native_demo(
-            chio,
-            server,
-            operator_command
-            if mode == "operator" and operator_command is not None
-            else [str(gateway), mode, tenant],
-            directory / ("launch-" + mode),
-            directory,
-            environment=environment,
-        )
-        for server, mode in (("jobs", "worker"), ("jobs-admin", "operator"))
-    ]
-    write(
-        directory / "host-config.json",
-        {
-            "schema": "chio.process.host.v1",
-            "policy": "policy.yaml",
-            "servers": servers,
-            "limits": {"max_processes": 3, "max_depth": 1, "max_calls": 100},
-            "children": [
-                {
-                    "id": name,
-                    "parent": "root",
-                    "budget_share_bps": 4000,
-                    "tools": [
-                        {"server_id": "jobs", "tool_name": tool}
-                        for tool in ("task", "complete", "renew")
-                    ],
-                }
-                for name in ROLES
-            ],
-        },
-    )
+def host_environment():
+    """No database or model credentials enter the kernel or broker fixture."""
+    return {
+        name: os.environ[name]
+        for name in ("PATH", "HOME", "TMPDIR", "SYSTEMROOT")
+        if name in os.environ
+    }
+
+
+def route(tool, *, operator=False):
+    return ("jobs-admin-" if operator else "jobs-") + tool
+
+
+def prepared_request(connection, operation, tool, arguments, *, known=True):
+    server = route(tool, operator=True)
+    prepared = ProcessClient(
+        connection["socket_path"], connection["credential"]
+    ).prepare_invocation(operation, server, tool, arguments)
+    if (
+        not isinstance(prepared, dict)
+        or prepared.get("schema") != "chio.broker-execute.v1"
+    ):
+        raise ValueError("host returned an invalid preparation")
+    return {
+        "operation_key": operation,
+        "server_id": server,
+        "tool_name": tool,
+        "arguments": prepared,
+        "known_outcome_only": known,
+    }
+
+
+@contextlib.contextmanager
+def prepare(chio, gateway, tenant, directory, environment, *, fault=None):
+    from services import Services
+
+    with Services(
+        chio, gateway, tenant, directory, environment, fault=fault
+    ) as services:
+        key, connections = initialize(chio, gateway, directory, services.config_path)
+        yield key, connections, services
+
+
+def initialize(chio, gateway, directory, config_path):
     initialized = json.loads(
         command(
             [
@@ -94,12 +85,12 @@ capabilities:
                 "process",
                 "init",
                 "--config",
-                directory / "host-config.json",
+                config_path,
                 "--state",
                 directory / "host",
             ],
             directory,
-            env=environment,
+            env=host_environment(),
         )
     )
     (directory / "kernel.pub").write_text(initialized["kernel_key"] + "\n")
@@ -124,6 +115,26 @@ capabilities:
             directory,
         )
         connections[name] = json.loads(path.read_text())
+        if name in ROLES:
+            # These are the resource argument schemas, before trusted host
+            # preparation. The native manifest accepts only the prepared envelope.
+            definitions = json.loads(
+                command(
+                    [gateway, "definitions", "worker"],
+                    directory,
+                    env=host_environment(),
+                )
+            )
+            connections[name]["tools"] = [
+                {
+                    "name": "jobs__" + tool["name"],
+                    "server_id": route(tool["name"]),
+                    "tool_name": tool["name"],
+                    "description": tool["description"],
+                    "input_schema": tool["inputSchema"],
+                }
+                for tool in definitions
+            ]
     return initialized["kernel_key"], connections
 
 
@@ -138,7 +149,7 @@ def stop(process):
 
 
 @contextlib.contextmanager
-def serve(chio, directory, key, environment, *, socket_path=None):
+def serve(chio, directory, key, services, *, socket_path=None):
     with (directory / "host.log").open("ab") as log:
         process = subprocess.Popen(
             [
@@ -150,7 +161,7 @@ def serve(chio, directory, key, environment, *, socket_path=None):
                 "--socket",
                 str(socket_path or directory / "worker.sock"),
             ],
-            env=environment,
+            env=host_environment(),
             stdout=subprocess.PIPE,
             stderr=log,
         )
@@ -165,6 +176,7 @@ def serve(chio, directory, key, environment, *, socket_path=None):
             ready = json.loads(line)
             if ready.get("ready") is not True or ready.get("kernel_key") != key:
                 raise RuntimeError("host readiness or signer changed")
+            services.start()
             yield process
         finally:
             stop(process)

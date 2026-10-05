@@ -56,23 +56,23 @@ EXPECTED_ACTIONLINT_CONFIG = {
 }
 EXPECTED_SECURITY_IMAGE_FROM = (
     "--platform=linux/amd64 "
-    "rust:1.94.1-alpine3.22@sha256:"
-    "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
+    "rust:1.95.0-alpine3.22@sha256:"
+    "2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775"
 )
 EXPECTED_APK_LOCK_SHA256 = (
     "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "05d699fa27c0a3fb59f7bcc31c5bf77993231c7602240d8e609b05b21d92d13a"
+    "c72d5b119e3303cbb6b99ca49ee3b0a7feba29a05c832d01ab25de980a27b366"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
-    "d52c5633ea77aefd345519d0a6c87e19c2636a1e90178585c30db481b3de9de0"
+    "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
 )
 EXPECTED_CLIPPY_ARCHIVE_SHA256 = (
-    "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda"
+    "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61"
 )
 EXPECTED_RUSTFMT_ARCHIVE_SHA256 = (
-    "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b"
+    "688a9ba3b40e9fd360dc083ff28b7ae43c110f2919ee939bb788a46a1e579a84"
 )
 EXPECTED_CARGO_MUTANTS_ARCHIVE_SHA256 = (
     "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028"
@@ -905,11 +905,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "44f78d1b6726ccb4f9dcf5ffcf1f8f447e6af3c0cd6446803e9719a7bc7ae0ea",
+    ): "ba12570c0bfc4982d977643e12522dc90b64d941224a18861556405c08140186",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "36c623035b6ea06ee45a06f29ba8232d059994fd990bba5f7a10a315df6f447d",
+    ): "96b283337273721fffd49fbd1787d0f6d85791da36e1ac042cf72ecf911e5947",
     (
         "security contract revocation",
         "bind-revocation",
@@ -1228,7 +1228,9 @@ EXPECTED_MSRV_EXTRAS = {
         }
     }
 }
-EXPECTED_CARGO_VET_STEPS = (("cargo vet --locked", "cargo vet --locked"),)
+EXPECTED_CARGO_VET_STEPS = (
+    ("Verify source-bound fork and locked supply-chain audits", "bash scripts/check-supply-chain.sh"),
+)
 EXPECTED_CARGO_DENY_STEPS = (
     ("cargo deny check advisories", "cargo deny check advisories"),
     ("cargo deny check licenses", "cargo deny check licenses"),
@@ -1295,7 +1297,7 @@ EXPECTED_THREAT_CONCURRENCY = {
 }
 EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
-    "PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0"
+    "PyYAML==6.0.3 jsonschema==4.26.0 referencing==0.37.0"
 )
 EXPECTED_ENTERPRISE_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
@@ -2022,28 +2024,28 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
 
     expected_rust_components = (
         "curl --proto '=https' --tlsv1.2 --fail --location --output "
-        "/tmp/clippy.tar.gz https://static.rust-lang.org/dist/2026-03-26/"
-        "clippy-1.94.1-x86_64-unknown-linux-musl.tar.gz",
+        "/tmp/clippy.tar.gz https://static.rust-lang.org/dist/2026-04-16/"
+        "clippy-1.95.0-x86_64-unknown-linux-musl.tar.gz",
         f"echo '{EXPECTED_CLIPPY_ARCHIVE_SHA256} /tmp/clippy.tar.gz' | sha256sum -c -",
         "tar -xzf /tmp/clippy.tar.gz -C /tmp",
         "curl --proto '=https' --tlsv1.2 --fail --location --output "
-        "/tmp/rustfmt.tar.gz https://static.rust-lang.org/dist/2026-03-26/"
-        "rustfmt-1.94.1-x86_64-unknown-linux-musl.tar.gz",
+        "/tmp/rustfmt.tar.gz https://static.rust-lang.org/dist/2026-04-16/"
+        "rustfmt-1.95.0-x86_64-unknown-linux-musl.tar.gz",
         f"echo '{EXPECTED_RUSTFMT_ARCHIVE_SHA256} /tmp/rustfmt.tar.gz' | sha256sum -c -",
         "tar -xzf /tmp/rustfmt.tar.gz -C /tmp",
-        "rustup component add --toolchain 1.94.1-x86_64-unknown-linux-musl "
+        "rustup component add --toolchain 1.95.0-x86_64-unknown-linux-musl "
         "clippy rustfmt",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/cargo-clippy /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-clippy /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/"
         "clippy-preview/bin/cargo-clippy",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/clippy-driver /tmp/clippy-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/clippy-driver /tmp/clippy-1.95.0-x86_64-unknown-linux-musl/"
         "clippy-preview/bin/clippy-driver",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/cargo-fmt /tmp/rustfmt-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/cargo-fmt /tmp/rustfmt-1.95.0-x86_64-unknown-linux-musl/"
         "rustfmt-preview/bin/cargo-fmt",
-        "cmp /usr/local/rustup/toolchains/1.94.1-x86_64-unknown-linux-musl/"
-        "bin/rustfmt /tmp/rustfmt-1.94.1-x86_64-unknown-linux-musl/"
+        "cmp /usr/local/rustup/toolchains/1.95.0-x86_64-unknown-linux-musl/"
+        "bin/rustfmt /tmp/rustfmt-1.95.0-x86_64-unknown-linux-musl/"
         "rustfmt-preview/bin/rustfmt",
         "printf '%s\\n' cargo-x86_64-unknown-linux-musl "
         "clippy-x86_64-unknown-linux-musl rust-std-x86_64-unknown-linux-musl "
@@ -2053,12 +2055,12 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         "/tmp/security-evidence-rust-components.actual",
         "cmp /tmp/security-evidence-rust-components.expected "
         "/tmp/security-evidence-rust-components.actual",
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
-        "rm -rf /tmp/clippy.tar.gz /tmp/clippy-1.94.1-x86_64-unknown-linux-musl "
-        "/tmp/rustfmt.tar.gz /tmp/rustfmt-1.94.1-x86_64-unknown-linux-musl "
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
+        "rm -rf /tmp/clippy.tar.gz /tmp/clippy-1.95.0-x86_64-unknown-linux-musl "
+        "/tmp/rustfmt.tar.gz /tmp/rustfmt-1.95.0-x86_64-unknown-linux-musl "
         "/tmp/security-evidence-rust-components.expected "
         "/tmp/security-evidence-rust-components.actual",
     )
@@ -2125,13 +2127,13 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
     )
     expected_authority = (
         '--mount=type=bind,target=/opt/authorized-source,readonly '
-        'test "$(rustc --version)" = "rustc 1.94.1 '
-        '(e408947bf 2026-03-25)"',
+        'test "$(rustc --version)" = "rustc 1.95.0 '
+        '(59807616e 2026-04-14)"',
         'test "$(cargo mutants --version | awk \'{print $2}\')" = "25.3.1"',
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
         f"echo '{cargo_digest} Cargo.lock' | sha256sum -c -",
         f"echo '{toolchain_digest} rust-toolchain.toml' | sha256sum -c -",
         "cargo fetch --locked",
@@ -4823,9 +4825,9 @@ def validate_isolated_execution_job(
 # pinned action and unprivileged job setting. Update only after reviewing the
 # changed inventory; hashing parsed jobs ignores YAML formatting and comments.
 EXPECTED_NONCE_FIPS_JOBS = {
-    "threshold-crypto-floor": "5fb08de467943ab789cb1677859e81fc739cfa14db743857ffaeae86eecc49bb",
-    "session-reports": "13613014c1fe2a1f845b1884094ec73b3985a49e63276cd9db68d9fbf3b053bf",
-    "fips-smoke": "2d300a5b16e51ea5260cfad2eb0c2d09f7b179a82cd0a24e30ca744352e9bc9b",
+    "threshold-crypto-floor": "8e6a63eec8068921e5d63cd180f4357755c2b85d212edf055bb9826c4c285ed9",
+    "session-reports": "16ad2e1401ffc2ea0361cc508047e837d6ee3c09a01fa863e9cb3f35a461defc",
+    "fips-smoke": "6530286bad2e0e616421639eccc930cc6f39f2c95538d458257c3562b7bd69a6",
 }
 EXPECTED_NONCE_FIPS_PATHS = [
     ".github/workflows/chio-tee-fips.yml",
@@ -7134,6 +7136,17 @@ def validate(root: Path) -> None:
         )
     failure_routine = publisher_run[failure_start:reconciliation_start]
     bad_ci_routine = publisher_run[reconciliation_start:success_start]
+    # This nested helper is called conditionally, which disables shell errexit.
+    # Its reviewed API and validation failures must propagate explicitly; the
+    # surrounding reconciliation must still retain monotone failure handling.
+    listing = re.search(
+        r"(?ms)^  list_matching_ci_runs\(\) \{\n.*?^  \}\n", bad_ci_routine
+    )
+    if listing is None or hashlib.sha256(listing[0].encode()).hexdigest() != (
+        "6c9a6d1bb96e8d733b842ec175255f6632f669301a3d60389dfe3278e4444a69"
+    ):
+        raise ContractError("publisher CI listing error propagation changed")
+    reconciliation_body = bad_ci_routine[:listing.start()] + bad_ci_routine[listing.end():]
     success_routine = publisher_run[success_start:branch_start]
     branch_routine = publisher_run[branch_start:]
     if (
@@ -7156,7 +7169,7 @@ def validate(root: Path) -> None:
         or "--request PATCH" in bad_ci_routine
         or bad_ci_routine.count("normalize_bad_ci_namespace ") != 5
         or bad_ci_routine.count("return 0") != 2
-        or "return 1" in bad_ci_routine
+        or "return 1" in reconciliation_body
         or "bad_ci_observed=false" not in bad_ci_routine
         or "bad_ci_observed=true" not in bad_ci_routine
         or "bad_ci_create_missing=false" not in bad_ci_routine
