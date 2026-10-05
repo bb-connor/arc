@@ -51,12 +51,3 @@ dependency or compiler bump does not by itself invalidate the artifact.
 `CLAIM_LEDGER.md` maps each result to its evidence and limits. Lean proves the
 finite-domain checker theorem. The Rust evidence is differential testing, and
 two configured keys do not establish two independent organizations.
-
-## Subsequent comparison correction
-
-The optional composed-baseline experiment has a retained
-[October 5 correction](bench/review-20261005/README.md). It excludes unpaired
-agreement-version cases and an incidental approval denial from comparative
-attack counts. Its new diagnostic run does not qualify latency. The original
-benchmark artifacts remain historical; their superseded baseline counts must
-not be used as current comparative evidence.

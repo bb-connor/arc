@@ -229,3 +229,14 @@ Some hosted jobs on `28842e598e` were cancelled before acquiring a runner.
 GitHub annotations report that no hosted runner acquired those jobs after
 multiple attempts. These are unavailable execution evidence. Requalification
 requires actual terminal execution on the replacement commit.
+## Archived artifact navigation
+
+The final-head Paper Artifact Check at `acf34b0746` and the local 15-test
+historical suite reproduce a stale programmable-sovereignty manifest. A later
+comparison correction changed the archived README, which is a hash-bound paper
+output. Restore that README exactly from assembly `884fd7894d`; retain the
+correction in `HISTORICAL_VALIDATION.md`. Preserve every archive pin, per-file
+hash, aggregate assertion and tamper control. Run the full historical suite and
+the real `--check-historical` command, then renew the native source inventory
+and paper freeze before replacing the candidate. The failed hosted campaign
+remains historical.

@@ -72,3 +72,12 @@ archival documents; their command is not a current-source qualification result.
 New measurements require an explicit new source revision and a separate
 experiment. Passing historical validation establishes retained artifact
 integrity, not present-code benchmark, security, or production qualification.
+
+## Subsequent comparison correction
+
+The optional composed-baseline experiment has a retained
+[October 5 correction](bench/review-20261005/README.md). It excludes unpaired
+agreement-version cases and an incidental approval denial from comparative
+attack counts. Its new diagnostic run does not qualify latency. The original
+benchmark artifacts remain historical; their superseded baseline counts must
+not be used as current comparative evidence.
