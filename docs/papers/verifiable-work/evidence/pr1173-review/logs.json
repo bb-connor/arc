@@ -1398,6 +1398,252 @@
       "observed_result": "passed-34-shared-resource-tests",
       "bytes": 133,
       "sha256": "199f02b72a41adfbbd724eb74d48393d9cad3aa0d0d3517a550dc8f380d4da51"
+    },
+    {
+      "log": "readiness-2ae8e-postgres-failure.log.gz",
+      "observed_result": "failed-second-native-assignment-2ae8ee2979",
+      "bytes": 363404,
+      "sha256": "588978594a4e722f228c5f227a2940416e7d2986ea172ff21db7019078ac2197"
+    },
+    {
+      "log": "readiness-414857-postgres-diagnostic-failure.log.gz",
+      "observed_result": "failed-native-capture-diagnostic-414857027c",
+      "bytes": 366899,
+      "sha256": "672ea3de9350b7a2bd0f12714358c515698e06badc57b75449e5aa9d5828fc3c"
+    },
+    {
+      "log": "readiness-pg-operator-diagnostic-index.json.gz",
+      "observed_result": "authenticated-public-operator-artifact-index-414857027c",
+      "bytes": 1803,
+      "sha256": "e741ceb46b2e8e3dfa13802d081f378747c268cdd1abec944f935432dc0015de"
+    },
+    {
+      "log": "readiness-pg-operator-diagnostics-414857-operator-5-receipts.ndjson.gz",
+      "observed_result": "signed-native-capture-denial-414857027c",
+      "bytes": 6273,
+      "sha256": "144b6d8f1e4df9b21bfb1629b3f004a03d42455cf2105d40e75af8aed8fb231e"
+    },
+    {
+      "log": "readiness-pg-operator-diagnostics-414857-operator-5-kernel.pub.gz",
+      "observed_result": "public-denial-receipt-verification-key-414857027c",
+      "bytes": 65,
+      "sha256": "7ba39569eb427ea6e91962bae122538f467518e1a8bc258c4878fa509bbac939"
+    },
+    {
+      "log": "readiness-pg-operator-denial-verify.log.gz",
+      "observed_result": "independently-verified-native-capture-denial-414857027c",
+      "bytes": 62,
+      "sha256": "5b842f4a04e455c73ed564eef7e37f6d5f5aaee8592672ed8a052d4c5f784e80"
+    },
+    {
+      "log": "readiness-76801-postgres-diagnostic-cancelled.json.gz",
+      "observed_result": "cancelled-while-queued-no-native-execution-76801dd3a3",
+      "bytes": 617,
+      "sha256": "f1d8a99c172689bece14b324ecff393ee6c774ba9b9277fc09b8fe6e94f48bd4"
+    },
+    {
+      "log": "readiness-pg-capture-diagnostics-compile.log.gz",
+      "observed_result": "compiled-temporary-hash-only-diagnostics-76801dd3a3",
+      "bytes": 13529,
+      "sha256": "d3c4679353f0da2be86dd977885e603eca72f0396504fbf1fab3e9b64d7b4182"
+    },
+    {
+      "log": "readiness-sequential-native-capture-probe.log.gz",
+      "observed_result": "passed-fixed-clock-repeated-capture-probe-no-repair-7471b6d470",
+      "bytes": 11300,
+      "sha256": "a2a3226f64eb8d6bd7f96b3221a4184d7aee3da22888ae4005c63339df35adad"
+    },
+    {
+      "log": "readiness-sequential-native-capture-probe.patch.gz",
+      "observed_result": "source-of-fixed-clock-diagnostic-probe-not-adopted",
+      "bytes": 2611,
+      "sha256": "1fc0ee78fe8cb505e1c1cbcd05e28a11bfdbe5663053406bb78956eb4f927ca2"
+    },
+    {
+      "log": "readiness-sequential-native-capture-advancing-clock-probe.log.gz",
+      "observed_result": "failed-fourth-egress-call-with-advancing-clock-e617ee53f0",
+      "bytes": 6868,
+      "sha256": "68bebff8463462f313469155bd074e6bf468934ccb70e84bd8890875347e4bba"
+    },
+    {
+      "log": "readiness-sequential-native-capture-denial-probe.log.gz",
+      "observed_result": "confirmed-dispatch-policy-expiry-in-advancing-clock-probe",
+      "bytes": 3836,
+      "sha256": "dbb93182f7abffa26f1839996d871cfeb91ed86569a987602cd29831618410af"
+    },
+    {
+      "log": "readiness-sequential-native-capture-optimized-arithmetic-probe.log.gz",
+      "observed_result": "arithmetic-only-optimization-failed-to-repair-expiry-not-adopted",
+      "bytes": 12825,
+      "sha256": "a8a49ee4902425bb547008798f4393be4259daa27885aa8b95508907e980469a"
+    },
+    {
+      "log": "readiness-sequential-native-capture-advancing-clock-probe.patch.gz",
+      "observed_result": "source-of-advancing-clock-diagnostic-probe-not-adopted",
+      "bytes": 6194,
+      "sha256": "d0e61008d75d6c6fb16ab3e4bc350fd17b448cdc1f2308d37e529c855ac91e21"
+    },
+    {
+      "log": "readiness-native-launch-owner-red.log.gz",
+      "observed_result": "retiring-pooled-launch-thread-failed-child-survival-regression",
+      "bytes": 11202,
+      "sha256": "ddf20b6236b4c0a2080611d7c4147c4acb254224c37d41bdd64932c9337528bc"
+    },
+    {
+      "log": "readiness-launch-owner-pooled-red.rs.gz",
+      "observed_result": "temporary-original-pooled-thread-behavior-used-for-red-control",
+      "bytes": 1671,
+      "sha256": "98f456860ff0b25441e24b80157e2bc732bc68df7aa41ca9e7d9f8b2c2fcfab7"
+    },
+    {
+      "log": "readiness-native-launch-owner-broker-green.log.gz",
+      "observed_result": "failed-parallel-debug-sweep-195-passed-five-native-deadlines-failed",
+      "bytes": 26065,
+      "sha256": "c673a55b1b2b256f77b7b244e915c64d3657b72a0af0abc9a6d7457a5438fcd8"
+    },
+    {
+      "log": "readiness-native-launch-owner-broker-serial-green.log.gz",
+      "observed_result": "passed-all-200-broker-tests-under-existing-serialized-native-gate",
+      "bytes": 22213,
+      "sha256": "a72f3572306d8ecca5f556c4f0cdf6ee5bd40749f34a3f8bccf5c68ce35ac58f"
+    },
+    {
+      "log": "readiness-native-launch-owner-clippy.log.gz",
+      "observed_result": "passed-strict-native-broker-all-target-clippy",
+      "bytes": 11272,
+      "sha256": "cb6c83ef7f3ec97159b185f9ca2620a47c0d656e788d30033756453c279d87c7"
+    },
+    {
+      "log": "readiness-native-launch-owner-workspace-format.log.gz",
+      "observed_result": "passed-workspace-format-check",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "readiness-pg-production-profile-red.log.gz",
+      "observed_result": "failed-production-profile-contract-before-wiring-repair",
+      "bytes": 1433,
+      "sha256": "b391b6ca21e1b58fc45b682f2c13ad3f87c3a9b101faf63067e5783c1ba59501"
+    },
+    {
+      "log": "readiness-pg-production-profile-final.log.gz",
+      "observed_result": "passed-19-native-workflow-contract-tests",
+      "bytes": 118,
+      "sha256": "67a46e2a3b5795ee3cf411cdb6cc7b0367e210e1ae3fee5a23e673eb30764b40"
+    },
+    {
+      "log": "readiness-cflite-export-selection-red.log.gz",
+      "observed_result": "failed-export-selection-before-boundary-repair",
+      "bytes": 1814,
+      "sha256": "fbec71c5a2e3fbd35a656bf8bc0e41a1902c6b075c79b25b302c7abc9c721b4a"
+    },
+    {
+      "log": "readiness-cflite-export-selection-green.log.gz",
+      "observed_result": "passed-six-export-and-builder-behavioral-controls",
+      "bytes": 287,
+      "sha256": "2182a7e9c0f36ce9a6835a88b352b3ca502cd22849070d36b37b73380cb099d4"
+    },
+    {
+      "log": "readiness-cflite-mode-ownership-red.log.gz",
+      "observed_result": "failed-full-mode-retention-and-export-ownership-controls",
+      "bytes": 1746,
+      "sha256": "c2d8f134abdb5505e6f238638f72ce24bbd59ff566018d7961caa8c0c8223d1d"
+    },
+    {
+      "log": "readiness-cflite-mode-ownership-green.log.gz",
+      "observed_result": "passed-eight-fuzz-handoff-controls",
+      "bytes": 106,
+      "sha256": "8473e3b2f87511026b5e469d9f71aecbd8cd62c540bcd1e536df9f650c3029a7"
+    },
+    {
+      "log": "readiness-2ae8e-cargo-vet.log.gz",
+      "observed_result": "passed-source-audit-six-deployments-and-locked-vet-2ae8ee2979",
+      "bytes": 58306,
+      "sha256": "8cb0d44140bd4868fb61a14de575450eed51b6bdfc3933209b809b2b43620164"
+    },
+    {
+      "log": "readiness-2ae8e-advisories.log.gz",
+      "observed_result": "passed-cargo-audit-and-unfiltered-osv-2ae8ee2979",
+      "bytes": 77879,
+      "sha256": "a6f5153980693bbd81b60fa5c94c7ec4ae8fc3c325a3c641326a39bfda88ffaa"
+    },
+    {
+      "log": "readiness-2ae8e-security-image.log.gz",
+      "observed_result": "passed-native-x86-execution-image-build-2ae8ee2979",
+      "bytes": 156507,
+      "sha256": "ec06ef05cd9b3c250c61f56f008fca0bffb24bf5980f2393c330ea8b3164750d"
+    },
+    {
+      "log": "readiness-2ae8e-kani-core.log.gz",
+      "observed_result": "passed-all-32-core-kani-pr-harnesses-2ae8ee2979",
+      "bytes": 98631551,
+      "sha256": "9dcae390424299e9c063ea7f845e4071b605fa242cb5dbeafb9c75b96bf5e1d2"
+    },
+    {
+      "log": "readiness-2ae8e-kani-manifest.log.gz",
+      "observed_result": "passed-all-21-non-core-kani-pr-harnesses-2ae8ee2979",
+      "bytes": 9818257,
+      "sha256": "b83c6a2cb66202bf9468589ce7c7d3ff4c7f639928fb954e0a78a9108a05e118"
+    },
+    {
+      "log": "readiness-2ae8e-crypto-floor.log.gz",
+      "observed_result": "passed-complete-crypto-floor-2ae8ee2979",
+      "bytes": 412691,
+      "sha256": "b7764acf8f339349762ab8d47a2f90b4f39168c8e02d09fdaf91356eb2c13efd"
+    },
+    {
+      "log": "readiness-2ae8e-lean.log.gz",
+      "observed_result": "passed-lean-profile-2ae8ee2979",
+      "bytes": 178526,
+      "sha256": "2278dc3eb7feedc68431211553f4e609d31998a501c0bd9bcd9859efcb4affd6"
+    },
+    {
+      "log": "readiness-2ae8e-runtime-mutants.log.gz",
+      "observed_result": "passed-77-runtime-mutants-69-caught-eight-unviable-2ae8ee2979",
+      "bytes": 136594,
+      "sha256": "15c1c6dc278a820947163dda80e63c6bf18389872b1b9be144cf88dfe88a8aba"
+    },
+    {
+      "log": "readiness-2ae8e-native-protocol.log.gz",
+      "observed_result": "passed-native-protocol-profile-with-one-declared-ignored-target-2ae8ee2979",
+      "bytes": 492975,
+      "sha256": "26b8ebe725e11b8da6679509e3a1c2ffca82a528b24044f205798cc9fa66e41c"
+    },
+    {
+      "log": "readiness-2ae8e-installed-consumer-recovery.log.gz",
+      "observed_result": "passed-installed-native-consumer-recovery-2ae8ee2979",
+      "bytes": 416580,
+      "sha256": "2d48e86847096257c5df13d5367653824943e15c7303f3b248ece6b2c19ceaee"
+    },
+    {
+      "log": "readiness-2ae8e-mcp-native-recovery.log.gz",
+      "observed_result": "passed-mcp-and-enforced-native-recovery-2ae8ee2979",
+      "bytes": 2439,
+      "sha256": "4e4b45e7077656439a2dba6573563ed5d6f96cce8eea9e38767620cde4aaa1de"
+    },
+    {
+      "log": "readiness-2ae8e-fuzz-failure.log.gz",
+      "observed_result": "runner-shutdown-during-build-before-fuzz-execution-attempt-one-2ae8ee2979",
+      "bytes": 1905426,
+      "sha256": "a073dd9a8220de968e0c689cad1f25080e4e61ed3d88b4150cbf822903922f97"
+    },
+    {
+      "log": "readiness-2ae8e-fuzz-debug-running.log.gz",
+      "observed_result": "passed-attempt-two-all-33-previously-exported-targets-no-crashes-2ae8ee2979",
+      "bytes": 2363796,
+      "sha256": "c705f293b0e7d8fb03e06d5716f171f2079b80b3d05c78bf017e6c68b9d273fa"
+    },
+    {
+      "log": "readiness-2ae8e-fuzz-attempt-two.json.gz",
+      "observed_result": "terminal-success-job-metadata-fuzz-attempt-two-2ae8ee2979",
+      "bytes": 3640,
+      "sha256": "263cd0d2b4c814ea6e07efc70297fb58dff7e316568086c3a55f5ec8b6c84972"
+    },
+    {
+      "log": "readiness-native-qualification-launch-owner.log.gz",
+      "observed_result": "passed-all-21-source-bound-commands-6434f8c9e1",
+      "bytes": 539,
+      "sha256": "56b6848dc230813e18a5ad84bdd1d3b5ae19720be3fbe60ce7c8e4d42733c985"
     }
   ]
 }

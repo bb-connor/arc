@@ -12,5 +12,5 @@ test unknown_original_keeps_its_allocation_while_a_sibling_completes ... ok
 test changed_native_identity_payload_and_ceiling_never_dispatch ... ok
 test governed_delegation_preserves_tool_arguments_and_denies_binding_substitution ... ok
 
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.92s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.22s
 

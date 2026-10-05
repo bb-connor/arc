@@ -400,3 +400,94 @@ hashes. The funded suite reports 92 passed and six explicitly ignored. Native
 parent SIGKILL, evolving funded work and the four child-payment interruption
 cases pass. A separate inline review of the consumer correction finds no
 additional P0/P1/P2 issue; the hosted acceptance boundary above remains open.
+
+## Native lifetime and fuzz handoff follow-up
+
+Candidate `2ae8ee2979921dba7585bdcb4b2629bc6f96e563` passes the source-backed
+AWS-LC/deployment gate, Cargo Audit and unfiltered OSV, native x86 image, all
+32 core and 21 non-core Kani PR harnesses, the crypto floor, Lean, native
+protocol, installed consumer recovery and the aggregate native MCP recovery
+gate. Its runtime mutation campaign tests 77 mutations: 69 caught and eight
+unviable. Those results remain bound to that candidate. Its first fuzz attempt
+receives a runner shutdown during compilation; its debug rerun is separate.
+
+The PostgreSQL trajectory reaches first assignment, exact replay, release and
+pending inspection, then denies the replacement assignment. Diagnostic source
+`414857027caa2a9d84745dd5364071c4c78405d3` retains explicitly selected public
+operator responses and signed receipts. Artifact `11335632271` authenticates
+with SHA-256
+`0bd107e9c9c0e493e26aba4871c00ad89e21c1e5382d05e32576774477962505`.
+The actual receipt verifier accepts the operator-5 denial signature, signer pin
+and action hash. The denial occurs in native dispatch capture after launch.
+No private host log, database credential or signing seed is exported.
+
+A repeated real-kernel/SQLite probe passes with a fixed clock. An advancing
+clock reproduces dispatch-policy expiry on the fourth egress operation. The
+store refuses the expired policy; a curve-arithmetic-only optimization does not
+repair that result and is not adopted. Both unsuccessful probes and their
+source patches are retained. A second hash-only diagnostic campaign at
+`76801dd3a3fe09cfd0b89ea4094b4a8d03400e2c` is cancelled while queued, with zero
+executed steps, after the local reproduction and current security-lane review
+supply the required diagnosis. It provides no native qualification evidence.
+
+The active security lane already addressed this boundary in
+`49a21b1a7e9dc76e96edb3b2bbd53488005034ef`. The repair is reused here: qualify
+the enforcing PostgreSQL CLI with the existing `docker-release` profile, and
+retain a bounded, invocation-owned launch thread through child shutdown and
+terminal receipt persistence. Linux ties parent-death protection to the
+creating thread, as specified by the
+[Linux manual](https://man7.org/linux/man-pages/man2/PR_SET_PDEATHSIG.2const.html).
+A Tokio blocking worker can retire while its child remains live. The imported
+owner keeps that thread alive without weakening the signal, dispatch deadline,
+confinement profile or custody checks. It refuses preparation when its 64-thread
+capacity is exhausted. This branch retains its existing Rust PostgreSQL resource
+adapter and original-capability payload mapping.
+
+The original pooled-thread behavior fails the child-survival regression.
+The imported owner passes all 200 broker library tests with the repository's
+serialized native-test configuration, including runtime retirement,
+cancellation, preparation failure and capacity release. The initial parallel
+debug campaign remains failed: 195 passed and five native deadline failures.
+Strict all-target broker Clippy and workspace formatting pass. Nineteen native
+workflow controls require the production build and staging of that same binary;
+removing the profile or copying the debug binary fails. Local operator commands
+use the same profile.
+
+Fuzz review finds that the pinned upstream action clones a clean repository and
+does not forward the step's target-selection environment into its nested build.
+The CFLite builder also omits the mapped FROST round-two executable. The repaired
+workflow builds and validates all 34 mapped executables, then selects the
+exported binaries immediately before fuzzing. Both modes retain unaffected
+executables until that validation; the runner creates the export directory so
+it can remove unselected executables after the root builder exits. Eight
+behavioral and handoff tests pass after their failing controls. Unknown,
+duplicated and empty selections, missing executables, non-executable files and
+symlink substitutions fail before pruning. Corpora and runtime support files
+remain intact. The configured 60/120-second total sampling budgets are unchanged.
+The generated-file handoff tried in local commit `f6d96879bb` was superseded by
+export selection before publication; it is not the final implementation.
+
+The source-backed repair checkpoint is
+`6434f8c9e1d192efedd3244ce4dc37f5acc6226c`. Its refreshed native qualification
+and final exact-candidate hosted acceptance are recorded separately below.
+The current log manifest authenticates 269 retained streams; no earlier failed,
+cancelled or interrupted campaign is relabeled as passing.
+
+The separate fuzz rerun at `2ae8ee2979` finishes successfully in job
+`111688251606`, run `37278705710`, attempt two. All 33 previously exported
+targets execute with no reported crash. Attempt one remains interrupted.
+This success does not cover the replacement workflow or restored 34th target;
+those require the replacement candidate campaign. The log manifest now
+authenticates 271 retained streams.
+
+Frozen source `6434f8c9e1d192efedd3244ce4dc37f5acc6226c` passes all 21
+terminal qualification commands against 37,269 source files, retaining 48
+outputs with unchanged before/after source hashes. Funded work reports
+92 passed and six explicitly ignored. Parent SIGKILL, evolving funded work and
+all four child-payment interruption cases pass. A separate inline review of
+the launch owner, its cancellation and failure paths, both fuzz export modes,
+production binary staging and public artifact allowlist finds no additional
+P0/P1/P2 issue. The manifest authenticates 272 retained streams. Final hosted
+acceptance for the pushed evidence candidate remains required and is recorded
+in the PR without mutating that candidate. This is author self-review, with
+no independent approval implied.
