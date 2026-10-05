@@ -139,7 +139,7 @@ loopback peers, denial cases, duplicate races, and revocation/cut recovery; it i
 not a performance benchmark or independent operation.
 
 The current source-bound native qualification is maintained at
-`docs/research/dynamic-delegation/evidence/qualification.json`. The final integrated run passed all 21 terminal commands against 37,217 source
+`docs/research/dynamic-delegation/evidence/qualification.json`. The final integrated run passed all 21 terminal commands against 37,265 source
 files and retained 48 output artifacts, including actual parent SIGKILL and
 stable child collection replay. Historical native inventories and benchmark
 results retain their original revisions. The six
@@ -193,9 +193,63 @@ economic and foundational claims. `publish_ready` and `breakthrough_established`
 remain false. Exact-head hosted status must be read from the PR after the repair
 commit is pushed; local aarch64 checks cannot qualify the x86 enforcing fixture.
 
-Known foundation gates remain open: the genuine AWS-LC source audit required by
-Cargo Vet; reported Wasmtime and JavaScript dependency advisories; the Kani
-compiler's incompatibility with the current crate MSRV; and PostgreSQL adapter
-qualification under the native confinement profile. No audit exemption,
-containment relaxation, skipped required check, or unsupported production claim
-is introduced to make those gates appear green.
+At the earlier `14477aaa` candidate, the AWS-LC audit, dependency advisories,
+Kani compiler compatibility and confined PostgreSQL qualification remained open.
+The readiness work below supersedes that local status without reclassifying the
+earlier hosted failures.
+
+## Production-readiness integration
+
+The candidate integrates the audited prerequisite from `main` at
+`4f3c967f04af40b5025b9222e8db95a3aee0b5f4` and the PR base at
+`75d6796702eebecbaa2a016da778c87ab8d0c2d6`. This work was implemented and reviewed
+inline without subagents. The retained `readiness-*` streams record these local
+results; they are not hosted or release acceptance.
+
+- The complete AWS-LC gate passes: authenticated fork reconstruction, six
+  deployment resolutions, default/FIPS lint inventories, Cargo Vet, three DES
+  parity regressions, AES initialization and FIPS wrong-key rejection. The
+  upstream review is non-implying because the registry wrapper has known
+  defects. Deployment requires the corrected exact fork and the composite gate.
+  No new Vet exemption was introduced; 730 existing exemptions remain.
+- Wasmtime 48.0.5 uses Rust 1.95. Cargo Audit and OSV pass the existing policy.
+  Braces and node-forge private tooling repairs reconstruct the exact registry
+  archive plus pinned upstream changes. The monitor queries the original
+  package identities and rejects additional advisories. Braces' complete
+  upstream suite retains 42 pre-existing Bash-compatibility failures, compared
+  with 50 before repair. Forge's RSA suite passes 101 tests with four pending.
+- The repaired Kani 0.68 compiler retains its pinned release and upstream
+  signature-assertion fix. Real installation controls require successful proof
+  and rejection of reachable unsupported catch-unwind. All 32 selected public
+  core and 21 other PR harnesses pass. The bounded Merkle input domain includes
+  the former fixture mutations without the solver's redundant heap expansion.
+  An actual off-by-one verifier mutation fails the independent oracle; the
+  restored verifier passes all 963 checks. Model-only quote errors avoid
+  unrelated recursive destructor expansion without changing runtime code.
+- The receiver lease-reference predicate has isolated regression coverage for
+  each identity and expiry substitution. An actual OR-to-AND mutation fails;
+  restored tests pass. The historical cancelled mutation campaign remains
+  cancelled. CI time budgets now cover the unchanged proof/fuzz selections.
+- PostgreSQL composes through the existing prepared broker and native proxy.
+  The trusted host owns TLS and database credentials; the kernel constructs the
+  caller binding from the original capability. Strict role routes, bounded JSON,
+  duplicate rejection and timeout errors preserve conservative effect handling.
+  The committed-claim cut point withholds the real reply until the orchestrator
+  kills the kernel. Adapter, payload, Python, TypeScript and contract controls
+  pass locally. Real Linux x86 confinement and both PostgreSQL trajectories
+  remain required hosted evidence.
+- The formal source review follows moved implementation helpers, including
+  deadlines and initialized-record validation. All 230 mirror entries match,
+  and the generated coverage contains 66 rows and 182 artifacts. These are
+  declared abstraction anchors, with their limits recorded in
+  `docs/formal/PR1173-SOURCE-REVIEW.md`; they do not establish Rust refinement.
+- The security evidence image pins Rust 1.95 and its component archives, source
+  lock and toolchain. A dedicated x86 build qualifies the actual image without
+  publishing it. Local aarch64 execution cannot supply that result.
+
+The final local source-bound qualification passed all 21 commands against
+37,265 source files and retained 48 outputs, including actual parent loss and
+child collection recovery. Its source snapshot matches the integrated candidate.
+Final acceptance still requires terminal exact-candidate x86 CI and a clean
+matching local/remote/PR head. The PR remains draft. No merge, publication or
+deployment is implied.

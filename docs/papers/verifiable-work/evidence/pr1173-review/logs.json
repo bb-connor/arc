@@ -654,6 +654,363 @@
       "observed_result": "passed-21-source-bound-commands",
       "bytes": 539,
       "sha256": "cc76a42abea311b159567346728065317cf08b1d1ba7fb8e415975b2f99b6ea6"
+    },
+    {
+      "log": "readiness-kani-core-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 70515046,
+      "sha256": "f22f981d8275afc67baf1f5eecded9f7955bb55553d04b30b0d2b427ba65a005"
+    },
+    {
+      "log": "readiness-kani-manifest-model-errors.log.gz",
+      "observed_result": "passed",
+      "bytes": 6984697,
+      "sha256": "3688ff4a3eac8f89e4654881bc2aad1e710eee8d395ca247ee4e7fbab9974258"
+    },
+    {
+      "log": "readiness-kani-install-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 46726,
+      "sha256": "7f7605144f17888c2b01489ecc07833715a144c66c402787b585bb6433bea6f2"
+    },
+    {
+      "log": "readiness-kani-toolchain-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 100,
+      "sha256": "ad61be9b74efb8a4b8ae7d0427622d79c722d44dc55c2f4aeb51140568dfc278"
+    },
+    {
+      "log": "readiness-kani-version-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 29,
+      "sha256": "cea8eec24c4a85818d5fa4cca2ec0d87013bca2671be3a8c7249808e605c4c23"
+    },
+    {
+      "log": "readiness-kani-empty-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 652,
+      "sha256": "25117f4f9006eaf3179946dd8da61e6b2b8f659299300238a063de0f0df6ac88"
+    },
+    {
+      "log": "readiness-kani-public-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 42,
+      "sha256": "0108ab28839319a0c171c0b72af0bb13286072ddf7fb78dbd4ef3d83b7ab9b23"
+    },
+    {
+      "log": "readiness-kani-inventory-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 68,
+      "sha256": "2844d09432a2a66646330bdc49c4a8992259d047e48471fcfa034c9b80c34b0c"
+    },
+    {
+      "log": "readiness-proof-mutants-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 67,
+      "sha256": "754dafea92c781c7e2a719966948032af90a8ca39e99fd93751938cc7bd01e02"
+    },
+    {
+      "log": "readiness-merkle-boundary-restored.log.gz",
+      "observed_result": "passed",
+      "bytes": 336176,
+      "sha256": "f58670545f4496e294570a307a47db24621a0ebd34b7ef54d9da723665fcdd11"
+    },
+    {
+      "log": "readiness-lease-restored.log.gz",
+      "observed_result": "passed",
+      "bytes": 2198,
+      "sha256": "73ee39ec8cc1145be8d9bc2dd8f81370d77634608da1fed523b5b790669c441e"
+    },
+    {
+      "log": "readiness-supply-chain-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 2618,
+      "sha256": "d536566a89ee811aac2529b97c8910498cf5a8d2196bc0eddccdece43b12d0f9"
+    },
+    {
+      "log": "readiness-cargo-audit-final.json.gz",
+      "observed_result": "passed",
+      "bytes": 5260,
+      "sha256": "0b3d390cda84d5be8461d7163d9b572c7f5a204b8449ef84cbe537285d144a9b"
+    },
+    {
+      "log": "readiness-osv-qualified.json.gz",
+      "observed_result": "passed",
+      "bytes": 124,
+      "sha256": "54345d5194d238b6017d0f3181f392109ce35023cc6b4bdfa8c134943dcb578e"
+    },
+    {
+      "log": "readiness-npm-source-gate-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 246,
+      "sha256": "89e155510efdbf828a36a1938a3008b59d766273b7ae7a52f97eef5f4b98a71b"
+    },
+    {
+      "log": "readiness-npm-gate-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 102,
+      "sha256": "1d62b0bd0d17497a59577680447e891c3fb121c723f798ef4918014f10b11632"
+    },
+    {
+      "log": "readiness-npm-regressions-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 349,
+      "sha256": "f3f2429a58b7d3562f3c6ae9aee7929fd12dcbba9fc0be1a3b2c66dbb6c6d90b"
+    },
+    {
+      "log": "readiness-forge-rsa-suite.log.gz",
+      "observed_result": "passed",
+      "bytes": 7921,
+      "sha256": "df4973e8bbf1873261bd6d35fdf2de23e39dda8f710b3ecc612c83a5b217fcba",
+      "scope": "101 passing, four pending upstream RSA tests; pending tests remain unverified."
+    },
+    {
+      "log": "readiness-payload-final-qualified.log.gz",
+      "observed_result": "passed",
+      "bytes": 2124,
+      "sha256": "22f54fe7318ec6284dd2cf784bab514854b2203073a1e9c7b2a7e68ba2298c0c"
+    },
+    {
+      "log": "readiness-pending-approvals-final-qualified.log.gz",
+      "observed_result": "passed",
+      "bytes": 3117,
+      "sha256": "16cd536c36172a41aa8ca08c71d471f399e51f3713e6463df74ff0f26ee8970a"
+    },
+    {
+      "log": "readiness-postgres-final-tests.log.gz",
+      "observed_result": "passed",
+      "bytes": 7476,
+      "sha256": "979b25d76270e11dbcbaee262327485ce953a458938012f0681327eb1fdb7ffa"
+    },
+    {
+      "log": "readiness-postgres-final-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 6926,
+      "sha256": "f4545d838070aaa63ea7456f5c7a290fa342cce468e5e609ba79fd4037d55b83"
+    },
+    {
+      "log": "readiness-postgres-python-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 100,
+      "sha256": "fe008aab760eb03ccac7578e2b84665b1b50b0d7f855b17a0c7a8d039435b658"
+    },
+    {
+      "log": "readiness-live-python-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 133,
+      "sha256": "df693cb2547c01d97b10b34303d04644471d0bfe8cc21e45b5274682b2f291a0"
+    },
+    {
+      "log": "readiness-process-ts-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 825,
+      "sha256": "33f235ceed248e1e0d843081459d6a68da4252a11aa7fe719ee493f30a430105"
+    },
+    {
+      "log": "readiness-python-lint-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 46,
+      "sha256": "5cc4f8abb4754e4fd06f45f351a4f3080dcee0b5bb06164873b78e5da4c10057"
+    },
+    {
+      "log": "readiness-native-ci-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 93,
+      "sha256": "3bfcf143b70fbbd5232c5352be68d1d18c90870f3a487494dd4e60dd426686cd"
+    },
+    {
+      "log": "readiness-native-ci-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 117,
+      "sha256": "c6ccb1cfaa09285c045dc289e897ed7c06ced4c13c0528552bcfacdd5b42b3fe"
+    },
+    {
+      "log": "readiness-security-contract-controls-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "readiness-security-definitions-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 2844,
+      "sha256": "c42f80d870daff8c9affae20985cb5df65a5a336510baf60d70ad51ca9e1635e"
+    },
+    {
+      "log": "readiness-cli-clippy-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 9678,
+      "sha256": "451eca6a6a25ccdefdba440942348d5614505cad27681afc1c3a3ab7cc44d165"
+    },
+    {
+      "log": "readiness-runtime-clippy-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 10803,
+      "sha256": "46837c796840691a1e2466fff46ace78b5e2c8a8caf7dbc4fcbebcb6e37d546b"
+    },
+    {
+      "log": "readiness-wasm-clippy-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 14804,
+      "sha256": "1496cc4b31a9abf821bbc00381936ca3b499e6db503384bfa112ceea08583744"
+    },
+    {
+      "log": "readiness-threshold-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 9747,
+      "sha256": "d35c467ed2fe6968f7010b6e0ebd4a748c158952f23b52b6b9ba6264f033c515"
+    },
+    {
+      "log": "readiness-operator-http-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 121,
+      "sha256": "96249810f944b94a26e891f87c98b12f61961a80541801a078c306ea5ca95152"
+    },
+    {
+      "log": "readiness-landing-ledger-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 93,
+      "sha256": "4e0f4b17bc9fb33693747e24ed6ef97ce425081b04f23df035a0e55ef6a3ddd2"
+    },
+    {
+      "log": "readiness-formal-mirrors-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "readiness-formal-coverage-check-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "readiness-kani-version-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 63,
+      "sha256": "fd3da10146f77d23a31f821b22bb7fee136240a6e671344b935b95b2ee7dcc58"
+    },
+    {
+      "log": "readiness-kani-toolchain-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 560,
+      "sha256": "d1ae2279e228660bb1d18c899f9649334388fe647cd7046d73484946bda54f7f"
+    },
+    {
+      "log": "readiness-mcp-payload-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 27763,
+      "sha256": "9fe1c326bdc884733246656faf13eec7f22e19ea9376077555709dcfc24de4dc"
+    },
+    {
+      "log": "readiness-postgres-adapter-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 17895,
+      "sha256": "4b54956dea1413eb61de732b192f876c51beaa6a428748d1826531c6564875eb"
+    },
+    {
+      "log": "readiness-postgres-ci-contract-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 1068,
+      "sha256": "a2a54da155514177319877d9adee5c6a004f95d356c068825a1ccd9a79a5fd0e"
+    },
+    {
+      "log": "readiness-live-python-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 824,
+      "sha256": "3407f4b6e7eee38630e09e7a37a456fa9480830367c2d6b50fce718a9511eabe"
+    },
+    {
+      "log": "readiness-npm-tooling-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 3746,
+      "sha256": "987b0ffe088f8eacb2b349c84fb067ba1da48e9cc0bf6343dd28534a478c1ac7"
+    },
+    {
+      "log": "readiness-kani-manifest-final.log.gz",
+      "observed_result": "failed",
+      "bytes": 1951222,
+      "sha256": "38509727ae25378937182a6291ffa02709acd4173f4687d127ab320b22dd6976"
+    },
+    {
+      "log": "readiness-braces-registry-suite.json.gz",
+      "observed_result": "failed",
+      "bytes": 655137,
+      "sha256": "b53ab84c34d09a5cff1c46c2949b1e1bdd80c672a2dac8ea22d2699af47e38a4",
+      "scope": "Full upstream Bash-compatibility suite; repaired source still has baseline failures."
+    },
+    {
+      "log": "readiness-braces-repaired-suite.json.gz",
+      "observed_result": "failed",
+      "bytes": 631107,
+      "sha256": "e909221e7d90c1816a9e2e1494a1e2f752ff0e87301dc512206bda205571b768",
+      "scope": "Full upstream Bash-compatibility suite; repaired source still has baseline failures."
+    },
+    {
+      "log": "readiness-merkle-boundary-mutant.log.gz",
+      "observed_result": "failed",
+      "bytes": 336680,
+      "sha256": "f57246fa364750e0a3abd972988dbf1eddb896d2a2c33c4edbdcf5103657cff0",
+      "purpose": "Expected rejection of an actual production-source mutation; restored run retained separately."
+    },
+    {
+      "log": "readiness-lease-predicate-mutant.log.gz",
+      "observed_result": "failed",
+      "bytes": 2860,
+      "sha256": "d9c3113f27286319b3d1d3c529a75e6acf8cbe73efe08193a7cf4a80ae8c28fa",
+      "purpose": "Expected rejection of an actual production-source mutation; restored run retained separately."
+    },
+    {
+      "log": "readiness-proof-coverage-tests-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 24865,
+      "sha256": "e3fdaa17b94cff8577494ac175189e7ba383782bf97efed73ba9ab8ffc9a3354"
+    },
+    {
+      "log": "readiness-formal-mirror-tests-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 4537,
+      "sha256": "90a566099ee5d30d853c807638e8c8f42780b2d47dee1a91e768b920846eea6b"
+    },
+    {
+      "log": "readiness-mapping-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 4079,
+      "sha256": "369ad7845fcbbc202bef3291897a1fadba7a1ea41ba3cd2b10744d24ad69495a"
+    },
+    {
+      "log": "readiness-kani-core.log.gz",
+      "observed_result": "failed",
+      "scope": "Unrepaired compiler assertion failure.",
+      "bytes": 26972,
+      "sha256": "464f890ac066d21d3abfb8b3dc3201d47b364271d7eb01a5b5f078fe6733ab1e"
+    },
+    {
+      "log": "readiness-kani-core-patched.log.gz",
+      "observed_result": "failed",
+      "scope": "Campaign interrupted after excessive solver memory use; not a verified proof or a mathematical counterexample.",
+      "bytes": 70537037,
+      "sha256": "829adbbd6553470a0bf2abbaf8159863a2621bfbbe27ba9fd1fefea9603855d1"
+    },
+    {
+      "log": "readiness-kani-inclusion-direct.log.gz",
+      "observed_result": "failed",
+      "scope": "Proof interrupted after excessive solver memory use; not a verified proof or a mathematical counterexample.",
+      "bytes": 435147,
+      "sha256": "b610f9eabca30836abafed2d968e927be975808ba369404ed19d76a74c70518d"
+    },
+    {
+      "log": "readiness-kani-compiler-build.log.gz",
+      "observed_result": "failed",
+      "scope": "Initial compiler build failed when the local target exhausted disk space.",
+      "bytes": 16542,
+      "sha256": "daf9b5a520377c17cccaabdca371c0a1a1880112a69ab2f80ccdb23f323fe38a"
+    },
+    {
+      "log": "readiness-native-qualification-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 539,
+      "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
     }
   ]
 }

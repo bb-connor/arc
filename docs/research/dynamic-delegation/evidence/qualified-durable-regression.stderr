@@ -12,5 +12,5 @@ help: Check that the patched package version and available features are compatib
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
    Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
-    Finished `test` profile [unoptimized] target(s) in 15.11s
-     Running tests/durable_admission_sqlite.rs (/home/connor/chio-pr1173-target/debug/deps/durable_admission_sqlite-ec17a4c1e01e23b2)
+    Finished `test` profile [unoptimized] target(s) in 14.49s
+     Running tests/durable_admission_sqlite.rs (/home/connor/chio-pr1173-target/debug/deps/durable_admission_sqlite-32206c514b399d38)

@@ -7,8 +7,8 @@
     "rfc8785": "0.1.4"
   },
   "versions": {
-    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
-    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
     "node": "v24.16.0",
     "checkerPython": "Python 3.12.3"
   }
