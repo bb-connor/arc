@@ -2915,10 +2915,56 @@
         "inherited-thread:r3563101189"
       ],
       "head_in_foundation": false
+    },
+    {
+      "pr": 1174,
+      "url": "https://github.com/bb-connor/arc/pull/1174",
+      "title": "docs(specs): FTL lessons program, kernel north star, and eleven design specs",
+      "head": "05c3a79e0d92ea892c8816423fdd8a507d4b0438",
+      "branch": "docs/ftl-lessons-specs-20261004",
+      "original_base": "main",
+      "track": "proposed-architecture-specs",
+      "destination_pr": 1174,
+      "disposition": "keep-open-separate-design-review",
+      "next_action": "Review proposed FTL-derived designs separately; reconcile baseline claims against actual unmerged #1160, #1172 and #1173 source and review confirmed defects against the landing ledger before accepting implementation scope. Do not treat referenced branches as shipped.",
+      "depends_on": [
+        1160,
+        1172,
+        1173
+      ],
+      "open_review_requirements": [
+        "PRRT_kwDOR0fQBc6o40GK",
+        "PRRT_kwDOR0fQBc6o40GL",
+        "PRRT_kwDOR0fQBc6o40GN",
+        "PRRT_kwDOR0fQBc6o40GP",
+        "PRRT_kwDOR0fQBc6o40GQ",
+        "PRRT_kwDOR0fQBc6o40GS",
+        "PRRT_kwDOR0fQBc6o40GV",
+        "PRRT_kwDOR0fQBc6o40GY",
+        "PRRT_kwDOR0fQBc6o40GZ",
+        "PRRT_kwDOR0fQBc6o5Ec5",
+        "PRRT_kwDOR0fQBc6o5Ec-",
+        "PRRT_kwDOR0fQBc6o5EdB",
+        "PRRT_kwDOR0fQBc6o5EdE",
+        "PRRT_kwDOR0fQBc6o5EdG",
+        "PRRT_kwDOR0fQBc6o5EdJ",
+        "PRRT_kwDOR0fQBc6o5EdK",
+        "PRRT_kwDOR0fQBc6o5EdM",
+        "PRRT_kwDOR0fQBc6o5EdN",
+        "PRRT_kwDOR0fQBc6o5Lhc",
+        "PRRT_kwDOR0fQBc6o5Lhf",
+        "PRRT_kwDOR0fQBc6o5Lhi",
+        "PRRT_kwDOR0fQBc6o5Lhm",
+        "PRRT_kwDOR0fQBc6o5Lhr",
+        "PRRT_kwDOR0fQBc6o5Lhv",
+        "PRRT_kwDOR0fQBc6o5Lhy",
+        "PRRT_kwDOR0fQBc6o5Lh2"
+      ],
+      "head_in_foundation": false
     }
   ],
-  "verified_utc": "2026-10-04T23:34:05.703435+00:00",
-  "verified_open_count": 22,
+  "verified_utc": "2026-10-05T03:11:15.257389+00:00",
+  "verified_open_count": 23,
   "outcomes": {
     "path": "docs/security/audits/pr-consolidation-outcomes-20261004.json.gz",
     "sha256": "dde0d765e3fca43dc87c6afaa85a44e5d82f421c26dff19e3a5aa2c521861c87"
@@ -3269,5 +3315,16 @@
     "scope": "Paths of all recorded distinct/equivalent commits remain assigned to their open destinations. #1136 exact patch preservation supersedes a naive comparison of later file bytes. #1029 semantic reconciliation remains open.",
     "entry": "legacy-source-reconciliation.json",
     "entry_sha256": "ae8606aa833c1d043eaac00ccdb18a31acf6f2403b2ea2b5becac79b2a43081b"
-  }
+  },
+  "post_consolidation_observations": [
+    {
+      "observed_utc": "2026-10-05T03:11:15.257389+00:00",
+      "open_pr_count": 23,
+      "new_prs": [
+        1174
+      ],
+      "source": "GitHub live inventory after duplicate closures",
+      "scope": "The initial 85 to 22 consolidation remains complete; #1174 was opened independently afterward. Unique proposals stay open in their own review track. No new landing slot is activated."
+    }
+  ]
 }

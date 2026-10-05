@@ -19,18 +19,49 @@ were refreshed; #1164 retains all six older workbench heads and their 12 open
 review obligations.
 
 The published transfer is complete: all 57 process/security duplicates and six
-workbench duplicates are closed as superseded. The verified open count is 22.
+workbench duplicates are closed as superseded. That reduced 85 open PRs to 22.
+The current count is 23 after the independently opened proposed-spec PR #1174;
+it has an explicit separate R&D disposition and no foundation landing slot.
 #1155 now targets the foundation and retains its complete unique 24-file patch.
 #1164 targets main and retains the complete seven-PR, 141-file workbench scope.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1590 ledger requirements, including 201 carried review records, four findings
-from the October 5 independent reviews and three subsequent repair obligations.
+1592 ledger requirements, including 201 carried review records, four findings
+from the October 5 independent reviews and five subsequent repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+The latest [mobile consumer evidence](audits/foundation-mobile-consumers-20261005.json.gz)
+records four native Kotlin ABI tests passing on `e3a85a724b`. The locked
+UniFFI generator now renames error payload fields to `detail` and selects the
+actual Rust shared-library name. The original compile and loader failures are
+retained. The checked-in wrapper is exercised against Rust, and CI runs this
+consumer check. Android AAR packaging and device qualification remain open.
+
+Both Swift jobs pass in run `37257006831` on `5e9c904834`, including five
+native tests of the rebuilt framework. Generated headers are normalized before
+packaging and testing. Artifact `11323267982` is installed with its GitHub ZIP
+digest and all manifest hashes verified. This repairs the hosted whitespace
+failure without altering already-hashed artifacts. Final candidate checks remain
+required.
+
+GitHub Codex reports no major issues on `8384454ca6` in
+[its completed review](https://github.com/bb-connor/arc/pull/1160#issuecomment-5987167491).
+Four original consumer threads are resolved against their source repairs and
+that review. The subsequent mobile changes require another review. Source
+`8384454ca6` was briefly authorized for mutation refresh, but its queued
+controller was cancelled when superseded and the refresh label removed. No
+native capture or signed qualification resulted; authorization still names that
+older source.
+
+The [PostgreSQL mediation plan](../superpowers/plans/2026-10-05-postgres-native-resource-mediation.md)
+records the mandatory unfinished repair. Database credentials and sockets must
+stay at the host resource boundary, with caller identity bound by durable broker
+preparation. Both PostgreSQL native scenarios, final Linux/trusted evidence and
+the protected foundation merge remain open.
 
 Source `75f2a51c9daecd6852939d2490b289a4f54997c6` closes five reproduced
 weak-key attack paths in kernel DPoP and broker authority. Both DPoP versions
@@ -139,8 +170,8 @@ their missing inputs, but is not an execution pass. The PostgreSQL demo still
 opens direct database connections that the enforced cage forbids; it needs a
 mediated database boundary and native qualification. No socket permission or
 required check is relaxed. The local host is ARM64, so it cannot supply the
-required trusted Linux x86_64 campaign or hosted provenance. Source authorization
-remains unrotated pending independent candidate review and qualification.
+required trusted Linux x86_64 campaign or hosted provenance. Final source authorization
+and qualification remain pending; the superseded refresh is recorded above.
 The repository's trusted-definition variable now selects the actual #1167
 merge, after exact blob equality was verified for all five authority workflows.
 

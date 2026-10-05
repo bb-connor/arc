@@ -1,20 +1,20 @@
 {
   "schema": "chio.mobile.ios-framework-build.v1",
-  "source_commit": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49",
+  "source_commit": "5e9c904834cb98c16b2139096850782354bd8a86",
   "cargo_lock_sha256": "5aaac717fb51911be9e58bb8121f655af92cacecc8ca43acb6a18fff5c03be44",
   "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
   "files": {
-    "ChioKernel.xcframework/Info.plist": "b3b1a39453ea6478ca66da5898cbfa85f721d63320aed095dc41c6dc1c42e647",
-    "ChioKernel.xcframework/ios-arm64/Headers/chio_kernel_mobileFFI.h": "48fef587c7a2ded16d58fb55ad05dae8430adc0893fee5ecb12cd222971d7e87",
-    "ChioKernel.xcframework/ios-arm64/Headers/module.modulemap": "6f97f8e27624139e40de4f6815f9425e9b211fce13250c7406d781d5a44064be",
-    "ChioKernel.xcframework/ios-arm64/libchio_kernel_mobile.a": "83a33b52228c656358e0a1a9552d9989a30598503788c80cf5f97a7664676ff7",
-    "ChioKernel.xcframework/ios-arm64_x86_64-simulator/Headers/chio_kernel_mobileFFI.h": "48fef587c7a2ded16d58fb55ad05dae8430adc0893fee5ecb12cd222971d7e87",
-    "ChioKernel.xcframework/ios-arm64_x86_64-simulator/Headers/module.modulemap": "6f97f8e27624139e40de4f6815f9425e9b211fce13250c7406d781d5a44064be",
-    "ChioKernel.xcframework/ios-arm64_x86_64-simulator/libchio_kernel_mobile.a": "60b9f78a802ade7b08c3afc0b6331fb2e9e48f5bb650c749703b57c51f93ed89",
-    "headers/chio_kernel_mobileFFI.h": "48fef587c7a2ded16d58fb55ad05dae8430adc0893fee5ecb12cd222971d7e87",
-    "headers/module.modulemap": "6f97f8e27624139e40de4f6815f9425e9b211fce13250c7406d781d5a44064be",
+    "ChioKernel.xcframework/Info.plist": "c6d78b92f34a360df144fca5abf9b7e40624cb47bf41829580049c8525566ba7",
+    "ChioKernel.xcframework/ios-arm64/Headers/chio_kernel_mobileFFI.h": "2f95aeade3a3b9029b329bc265af900981f331412b72f33c59c85d3272e03032",
+    "ChioKernel.xcframework/ios-arm64/Headers/module.modulemap": "c837526aa9b4d06254929f64b3a2478d5a58fdbf38044df1d2f701e272c66174",
+    "ChioKernel.xcframework/ios-arm64/libchio_kernel_mobile.a": "808de5a968f7f866121064f4abd830617dfb12e0380968062120f508b79ca38f",
+    "ChioKernel.xcframework/ios-arm64_x86_64-simulator/Headers/chio_kernel_mobileFFI.h": "2f95aeade3a3b9029b329bc265af900981f331412b72f33c59c85d3272e03032",
+    "ChioKernel.xcframework/ios-arm64_x86_64-simulator/Headers/module.modulemap": "c837526aa9b4d06254929f64b3a2478d5a58fdbf38044df1d2f701e272c66174",
+    "ChioKernel.xcframework/ios-arm64_x86_64-simulator/libchio_kernel_mobile.a": "cd90e88282fef7f438cb6f85249e36b71a307a381c5e46a1463f7f222edc4634",
+    "headers/chio_kernel_mobileFFI.h": "2f95aeade3a3b9029b329bc265af900981f331412b72f33c59c85d3272e03032",
+    "headers/module.modulemap": "c837526aa9b4d06254929f64b3a2478d5a58fdbf38044df1d2f701e272c66174",
     "swift/chio_kernel_mobile.swift": "b2afeae415ab284ffb2aa942abd159a04986d0ccfc5095857ac3d5341cf8d52b",
-    "swift/chio_kernel_mobileFFI.h": "48fef587c7a2ded16d58fb55ad05dae8430adc0893fee5ecb12cd222971d7e87",
-    "swift/chio_kernel_mobileFFI.modulemap": "6f97f8e27624139e40de4f6815f9425e9b211fce13250c7406d781d5a44064be"
+    "swift/chio_kernel_mobileFFI.h": "2f95aeade3a3b9029b329bc265af900981f331412b72f33c59c85d3272e03032",
+    "swift/chio_kernel_mobileFFI.modulemap": "c837526aa9b4d06254929f64b3a2478d5a58fdbf38044df1d2f701e272c66174"
   }
 }

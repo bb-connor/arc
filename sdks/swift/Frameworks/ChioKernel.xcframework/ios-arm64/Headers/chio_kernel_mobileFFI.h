@@ -561,73 +561,73 @@ void ffi_chio_kernel_mobile_rust_future_complete_void(uint64_t handle, RustCallS
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_ATTEST_APP_ATTEST
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_ATTEST_APP_ATTEST
 uint16_t uniffi_chio_kernel_mobile_checksum_func_attest_app_attest(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_ATTEST_PLAY_INTEGRITY
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_ATTEST_PLAY_INTEGRITY
 uint16_t uniffi_chio_kernel_mobile_checksum_func_attest_play_integrity(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_EVALUATE
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_EVALUATE
 uint16_t uniffi_chio_kernel_mobile_checksum_func_evaluate(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_INSPECT_MOBILE_RECEIPT_ENVELOPES
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_INSPECT_MOBILE_RECEIPT_ENVELOPES
 uint16_t uniffi_chio_kernel_mobile_checksum_func_inspect_mobile_receipt_envelopes(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_SIGN_RECEIPT
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_SIGN_RECEIPT
 uint16_t uniffi_chio_kernel_mobile_checksum_func_sign_receipt(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_SIGN_RECEIPT_RELAYING_TRUSTED_BODY
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_SIGN_RECEIPT_RELAYING_TRUSTED_BODY
 uint16_t uniffi_chio_kernel_mobile_checksum_func_sign_receipt_relaying_trusted_body(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_APP_ATTEST_EVIDENCE
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_APP_ATTEST_EVIDENCE
 uint16_t uniffi_chio_kernel_mobile_checksum_func_verify_app_attest_evidence(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_CAPABILITY
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_CAPABILITY
 uint16_t uniffi_chio_kernel_mobile_checksum_func_verify_capability(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_CAPABILITY_WITH_CONTEXT
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_CAPABILITY_WITH_CONTEXT
 uint16_t uniffi_chio_kernel_mobile_checksum_func_verify_capability_with_context(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_PASSPORT
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_PASSPORT
 uint16_t uniffi_chio_kernel_mobile_checksum_func_verify_passport(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_PLAY_INTEGRITY_EVIDENCE
 #define UNIFFI_FFIDEF_UNIFFI_CHIO_KERNEL_MOBILE_CHECKSUM_FUNC_VERIFY_PLAY_INTEGRITY_EVIDENCE
 uint16_t uniffi_chio_kernel_mobile_checksum_func_verify_play_integrity_evidence(void
-    
+
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_CHIO_KERNEL_MOBILE_UNIFFI_CONTRACT_VERSION
 #define UNIFFI_FFIDEF_FFI_CHIO_KERNEL_MOBILE_UNIFFI_CONTRACT_VERSION
 uint32_t ffi_chio_kernel_mobile_uniffi_contract_version(void
-    
+
 );
 #endif
 
