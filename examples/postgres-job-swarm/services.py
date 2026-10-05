@@ -13,7 +13,7 @@ import socket
 import subprocess
 import time
 
-from host import ROLES, command, host_environment, route, stop, write
+from host import MAX_CALLS, ROLES, command, host_environment, route, stop, write
 
 HOST = "boundary-upstream.test"
 
@@ -215,7 +215,7 @@ class Services(contextlib.AbstractContextManager):
         wait(self.helper, "CHIO_CONSUMER_READY")
         self.config_path = root / "config.json"
         config = json.loads(self.config_path.read_text())
-        config["limits"].update(max_calls=100, max_processes=3)
+        config["limits"].update(max_calls=MAX_CALLS, max_processes=3)
         config["children"] = [
             {
                 "id": name,

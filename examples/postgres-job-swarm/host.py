@@ -8,6 +8,7 @@ import subprocess
 
 from chio_process import ProcessClient
 
+MAX_CALLS = 100
 ROLES = ("superseded", "replacement")
 
 
@@ -88,6 +89,8 @@ def initialize(chio, gateway, directory, config_path):
                 config_path,
                 "--state",
                 directory / "host",
+                "--aggregate-invocations",
+                str(MAX_CALLS),
             ],
             directory,
             env=host_environment(),

@@ -239,3 +239,15 @@ scan and use the repository's already qualified compatible selection. Run the
 standalone build, type check and full existing tests, then require the actual
 unfiltered OSV selection to contain no findings. Refresh the source-bound
 qualification before pushing the final candidate.
+
+### Explicit aggregate budget for native initialization
+
+The next x86 attempt passes the readiness marker, native enforcement and the
+public PostgreSQL worker API, then fails at `chio process init`. Native broker
+hosts require `--aggregate-invocations`; this example omitted that argument.
+Bind it to the same 100-call fixture limit already used by the process tree,
+using one shared value for both settings. Preserve the kernel's mandatory
+budget check and the children's 40-percent shares. Reproduce the rejection with
+the real CLI before the repair and verify that the corrected initializer passes
+that boundary. This local configuration probe does not qualify native execution;
+both complete x86 PostgreSQL trajectories remain required.
