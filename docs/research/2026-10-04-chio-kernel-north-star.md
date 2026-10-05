@@ -75,7 +75,7 @@ fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState,
 ```
 
 - Every evaluator, recovery's original-operation closure, the spec 4 drain, spec 8's stop and startup reconciliation become drivers of it. A driver performs `Effect`s (commit, sign, dispatch) against ports.
-- The machine is extracted to Lean (Aeneas already does this for kernel-core) and refinement-checked against the Apalache saga model.
+- The machine is extracted to Lean (Aeneas already does this for kernel-core) and checked against a new Apalache admission model. No TLA+ model of the admission saga exists today, so `AdmissionMachine.tla` is new (spec `2026-10-04-pure-admission-machine-design.md`).
 - It is the substrate for deterministic simulation (bet 9).
 
 **Why.**
@@ -91,7 +91,7 @@ fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState,
 
 **Cost.** High. It is a contract refactor. Do it in the model first, then one driver at a time.
 
-### Bet 2: one crossing primitive on a two-commit hot path (keystone)
+### Bet 2: one crossing primitive on a minimal-commit hot path (keystone)
 
 **What.** Every place an effect or a byte leaves custody becomes one kernel primitive with one transaction shape:
 - dispatch commit;
@@ -109,7 +109,7 @@ fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState,
 4. commit reservations (spec 3);
 5. write the crossing record.
 
-**The hot path.** A mediated call becomes exactly two synchronous commits:
+**The hot path.** Specced in `2026-10-04-crossing-primitive-design.md`. A side-effecting call becomes three commits: an intent commit, an anchor-free return record that keeps returned bytes durable before post-return work, and an outcome commit. A read-only call becomes a check-only dispatch (no write) plus one release commit that carries the receipt. Fusing the return record into the outcome commit for a true two-commit path is that spec's open decision 1. The fast path is:
 - the **intent commit**: begin, the admission transitions and the budget hold, up to `DispatchCommitted`;
 - the **outcome commit**: the tool return, the post-return stages and the terminal projection.
 
@@ -130,7 +130,7 @@ Commits stay separate only for participants in other stores (remote budget, paym
 - Spec 4's crossing table is the primitive's inventory.
 
 **First step.**
-1. Update the Apalache saga model to the intent/outcome pair, and show that the existing safety predicates still hold. The benchmark notes say lower commit counts require changing "contracts, which the formal models cover".
+1. Write the new Apalache admission model (`AdmissionCrossing.tla`) for intent, return and outcome, and show that the existing safety predicates hold. The benchmark notes say lower commit counts require changing "contracts, which the formal models cover".
 2. Prototype group commit behind the existing store port.
 
 **Cost.** High for the contract change; medium for group commit.
@@ -323,7 +323,7 @@ On the same tree:
 now (foundations; each is independently valuable):
   hosted CI green; Mechanism D gate                         (bet 9)
   live defect fixes: D1, N14, D3, D4, D6, D8, N22, N23       (umbrella section 3)
-  saga model updated to intent/outcome; group-commit prototype (bet 2)
+  new admission model (intent, return, outcome); anchor-before-crossing; group-commit prototype (bet 2)
   AdmissionState vocabulary; port the startup classifier     (bet 1)
   prebuilt binary + e2e quickstart in CI                     (bet 11)
   C2SP checkpoint compatibility                              (bet 6)
@@ -359,10 +359,10 @@ later (research-grade or large):
 
 ## 7. Proposed next specs
 
-Three specs would unlock the most:
+The top three are now specced as PROPOSED drafts: `2026-10-04-pure-admission-machine-design.md`, `2026-10-04-crossing-primitive-design.md` and `2026-10-04-integrity-gated-admission-design.md`. They were the three that would unlock the most:
 
 1. **Pure admission machine** (bet 1). The keystone for proof, simplification and simulation.
-2. **Two-commit crossing primitive and group commit** (bet 2). The keystone for performance. It also gives specs 3, 4 and 8 their single enforcement point.
+2. **Crossing primitive, minimal-commit hot path and group commit** (bet 2). The keystone for performance. It also gives specs 3, 4 and 8 their single enforcement point.
 3. **Integrity-gated admission** (bet 3). The most differentiated agent guarantee, built mostly from shipped P3, P4 and P5 parts.
 
 Bets 6 (C2SP witnessing) and 11 (60-second first receipt) are small enough to go straight to implementation plans.
