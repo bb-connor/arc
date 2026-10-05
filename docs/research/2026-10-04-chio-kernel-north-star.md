@@ -114,7 +114,7 @@ fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState,
   - the **intent commit**: begin, the admission transitions and the budget hold, up to `DispatchCommitted`;
   - the **return record**: keeps the returned bytes durable before post-return work. It is progress-only, so it needs no synchronous anchor, though a lag anchor can fire when the outcome is delayed past the lag bound;
   - the **outcome commit**: the post-return stages and the terminal projection.
-- **Durable reads**, under `All` or integrity tracking, take two commits: intent and outcome, with no return record.
+- **Durable reads** take two commits (intent and outcome, no return record) only when they are eligible: covered by the durable mode, with a driver that permits bounded redispatch. Other durable or tracked reads take three commits, including reads that integrity tracking forces into durability and `invoke_known_only` reads (spec 10 section 6.2).
 - **Eligible check-only reads**, outside durable coverage, redispatch-safe and untracked, take a check-only dispatch (no write) plus a release write that carries the receipt.
 
 Fusing the return record into the outcome commit for a true two-commit side-effecting path is that spec's open decision 1.
@@ -388,3 +388,9 @@ Bets 6 (C2SP witnessing) and 11 (60-second first receipt) are small enough to go
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-0-02 | The research hot-path summary still describes the superseded read and return paths | Fixed. The hot-path summary now lists the three path classes: three-commit side-effecting calls with a separate return record whose anchor is lag-triggered only; two-commit durable reads; eligible check-only reads. | "The hot path" |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-0-02 (residual) | The revised overview still makes every durable read a two-commit read | Fixed. Only eligible durable reads (covered by the mode, with bounded redispatch permitted) take two commits. Tracked or otherwise ineligible reads take three, per spec 10 section 6.2 | "The hot path" |

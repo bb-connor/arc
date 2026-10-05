@@ -350,7 +350,7 @@ Rules:
 
 - **S7. Tier 2 decides.** A crossing transaction that observes an effective `Stopped` state for a `Deny` or `Withhold` kind fails with the typed `KernelStopped { scope, epoch, observed_via }`, and makes no state change.
    - The caller follows the path for its disposition and phase (section 8, S15). Every store-level refusal is typed `KernelStopped`, never a generic reason string (S35).
-   - A `Settle` crossing passes only when every effect it completes or settles has a crossing index (`batch_index`, `writer_epoch`) earlier than the stop head's commit. A `Settle` crossing with no prior committed subject is a new authorization and is refused. The same subject-before-cut test applies to the closure-fence and revocation checks of `Settle` kinds (spec 10 section 4.2), so a revocation or closure that lands after the effect committed never blocks its settlement.
+   - A `Settle` crossing passes only when every effect it completes or settles has a `CrossingOrder` (spec 10 X4) earlier than the stop record's own `commit_sequence` in the same store. For a sharded tenant, that is the replica record's sequence in the shard's store. A `Settle` crossing with no prior committed subject is a new authorization and is refused. The same subject-before-cut test applies to the closure-fence and revocation checks of `Settle` kinds (spec 10 section 4.2), so a revocation or closure that lands after the effect committed never blocks its settlement.
    - An `AllowIfContainment` crossing passes only when every applicable `Stopped` head has `allow_containment = true` and no host latch applies (S20).
    - P5: a stop committed after the `admit_confined_return` commit and before `sink.deliver` is caught best-effort. The final serialized activity read (spec 10 X5a, kept for cancellation) also consults tier 1 (`durable_heads ∪ process_latches`). The claim limit names this window as tier 1 only.
 - **S8. Issuance is defense in depth.** Capability issuance does not run in the admission writer, so under spec 10 X3 it is `early_only`. A capability minted in the race window still cannot cross, because every crossing is fenced by S7. Every mint path is listed:
@@ -370,7 +370,7 @@ committed(stop(s, e)) before crossing(x) and kind(x) in {Deny, Withhold} and s i
   -> not crossed(x)
 crossed(x) before committed(stop(s, e)) -> effect may proceed; its later crossings are
   checked at their own commits (S7)
-settle(x) crossed after committed(stop(s, e)) -> every subject(x) indexed before stop(s, e)
+settle(x) crossed after committed(stop(s, e)) -> forall y in subject(x): order(y) < order(stop(s, e))   (CrossingOrder, spec 10 X4)
 allow_if_containment(x) crossed while stopped -> head.allow_containment and no host latch
 ```
 
@@ -502,6 +502,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - `true` (`Reusable`) only on the tier-1, fused-from-`Unbegun` and check-only rows, and on a check-only read's `Withheld { retry: AfterResume }`. No row, tombstone or custody binds the request id there;
       - `false` (`Terminal`) on the `Prepared`-intent and slow-path rows, whose compensated row now holds the request id, and on the `NonDurable` effect row, whose effect already ran;
       - the `Parked`, post-dispatch and caller-report rows sign no stop receipt at the refusal. The operation stays live, and its later terminal receipt carries `Terminal`.
+      - never `Retained`. Spec 9 M20's third value marks the ambiguous deny of an unknown commit, and `retryable_after_resume` would be `false` for it, but a stop refusal is definite, so no stop receipt carries it.
 
       A receipt with `true` is evidence of a refused attempt, not a terminal admission record. One with `false` tells the client that retrying the same request id returns the bound terminal result, never a fresh admission. `chio_runtime` is a kernel-reserved metadata key, so caller metadata can never set either field (spec 9 M20).
     - Under process retries, a process retries with the same request id (M: `chio-process/ARCHITECTURE.md:40-45`).
@@ -848,8 +849,8 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - A stop commit racing a `DispatchCommitted` CAS gives exactly one order.
   - With a stale tier 1, tier 2 still refuses the post-stop crossing.
   - Random stop, restrict, resume, dispatch, release, settle and recovery capture sequences. Properties:
-    - no `Deny` or `Withhold` crossing commits with an index after a `Stopped` head commit in an applicable scope;
-    - every `Settle` crossing after a stop references only subjects indexed before it;
+    - no `Deny` or `Withhold` crossing has a `CrossingOrder` after a `Stopped` head's commit in an applicable scope, counting written records and check-only receipts placed by `observed_commit_sequence` (spec 10 X4);
+    - every `Settle` crossing after a stop references only subjects whose `CrossingOrder` precedes the stop record's;
     - every `AllowIfContainment` crossing during a stop has `allow_containment` and no host latch.
   - A shard offline during the fan-out, then restarted: it is not ready until caught up (S37).
   - A serving shard partitioned from the origin, then a kernel stop at the origin: within `shard_origin_lease` the shard refuses `Deny` crossings and reports `stop_origin_stale`. After it reconnects, it serves again only once its replica holds the stop (S37).
@@ -1056,6 +1057,13 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186364947 | Require exact origin equality before shard readiness | Fixed now. Boot readiness requires an exact position and digest match with the origin head. A replica behind catches up. A replica ahead is an origin regression: the shard latches `stop_origin_regressed` and the kernel scope `Stopped`, and does not serve. Spec 10 S3 mirrors this | section 13 sharding; S37 |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-6-07 (alignment) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. `retryable_after_resume` stays equal to `identity_disposition == Reusable`, so it is `false` for the new `Retained` value. A stop refusal is definite, so stop receipts are never `Retained` | S15 |
+| R-10-03 (consumer side) | The crossing index lacks the ordering contract required by its consumers | Fixed. S7's `Settle` test, its predicate and the DST property use spec 10 X4's `CrossingOrder`. A subject's order is compared with the stop record's own `commit_sequence` in the same store, or the shard's replica. `ChainRollover`'s `writer_epoch` remains the serving owner's fence and is not used for ordering | S7; section 8 predicate; section 17 DST |
 
 ## Appendix A. FTL reference
 

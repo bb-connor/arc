@@ -440,7 +440,7 @@ no_input_ok(op)        -> no_input_row(contract(op)) is defined
                           and for each slot digest d: unconsumed(d, key(op)) = 0
 inputs_bound(op)       -> |selector_inputs(op)| = slots(contract(op))
                           and each input is a committed, slot-matching ExternalBounded return in key(op)
-                          and for each digest d: unconsumed(d, key(op)) = slots_d(contract(op)), filled in commit order
+                          and for each digest d: unconsumed(d, key(op)) = slots_d(contract(op)), filled in CrossingOrder (spec 10 X4)
                           and each input is consumed exactly once, by op, at intent_commit(op)
 inherit(parent, child) -> quarantined(child)
                           or (state(child) at creation >= state(parent) at the same transaction,
@@ -520,7 +520,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
       - **Cardinality.** Exactly one input per slot. A missing or extra input denies.
       - **Membership.** Each input is in the call's key state (I17), is a confined-return observation, and its return contract digest equals its slot's digest. An input from another context's state denies.
       - **Distinct.** No observation fills two slots.
-      - **Unambiguous, in a defined order.** For each digest `d`, let `s_d` be the number of slots naming `d`. The key state must hold exactly `s_d` unconsumed returns under `d`, and they fill those slots in commit order (the confined-return admission's `batch_index` and `writer_epoch`). More unconsumed returns than slots is ambiguous and denies. A call therefore cannot pick whichever historical value makes its action pass, because at most one binding is admissible for a given state.
+      - **Unambiguous, in a defined order.** For each digest `d`, let `s_d` be the number of slots naming `d`. The key state must hold exactly `s_d` unconsumed returns under `d`, and they fill those slots in `CrossingOrder` (spec 10 X4) of their `ConfinedReturn` crossings: `(store_uuid, commit_sequence, member_ordinal)`, compared within the call's store. More unconsumed returns than slots is ambiguous and denies. A call therefore cannot pick whichever historical value makes its action pass, because at most one binding is admissible for a given state.
       - **Consumed once.** The crossing records each input as consumed by this operation, in the same transaction. A second operation that binds a consumed input denies, and a replay of the same operation returns its bound terminal result.
     - Crossing check 4 computes the expected action from the bound inputs' committed, host-recomputed values, in slot order, through the selector. It uses the host's canonical projections (I23), never model text. The bound ids go to the operator-only audit record (I25a), not to caller-visible receipts.
     - It admits the call only when the call's exact action equals that expected action and is in `authorized_actions`. Otherwise it refuses with `InsufficientIntegrity`. This condition applies on both I15a branches. An endorsement satisfies only the level condition, never this one.
@@ -840,6 +840,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186364901 | Add the no-input case to action_ok | Fixed now. `action_ok` gains an explicit no-input branch: the contract defines a `no_input` row, the call binds zero inputs, no unconsumed return exists under any slot digest, and the action equals that row and is authorized. The normal trusted-context path therefore satisfies the admission invariant | section 8 predicates |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-10-03 (consumer side) | The crossing index lacks the ordering contract required by its consumers | Fixed. I22a fills selector slots in spec 10 X4's `CrossingOrder` of the `ConfinedReturn` crossings, `(store_uuid, commit_sequence, member_ordinal)`, which is a total order within the store. Two returns in one batch, or in consecutive batches, therefore have one defined slot order | I22a; section 8 predicates |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

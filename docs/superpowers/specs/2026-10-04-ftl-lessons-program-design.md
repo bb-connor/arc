@@ -67,12 +67,20 @@ It also audited the defect table. 35 rows are confirmed. N20 and N21 above are q
 - spec 9 and spec 10:
   - rail releases need a per-hold key with idempotency or fencing;
   - `StoreUnavailable` is distinct from `Unavailable`, and retained members are re-fed by `StoreRecoveryDriver`;
-  - a signed `IdentityDisposition` (`Reusable` or `Terminal`) on every deny, which spec 6 and spec 8 consume;
+  - a signed `IdentityDisposition` on every deny, which spec 6 and spec 8 consume. It was two-valued (`Reusable`, `Terminal`) in pass 2, and pass 3 added `Retained` for unresolved commits;
 - spec 7: required lanes come from the run plan;
 - spec 8: compensated slow-path stop denials are not retryable;
 - the north star's hot-path summary is corrected.
 
 The pass audited 40 defect rows: 37 confirmed, and 3 correctly reclassified as non-defects.
+
+**Revision 4e, independent review pass 3 (2026-10-05, head `880261fc2`).** The third pass compared the specs with #1160, #1173 and #1170. It found 0 Blockers and raised 5 findings, all applied:
+- `IdentityDisposition` gains `Retained` for unresolved commits (spec 9 M20, spec 3 section 4.11, spec 6 rule 10, spec 10 X22);
+- spec 6's bound builder seals the complete governed D1 request;
+- one total `CrossingOrder = (store_uuid, commit_sequence, member_ordinal)` (spec 10 X4, spec 8 S7, spec 11 I22a);
+- GT1 is restated with current #1160 hosted evidence (N5, spec 1);
+- the north star's read-path summary is corrected.
+
 
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.
 - **Spec 2 (faults)** now plugs in as a recovery planner fact. W: maps an unsatisfied capability fact to the terminal `BlockedByCapability`, and the new `Authority` remedy kind is the upcall tier for exactly that case. W: pins one capability per workflow, so a resolution runs as a linked `AuthorityContinuation` workflow. Because recovery refuses delegated control tokens, an operator-assigned actor drives it.
@@ -156,7 +164,7 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
 | N2 | The security recorder records `Released` before finalization | Open | M: `async_evaluation_core.rs:1727` | Spec 3 |
 | N3 | Caged long-lived `AdaptedMcpServer` receipts carry no `native_launch` | Open | M: `chio-mcp-adapter/src/server.rs:141` | Spec 7 section 5.1 |
 | N4 | The Mechanism D escape-hatch gate was never built | Open | M: `unrepresentable-defects-design.md:503-518` | Spec 3 builds it |
-| N5 | GT1: the hardening gates do not run in hosted CI | Open | M: `hardening-toolchain-spec.md:506-521` | Rollout blocker |
+| N5 | GT1: at the M baseline the hardening gates did not run in hosted CI. At #1160 head `89e4641f6`, hosted job `111748798722` passed the structural, formal-traceability and temporal-security gate steps and then failed at workspace tests | Open (qualification) | M: `hardening-toolchain-spec.md:506-521`; GitHub Actions job `111748798722` | Rollout blocker until a whole hosted run passes |
 | N6 | The default sidecar threshold collector lacks its production request-context source | Open | M: `threshold-approval-collection.md:282-283` | Approval owners |
 | N9 | Container launch evidence is unsigned | Open | Spec 7 section 5.3 | Spec 7 |
 | N10 | W2 plans HTTPS co-signing, while V: ships `IrohBilateralCoSigner` | Open | V: `lanes/bilateral.rs:795` | Work owners |

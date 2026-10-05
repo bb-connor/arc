@@ -113,7 +113,7 @@ This does not replace:
 | Security seams in the kernel | M: `kernel/mod.rs:214` (`CapabilityIssuanceAdmissionAuthority`), `:334` (`SecurityInvocationContextAuthority`), `:344` (`SecurityPreDispatchPolicy`), `:403` (`SecurityPreDispatchHook`); `chio-security-kernel` is `forbid(unsafe_code)` (M: `src/lib.rs:15`) |
 | TCB closure on `main` (`cargo tree -p chio-kernel -e normal`, aarch64-apple-darwin) | **Archived measurement** on `main` at `f5a9d2ab2`, not reproduced for the M:/V:/W: integrated closure: 407 distinct names (434 name/version pairs). Paths: alloy via `chio-settle` default `web3` (V: `chio-settle/Cargo.toml:15-23`, `default = ["web3"]`) **and** via `chio-core` to `chio-web3` to `alloy-primitives`; `reqwest`/`hyper` via `chio-link`, `chio-settle`, `chio-egress-contract`; sigstore via `chio-weights` to `chio-attest-verify`; `ureq` direct |
 | Shrink paths (edge removal over the resolved `main` graph) | **Archived measurement** on `main` at `f5a9d2ab2` (same target and command), not reproduced for the integrated closure. Cut `chio-weights` to `chio-attest-verify`: 310 names. Also cut the `reqwest` edges of `chio-link`, `chio-settle`, `chio-egress-contract`: 281, with no `reqwest`/`hyper`/sigstore. Also cut `chio-settle`'s `web3` edges: 262, with one alloy crate left through `chio-core` to `chio-web3`. Revision 1's "285 of 407, none banned" ignored alloy |
-| Existing gates on M | H11 `scripts/check-dependency-budget.py`: one musl target (`:26`), `Budget` (`:30`), `COMMON_DENY` (`:41`), `HELPER_DENY` (`:55`), `chio-cage-init` ceiling 72 (`:81-87`), broker ceiling 481 (`:89-97`), CI `ci.yml:204`. `scripts/check-trust-boundaries.py` (catalog `:16`, CI `ci.yml:193`), "a source inventory, not a Rust/SQL verifier" (`:4`). H8 deferred (M: hardening spec `:317`, `:510`). **GT1: none of these gates runs in hosted CI** (`:514`). Mechanism D gate specified (M: unrepresentable-defects `:440`) and never built (RP6, `:516`) |
+| Existing gates on M | H11 `scripts/check-dependency-budget.py`: one musl target (`:26`), `Budget` (`:30`), `COMMON_DENY` (`:41`), `HELPER_DENY` (`:55`), `chio-cage-init` ceiling 72 (`:81-87`), broker ceiling 481 (`:89-97`), CI `ci.yml:204`. `scripts/check-trust-boundaries.py` (catalog `:16`, CI `ci.yml:193`), "a source inventory, not a Rust/SQL verifier" (`:4`). H8 deferred (M: hardening spec `:317`, `:510`). **GT1, historical:** at the M baseline none of these gates ran in hosted CI (`:514`). **Current #1160 status:** at #1160 head `89e4641f6` (2026-10-05), hosted job `111748798722` passed step 13 "Workspace structural gates" (trust-boundary, Rust hardening, compiler-probe and dependency-budget gates, M+: `ci.yml:193-205`), step 14 "Formal traceability gate" and step 15 "Temporal security gate", then failed at step 33 "Workspace tests". Structural reachability is shown; overall hosted, native and trusted qualification stays open. Mechanism D gate specified (M: unrepresentable-defects `:440`) and never built (RP6, `:516`) |
 | Emergency stop | Process-local and not persisted (M: `construction.rs:369`). Ledger rows `2026-10-01-compliance-product-truth-review:EV11` and `2026-10-01-execution-review-accounting-clocks:AC6` are `open-acceptance` (M: `docs/security/landing-ledger.json`). No stop check in M: `validation/issuance.rs` |
 
 ## 3. Goals and non-goals
@@ -226,6 +226,7 @@ Revision 1's entry-point table still holds for the `main` surface. Changes for t
 | `Reconcile` (W:) | adds `reconcile_recovery_continuation`, `observe_recovery_completion`, `replay_recovery_result`, `settle_recovery_workflow`, `reserve_recovery_provider_lookup`, `attach_recovery_provider_finality` (6) | `allow` (closure and settlement must complete during a stop) |
 | query (W:) | `recovery_deployment`, `observe_recovery_source`, `recovery_native_identity`, `semantic_request_namespace`, `durable_knowledge_enforcement`, `durable_knowledge_enforced`, `durable_authority_id` (7) | n/a |
 | `test_support` (W:) | `install_native_capture_observer_for_test` | n/a |
+| query (proposed, spec 6) | `delegated_work_layout`: read-only, reports the installed D1 layout (`Arguments` or `GovernedContext`) so spec 6's bound builder can validate a request before sealing (spec 6 rule 11). It joins the inventory when it lands | n/a |
 
 The phase 0 inventory classifies all 254 union names (230 on M ∪ V, plus 24 from W:). Revision 1's category counts for `main` (65 op entry points, 30 queries, 3 handle exports, 51 boot symbols) are the starting point.
 
@@ -341,7 +342,7 @@ H11 measures name/version pairs. Revision 1's numbers were distinct names; this 
 ### 7.3 Relationship to H8 and GT1
 
 - **H8.** `cargo-public-api` and `cargo-semver-checks` snapshot signatures of publishable crates. The census classifies semantics. They are complementary layers. When H8 lands for `chio-kernel-core`, the census consumes its snapshot instead of its own token hash.
-- **GT1.** No hardening gate runs in hosted CI yet. These gates join the same CI job (M: `ci.yml:193-205`) and are not acceptance-complete until a hosted run passes. Local passes are evidence, not acceptance.
+- **GT1.** At the M baseline no hardening gate ran in hosted CI. At #1160 head `89e4641f6`, hosted job `111748798722` reached and passed the structural, formal-traceability and temporal-security gate steps, but the job failed later at workspace tests. These gates join the same CI job (M: `ci.yml:193-205`). They are not acceptance-complete until a hosted run passes as a whole. A passing step is not a passing job, candidate or release, and local passes are evidence, not acceptance.
 
 ## 8. Failure modes and fail-closed behavior
 
@@ -441,6 +442,12 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
 |---|---|---|---|
 | Numbers check | Closure and edge-cut counts lack provenance for the integrated tree | Fixed. The 407/434 closure and the 310/281/262 cut counts are labelled as archived measurements on `main` at `f5a9d2ab2` (aarch64-apple-darwin, `cargo tree -p chio-kernel -e normal`), not reproduced for the M:/V:/W: integrated closure. Phase 0 re-measures them with a retained script and resolved graph, and those values become the budgets | Section 2 rows; section 10 phase 2 note |
 | R-1-01 | Caller reconciliation belongs to two different ABI operations | Fixed. `reconcile_caller_execution*` is an entry point of `CallerExecution` only, with a per-entry-point `allow` under R5b. It is removed from the `Reconcile` row. R5b now states that the generated test asserts per entry point, so the inventory and the stop tests come from one table. Spec 8 S13 and its disposition row agree | R5b; union entry-point table (section 5) |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-1-02 | The hosted gate rollout statement is stale against current #1160 evidence | Fixed. The M-baseline GT1 history is kept with its source. The current status is recorded as verified: hosted job `111748798722` at `89e4641f6` passed structural (13), formal traceability (14) and temporal security (15) steps, then failed at workspace tests (33). Overall qualification stays open | section 2 table; section 7.3 GT1 |
 
 ## Appendix: FTL reference
 

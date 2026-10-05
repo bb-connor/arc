@@ -330,9 +330,19 @@ Rules:
    - a spec 8 section 5 stop disposition.
 2. **X2. Order.** Checks run in `CrossingCheck` order, before any mutation, and the first refusal ends the crossing.
 3. **X3. Same writer.** A check is authoritative only when its state lives in the crossing's writer. Otherwise it is an early read, reported `early_only` (spec 8 section 13).
-4. **X4. Record.** `crossing_records(crossing_id, kind, operation_id, scope_digest, checks_digest, batch_index, writer_epoch)` is written last in the same savepoint. It is operational, not signed evidence.
-   - `CheckOnlyDispatch` is exempt, because it writes nothing.
-   - Its linearization index (`batch_index`, `writer_epoch`) travels in the call's receipt metadata as `chio_runtime.crossing`. Spec 8's property "no crossing with an index after a `Stopped` head" is evaluated over both sources.
+4. **X4. Record and crossing order.** `crossing_records(crossing_id, kind, operation_id, scope_digest, checks_digest, store_uuid, commit_sequence, member_ordinal)` is written last in the same savepoint. It is operational, not signed evidence.
+   - **One total order.** `CrossingOrder = (store_uuid, commit_sequence, member_ordinal)`. It orders every written crossing, stop and fence record and influence observation in one store. Every consumer uses it: spec 8 S7's subject-before-stop test and DST property, and spec 11 I22a's selector-slot order.
+     - `commit_sequence` reuses the existing durable authority chain. It is the greatest `authority_global_commits.commit_sequence` written by the member's savepoint (M: `serving_owner/global_commit_chain.rs:43-77`). Every written crossing mutates at least one authority projection, so the value is defined. Stop and fence records are covered by the same chain (spec 8 S2), so they have a `commit_sequence` too.
+     - `member_ordinal` is the member's 0-based position in its batch, assigned in dequeue order (X19).
+     - Members run serially and the chain sequence is strictly increasing within a store, so `commit_sequence` alone already orders written crossings, including two members of one batch. `member_ordinal` is a tiebreak that a written crossing never needs.
+     - The tuple is chosen over `(batch_index, writer_epoch)`, which revision 2 used and this revision withdraws. A per-batch ordinal collides across consecutive batches, a batch number leaves members of one batch unordered, and `writer_epoch` is the serving owner's fence, not a commit counter.
+   - **Check-only crossings** write nothing. A `CheckOnlyDispatch` or X13a release records `(store_uuid, observed_commit_sequence, check_ordinal)` in the call's receipt metadata as `chio_runtime.crossing`. `observed_commit_sequence` is the chain head that the check read in the writer. The check is ordered after that commit and before the next one, and `check_ordinal` orders only checks that observed the same head.
+   - **Comparison.**
+     - Orders compare only within one `store_uuid`.
+     - `commit_sequence` continues across owner changes, because it is the store's own table key, not an owner counter.
+     - A sharded tenant compares stop records through its verified replica, which has its own sequence in the shard's store (section 10).
+     - After a restore only the anchored prefix exists, and X6 already covers it.
+   - Spec 8's property "no `Deny` or `Withhold` crossing ordered after a `Stopped` head" is evaluated over written records and check-only receipt metadata together.
 5. **X5. Spec 9 boundary.** `CrossingTx` executes spec 9's planned commit effects and never decides an admission transition. Each plan carries the expected operation version.
    - **X5a. P5.** `ConfinedReturn` covers stop and fence at the return-admission commit (W: `store.admit_confined_return`, `chio-control-plane/src/confinement.rs:214-226`). P5's final serialized activity read before `sink.deliver` (`:234-236`, a process-journal read outside this writer) stays as written, so a late cancellation still withholds bytes.
      - That final read is not a stop check (spec 8 S8-10).
@@ -520,7 +530,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
       - Post-effect members are never refused with `Overloaded`: return records, outcome commits, release crossings, `Terminalize`, `Compensate` and `ReleaseHold`. A rail adapter used for an unknown-outcome `ReleaseHold` must declare one of two capabilities over the hold's `hold_release_key` (spec 9 M7a). `IdempotentPerKey` means at most one release executes per key, whatever request body carries it. The key includes the hold's `attempt_generation`, which rotates only after a durable `release_abandoned` proves the previous key's request can never execute (spec 9 M7a). `FenceByKey` means a terminal fence whose success excludes later acceptance of any request with that key. A status query alone does not qualify, so the `ExternalPrepare { Settle }` crossing refuses a release on an adapter without either capability, before any rail call. Refusing one would turn a known outcome into an unknown one, or strand a hold.
       - Their number is bounded by operations already admitted. Each dispatched operation has at most one post-effect member queued, so admitting them past the bound cannot grow the queue without limit.
 18. **X18. No added latency at low load.** The loop never waits to fill a batch. At concurrency 1, latency is unchanged.
-19. **X19. Linearization.** Members execute serially in dequeue order, each seeing earlier members' effects. Every CAS keeps its meaning.
+19. **X19. Linearization.** Members execute serially in dequeue order, each seeing earlier members' effects. Every CAS keeps its meaning. Dequeue order assigns `member_ordinal`, and each member's authority-chain appends give it a strictly greater `commit_sequence` than every earlier member. So X4's `CrossingOrder` equals execution order.
 20. **X20. Fairness.** Members dequeue FIFO, after the X17a priority lane, with a per-tenant cap of a quarter of a contended batch. The cap reorders across tenants only, and X19's order is the dequeue order after the cap. In the single-tenant process host (`LOCAL_SYSTEM_TENANT_ID`) the cap is inert.
 21. **X21. Savepoint failure protocol.**
     - After any non-refusal SQLite error, the loop checks `sqlite3_get_autocommit()` and acts on what it reports. On `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM`, SQLite may roll back the whole transaction automatically, or may leave it active with only the failing statement rolled back (SQLite, "Response To Errors Within A Transaction"). The loop never assumes either outcome.
@@ -536,7 +546,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
     - **`store_healthy`.** After a batch commits following a store incident, the writer emits `store_healthy` once. Spec 9's `StoreRecoveryDriver` re-feeds every retained member on it, and with bounded backoff otherwise.
 22. **X22. Unknown outcomes.**
     - If `COMMIT` fails with an unknown outcome, the owner is poisoned and every member gets `OutcomeUnknown`. The same happens when the anchor sync fails after a successful `COMMIT` (`serving_owner.rs:284-289`).
-    - Spec 9 emits `HaltOperation` for each member's operation: no dispatch, no compensation, holds and credentials retained (spec 3's `BoundaryFailure::CommitUnconfirmed`). Restart reconciles each one. The halt is per operation; the poisoned owner, not a kernel latch, is what stops further writes until restart. Members queued after the poisoning are answered `StoreUnavailable` (X21, spec 9 M19).
+    - Spec 9 emits `HaltOperation` for each member's operation: no dispatch, no compensation, holds and credentials retained (spec 3's `BoundaryFailure::CommitUnconfirmed`). A pre-dispatch member answered `OutcomeUnknown` signs the ambiguous deny with `identity_disposition = Retained` (spec 9 M12, M20). Its request's terminal record comes from reconciliation. Restart reconciles each one. The halt is per operation; the poisoned owner, not a kernel latch, is what stops further writes until restart. Members queued after the poisoning are answered `StoreUnavailable` (X21, spec 9 M19).
     - A `DispatchIntent` member reconciled as `DispatchCommitted` is terminalized as outcome-unknown with holds frozen, even though the driver never handed off. This is the batch's blast radius, bounded by `max_intent_members`. Release then needs the existing counterparty authorities (section 19).
 
 ## 10. Writer sharding (later phase, with preconditions)
@@ -641,7 +651,7 @@ The B: kernel-only and sustained-load figures stay as context (section 2.8).
 ## 15. Protocol, schema and wire impact
 
 - **Native wire, verdicts and receipt format:** none, except spec 8's `OutputWithheld` result for a stop-withheld two-commit read (X14a), which spec 8 defines.
-- **Receipt metadata:** `chio_runtime.crossing { kind, batch_index, writer_epoch }` on check-only reads and `NonDurable` calls, a `withheld` decision reason on refused releases, the stop head's `observed_epoch` on `KernelStopped` denials (X15a), and `chio_runtime.identity_disposition` on every non-allow receipt (spec 9 M20). `chio_runtime` and `receipt_context` are kernel-reserved keys that caller metadata cannot set (spec 9 M20).
+- **Receipt metadata:** `chio_runtime.crossing { kind, store_uuid, observed_commit_sequence, check_ordinal }` on check-only reads and `NonDurable` calls (X4), a `withheld` decision reason on refused releases, the stop head's `observed_epoch` on `KernelStopped` denials (X15a), and `chio_runtime.identity_disposition` on every non-allow receipt (spec 9 M20). `chio_runtime` and `receipt_context` are kernel-reserved keys that caller metadata cannot set (spec 9 M20).
 - **`spec/PROTOCOL.md` section 6:** durable-before-allow is satisfied by the receipt in the anchored terminal projection. A receipt is audit-complete when the receipt store and a checkpoint cover it.
 - **Admission design amendments:** X14 and X14a (the opt-in two-commit read and its stop fallback), X15 and X15a (deny tombstones on the fused path except for `KernelStopped`; rule 4 unchanged), the caller report as a progress-only return record (section 7), and the commit classes of section 5.
 - **ADR-0013:** no rule change. The authority writer is the local WAL under rules 23 to 25.
@@ -695,7 +705,14 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
   - a member whose reply handle is dropped after enqueue still commits, and the handle's new owner receives the reply (X17);
   - a `Terminalize` and a `Compensate` member that exhaust `member_fault_retries` are answered `StoreUnavailable`, never `Refused(Unavailable)`; after `store_healthy` the same member commits exactly once. After owner poisoning, queued members get `StoreUnavailable` and restart re-drives them (X21, X22);
   - an `ExternalPrepare { Settle }` for an unknown-outcome release on a rail adapter with neither `IdempotentPerKey` nor `FenceByKey` is refused before any rail call (X17b);
-  - every non-allow receipt carries `identity_disposition`, and for stop denials it agrees with spec 8's `retryable_after_resume` (X15, X15a).
+  - every non-allow receipt carries `identity_disposition`, and for stop denials it agrees with spec 8's `retryable_after_resume` (X15, X15a);
+  - a pre-dispatch member answered `OutcomeUnknown` signs a `Retained` deny, and the outcome-unknown terminal that reconciliation later writes is the request's one `Terminal` receipt (X22);
+  - crossing order (X4):
+    - two members in one batch get strictly increasing `commit_sequence`;
+    - members with the same `member_ordinal` in consecutive batches are ordered by `commit_sequence`;
+    - a stop committed between two batches orders the first batch before it and the second after it;
+    - across an owner restart, `commit_sequence` continues and no order repeats;
+    - a check-only receipt's `observed_commit_sequence` places it between the commits it observed.
 
 ## 18. Alignment with sibling specs
 
@@ -868,3 +885,10 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186364947 (spec 8) | Require exact origin equality before shard readiness | Mirrored in section 10 S3: readiness requires an exact match; a replica ahead latches | section 10 S3 |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-10-03 | The crossing index lacks the ordering contract required by its consumers | Fixed. X4 defines `CrossingOrder = (store_uuid, commit_sequence, member_ordinal)` over the existing durable authority chain, with check-only crossings placed by `observed_commit_sequence`, plus comparison rules for owner change, sharding and restore. `(batch_index, writer_epoch)` is withdrawn everywhere. X19 ties the order to execution order, and tests cover same-batch, consecutive-batch, stop-between and owner-restart cases. Answers the owner's open question 3: reuse the global commit sequence with a member ordinal, and add no new sequence | X4; X19; section 15 receipt metadata; section 17 |
+| R-6-07 (emitter side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. X22 states that pre-dispatch members answered `OutcomeUnknown` sign `Retained` denials, and that the reconciled outcome-unknown terminal is the one `Terminal` receipt | X22; section 17 |

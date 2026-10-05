@@ -307,7 +307,7 @@ Rules:
    ```
 
    - `RejectedBeforeCommit` compensates the `compensable` entries and returns the report, as `build_pre_commit_credential_rejection_response` does today (M: `dispatch_commit_failure.rs:11-37`).
-   - `CommitUnconfirmed` moves every entry to retained, signs the ambiguous deny with retained markers through `ambiguous_dispatch_receipt_metadata`, and calls `record_dispatch_failed`, exactly as M: does (`dispatch_commit_failure.rs:40-75`). It never compensates: "Do not infer nonexecution from an error returned after entering the store" (`:52-54`). If the CAS to `DispatchCommitted` landed, recovery terminalizes the operation as `OutcomeUnknownAfterDispatch` with the holds still frozen. This is the same rule as spec 9 M12: an unknown commit outcome halts the operation with no compensation.
+   - `CommitUnconfirmed` moves every entry to retained, signs the ambiguous deny with retained markers through `ambiguous_dispatch_receipt_metadata`, and calls `record_dispatch_failed`, exactly as M: does (`dispatch_commit_failure.rs:40-75`). The deny carries `identity_disposition = Retained` (spec 9 M20): it records an unresolved attempt, and recovery later supplies the request's one terminal record. It never compensates: "Do not infer nonexecution from an error returned after entering the store" (`:52-54`). If the CAS to `DispatchCommitted` landed, recovery terminalizes the operation as `OutcomeUnknownAfterDispatch` with the holds still frozen. This is the same rule as spec 9 M12: an unknown commit outcome halts the operation with no compensation.
    - On success, every entry moves into `RetainedReservations`, which post-effect paths read to stamp retained markers and which nothing can release. The one exception is the `EvidenceSlot` entry, which moves into the obligation's `evidence_slot` field (rule 18). `RejectedBeforeCommit` returns it to the pool with the rest of the compensation. `CommitUnconfirmed` carries it with the retained entries, so the ambiguous deny can buffer into it if its own append fails.
 5. Every `match` over `CompensableReservation`, `RetentionCause` and `ExternalCommitment` is exhaustive, under `#[deny(clippy::wildcard_enum_match_arm)]`. A new kind cannot compile without choosing its class. A `Commitment` or a retained entry has no compensator to call.
 6. **`Drop` on an unconsumed `AdmissionReservations` compensates best-effort and never latches.** An unconsumed ledger is type-level proof that `enter_effect_boundary` never ran, so no effect is possible. R: `02-rust-design.md:124` forbids `Drop` from certifying no effect after capture, not from attempting compensation before the boundary. Dropping an evaluation future before dispatch is routine: a client disconnects, or an outer timeout or `select!` fires. M: guards every pre-dispatch await for that reason (section 2.1).
@@ -590,7 +590,14 @@ Receipts are classified by spec 9 M20's signed `chio_runtime.identity_dispositio
 - **`Reusable` receipts end one attempt, not the request id.** Examples are tier-1 and fused-from-`Unbegun` stop denials (`retryable_after_resume = true`, spec 8 S15), `Overloaded`, check-only refusals and a check-only read's `Withheld { retry: AfterResume }`.
   - Within its attempt, a `Reusable` receipt still discharges that attempt's obligation: the `exactly_one_of` predicate applies per attempt.
   - The per-request predicate ("no second terminal receipt") counts only `Terminal` receipts, so a later attempt with the same request id may commit its one terminal receipt.
-- **`Terminal` receipts bind the request id.** Examples are a compensated `Prepared`-intent or slow-path stop denial, a deny tombstone, every terminal outcome, and a `NonDurable` withheld effect. They are counted by every predicate above, so a stop denial on the slow path is not excluded.
+- **`Retained` receipts mark an unresolved attempt.** The ambiguous deny of rule 4's `CommitUnconfirmed` (spec 9 M12) is `Retained`. It is excluded from the per-request predicate, because the commit may have landed and recovery then records the request's one terminal: a compensation tombstone, or `OutcomeUnknownAfterDispatch`. If reconciliation proves that nothing committed, no terminal follows and a later attempt may commit its one terminal receipt.
+- **`Terminal` receipts bind the request id.** Examples are a compensated `Prepared`-intent or slow-path stop denial, a deny tombstone, every terminal outcome, a `NonDurable` withheld effect, and the ambiguous deny of an unconfirmed non-durable invocation capture (rule 22). They are counted by every predicate above, so a stop denial on the slow path is not excluded.
+
+```text
+terminal_receipts(request_id) = { r : identity_disposition(r) = Terminal }
+|terminal_receipts(request_id)| <= 1
+retained(r) -> eventually (exists t in terminal_receipts(request_id(r))) or proven_uncommitted(request_id(r))
+```
 
 ### 4.12 Division with specs 9 and 10
 
@@ -633,7 +640,7 @@ Sequencing:
     - `compile_fail` tests pin forging and duplicate release.
 22. **Retained before dispatch.** `ledger.retain(slot, cause)` moves an entry from `compensable` to `retained` before the boundary. It is triggered in two cases:
     - on acknowledgement of an external payment authorization. The credentials are retained, because "retrying could duplicate a payment hold or minted authority" (M: `credential_reservation.rs:91-103`; call site `async_evaluation_core.rs:1252-1291`);
-    - on an unconfirmed non-durable invocation capture, which keeps its hold and signs an ambiguous deny (M: `evaluation/invocation_capture.rs:57-77`).
+    - on an unconfirmed non-durable invocation capture, which keeps its hold and signs an ambiguous deny (M: `evaluation/invocation_capture.rs:57-77`). No durable operation exists for recovery to terminalize, so that deny is the request's one record and carries `identity_disposition = Terminal`. The retained hold is reconciled by the existing reserved-hold reaper, not by a later receipt.
 
     `compensate_before_dispatch` stamps retained entries as markers and never reverses them. M: already preserves "prior payment or irreversible nonce retention" on rejection (`dispatch_commit_failure.rs:8-10`).
 23. **Post-dispatch drop of a durable future.** When a durable obligation is dropped, or `fail` hands a durable call to the saga, the kernel enqueues the operation to a supervised reconciliation job. No durable transition runs inside `Drop` (R: `02-rust-design.md:124`).
@@ -914,6 +921,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180933161 | Carry the reserved evidence slot into the obligation | Fixed now. `EvidenceSlot` is a move-only token: a `CompensableReservation::EvidenceSlot` ledger entry before the boundary, moved into `PostEffectObligation::evidence_slot` by `enter_effect_boundary`, dropped (returned) when a terminal or fault receipt commits, and moved into the buffered record on `fail` or `Drop` until it flushes. `RejectedBeforeCommit` returns it; `CommitUnconfirmed` carries it | section 4.3 enum; rule 4; section 4.4 struct; rule 18 |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-6-07 (counting side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. Rule 4's `CommitUnconfirmed` deny carries `Retained`. Section 4.11 counts only `Terminal` receipts per request, so the ambiguous deny and the recovery terminal no longer both count. A `Retained` receipt is followed by the terminal or by a proof that nothing committed. An unconfirmed non-durable capture's deny stays `Terminal`, because no durable operation will be terminalized | rule 4; rule 22; section 4.11 |
 
 ## Appendix A. FTL reference
 

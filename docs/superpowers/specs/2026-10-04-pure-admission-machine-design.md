@@ -399,6 +399,8 @@ pub enum ReceiptDecision {
 /// it is never a driver choice or a caller claim.
 pub enum IdentityDisposition {
     Reusable, // the attempt was refused before any operation row, tombstone or custody exists; the same request id may be retried
+    Retained, // the outcome of a submitted commit is unknown (M12); the identity is occupied: no fresh dispatch, no optimistic retry;
+              // reconciliation later supplies the one terminal record, or proves that nothing committed
     Terminal, // the request id is bound to a terminal record (tombstone, compensated row, terminal outcome) or to an executed effect
 }
 ```
@@ -521,7 +523,11 @@ pub enum IdentityDisposition {
       - **`NonDurable`.** The effect has executed and nothing binds a retry to it. A retry would redispatch the side effect, as spec 5 confirms for non-durable calls. The `Withheld` receipt therefore records `effect_executed: true`, and its stop block sets `retryable_after_resume: false` (spec 8 S15). The driver returns the terminal `OutputWithheld { retry: Never, effect_executed: true }`, and the result is final for that request. `KernelStopped` is temporary only for refusals before dispatch. A deployment that cannot accept dropped output must not run `Monetary` or development `Off` modes (spec 3 open decision 1).
 12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect yields `HaltOperation { CommitOutcomeUnknown }`, with no compensation, no dispatch and no state change.
     - This is the machine form of spec 3's `BoundaryFailure::CommitUnconfirmed`: every hold and credential is retained.
-    - When the unknown commit is pre-dispatch (an `IntentCommit` or a slow-path dispatch-commit step), a second group signs the ambiguous `SignReceipt(Deny)` with retained markers, as M: does today (M: `kernel/evaluation/dispatch_commit_failure.rs:40-75`).
+    - When the unknown commit is pre-dispatch (an `IntentCommit` or a slow-path dispatch-commit step), a second group signs the ambiguous `SignReceipt(Deny)` with retained markers, as M: does today (M: `kernel/evaluation/dispatch_commit_failure.rs:40-75`). That receipt carries `identity_disposition = Retained` (M20). It is evidence of an unresolved attempt, not the operation's terminal record.
+    - **Resolving a `Retained` identity.** Reconciliation (`StartupReconciler`, `DropReconcileJob`, or a replay of the request id) resolves it from the store, after the writer that owned the member has drained or the process has restarted. There are two outcomes:
+      - **A row committed.** The cut table (section 6.1) produces the operation's one `Terminal` record: a compensation tombstone if the committed phase is pre-dispatch, or `OutcomeUnknownAfterDispatch` if it is `DispatchCommitted`. That record is the request's terminal receipt, and the earlier `Retained` deny is not.
+      - **No row under the replay key.** This is only possible for a fused intent from `Unbegun`. The attempt never committed, so the identity is free and the next attempt with that request id is evaluated as new. No terminal receipt is signed for the failed attempt.
+    - Until it is resolved, a replay of the request id is answered with an unresolved status and never causes a fresh dispatch.
     - When the unknown commit is post-effect, no receipt is signed, because the unknown commit may hold it.
     - Restart re-projects the operation from the store.
 13. **M13. Integrity at every dispatch commit.** Every dispatch-commit step, fast or slow, and every `CheckOnlyCrossing`, is a crossing that carries spec 10's full `CrossingCheck` list, including `KnowledgeIntegrity` (spec 11 rule I15). No earlier acknowledgement satisfies it.
@@ -612,10 +618,15 @@ pub enum IdentityDisposition {
     | `Compensate` of a persisted operation: `Prepared`-intent refusals and slow-path refusals for any reason, `KernelStopped` included (M10, M15), cut-table compensations, drop compensations | `Terminal` |
     | `Terminalize` for any terminal, including `DeniedAfterDelivery`, `OutcomeUnknownAfterDispatch` and `NotAcceptedAfterDispatchCommit` | `Terminal` |
     | Post-effect receipts of classes with no row (M16): `DenyDelivery`, `Cancelled`, a `NonDurable` `Withheld { retry: Never }` | `Terminal` |
-    | The ambiguous deny for an unknown pre-dispatch commit (M12) | `Terminal`: the store may hold a row for the id |
+    | The ambiguous deny for an unknown pre-dispatch commit (M12; spec 3 `BoundaryFailure::CommitUnconfirmed`; spec 10 X22 members answered `OutcomeUnknown`) | `Retained`: the store may hold a row for the id, and reconciliation supplies the terminal record |
 
-    - The rule: `Reusable` exactly when the refusal leaves no operation row, tombstone, custody or executed effect bound to the request id. Every other non-allow receipt is `Terminal`.
-    - Spec 8 S15's `chio_runtime.stop.retryable_after_resume` must equal `identity_disposition == Reusable`. Spec 3's per-request predicates count only `Terminal` receipts (spec 3 section 4.11). Spec 6 rule 10 binds a sealed submission only on a `Terminal` disposition or an allow or terminal outcome; on `Reusable` it lowers the deny and leaves the record sealed.
+    - The rule:
+      - `Reusable` exactly when the refusal leaves no operation row, tombstone, custody or executed effect bound to the request id;
+      - `Retained` exactly when the receipt is the ambiguous deny of a submitted commit whose outcome is unknown (M12);
+      - every other non-allow receipt is `Terminal`.
+    - Spec 8 S15's `chio_runtime.stop.retryable_after_resume` must equal `identity_disposition == Reusable`, so it is `false` for `Retained`. A stop refusal is definite, so a stop receipt is never `Retained`.
+    - Spec 3's per-request predicates count only `Terminal` receipts (spec 3 section 4.11).
+    - Spec 6 rule 10 binds a sealed submission only on a `Terminal` disposition, or on an allow or terminal outcome. On `Reusable` it lowers the deny and leaves the record sealed. On `Retained` it lowers an unresolved-status deny and also leaves the record sealed, so the later recovery terminal receipt binds normally.
     - **Kernel-reserved metadata keys.** Two receipt-metadata keys are written only by the kernel. Caller-supplied metadata that carries either is rejected before evaluation through the existing `reject_reserved_receipt_metadata` path:
       - `receipt_context`, which gains a kernel-written `receipt_context.request_namespace_digest`. The kernel derives it from the authenticated evaluation context, exactly as `AuthenticatedRequestNamespace::bind` derives the replay-key namespace (M: `admission_operation/identity.rs:154`). Spec 6 R-6-05 compares it.
       - `chio_runtime`, including `chio_runtime.identity_disposition`, `chio_runtime.stop` (spec 8) and `chio_runtime.crossing` (spec 10).
@@ -801,7 +812,7 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 | T11 `stop_is_temporary` | a `KernelStopped` refusal never emits `DenyTombstone` or `Terminalize`, and never emits `Compensate` from `Parked` or a post-dispatch phase | spec 8 S14, S15 |
 | T12 `hints_trail_commits` | a `Hint` effect appears only in the last group of a list, after a group whose commit was acknowledged `Committed`; no transition reads a hint | spec 5 H1, H2 |
 | T13 `store_failure_is_not_policy` | `StoreUnavailable` never yields `Compensate`, `Terminalize`, `DenyTombstone`, `ReleaseHold` or a phase change; the next state retains the same planned member with its expected version | spec 10 X21 |
-| T14 `identity_disposition_truthful` | a receipt is `Reusable` exactly when its producing transition leaves no operation row, tombstone, custody or executed effect bound to the request id | spec 8 S15, spec 6 rule 10, spec 3 section 4.11 |
+| T14 `identity_disposition_truthful` | a receipt is `Reusable` exactly when its producing transition leaves no operation row, tombstone, custody or executed effect bound to the request id; `Retained` exactly when it is the ambiguous deny of an unknown pre-dispatch commit; `Terminal` otherwise. A request id has at most one `Terminal` receipt, and a `Retained` receipt is followed by either that terminal or a proof that no row committed | spec 8 S15, spec 6 rule 10, spec 3 section 4.11 |
 
 **Model checking.**
 - Add `formal/apalache/AdmissionMachine.tla` for two operations and these concurrent drivers racing through version CAS: evaluator, startup reconciler, recovery closure, caller execution, the drain, the drop-reconcile job, and the governed active response resume.
@@ -891,6 +902,8 @@ Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI
   - rail-held release with `FenceByKey`: a negative status query keeps `ReleaseSubmitted`; a successful fence returns to `Frozen`; the original request delivered afterwards is refused by the rail;
   - a rail adapter with neither capability: the prepare crossing refuses before any rail call and the hold stays `Frozen`;
   - identity disposition per path, each case separate: tier-1 stop denial (`Reusable`), fused stop denial from `Unbegun` (`Reusable`), fused intent from `Prepared` refused by a stop (`Terminal`, compensated), slow-path stop compensation (`Terminal`), parked operation during a stop (no stop receipt; later terminal receipt `Terminal`), durable post-effect withhold (no stop receipt; later terminal receipt `Terminal`), check-only read withheld (`Reusable`), `NonDurable` effect withheld (`Terminal`), `Overloaded` (`Reusable`). Each asserts `retryable_after_resume == (identity_disposition == Reusable)` (T14);
+  - a `Retained` ambiguous deny A for an unknown intent commit, then the recovery terminal B for the same namespace, request id and binding, both in the same process and across a restart. B is the one `Terminal` receipt, and a replay before resolution returns an unresolved status with no dispatch;
+  - a `Retained` deny for a fused intent from `Unbegun` whose read-back finds no row: the next attempt with the same request id is admitted as new;
   - caller-supplied metadata carrying `receipt_context` or `chio_runtime` is rejected before evaluation.
 
 ## 15. Residual risks and open decisions
@@ -1023,6 +1036,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186364916 | Update T6 for per-attempt release keys | Fixed now. T6 scopes key equality to one `attempt_generation` and asserts that the generation increments only with `release_abandoned`, so the theorem matches M7a's rotation after proven non-acceptance | T6 |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-6-07 (producing side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. `IdentityDisposition` gains `Retained`. M12's ambiguous deny (and spec 3's `CommitUnconfirmed`, spec 10 X22) carries it. Reconciliation resolves a `Retained` identity to the one `Terminal` record or to a proof that nothing committed. Spec 8 equality, spec 3 counting and spec 6 binding are stated for all three values. T14 and tests are updated | section 5.2 enum; M12; M20; T14; section 14 tests |
 
 ## Appendix A. External and FTL precedent
 

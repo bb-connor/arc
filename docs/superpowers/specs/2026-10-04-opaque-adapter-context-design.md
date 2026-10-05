@@ -1,6 +1,6 @@
 # Design: lift-bound adapter correlation (opaque adapter context, narrowed)
 
-- Status: PROPOSED (revision 5, 2026-10-05, after the second independent review on PR #1174; revision 4 after Codex review; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
+- Status: PROPOSED (revision 5, 2026-10-05, after the second and third independent reviews on PR #1174; revision 4 after Codex review; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
 - Date: 2026-10-04
 - Citations:
   - Unprefixed paths are `main` at `f5a9d2ab2`.
@@ -20,6 +20,8 @@
 - **Retry identity excludes the observation time (R-6-04).** `provenance.received_at` is sampled at every lift (M: `chio-gemini-tools-adapter/src/adapter.rs:257-268`), so including it made the second lift of a retried `LiftContext` turn fail `SubmissionConflict` before evaluation. The invocation digest now covers every identity field except `received_at`, which stays observation metadata. Two lifts of one turn now produce the same digest and seal idempotently, so terminal replay and a retry after a reusable denial both work (section 5.1, rule 11).
 - **The binding names the authenticated namespace and capability (R-6-05).** The binding digest is now `binding.v3`, always computed, over the request namespace digest, the submitted capability id, the invocation digest and the optional digests. The constructor looks the sealed record up by the receipt's kernel-written namespace digest and request id. It also compares the receipt's kernel-resolved `tenant_id` and signed `capability_id` with the record. A receipt from namespace A can no longer be paired with namespace B's record for byte-identical invocations (rule 10 check 2a).
 - **Record binding follows the kernel's identity disposition (R-6-06).** Rule 10 now binds the sealed record only when the receipt's signed `chio_runtime.identity_disposition` is `Terminal`, or the receipt is an allow or terminal outcome. A `Reusable` denial, such as `Overloaded`, an early or fused `KernelStopped`, or a refused check-only read, leaves the record sealed for the retry. A receipt without the field is treated as `Terminal`. This replaces the stop-specific wording of round 6.
+- **An unresolved outcome does not bind (R-6-07).** An ambiguous deny signed for an unconfirmed commit carries the new `Retained` disposition. It is lowered as an unresolved-status deny and leaves the sealed record unbound, so recovery's later terminal receipt is checked and binds normally (rule 10 check 6).
+- **The bound builder seals the complete request (R-6-08).** `build_bound_tool_call_request` now takes a `BoundAuthorization`: the governed intent, the host-established peer negotiation and the receiver's installed D1 layout. It assembles and validates the complete authorization-bearing request before sealing. The permit digest is derived from the actual request in the `Arguments` or `GovernedContext` layout, and unsupported combinations are refused before sealing (rule 11).
 
 ## Revision 4 changes
 
@@ -197,7 +199,18 @@ pub enum VerdictResult {
         receipt_id: ReceiptId,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         invocation_digest: Option<InvocationDigest>,
+        /// Copied by the shim from the receipt's signed `chio_runtime.identity_disposition` (rule 10 check 6).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        disposition: Option<DenyDisposition>,
     },
+}
+
+/// Fabric mirror of spec 9's `IdentityDisposition`. It tells the host what a retry
+/// with the same request id means; it never authorizes anything.
+pub enum DenyDisposition {
+    Reusable, // refused before any operation row; the same request id may be retried
+    Retained, // outcome unresolved; do not mint a new id; retry the same id for status
+    Terminal, // final for this request id
 }
 
 /// Tool output plus the binding of the invocation that produced it. The binding is
@@ -282,21 +295,43 @@ pub struct SubmissionRecord {
     model_context_sha256: Option<String>,
     governed_intent_hash: Option<String>, // binding hash of the submitted governed intent, when present
     binding_digest: InvocationDigest,     // binding.v3, computed once, from the fields above
-    bound_receipt_id: Option<ReceiptId>,  // set once, by rule 10, only on a Terminal disposition
+    bound_receipt_id: Option<ReceiptId>,  // set once, by rule 10, only by a terminal outcome or a Terminal disposition; never by Reusable or Retained
 }
 
 /// Host-owned table of sealed submissions, keyed by (request_namespace_digest, kernel_request_id).
 pub struct SubmissionTable { /* private */ }
 
-/// Replaces `build_tool_call_request` for bound use: builds the request, seals its record,
-/// and returns the receipt metadata the request must be evaluated with (rule 7).
+/// Replaces `build_tool_call_request` for bound use. It assembles and validates the
+/// complete authorization-bearing request, then seals its record, then returns the
+/// receipt metadata the request must be evaluated with (rules 7 and 11).
 pub fn build_bound_tool_call_request(
     table: &SubmissionTable,
     namespace: &RequestNamespace,
     binding: &InvocationBinding<'_>,
-    /* the existing build_tool_call_request inputs */
+    capability: CapabilityToken,
+    agent_id: AgentId,
+    server_id: ServerId,
+    registry: &chio_manifest::VerifiedManifestRegistry,
+    authorization: &BoundAuthorization,
 ) -> Result<BoundSubmission, ProviderVerdictError>;
 
+/// The authorization-bearing parts of the request that the existing builder cannot
+/// supply (it always sets `governed_intent: None`, V: `provider_verdict.rs:106-130`).
+pub struct BoundAuthorization {
+    /// The governed intent to submit, including `context.chioDelegation` under the
+    /// `GovernedContext` layout. `None` submits no intent.
+    pub governed_intent: Option<GovernedTransactionIntent>,
+    /// The host-established peer profile. `CapabilityNegotiation::default()` when the
+    /// bridge negotiated nothing, which is today's behavior.
+    pub negotiation: CapabilityNegotiation,
+    /// The receiver's installed D1 layout, read from `ChioKernel::delegated_work_layout()`.
+    /// `None` when no delegated-work guard is installed. Never chosen per request.
+    pub delegated_work_layout: Option<DelegatedWorkLayout>,
+}
+
+/// The request is complete when sealed. Any later change to it is refused by rule 10
+/// (`GovernedIntent`, `ParameterHash`, `SignedBinding`), so nothing built from a
+/// changed request is ever lowered.
 pub struct BoundSubmission {
     pub request: ToolCallRequest,
     /// `{ "chio_fabric_binding": { binding_digest, invocation_digest,
@@ -320,7 +355,13 @@ pub enum ProviderVerdictError {
     ResponseBindingMismatch { check: ResponseBindingCheck },
     /// A different binding is already sealed for this (namespace, request id).
     SubmissionConflict,
+    /// The request's D1 shape does not match the receiver's installed layout (rule 11).
+    UnsupportedDelegationLayout { installed: Option<DelegatedWorkLayout>, found: DelegationShape },
+    /// The binding's permit digest differs from the permit in the assembled request (rule 11).
+    DelegationPermitMismatch,
 }
+
+pub enum DelegationShape { None, ArgumentsEnvelope, GovernedContext }
 
 pub enum ResponseBindingCheck {
     ReceiptSignature, KernelKey, SubmissionRecord, RequestId, RequestNamespace, Tenant, CapabilityId,
@@ -416,7 +457,7 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
    Any mismatch returns `ResultBindingMismatch`, and nothing is lowered. Passing invocation and verdict B with result A therefore fails: A's binding digest differs, and A's bytes do not hash to B's signed `content_hash`.
 10. **The kernel response is bound before the verdict exists.** `bound_verdict_from_response` checks in this order, and constructs nothing until every check passes:
     1. `response.receipt` verifies, and its `kernel_key` is in `trusted_kernel_keys`.
-    2. The receipt's signed `metadata.receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:138-145`) and `response.request_id` both equal `invocation.provenance.request_id`. The constructor then looks up the sealed record by `(signed request_namespace_digest, signed request id)` (check 2a, rule 11). The caller never chooses the record, and the caller's `namespace` argument must equal the signed one (`RequestNamespace`). A missing record fails `SubmissionRecord`. The invocation digest recomputed from `invocation` must equal the record's (`InvocationDigest`). When the record holds a governed-intent hash, the receipt's signed `governed_transaction.intent_hash` (M: `receipt_support/receipt_metadata.rs:563-585`) must equal it (`GovernedIntent`). That compares the D1 permit, which travels inside the governed intent, against kernel-signed evidence.
+    2. The receipt's signed `metadata.receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:138-145`) and `response.request_id` both equal `invocation.provenance.request_id`. The constructor then looks up the sealed record by `(signed request_namespace_digest, signed request id)` (check 2a, rule 11). The caller never chooses the record, and the caller's `namespace` argument must equal the signed one (`RequestNamespace`). A missing record fails `SubmissionRecord`. The invocation digest recomputed from `invocation` must equal the record's (`InvocationDigest`). When the record holds a governed-intent hash, the receipt's signed `governed_transaction.intent_hash` (M: `receipt_support/receipt_metadata.rs:563-585`) must equal it (`GovernedIntent`). That compares the D1 permit, which travels inside the governed intent, against kernel-signed evidence. When the record holds none, the receipt must carry no `governed_transaction` block (`GovernedIntent`), so an intent added after sealing is refused.
     2a. **Kernel-authenticated identity.** Three receipt fields are derived by the kernel, never from caller input, and each must equal the record:
        - `metadata.receipt_context.request_namespace_digest` equals the record's `request_namespace_digest` (`RequestNamespace`). The kernel writes it beside `receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:137-144`), computing it from the evaluation's authenticated tenant and coordinator authority with the same derivation as `AuthenticatedRequestNamespace::bind` (M: `admission_operation/identity.rs:122-172`). It does this for durable and non-durable evaluations alike. `receipt_context` joins the kernel's reserved receipt-metadata keys, so no caller metadata can pre-set it; M: does not reserve it today (`kernel/mod.rs:152-160`). A receipt without the field fails;
        - the receipt body's `tenant_id` equals the record's `authenticated_tenant_id` (`Tenant`). The kernel resolves it from the authenticated evaluation context and never from a request field (M: `receipt_persistence.rs:122-135`);
@@ -431,16 +472,33 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
     6. The verdict's `invocation_digest` and the `BoundToolResult`'s `binding_digest` are the record's `binding_digest`, never a digest computed from optional values the caller passes at this point. Whether the receipt binds the record follows the kernel's signed **identity disposition** (spec 9, `IdentityDisposition`). The kernel derives `chio_runtime.identity_disposition` from the machine row that produced the receipt; it is never a caller claim:
        - **Binds.** An `Allow`, `Cancelled`, `Incomplete`, `DeniedAfterDelivery` or other terminal outcome, and any deny or `Withheld` receipt whose disposition is `Terminal`, binds the record to its receipt id. Examples are a deny tombstone, a compensated slow-path or `Prepared`-intent refusal (including `KernelStopped` there), and a `NonDurable` withheld effect (`retry: Never`). A later call with a different receipt for that record fails `ReceiptAlreadyBound`, and a replay of the same receipt returns the same outcome.
        - **Leaves sealed.** A deny or `Withheld` receipt whose disposition is `Reusable` is lowered as a deny but does not bind the record. The record stays sealed with the same binding, so a retry with the same request id and binding produces a new receipt, which is checked and bound normally. Examples are an early (tier 1) denial, a fused `IntentCommit` refused with `KernelStopped`, `Overloaded` before admission, a refused check-only read (`Withheld { retry: AfterResume }`), and any other pre-admission transient refusal that persists no state. A retry with a different binding still fails `SubmissionConflict` (rule 11).
-       - **Missing field.** A deny or `Withheld` receipt without `chio_runtime.identity_disposition` is treated as `Terminal`. That fails closed: a later receipt for the same record is refused, and nothing unbound is lowered.
+       - **Leaves sealed, outcome unresolved.** A deny whose disposition is `Retained` is the ambiguous deny signed for an unconfirmed commit: spec 3 `BoundaryFailure::CommitUnconfirmed`, spec 9 M12 `CommitOutcomeUnknown`, or a spec 10 X22 member answered `OutcomeUnknown`. It is evidence of an unresolved attempt, not the operation's terminal record, because the commit may have landed.
+         - It is lowered as a deny with `disposition: Retained`, which tells the provider-facing host to retry the same request id for status and never to mint a new one.
+         - It does not bind the record. The record stays sealed with the same binding and must not be evicted while unresolved (retention, rule 11).
+         - A retry with the same request id and binding is answered by the kernel from the operation's current state, never by a fresh dispatch: a durable replay of the terminal once recovery has produced it, or another `Retained` status while it is still unresolved.
+         - Recovery's later terminal receipt, for example `OutcomeUnknownAfterDispatch` after startup reconciliation, is checked like any receipt and binds the record. A second `Retained` receipt never binds, so recovery's one terminal receipt is always lowerable.
+       - **Missing field.** A deny or `Withheld` receipt without `chio_runtime.identity_disposition` is treated as `Terminal`. That fails closed: a later receipt for the same record is refused, and nothing unbound is lowered. A kernel that predates the field also fails check 2a, because it writes no `receipt_context.request_namespace_digest`, so a bound deployment always runs a kernel that emits the disposition.
 
     Any failure returns `ResponseBindingMismatch`. If concurrent response B is paired with invocation A, check 2 or 4 fails, and no verdict carrying A's digest is ever produced. If a bridge passes a binding that names model context or permit B for a response submitted under A, the constructor ignores it, check 3a confirms A from the signed receipt, and it stamps A's binding, so `lower_bound`'s rule 3 comparison with B fails. A record that names B for a receipt signed under A fails check 3a. `verdict_result_from_response` is deprecated on the schedule of `lower`.
 11. **Sealed submission records.** The optional digests are fixed when the request is submitted, not when the verdict is built:
-    - `build_bound_tool_call_request` builds the `ToolCallRequest` exactly as `build_tool_call_request` does (M: `provider_verdict.rs:105-124`). It then seals a `SubmissionRecord` into the host's `SubmissionTable` under `(request_namespace_digest, request_id)`, before the request is evaluated, and returns the `chio_fabric_binding` metadata the request must be evaluated with (rule 7). `KernelBoundVerdictSource` always evaluates with it. The record holds the request namespace digest and the authenticated tenant it is derived from, the submitted capability id, the invocation digest, the permit and model-context digests, the governed-intent binding hash when the request carries a governed intent, and the `binding.v3` digest computed once from them.
+    - **Assemble, validate, then seal.** `build_bound_tool_call_request` runs in this order, and seals nothing until every step passes:
+      1. The existing builder checks, unchanged (V: `provider_verdict.rs:64-104`): `invocation.validate()`, bridge security present, admitted server equal to `server_id`, registry bridge validation, canonical argument decoding and manifest argument validation.
+      2. It assembles the complete request: the fields `build_tool_call_request` sets, plus `governed_intent` from `authorization`. Every other authorization extension stays absent, as today: approval tokens, threshold proposal, supplemental authorization, DPoP and nonce. A host that needs one of them does not use this profile.
+      3. It validates the assembled request: `validate_peer_capabilities(&authorization.negotiation)` (V: `runtime.rs:124-135`; an ordinary governed intent needs no negotiated feature, while an `ActiveResponsePlan` intent needs `GOVERNED_ACTIVE_RESPONSE_PLAN`, `capability/features.rs`), then `validate_authorization_extensions()`.
+      4. It checks the D1 layout, below, and derives the permit digest from the assembled request.
+      5. It computes `governed_intent_hash = governed_intent.binding_hash()` (V: `capability/governance.rs:1220`) when an intent is present.
+      6. It seals a `SubmissionRecord` into the host's `SubmissionTable` under `(request_namespace_digest, request_id)`, before the request is evaluated, and returns the complete request with the `chio_fabric_binding` metadata it must be evaluated with (rule 7).
+    - **Supported D1 layouts (answers open question 2).** Both of V:'s layouts are supported. The layout is the receiver's, fixed when the guard is installed (V: `delegated_work.rs:21-55`). It is read through a new read-only `ChioKernel::delegated_work_layout()`, which is a kernel change, and it is never chosen per request. Writing `permit_sha256(p) = hex(SHA256(canonical_json(p)))` for the `Signed<DispatchPermit>` value `p` as submitted:
+      - **No layout installed.** The binding's `delegation_permit_sha256` must be `None`, and the governed intent, if any, must not carry `context.chioDelegation`. Otherwise sealing fails `UnsupportedDelegationLayout`, because no guard would read the permit.
+      - **`Arguments`.** The permit is `arguments.allocation` in the `{slot_id, payload, allocation}` envelope (V: `delegated_work.rs:66-72`). The arguments must decode as that envelope, and the governed intent must not carry `chioDelegation`. The binding's permit digest must equal `permit_sha256(arguments.allocation)`, or sealing fails `DelegationPermitMismatch`. The permit is also covered by the invocation digest, through `SHA256(arguments)`.
+      - **`GovernedContext`.** `governed_intent` must be present, with `context.chioDelegation = {slot_id, allocation}` (V: `delegated_work.rs:74-79`, `:92-99`). The binding's permit digest must equal `permit_sha256(chioDelegation.allocation)`, or sealing fails `DelegationPermitMismatch`. The tool arguments are the unchanged payload. A request in this layout without the intent fails `UnsupportedDelegationLayout` before sealing, instead of being admitted only to fail the guard's "governed delegation permit absent".
+      - **Mixed or mismatched shapes.** A request whose shape differs from the installed layout fails `UnsupportedDelegationLayout` before sealing. That covers an envelope under `GovernedContext`, a `chioDelegation` intent under `Arguments`, and any permit under no layout. A permit digest in the binding with no permit in the request fails `DelegationPermitMismatch`.
+    - **After sealing.** The sealed request is the one evaluated. A change made after sealing is refused when the response is constructed: a changed intent fails `GovernedIntent` (check 2), an added intent fails the same check, changed arguments fail `ParameterHash` (check 4), and evaluation without the returned metadata fails `SignedBinding` (check 3a). `KernelBoundVerdictSource` always evaluates with it. The record holds the request namespace digest and the authenticated tenant it is derived from, the submitted capability id, the invocation digest, the permit and model-context digests, the governed-intent binding hash when the request carries a governed intent, and the `binding.v3` digest computed once from them.
     - **One binding per request id.** Sealing an identical binding again under the same key (a retried `LiftContext` turn, whose re-lift reproduces the digest because `received_at` is excluded) is idempotent. Sealing a different binding fails `SubmissionConflict`, and the request is not evaluated. This matches durable admission's changed-body conflict for the same replay key.
-    - **Permit evidence at seal time.** When the request carries a governed intent with `context.chioDelegation`, the permit digest in the binding must equal the digest of that permit, or sealing fails. Rule 10's `GovernedIntent` check later ties the receipt to the same intent.
+    - **Permit evidence at seal time.** The permit digest in the binding is checked against the permit in the assembled request, in whichever layout is installed (above), or sealing fails. Rule 10's `GovernedIntent` check later ties the receipt to the same intent under `GovernedContext`, and its `ParameterHash` check ties it to the same arguments, and so the same permit, under `Arguments`.
     - **Model context.** The model-context digest is authenticated by the kernel's signature over `chio_fabric_binding` (rule 7), which records what the host submitted before evaluation. Rule 10 check 3a compares it with the sealed record, and rule 8 additionally requires the delivering `ReleaseIntent` to name the same `model_context_sha256`.
     - **Durable replay.** A replayed terminal result returns the original receipt, whose signed block names the original binding. A retry whose sealed record differs therefore fails check 3a and is never lowered.
-    - **Retention.** A record lives as long as the host can receive a terminal result for its request id, including a durable replay. Under durable admission the host persists it with its provider-correlation record (section 2.4.1). A response whose record was evicted fails `SubmissionRecord`, and nothing is lowered.
+    - **Retention.** A record lives as long as the host can receive a terminal result for its request id, including a durable replay. Under durable admission the host persists it with its provider-correlation record (section 2.4.1), so it survives a host restart. A record whose last response was `Retained` is never evicted before a terminal receipt binds it, because recovery's terminal is still owed. A response whose record was evicted fails `SubmissionRecord`, and nothing is lowered.
 
 ### 5.3 Safety predicates
 
@@ -485,6 +543,19 @@ bound(rec, receipt) ->
   receipt is an allow or terminal outcome
   or receipt.chio_runtime.identity_disposition in { Terminal, absent }
 
+receipt.chio_runtime.identity_disposition in { Reusable, Retained } ->
+  rec.bound_receipt_id unchanged by constructing its verdict
+
+retained(rec) and later terminal receipt t for the same (namespace, request_id, binding) ->
+  constructed(verdict(t)) succeeds and bound(rec, t)        (across a host restart as well)
+
+rec.governed_intent_hash absent -> r.receipt has no governed_transaction block
+
+sealed(rec) -> rec was sealed from the complete assembled request:
+  validate_peer_capabilities(negotiation) and validate_authorization_extensions() passed,
+  the D1 shape equals ChioKernel::delegated_work_layout(),
+  and rec.delegation_permit_sha256 == permit_sha256(permit in that layout) (or both absent)
+
 lift(turn t, time a) and lift(turn t, time b), same LiftContext ->
   invocation_digest equal, request_id equal   (received_at is not identity)
 
@@ -521,6 +592,11 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Receipt's kernel-written namespace digest, kernel-resolved tenant or signed capability id differs from the record, or the namespace field is absent | `ResponseBindingMismatch { RequestNamespace \| Tenant \| CapabilityId }`; no verdict is constructed |
 | Deny or `Withheld` receipt with `Reusable` disposition | Deny lowered; record stays sealed; a later receipt for the same binding is checked and bound |
 | Deny or `Withheld` receipt without `identity_disposition` | Treated as `Terminal`; record bound; a later different receipt fails `ReceiptAlreadyBound` |
+| Deny with `Retained` disposition (unconfirmed commit) | Lowered as `Deny { disposition: Retained }`; record stays sealed and is retained; a same-id retry gets status or replay, never a fresh dispatch; recovery's terminal receipt binds |
+| Request's D1 shape differs from the receiver's installed layout, or a permit appears under no layout | `UnsupportedDelegationLayout`; nothing is sealed or evaluated |
+| Binding's permit digest differs from the permit in the assembled request | `DelegationPermitMismatch`; nothing is sealed or evaluated |
+| Assembled request fails peer-capability or authorization-extension validation | Existing `UnsupportedAuthorization`; nothing is sealed or evaluated |
+| Request changed after sealing (intent changed or added, arguments changed, or evaluated without the returned metadata) | `ResponseBindingMismatch { GovernedIntent \| ParameterHash \| SignedBinding }`; nothing is lowered |
 | Receipt lacks `chio_fabric_binding`, or its signed value differs from the sealed record | `ResponseBindingMismatch { SignedBinding }`; no verdict is constructed |
 | Stream gate receives an outcome whose digest or `released_block_sha256` does not match | Block discarded; no final frame; `VerdictBindingMismatch` or `ResultBindingMismatch` |
 | `request_id` over 2048 bytes | `InvalidIdentity`; lift fails |
@@ -538,7 +614,9 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 - **Receipt metadata:**
   - one new host-supplied block, `chio_fabric_binding`, carried in signed receipt metadata through the existing extra-metadata channel (rule 7). It is additive; verifiers that do not know it ignore it, and only the provider-verdict shim relies on it;
   - one new kernel-written field, `receipt_context.request_namespace_digest`, beside `receipt_context.request_id`. `receipt_context` joins the kernel's reserved receipt-metadata keys (rule 10 check 2a). Additive;
-  - the shim consumes spec 9's kernel-written `chio_runtime.identity_disposition` (rule 10 check 6).
+  - the shim consumes spec 9's kernel-written `chio_runtime.identity_disposition`, including `Retained` (rule 10 check 6).
+- **Fabric verdict:** `VerdictResult::Deny` gains one more optional, skip-if-absent field, `disposition`, with the same compatibility as the fields above.
+- **Kernel accessor:** a new read-only `ChioKernel::delegated_work_layout() -> Option<DelegatedWorkLayout>`, set by `install_delegated_work_with_layout` (V: `delegated_work.rs:39-57`). It exposes configuration only and grants nothing.
 - **Digest domains:** `chio.tool-invocation.v2` (excludes `received_at`) and `chio.tool-invocation-binding.v3` replace the earlier domains before any implementation, so no deployed verdict carries the old forms.
 - **Errors:** `VerdictBindingMismatch` and `ResultBindingMismatch` need fabric error-code entries in `spec/errors/registry.yaml` beside the existing `chio-tool-call-fabric` entries (`registry.yaml:494`, `registry.yaml:640`). `ResponseBindingMismatch` is a kernel shim error.
 - **Provenance wire schema:** `spec/schemas/chio-wire/v1/provenance/verdict-link.schema.json` is unchanged. It binds verdicts by `requestId`, and rule 1 makes that id unique across payloads in the namespace.
@@ -573,6 +651,8 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
   - a receipt whose signed `governed_transaction.intent_hash` names a different permit than the sealed record fails `GovernedIntent`; a response whose record is missing fails `SubmissionRecord`; a second, different receipt for a bound record fails `ReceiptAlreadyBound`;
   - **stream gate:** the final frame is never emitted from an unbound outcome. An outcome with no `invocation_digest`, a digest for another binding, a `released_block_sha256` that differs from the buffered block, or a `Deny` all leave the gate without emitting, and a `compile_fail` doctest shows that `StreamGate::release` accepts no bare `VerdictResult`;
   - **dependency direction:** a `cargo metadata` check in CI asserts that `chio-tool-call-fabric` has no dependency path to `chio-kernel`.
+  - **unresolved then recovered (R-6-07):** under one namespace, request id and binding, an ambiguous `Retained` deny A for an unconfirmed commit is lowered with `disposition: Retained` and leaves the record unbound. A same-id retry before recovery returns another `Retained` status and dispatches nothing. Recovery then produces terminal receipt B (`OutcomeUnknownAfterDispatch`), which is constructed and binds. The same sequence across a host restart works too, with the record persisted with its correlation record, A before the restart and B after it. In contrast, a `Terminal` deny followed by a different receipt fails `ReceiptAlreadyBound`;
+  - **governed D1 end to end (R-6-08):** with the `GovernedContext` layout installed, a real `GovernedContext` request is built by `build_bound_tool_call_request` from a `BoundAuthorization` carrying `chioDelegation`, admitted by the delegated-work guard, and lowered through `lower_bound`. Changing the intent after sealing (another `slot_id` or permit) fails `GovernedIntent`, and adding an intent to a request sealed without one fails the same check. Under the `Arguments` layout, the envelope request seals and lowers, and a binding permit digest that differs from `arguments.allocation` fails `DelegationPermitMismatch` before evaluation. A `chioDelegation` intent under `Arguments`, an envelope under `GovernedContext`, a `GovernedContext` request without an intent, and a permit digest with no layout installed each fail before sealing. An `ActiveResponsePlan` intent without the negotiated feature fails the peer-capability check before sealing;
 - **Proptest in `chio-tool-call-fabric`:**
   - the digest is stable across serde round-trips of `ToolInvocation`;
   - any single-field change (`tool_name`, any provenance identity field, any argument byte) changes the digest, and a change to `received_at` alone does not;
@@ -587,6 +667,7 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 - **Verdict authenticity (open, narrowed).** Rule 10 derives the binding from the verified receipt, so mis-pairing is caught, and `result_sha256` is the receipt's signed content hash. What remains open is a hostile host that forges the `VerdictResult` or `BoundOutcome` object passed to `lower_bound` or the stream gate. The stronger form has `lower_bound` itself verify the receipt, which would make the fabric depend on receipt verification keys. That depends on how `2026-10-04-closed-kernel-abi-design.md` defines the verdict surface. Recommendation: decide there, not here.
 - **Host mapping of request ids (resolved in revision 4).** The shipped shim already maps `provenance.request_id` into `ToolCallRequest.request_id` (M: `provider_verdict.rs:107`; `main` `:55`), so a reused id collides on the admission replay key `(request_namespace_digest, request_id)`: the same arguments dedupe to the first receipt, and different arguments conflict. Rule 1 therefore requires uniqueness across payloads in the namespace, not only within one.
 - **Who selects the model context (open).** Under P4, the host selects `ModelContextV1` for restore and release. This spec assumes the bridge host that calls `lower_bound` is the same host that holds the selected context. If a deployment splits them, the context digest must travel from the knowledge runtime to the bridge as host configuration, never from the provider response.
+- **D1 adapter profile (resolved, answering the owner's question).** The bound builder supports both `Arguments` and `GovernedContext`, selected by the receiver's installed layout through `ChioKernel::delegated_work_layout()`. Complete request assembly and validation precede sealing, and unsupported combinations are refused before sealing (rule 11). Other authorization extensions (approval tokens, threshold proposals, supplemental authorization, DPoP, nonces) stay outside this profile, as in the existing builder.
 - **`received_at` in the digest (decided in revision 5: excluded).** Revision 4 included it, which broke retried `LiftContext` turns: the re-lift's new timestamp changed the digest and sealing failed `SubmissionConflict`. Excluding it costs no mis-pair detection, because different turns and fresh lifts already differ in `request_id` (section 5.1).
 - **Value check.** If the review finds that host bridges already pair verdicts structurally everywhere (as the stream gate does), phase 3 cleanup alone (rule 2 plus rule 1) captures most of the value, and the verdict digest becomes optional hardening.
 - **Unrelated finding (resolved on the shipped baseline).** On `main`, the hosted MCP resume tag uses the authority keypair seed directly as MAC key material (`remote_mcp/session_resume.rs:157-167`). `M:` and `V:` replace this with a dedicated `RemoteSessionHmacKeyring`, with key id, key version, and a v2 envelope that also binds `resume_generation` (`V:crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs:802-824`). No action is needed once the baseline merges.
@@ -641,6 +722,13 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | R-6-04 | Retry-stable request ids are paired with a deliberately retry-unstable invocation digest | Fixed. The invocation digest (`chio.tool-invocation.v2`) covers every identity field except `provenance.received_at`, which stays observation metadata. Re-lifts of one `LiftContext` turn reproduce the digest, seal idempotently, replay their terminal result, and retry after a reusable denial. No mis-pair detection is lost, because different turns and fresh lifts differ in `request_id` | Section 5.1 digest; rules 1 and 11; section 5.3; section 10; section 11 |
 | R-6-05 | The checked signed binding does not bind the authenticated request namespace | Fixed. `binding.v3` always includes the request namespace digest and the submitted capability id. The constructor looks the record up by the receipt's kernel-written `receipt_context.request_namespace_digest`, which is derived like `AuthenticatedRequestNamespace::bind` and reserved against caller metadata. It requires the receipt's kernel-resolved `tenant_id` and signed `capability_id` to equal the record. A receipt-swap test covers two namespaces with identical invocation bytes and request ids | Section 5.1; rules 3, 7, 10 (check 2a) and 11; sections 5.3, 7, 8 and 10 |
 | R-6-06 | Retryable admission denials other than stops have no binding disposition | Fixed. Rule 10 check 6 consumes spec 9's kernel-written `chio_runtime.identity_disposition`. `Terminal` (or an allow or terminal outcome) binds the record. `Reusable` (early denial, fused `KernelStopped`, `Overloaded`, refused check-only read) leaves it sealed. A missing field is treated as `Terminal`. Deny-then-allow tests cover `Overloaded` and a stop | Rule 10 check 6; sections 5.3, 7, 8 and 10 |
+
+### Independent review pass 3 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-6-07 (consumer side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. Rule 10 check 6 consumes spec 9's new `Retained` disposition. The ambiguous deny for an unconfirmed commit is lowered as `Deny { disposition: Retained }` and leaves the sealed record unbound and retained. A same-id retry gets status or replay, never a fresh dispatch, and recovery's terminal receipt is constructed and binds. Tests cover deny A then recovery terminal B under the same namespace, request id and binding, including across a restart | Section 5.1 (`DenyDisposition`, `bound_receipt_id`); rule 10 check 6; rule 11 retention; sections 5.3, 7, 8 and 10 |
+| R-6-08 | The bound request builder cannot carry the governed D1 request it promises to seal | Fixed. `build_bound_tool_call_request` takes a `BoundAuthorization` (governed intent, host-established negotiation, installed D1 layout). It runs the existing checks, assembles the complete request, validates peer capabilities and authorization extensions, checks the D1 shape against the receiver's layout, and derives the permit digest from the actual request before sealing. Both V: layouts are supported (`Arguments` and `GovernedContext`); unsupported combinations fail before sealing. A post-seal intent change fails `GovernedIntent`. Open question 2 is answered | Section 5.1 (builder, `BoundAuthorization`, errors); rule 10 check 2; rule 11; sections 5.3, 7, 8, 10 and 11 |
 
 ## Appendix A: FTL reference
 
