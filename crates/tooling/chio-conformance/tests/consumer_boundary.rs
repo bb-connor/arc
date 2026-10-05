@@ -40,7 +40,7 @@ fn aggregate_restart(protocol: Protocol) -> TestResult {
 fn threshold_restart(protocol: Protocol) -> TestResult {
     use chio_core::capability::governance::{
         GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        ThresholdApprovalProposal,
+        GovernedTransactionIntentBody, ThresholdApprovalProposal,
     };
     let fixture = Fixture::new()?.with_threshold_approval()?;
     let mut request = fixture.request("threshold-operation")?;
@@ -48,6 +48,15 @@ fn threshold_restart(protocol: Protocol) -> TestResult {
         "id":"threshold-intent", "server_id":SERVER, "tool_name":TOOL,
         "purpose":"authorize one counted consumer invocation", "max_amount":{"units":100,"currency":"USD"}
     }))?);
+    // Every consumer must ask approvers to sign the same exact invocation that
+    // the kernel evaluates, including the capability and canonical arguments.
+    request.governed_intent.as_mut().ok_or("intent")?.body =
+        GovernedTransactionIntentBody::BoundToolInvocation {
+            capability_id: request.capability.id.clone(),
+            parameters_hash: chio_core::sha256(&chio_core::canonical_json_bytes(
+                &request.arguments,
+            )?),
+        };
     let mut consumer = fixture.open(protocol)?;
     let pending = consumer.invoke(&request)?;
     assert_eq!(
@@ -69,6 +78,7 @@ fn threshold_restart(protocol: Protocol) -> TestResult {
         .as_ref()
         .ok_or("intent")?
         .binding_hash()?;
+    assert_eq!(proposal.body.governed_intent_hash, intent_hash);
     request.approval_tokens = fixture
         .approvers
         .iter()

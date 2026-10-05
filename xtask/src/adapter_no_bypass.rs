@@ -425,8 +425,8 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
     )?;
     require_path(
         parsed
-            .get("crates/products/chio-api-protect/src/evaluator.rs")
-            .ok_or_else(|| "API protect evaluator was not parsed".to_string())?,
+            .get("crates/products/chio-api-protect/src/evaluator/route_matching.rs")
+            .ok_or_else(|| "API protect route matcher was not parsed".to_string())?,
         "RequestEvaluator::match_route_with_status",
         "PolicyDecision::DenyByDefault",
     )?;
@@ -707,6 +707,9 @@ fn is_test_path(path: &Path) -> bool {
 fn parse_source(source: &str, label: &str) -> Result<SourceFacts, String> {
     let syntax = syn::parse_file(source)
         .map_err(|error| format!("cannot parse production Rust source {label}: {error}"))?;
+    if test_only(&syntax.attrs) {
+        return Ok(SourceFacts::default());
+    }
     let mut visitor = FunctionVisitor::default();
     visitor.visit_file(&syntax);
     let mut functions = BTreeMap::new();
@@ -862,7 +865,12 @@ fn impl_name(node: &ItemImpl) -> Option<String> {
 fn test_only(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attribute| {
         let path = normalize_tokens(attribute.path());
-        path == "test" || path.ends_with("::test") || normalize_tokens(attribute) == "#[cfg(test)]"
+        path == "test"
+            || path.ends_with("::test")
+            || (attribute.path().is_ident("cfg")
+                && attribute
+                    .parse_args::<syn::Path>()
+                    .is_ok_and(|path| path.is_ident("test")))
     })
 }
 

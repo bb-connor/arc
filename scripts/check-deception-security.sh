@@ -29,6 +29,7 @@ run_exact_target --label "decoy matcher" --expected \
   -- cargo test -p chio-decoy --test matcher
 
 run_exact_target --label "decoy materialization" --expected \
+  materialize::unix::reader_boundary_tests::materialized_paths_obey_the_persisted_path_limit \
   cleanup_is_idempotent_and_recovers_after_quarantine_rename \
   cleanup_rejects_changed_or_replaced_content_without_removal \
   cleanup_rejects_forged_registry_identity_and_metadata_proof \
@@ -113,6 +114,7 @@ run_exact_target --label "sealed private registry store" --expected \
   scan_uses_byte_ordered_opaque_cursor_without_duplicates \
   sqlite_fixture_contains_tokens_and_ciphertext_but_no_raw_secrets \
   stable_operation_can_record_distinct_retry_transitions_for_one_artifact \
+  tenant_isolation::exact_decoy_tokens_never_grant_cross_tenant_reads_after_restart \
   transition_replay_rejects_shape_valid_equal_generation_tampering \
   transition_replay_returns_original_snapshot_after_later_update_and_reopen \
   watermark_observation_identity_is_source_tenant_scoped \
@@ -126,4 +128,4 @@ run_exact_target --label "native canary and honey-tool pre-dispatch denial" --al
   honey_tool_pre_dispatch_denial \
   -- cargo test -p chio-conformance --test active_defense pre_dispatch_denial
 
-echo "Deception security gate passed (82 exact tests)"
+echo "Deception security gate passed (85 exact tests)"

@@ -1803,8 +1803,17 @@ def fake_docker_main_tests() -> None:
                     BOUNDARY, "run_checked", side_effect=fake.run_checked
                 ),
                 mock.patch.object(sys, "argv", argv),
+                mock.patch.object(
+                    BOUNDARY,
+                    "start_attached_container",
+                    side_effect=lambda docker, environment, identifier, **kwargs: fake.output(
+                        docker, ["start", identifier], environment
+                    ),
+                ),
             )
-            with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
                 if revalidate is None:
                     BOUNDARY.main()
                 else:
@@ -2452,6 +2461,38 @@ def trusted_failure_diagnostic_tests() -> None:
         raise AssertionError("failed verifier emitted unescaped terminal controls")
 
 
+def attached_container_diagnostic_tests() -> None:
+    with tempfile.TemporaryDirectory(prefix="chio-container-diagnostic-") as raw:
+        docker = Path(raw) / "docker"
+        programs = {
+            "success": "import sys; assert sys.argv[1:] == ['start','--attach','a'*64]; assert sys.stdin.read() == ''; print('done')",
+            "failure": "import sys; sys.stdout.buffer.write(b'x'*100000 + b'END\\n::error::untrusted\\x1b\\x00'); sys.exit(7)",
+            "timeout": "import sys,time; print('before timeout',flush=True); time.sleep(30)",
+        }
+        for name, program in programs.items():
+            docker.write_text(f"#!{sys.executable}\n{program}\n")
+            docker.chmod(0o700)
+            try:
+                BOUNDARY.start_attached_container(
+                    str(docker), BOUNDARY.clean_host_env(), "a" * 64, timeout=1
+                )
+            except BOUNDARY.BoundaryError as error:
+                if name == "success":
+                    raise
+                diagnostic = str(error)
+                if len(diagnostic) > 33_000 or any(
+                    char in diagnostic for char in ("\n", "\x1b", "\x00")
+                ):
+                    raise AssertionError("container diagnostic is not bounded and escaped")
+                if name == "failure" and ("status 7" not in diagnostic or "END" not in diagnostic):
+                    raise AssertionError("original container error tail was lost")
+                if name == "timeout" and "execution bound" not in diagnostic:
+                    raise AssertionError("hung attachment did not retain timeout failure")
+            else:
+                if name != "success":
+                    raise AssertionError("failed attachment accepted as successful execution")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--docker", action="store_true")
@@ -2473,6 +2514,7 @@ def main() -> int:
     entrypoint_repository_inventory_tests()
     fake_docker_main_tests()
     trusted_failure_diagnostic_tests()
+    attached_container_diagnostic_tests()
     if args.docker:
         image = args.image or os.environ.get("CHIO_SECURITY_EXECUTION_IMAGE", "")
         if not BOUNDARY.IMAGE_PATTERN.fullmatch(image):

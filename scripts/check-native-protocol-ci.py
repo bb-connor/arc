@@ -91,7 +91,10 @@ def validate_consumer(
         )
 
 
-def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict, sdk: dict) -> None:
+def validate(
+    ci: dict, process: dict, action: dict, cpp: dict, postgres: dict, sdk: dict,
+    enterprise: dict,
+) -> None:
     checks = (
         "python3 scripts/check-native-protocol-ci.py",
         "python3 scripts/tests/check-native-protocol-ci.test.py",
@@ -145,12 +148,15 @@ def validate(ci: dict, process: dict, action: dict, cpp: dict, postgres: dict, s
         (cpp, "conformance", "Run live C++ conformance areas"),
         (postgres, "native", "Exercise the public worker role and actual native process host"),
         (sdk, "sdk-parity", "Run SDK parity"),
+        (enterprise, "portable-contracts", "Native security conformance"),
+        (enterprise, "active-defense-security", "Durable consumer boundaries"),
     ):
         validate_consumer(workflow, job_id, consumer, {"name": FIXTURE_NAME, "uses": FIXTURE_ACTION})
     for workflow, job_id, step_name, profile in (
         (cpp, "conformance", "Run live C++ conformance areas", ""),
         (postgres, "native", "Build the real gateway and kernel", " --profile docker-release"),
         (sdk, "sdk-parity", "Run SDK parity", ""),
+        (enterprise, "portable-contracts", "Native security conformance", ""),
     ):
         _, step = named_step(workflow["jobs"][job_id], step_name)
         require(
@@ -181,8 +187,9 @@ def main() -> None:
         yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
         yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
+        yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
     )
-    print("native protocol CI contract passed: workspace, process, C++, PostgreSQL and SDK parity consumers")
+    print("native protocol CI contract passed: workspace, process, C++, PostgreSQL, SDK parity and enterprise consumers")
 
 
 if __name__ == "__main__":

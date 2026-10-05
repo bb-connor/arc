@@ -227,6 +227,31 @@ mod tests {
     }
 
     #[test]
+    fn file_level_test_configuration_excludes_effects_and_includes(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir = fixture(&[(
+            "lib.rs",
+            "#![cfg(test)]\nfn fixture() { server.invoke(); }\ninclude!(\"absent.inc\");",
+        )])?;
+        let sources = parse_repo_sources(dir.path(), &[ENTRY.to_string()])?;
+        assert_eq!(sources.len(), 1);
+        validate_dangerous_calls(&sources, false)?;
+        Ok(())
+    }
+
+    #[test]
+    fn file_configuration_with_a_production_branch_keeps_effects_visible(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let dir = fixture(&[(
+            "lib.rs",
+            "#![cfg(any(test, unix))]\nfn bypass() { server.invoke(); }",
+        )])?;
+        let sources = parse_repo_sources(dir.path(), &[ENTRY.to_string()])?;
+        assert!(validate_dangerous_calls(&sources, false).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn test_only_includes_are_not_required() -> Result<(), Box<dyn std::error::Error>> {
         let dir = fixture(&[(
             "lib.rs",

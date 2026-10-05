@@ -26,6 +26,7 @@ LIVE = (
     yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/postgres-job-swarm.yml").read_text()),
     yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text()),
+    yaml.safe_load((ROOT / ".github/workflows/enterprise-hardening.yml").read_text()),
 )
 CONSUMERS = (
     (0, "check", "Workspace tests"),
@@ -34,10 +35,20 @@ CONSUMERS = (
     (3, "conformance", "Run live C++ conformance areas"),
     (4, "native", "Exercise the public worker role and actual native process host"),
     (5, "sdk-parity", "Run SDK parity"),
+    (6, "portable-contracts", "Native security conformance"),
+    (6, "active-defense-security", "Durable consumer boundaries"),
 )
 
 
 class NativeProtocolCiTests(unittest.TestCase):
+    def test_enterprise_conformance_requires_qualified_native_authority(self):
+        CHECKER.validate_consumer(
+            LIVE[6],
+            "portable-contracts",
+            "Native security conformance",
+            {"name": CHECKER.FIXTURE_NAME, "uses": CHECKER.FIXTURE_ACTION},
+        )
+
     def test_sdk_parity_requires_enforced_native_consumers(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/sdk-parity.yml").read_text())
         CHECKER.validate_consumer(
@@ -136,6 +147,7 @@ class NativeProtocolCiTests(unittest.TestCase):
             (3, "conformance", "Run live C++ conformance areas"),
             (4, "native", "Build the real gateway and kernel"),
             (5, "sdk-parity", "Run SDK parity"),
+            (6, "portable-contracts", "Native security conformance"),
         ):
             with self.subTest(job=job_id):
                 changed = copy.deepcopy(LIVE)

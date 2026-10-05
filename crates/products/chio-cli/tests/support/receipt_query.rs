@@ -86,11 +86,19 @@ pub(crate) use reqwest::blocking::Client;
 pub(crate) use rusqlite::Connection;
 
 pub(crate) fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(prefix);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    // These fixtures retain paths across child processes. Keep the directory
+    // with its existing caller-owned lifetime, but establish custody at creation.
+    builder
+        .tempdir()
+        .expect("private receipt-query fixture")
+        .keep()
 }
 
 pub(crate) fn workspace_root() -> PathBuf {

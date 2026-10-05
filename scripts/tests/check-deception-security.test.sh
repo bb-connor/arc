@@ -68,6 +68,10 @@ def rust_tests_with_exact_includes(
 
 materialize = rust_tests("crates/security/chio-decoy/tests/materialize.rs")
 materialize.remove("non_unix_materializer_is_explicitly_unsupported")
+materialize.extend(
+    "materialize::unix::reader_boundary_tests::" + name
+    for name in rust_tests("crates/security/chio-decoy/src/materialize.rs")
+)
 adapters = rust_tests("crates/security/chio-security-kernel/tests/adapters.rs")
 active_defense = rust_tests_with_exact_includes(
     "crates/tooling/chio-conformance/tests/active_defense.rs",
@@ -146,7 +150,11 @@ expected = {
     ),
     "sealed private registry store": (
         False,
-        rust_tests("crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs"),
+        rust_tests_with_exact_includes(
+            "crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs",
+            set(),
+            {"sealed_decoy_registry/tenant_isolation.rs": "tenant_isolation"},
+        ),
         [
             "cargo",
             "test",
@@ -230,8 +238,8 @@ for label, (expected_filtered, expected_inventory, expected_command) in expected
         )
 
 total = sum(len(inventory) for _, inventory, _ in calls.values())
-if total != 83:
-    raise SystemExit(f"deception exact inventory total changed: expected=83 observed={total}")
+if total != 85:
+    raise SystemExit(f"deception exact inventory total changed: expected=85 observed={total}")
 PY
 }
 
@@ -355,4 +363,4 @@ for mutant in "${work}"/*.sh; do
   fi
 done
 
-echo "Deception security gate contract passed (12 exact inventories, 83 tests)"
+echo "Deception security gate contract passed (12 exact inventories, 85 tests)"

@@ -315,6 +315,9 @@ pub fn run_conformance_harness(
     options: &ConformanceRunOptions,
 ) -> Result<ConformanceRunSummary, RunnerError> {
     validate_conformance_credentials(options)?;
+    // Validate once before builds or replacing earlier results. Retain these
+    // arguments so provisioning uses the same authority that passed preflight.
+    let cage_arguments = native_launch::configured_cage_arguments()?;
     if options.results_dir.exists() {
         fs::remove_dir_all(&options.results_dir)?;
     }
@@ -352,6 +355,7 @@ pub fn run_conformance_harness(
         options,
         &runtime_state,
         &provision_log_path,
+        &cage_arguments,
     )?;
     let server_log_path = logs_dir.join("chio-mcp-serve-http.log");
     let server = spawn_remote_edge(
@@ -575,8 +579,8 @@ fn provision_native_mcp_security(
     options: &ConformanceRunOptions,
     runtime_state: &ConformanceRuntimeState,
     log_path: &Path,
+    cage_arguments: &[OsString],
 ) -> Result<ConformanceNativeSecurity, RunnerError> {
-    let cage_arguments = native_launch::configured_cage_arguments()?;
     let security_directory = runtime_state.root().join("native-mcp-security");
     let upstream_python = native_launch::configured_upstream_python(&options.python_binary)?;
     let target_executable = resolve_python_executable(&upstream_python)?;
@@ -1002,6 +1006,53 @@ mod tests {
             }
             None
         })
+    }
+
+    #[test]
+    fn missing_launch_authority_preserves_results_before_executable_discovery(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        const CHILD: &str = "CHIO_CONFORMANCE_PREFLIGHT_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            // Isolate environment removal from concurrently running tests and
+            // from the native authority supplied by the caller's CI fixture.
+            let output = Command::new(std::env::current_exe()?)
+                .args([
+                    "--exact",
+                    "runner::tests::missing_launch_authority_preserves_results_before_executable_discovery",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .env_remove("CHIO_CAGE_INIT")
+                .output()?;
+            assert!(
+                output.status.success(),
+                "preflight child failed: {}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
+            return Ok(());
+        }
+
+        let root = tempfile::tempdir()?;
+        let mut options = default_run_options();
+        options.repo_root = root.path().to_path_buf();
+        options.results_dir = root.path().join("results");
+        options.report_output = root.path().join("reports/report.md");
+        options.cargo_binary = root.path().join("cargo-must-not-run").into_os_string();
+        fs::create_dir(&options.results_dir)?;
+        let sentinel = options.results_dir.join("previous-evidence");
+        fs::write(&sentinel, b"retained evidence")?;
+
+        let result = run_conformance_harness(&options);
+        assert!(
+            matches!(result, Err(RunnerError::InvalidSecurityMaterial(ref message))
+                if message == "CHIO_CAGE_INIT must name an absolute path on the enforcing host"),
+            "missing launch authority must precede executable discovery",
+        );
+        assert_eq!(fs::read(&sentinel)?, b"retained evidence");
+        assert!(!options.results_dir.join("artifacts").exists());
+        assert!(!root.path().join("reports").exists());
+        Ok(())
     }
 
     fn unique_test_dir(label: &str) -> std::path::PathBuf {

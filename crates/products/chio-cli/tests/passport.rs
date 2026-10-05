@@ -4520,11 +4520,12 @@ fn passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request
         return;
     }
 
-    let passport_path = unique_path("passport-oid4vp-rotation", ".json");
-    let authority_db_path = unique_path("passport-oid4vp-rotation-authority", ".sqlite3");
-    let issuance_registry_path = unique_path("passport-oid4vp-rotation-registry", ".json");
-    let verifier_db_path = unique_path("passport-oid4vp-rotation-verifier", ".sqlite3");
-    let status_registry_path = unique_path("passport-oid4vp-rotation-statuses", ".json");
+    let temporary = chio_test_support::private_tempdir().expect("private authority fixture");
+    let passport_path = temporary.path().join("passport.json");
+    let authority_db_path = temporary.path().join("authority.sqlite3");
+    let issuance_registry_path = temporary.path().join("issuance.json");
+    let verifier_db_path = temporary.path().join("verifier.sqlite3");
+    let status_registry_path = temporary.path().join("statuses.json");
     let listen = reserve_listen_addr();
     let base_url = format!("http://{}", listen);
     let service_token = "passport-oid4vp-rotation-service-token";

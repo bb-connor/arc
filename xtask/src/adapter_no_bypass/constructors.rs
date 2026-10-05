@@ -174,6 +174,12 @@ struct ConstructorVisitor {
 }
 
 impl<'ast> Visit<'ast> for ConstructorVisitor {
+    fn visit_file(&mut self, node: &'ast syn::File) {
+        if !test_only(&node.attrs) {
+            visit::visit_file(self, node);
+        }
+    }
+
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         if test_only(&node.attrs) {
             return;
@@ -321,6 +327,16 @@ mod tests {
                 .get(&("outer::nested".to_string(), "build_kernel".to_string())),
             Some(&1)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn file_configuration_excludes_only_unconditional_test_sources() -> Result<(), syn::Error> {
+        let test_source = inspect("#![cfg(test)] fn fixture() { ChioKernel::new(); }")?;
+        assert!(test_source.references.is_empty());
+        let production_source =
+            inspect("#![cfg(any(test, unix))] fn host() { ChioKernel::new(); }")?;
+        assert_eq!(production_source.references.len(), 1);
         Ok(())
     }
 

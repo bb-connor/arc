@@ -86,17 +86,18 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "8fd4dd02dacb31283453475e883409b716268ac5e918e25062b749cfe6e29742"
+    "8926c71c4387410f7513dd7093cec021ddc4c04fc0be855e96a203836b679ead"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "af0328953406b10e46e1b70454eff921e3a1c91c259a65d96c3405c4aed37f9d"
+    "93e552d424ec2c27d74ca3cbba0d269b5bb708d5035d6273d8409c4387b43a49"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
 )
 EXPECTED_SECURITY_RUNNER_SHA256 = (
-    "3126309f83ff5920c66e55bfc9f988879b1b677b468b6ba1cc59368d535d285b"
+    "793375d3fa1d3b3750591beb2c1030f2f6e050d51c1e3fbb397a7e7662736211"
 )
+EXPECTED_SECURITY_AGGREGATOR_SHA256 = "c7e8be6259cd3d6b3a5dc11feb1adc34e696192e65f48d0a0f23af5aa72ed72a"
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
     "c6552d29a356e634f2856669ce29d753da5aad986ed76ffae18b2022a31187fd"
 )
@@ -542,12 +543,26 @@ EXPECTED_CAPTURE_STEP_INVENTORIES = {
             "security-image",
             None,
         ),
-        ("Refresh all evidence inside trusted execution boundary", None, None),
+        ("Refresh shard inside trusted execution boundary", None, None),
         (
-            "Upload unsigned evidence patch",
+            "Upload unsigned evidence shard",
             None,
             "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         ),
+    ),
+    "aggregate-refreshed-evidence": (
+        ("Checkout exact candidate source without credentials", None,
+         "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5"),
+        ("Checkout exact authorized security tooling without credentials", None,
+         "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5"),
+        ("Validate exact aggregation inputs", None, None),
+        ("Build digest-addressed trusted security execution image", "security-image", None),
+        *((f"Download exact evidence shard {index}", None,
+           "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093")
+          for index in range(7)),
+        ("Compose exact shards and require isolated complete validation", None, None),
+        ("Upload unsigned evidence patch", None,
+         "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"),
         ("Require refreshed evidence to be committed", None, None),
     ),
     "capture-linux-enforcement": (
@@ -882,6 +897,7 @@ EXPECTED_ENTERPRISE_BOUNDARY_STEP_INVENTORIES = {
     ),
 }
 EXPECTED_TRUST_JOB_DIGESTS = {
+    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "6ba4118241e1a04192cedc12e47be095b57553b0fe5edf40b950eec9cae1f209",
     (
         "enterprise-hardening",
         "bind-source",
@@ -897,7 +913,7 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise Linux capture",
         "refresh-linux-evidence",
-    ): "18e9cdd8888375b9f8fe972983b6a1a563ab32f7f5c2b75b516cfffd1553443e",
+    ): "39dd1339a0df4c859e838974e39a7d76ddc494dcc7c651bd501f35b61d1647ab",
     (
         "enterprise Linux capture",
         "capture-linux-enforcement",
@@ -947,7 +963,8 @@ EXPECTED_AGGREGATE_RUN = "\n".join(
 )
 EXPECTED_NATIVE_SECURITY_RUN = r"""
 set -euo pipefail
-cargo test --locked -p chio-conformance --all-targets
+cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
+cargo test --locked -p chio-conformance --all-targets --no-fail-fast
 
 generated_vector_list_output="$(mktemp)"
 generated_vector_run_output="$(mktemp)"
@@ -4681,7 +4698,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "validate_container_create_arguments(create_arguments)"
     )
     inspect_contract_call = main_body.find("validate_created_container(")
-    start_call = main_body.find('docker_output(docker, ["start", identifier]')
+    start_call = main_body.find("start_attached_container(")
     if (
         create_contract_call < 0
         or inspect_contract_call < create_contract_call
@@ -4699,6 +4716,11 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         )
     if hashlib.sha256(runner.encode("utf-8")).hexdigest() != EXPECTED_SECURITY_RUNNER_SHA256:
         raise ContractError("trusted security container runner source commitment changed")
+    aggregator_path = root / "scripts/aggregate-security-evidence-shards.py"
+    if (aggregator_path.is_symlink() or not aggregator_path.is_file()
+        or hashlib.sha256(aggregator_path.read_bytes()).hexdigest()
+        != EXPECTED_SECURITY_AGGREGATOR_SHA256):
+        raise ContractError("trusted evidence aggregation source commitment changed")
 
     entrypoint = (
         root / "scripts/security-execution-container-entrypoint.py"
@@ -4773,6 +4795,7 @@ def validate_isolated_execution_job(
     trusted_checkout: dict[str, str],
     execution_step_name: str,
     operation: str,
+    aggregation: bool = False,
 ) -> None:
     validate_step_inventory(job_body, inventory, contract)
     trusted_inventory = (
@@ -4851,6 +4874,15 @@ def validate_isolated_execution_job(
         '--state-dir "${RUNNER_TEMP}/security-execution-state"',
         "--timeout-seconds",
     )
+    if aggregation:
+        execution_markers = (
+            "/usr/bin/python3 -I",
+            "authorized-security/scripts/aggregate-security-evidence-shards.py",
+            "--candidate candidate", '--expected-sha "${EVIDENCE_SOURCE_SHA}"',
+            '--image "${SECURITY_EXECUTION_IMAGE}"',
+            '--shards "${RUNNER_TEMP}/evidence-shards"',
+            '--output-dir "${RUNNER_TEMP}/linux-evidence-artifact"',
+        )
     if not isinstance(execution_run, str) or any(
         marker not in execution_run for marker in execution_markers
     ):
@@ -5336,7 +5368,7 @@ def validate(root: Path) -> None:
     if portable_prerequisites != {
         "name": "Install native prerequisites",
         "uses": "./.github/actions/apt-install",
-        "with": {"packages": "protobuf-compiler ripgrep"},
+        "with": {"packages": "protobuf-compiler ripgrep musl-tools"},
     }:
         raise ContractError(
             "enterprise portable contracts do not install exact native prerequisites"
@@ -5782,6 +5814,7 @@ def validate(root: Path) -> None:
     if set(capture_jobs) != {
         "authorize-capture",
         "refresh-linux-evidence",
+        "aggregate-refreshed-evidence",
         "capture-linux-enforcement",
         "dispatch-trusted-finalizer",
     }:
@@ -5968,6 +6001,7 @@ def validate(root: Path) -> None:
         )
     expected_capture_conditions = {
         "refresh-linux-evidence": "needs.authorize-capture.outputs.mode == 'refresh'",
+        "aggregate-refreshed-evidence": "needs.authorize-capture.outputs.mode == 'refresh'",
         "capture-linux-enforcement": "needs.authorize-capture.outputs.mode == 'enforcement'",
     }
     for identifier, condition in expected_capture_conditions.items():
@@ -5976,16 +6010,22 @@ def validate(root: Path) -> None:
             raise ContractError(
                 f"isolated capture job is not GitHub-hosted: {identifier}"
             )
-        expected_timeout = "360" if identifier == "refresh-linux-evidence" else "180"
+        aggregate_job = identifier == "aggregate-refreshed-evidence"
+        refresh_job = identifier != "capture-linux-enforcement"
+        expected_timeout = (
+            "30" if aggregate_job else "360" if refresh_job else "180"
+        )
         if capture_job.get("timeout-minutes") != expected_timeout:
             raise ContractError(f"isolated capture timeout changed: {identifier}")
         if capture_job.get("if") != condition:
             raise ContractError(f"isolated capture mode is not exact: {identifier}")
-        if capture_job.get("needs") != ["authorize-capture"]:
+        expected_needs = ["authorize-capture", "refresh-linux-evidence"] if aggregate_job else ["authorize-capture"]
+        if capture_job.get("needs") != expected_needs:
             raise ContractError(
                 f"isolated capture bypasses authorization: {identifier}"
             )
-        if capture_job.get("permissions") != {"contents": "read"}:
+        expected_permissions = {"actions": "read", "contents": "read"} if aggregate_job else {"contents": "read"}
+        if capture_job.get("permissions") != expected_permissions:
             raise ContractError(
                 f"isolated capture job permissions changed: {identifier}"
             )
@@ -5996,22 +6036,23 @@ def validate(root: Path) -> None:
         )
         candidate_step_name = (
             "Checkout exact candidate source without credentials"
-            if identifier == "refresh-linux-evidence"
+            if refresh_job
             else "Checkout exact candidate merge without credentials"
         )
         candidate_checkout = (
             EXPECTED_SOURCE_CHECKOUT
-            if identifier == "refresh-linux-evidence"
+            if refresh_job
             else EXPECTED_MERGE_CHECKOUT
         )
         execution_step_name = (
-            "Refresh all evidence inside trusted execution boundary"
-            if identifier == "refresh-linux-evidence"
+            "Compose exact shards and require isolated complete validation" if aggregate_job
+            else "Refresh shard inside trusted execution boundary"
+            if refresh_job
             else "Run candidate enforcement inside trusted execution boundary"
         )
         operation = (
-            "refresh-all-evidence"
-            if identifier == "refresh-linux-evidence"
+            '"refresh-evidence-shard-${EVIDENCE_SHARD}"'
+            if refresh_job
             else "linux-enforcement"
         )
         validate_isolated_execution_job(
@@ -6023,7 +6064,26 @@ def validate(root: Path) -> None:
             trusted_checkout=EXPECTED_CAPTURE_TRUSTED_CHECKOUT,
             execution_step_name=execution_step_name,
             operation=operation,
+            aggregation=aggregate_job,
         )
+    shard_job = job(linux_capture, "refresh-linux-evidence")
+    if shard_job.get("strategy") != {
+        "fail-fast": "false", "max-parallel": "7",
+        "matrix": {"shard": [str(index) for index in range(7)]},
+    }:
+        raise ContractError("isolated refresh must execute exactly the seven fixed shards")
+    aggregate_job = job(linux_capture, "aggregate-refreshed-evidence")
+    for index in range(7):
+        step_name = f"Download exact evidence shard {index}"
+        if named_step(aggregate_job, step_name) != {
+            "name": step_name,
+            "uses": "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+            "with": {
+                "name": f"linux-adversarial-shard-{index}-" + "${{ needs.authorize-capture.outputs.source_sha }}-${{ github.run_id }}-${{ github.run_attempt }}",
+                "path": "${{ runner.temp }}/evidence-shards/" + f"shard-{index}",
+            },
+        }:
+            raise ContractError("aggregation must download each exact current-run shard once")
     capture_enforcement = job(linux_capture, "capture-linux-enforcement")
     require_run_markers(
         capture_enforcement,
@@ -6224,7 +6284,7 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("trusted finalizer dispatch intent upload changed")
     refresh_upload = named_step(
-        job(linux_capture, "refresh-linux-evidence"), "Upload unsigned evidence patch"
+        job(linux_capture, "aggregate-refreshed-evidence"), "Upload unsigned evidence patch"
     )
     if refresh_upload != {
         "name": "Upload unsigned evidence patch",

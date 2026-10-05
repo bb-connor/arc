@@ -136,6 +136,7 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/check-supply-chain.sh"),
     Path("scripts/check-temporal-security.sh"),
     Path("scripts/run-security-execution-container.py"),
+    Path("scripts/aggregate-security-evidence-shards.py"),
     Path("scripts/security-execution-command-client.py"),
     Path("scripts/security-execution-container-entrypoint.py"),
     Path("scripts/tests/run-security-execution-container.test.py"),
@@ -1232,6 +1233,23 @@ assert_boundary_file_rejected(
     Path("deploy/docker/security-evidence-seccomp.json"),
     replace_once('"valueTwo": 268435456', '"valueTwo": 0'),
     "seccomp syscall contract changed",
+)
+assert_boundary_file_rejected(
+    "security runner retains unbounded container diagnostics",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once("del tail[:-8192]", "pass"),
+    "trusted security container runner source commitment changed",
+)
+assert_boundary_file_rejected(
+    "security runner emits raw container diagnostic controls",
+    Path("scripts/run-security-execution-container.py"),
+    replace_once(
+        'f"candidate container attachment failed with status {status}; "\n'
+        '                f"untrusted output tail: {bytes(tail)!r}"',
+        'f"candidate container attachment failed with status {status}; "\n'
+        '                f"untrusted output tail: {bytes(tail).decode()}"',
+    ),
+    "trusted security container runner source commitment changed",
 )
 assert_boundary_file_rejected(
     "security runner exposes signed outputs to candidate builds",
@@ -2564,8 +2582,8 @@ assert_rejected(
     "capture refresh downgrades to the partial campaign set",
     "enterprise-linux-capture.yml",
     replace_in_named_step(
-        "Refresh all evidence inside trusted execution boundary",
-        "--operation refresh-all-evidence",
+        "Refresh shard inside trusted execution boundary",
+        '--operation "refresh-evidence-shard-${EVIDENCE_SHARD}"',
         "--operation refresh-linux-evidence",
     ),
     "bypasses the trusted execution runner",
@@ -2579,6 +2597,39 @@ assert_rejected(
         "--platform linux/arm64",
     ),
     "does not build a digest-addressed trusted image",
+)
+assert_rejected(
+    "refresh drops a required shard",
+    "enterprise-linux-capture.yml",
+    replace_once('shard: ["0", "1", "2", "3", "4", "5", "6"]',
+                 'shard: ["0", "1", "2", "3", "4", "5"]'),
+    "exactly the seven fixed shards",
+)
+assert_rejected(
+    "aggregation runs before every shard succeeds",
+    "enterprise-linux-capture.yml",
+    replace_once("needs: [authorize-capture, refresh-linux-evidence]",
+                 "needs: [authorize-capture]"),
+    "bypasses authorization",
+)
+assert_rejected(
+    "aggregation substitutes an older artifact attempt",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Download exact evidence shard 0",
+        "${{ github.run_attempt }}", "1",
+    ),
+    "exact current-run shard once",
+)
+assert_rejected(
+    "aggregation executes candidate tooling",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Compose exact shards and require isolated complete validation",
+        "authorized-security/scripts/aggregate-security-evidence-shards.py",
+        "candidate/scripts/aggregate-security-evidence-shards.py",
+    ),
+    "bypasses the trusted execution runner",
 )
 assert_rejected(
     "capture marks unsigned data signed",
@@ -5129,7 +5180,7 @@ assert_rejected(
     "enterprise-hardening.yml",
     replace_in_named_step(
         "Install native prerequisites",
-        "protobuf-compiler ripgrep",
+        "protobuf-compiler ripgrep musl-tools",
         "protobuf-compiler",
     ),
     "enterprise portable contracts do not install exact native prerequisites",
