@@ -9,23 +9,15 @@ toolchain from `src/chio_kernel_mobile.udl`.
 ## Prerequisites
 
 - Rust toolchain matching the workspace `rust-version` (1.93+).
-- `uniffi-bindgen` binary. Not a default Cargo install because
-  UniFFI publishes its binary under the namespaced crate
-  `uniffi_bindgen`. On this repo install with:
+- Use the workspace-locked bindgen example:
 
   ```bash
-  cargo install --git https://github.com/mozilla/uniffi-rs \
-      --tag v0.28.3 --bin uniffi-bindgen uniffi_bindgen
+  cargo run --locked -p chio-kernel-mobile --example bindgen -- --help
   ```
 
-  (Pinning to `v0.28.3` matches the `uniffi = "0.28"` dependency in
-  `Cargo.toml`. If the workspace bumps the UniFFI version, bump the
-  tag here in lockstep.)
-
-  If your operator host has no Git access, build the binary from the
-  workspace itself by adding a `[[bin]] name = "uniffi-bindgen"`
-  target to `chio-kernel-mobile/Cargo.toml` (see
-  `uniffi/docs/tutorial/foreign_language_bindings.md` upstream).
+  This uses the same UniFFI version in `Cargo.lock` as the mobile Rust
+  scaffolding. Use this command prefix in place of an independently installed
+  `uniffi-bindgen` for the generation commands below.
 
 - iOS target: `rustup target add aarch64-apple-ios aarch64-apple-ios-sim
   x86_64-apple-ios`.

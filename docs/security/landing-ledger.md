@@ -25,11 +25,33 @@ workbench duplicates are closed as superseded. The verified open count is 22.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1583 ledger requirements, including 201 newly carried review records.
+1585 ledger requirements, including 201 carried review records and two new
+foundation findings from the October 5 independent review.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+GitHub Codex completed independent review of `19df31ad93` with two P1 findings:
+stale generated proof coverage and a bundled Swift framework behind the wrapper
+ABI. That review is not approval. Source `d0e88d93f1c6a80047388208fc2f989b6f44b923`
+regenerates proof coverage, repairs the fuzz and Docker dependency graphs, and
+rejects weak FROST transport keys with strict signatures in both rounds. Three
+forgery regressions failed before the repair; the authority suite now passes 23
+tests with only the explicit vector-regeneration utility ignored. All-target
+Clippy, locked fork reconstruction/deployment resolution and Cargo Vet pass.
+The [follow-up evidence](audits/foundation-review-followup-20261005.json.gz)
+retains failures and subsequent local results separately.
+
+The repeated archive finding is already repaired by `58cc1b55bc`: the current
+reader authenticates schema-6 archives without rewriting them at startup. All
+16 writer/checkpoint boundary tests pass, including resumed rotation after
+restart. No duplicate production migration was added. Swift's former test
+accepted `bindingUnavailable` as success; stronger tests now require real Rust
+calls. Native run `37251015566` failed all three Rust consumer tests with the
+unavailable binding; both App Attest wrapper tests passed. Rebuilt bundled
+artifacts and final review remain open. The ledger also maps issue-summary findings to their original requirements,
+so findings outside inline threads retain an explicit owner and acceptance.
 
 Source `1ae6920d14f7e3e5c59122a189f26bfdb81bffbd` repairs the consumer findings
 and the reproduced qualification regressions. The

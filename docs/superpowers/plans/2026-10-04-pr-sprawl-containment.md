@@ -133,6 +133,34 @@ foundation merge with post-merge source verification.
   framework and supported native Swift/Kotlin build matrix still need rebuilding
   and qualification; TypeScript and host Rust FFI results cannot replace them.
 
+## Independent review follow-up (October 5)
+
+Use the user-authorized GitHub Codex review integration. Its completed review of
+`19df31ad93a91bcb4d984094df375100935bbdf3` reports two P1 findings in
+[comment 5986409195](https://github.com/bb-connor/arc/pull/1160#issuecomment-5986409195).
+Neither a completed review with findings nor a self-authored repair reply is approval.
+
+- [x] Reproduce all three weak FROST transport boundaries, reject provisioned
+  weak keys, and use strict verification in both rounds. Commit `d0e88d93f1`
+  passes 23 authority tests; the one ignored test regenerates fixtures and is
+  deliberately not executed. All-target Clippy passes with warnings denied.
+- [x] Recheck the archive finding against the actual source. Commit `58cc1b55bc`
+  already supplies authenticated, read-only schema-6 compatibility. All 16
+  checkpoint/writer boundary tests pass, including a new repeated-rotation test.
+  Do not duplicate that migration or rewrite operator-owned archives at startup.
+- [x] Regenerate proof coverage and both stale deployment dependency graphs.
+  Locked fork reconstruction and deployment resolution, Cargo Vet and the
+  generated coverage check pass locally without added exemptions.
+- [x] Require successful native Swift-to-Rust calls in the SDK tests. The former
+  test incorrectly accepted `bindingUnavailable` as success. Native run
+  `37251015566` fails all three Rust consumer tests with that error, while both
+  App Attest wrapper tests pass. Preserve this red result separately.
+- [ ] Use the workspace-locked UniFFI generator, build the Apple static
+  libraries, expose their C module correctly, and compile generated Swift as
+  a real package target. Rebuild the bundled framework and test that exact SDK.
+- [ ] Preserve native build provenance, renew final independent review and
+  complete hosted, Linux/native/trusted and protected-merge acceptance.
+
 ## Execution rulings
 
 - The user's later preservation instruction supersedes the earlier proposal to
