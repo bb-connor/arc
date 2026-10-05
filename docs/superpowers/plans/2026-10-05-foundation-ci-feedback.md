@@ -63,8 +63,9 @@
 
 **Interfaces:** Consume passing component evidence, reviewed source S and trusted definition D; produce exact terminal hosted checks and the required signed evidence chain.
 
-- [ ] Record repairs and evidence in the landing ledger; commit the complete source batch.
-- [ ] Obtain independent GitHub Codex review. Land any trusted-definition prerequisite and consume its exact commit.
+- [x] Record repairs and evidence in the landing ledger; commit the complete source batch.
+- [x] Obtain independent GitHub Codex review of the repair checkpoint. Land the trusted-definition prerequisite and consume its exact commit.
+- [ ] Obtain exact-source review of the final composed candidate before authorization.
 - [ ] Authorize the reviewed source before a fresh workflow event. Do not rerun an expired controller event.
 - [ ] Regenerate complete genuine evidence, validate its exact import inventory, and publish only allowed derived outputs.
 - [ ] Verify every required check on the final exact candidate and perform the protected foundation landing only when all acceptance gates pass.
@@ -180,3 +181,79 @@ cancelled, rather than mixing two workflow versions into a claimed result. One
 final run covers the complete frozen repair. Prior failures and that cancellation
 are retained. Exact-source review, prerequisite landing, all 35 genuine mutation
 campaigns and final hosted/native/trusted qualification remain open.
+
+
+## Protected definition landing checkpoint
+
+Prerequisite #1175 passes its complete required CI and exact-head independent
+review at `b1c99c494a67e767609a011528aadc5ea098b423`. Its protected main merge is `c009aced79d69f01880b5f7c53ed3c1754e3b7da`.
+The final composition preserves this actual merge and pins the reusable workflow
+to that same commit. The landing ledger retains the definition-only controller
+refusal and the two canceled archive-tag SDK runs separately from required PR CI.
+
+All 35 selected mutations are caught by cached diagnostic builds at repair
+checkpoint `3a43737681aca26e45b5c2be471924a7c5eeeb73`. Zero are missed, timed out or unviable. The two native
+controls run on x86_64; the other 33 run on Linux aarch64. An initial native probe
+with group-writable permissions is rejected before mutation execution; correcting
+only the fixture mode and umask restores the positive baseline and catches the
+negative mutation. Original failure and successful rerun remain separate records.
+
+Published verifier bytes match the configured SHA-256. Signing and publishing
+environments permit only main and disable administrator bypass. Environment-scoped
+installation configuration is omitted from the public audit record. Private App
+metadata is unavailable through the ordinary operator API; the protected runtime
+must still validate its identity and permissions. Final evidence policy and commit
+variables remain absent pending genuine finalizer output.
+
+These preparations do not complete isolated source-bound refresh, final native or
+hosted qualification, signing, or foundation landing. Freeze all source and status
+documents before authorizing the reviewed final composition and starting refresh.
+
+
+### Final evidence event ordering
+
+The source authority and the committed evidence authority are distinct. Keep the
+independently reviewed source S fixed after importing and reviewing the complete
+64-path mutation refresh. Signed-output descendant E may change only the three
+closed regular evidence blobs. Its exact final review is still required before
+protected landing.
+
+1. Capture and sign genuine native evidence for S through the trusted controller,
+   capture and finalizer. Retain the exact artifact identity, bytes and generated
+   policy. The first publication authorizer cannot publish while no committed
+   evidence descendant exists; retain that refusal separately from signing.
+2. Authenticate the signed artifact and policy against their trusted run and the
+   pinned verifier/key. Create a local single-parent evidence commit E containing
+   only those three files. Run the strict committed-evidence checker on local E
+   against S and the authentic generated policy, and verify the closed modes and
+   ancestry before configuration. Do not create or alter canary values manually.
+3. Configure the authentic policy and CHIO_COMMITTED_LINUX_EVIDENCE_SHA=E before
+   the first push of E to the foundation PR. CHIO_AUTHORIZED_SECURITY_SOURCE_SHA
+   remains S. This authorizes already authenticated output under reviewed source;
+   it does not waive final independent review or any check. Publish E, request its
+   exact GitHub Codex review, and let its first complete CI run execute with the
+   correct immutable event inputs.
+4. Keep E, its base, source and definition variables, policy and capture labels
+   stable. The fresh E capture must validate native behavior and its finalizer
+   must join the strict committed S evidence with successful exact E/M CI and the
+   attested merge binding before publishing the five authority contexts.
+5. The E capture also emits a newly signed canary for E. Retain that artifact as
+   run evidence, without replacing the committed canary/policy for S. Publication
+   independently verifies the already committed S evidence and fresh E capture;
+   importing the second artifact would create another head and invalidate the
+   candidate being qualified.
+6. If a controller expires before a valid capture begins, preserve its failed
+   attempt and use a fresh `labeled` event to request a new capture once capacity
+   is available. Do not use `unlabeled` for that retry: CI also listens for that
+   event and its concurrency policy can cancel the existing E run. Keep labels
+   stable once the replacement capture is authenticated.
+7. Do not cancel or casually rerun the final authorized E CI. A non-successful CI
+   conclusion can create sticky failure authority for its exact merge M. If a
+   real failure occurs, inspect the trusted revocation result before selecting a
+   repaired, reviewed candidate. Never overwrite or bypass failed authority.
+
+This order follows the existing workflow behavior: the publication authorizer
+requires committed evidence SHA equal to live head E, verifies its policy source
+against S, joins the E capture and exact CI independently, and requires signing
+success before publication. The second signature artifact is not imported by the
+publisher. No workflow change or relaxation of the source ancestry rule is needed.

@@ -20,14 +20,14 @@ review obligations.
 
 The published transfer is complete: all 57 process/security duplicates and six
 workbench duplicates are closed as superseded. That reduced 85 open PRs to 22.
-The current count is 24 after the independently opened proposed-spec PR #1174
-and trusted workflow prerequisite #1175;
+The current count is 23 after the independently opened proposed-spec PR #1174
+and the protected landing of trusted workflow prerequisite #1175;
 #1174 has an explicit separate R&D disposition and no foundation landing slot.
 #1155 now targets the foundation and retains its complete unique 24-file patch.
 #1164 targets main and retains the complete seven-PR, 141-file workbench scope.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
-actual closures, surviving candidates and source-ref verification. The active landing queue is #1175 followed by #1160. There are now
+actual closures, surviving candidates and source-ref verification. The active landing queue now contains only #1160. There are now
 1609 ledger requirements, including 201 carried review records, the October 5
 independent findings and subsequent qualification repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
@@ -35,25 +35,45 @@ update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
 
-The current CI repair source is `dff1b63b1093f76941659e0f0b86f08e14092985` (preceded by `6a3a397c47`).
-The [feedback plan](../superpowers/plans/2026-10-05-foundation-ci-feedback.md)
-and [retained diagnostic evidence](audits/foundation-ci-feedback-20261005.json.gz)
-record each original failure, source repair and passing component check. Exact
-inventories, native conformance prerequisites, CLI trust fixtures and bounded
-container diagnostics are repaired. All six cached native consumer stages pass;
-all eight active cluster scenarios and reputation issuance pass; all five
-security-vector tests and their exact inventory pass. Three previously ignored
-cluster scenarios and private-host Bubblewrap refusals remain distinct.
+The reviewed repair checkpoint is `3a43737681aca26e45b5c2be471924a7c5eeeb73`, containing source repairs
+`6a3a397c47` and `dff1b63b10`. Its exact-source GitHub Codex review reports no
+major issues, with no unresolved threads. The
+[feedback plan](../superpowers/plans/2026-10-05-foundation-ci-feedback.md),
+[repair evidence](audits/foundation-ci-feedback-20261005.json.gz), and
+[definition landing record](audits/foundation-definition-update-20261005.json.gz)
+retain the original failures, corrections and passing diagnostics.
 
-[Prerequisite #1175](https://github.com/bb-connor/arc/pull/1175) supplies the two
-trusted workflow definitions. It retains all existing resource and isolation
-limits while scheduling 35 complete mutation campaigns across seven fixed shards.
-The aggregator requires all 64 evidence paths and complete isolated validation.
-The independent S/E finding is repaired with the same closed 32-commit signed
-output ancestry rule. No source is newly authorized, and no partial refresh is
-accepted. Full local CI-contract mutations pass. Prerequisite review/landing,
-new source review, complete native/trusted evidence, final hosted checks and
-protected foundation landing remain open. #1160 is still unmerged.
+[Prerequisite #1175](https://github.com/bb-connor/arc/pull/1175) is protected-merged
+at `c009aced79d69f01880b5f7c53ed3c1754e3b7da`. Its exact reviewed head `b1c99c494a67e767609a011528aadc5ea098b423` passes all four
+required checks, including the complete workspace and feature test pipeline.
+The nonrequired controller refusal on its definition-only source and two canceled
+archive-only SDK runs remain recorded as unsuccessful runs. They do not replace
+mandatory foundation capture or qualification. The reviewed head is preserved by
+`archive/enterprise-ci-prerequisite-20261005`.
+
+All 35 genuine engine mutations are caught in cached diagnostic builds on
+reviewed source `3a43737681`: 33 Linux aarch64 controls and two native Linux
+x86_64 controls. No mutant is missed, timed out or unviable. The initial native
+descriptor baseline rejected a group-writable diagnostic probe; correcting that
+fixture's mode and umask makes the baseline pass and its mutation fail. No cage
+validation changed. That failed attempt is retained separately. The native worker
+was stopped after evidence collection and the clean temporary checkout was retired.
+These diagnostics do not constitute fresh isolated evidence acceptance.
+
+The earlier repair also passes all six cached native consumer stages, eight active
+cluster scenarios, reputation issuance, five security-vector tests and their exact
+inventory, and the complete local CI contract mutation suite. Three previously
+ignored cluster scenarios and private-host Bubblewrap refusals remain distinct.
+
+This composition consumes the actual merged definition through its immutable CI
+pin, preserving both histories and all five trusted workflow blobs. The seven
+fixed refresh shards retain all 35 campaigns, 28 cases, 64 evidence paths and
+existing isolation/resource/time limits. Complete aggregation is mandatory.
+
+No new source authorization or accepted mutation refresh is claimed here. The
+final composition still requires its own exact-source review, fresh authorization,
+all isolated mutation campaigns, native/trusted capture and signing, final hosted
+checks and protected foundation landing. #1160 remains unmerged.
 
 Historical checkpoints below preserve their original scope and observations.
 
