@@ -59,7 +59,7 @@ Five properties, each measurable:
 | **Small** | Trusted orchestration under about 30K lines behind a closed, layered ABI (spec 1). Everything else is a component behind a polarity-classified seam | A shell of roughly 125K-147K non-test lines; a 407-package kernel closure (an archived measurement on main `f5a9d2ab2` for one target, not an integrated M:/V:/W: count) |
 | **Proven** | The code that decides effects is generated from, or refinement-checked against, one machine-checked model | Proofs cover the pure core only |
 | **Fast** | Three durable commits per side-effecting call and two for eligible reads (spec 10); group commit; a shared-writer throughput target measured against a phase-0 baseline | Historical: about 26.5 attributed fsyncs per call (about 40 with setup); `read` median 130 ms; no shared-writer throughput baseline yet |
-| **Agent-safe** | Unbounded or unknown external influence cannot authorize a consequential tool call except through an exact endorsement, enforced by the kernel for any framework. Bounded quarantine returns are an explicit allowance (spec 11 section 11) | Labels exist (P4); admission ignores them |
+| **Agent-safe** | Unbounded or unknown external influence cannot authorize a consequential tool call except through an exact endorsement, enforced by the kernel for any framework. Bounded quarantine returns are an explicit allowance (spec 11 section 11). Bootstrap input counts as influence too: it is joined before a context is ready, and trusting it takes an operator-signed assertion, not a pinned hash (spec 11 I7a). An action contract survives attenuation independently of the integrity level | Labels exist (P4); admission ignores them |
 | **Verifiable by others** | Receipts in publicly witnessed logs; confinement and execution evidence in standard formats; optionally, proof-carrying verdicts | Signed receipts, local checkpoints |
 
 ## 3. The bets
@@ -109,16 +109,22 @@ fn transition(state: &AdmissionState, event: AdmissionEvent) -> (AdmissionState,
 4. commit reservations (spec 3);
 5. write the crossing record.
 
-**The hot path.** Specced in `2026-10-04-crossing-primitive-design.md`. A side-effecting call becomes three commits: an intent commit, an anchor-free return record that keeps returned bytes durable before post-return work, and an outcome commit. A read-only call becomes a check-only dispatch (no write) plus one release commit that carries the receipt. Fusing the return record into the outcome commit for a true two-commit path is that spec's open decision 1. The fast path is:
-- the **intent commit**: begin, the admission transitions and the budget hold, up to `DispatchCommitted`;
-- the **outcome commit**: the tool return, the post-return stages and the terminal projection.
+**The hot path.** Specced in `2026-10-04-crossing-primitive-design.md`. There are three path classes:
+- **Side-effecting calls** take three commits:
+  - the **intent commit**: begin, the admission transitions and the budget hold, up to `DispatchCommitted`;
+  - the **return record**: keeps the returned bytes durable before post-return work. It is progress-only, so it needs no synchronous anchor, though a lag anchor can fire when the outcome is delayed past the lag bound;
+  - the **outcome commit**: the post-return stages and the terminal projection.
+- **Durable reads**, under `All` or integrity tracking, take two commits: intent and outcome, with no return record.
+- **Eligible check-only reads**, outside durable coverage, redispatch-safe and untracked, take a check-only dispatch (no write) plus a release write that carries the receipt.
+
+Fusing the return record into the outcome commit for a true two-commit side-effecting path is that spec's open decision 1.
 
 Commits stay separate only for participants in other stores (remote budget, payment rails).
 
 **Around it:**
 - a group-commit WAL writer that batches many operations' crossings into one fsync, sharded per tenant or authority domain;
 - a Merkle-batch-signed, slim receipt log, as Certificate Transparency does, with inclusion proofs returned asynchronously;
-- eligible read-only calls outside durable coverage get a check-only dispatch plus a release write that carries the receipt. D1's closure stays with spec 3 phase 1.
+- D1's closure for non-durable calls stays with spec 3 phase 1.
 
 **Why.**
 - Signatures are not the bottleneck: 0.23 ms against a 13.9 ms kernel-only allow (`B:.../bilateral-admission-components.csv`). Commits and the single writer are.
@@ -376,3 +382,9 @@ Bets 6 (C2SP witnessing) and 11 (60-second first receipt) are small enough to go
 |---|---|---|---|
 | R-0-01 | The north-star diagnosis mislabels the benchmark topology and mixes historical baselines | Fixed. Each figure now names its harness and historical status. 59 calls/s is labelled a per-worker private-kernel harness with an in-memory admission store, not a shared-writer baseline. Latency figures are labelled selected historical examples, with the 130 ms `read` median. The fsync figures are re-derived (about 26.5 attributed per call). The 3-5x latency claim is replaced by the derived ratios (95 ms target about 1.37x; model about 1.5x). The "Fast" target is now three commits per side-effecting call and two for eligible reads. Also corrected: the ledger count (986 of 1,583), the formal inventory (some harnesses are non-core), the shell size (a range with its recipe), the archived 407-package closure, and the hosted-CI statement's date | section 1; section 2 table; bet 2 |
 | R-11-02 (north-star part) | A bounded return does not establish the claimed zero-injection guarantee | Fixed. The "Agent-safe" target and bet 3 state spec 11's property: unbounded or unknown influence needs an exact endorsement, and bounded returns are an explicit allowance. The CaMeL and FIDES analogies no longer import their guarantees | section 2 table; bet 3 |
+
+### Independent review pass 2 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-0-02 | The research hot-path summary still describes the superseded read and return paths | Fixed. The hot-path summary now lists the three path classes: three-commit side-effecting calls with a separate return record whose anchor is lag-triggered only; two-commit durable reads; eligible check-only reads. | "The hot path" |

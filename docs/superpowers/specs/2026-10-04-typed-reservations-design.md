@@ -586,7 +586,11 @@ work_profile_installed -> forall call: durable_admission(call) or denied(call)
 
 The receipts.db `exactly_one_of` predicate is scoped to non-durable calls. For durable calls, receipts.db carries no terminal record of its own, and the saga's terminal projection is the record.
 
-Stop deny receipts are excluded from every predicate above. They carry `chio_runtime.stop.retryable_after_resume = true` (spec 8 S15) and record a refused attempt, not a terminal admission record. A request refused by a stop may therefore commit its one terminal receipt after resume.
+Receipts are classified by spec 9 M20's signed `chio_runtime.identity_disposition`:
+- **`Reusable` receipts end one attempt, not the request id.** Examples are tier-1 and fused-from-`Unbegun` stop denials (`retryable_after_resume = true`, spec 8 S15), `Overloaded`, check-only refusals and a check-only read's `Withheld { retry: AfterResume }`.
+  - Within its attempt, a `Reusable` receipt still discharges that attempt's obligation: the `exactly_one_of` predicate applies per attempt.
+  - The per-request predicate ("no second terminal receipt") counts only `Terminal` receipts, so a later attempt with the same request id may commit its one terminal receipt.
+- **`Terminal` receipts bind the request id.** Examples are a compensated `Prepared`-intent or slow-path stop denial, a deny tombstone, every terminal outcome, and a `NonDurable` withheld effect. They are counted by every predicate above, so a stop denial on the slow path is not excluded.
 
 ### 4.12 Division with specs 9 and 10
 
@@ -899,6 +903,18 @@ Open decisions:
 |---|---|---|---|
 | 4180839034 (spec 9) | Do not compensate while the intent commit is still in flight | Fixed in spec 9 M17. Mirrored here as rule 29, so the affine contract matches: a drop after submission and before the acknowledgement is `CommitUnconfirmed`, retains everything, and is reconciled from the store's outcome. On M: the window is empty today, because both dispatch-commit calls are synchronous, and the rule binds once the commit becomes awaited | rules 6, 23, 29; section 4.11; section 6; section 9 |
 
+### Independent review pass 2 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-8-02 (alignment) | Slow-path terminal stop denials are marked retryable after resume | Fixed here for the predicates. The stop-receipt exclusion now keys on spec 9 M20's `identity_disposition`. `Reusable` receipts end one attempt but not the request id. `Terminal` receipts, including compensated slow-path and `Prepared`-intent stop denials, are counted by every predicate | section 4.11 |
+
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933161 | Carry the reserved evidence slot into the obligation | Fixed now. `EvidenceSlot` is a move-only token: a `CompensableReservation::EvidenceSlot` ledger entry before the boundary, moved into `PostEffectObligation::evidence_slot` by `enter_effect_boundary`, dropped (returned) when a terminal or fault receipt commits, and moved into the buffered record on `fail` or `Drop` until it flushes. `RejectedBeforeCommit` returns it; `CommitUnconfirmed` carries it | section 4.3 enum; rule 4; section 4.4 struct; rule 18 |
+
 ## Appendix A. FTL reference
 
 What FTL does (paths relative to the FTL checkout):
@@ -918,9 +934,3 @@ Where the analogy breaks:
 - **What commit means.** FTL's commit is an in-memory push into held capacity, so it truly cannot fail. Chio's commits are durable writes, so the Chio equivalent is "cannot fail silently".
 - **Drop.** FTL's `Drop` releases capacity it fully owns, under `panic = "abort"` (`Cargo.toml:26`, `:29`). Chio's pre-dispatch `Drop` may compensate best-effort, because nothing crossed the boundary, but its post-dispatch `Drop` may only record evidence, latch, or hand off to supervised reconciliation (rules 6, 11 and 23). Some Chio reservations (`ExternalCommitment`) have no owner the kernel could release them to at all.
 - **Ownership.** FTL's reservations live under one spinlock. Chio's ledger is only the in-process view of reservations whose truth lives in the stores.
-
-### Codex review (PR #1174, round 4)
-
-| Comment | Title | Disposition | Where |
-|---|---|---|---|
-| 4180933161 | Carry the reserved evidence slot into the obligation | Fixed now. `EvidenceSlot` is a move-only token: a `CompensableReservation::EvidenceSlot` ledger entry before the boundary, moved into `PostEffectObligation::evidence_slot` by `enter_effect_boundary`, dropped (returned) when a terminal or fault receipt commits, and moved into the buffered record on `fail` or `Drop` until it flushes. `RejectedBeforeCommit` returns it; `CommitUnconfirmed` carries it | section 4.3 enum; rule 4; section 4.4 struct; rule 18 |

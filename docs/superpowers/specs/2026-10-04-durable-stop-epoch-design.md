@@ -450,16 +450,22 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     | Tier 1 early, before any durable row | any existing check site | `SignReceipt(Deny { kernel_stopped })` with `observed_epoch`; no tombstone | not burned; the same id proceeds after resume |
     | Fused intent commit (spec 9 M10, spec 10 X15) | tier 2 in `IntentCommit` | savepoint rolls back; deny receipt only; no `DenyTombstone` | not burned |
     | Check-only read | tier 1 or the check-only crossing | deny receipt only | not burned |
+    | Fused intent commit from `Prepared` (spec 10 X10, spec 9 M10) | tier 2 in `IntentCommit` | compensate the persisted operation under `PreDispatchNoEffect`; deny receipt | terminal, as on M: today |
     | Slow path with a begin row, not parked | the dispatch-commit CAS | compensate under `PreDispatchNoEffect`; deny receipt | terminal, as on M: today |
     | `Parked` (approval) | the resume intent commit | **Retain** in `Parked`; no compensation (S16) | unchanged; resumes after resume |
     | Post-dispatch (`Finalizing`, a release) | the release crossing | `Withhold` (S14) | unchanged |
     | Caller report | never stop-checked (S27) | return record persisted | unchanged |
     | `NonDurable` side-effecting call, release refused | the release crossing, after the effect ran | signed withheld receipt with `retryable_after_resume: false`; `OutputWithheld { retry: Never, effect_executed: true }`. **Terminal, not temporary**: there is no custody to resume from | terminal for that call; a retry is a new, deliberate dispatch |
 
-    - A stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, retryable_after_resume }`. It is `true` on every row above except the `NonDurable` effect row, where it is `false` because the effect already ran. A receipt with `true` is evidence of a refused attempt, not a terminal admission record.
+    - A stop receipt carries `chio_runtime.stop = { scope, observed_epoch, retryable_after_resume }` beside `chio_runtime.identity_disposition` (spec 9 M20). `retryable_after_resume` MUST equal `identity_disposition == Reusable`:
+      - `true` (`Reusable`) only on the tier-1, fused-from-`Unbegun` and check-only rows, and on a check-only read's `Withheld { retry: AfterResume }`. No row, tombstone or custody binds the request id there;
+      - `false` (`Terminal`) on the `Prepared`-intent and slow-path rows, whose compensated row now holds the request id, and on the `NonDurable` effect row, whose effect already ran;
+      - the `Parked`, post-dispatch and caller-report rows sign no stop receipt at the refusal. The operation stays live, and its later terminal receipt carries `Terminal`.
+
+      A receipt with `true` is evidence of a refused attempt, not a terminal admission record. One with `false` tells the client that retrying the same request id returns the bound terminal result, never a fresh admission. `chio_runtime` is a kernel-reserved metadata key, so caller metadata can never set either field (spec 9 M20).
     - Under process retries, a process retries with the same request id (M: `chio-process/ARCHITECTURE.md:40-45`).
       - On the tier-1, fused and check-only paths, the retry after resume proceeds.
-      - On the slow path with a begin row, the id is terminal. The retained call slot then belongs to a dead logical operation, so the worker must use a new operation key. The process tier-1 check before slot commit makes this path rare.
+      - On the slow path with a begin row, and on a fused intent from `Prepared`, the id is terminal. The retained call slot then belongs to a dead logical operation, so the worker must use a new operation key. The process tier-1 check before slot commit makes this path rare.
 - **S16. Approvals.** Approval collection denies while stopped (M: `collection_context.rs:64`).
     - Approval resolutions for parked operations that arrive while stopped are refused at the edge, before any operation step and without consuming the approval. The parked operation is retained, never compensated (spec 9 M10). After resume, the resolution may be resubmitted and meets the live checks, and pending approvals expire by their own deadlines.
     - Recovery approvals cannot proceed, because `SubmitApproval` and `ResumeWorkflow` deny.
@@ -588,7 +594,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - Only a signed resume can make a head `Running`, so a running head's whole chain is backed by signed artifacts.
 - **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, epoch, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
 - **Status route.** It returns `{ readiness, stopped, scope_heads: [...], host_latch, durability, stop_enforcement, withheld_operations, withheld_volatile }`. The existing `stopped`, `since` and `reason` fields stay as a projection of the kernel-scope head, with `reason` taken from the redacted note.
-- **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }`. Tier 1's epoch can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
+- **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }` and `chio_runtime.identity_disposition`, which always agree (S15, spec 9 M20). The `chio_runtime` block is kernel-reserved: caller-supplied metadata carrying it is rejected before evaluation. M: does not reserve it today (`kernel/mod.rs:151-159`), so this is a kernel change. Tier 1's epoch can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
 
 ## 11. Hints (spec 5)
 
@@ -792,6 +798,16 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - **Two pending stops for one scope (R-8-01).** Two stop requests for the same scope merge, the second narrowing containment (generation 2). The first, wider record commits carrying generation 1 and is anchored; kill before the follow-up `Restrict`, restart: the entry is unsatisfied, so the scope comes up `Stopped` with containment off and `latch_only`, and the first write appends a `Restrict` carrying generation 2 (S25).
   - **Latch-only stop, then a narrowing request, then a crash (Codex round 5).** The head is `Running` at epoch 4. A stop under `SQLITE_FULL` is recorded as `latch_only` (generation 1); a narrowing request (containment off) joins the entry (generation 2) before any record commits. Kill, restart: the scope is `Stopped` with containment off; the first write appends exactly one `Stop` at epoch 5 with containment off, `satisfies_intent` generation 2 and both contributors; the entry is then removed. No `Restrict` is ever appended over the running head (S2, S25).
   - **S8-01:** stop with caller-executed, native and ordinary operations in `Finalizing`; kill; restart. The host serves `ready_stopped`, status answers, resume succeeds, and the outputs are released exactly once.
+- **Identity disposition per path (R-8-02).** Each case separate. Each asserts `retryable_after_resume == (identity_disposition == Reusable)` and the behavior of a retry with the same request id after resume:
+  - tier-1 early stop denial: `Reusable`; the retry is admitted;
+  - fused intent from `Unbegun` refused by a stop: `Reusable`; the retry is admitted;
+  - fused intent from `Prepared` refused by a stop: compensated, `Terminal`; the retry returns the bound compensated result;
+  - slow path with a begin row refused by a stop: compensated, `Terminal`; the retry returns the bound compensated result;
+  - parked operation during a stop: no stop receipt; after resume it proceeds, and its terminal receipt is `Terminal`;
+  - durable post-effect release during a stop: output withheld with no stop receipt; released after resume, terminal receipt `Terminal`;
+  - check-only read withheld: `Reusable`, `retry: AfterResume`;
+  - `NonDurable` effect withheld: `Terminal`, `retry: Never`;
+  - caller metadata carrying `chio_runtime` is rejected before evaluation.
 - **Failure injection.**
   - Stop under `Overloaded` and per-tenant caps: committed through the priority lane.
   - Stop under `SQLITE_FULL`: `stop_not_durable` with `latch_only`; a restart is stopped.
@@ -919,6 +935,13 @@ Open decisions:
 |---|---|---|---|
 | R-8-01 | An unrelated same-scope epoch can erase a pending stop or restriction | Fixed. Each journal entry has a durable `intent_id` and a `generation` that counts its contributing requests. Stop and Restrict records carry `satisfies_intent`. An entry retires only when an anchored head proves it was applied (matching id, current generation, containment no wider), never by epoch number. Boot honors every unsatisfied entry. Resume and relax refuse with `StopIntentPending` under the journal mutex, so a resume cannot commit between an intent's fsync and its record. A `Restrict` that finds a running head applies as a `Stop`. Both counterexamples are crash tests | `StopEpochV1.satisfies_intent`; S25; S31; S38; S9 step 3; section 14 failure rows; section 17 |
 | R-1-01 (spec 1) | Caller reconciliation belongs to two different ABI operations | Fixed in spec 1. The S13 `CallerExecution` row here now states that `reconcile_caller_execution*` belongs to `CallerExecution` only | section 7 S13 row |
+
+### Independent review pass 2 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-8-02 | Slow-path terminal stop denials are marked retryable after resume | Fixed. `retryable_after_resume` must equal spec 9 M20's `identity_disposition == Reusable`. It is `false` for compensated slow-path and `Prepared`-intent stop denials and for the `NonDurable` effect, and `true` only for tier-1, fused-from-`Unbegun` and check-only refusals. S15 gains the missing `Prepared` row. Per-path tests are separate for early, fused, prepared, slow, parked, post-effect, check-only and `NonDurable` | S15; section 10 deny receipts; section 17 |
+| R-6-05 / R-6-06 (cross-reference) | Kernel-reserved receipt metadata | Fixed. The `chio_runtime.stop` block, with `chio_runtime.identity_disposition`, is kernel-reserved, so caller metadata can never set or override it. This is a kernel change: M: reserves seven other keys (`kernel/mod.rs:151-159`) | section 10 deny receipts; S15 |
 
 ## Appendix A. FTL reference
 

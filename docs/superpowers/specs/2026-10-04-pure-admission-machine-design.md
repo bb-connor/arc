@@ -272,6 +272,7 @@ pub enum AdmissionEvent {
     MutationResult { applied: bool, result_digest: Digest },
     CommitFailed { effect: EffectId, reason: CommitFailure },
     CommitOutcomeUnknown { effect: EffectId },
+    StoreUnavailable { effect: EffectId },    // M19: spec 10 X21 known-not-committed store failure (retry exhaustion, poisoned owner)
     PostEffectStepFailed { step: PostEffectStep, cause: PostEffectCause },  // M16
     ReceiptAppendFailed { outcome: AppendFailure },                         // M16; spec 10 receipts append
     ReceiptReadBack { original_present: bool },                             // after AppendFailure::Unknown drains
@@ -282,7 +283,8 @@ pub enum AdmissionEvent {
 
 pub enum CommitFailure {  // spec 10 CrossingRefused, plus two non-policy reasons
     KernelStopped, AuthoritySpaceClosed, Revoked, InsufficientIntegrity, ReservationConflict,
-    VersionConflict, Unavailable, Overloaded,
+    VersionConflict, Overloaded,
+    Unavailable,          // the fused form is ineligible (its preconditions do not hold): re-plan. Never a storage failure (M19)
 }
 
 pub enum UnknownOutcomeRelease {  // the counterparty-authorized release kinds (V: payment/journal.rs:88-96)
@@ -391,6 +393,14 @@ pub enum ReceiptDecision {
     Allow, Deny { code: DenyCode }, DenyDelivery { reason: ReasonCode },
     Cancelled { reason: ReasonCode }, Incomplete, PendingApproval, Withheld { reason: ReasonCode },
 }
+
+/// M20. Signed as `chio_runtime.identity_disposition` on every receipt whose decision is not
+/// `Allow` or `PendingApproval`. The machine derives it from the row that produced the receipt;
+/// it is never a driver choice or a caller claim.
+pub enum IdentityDisposition {
+    Reusable, // the attempt was refused before any operation row, tombstone or custody exists; the same request id may be retried
+    Terminal, // the request id is bound to a terminal record (tombstone, compensated row, terminal outcome) or to an executed effect
+}
 ```
 
 **Effect-list semantics.**
@@ -398,6 +408,7 @@ pub enum ReceiptDecision {
 - Effects inside a group are atomic: one crossing, or one port call that is atomic at its authority.
 - Every state-mutating effect carries the expected operation version. A mismatch returns `CommitFailed { VersionConflict }`.
 - `Compensate` and `Terminalize` carry their receipt, so the terminal projection binds the no-effect proof and the receipt atomically (saga rule 5).
+- Every `ReceiptPlan` and every `SignReceipt` whose decision is not `Allow` or `PendingApproval` carries the `IdentityDisposition` that M20 assigns to the producing row.
 - A compensation that needs an external rail release first is two groups: the rail release (`ParticipantCommit`), then the projection. A partially completed compensation is driven again by the next `Cut`.
 - Capacity is fixed: at most 4 groups of 4 effects. Every arm builds a literal list, so exceeding capacity is a compile error. A trailing hint group (M18) counts toward the four.
 - `HaltOperation` changes no persisted state. The driver stops acting on that operation; a later re-projection from the store or a `Cut` clears the halt. It never gates other operations or new dispatch. Only `KernelEvidenceLatch` gates new dispatch, and only while its buffered record is unpersisted (spec 3 section 4.8).
@@ -448,16 +459,25 @@ pub enum ReceiptDecision {
      - **Repeats.** While `Releasing`, a `ReleaseAuthorized` with the same authority and evidence yields `Retain` and emits no second effect. One with a different authority or evidence is illegal (M2). After `Released`, a duplicate yields `Retain`. In any other phase, or with no frozen hold, the event is illegal and releases nothing.
      - **Persistence, writer-held holds.** `Releasing` is never persisted. The `ReleaseHold` member (spec 10 X17b) writes the payment-journal release entry and the operation's released fact in one writer transaction, keyed by `operation_id`, so at most one release exists per frozen hold. Because the release is a single local transaction, absence of the entry after an unknown outcome proves it did not commit, and projection yields `Frozen` or `Released`.
      - **Persistence, rail-held holds.** A release that needs an external rail call is two-phase, and absence of a local completion never means "not released":
-       - **Prepare.** An `ExternalPrepare { Settle }` crossing commits a durable `release_submitted` row before the external call, with `idempotency_key = H("chio.unknown-release.v1" || operation_id || authority || evidence)`. Projection of that row yields the persisted `ReleaseSubmitted { authority, idempotency_key }`.
-       - **External call.** The rail call carries the idempotency key. Spec 10 X17b requires a rail adapter used for unknown-outcome releases to support either idempotent submission by key or an authoritative status query by key.
+       - **One key per frozen hold.** The idempotency key is fixed when the hold freezes: `hold_release_key = H("chio.unknown-release.v1" || operation_id || hold_id)`. It does not depend on the authority or the evidence, so every later authorization for the same hold reuses it. There is at most one frozen hold per operation.
+       - **Prepare.** An `ExternalPrepare { Settle }` crossing commits a durable `release_submitted` row before the external call, carrying `hold_release_key`, the authority and the evidence digest. Projection of that row yields the persisted `ReleaseSubmitted { authority, idempotency_key }`.
+       - **Adapter capability (spec 10 X17b).** The prepare crossing refuses, before any rail call, when the hold's rail adapter declares neither capability below. The hold stays `Frozen`, and the driver raises `Fault { RailCapabilityMissing }` for operator settlement outside the machine.
+         - **`IdempotentPerKey`.** The rail executes at most one release per key for as long as the hold can exist, whatever request body carries the key. Re-submitting with the key is safe and returns the original outcome.
+         - **`FenceByKey`.** The rail offers a terminal non-acceptance operation. Once `fence(key)` succeeds, no request carrying the key can be accepted afterwards, and status reports a terminal `NotReleasedFenced`.
+       - **External call.** The rail call carries `hold_release_key`.
        - **Completion.** The completion commit writes the payment-journal release entry and sets `Released(authority)`.
-       - **Unknown or crash.** From `ReleaseSubmitted`, `UnknownReleaseDriver` queries the rail by key, or re-submits with the same key. The answer decides the outcome. An authoritative "released" commits the completion. An authoritative "not released" commits a `release_abandoned` record and returns to `Frozen`. No answer keeps `ReleaseSubmitted` with bounded backoff and an operator incident.
-       - **No re-release.** While `ReleaseSubmitted` holds, a new `ReleaseAuthorized` is illegal (M2), so no second release is ever submitted without the key.
+       - **Unknown or crash.** From `ReleaseSubmitted`, `UnknownReleaseDriver` resolves the release only through the adapter's declared capability:
+         - `IdempotentPerKey`: it re-submits with the same key. "Released" commits the completion. A definitive rejection of the keyed request commits a `release_abandoned` record and returns to `Frozen`. A delayed copy of the original request carries the same key, so the rail deduplicates it against any later release of the same hold.
+         - `FenceByKey`: it calls `fence(key)`. "Already released" commits the completion. A successful fence with no release commits `release_abandoned` and returns to `Frozen`; the original request can no longer be accepted.
+         - An ordinary status query that reports "not released", "unknown key" or no answer is not terminal. It keeps `ReleaseSubmitted` with bounded backoff and an operator incident. A query alone never returns the hold to `Frozen`, and the driver never re-submits an ambiguous request except under `IdempotentPerKey`.
+         - If the adapter's declared capability is lost after submission (a configuration change), only a "released" answer is acted on. Every other answer keeps `ReleaseSubmitted`.
+       - **No re-release.** While `ReleaseSubmitted` holds, a new `ReleaseAuthorized` is illegal (M2). After a return to `Frozen`, a new authorization reuses `hold_release_key`, so the original request is either deduplicated (`IdempotentPerKey`) or fenced (`FenceByKey`) before a replacement can execute.
+       - **Required semantics, answering the owner's rail question.** An adapter qualifies for unknown-outcome releases only if it provides at-most-once execution per caller-supplied key for the hold's lifetime, or a terminal fence by key whose success excludes later acceptance. A current-state lookup does not qualify. Chio names no specific rail here. Each adapter declares its capability, and its conformance test covers a delayed original request delivered after a negative status query, both before and after a replacement request.
      - The driver verifies the evidence (the counterparty's signed agreement, or the contract's capture-waiver term) before it feeds the event. The machine checks only the phase and the hold fact.
      - This is how a hold frozen by M7, M12 or the cut table is released after migration. It never moves money on the machine's own authority (T4, T6).
 8. **M8. Cuts.** A `Cut` event is classified only by the normative table of section 6.1.
 9. **M9. Liveness protection.** `Prepared` with `nonce_issuance_live`, and `Ready` with `caller_reservation_live`, are retained under `StartupRecovery`, and under `RecoveryClosure` only while control is `Active` (M: `recovery.rs:206-221`; W: `recovery_runtime.rs:213-218`). No other cause is protected.
-10. **M10. Pre-dispatch commit failures.** Rows match on the failed effect, its starting phase and the reason. The reason is inspected before any generic row applies, so a non-policy reason (`Unavailable`, `VersionConflict`, `Overloaded`) never compensates. Every `CommitFailure` reason has a row for every pre-dispatch effect, so none reaches M2's illegal-event arm.
+10. **M10. Pre-dispatch commit failures.** Rows match on the failed effect, its starting phase and the reason. The reason is inspected before any generic row applies, so a non-policy reason (`Unavailable`, `VersionConflict`, `Overloaded`) never compensates. Every `CommitFailure` reason has a row for every pre-dispatch effect, so none reaches M2's illegal-event arm. A store failure arrives as `StoreUnavailable`, not as a `CommitFailure`, and M19 handles it for every effect. M20 assigns each row's identity disposition.
 
     | Failed effect | Reason | Next and effects |
     |---|---|---|
@@ -467,7 +487,8 @@ pub enum ReceiptDecision {
     | `IntentCommit` (from `Unbegun` or `Prepared`) | `Unavailable` | stay in the phase; the driver feeds `Replan { slow_path: true }`, and the machine emits slow-path `ParticipantCommit` steps. Never compensates |
     | any pre-dispatch effect | `VersionConflict` | `Retain`; the driver re-projects from the store and re-feeds. Never compensates |
     | `IntentCommit` (from `Unbegun`), `CheckOnlyCrossing` | `Overloaded` | stay `Unbegun`; the driver signs a deny receipt (`Overloaded`) before admission and persists no state (spec 10 X15); the request id stays usable. A `NonDurable` call first releases its in-memory ledger entries (`Compensate` against spec 3's ledger) |
-    | `IntentCommit` (from `Prepared`), slow-path `ParticipantCommit` or dispatch-commit step | `Overloaded`, or `Unavailable` on a step that has no fused form | `Retain`; the driver re-submits the same planned step with bounded backoff. If the caller abandons the call first, M17's before-acknowledgement rule compensates. Never compensates on its own |
+    | `IntentCommit` (from `Prepared`), slow-path `ParticipantCommit` or dispatch-commit step | `Overloaded` | `Retain`; the driver re-submits the same planned step with bounded backoff. If the caller abandons the call first, M17's before-acknowledgement rule compensates. Never compensates on its own |
+    | slow-path `ParticipantCommit` or dispatch-commit step | `Unavailable` | Not produced: a slow-path step has no fused form, and store failures arrive as `StoreUnavailable` (M19). If received, it is handled like `Overloaded`: `Retain` and re-submit. Never compensates |
     | slow-path dispatch-commit step from `Parked` (approval resume) | `KernelStopped` | `Retain` in `Parked`. Never compensates, so the pending approval survives the stop (M15) |
     | `IntentCommit` remainder from `CapturePending` with capture `Committed` | `KernelStopped` | `Retain` in `CapturePending`; re-emitted after the stop is resumed. Never compensates |
     | `IntentCommit` remainder from `CapturePending` with capture `Committed` | any other policy reason (`AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict`) | Post-dispatch, as the section 6.1 `X` row: `HaltOperation { RefusedAfterCapture(reason) }`, then `Terminalize(OutcomeUnknownAfterDispatch)` with holds frozen, as a restrictive, non-crossing commit. Never `Compensate`: a committed capture cannot be undone under `PreDispatchNoEffect` (T3). This row takes precedence over the generic slow-path row below |
@@ -489,9 +510,9 @@ pub enum ReceiptDecision {
     - **`ReservationConflict`.** `HaltOperation { InvariantViolation }` and `Fault`. It is unreachable after the effect, because reservations commit in the intent commit, so reaching it is an invariant violation.
     - **`VersionConflict`.** Re-project.
     - **`Overloaded`.** Not produced for post-effect members, because spec 10 X17b admits them past the queue bound. If received: `Retain`, and the driver re-submits the same plan. Never compensates.
-    - **`Unavailable`.** The fused outcome commit's preconditions no longer hold, for example because settlement needs an external rail capture. From `Finalizing`, the driver feeds `Replan { slow_path: true }`. The machine then emits the settlement as `ParticipantCommit` groups (spec 10 `ExternalPrepare { Settle }`), followed by the rest of the `OutcomeCommit`. On a two-commit read with no return record (spec 10 X14), `ReturnRecord` comes first.
+    - **`Unavailable`.** The fused outcome commit's preconditions no longer hold, for example because settlement needs an external rail capture. `Unavailable` never means the store failed; that is `StoreUnavailable` (M19). From `Finalizing`, the driver feeds `Replan { slow_path: true }`. The machine then emits the settlement as `ParticipantCommit` groups (spec 10 `ExternalPrepare { Settle }`), followed by the rest of the `OutcomeCommit`. On a two-commit read with no return record (spec 10 X14), `ReturnRecord` comes first.
     - **Totality.** Every `CommitFailure` reason has a row here for every post-effect effect, so none reaches M2's illegal-event arm.
-      - `Terminalize`, `Compensate` and `ReleaseHold` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project) and `CommitOutcomeUnknown` (M12) can fail them. A failed or unknown `ReleaseHold` follows M7a: back to `Frozen`, or `HaltOperation` while `Releasing`.
+      - `Terminalize`, `Compensate` and `ReleaseHold` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project), `CommitOutcomeUnknown` (M12) and `StoreUnavailable` (M19) can fail them. A refused or unknown `ReleaseHold` follows M7a: back to `Frozen`, or `HaltOperation` while `Releasing`. A `StoreUnavailable` keeps `Releasing` and re-submits the same `ReleaseHold` (M19).
       - Every `Retain` above has a re-feed source. The `FinalizingRetryDriver` (section 7) feeds `Tick` when the stop is resumed and with bounded backoff. `StartupReconciler` covers restart.
     - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that. Whether a retry is safe differs by class:
       - **Read-only (check-only).** The call is eligible only when `can_redispatch_unknown_read` holds (section 4.4), so a retry after resume is safe. The driver returns `OutputWithheld { retry: AfterResume }` (spec 8).
@@ -519,11 +540,14 @@ pub enum ReceiptDecision {
     | Tier-1 early stop check, before `Begin` | A driver pre-check outside the machine, like `Overloaded`. It signs `Deny { KernelStopped }` with `observed_epoch`, persists no state, and leaves the request id usable after resume |
     | Fused `IntentCommit` | M10: receipt only, id usable after resume |
     | `CheckOnlyCrossing` | M10: receipt only; the read-only class has no id to burn |
+    | Fused `IntentCommit` from `Prepared` (spec 10 X10) | M10: compensates the persisted operation; the id is terminal, as on M: today |
     | Slow path with a persisted begin row, not parked | M10: compensates; the id is terminal, as on M: today |
     | `Parked` | `Retain`. While the driver's stop read says stopped, approval resolutions are refused at the edge before any event, without consuming the approval (S8-19). `ApprovalSupplied` is therefore never fed during a stop |
     | After the effect | M11: withheld and retained, or a `Withheld` receipt for classes with no row |
 
-    Consequence for processes: chio-process retries with the same request id (M: `crates/kernel/chio-process/ARCHITECTURE.md:40-45`). A tier-1 or fused stop denial leaves that id usable after resume. A slow-path compensation burns it, as today.
+    Consequence for processes: chio-process retries with the same request id (M: `crates/kernel/chio-process/ARCHITECTURE.md:40-45`). A tier-1 or fused stop denial leaves that id usable after resume. A slow-path or `Prepared`-intent compensation burns it, as today.
+
+    "Temporary" describes the stop, not every receipt it causes. The receipt's identity disposition is assigned by M20: the tier-1, fused-from-`Unbegun` and check-only rows are `Reusable`; the `Prepared` and slow-path rows are `Terminal`, because a compensated row now holds the request id; the `NonDurable` withheld effect is `Terminal`. The parked and durable post-effect rows sign no stop receipt at the point of refusal: the operation stays live, and its later terminal receipt carries `Terminal`. Spec 8 S15's `retryable_after_resume` equals `identity_disposition == Reusable`.
 16. **M16. Post-effect step failures and receipt appends.** These rows are the step-to-receipt mapping. Spec 3 owns the closed `PostEffectStep` and `PostEffectRejection` enums; spec 10 executes the commits. Durable means a class with a persisted row.
 
     | Event | Durable class | Classes with no row (read-only, `NonDurable`) |
@@ -559,6 +583,42 @@ pub enum ReceiptDecision {
       - After a progress-only commit (return record, park), a `Restore(k)` can undo the change. Consumers re-read and treat absence as a resync.
     - No `AdmissionEvent` is derived from a hint (spec 5 H1). The differential suite drops and forges hints and asserts identical transitions.
     - Until spec 5 Part B lands, drivers install a no-op `HintPort`.
+19. **M19. Store unavailability is not a policy outcome.** Spec 10 X21 answers `StoreUnavailable` when a member fails `member_fault_retries` times with the transaction still active, or when the owner is poisoned or the connection-recovery fence fails. The member is known not committed. `Refused(Unavailable)` keeps its one meaning: the fused form is ineligible, so re-plan.
+
+    | Effect | Next and effects |
+    |---|---|
+    | `IntentCommit` from `Unbegun`, `CheckOnlyCrossing` before dispatch | stay `Unbegun`; no dispatch. The driver signs `Deny { StoreUnavailable }` with `Reusable` (M20) if the receipt path is up; otherwise it returns a fail-closed error with no effect. Nothing was persisted, so nothing is compensated |
+    | `DenyTombstone` | stay `Unbegun`; the deny receipt is signed `Reusable`, because no tombstone committed. A retry re-evaluates and meets the same committed fences |
+    | Every other pre-dispatch effect (`IntentCommit` from `Prepared`, `ParticipantCommit`, slow-path dispatch-commit step, `Park`) | `Retain` the same planned member with its expected version. Every hold stays. Never `Compensate` because of the failure. If the caller abandons the call, M17's rules apply: the member is known not committed, so abandonment compensates through its own `Compensate` member, which M19 retains in turn while the store is down |
+    | Post-effect crossings (`ReturnRecord`, `OutcomeCommit`, release crossings) | `Retain` in the phase with output withheld in custody; the same plan is re-submitted. Never terminalize because of the failure |
+    | Post-effect `CheckOnlyCrossing` (release of a read-only or `NonDurable` call) | fail closed as an unverifiable release: the output is withheld. A check-only read gets `Withheld { retry: AfterResume }` (`Reusable`); a `NonDurable` effect gets the terminal `Withheld { retry: Never }` (`Terminal`), as in M11 |
+    | Non-crossing effects (`Terminalize`, `Compensate`, `ReleaseHold`) | `Retain` the same planned member, the same expected version and every hold. `ReleaseHold` keeps `Releasing`, and a rail-held release keeps `ReleaseSubmitted`. Never convert to another terminal, never release |
+
+    - **Re-feed.** `StoreRecoveryDriver` (section 7) re-feeds every operation retained under this rule: with bounded backoff, and at once on the writer's `store_healthy` signal, which spec 10 emits after its next successful batch commit. A poisoned owner stops writes until restart (spec 10 X22), so `StartupReconciler` re-projects and re-drives those operations.
+    - **Totality.** `StoreUnavailable` has a row for every effect, so M2's illegal-event arm is never reached.
+20. **M20. Identity disposition.** Every non-allow receipt carries `IdentityDisposition` (section 5.2), assigned by the row that produced it:
+
+    | Producing row | Disposition |
+    |---|---|
+    | Tier-1 early denials before `Begin` (stop, `Overloaded`, any pre-admission check that persists no state) | `Reusable` |
+    | Fused `IntentCommit` from `Unbegun` refused with `KernelStopped` (M10, M15) | `Reusable` |
+    | `Overloaded` before admission (M10) | `Reusable` |
+    | `CheckOnlyCrossing` refusals before dispatch, for both read-only and `NonDurable` classes (M10); nothing is persisted | `Reusable` |
+    | A check-only read's `Withheld { retry: AfterResume }` (M11, M19) | `Reusable` |
+    | `StoreUnavailable` deny before any row (M19) | `Reusable` |
+    | `DenyTombstone` (M10, spec 10 X15) | `Terminal` |
+    | `Compensate` of a persisted operation: `Prepared`-intent refusals and slow-path refusals for any reason, `KernelStopped` included (M10, M15), cut-table compensations, drop compensations | `Terminal` |
+    | `Terminalize` for any terminal, including `DeniedAfterDelivery`, `OutcomeUnknownAfterDispatch` and `NotAcceptedAfterDispatchCommit` | `Terminal` |
+    | Post-effect receipts of classes with no row (M16): `DenyDelivery`, `Cancelled`, a `NonDurable` `Withheld { retry: Never }` | `Terminal` |
+    | The ambiguous deny for an unknown pre-dispatch commit (M12) | `Terminal`: the store may hold a row for the id |
+
+    - The rule: `Reusable` exactly when the refusal leaves no operation row, tombstone, custody or executed effect bound to the request id. Every other non-allow receipt is `Terminal`.
+    - Spec 8 S15's `chio_runtime.stop.retryable_after_resume` must equal `identity_disposition == Reusable`. Spec 3's per-request predicates count only `Terminal` receipts (spec 3 section 4.11). Spec 6 rule 10 binds a sealed submission only on a `Terminal` disposition or an allow or terminal outcome; on `Reusable` it lowers the deny and leaves the record sealed.
+    - **Kernel-reserved metadata keys.** Two receipt-metadata keys are written only by the kernel. Caller-supplied metadata that carries either is rejected before evaluation through the existing `reject_reserved_receipt_metadata` path:
+      - `receipt_context`, which gains a kernel-written `receipt_context.request_namespace_digest`. The kernel derives it from the authenticated evaluation context, exactly as `AuthenticatedRequestNamespace::bind` derives the replay-key namespace (M: `admission_operation/identity.rs:154`). Spec 6 R-6-05 compares it.
+      - `chio_runtime`, including `chio_runtime.identity_disposition`, `chio_runtime.stop` (spec 8) and `chio_runtime.crossing` (spec 10).
+
+      This is a kernel change. M: reserves seven keys today, and neither of these is among them (M: `kernel/mod.rs:151-159`, `RESERVED_RECEIPT_METADATA_KEYS`). Without it, a caller could pre-set an identity disposition or a namespace digest that a verifier would trust.
 
 ### 6.1 The normative cut table
 
@@ -624,7 +684,8 @@ forall cause: Terminalize(OutcomeUnknownAfterDispatch) in classify(s, cause, f, 
 | `ReservationReconcileDriver` | settlement of a reserved authorization by nonce (M: `kernel/reconciliation.rs:148`) | as above |
 | `DropReconcileJob` | for a driver dropped after submitting its dispatch-commit crossing: the writer's reply for that member, then `Cut(DriverDropped)` (M17) | as above |
 | `FinalizingRetryDriver` | `Tick` to every operation retained in `Finalizing` (stop-withheld output, infrastructure fault, re-submitted plan). It fires on the `StopHeads` watch when a stop is resumed, and with bounded backoff otherwise (M11, M16) | `CrossingPort` |
-| `UnknownReleaseDriver` | `ReleaseAuthorized` after it verifies a counterparty agreement or contractual capture waiver for a frozen hold (M7a) | payment-journal port, `CrossingPort` |
+| `UnknownReleaseDriver` | `ReleaseAuthorized` after it verifies a counterparty agreement or contractual capture waiver for a frozen hold. From `ReleaseSubmitted` it resolves the release only through the adapter's declared `IdempotentPerKey` or `FenceByKey` capability, never from a status query alone (M7a) | payment-journal port, `CrossingPort` |
+| `StoreRecoveryDriver` | re-feeds every operation retained under M19 with its same planned member: with bounded backoff, and at once on spec 10's `store_healthy` signal. After a poisoned owner, `StartupReconciler` takes over at restart | `CrossingPort` |
 
 The rules for drivers:
 - Drivers own leases (the existing `mutation_sequencer.try_own_operation`), the clock, fact lookups, identity allocation, and every port call.
@@ -716,7 +777,7 @@ Each phase keeps the suite green and changes no wire, receipt or persisted forma
 - `admission_machine::core`: phases and participants as codes, facts as fixed-width bitsets, digests as `[u8; 32]`, effects as codes. It is extractable: no `serde_json`, no attachments and no heap collections, consistent with the hub's rule (M: `formal_aeneas.rs:1-5`).
 - `admission_machine::hydrate`: builds `IntentCommitPlan`, receipt metadata and attachments from core codes. It is not extracted, and it is covered by differential tests and Kani.
 
-Phase 0 extracts a prototype core with payload-carrying enums before committing T1-T12. The Lean statements live in `Chio/Admission/Machine.lean`.
+Phase 0 extracts a prototype core with payload-carrying enums before committing T1-T14. The Lean statements live in `Chio/Admission/Machine.lean`.
 
 **Theorems** (safety, over the extracted core):
 
@@ -727,17 +788,19 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 | T3 `no_compensation_after_commit` | `Compensate` only from pre-dispatch phases with capture not committed, and never while a submitted dispatch-commit crossing has no terminal reply | spec 4 section 5 |
 | T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`, and the last only on a zero recomputed amount or `DeniedAfterDelivery`; it emits `ReleaseHold` only on a `ReleaseAuthorized` event in `Terminal(OutcomeUnknownAfterDispatch)` with a frozen hold | saga rule 6 |
 | T5 `terminal_absorbing` | no transition leaves a terminal phase; `ReleaseAuthorized` changes only `unknown_hold` | saga rule 4 |
-| T6 `unknown_stays_unknown` | no `Dispatch` and no `MachineRelease` after `OutcomeUnknownAfterDispatch`; the only hold release is a counterparty-authorized `ReleaseHold`; `unknown_hold = Released(a)` only on the acknowledgement of the `ReleaseHold` for `a`, with at most one `ReleaseHold` outstanding per operation | saga rule 6 |
+| T6 `unknown_stays_unknown` | no `Dispatch` and no `MachineRelease` after `OutcomeUnknownAfterDispatch`; the only hold release is a counterparty-authorized `ReleaseHold`; `unknown_hold = Released(a)` only on the acknowledgement of the `ReleaseHold` for `a`, with at most one `ReleaseHold` outstanding per operation; `ReleaseSubmitted` returns to `Frozen` only on a definitive keyed rejection or a successful fence, and every release of one hold carries the same `hold_release_key` | saga rule 6 |
 | T7 `fence_dominance` | a policy refusal on any dispatch-commit step (fast or slow) or check-only crossing never leads to `Dispatch`; a refusal on an outcome or release commit never leads to an `Allow` receipt | spec 8 S7/S15, spec 4 section 4.1, spec 11 |
 | T8 `post_effect_discharge` | every post-dispatch phase has an enabled transition to the M14 discharge set, or to `HaltOperation`, under the named fair events; none returns to a pre-dispatch phase; each handed-off operation acknowledges exactly one discharge | spec 3 section 4.11 |
 | T9 `plan_order` | participants are acknowledged in plan order or by the combined acknowledgement; `Authorized` exactly when the plan is complete | both legacy orderings |
 | T10 `replay_uniqueness` | an operation in a terminal phase, including a deny tombstone, never reaches `Dispatch` again for the same binding | saga rule 4 and its predicates |
 | T11 `stop_is_temporary` | a `KernelStopped` refusal never emits `DenyTombstone` or `Terminalize`, and never emits `Compensate` from `Parked` or a post-dispatch phase | spec 8 S14, S15 |
 | T12 `hints_trail_commits` | a `Hint` effect appears only in the last group of a list, after a group whose commit was acknowledged `Committed`; no transition reads a hint | spec 5 H1, H2 |
+| T13 `store_failure_is_not_policy` | `StoreUnavailable` never yields `Compensate`, `Terminalize`, `DenyTombstone`, `ReleaseHold` or a phase change; the next state retains the same planned member with its expected version | spec 10 X21 |
+| T14 `identity_disposition_truthful` | a receipt is `Reusable` exactly when its producing transition leaves no operation row, tombstone, custody or executed effect bound to the request id | spec 8 S15, spec 6 rule 10, spec 3 section 4.11 |
 
 **Model checking.**
 - Add `formal/apalache/AdmissionMachine.tla` for two operations and these concurrent drivers racing through version CAS: evaluator, startup reconciler, recovery closure, caller execution, the drain, the drop-reconcile job, and the governed active response resume.
-- Safety invariants T2, T3, T5, T7, T10 and T11 are checked under interleaving, with a negative model for each. The model includes a stop committed and resumed at any point, so T11 is checked against a parked operation and a stop-withheld release.
+- Safety invariants T2, T3, T5, T7, T10, T11 and T13 are checked under interleaving, with a negative model for each. The model includes a stop committed and resumed at any point, so T11 is checked against a parked operation and a stop-withheld release.
 - **Liveness** is checked here, not in Lean, under weak fairness on these events:
   - eventually a caller report, or the open decision 1 deadline edge;
   - eventually a transport answer or ambiguity;
@@ -749,8 +812,8 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 **Trace validation.** Today's commit log retains digests, not states (section 2). Phase 1 validates that machine-produced states hash to the retained operation digests. Full replay of production histories needs per-version snapshots or an event log (open decision 6).
 
 **Deterministic simulation.**
-- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, a refused fused intent from `Prepared` holding a runtime hook, a counterparty release of a frozen hold (including a duplicate), and clock unavailability.
-- The oracles are T1-T12 as runtime assertions, plus the legacy predicates during compatibility.
+- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, a refused fused intent from `Prepared` holding a runtime hook, a counterparty release of a frozen hold (including a duplicate), a rail-held release whose original request is delivered after a negative status query (before and after a replacement request), member retry exhaustion and owner poisoning on every effect (`StoreUnavailable`), and clock unavailability.
+- The oracles are T1-T14 as runtime assertions, plus the legacy predicates during compatibility.
 
 ## 11. Performance
 
@@ -769,6 +832,8 @@ Acceptance:
 | Machine and legacy predicate disagree (compatibility) | the operation is handed to the legacy driver, with an `audit_fault`; never blocked |
 | Commit effect refused | M10 before the effect, M11 after it |
 | Commit outcome unknown | M12: `HaltOperation`, holds retained, ambiguous deny if pre-dispatch; re-project at restart |
+| Store unavailable (member retry exhaustion, poisoned owner) | M19: the same planned member is retained with every hold; never compensated or terminalized because of the failure; `StoreRecoveryDriver` re-feeds on `store_healthy` and with backoff, and `StartupReconciler` after restart |
+| Rail answers "not released" to a status query | M7a: not terminal; `ReleaseSubmitted` is kept. Only a keyed rejection (`IdempotentPerKey`) or a successful fence (`FenceByKey`) returns the hold to `Frozen` |
 | Post-effect step failure | M16: durable classes retain and re-run from frozen inputs or terminalize `DeniedAfterDelivery`; classes with no row append a fault receipt |
 | Receipt append outcome unknown | M16: `KernelEvidenceLatch` with the buffered fault record; nothing appended until the read-back |
 | Driver future dropped | M17: compensate before submission. If submitted but unacknowledged, retain, then reconcile from the writer's reply and `Cut(DriverDropped)`. After the acknowledgement, `Cut(DriverDropped)`. Never a durable transition in `Drop` |
@@ -785,19 +850,19 @@ Acceptance:
 | 1 | Startup and approval-retirement drivers; Lean skeleton; `AdmissionMachine.tla` | T3, T5, T10 proven; Apalache positive and negative pass |
 | 2 | Recovery closure and governed active response drivers | W: recovery suites and governed active response recovery tests green |
 | 3 | Drain driver (spec 4) and the stop path from spec 8 phase 2 onward; spec 8 phase 1 has already landed on the legacy reconciler | Spec 4 and 8 conformance |
-| 4 | Evaluation, nested, caller-execution, reservation-reconcile and drop-reconcile drivers; `evaluate`; deprecations | Benchmark acceptance; T1-T12 proven; liveness checked |
+| 4 | Evaluation, nested, caller-execution, reservation-reconcile and drop-reconcile drivers; `evaluate`; deprecations | Benchmark acceptance; T1-T14 proven; liveness checked |
 | 5 | Persisted model decision; compatibility assertions and legacy drivers removed | One release with zero disagreements |
 
 Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI.
 
 ## 14. Tests and conformance evidence
 
-- **Unit:** projection totality over all 19 tool-model and 15 security-model states with their dispatch pairs; `persist(project(r), r, ..) == r` for every reachable record, including security forward actions; rules M1-M18 by example; every row of the cut table, including `DriverDropped` and the `LatchRequest` emissions under `X`; every M16 row for both class groups.
+- **Unit:** projection totality over all 19 tool-model and 15 security-model states with their dispatch pairs; `persist(project(r), r, ..) == r` for every reachable record, including security forward actions; rules M1-M20 by example; every row of the cut table, including `DriverDropped` and the `LatchRequest` emissions under `X`; every M16 row for both class groups.
 - **Differential:** the two inclusions of phase 0, over the live transition space.
-- **Proptest:** random event sequences per kind, class and plan, checking T1-T12 as executable assertions.
+- **Proptest:** random event sequences per kind, class and plan, checking T1-T14 as executable assertions.
 - **Kani:** `transition` never panics; `classify` is total; the hydrator's plans are well formed.
-- **Lean:** T1-T12, with mirrors registered.
-- **Apalache:** `AdmissionMachine.tla`, with negative mutants: drop the T2 guard, compensate after commit, leave a terminal, dispatch after a deny tombstone, tombstone a `KernelStopped` refusal, compensate a parked operation on `KernelStopped`.
+- **Lean:** T1-T14, with mirrors registered.
+- **Apalache:** `AdmissionMachine.tla`, with negative mutants: drop the T2 guard, compensate after commit, leave a terminal, dispatch after a deny tombstone, tombstone a `KernelStopped` refusal, compensate a parked operation on `KernelStopped`, compensate or terminalize on `StoreUnavailable`, return a rail-held release to `Frozen` on a status query.
 - **Loom:** two drivers racing on one operation through the CAS adapter; a cut racing a caller report; a driver dropped while its dispatch-commit acknowledgement is in flight, racing the drop-reconcile job.
 - **DST:** one fault-injection seed per effect group and failure reason, added to `tests/dst/seeds.toml`.
 - **Conformance:**
@@ -814,7 +879,14 @@ Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI
   - a two-commit read refused at its outcome commit, which returns `OutputWithheld` and is never re-dispatched;
   - restart during a stop with caller, native and ordinary operations in `Finalizing` (spec 8 S8-01);
   - a receipt append that times out and then commits, which yields exactly one terminal receipt;
-  - a `NonDurable` call under `Monetary` with every M16 failure.
+  - a `NonDurable` call under `Monetary` with every M16 failure;
+  - `Terminalize` and `Compensate` answered `StoreUnavailable` after member retry exhaustion: the same member is retained with its holds, and after `store_healthy` it commits exactly once. The same after owner poisoning, resolved by `StartupReconciler` at restart. No compensation or terminal is ever produced by the failure itself (T13);
+  - an `IntentCommit` from `Unbegun` answered `StoreUnavailable`: no dispatch, a `Reusable` deny, and a retry with the same id after recovery is admitted;
+  - rail-held release with `IdempotentPerKey`: the original request is lost, re-submission with the same key resolves it, and a delayed original delivered after a replacement authorization is deduplicated by the rail;
+  - rail-held release with `FenceByKey`: a negative status query keeps `ReleaseSubmitted`; a successful fence returns to `Frozen`; the original request delivered afterwards is refused by the rail;
+  - a rail adapter with neither capability: the prepare crossing refuses before any rail call and the hold stays `Frozen`;
+  - identity disposition per path, each case separate: tier-1 stop denial (`Reusable`), fused stop denial from `Unbegun` (`Reusable`), fused intent from `Prepared` refused by a stop (`Terminal`, compensated), slow-path stop compensation (`Terminal`), parked operation during a stop (no stop receipt; later terminal receipt `Terminal`), durable post-effect withhold (no stop receipt; later terminal receipt `Terminal`), check-only read withheld (`Reusable`), `NonDurable` effect withheld (`Terminal`), `Overloaded` (`Reusable`). Each asserts `retryable_after_resume == (identity_disposition == Reusable)` (T14);
+  - caller-supplied metadata carrying `receipt_context` or `chio_runtime` is rejected before evaluation.
 
 ## 15. Residual risks and open decisions
 
@@ -923,6 +995,16 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 |---|---|---|---|
 | 4180993960 | Make stopped non-durable effects terminal to retries | Fixed now. A `NonDurable` call whose release is refused by a stop has executed its effect, so its `Withheld` receipt records `effect_executed: true` and `retryable_after_resume: false`. The driver returns the terminal `OutputWithheld { retry: Never }`. Only check-only reads, which are redispatch-safe by eligibility, get `retry: AfterResume` | M11 "Classes with no row"; spec 8 S15 and `OutputWithheld`; spec 10 X16 |
 | 4180993966 | Reconcile an external hold release before retrying it | Fixed now. Rail-held releases are two-phase. A durable `release_submitted` row with an idempotency key commits before the external call, and projects to the persisted `ReleaseSubmitted`. `UnknownReleaseDriver` resolves it only from an authoritative rail answer by key, and a new `ReleaseAuthorized` is illegal meanwhile. Writer-held releases stay single-transaction, so absence still proves non-commit there | `UnknownHold`; M7a persistence and unknown rules |
+
+### Independent review pass 2 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-9-01 | A negative rail status query is not proof that an in-flight release can never arrive | Fixed. One `hold_release_key` per frozen hold, independent of authority and evidence. A rail adapter must declare `IdempotentPerKey` or `FenceByKey`, or the prepare crossing refuses before any rail call. From `ReleaseSubmitted`, only a definitive keyed rejection or a successful fence returns the hold to `Frozen`. A status query alone keeps `ReleaseSubmitted`, and no ambiguous request is re-submitted except under `IdempotentPerKey`. Answers the owner's open question 2 with the required semantics | M7a; T6; section 7 `UnknownReleaseDriver`; section 12; section 14; spec 10 X17b |
+| R-9-02 | Writer escalation produces Unavailable for effects whose machine declares that result impossible | Fixed. New event `StoreUnavailable` (spec 10 X21's distinct result) with an M19 row for every effect. The same planned member is retained with every hold, never compensated or terminalized because of the failure, and re-fed by the new `StoreRecoveryDriver` on `store_healthy` or with backoff, or by `StartupReconciler` after a poisoned owner. `CommitFailure::Unavailable` now means only "fused form ineligible". T13 | section 5.1; M10; M11 totality; M19; section 7; T13; sections 12 and 14 |
+| R-8-02 | Slow-path terminal stop denials are marked retryable after resume | Fixed through the shared contract. M20 `IdentityDisposition` is assigned per producing row. Compensated slow-path and `Prepared`-intent stop denials are `Terminal`, and spec 8's `retryable_after_resume` equals `identity_disposition == Reusable`. M15 gains the missing `Prepared` row. T14; separate tests for early, fused, prepared, slow, parked and post-effect cases | M15; M20; section 5.2; T14; section 14; spec 8 S15 |
+| R-6-06 (contract part) | Retryable admission denials other than stops have no binding disposition | Fixed here for the producing side. `Overloaded`, check-only refusals, `StoreUnavailable` before any row and every other pre-admission refusal that persists no state are `Reusable`, signed in `chio_runtime.identity_disposition`. Spec 6 consumes it | M20 |
+| R-6-05 / R-6-06 (cross-reference) | Kernel-reserved receipt metadata | Fixed. `receipt_context`, with a new kernel-written `request_namespace_digest` derived like `AuthenticatedRequestNamespace::bind`, and `chio_runtime` become kernel-reserved keys. This is a kernel change: M: reserves seven other keys today (`kernel/mod.rs:151-159`) | M20 |
 
 ## Appendix A. External and FTL precedent
 

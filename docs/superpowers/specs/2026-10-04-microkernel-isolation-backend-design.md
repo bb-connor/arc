@@ -1,6 +1,6 @@
 # Design: confinement evidence for tool servers and workers (microkernel backend exploratory)
 
-- Status: EXPLORATORY (revision 4, 2026-10-05, after Codex review on PR #1174; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:)).
+- Status: EXPLORATORY (revision 5, 2026-10-05, after the second independent review on PR #1174; revision 4 after Codex review; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:)).
   - Sections 5, 6, and 7 are PROPOSED and can be reviewed for implementation.
   - Sections 8 and 9 (the microkernel backend and its spike) stay EXPLORATORY. No implementation is authorized there, and the spike is throwaway.
 - Date: 2026-10-04
@@ -35,6 +35,12 @@ Citation convention:
 | FTL | FTL checkout | |
 
 All five count as shipped for this revision. W1-W4 and R: APIs whose code does not exist are labeled "assumed shipped (contract anchor)".
+
+## Revision 5 changes
+
+From the second independent review on PR #1174:
+- **Launch qualification is not input trust (R-11-05, with spec 11).** Revision 4's `container` predicate treated a run plan that pins every input as grounds for a trusted start. Qualification now attests only the boundary, meaning the worker has no channel outside mediation. A context's initial input influence is spec 11's I7a: every bootstrap contribution is joined before readiness, and pinned contributions are `External` unless an operator-signed `BootstrapTrustAssertionV1` covers them (rule 6.3.5; S1-S5 note).
+- **Required lanes come from the agreement and run plan (R-7-02).** Revision 4 derived the worker lane from a receipt carrying `worker_profile`, so a missing profile could remove the lane instead of failing it. Section 7 rule 3 now derives the required lanes and the expected worker identity from the agreement scope and run plan before reading any receipt evidence. A missing profile or reference on a required lane fails the facet.
 
 ## Revision 4 changes
 
@@ -339,6 +345,8 @@ A `split_domain` profile qualifies only when every requirement holds:
 - **S4.** The controller itself runs under the `container` profile or stronger, with its own launch record (5.3).
 - **S5.** The run plan binds the controller digest and the execution tool server IDs. The runner records the profile per attempt.
 
+S1-S5 qualify the controller's boundary. They say nothing about the controller's inputs. Pinning the controller code (S3) and binding the servers (S5) make a run reproducible, but they do not assert that the task, seeds or other bootstrap input are free of external influence. Those inputs are joined under spec 11 rule I7a.
+
 P5 is the existing qualified reference for S1-S3, in a narrower shape:
 - **S1.** The pinned plan has no broker IPC fd and no read or write grants, and the child holds no worker credential (W:`confinement/execution.rs:46-77`).
 - **S2.** P5 mediates through a host-framed `CHIOCF1` stdin packet and a host-recomputed return, rather than through tool calls.
@@ -362,14 +370,15 @@ Rules:
 2. `launch_ref` and `launch_attempt` are required for `container`, `split_domain`, and `confined_reader`. `launch_attempt` is the runner's launch attempt for the worker, the `attempt` of the container launch record (5.3) or the boundary's launch for `confined_reader`. It is distinct from `chio_process.attempt`, which numbers retries of one operation. A host attribution that differs from the runner's per-attempt record denies, mirroring the `native_launch` mismatch rule.
    - For `confined_reader`, `record_id` is the boundary's `EvidenceRef`, and `record_sha256` is the retained `launch` digest (W:`.../knowledge/confinement/launch.rs:125-127`).
    - It is attached to receipts the parent produces after the return is admitted, and to the exported evidence of section 6.4.
-3. An absent `worker_profile` renders as `direct` (no claim).
+3. An absent `worker_profile` renders as `direct` (no claim). That rendering is only for display and influence; it never satisfies a confinement requirement. Where an agreement's run plan requires the worker lane, an absent profile fails the facet (section 7 rule 3).
 4. `split_domain` may be recorded only when S5's plan binding exists and the execution tool server IDs in the plan are served under rule 5.1.3.
 5. **A verified fact, never a grant.** `worker_profile` grants no authority, and no guard or policy branches on it, with one consumer: integrity admission (`2026-10-04-integrity-gated-admission-design.md` rule I7) uses it to choose a context's initial influence. That makes it an allow-affecting fact for that one purpose, so integrity admission consumes it only in verified form:
    - **Qualification.** The fact is `Verified(kind)` only when every condition holds:
      - the host attribution equals the runner's per-attempt record (rule 2);
      - the referenced launch record verifies: pinned signer, canonical digest equal to `launch_ref.record_sha256`, and state `FullyEnforced` (for `confined_reader`, `EnforcedRunning` or later);
      - the record's attempt equals `launch_attempt` (rule 2), which the runner binds per launch;
-     - the kind's own predicate holds: for `container`, the run plan pins every input, the image digest, the task input and the seeds; for `split_domain`, S1-S5.
+     - the kind's own boundary predicate holds: for `container`, the launch record's image digest equals the run plan's; for `split_domain`, S1-S5.
+   - **What qualification means.** A `Verified` profile attests only that the worker has no channel outside mediation. It never makes the worker's inputs trusted. The context's initial input influence is spec 11 rule I7a: every bootstrap contribution is joined before readiness, and a pinned contribution is `External` unless an operator-signed `BootstrapTrustAssertionV1` covers it. A content digest proves which bytes were supplied, not their provenance.
    - **Where it is checked.** The host verifies the fact once, when the process's knowledge scope is created. It commits the resulting initial influence in the serving writer in the same transaction (spec 11 rule I7). Crossings read the committed state and never re-derive it from attribution.
    - **Failure behavior.** Any of these yields `Unverified`, which is treated exactly as `direct`: an absent field, an unverifiable or mismatched record, a record lookup that fails, or a kind predicate that does not hold. The context then starts at `unknown = true`, which no integrity requirement satisfies. A failure can only make the starting state less trusted, never more.
    - **Never upgraded later.** A later attribution can only add influence (spec 11 rule I2).
@@ -389,7 +398,8 @@ attribution.worker_profile.kind = confined_reader ->
   and boundary.limits = { launches: 1, tool_calls: 0, model_calls: 0 }
 
 initial_influence(ctx) is trusted ->
-  worker_profile_fact(ctx) = Verified(k) and k in {container with pinned plan, split_domain}
+  worker_profile_fact(ctx) = Verified(k) and k in {container, split_domain}
+  and forall b in bootstrap(ctx): inherited_trusted(b) or asserted_trusted(b)     (spec 11 I7a)
 worker_profile_fact(ctx) = Unverified -> initial_influence(ctx).unknown
 ```
 
@@ -419,13 +429,22 @@ Verifiable work names confinement as a host assumption (V:`delegated_work.rs:4-5
    - The envelope is signed by the operator's runtime-attestation authority and appraised by the appraisal authority the verifier pins.
 2. **Tier ceiling.** Confinement-only evidence resolves to at most `RuntimeAssuranceTier::Basic`. `Attested` and `Verified` stay reserved for hardware-rooted attestation, which local trust policy decides. See open decision 1.
 3. **Binding to the work (backend-neutral, per lane).** Inside `RuntimeAssuranceBacking`, every production receipt in the agreement's confinement scope must map to exactly one attested record **for each lane that applies to it**. The evaluator already receives the production receipts (V:`verify.rs:1467-1473`).
-   - **Applicable lanes.** The tool lane applies to a receipt whose tool server is an execution tool server named in the run plan. The worker lane applies to a receipt attributed to the worker attempt (`chio_process` attribution carrying `worker_profile`). Both can apply to one receipt: a `container` worker that invokes a caged execution tool produces a receipt naming two distinct launches, and both must verify. Choosing either one alone would let an agreement that requires both boundaries pass with one.
+   - **Required lanes come first, from the agreement and run plan.** Before reading any receipt evidence, the verifier derives from the agreement's confinement scope and the signed run plan:
+     - which lanes are required;
+     - the execution tool server ids, for the tool lane;
+     - the expected worker identity, for the worker lane: the worker attempt, the profile kind and the launch reference the runner bound to it.
+
+     Optional receipt fields never decide whether a lane applies.
+     - The **tool lane** is required for every in-scope receipt whose tool server is an execution tool server named in the run plan.
+     - The **worker lane** is required for every in-scope receipt produced under the run plan's worker attempt, identified by the agreement's process or request scope, whenever the agreement requires worker confinement. It is required whether or not the receipt carries `worker_profile`.
+     - Both can apply to one receipt. A `container` worker that invokes a caged execution tool produces a receipt naming two distinct launches, and both must verify. Choosing either one alone would let an agreement that requires both boundaries pass with one.
+   - **A missing reference fails a required lane.** A required lane with no reference fails the facet. That includes a receipt with no `worker_profile` at all, a profile with no `launch_ref` or `launch_attempt`, and a profile whose kind or launch reference differs from the run plan's expected worker identity.
    - **References and attempt binding, per lane.** The map uses only kernel-bound or runner-bound references in the signed receipt, whatever the backend. Each reference has its own attempt binding (rule 5.2.8):
      - tool lane, `LinuxCage`: `native_launch { receipt_id, receipt_sha256 }` (5.1). It carries no separate attempt field. Its attempt identity is `receipt_id`, the cage enforcement receipt that names one spawn, so the matched record has `native_record_digest = receipt_sha256` and `attempt_id = receipt_id`. A long-lived adapted server references one spawn from many receipts, which all map to that one record;
      - tool lane, any other backend: `confinement_launch { record_schema, record_sha256, attempt_id }` (rule 5.1.6), matched on `record_sha256` and its own `attempt_id`;
      - worker lane (`ProcessContainer`, `confined_reader`, or a `split_domain` controller): `chio_process.worker_profile.launch_ref.record_sha256` and `worker_profile.launch_attempt` (6.3), never `chio_process.attempt`.
    - **Match, keyed by (receipt, lane).** For each applicable lane, exactly one attested record must have `lane` equal to that lane, `native_record_digest` equal to that lane's reference digest, and `attempt_id` equal to that lane's attempt binding. The facet fails when an applicable lane has no reference, zero matching records, or more than one matching record in that lane, or when a reference matches only a record of the other lane.
-   - **No substitution.** A disclosed `tool_origin` never substitutes for a reference in scope. Only receipts outside the scope, such as in-process `ChioInternal` tools the agreement permits, fall back to the disclosure table. A record attested for an attempt that no in-scope receipt references vouches for nothing.
+   - **No substitution.** A disclosed `tool_origin` never substitutes for a reference in scope. Only receipts outside the scope, such as in-process `ChioInternal` tools the agreement permits, fall back to the disclosure table. A record attested for an attempt that no in-scope receipt references vouches for nothing, and it never satisfies a required lane on its own.
 4. **Requiring it.** An agreement or finding requires confinement by setting `runtime_assurance_tier = Basic` and adding a trust-policy rule that accepts the schema. Verifiers deny unless the evidence is present (`Unavailable` and `Asserted` never pass a required facet; V:`report.rs:107-110`). The paper's host premise becomes a negotiated, checkable term. No facet is added.
 5. **Scope.** Execution evidence attests local execution only (V:`execution_evidence.rs:1`). A confinement record attests the exporter's own launches, never a remote owner's.
 6. **Appraisal registration (required before rule 4 can pass).** On the baseline, `derive_runtime_attestation_appraisal` accepts four schemas and returns `UnsupportedSchema` for any other before local trust policy runs (`main`/V: `crates/economy/chio-appraisal/src/appraisal.rs:711-750`). The shared trust boundary repeats the closed list (V: `crates/core/chio-core-types/src/runtime_attestation.rs:65-110`), and so does the signed-artifact schema table (V: `signed_artifact.rs:1247-1250`). A trust-policy rule alone therefore cannot accept confinement evidence. One change adds:
@@ -481,6 +500,8 @@ Output: `docs/research/2026-10-ftl-isolation-spike.md`.
 | Signing the container success record fails after the start | Container stopped. Attempt recorded `BootstrapFailed`. No call is admitted |
 | An in-scope production receipt lacks a reference for an applicable lane, or matches zero or several attested records in that lane, or matches only a record of the other lane | Facet fails, whatever its `tool_origin` |
 | A receipt to which both lanes apply verifies in only one lane | Facet fails |
+| A receipt in a scope that requires the worker lane has no `worker_profile`, or its profile has no launch reference, or the profile differs from the run plan's expected worker | Facet fails. The lane is required by the agreement and run plan, not by the receipt (rule 7.3) |
+| A `container` or `split_domain` context with pinned bootstrap input and no trust assertion | Profile still `Verified`. Pinned contributions join `External` (spec 11 I7a), so a `Trusted` requirement denies |
 | The verifier's appraisal layer does not know the confinement attestation schema | `UnsupportedSchema`. Facet fails |
 | The `worker_profile` fact is unverified (absent, mismatched, unverifiable, lookup failed) | The context starts at `unknown` (spec 11 rule I7). Integrity-gated calls deny |
 | Projection error (unknown schema, missing surface) | No record. A facet requiring it is `Unavailable`, which denies |
@@ -513,7 +534,8 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
   - the adapted server returns its spawn receipt while alive, and preparation errors after `Exited`;
   - the disclosure table is rendered for every `ToolOrigin`;
   - `worker_profile` mismatch denies;
-  - each `worker_profile` qualification failure (absent, mismatched, unverifiable record, failed lookup, unpinned `container` plan) yields `Unverified` and an `unknown` initial influence.
+  - each `worker_profile` qualification failure (absent, mismatched, unverifiable record, failed lookup, image digest differing from the run plan) yields `Unverified` and an `unknown` initial influence;
+  - a `Verified` `container` profile with a pinned external task input and no `BootstrapTrustAssertionV1` starts with that contribution as `External`, not trusted (spec 11 I7a).
 - **Proptest:** projection determinism; `FullyEnforced` is rejected with any `NotEnforced` or `SameDomain` isolation surface, and with any withheld-by-contract channel that is not `Enforced`; native digest mismatch is rejected.
 - **Container:** the inspection comparator rejects each single-field deviation from the fixed profile (capabilities, seccomp, network, mounts, read-only root, limits). A start failure yields a signed `BootstrapFailed` record and no success record. A worker call before the success record is committed is refused.
 - **chio-conformance:** extend `tool_server_escape` (M:`crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs`):
@@ -525,6 +547,8 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
   - an in-scope receipt carries no reference, even under a permitted `tool_origin`;
   - two attested records match one receipt in the same lane;
   - a receipt to which both lanes apply (a `container` worker calling a caged execution tool) passes with one record per lane, and fails when either lane's record is omitted;
+  - on a receipt whose run plan requires both lanes, each single-lane omission fails: the tool lane's `native_launch` or `confinement_launch` removed, and the worker lane's `launch_ref` removed;
+  - the same receipt with the whole `worker_profile` object absent fails, while the bundle contains a valid worker-lane record that no receipt references;
   - a record whose `attempt_id` differs from the lane's attempt binding (wrong spawn, wrong `confinement_launch.attempt_id`, or `chio_process.attempt` used in place of `launch_attempt`) is rejected;
   - the verifier predates the appraisal registration (`UnsupportedSchema`).
 - **Confined reader:** an export of an admitted P5 return projects to a worker-lane record with `inherited_authority = Absent` and `output_channels` showing only `Value`. An export whose retained evidence differs from the pinned helper or image digest is rejected. An export of a `Cancelled` boundary carries no return evidence.
@@ -572,6 +596,13 @@ Refinements to the review directives, recorded with evidence:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-7-01 | Exactly one confinement record per receipt rejects calls covered by both lanes | Fixed. The match is now exactly one record per applicable lane, keyed by (receipt, lane), and both are required when both lanes apply. Each reference has its own attempt binding: `native_launch` uses its cage enforcement `receipt_id` as the attempt identity, `confinement_launch` carries `attempt_id`, and the worker lane uses a new runner-bound `worker_profile.launch_attempt`, because `chio_process.attempt` numbers operation retries, not launches (M:`chio-process/src/lib.rs:455-461`) | Section 7 rule 3; rule 5.2.8; section 6.3 rules 2 and 5; section 10; section 13 |
+
+### Independent review pass 2 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-7-02 | Worker-lane applicability is defined using the evidence whose absence should fail verification | Fixed. The verifier derives the required lanes and the expected worker identity from the agreement scope and signed run plan before reading receipt evidence. The worker lane is required for every in-scope receipt under the worker attempt, whether or not it carries `worker_profile`. A missing profile, a missing launch reference, or a profile that differs from the run plan fails the facet, and an unreferenced record never satisfies a required lane. Tests cover each single-lane omission and a fully absent profile | rule 6.3.3; section 7 rule 3; section 10; section 13 |
+| R-11-05 (spec 7 side) | Pinning bootstrap bytes is treated as proof that those bytes have no external influence | Fixed with spec 11 I7a. The `container` qualification predicate is now a boundary check (image digest equals the run plan), not input pinning. `Verified` attests only "no channel outside mediation". Bootstrap contributions are joined under I7a, and pinned ones are `External` without an operator-signed assertion. S1-S5 note that boundary qualification is not input trust | S1-S5 note; rule 6.3.5; section 6.3 formal block; section 10; section 13 |
 
 ## Appendix A. FTL reference
 

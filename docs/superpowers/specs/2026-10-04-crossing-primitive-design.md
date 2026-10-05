@@ -267,6 +267,7 @@ pub enum CrossingResult {
     Refused(CrossingRefused),              // typed reason, no state change
     OutcomeUnknown,                        // COMMIT or the post-COMMIT anchor sync failed; owner poisoned
     Retry,                                 // the batch transaction was lost before COMMIT (X21); re-queue
+    StoreUnavailable,                      // known not committed; the store cannot run this member now (X21 retry exhaustion, poisoned owner, failed recovery fence)
 }
 ```
 
@@ -275,9 +276,9 @@ pub enum CrossingResult {
 | Kind of reason | Reasons |
 |---|---|
 | Policy refusals | `KernelStopped`, `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict` |
-| Non-policy | `VersionConflict` (the planned CAS saw another version, X5), `Unavailable` (fast-path preconditions do not hold, so the driver re-plans the slow path), `Overloaded` (the writer queue is full, so the refusal comes before any write) |
+| Non-policy | `VersionConflict` (the planned CAS saw another version, X5), `Unavailable` (fast-path preconditions do not hold, so the driver re-plans the slow path; never a storage failure), `Overloaded` (the writer queue is full, so the refusal comes before any write) |
 
-Spec 9 receives refusals as `CommitFailed { reason }`, `OutcomeUnknown` as the distinct event `CommitOutcomeUnknown`, and `Retry` as nothing: the driver re-submits.
+Spec 9 receives refusals as `CommitFailed { reason }`, `OutcomeUnknown` as the distinct event `CommitOutcomeUnknown`, `StoreUnavailable` as the distinct event `StoreUnavailable` (spec 9 M19: the same member is retained and re-fed, never compensated), and `Retry` as nothing: the driver re-submits.
 
 ### 4.2 Checks per kind
 
@@ -443,11 +444,13 @@ Rules:
     - the signed deny receipt, as its terminal evidence.
 
     Admission rule 4 ("terminal tombstones retained") and `unique(request_namespace_digest, request_id) -> one operation_id` hold unchanged for these reasons. `Unavailable` re-plans with no tombstone, `VersionConflict` re-projects, and `Overloaded` denies with a receipt before admission.
+    - **Identity disposition (spec 9 M20).** The tombstone's receipt, and the compensation receipt of a refusal from `Prepared` (X10), carry `chio_runtime.identity_disposition = Terminal`. The `Overloaded` deny carries `Reusable`. So does a `StoreUnavailable` deny before any row, because no tombstone could commit.
 
     - **X15a. Stop denials are temporary (spec 8 S15, S8-17).** `KernelStopped` writes no tombstone on either tier.
       - A tier-1 early denial, and a fused intent commit refused with `KernelStopped`, sign a deny receipt carrying `observed_epoch` and persist no operation row. The request id stays usable after resume.
       - This keeps today's behavior: M:'s early stop check runs before any begin commit. It also avoids an anchored write per denied request in the middle of an incident.
-      - A slow-path operation that already has a begin row still compensates, as today, and its id is terminal (spec 9 M10, M15).
+      - A slow-path operation that already has a begin row still compensates, as today, and its id is terminal (spec 9 M10, M15). The same holds for a fused intent from `Prepared` (X10).
+      - **Identity disposition (spec 9 M20).** The tier-1 and fused-from-`Unbegun` stop denials carry `identity_disposition = Reusable`, and spec 8's `retryable_after_resume = true`. The `Prepared` and slow-path stop compensations carry `Terminal` and `retryable_after_resume = false`. The two fields always agree.
 
 ### 6.4 Refusals after the effect
 
@@ -514,7 +517,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
       - A full queue therefore cannot keep an operator from stopping the kernel.
       - Under X21, a lost transaction answers `Retry`, and the lane re-runs first. A stop that cannot become durable (for example on `SQLITE_FULL`) is covered by spec 8's fsynced stop-intent latch, written before the transaction. Boot honors that latch until a durable head supersedes it.
     - **X17b. Post-effect members bypass the queue bound.** `Overloaded` applies only to members that would start new work: intent commits, check-only dispatches, slow-path pre-dispatch steps, and non-admission writes such as budget administration.
-      - Post-effect members are never refused with `Overloaded`: return records, outcome commits, release crossings, `Terminalize`, `Compensate` and `ReleaseHold`. A rail adapter used for an unknown-outcome `ReleaseHold` must support idempotent submission or an authoritative status query by the release's idempotency key (spec 9 M7a). Refusing one would turn a known outcome into an unknown one, or strand a hold.
+      - Post-effect members are never refused with `Overloaded`: return records, outcome commits, release crossings, `Terminalize`, `Compensate` and `ReleaseHold`. A rail adapter used for an unknown-outcome `ReleaseHold` must declare one of two capabilities over the hold's `hold_release_key` (spec 9 M7a). `IdempotentPerKey` means at most one release executes per key for the hold's lifetime, whatever request body carries it. `FenceByKey` means a terminal fence whose success excludes later acceptance of any request with that key. A status query alone does not qualify, so the `ExternalPrepare { Settle }` crossing refuses a release on an adapter without either capability, before any rail call. Refusing one would turn a known outcome into an unknown one, or strand a hold.
       - Their number is bounded by operations already admitted. Each dispatched operation has at most one post-effect member queued, so admitting them past the bound cannot grow the queue without limit.
 18. **X18. No added latency at low load.** The loop never waits to fill a batch. At concurrency 1, latency is unchanged.
 19. **X19. Linearization.** Members execute serially in dequeue order, each seeing earlier members' effects. Every CAS keeps its meaning.
@@ -524,15 +527,16 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
     - If the transaction is gone, every member gets `Retry` (known not committed) and re-queues. No member ever runs outside the batch transaction.
     - **If the transaction is still active,** SQLite kept it open, whatever the error code. Before anything else, the loop runs `ROLLBACK TO` and then `RELEASE` for that member's savepoint, discarding every write the member made. Then:
       - a uniqueness or CAS-guard constraint answers `Refused(VersionConflict)`, which spec 9 re-projects;
-      - any other error answers that member `Retry`, known not committed. After `member_fault_retries` (default 2) consecutive failures of the same planned member, it is answered `Refused(Unavailable)` instead and a store incident is raised. Spec 9 never compensates on either reason by itself (M10, M11);
+      - any other error answers that member `Retry`, known not committed. After `member_fault_retries` (default 2) consecutive failures of the same planned member, it is answered `StoreUnavailable` instead and a store incident is raised. `StoreUnavailable` is distinct from `Refused(Unavailable)`, which means only that a fused form is ineligible. Spec 9 retains the same member for every effect and never compensates or terminalizes because of it (spec 9 M19);
       - the next member runs only after the savepoint rollback succeeds, so no member executes against a partially applied predecessor.
     - **If `ROLLBACK TO` or `RELEASE` fails,** the loop issues `ROLLBACK` for the whole transaction. No `COMMIT` was issued, so every member is known not committed and gets `Retry`. The writer discards the connection and reopens it through the X9 connection-recovery fence before the next batch.
-      - If the fence fails, the owner is poisoned. Queued members are answered `Refused(Unavailable)`, so pre-dispatch drivers deny and post-effect drivers retain (spec 9 M10, M11).
+      - If the fence fails, the owner is poisoned. Queued members are answered `StoreUnavailable` (spec 9 M19). Pre-dispatch drivers with no row deny with a `Reusable` receipt; every other member is retained with its holds until `StartupReconciler` re-drives it after restart.
       - A stop or resume in the priority lane is still covered by spec 8's stop-intent journal (S25).
     - In-memory side effects of a member (the trusted-time fence, caches) are buffered and applied only after `COMMIT`.
+    - **`store_healthy`.** After a batch commits following a store incident, the writer emits `store_healthy` once. Spec 9's `StoreRecoveryDriver` re-feeds every retained member on it, and with bounded backoff otherwise.
 22. **X22. Unknown outcomes.**
     - If `COMMIT` fails with an unknown outcome, the owner is poisoned and every member gets `OutcomeUnknown`. The same happens when the anchor sync fails after a successful `COMMIT` (`serving_owner.rs:284-289`).
-    - Spec 9 emits `HaltOperation` for each member's operation: no dispatch, no compensation, holds and credentials retained (spec 3's `BoundaryFailure::CommitUnconfirmed`). Restart reconciles each one. The halt is per operation; the poisoned owner, not a kernel latch, is what stops further writes until restart.
+    - Spec 9 emits `HaltOperation` for each member's operation: no dispatch, no compensation, holds and credentials retained (spec 3's `BoundaryFailure::CommitUnconfirmed`). Restart reconciles each one. The halt is per operation; the poisoned owner, not a kernel latch, is what stops further writes until restart. Members queued after the poisoning are answered `StoreUnavailable` (X21, spec 9 M19).
     - A `DispatchIntent` member reconciled as `DispatchCommitted` is terminalized as outcome-unknown with holds frozen, even though the driver never handed off. This is the batch's blast radius, bounded by `max_intent_members`. Release then needs the existing counterparty authorities (section 19).
 
 ## 10. Writer sharding (later phase, with preconditions)
@@ -594,8 +598,8 @@ These extend M: `native-restart-safety.md`'s matrix:
 | C7. Restore to a prefix at or above the anchor | Progress-only suffix lost | X6: no refused crossing becomes allowed. A lost return record becomes unknown |
 | B1. Batch `COMMIT` outcome unknown | Unknown for every member | Owner poisoned; restart reconciles each member |
 | B2. Batch transaction lost before `COMMIT` | Nothing from the batch | Members get `Retry` (X21) |
-| B2a. Statement error with the transaction still active | That member's savepoint is rolled back; other members are unaffected | That member gets `VersionConflict`, `Retry`, or `Unavailable` after `member_fault_retries` (X21) |
-| B2b. Savepoint rollback fails | The whole transaction is rolled back | Members get `Retry`; the connection is reopened through X9; the owner is poisoned if the fence fails (X21) |
+| B2a. Statement error with the transaction still active | That member's savepoint is rolled back; other members are unaffected | That member gets `VersionConflict`, `Retry`, or `StoreUnavailable` after `member_fault_retries` (X21). Spec 9 M19 retains it; `store_healthy` re-feeds it |
+| B2b. Savepoint rollback fails | The whole transaction is rolled back | Members get `Retry`; the connection is reopened through X9. If the fence fails, the owner is poisoned and queued members get `StoreUnavailable` (X21) |
 | R1. Receipt not yet materialized | Receipt in the terminal projection | The mover resumes; status `signed_but_not_durable` |
 | R1a. Crash after the `receipts.db` append, before the mover advances | Receipt in the log and in the terminal projection | The re-run append conflicts on `(namespace, log_sequence)` and `receipt_id`, the digests match, and nothing is appended (rule 24) |
 | R2. Check-only or `NonDurable` receipt append outcome unknown | The append may or may not commit | Spec 9 M16: `KernelEvidenceLatch` with a buffered fault record; read back the original id before appending any fault receipt (rule 28) |
@@ -637,7 +641,7 @@ The B: kernel-only and sustained-load figures stay as context (section 2.8).
 ## 15. Protocol, schema and wire impact
 
 - **Native wire, verdicts and receipt format:** none, except spec 8's `OutputWithheld` result for a stop-withheld two-commit read (X14a), which spec 8 defines.
-- **Receipt metadata:** `chio_runtime.crossing { kind, batch_index, writer_epoch }` on check-only reads and `NonDurable` calls, a `withheld` decision reason on refused releases, and the stop head's `observed_epoch` on `KernelStopped` denials (X15a).
+- **Receipt metadata:** `chio_runtime.crossing { kind, batch_index, writer_epoch }` on check-only reads and `NonDurable` calls, a `withheld` decision reason on refused releases, the stop head's `observed_epoch` on `KernelStopped` denials (X15a), and `chio_runtime.identity_disposition` on every non-allow receipt (spec 9 M20). `chio_runtime` and `receipt_context` are kernel-reserved keys that caller metadata cannot set (spec 9 M20).
 - **`spec/PROTOCOL.md` section 6:** durable-before-allow is satisfied by the receipt in the anchored terminal projection. A receipt is audit-complete when the receipt store and a checkpoint cover it.
 - **Admission design amendments:** X14 and X14a (the opt-in two-commit read and its stop fallback), X15 and X15a (deny tombstones on the fused path except for `KernelStopped`; rule 4 unchanged), the caller report as a progress-only return record (section 7), and the commit classes of section 5.
 - **ADR-0013:** no rule change. The authority writer is the local WAL under rules 23 to 25.
@@ -659,7 +663,7 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
 ## 17. Tests and conformance evidence
 
 - **Apalache:** the model and mutants of section 12.
-- **Loom:** batch leader and followers; savepoint isolation; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
+- **Loom:** batch leader and followers; savepoint isolation; `StoreUnavailable` after member retry exhaustion leaves no partial member and later members unaffected; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
 - **DST:** crash injection at C1-C7, B1, B2, R2 and P1, plus restore-from-snapshot at random anchored prefixes, under random workloads. Stops are issued under `Overloaded` and under `SQLITE_FULL` injection. Under sharding, one shard is offline during a stop fan-out and then restarts; it must not serve until its replica catches up (S3). A serving shard partitioned from the origin during a stop latches `Stopped` within its 1 s lease. A crash between the `receipts.db` append and the mover's advance re-runs as a no-op (rule 24). The properties are section 8's predicates.
 - **Differential:** generated workloads run through the legacy and fused paths must reach identical terminal states, receipts and release decisions. The two-commit read is compared under its own flag.
 - **Commit-budget gates:** these are deterministic, from store hooks, and scoped to fast-path-eligible plans:
@@ -688,13 +692,16 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
   - an outcome commit under a full writer queue is never refused `Overloaded` (X17b);
   - a re-run receipt move appends nothing (rule 24);
   - a read under integrity tracking takes the durable path, and its influence join is committed before the output is delivered (X13);
-  - a member whose reply handle is dropped after enqueue still commits, and the handle's new owner receives the reply (X17).
+  - a member whose reply handle is dropped after enqueue still commits, and the handle's new owner receives the reply (X17);
+  - a `Terminalize` and a `Compensate` member that exhaust `member_fault_retries` are answered `StoreUnavailable`, never `Refused(Unavailable)`; after `store_healthy` the same member commits exactly once. After owner poisoning, queued members get `StoreUnavailable` and restart re-drives them (X21, X22);
+  - an `ExternalPrepare { Settle }` for an unknown-outcome release on a rail adapter with neither `IdempotentPerKey` nor `FenceByKey` is refused before any rail call (X17b);
+  - every non-allow receipt carries `identity_disposition`, and for stop denials it agrees with spec 8's `retryable_after_resume` (X15, X15a).
 
 ## 18. Alignment with sibling specs
 
 | Spec | What it must carry |
 |---|---|
-| Spec 9 | **Division:** spec 9 decides every transition and receipt; this spec executes the commits and reports `Committed`, `Refused`, `OutcomeUnknown` or `Retry` per crossing, and `Committed`, `Refused` or `Unknown` per receipt append (rule 28). **Effects:** `IntentCommit` (with the `from_prepared` flag), `ReturnRecord` (fused with begin-evaluation; also the caller report and the X14a fallback, never stop-checked), `OutcomeCommit`, `CheckOnlyCrossing` acknowledged by `CheckOnlyAcknowledged` (read-only and `NonDurable` classes), `DenyTombstone` (not for `KernelStopped`) and `ParticipantCommit`. **Events:** `CommitFailed` reasons including `Overloaded`; `CommitOutcomeUnknown` (`HaltOperation`, no compensation, reconcile at restart); `ReceiptAppendFailed`. **Inputs:** `EvaluationContext` must carry whether the driver permits redispatch on unknown (X14). **Section 6.4:** post-effect refusal handling, spec 9 M11 and M16 |
+| Spec 9 | **Division:** spec 9 decides every transition and receipt; this spec executes the commits and reports `Committed`, `Refused`, `OutcomeUnknown` or `Retry` per crossing, and `Committed`, `Refused` or `Unknown` per receipt append (rule 28). **Effects:** `IntentCommit` (with the `from_prepared` flag), `ReturnRecord` (fused with begin-evaluation; also the caller report and the X14a fallback, never stop-checked), `OutcomeCommit`, `CheckOnlyCrossing` acknowledged by `CheckOnlyAcknowledged` (read-only and `NonDurable` classes), `DenyTombstone` (not for `KernelStopped`) and `ParticipantCommit`. **Events:** `CommitFailed` reasons including `Overloaded`; `CommitOutcomeUnknown` (`HaltOperation`, no compensation, reconcile at restart); `StoreUnavailable` (M19: retain the same member, re-feed on `store_healthy`); `ReceiptAppendFailed`. **Receipts:** every non-allow receipt carries spec 9 M20's `identity_disposition`. **Inputs:** `EvaluationContext` must carry whether the driver permits redispatch on unknown (X14). **Section 6.4:** post-effect refusal handling, spec 9 M11 and M16 |
 | Spec 11 | Owns `KnowledgeIntegrity` semantics. It runs inside the intent commit and every dispatch-commit step, fast or slow. In the check-only dispatch it applies only to non-grant requirements, because grant constraints make a call ineligible (X13). The outcome commit records the output influence join. A call under integrity tracking never takes the check-only or `NonDurable` path, so every delivery it makes has an outcome commit to carry the join (X13, X13c) |
 | Spec 3 | Spec 3 owns the affine driver contract, `LatchScope` and the ledger. Its obligation is discharged by the acknowledgement of a spec 9 M14 discharge effect that this spec executes: the outcome commit, the return record, a terminal projection, or the rule 28 receipt append. The `Reservations` check writes only `Compensable` holds and records `Commitment` entries by reference. Spec 3 phase 1's obligation and kernel-evidence latch close D1 on the check-only and `NonDurable` paths (X13b, X13c). `HaltOperation` is spec 3's `LatchScope::Operation` |
 | Spec 4 | The dispatch-commit fence is the `ClosureFence` check. Section 4.1's new crossing kinds join its section 4.3 table. Refused releases terminalize through a restrictive, non-crossing `DeniedAfterDelivery`, so its drain terminates |
@@ -840,3 +847,12 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4181461517 | Recheck revocation on check-only release | Fixed now. The X13a release crossing rechecks stop, fence and revocation, matching the durable `OutputRelease` row. A revocation after dispatch withholds the output under spec 9 M11's post-effect handling, for both check-only reads and `NonDurable` calls | X13a |
+
+### Independent review pass 2 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-9-02 | Writer escalation produces Unavailable for effects whose machine declares that result impossible | Fixed. X21 retry exhaustion, a failed recovery fence and members queued after poisoning now answer the distinct `CrossingResult::StoreUnavailable`, known not committed. `Refused(Unavailable)` keeps its one meaning, a fused form is ineligible. Spec 9 M19 retains the same member for every effect, and the writer emits `store_healthy` to re-feed it | section 4.1; X21; X22; B2a, B2b; section 17 |
+| R-9-01 | A negative rail status query is not proof that an in-flight release can never arrive | Fixed with spec 9 M7a. X17b requires a declared `IdempotentPerKey` or `FenceByKey` capability over the per-hold key. The prepare crossing refuses an adapter without one, before any rail call | X17b; section 17 |
+| R-8-02 / R-6-06 | Identity disposition for retryable versus terminal denials | Fixed through spec 9 M20. Tombstones and `Prepared` or slow-path compensations are `Terminal`; tier-1, fused-from-`Unbegun` stop, `Overloaded` and no-row `StoreUnavailable` denials are `Reusable`. Spec 8's `retryable_after_resume` agrees. `chio_runtime` and `receipt_context` are kernel-reserved (R-6-05 cross-reference) | X15; X15a; section 15; section 18 |
+
