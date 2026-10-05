@@ -97,7 +97,7 @@ EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
 EXPECTED_SECURITY_RUNNER_SHA256 = (
     "793375d3fa1d3b3750591beb2c1030f2f6e050d51c1e3fbb397a7e7662736211"
 )
-EXPECTED_SECURITY_AGGREGATOR_SHA256 = "c7e8be6259cd3d6b3a5dc11feb1adc34e696192e65f48d0a0f23af5aa72ed72a"
+EXPECTED_SECURITY_AGGREGATOR_SHA256 = "7d752cd35b704dd2212fb317a8ec1a70df929df8e374bb9305b5e17313f1cc93"
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
     "c6552d29a356e634f2856669ce29d753da5aad986ed76ffae18b2022a31187fd"
 )
@@ -897,7 +897,7 @@ EXPECTED_ENTERPRISE_BOUNDARY_STEP_INVENTORIES = {
     ),
 }
 EXPECTED_TRUST_JOB_DIGESTS = {
-    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "6ba4118241e1a04192cedc12e47be095b57553b0fe5edf40b950eec9cae1f209",
+    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "407f050bd8140ef2f271ce12eae990917990648bc99d89fcc7f4e637e1bdc37f",
     (
         "enterprise-hardening",
         "bind-source",
@@ -980,6 +980,7 @@ python3 scripts/check-exact-cargo-test-inventory.py \
   --run-output "${generated_vector_run_output}" \
   active_defense_schema_and_semantics_reject_mutation_corpus \
   generated_active_defense_types_decode_reencode_and_reject \
+  generated_response_plan_requires_exact_execution_binding \
   legacy_response_transition_canonical_digest_is_unchanged \
   native_receipt_types_reject_unsafe_json_integers
 """.strip()
@@ -4878,6 +4879,7 @@ def validate_isolated_execution_job(
         execution_markers = (
             "/usr/bin/python3 -I",
             "authorized-security/scripts/aggregate-security-evidence-shards.py",
+            '--authorized-source-sha "${AUTHORIZED_SOURCE_SHA}"',
             "--candidate candidate", '--expected-sha "${EVIDENCE_SOURCE_SHA}"',
             '--image "${SECURITY_EXECUTION_IMAGE}"',
             '--shards "${RUNNER_TEMP}/evidence-shards"',

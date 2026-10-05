@@ -28,6 +28,10 @@ use reqwest::blocking::Client;
 use reqwest::header::AUTHORIZATION;
 use serde_json::{json, Value};
 
+#[path = "trust_cluster/authority_fixture.rs"]
+mod authority_fixture;
+use authority_fixture::provision_cluster_authorities;
+
 #[path = "trust_cluster/revocation_proof.rs"]
 mod revocation_proof;
 const TRUST_CLUSTER_QUALIFICATION_RUNS: usize = 5;
@@ -86,14 +90,6 @@ fn cluster_peer_auth_signature(
     }))
     .expect("encode cluster peer auth payload");
     sha256_hex(&payload)
-}
-
-fn unique_test_dir() -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-cli-trust-cluster-{nonce}"))
 }
 
 fn workspace_root() -> PathBuf {
@@ -181,7 +177,7 @@ fn spawn_trust_service(
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()
         .expect("spawn chio trust serve");
 
@@ -1047,12 +1043,12 @@ fn assert_lineage_visible(client: &Client, base_url: &str, token: &str, capabili
 fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize) {
     println!("trust-cluster proving run {run_index}/{run_total}");
 
-    let dir = unique_test_dir().join(format!("run-{run_index}-of-{run_total}"));
-    fs::create_dir_all(&dir).expect("create test dir");
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(&dir, &["authority-a.sqlite3", "authority-b.sqlite3"]);
+    let nodes = reserve_cluster_nodes(2);
+    let (addr_a, url_a) = nodes[0].clone();
+    let (addr_b, url_b) = nodes[1].clone();
     let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
     let service_token = "cluster-token";
 
@@ -1601,8 +1597,9 @@ fn trust_cluster_runtime_assurance_policy_gates_capability_issuance() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir();
-    fs::create_dir_all(&dir).expect("create temp dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(&dir, &["authority.sqlite3"]);
 
     let addr = reserve_listen_addr();
     let base_url = format!("http://{addr}");
@@ -1764,13 +1761,13 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("cluster-node-identity");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(&dir, &["authority-a.sqlite3", "authority-b.sqlite3"]);
 
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
+    let nodes = reserve_cluster_nodes(2);
+    let (addr_a, url_a) = nodes[0].clone();
+    let (addr_b, url_b) = nodes[1].clone();
     let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
     let service_token = "cluster-node-identity-token";
 
@@ -1850,8 +1847,16 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("quorum-heal");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(
+        &dir,
+        &[
+            "authority-a.sqlite3",
+            "authority-b.sqlite3",
+            "authority-c.sqlite3",
+        ],
+    );
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();
@@ -2060,8 +2065,16 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("authority-fence-failover");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(
+        &dir,
+        &[
+            "authority-a.sqlite3",
+            "authority-b.sqlite3",
+            "authority-c.sqlite3",
+        ],
+    );
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();
@@ -2301,13 +2314,13 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("budget-quorum-commit-timeout");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(&dir, &["authority-a.sqlite3", "authority-b.sqlite3"]);
 
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
+    let nodes = reserve_cluster_nodes(2);
+    let (addr_a, url_a) = nodes[0].clone();
+    let (addr_b, url_b) = nodes[1].clone();
     let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
     let service_token = "budget-quorum-commit-timeout-token";
 
@@ -2414,13 +2427,13 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("denied-budget-events");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(&dir, &["authority-a.sqlite3", "authority-b.sqlite3"]);
 
-    let addr_a = reserve_listen_addr();
-    let addr_b = reserve_listen_addr();
-    let url_a = format!("http://{addr_a}");
-    let url_b = format!("http://{addr_b}");
+    let nodes = reserve_cluster_nodes(2);
+    let (addr_a, url_a) = nodes[0].clone();
+    let (addr_b, url_b) = nodes[1].clone();
     let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
     let follower_url = if expected_leader_url == url_a {
         url_b.clone()
@@ -2569,8 +2582,16 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("late-joiner");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(
+        &dir,
+        &[
+            "authority-a.sqlite3",
+            "authority-b.sqlite3",
+            "authority-c.sqlite3",
+        ],
+    );
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();
@@ -2757,8 +2778,16 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("snapshot-budget-holds");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(
+        &dir,
+        &[
+            "authority-a.sqlite3",
+            "authority-b.sqlite3",
+            "authority-late.sqlite3",
+        ],
+    );
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_late, late_url) = nodes[0].clone();
@@ -3016,8 +3045,16 @@ fn trust_control_cluster_multi_region_partition_qualification() {
     }
 
     let _test_lock = trust_cluster_test_lock();
-    let dir = unique_test_dir().join("multi-region-qualification");
-    fs::create_dir_all(&dir).expect("create test dir");
+    let temporary = chio_test_support::private_tempdir().expect("private cluster fixture");
+    let dir = temporary.path().to_path_buf();
+    provision_cluster_authorities(
+        &dir,
+        &[
+            "authority-a.sqlite3",
+            "authority-b.sqlite3",
+            "authority-c.sqlite3",
+        ],
+    );
 
     let nodes = reserve_cluster_nodes(3);
     let (addr_a, url_a) = nodes[0].clone();

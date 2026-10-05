@@ -201,6 +201,53 @@ class AggregationContractTests(unittest.TestCase):
             with self.assertRaises(self.aggregate.AggregationError):
                 self.aggregate.shard_directories(root)
 
+    def test_authorization_preserves_only_bounded_regular_evidence_descendants(self):
+        aggregate = self.aggregate
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            aggregate.git(root, "init", "--quiet")
+            aggregate.git(root, "config", "user.name", "Evidence test")
+            aggregate.git(root, "config", "user.email", "evidence@example.invalid")
+            (root / "source.rs").write_text("reviewed source\n")
+            outputs = root / aggregate.CHECKER.DERIVED_LINUX_EVIDENCE_ROOT
+            outputs.mkdir(parents=True)
+            for name in aggregate.CHECKER.DERIVED_LINUX_EVIDENCE_FILES:
+                (outputs / name).write_text("source evidence\n")
+            aggregate.git(root, "add", ".")
+            aggregate.git(root, "commit", "--quiet", "-m", "source")
+            source = aggregate.git(root, "rev-parse", "HEAD").decode().strip()
+            aggregate.require_authorized_candidate(root, source, source)
+            output = outputs / "enterprise-migration-canary.json"
+            for index in range(33):
+                output.write_text(f"evidence {index}\n")
+                aggregate.git(root, "add", ".")
+                aggregate.git(root, "commit", "--quiet", "-m", "evidence")
+            descendant = aggregate.git(root, "rev-parse", "HEAD").decode().strip()
+            with self.assertRaises(aggregate.AggregationError):
+                aggregate.require_authorized_candidate(root, descendant, source)
+            aggregate.git(root, "reset", "--hard", "HEAD~1")
+            descendant = aggregate.git(root, "rev-parse", "HEAD").decode().strip()
+            aggregate.require_authorized_candidate(root, descendant, source)
+            for mutation in ("source", "symlink", "executable", "deletion", "empty"):
+                with self.subTest(mutation=mutation):
+                    aggregate.git(root, "reset", "--hard", source)
+                    if mutation == "source":
+                        (root / "source.rs").write_text("unreviewed source\n")
+                    elif mutation == "symlink":
+                        output.unlink()
+                        output.symlink_to("../../../source.rs")
+                    elif mutation == "executable":
+                        output.chmod(0o755)
+                    elif mutation == "deletion":
+                        output.unlink()
+                    aggregate.git(root, "add", ".")
+                    aggregate.git(
+                        root, "commit", "--quiet", "--allow-empty", "-m", mutation
+                    )
+                    changed = aggregate.git(root, "rev-parse", "HEAD").decode().strip()
+                    with self.assertRaises(aggregate.AggregationError):
+                        aggregate.require_authorized_candidate(root, changed, source)
+
     def prepare_git_shards(self, root):
         aggregate = self.aggregate
         candidate = root / "candidate"
@@ -283,7 +330,12 @@ class AggregationContractTests(unittest.TestCase):
             ) as validate:
                 with self.assertRaisesRegex(aggregate.AggregationError, "incomplete"):
                     aggregate.aggregate(
-                        candidate, source, shards, output, "sha256:" + "c" * 64
+                        candidate,
+                        source,
+                        shards,
+                        output,
+                        "sha256:" + "c" * 64,
+                        authorized_source=source,
                     )
                 validate.assert_called_once()
             self.assertFalse(output.exists())
@@ -294,7 +346,12 @@ class AggregationContractTests(unittest.TestCase):
                 return_value={"diagnostic_test_double": True},
             ) as validate:
                 aggregate.aggregate(
-                    candidate, source, shards, output, "sha256:" + "c" * 64
+                    candidate,
+                    source,
+                    shards,
+                    output,
+                    "sha256:" + "c" * 64,
+                    authorized_source=source,
                 )
                 validate.assert_called_once()
             published = json.loads(
@@ -307,6 +364,60 @@ class AggregationContractTests(unittest.TestCase):
             self.assertEqual(
                 aggregate.git(candidate, "rev-parse", "HEAD").decode().strip(), source
             )
+            self.assertEqual(aggregate.git(candidate, "status", "--porcelain"), b"")
+
+    def test_evidence_descendant_keeps_reviewed_tooling_identity_during_composition(
+        self,
+    ):
+        aggregate = self.aggregate
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            candidate, authorized, shards = self.prepare_git_shards(root)
+            evidence = candidate / aggregate.CHECKER.DERIVED_LINUX_EVIDENCE_ROOT
+            evidence.mkdir(parents=True)
+            for name in aggregate.CHECKER.DERIVED_LINUX_EVIDENCE_FILES:
+                (evidence / name).write_text("signed output fixture\n")
+            aggregate.git(candidate, "add", ".")
+            aggregate.git(
+                candidate,
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "--quiet",
+                "--no-gpg-sign",
+                "-m",
+                "evidence descendant",
+            )
+            source = aggregate.git(candidate, "rev-parse", "HEAD").decode().strip()
+            for index in range(7):
+                directory = shards / f"shard-{index}"
+                path = directory / "all-evidence-inventory.json"
+                inventory = json.loads(path.read_bytes())
+                inventory["source_sha"] = source
+                path.write_bytes(aggregate.canonical(inventory))
+                (directory / "source-sha.txt").write_text(source + "\n")
+            output = root / "output"
+            with mock.patch.object(
+                aggregate,
+                "validate_composed",
+                return_value={"diagnostic_test_double": True},
+            ) as validate:
+                aggregate.aggregate(
+                    candidate,
+                    source,
+                    shards,
+                    output,
+                    "sha256:" + "c" * 64,
+                    authorized_source=authorized,
+                )
+                self.assertEqual(validate.call_args.args[1], authorized)
+            published = json.loads(
+                (output / "all-evidence-inventory.json").read_bytes()
+            )
+            self.assertEqual(published["source_sha"], source)
+            self.assertEqual(published["authorized_source_sha"], authorized)
             self.assertEqual(aggregate.git(candidate, "status", "--porcelain"), b"")
 
 

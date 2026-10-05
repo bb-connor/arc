@@ -2632,6 +2632,16 @@ assert_rejected(
     "bypasses the trusted execution runner",
 )
 assert_rejected(
+    "aggregation conflates candidate and authorized tooling source",
+    "enterprise-linux-capture.yml",
+    replace_in_named_step(
+        "Compose exact shards and require isolated complete validation",
+        '--authorized-source-sha "${AUTHORIZED_SOURCE_SHA}"',
+        '--authorized-source-sha "${EVIDENCE_SOURCE_SHA}"',
+    ),
+    "bypasses the trusted execution runner",
+)
+assert_rejected(
     "capture marks unsigned data signed",
     "enterprise-linux-capture.yml",
     replace_in_named_step(

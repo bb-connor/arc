@@ -35,7 +35,7 @@
 
 - [x] Strengthen the structural test to include the existing nested materializer regression. Run it and observe the omitted test failure.
 - [x] Add the missing test to the gate and correct the reported total. Preserve all existing required names.
-- [ ] Run the structural suite and actual deception targets. Inspect remaining active-defense target inventories and execute downstream gates before a hosted retry.
+- [x] Run the structural suite and actual deception targets. Inspect remaining active-defense target inventories and execute downstream gates before a hosted retry.
 
 ### Task 2: Supply native conformance prerequisites and early rejection
 
@@ -46,7 +46,7 @@
 - [x] Add a regression proving absent launch authority returns its specific error before a Cargo invocation or destructive result-directory preparation.
 - [x] Validate and retain launch arguments at harness entry, then use that same validated configuration for provisioning.
 - [x] Extend workflow contract coverage to the enterprise conformance consumer, observe failure, and add the existing host/authority fixture and enforcing CLI build in a separate prerequisite candidate.
-- [ ] Execute the failing live target first on the native diagnostic host, followed by every conformance target and the remaining portable steps.
+- [x] Execute the failing live target first on the native diagnostic host, followed by every conformance target and the remaining portable steps.
 
 ### Task 3: Make evidence failures diagnosable and qualify inputs first
 
@@ -56,8 +56,8 @@
 
 - [x] Retain exact job logs, source/auth identities and the current native attempt. Reproduce freshness refusal without a full compilation campaign.
 - [x] Add failure-diagnostic controls covering oversized output, control characters, collection failure and mandatory cleanup before changing the runner.
-- [ ] Run cheap input/contract checks and all affected script tests before building the native image.
-- [ ] Measure the full mutation campaign against its fixed bound. If scheduling cannot satisfy it, design and test complete, isolated campaign sharding before another full attempt; do not raise the bound or omit campaigns.
+- [x] Run cheap input/contract checks and all affected script tests before building the native image.
+- [x] Measure the full mutation campaign against its fixed bound. If scheduling cannot satisfy it, design and test complete, isolated campaign sharding before another full attempt; do not raise the bound or omit campaigns.
 
 ### Task 4: Freeze, review and run complete qualification
 
@@ -145,3 +145,38 @@ atomically; 79 tests pass across the affected report targets. Strict Clippy for
 all CLI, conformance and xtask targets passes after correcting one existing
 conformance test sort warning. PR #1175 is the workflow prerequisite. Its first
 Codex integration attempt returned an error; a new independent review is running.
+
+
+## Final component checkpoint
+
+The cached native rerun on source repair `6a3a397c475bd2d4abbd403b605e5be1c20ec028`
+passes all six stages: enforcing helper/discovery, privileged probe, independent
+fixture provisioning, enforcing CLI build, every conformance target and the full
+consumer-boundary gate. This remains diagnostic evidence, not isolated final
+qualification. The owned worker was stopped after the logs were retained.
+
+The remaining CLI cluster failures came from absent operator-provisioned
+replication anchors. Private fixture directories and explicit public-anchor plus
+signed-envelope provisioning now let all eight active cluster scenarios pass,
+including 20 partition/heal samples, late joiners and stale-term rejection. The
+three previously ignored scenarios remain recorded separately. Reputation
+issuance passes its one test. Strict lint passes for the changed fixtures.
+
+Executing the next portable step exposed a fifth generated-vector test omitted
+from the workflow's exact list. All five tests pass; the old list fails with the
+specific unexpected execution-binding regression, and the repaired list passes.
+The trusted definition and its exact workflow contract now include that test.
+
+Codex review of prerequisite #1175 found an S/E identity conflation after shard
+execution. Aggregation now keeps candidate E separate from authorized tooling S
+and independently enforces the controller's maximum 32 single-parent descendants
+restricted to the three regular signed-output files. Ten controls pass, including
+real-Git composition and rejection of source edits, deletion, executable outputs,
+symlinks, empty commits and excess ancestry. The 64-path refreshed mutation patch
+still requires its own review and source authorization. No ancestry rule is relaxed.
+
+Ruling: the full CI-contract run begun before the vector inventory discovery was
+cancelled, rather than mixing two workflow versions into a claimed result. One
+final run covers the complete frozen repair. Prior failures and that cancellation
+are retained. Exact-source review, prerequisite landing, all 35 genuine mutation
+campaigns and final hosted/native/trusted qualification remain open.

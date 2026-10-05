@@ -241,6 +241,63 @@ def git(root: Path, *arguments: str, payload: bytes | None = None) -> bytes:
     return result.stdout
 
 
+def require_authorized_candidate(root: Path, source: str, authorized: str) -> None:
+    """Preserve the controller's maximum 32 signed-evidence-only descendants."""
+    if not all(HOST.SHA_PATTERN.fullmatch(value) for value in (source, authorized)):
+        raise AggregationError("source authorization requires exact commit identities")
+    allowed = {
+        str(CHECKER.DERIVED_LINUX_EVIDENCE_ROOT / name).encode()
+        for name in CHECKER.DERIVED_LINUX_EVIDENCE_FILES
+    }
+    cursor = source
+    for distance in range(33):
+        if cursor == authorized:
+            break
+        if distance == 32:
+            raise AggregationError(
+                "candidate exceeds the authorized evidence ancestry bound"
+            )
+        parents = (
+            git(root, "show", "--format=%P", "--no-patch", cursor).decode().split()
+        )
+        if len(parents) != 1:
+            raise AggregationError("evidence descendants must have exactly one parent")
+        changes = git(
+            root,
+            "diff",
+            "--name-status",
+            "-z",
+            "--no-renames",
+            parents[0],
+            cursor,
+            "--",
+        ).split(b"\0")
+        if changes[-1] != b"" or len(changes) not in (3, 5, 7):
+            raise AggregationError("evidence descendant must change one to three files")
+        for status, path in zip(changes[:-1:2], changes[1::2], strict=True):
+            if status not in (b"A", b"M") or path not in allowed:
+                raise AggregationError(
+                    "candidate changes unreviewed source or deletes evidence"
+                )
+            entry = git(root, "ls-tree", "-z", cursor, "--", path.decode())
+            if not entry.startswith(b"100644 blob ") or entry.count(b"\0") != 1:
+                raise AggregationError(
+                    "evidence descendants require regular nonexecutable blobs"
+                )
+        cursor = parents[0]
+    if source != authorized:
+        rows = git(
+            root, "ls-tree", "-z", f"{source}:{CHECKER.DERIVED_LINUX_EVIDENCE_ROOT}"
+        ).split(b"\0")[:-1]
+        expected = {name.encode() for name in CHECKER.DERIVED_LINUX_EVIDENCE_FILES}
+        if (
+            len(rows) != 3
+            or any(not row.startswith(b"100644 blob ") for row in rows)
+            or {row.split(b"\t", 1)[-1] for row in rows} != expected
+        ):
+            raise AggregationError("candidate signed evidence directory is not closed")
+
+
 def apply_shard(root: Path, inventory: dict, patch: bytes) -> None:
     rows = git(root, "apply", "--numstat", "-z", "-", payload=patch).split(b"\0")
     names = []
@@ -284,7 +341,7 @@ def rebuild_manifest(root: Path) -> None:
     git(root, "add", "--", MANIFEST)
 
 
-def validate_composed(root: Path, source: str, image: str, temporary: Path) -> dict:
+def validate_composed(root: Path, authorized: str, image: str, temporary: Path) -> dict:
     """Run the complete checker through the same credential-free execution boundary."""
     git(
         root,
@@ -304,7 +361,7 @@ def validate_composed(root: Path, source: str, image: str, temporary: Path) -> d
             "-I",
             str(TOOL_ROOT / "scripts/run-security-execution-container.py"),
             "--authorized-source-sha",
-            source,
+            authorized,
             "--candidate",
             str(root),
             "--expected-sha",
@@ -339,7 +396,13 @@ def validate_composed(root: Path, source: str, image: str, temporary: Path) -> d
 
 
 def aggregate(
-    candidate: Path, source: str, shards: Path, output: Path, image: str
+    candidate: Path,
+    source: str,
+    shards: Path,
+    output: Path,
+    image: str,
+    *,
+    authorized_source: str,
 ) -> None:
     if not HOST.SHA_PATTERN.fullmatch(source) or not HOST.IMAGE_PATTERN.fullmatch(
         image
@@ -347,6 +410,7 @@ def aggregate(
         raise AggregationError("aggregation requires an exact source commit")
     if git(candidate, "rev-parse", "HEAD").decode().strip() != source:
         raise AggregationError("candidate source changed before aggregation")
+    require_authorized_candidate(candidate, source, authorized_source)
     inputs = load_shards(shards, source)
     with tempfile.TemporaryDirectory(prefix="chio-evidence-aggregation-") as temporary:
         workspace = Path(temporary) / "source"
@@ -378,10 +442,13 @@ def aggregate(
                     "composed evidence patch exceeds its import bound"
                 )
             digest = hashlib.sha256(patch).hexdigest()
-            validation = validate_composed(workspace, source, image, Path(temporary))
+            validation = validate_composed(
+                workspace, authorized_source, image, Path(temporary)
+            )
             inventory = {
                 "schema": "chio.security-evidence-refresh-aggregate.v1",
                 "source_sha": source,
+                "authorized_source_sha": authorized_source,
                 "campaign_count": 35,
                 "outcome_count": 35,
                 "case_count": 28,
@@ -408,6 +475,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--expected-sha", required=True)
+    parser.add_argument("--authorized-source-sha", required=True)
     parser.add_argument("--shards", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--image", required=True)
@@ -418,6 +486,7 @@ def main() -> None:
         args.shards.absolute(),
         args.output_dir.absolute(),
         args.image,
+        authorized_source=args.authorized_source_sha,
     )
 
 
