@@ -617,7 +617,8 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
   - In the remote durable profile, the control-plane serving authority that owns the store signs. The edge kernel that relayed the request is named in `requested_via`.
 - **S38. Signing obligation.** `SigningBackend::sign_bytes` is fallible (M: `crates/core/chio-core-types/src/crypto.rs:869`). A stop therefore never waits on the signer, and a resume never commits without its evidence.
     - `record_digest` and `previous` cover the canonical `StopEpochV1` body without the signature. Attaching the signature later changes no chain digest.
-    - **Stop, Restrict, Rollover and Migration commit first.**
+    - **Running rollovers sign inside the transaction.** A `Rollover` that restates `Running` signs its body inside the appending transaction, like `Resume`. If signing fails, the transaction rolls back and the writer retries with backoff. The previous generation's `rollover_margin` keeps appends possible meanwhile, and a stop can always take the last slot (S6). A running head is therefore never left with an unsigned record in its chain, and S38's claim that a running head's whole chain is signed holds.
+    - **Stop, Restrict, Migration and stopped rollovers commit first.** A `Rollover` that restates `Stopped` follows this path, because the scope stays stopped while its evidence is pending.
       - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, chain_generation, epoch, state = pending)`. A `Rollover` or `Migration` record, appended by the writer with no request, gets the same obligation as an operator's stop.
       - After the commit and anchor sync, the writer signs the body. It stores the artifact, and marks the obligation `signed`, in a progress-only commit.
       - A signing failure leaves the record committed and enforced. For a stop or restrict, the route still returns `stop_durable`, with `evidence: pending`. A rollover or migration has no route caller, so the status route reports `evidence_pending` for the scope.
@@ -1034,6 +1035,12 @@ Open decisions:
 |---|---|---|---|
 | 4185510083 | Make automatic rollover records representable | Fixed now. S2 defines field rules per transition. A `Rollover` has `requested_via: SystemRollover` (or `OfflineCli` for the offline append), `authorizer: ChainRollover { serving_owner, writer_epoch }`, empty `contributors`, `satisfies_intent: None`, and `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" \|\| expected_epoch \|\| previous)`. It restates the previous generation's final state, containment and id. The `authorizer`/`reason_commitment == contributors[0]` invariant applies only to `Stop`, `Restrict`, `Relax` and `Resume`, and verifiers reject a record that breaks its transition's rule | section 4 types (`StopRequestPath`, `StopAuthorizer::ChainRollover`, `DecisionTime`); S2; S6; section 17 |
 | 4185510099 | Reject replayed origin-freshness heartbeats | Fixed now. Only a signed `OriginHeadAttestationV1` that answers an outstanding, single-use shard nonce renews the lease, and only to `sent_at(nonce) + shard_origin_lease`. A replayed, stale, foreign or unknown-nonce response renews nothing. A head behind the last accepted head latches with `stop_origin_regressed`. Fan-out heartbeats are hints that trigger the "Behind" path and never renew. Replay can only shorten the lease. New failure rows and a replay test | S37; section 14; section 17 |
+
+### Codex review (PR #1174, round 10)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185993956 | Block running rollover heads until their artifact is signed | Fixed now. A `Rollover` that restates `Running` signs inside its transaction, like `Resume`, and rolls back and retries if signing fails; the rollover margin and the reserved stop slot keep the chain appendable. Only a rollover that restates `Stopped` commits first with a pending obligation. A running head's chain is therefore always signed | S38 |
 
 ## Appendix A. FTL reference
 

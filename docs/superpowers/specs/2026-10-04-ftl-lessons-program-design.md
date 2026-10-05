@@ -220,10 +220,17 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
 6. **One escape-hatch gate.** It is the Mechanism D gate, and it includes W:'s `Drop`-quarantine sites.
 7. **Reuse shipped gates.** H11 budgets and the trust-boundary census. GT1 blocks any claim.
 8. **Confinement bindings.**
-   - Tool confinement uses `native_launch`.
+   - Tool confinement uses `native_launch`, or the backend-neutral `confinement_launch` for backends other than the Linux cage.
    - Worker confinement uses `worker_profile`, including `confined_reader` evidence exported from P5.
    - Verifiable work requires confinement through `RuntimeAssuranceBacking`.
-9. **Correlation stays out of the kernel.** `invocation_digest` (`binding.v2`) binds the D1 permit and the P4 model context. Under P4, lowering into a model is a release.
+9. **Correlation stays out of the kernel.**
+   - `binding.v3` (spec 6) is the one authoritative binding version. It binds:
+     - the kernel-authenticated request namespace;
+     - the submitted capability id;
+     - the invocation digest, which includes `provider_call_id` and excludes `received_at`;
+     - the D1 permit and the P4 model context.
+   - The kernel signs the binding as `chio_fabric_binding` and authenticates the namespace in the reserved `receipt_context`.
+   - Under P4, lowering into a model is a release.
 10. **Closure is manual and economically inert.** It never touches earned claims, sealed allocations, escrow deadlines, pins or knowledge, and it records stranded capacity.
 11. **Name every crossing.** Dispatch commit, the recovery tombstone, P4 release and the P5 return-admission commit each declare their linearization point. The registry is spec 10 section 4.2 plus spec 4 section 4.3 (spec 10 X1; brainstorm candidate 9).
 12. **Process ABI v4.** The union of M:'s and W:'s v3 definitions is v4. Spec 5's `inspect` fields ride it.

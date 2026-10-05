@@ -399,7 +399,9 @@ attribution.worker_profile.kind in {container, split_domain} ->
 
 attribution.worker_profile.kind = split_domain ->
   plan_binds(controller_digest, execution_server_ids)
-  and forall call c by execution_server_ids: native_launch(c) verified
+  and forall call c by execution_server_ids: launch_ref(c) verified
+      -- launch_ref is native_launch for the Linux cage, or confinement_launch for
+      -- another tool-lane backend (rule 5.1.6), each checked by its 5.1 predicate
 
 attribution.worker_profile.kind = confined_reader ->
   exported(boundary(launch_ref.record_id)).state >= EnforcedRunning
@@ -550,7 +552,7 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
 - **chio-conformance:** extend `tool_server_escape` (M:`crates/tooling/chio-conformance/tests/threats/tool_server_escape.rs`):
   - a receipt referencing an `Exited` or `BootstrapFailed` cage receipt fails verification;
   - an adapted-server call carries `native_launch`;
-  - a `split_domain` attempt whose execution server lacks `native_launch` is rejected.
+  - a `split_domain` attempt whose execution server lacks a verified launch reference (`native_launch`, or `confinement_launch` for a Firecracker guest) is rejected, and one whose Firecracker execution server carries a verified `confinement_launch` is accepted.
 - **Verifier:** a finding with `runtime_assurance_tier = Basic` is denied without the confinement attestation, passes with it, and fails when:
   - a production receipt references an unattested launch;
   - an in-scope receipt carries no reference, even under a permitted `tool_origin`;
@@ -618,6 +620,12 @@ Refinements to the review directives, recorded with evidence:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4185756917 | Exempt backend-neutral references from the absence predicate | Fixed now. A receipt is classified `not_confined` only when both `native_launch` and `confinement_launch` are absent. `confinement_launch` has its own verification predicate (record digest, schema, pinned signer, `FullyEnforced`, attempt id, not exited before dispatch), so valid Firecracker or other backend-neutral evidence is accepted | section 5.1 predicate; rule 6 |
+
+### Codex review (PR #1174, round 10)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185993967 | Accept backend-neutral launch references for split-domain servers | Fixed now. The `split_domain` predicate requires a verified backend-appropriate launch reference for every execution-server call: `native_launch` for the Linux cage, or `confinement_launch` for another backend (rule 5.1.6). A Firecracker execution server can therefore yield `Verified(split_domain)`. Tests cover both | rule 6.3 predicate; section 10 tests |
 
 ## Appendix A. FTL reference
 

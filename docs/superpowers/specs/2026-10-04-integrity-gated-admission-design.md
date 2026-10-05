@@ -1,6 +1,6 @@
 # Design: integrity-gated admission
 
-- Status: PROPOSED (revision 5, 2026-10-05, after Codex review round 7 on PR #1174; revision 4 after the second independent review; revision 3 after the first independent review and Codex review; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
+- Status: PROPOSED (revision 5, 2026-10-05, after Codex review rounds 7, 8 and 10 on PR #1174; revision 4 after the second independent review; revision 3 after the first independent review and Codex review; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
 - Date: 2026-10-04
 - Scope: make "unbounded or unknown external influence cannot authorize a consequential tool call, except through an exact endorsement" a property the kernel enforces for any agent framework (the precise property is in section 11). It is built from the shipped and implemented knowledge (P4), semantic (P3) and confinement (P5) surfaces:
   - grants declare a required integrity;
@@ -35,6 +35,10 @@
   - the north-star specs `2026-10-04-pure-admission-machine-design.md` (A) and `2026-10-04-crossing-primitive-design.md` (B).
 
 ## Revision 5 changes
+
+From Codex review round 10 on PR #1174 (head `f7242409b`):
+- **The quarantined successor is the one exception to inheritance (4185993940).** I7a's lossless inheritance made the I22 successor inherit its tainted parent, so the remedy always denied. A verified isolation-epoch transition is now an explicit, fail-closed exception. It needs a verified remedy record, a fresh epoch and no parent channel other than P5 returns. When it applies, only P5 typed returns and the successor's own classified bootstrap contributions cross. Any failed condition falls back to full inheritance.
+- **Return types are validated at load (4185993976).** Every return type is validated at load: an `Enum` is non-empty and distinct, an `Integer` has `min <= max`, and an `Identifier` has valid bounds and charset. `N >= 1` therefore always holds, and a malformed contract is rejected at policy load.
 
 From Codex review round 7 on PR #1174 (head `3672dca3b`):
 - **Lossless inheritance (4185260800).** A child no longer copies parent observation ids, which bind the parent's destination, and no longer uses one summarizing observation, which can carry only one origin and one bit bound. Each parent observation is re-keyed for the child (`source_kind = inherited`), with its origin class, provider, bit bound and `unknown` copied exactly. A parent state that cannot be enumerated and re-keyed within bounds denies scope creation (I7a).
@@ -319,6 +323,17 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
      - the parent's set exceeds the per-context history bound of 4,096 rows (W: `security_participant_state/knowledge.rs:123-141`);
      - any parent row cannot be read.
 
+   **The one exception: the quarantined successor (I22).** A child created by I22's verified isolation-epoch transition does not inherit the parent's observation set. This is the only exception to inheritance, and it fails closed.
+   - **When it applies.** All three conditions hold in the creating transaction. Otherwise the child inherits in full, as above:
+     1. **Verified transition.** A committed remedy record of the `QuarantinedContinuation` template (I19, I22) drives the creation. It names the parent scope, the parent's commitment when the remedy was recorded, and the new isolation epoch id. Its approval or remedy decision, deployment binding (I5) and freshness are verified in the same transaction.
+     2. **Fresh epoch.** The new isolation epoch id has never been used in this tenant: no scope, flow row or summary head exists under it.
+     3. **No other channel.** The successor's scope gives the parent no capability, delegation, mailbox route, shared session, shared process lineage or shared principal into the successor. Its run plan names no input source in the parent other than P5 confined returns. The host checks this against the successor's run plan and capability set before readiness, and a check that cannot be completed counts as a failure.
+   - **What crosses.** The successor starts at the trusted bottom state of the new epoch, joined with:
+     - its own initial observation (I7) and its bootstrap contributions, classified by the rules below and never as inherited. A task, seed or other contribution that the parent authored is parent influence, so it joins the parent's state exactly as inheritance would. The remedy therefore succeeds only when the successor's task and seeds come from the remedy record's template, or from the workflow request that predates the taint, under a `BootstrapTrustAssertionV1`;
+     - each P5 typed confined return, joined as `ExternalBounded` through its confined-return record (I4a, I8). Under I17's key semantics this is the only influence that can reach the new epoch.
+   - **What does not cross.** The parent's observation set, its commitment and its summary heads. The context-creation record keeps `quarantined_from { parent scope, parent commitment, remedy record id, new epoch }` for audit.
+   - **Guarantee kept.** Every other child keeps the never-less-tainted guarantee above. The successor's property is I22's: under `BoundedExternal { n }`, at most `n` attacker-influenced bits reach it, each through a typed return.
+
    Each contribution is classified by the first rule that applies:
    - **Inherited.** It carries the parent's influence exactly, through the re-keyed observations above.
    - **Asserted trusted.** It is trusted only under a `BootstrapTrustAssertionV1` that covers it (below).
@@ -421,8 +436,12 @@ inputs_bound(op)       -> |selector_inputs(op)| = slots(contract(op))
                           and each input is a committed, slot-matching ExternalBounded return in key(op)
                           and for each digest d: unconsumed(d, key(op)) = slots_d(contract(op)), filled in commit order
                           and each input is consumed exactly once, by op, at intent_commit(op)
-inherit(parent, child) -> state(child) at creation >= state(parent) at the same transaction,
-                          with the inherited part exact on origins, bits and unknown, or creation is refused (I7a)
+inherit(parent, child) -> quarantined(child)
+                          or (state(child) at creation >= state(parent) at the same transaction,
+                              with the inherited part exact on origins, bits and unknown, or creation is refused)   (I7a)
+quarantined(child)     -> verified_remedy(child) and fresh_epoch(child) and no_parent_channel(child)
+                          and state(child) at creation = initial(child) join classified_bootstrap(child)
+                          and later influence(child) = typed_returns(child) join own deliveries(child)   (I7a exception, I22)
 attenuate(p, c)        -> level_ge(c.level, p.level) and contract_preserved(c, p)             (I3, I9)
 forall ctx: state(ctx) only increases              (I2; SEC-05)
 ```
@@ -470,7 +489,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
     - **History.** The context's state is unchanged (SEC-05). The next consequential call needs its own endorsement.
     - **Semantic connectors.** For P3 connectors, the existing `ScopedEndorsementV1` over `ExactAction` (W: `semantic/evidence.rs:84-87`) is the same rule, already implemented, and satisfies the crossing check for that action.
 22. **I22. Quarantined continuation.** The remedy that recovers utility without a human:
-    1. A verified isolation-epoch transition starts an isolated successor whose influence starts trusted (M: `active-defense-rollout.md:19`).
+    1. A verified isolation-epoch transition starts an isolated successor whose influence starts trusted (M: `active-defense-rollout.md:19`). This is I7a's single exception to parent inheritance. The parent's observation set does not cross into the new epoch; only P5 typed returns and the successor's own classified bootstrap contributions do. If the transition cannot be verified, the epoch is not fresh, or the parent keeps any other channel into the successor, the child inherits in full, and a `BoundedExternal` requirement then denies.
     2. The tainted parent hands its untrusted artifacts only to P5 confined readers.
     3. The readers' typed returns join the successor as `ExternalBounded` (I8).
     4. The successor performs the consequential call under a `BoundedExternal { n }` requirement.
@@ -510,8 +529,8 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
 ```rust
 pub enum ConfinedReturnTypeV1 {
     Boolean,                                                   // 1 bit
-    Enum { variants: BoundedList<ProtectedText<64>, 256> },    // ceil(log2(n)) bits
-    Integer { min: i64, max: i64 },                            // ceil(log2(max - min + 1)) bits
+    Enum { variants: BoundedList<ProtectedText<64>, 256> },    // ceil(log2(n)) bits; 1 <= n, variants pairwise distinct
+    Integer { min: i64, max: i64 },                            // ceil(log2(max - min + 1)) bits; min <= max
     Identifier { min_len: u8, max_len: u8, charset: IdentifierCharsetV1 }, // bit_length(sum over i in min_len..=max_len of |charset|^i - 1) bits; 1 <= min_len <= max_len <= 64
 }
 ```
@@ -523,6 +542,12 @@ pub enum ConfinedReturnTypeV1 {
       - `Integer`: `N = max - min + 1`.
       - `Identifier`: `N = sum over i from min_len to max_len of |charset|^i`, so every permitted length is counted, not only the longest strings. With the 65-character charset below, lengths 1 to 44 give `N = (65^45 - 65) / 64` and 266 bits, while `44 * log2(65)` rounds to 265 and undercounts by one bit. A fixed-length identifier (`min_len = max_len = 44`) gives 265. Lengths 1 to 64 give 386.
     - `Identifier` is the only variable-length type. Any future variable-length type must count every accepted length in the same way.
+    - **Validated at load.** Every return type is validated when the policy or contract that names it is loaded, before any projection or capacity calculation. That covers each `ReturnContractV1` and each input slot of an `ActionSelectionContractV1`:
+      - `Enum`: at least one variant, and variants pairwise distinct after `ProtectedText` canonicalization;
+      - `Integer`: `min <= max`. `N = max - min + 1` is computed in 128-bit or big-integer arithmetic, so the full `i64` range gives `N = 2^64` and 64 bits without overflow;
+      - `Identifier`: `1 <= min_len <= max_len <= 64`, and a charset that is non-empty, has no duplicate characters and lies inside the restricted set below.
+
+      So `N >= 1` always holds and `bit_length(N - 1)` is always defined. A type that violates an invariant is rejected at policy load, fail closed: the contract, and every grant or deployment binding that references it, does not load. Capacity is never computed for an unvalidated type.
     - `Identifier` uses a restricted charset (ASCII letters, digits, `.`, `_`, `-`), with no spaces and no punctuation that can form instructions. Free text is not a return type.
     - The host projection rejects any value outside the type. There is no fallback.
 24. **I24. Return discipline unchanged.** One value, on the `Value` channel only, with every other channel withheld. `max_bytes` is derived from the type, up to 64.
@@ -626,6 +651,8 @@ pub enum ConfinedReturnTypeV1 {
 | More unconsumed returns under a slot's digest than the contract has slots for it (ambiguous) | Deny (I22a) |
 | Call binds no inputs while an unconsumed return under a slot's digest exists | Deny (I22a) |
 | Parent state not in this writer, above the 4,096-row history bound, or unreadable at child creation | Child scope creation refused; never summarized (I7a) |
+| Quarantined successor with an unverified remedy record, a reused isolation epoch, or a parent channel into the successor (capability, delegation, mailbox, shared key, parent-authored task) | The exception does not apply; the child inherits the parent's full state, and a `BoundedExternal` requirement denies (I7a, I22) |
+| Return type with an empty or invalid value domain (empty or duplicate `Enum` variants, `Integer` with `min > max`, invalid `Identifier` bounds or charset) | Rejected at policy load; the contract and every grant referencing it do not load (I23) |
 | Portable core receives the constraint | `ConstraintError` deny (I11) |
 | Typed return outside its type | Return refused; no fallback (I23) |
 
@@ -673,11 +700,25 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Initial influence per verified worker profile. Each qualification failure starts at `unknown`.
   - Bootstrap classification (I7a): inherited, asserted, pinned without assertion (`External`), and unclassified (`unknown`). Assertions that are expired, for another run plan or deployment, or carry a mismatched digest are ignored.
   - **Lossless inheritance (I7a).** A parent holds `External`, `ModelProvider { p1 }`, `ModelProvider { p2 }`, and two distinct `ExternalBounded` observations of 3 and 5 bits. A child with disjoint keys and no other bootstrap contributions inherits re-keyed observations, and its `origins`, `bounded_bits_total = 8` and `unknown` equal the parent's. Each requirement the parent fails, the child fails too: `Trusted`, `ProviderOnly({p1})` and `BoundedExternal { 7 }`. A child sharing the parent's lineage does not re-key reachable rows, and its bit total stays 8. Re-running creation changes nothing. A parent above 4,096 rows refuses child creation.
-  - Typed return capacity and projection rejection. Capacity unit tests (I23): `Boolean` gives 1; `Enum` with 3 variants gives 2; `Integer { 0, 255 }` gives 8; a single-value type gives 0; `Identifier { 1, 44, 65 chars }` gives 266, and `Identifier { 44, 44, 65 chars }` gives 265. Each is computed by `bit_length(N - 1)` and compared with a big-integer reference.
+  - Typed return capacity and projection rejection. Capacity unit tests (I23): `Boolean` gives 1; `Enum` with 3 variants gives 2; `Integer { 0, 255 }` gives 8; a single-value type gives 0; `Identifier { 1, 44, 65 chars }` gives 266, and `Identifier { 44, 44, 65 chars }` gives 265. Each is computed by `bit_length(N - 1)` and compared with a big-integer reference. `Integer { i64::MIN, i64::MAX }` gives 64 without overflow.
+  - Load-time validation (I23). Each of these is rejected at policy load, and no capacity is computed for it:
+    - an empty `Enum`;
+    - duplicate `Enum` variants;
+    - `Integer { min: 5, max: 4 }`;
+    - `Identifier` with `min_len = 0`, with `min_len > max_len`, with `max_len > 64`, with an empty charset, with a duplicate character, or with a character outside the restricted set.
+
+    A grant that references a rejected contract does not load.
   - `InsufficientIntegrity` yields the `integrity_fault` block, never an `authority_fault` block. Its field set equals I19's, and `remedy_classes` depends only on the caller's requirement (I18, I19).
 - **Conformance.**
   - An injected tool output followed by a consequential call is denied.
-  - The quarantined continuation succeeds under `BoundedExternal`.
+  - The quarantined continuation succeeds under `BoundedExternal`. The parent holds `External` and `unknown` observations; the successor, created by a verified remedy record in a fresh epoch with a template task under an assertion, starts trusted, receives two typed returns, and its call under `BoundedExternal { n }` is admitted (I7a exception, I22).
+  - A non-remedy child of that same tainted parent still inherits its full state, and its `BoundedExternal` call is denied (I7a).
+  - Unverified transitions fall back to inheritance, and each successor's `BoundedExternal` call is denied. The cases are:
+    - a missing or unverifiable remedy record;
+    - a reused isolation epoch id;
+    - a capability or mailbox route from the parent into the successor;
+    - a shared session or lineage;
+    - a parent-authored task.
   - A same-principal endorsement replayed after new influence is refused.
   - Endorsement cases (I15a):
     - **fresh:** an exact endorsement over the current commitment admits the call once, with `satisfied_by = endorsement`;
@@ -780,6 +821,13 @@ Open decisions:
 |---|---|---|---|
 | 4185510046 | Apply the selector check to endorsed calls | Fixed now. The endorsement branch of crossing check 4 requires I22a's full `action_ok` (bound inputs, selector output equal to the call's action, membership in `authorized_actions`), exactly as the context branch does. An endorsement bypasses only `satisfies(state, requirement)`. The predicate is restated as `action_ok and (satisfies or endorsed)`, with a new failure row and an off-selector endorsement test | I15a; I22a; section 8 predicates; section 15 failure table; section 18 tests |
 | 4185510106 | Include identifier length in the capacity bound | Fixed now. Capacity is `bit_length(N - 1)` over the exact count of accepted values. For `Identifier`, `N` sums `|charset|^i` over every permitted length, with a new explicit `min_len`. The 65-character, length 1-44 case gives 266 bits, not 265. The other types are fixed-cardinality and already exact. Unit tests are added | section 10 type table; I23; section 18 |
+
+### Codex review (PR #1174, round 10)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185993940 | Exempt quarantined successors from parent-state inheritance | Fixed now. I7a gains one fail-closed exception for a child created by I22's verified isolation-epoch transition. It needs a verified `QuarantinedContinuation` remedy record naming the parent and the new epoch, a fresh epoch id, and no parent channel into the successor other than P5 returns. When it applies, the parent's observation set does not cross. Only P5 typed returns (`ExternalBounded`) and the successor's own classified bootstrap contributions do, and a parent-authored task joins as parent influence. Any failed condition falls back to full inheritance, and every other child keeps the never-less-tainted guarantee | I7a; I22 step 1; section 8 predicates; section 15; section 18 |
+| 4185993976 | Reject return types with an empty value domain | Fixed now. Every return type is validated at policy load, before any projection or capacity calculation. An `Enum` has at least one distinct variant. An `Integer` has `min <= max`, computed in 128-bit arithmetic. An `Identifier` has `1 <= min_len <= max_len <= 64` and a non-empty charset with no duplicates inside the restricted set. `N >= 1` always holds, and a malformed contract and every grant referencing it fail to load | I23; type comments; section 15; section 18 |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

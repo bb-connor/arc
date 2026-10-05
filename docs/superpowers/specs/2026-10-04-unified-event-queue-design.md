@@ -176,7 +176,7 @@ Part A ships as independent fixes in `chio-mcp-remote`, `chio-mcp-edge` and W: `
 Each POST request that expects a response registers a slot on the session **before** `session.send`:
 
 ```rust
-pub struct InboundSeq(u64);                              // session-local, monotonic, assigned at send (A1a)
+pub struct InboundSeq(NonZeroU64);                       // session-local, monotonic, starts at 1, assigned at send (A1a); 0 is the no-cause sentinel
 pub struct RequestSlot {
     request_id: Value,                                   // the JSON-RPC id of this POST
     cause: InboundSeq,                                   // the sequence its message is sent with
@@ -184,7 +184,7 @@ pub struct RequestSlot {
     server_requests: SlotQueue<RemoteSessionEvent>,      // server-to-client requests caused by this POST
 }
 impl RemoteSession {
-    fn reserve_inbound_seq(&self) -> Result<InboundSeq, SlotError>;   // checked add; exhaustion fails closed
+    fn reserve_inbound_seq(&self) -> Result<InboundSeq, SlotError>;   // first value 1, checked add; never issues 0; exhaustion fails closed
     fn register_request_slot(&self, cause: InboundSeq, request_id: Value,
                              credential_call: Option<PendingCall>)
         -> Result<RequestSlotReceiver, SlotError>;      // at most one active request slot per session
@@ -206,7 +206,7 @@ Rules:
    **Why not temporal correlation.** Revision 4 first correlated every server request emitted while a slot was active with that slot, on the grounds that `active_request_stream` serializes POSTs. Notification POSTs and client responses do not take that lock. The handler sends them even when `try_lock_owned()` fails, and on credential sessions it sends them without trying (M: `http_service.rs:363-394`; `main` `:390-399`). The edge runtime is serial, so a notification that arrives during call X is deferred, or waits in the input channel, and is handled after X's terminal response (M: `chio-mcp-edge/src/runtime.rs:426-449`; `nested_flow.rs:243-253`). A server request it causes, such as the `roots/list` that `notifications/roots/list_changed` queues (`runtime/requests.rs:127-133`, then `runtime_flow.rs:88-110`), is therefore emitted while some later POST's slot is active, and temporal correlation would hand it to that unrelated POST. Today's filter has the same defect in a weaker form: every POST stream emits every server-to-client request (`http_service_auth.rs:1-14`, the `event.message.get("method").is_some()` arm).
    - **A1a. Causal identity.** Every message the HTTP layer hands to the session input carries a session-local `InboundSeq`, assigned by `send_with_seq` under the input sender, so channel order equals sequence order.
      - The edge's hosted input becomes `InboundEnvelope { seq, message }`, replacing the bare `Value` of `serve_message_channels`. The stdio path assigns its own sequence in `pump_client_messages`.
-     - The edge runtime holds a cause cell shared with the writer, an `Arc<AtomicU64>` where 0 means no cause. The edge loop sets it to the envelope's sequence before handling a message, including a deferred one: `deferred_client_messages` (M: `runtime.rs:150`) stores envelopes, not bare values. The cell stays set through that message's pending actions and its terminal response. The loop clears it before background servicing, task processing and runtime-event forwarding (`runtime.rs:426-449`; `runtime/tasks.rs:710-723`).
+     - The edge runtime holds a cause cell shared with the writer, an `Arc<AtomicU64>` where 0 means no cause. Zero is reserved for that sentinel: the session's counter starts at 1, `InboundSeq` wraps `NonZeroU64` so a zero sequence cannot be constructed, and exhaustion fails closed. The first request's response therefore always reaches its slot. The edge loop sets it to the envelope's sequence before handling a message, including a deferred one: `deferred_client_messages` (M: `runtime.rs:150`) stores envelopes, not bare values. The cell stays set through that message's pending actions and its terminal response. The loop clears it before background servicing, task processing and runtime-event forwarding (`runtime.rs:426-449`; `runtime/tasks.rs:710-723`).
      - Pending actions capture their cause when queued. `EdgeAction::RefreshRoots` gains `cause: Option<InboundSeq>`, and processing the action sets the cell from it. A refresh queued at restore (`runtime.rs:318`) has no cause, so it is never attributed to the first request after restore.
      - The writer is driven synchronously from the edge worker thread (M: `session_core.rs:1094-1110`), and the edge changes the cell only between whole lines. The value `next_event` reads is therefore exactly the cause of the line it is publishing. `RemoteSessionEvent` gains `cause: Option<InboundSeq>`.
    - **A1b. Server requests with no request slot.** A server-to-client request caused by a notification, by a client response, by a request whose slot has already closed, or by nothing (background tasks, restore, late events) is never routed to a request slot:
@@ -868,6 +868,12 @@ Open decisions:
 |---|---|---|---|
 | 4185510067 | Retain expired subscriptions until the end hint is delivered | Fixed now. Every path that ends a subscription moves it to `Terminalized` with `SubscriptionEnded` pending in its own slot: expiry (including at restore), revalidation, subject gone, clock failure. It keeps its slot and metadata, accepts no posts, counts against capacity, and is removed only after a drain hands the hint to the transport. A persisted subscription leaves the persisted set only after delivery | H5a; H7; H7a; section 11.3 predicates; section 12.1; section 15; section 18 |
 | 4185510114 | Flush the terminal hint before cancelling streams | Fixed now. Termination runs in order: write `Terminal` to the log, copy it into each stream's reserved terminal frame, wait for every stream to emit and flush it (biased select, bounded by `terminal_flush_deadline_ms`), and only then cancel the session token. A stream closed at the deadline leaves the terminal retrievable for one replay within `terminal_retention_ms`. One logical terminal per session, with the same event id on every stream | H6a; section 13 item 2; section 11.3 predicates; section 15; section 18 |
+
+### Codex review (PR #1174, round 10)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185993994 | Reserve sequence zero for the no-cause sentinel | Fixed now. `InboundSeq` wraps `NonZeroU64`, the session counter starts at 1, `reserve_inbound_seq` never issues 0, and exhaustion fails closed. Zero is only the cause cell's no-cause sentinel | section 4 API; A1a |
 
 ## Appendix A. FTL reference
 
