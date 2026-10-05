@@ -4,6 +4,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,39 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY = set(tomllib.loads((ROOT / "fuzz/target-map.toml").read_text())["targets"])
 BUILDERS = (".clusterfuzzlite/build.sh", "fuzz/oss-fuzz/build.sh")
+
+
+class WorkflowHandoffTests(unittest.TestCase):
+    def test_both_modes_retain_the_export_until_owned_selection(self):
+        workflow = (ROOT / ".github/workflows/cflite_pr.yml").read_text()
+        builds = [
+            step
+            for step in workflow.split("      - name: ")
+            if "uses: google/clusterfuzzlite/actions/build_fuzzers@" in step
+        ]
+        self.assertEqual(len(builds), 2)
+        for step in builds:
+            self.assertIn("keep-unaffected-fuzz-targets: true", step)
+
+    def test_runner_creates_the_export_directory_before_the_root_builder(self):
+        workflow = (ROOT / ".github/workflows/cflite_pr.yml").read_text()
+        prepare = re.search(
+            r"      - name: Prepare writable fuzzer export\n"
+            r"        run: (.+)\n",
+            workflow,
+        )
+        self.assertIsNotNone(prepare)
+        self.assertLess(
+            prepare.start(),
+            workflow.index("uses: google/clusterfuzzlite/actions/build_fuzzers@"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            subprocess.run(
+                ["bash", "-euc", prepare.group(1)], cwd=temporary, check=True
+            )
+            directory = Path(temporary) / "build-out"
+            self.assertTrue(directory.is_dir())
+            self.assertEqual(directory.stat().st_uid, os.getuid())
 
 
 class BuilderTests(unittest.TestCase):

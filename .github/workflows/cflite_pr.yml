@@ -79,7 +79,7 @@ jobs:
     needs: budget-check
     runs-on: ubuntu-latest
     # Retained x86 evidence needs 66 minutes for a cold all-target ASan build.
-    # Preserve the full per-target fuzz duration and allow build/setup headroom.
+    # Preserve the configured fuzz budgets and allow build/setup headroom.
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -179,6 +179,11 @@ jobs:
           sed 's/^/  /' changed.txt >&2
           exit 1
 
+      # The action's root container preserves an existing directory. Create it
+      # as the runner so subset selection can unlink unselected executables.
+      - name: Prepare writable fuzzer export
+        run: mkdir build-out
+
       - name: Build ClusterFuzzLite inventory for changed-target sampling
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
@@ -210,6 +215,7 @@ jobs:
           language: rust
           sanitizer: address
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          keep-unaffected-fuzz-targets: true
 
       - name: Verify full-corpus build inventory
         if: steps.mode.outputs.full == 'true'

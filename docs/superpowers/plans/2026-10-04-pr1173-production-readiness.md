@@ -309,3 +309,10 @@ reject an extra wrapper or incomplete broker evidence, and refuse kernel or
 resource errors. Run the complete affected Python suites. Retain the failed
 hosted run separately, freeze the repaired source, and repeat the source-bound
 qualification and both complete x86 PostgreSQL trajectories.
+
+The export handoff also requires both build modes to retain unaffected fuzzers
+until the owned selector validates the complete inventory. The runner creates
+`build-out` before the root build container enters, so later subset selection can
+remove unselected executables without changing file ownership or permissions.
+Two additional red/green workflow controls exercise those integration contracts.
+The 60/120-second inputs remain the upstream action's total sampling budgets.
