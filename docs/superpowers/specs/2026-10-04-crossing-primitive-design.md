@@ -495,7 +495,7 @@ Rules:
     | `Overloaded` | Not produced for post-effect members (X17b). If received, the driver re-submits; never compensates |
     | `Unavailable` | The fused outcome commit's preconditions no longer hold (for example, an external rail capture). Spec 9 re-plans the settlement as slow-path steps, with an `ExternalPrepare { Settle }` crossing, then the rest of the outcome commit (spec 9 M11) |
 
-    For a check-only read or a `NonDurable` call, refusal yields the signed `withheld` receipt (X13a), `KernelStopped` included. No custody holds the output. A check-only read is redispatch-safe, so it returns `OutputWithheld { retry: AfterResume }`. A `NonDurable` effect has already executed, so its result is terminal: `OutputWithheld { retry: Never, effect_executed: true }`, with `retryable_after_resume: false` (spec 9 M11, spec 8 S15). `HaltOperation` halts one operation; it never closes the kernel to new dispatch (spec 3's `LatchScope::Operation`).
+    For a check-only read or a `NonDurable` call, refusal yields the signed `withheld` receipt (X13a), `KernelStopped` included. No custody holds the output. A check-only read's retry advice follows the refusal reason, exactly as spec 9 M11 and M20 classify it: `KernelStopped` gives `retry: AfterResume` and `StoreUnavailable` gives `retry: AfterStoreRecovery` (both `Reusable`), while `Revoked`, `AuthoritySpaceClosed` or `InsufficientIntegrity` gives `retry: Never` (`Terminal`). A `NonDurable` effect has already executed, so its result is terminal: `OutputWithheld { retry: Never, effect_executed: true }`, with `retryable_after_resume: false` (spec 9 M11, spec 8 S15). `HaltOperation` halts one operation; it never closes the kernel to new dispatch (spec 3's `LatchScope::Operation`).
 
 ## 7. Slow paths keep their semantics
 
@@ -962,3 +962,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187931934 | Bound retries after savepoint cleanup failures | Fixed now. A forced whole-transaction rollback after a failed `ROLLBACK TO` or `RELEASE` counts toward `batch_loss_retries`, like an automatic rollback. After that bound, members get `StoreUnavailable` and a store incident is raised, so the batch cannot loop and reconcilers get a final reply | X21 |
+
+### Codex review (PR #1174, round 27)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4188089194 | Align check-only retry advice with the refusal reason | Fixed now. X16 uses spec 9 M11 and M20's reason-specific mapping: `AfterResume` for a stop, `AfterStoreRecovery` for store unavailability, and `retry: Never` (`Terminal`) for revocation, closure or integrity refusals | X16 |

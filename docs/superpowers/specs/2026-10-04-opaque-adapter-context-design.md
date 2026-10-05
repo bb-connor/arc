@@ -211,6 +211,7 @@ pub enum DenyDisposition {
     Reusable, // refused before any operation row; the same request id may be retried
     Retained, // outcome unresolved; do not mint a new id; retry the same id for status
     Terminal, // final for this request id
+    Pending,  // signed PendingApproval: not final; the record stays sealed until the approval resolves
 }
 
 /// Tool output plus the binding of the invocation that produced it. The binding is
@@ -479,7 +480,8 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
          - It does not bind the record. The record stays sealed with the same binding and must not be evicted while unresolved (retention, rule 11).
          - A retry with the same request id and binding is answered by the kernel from the operation's current state, never by a fresh dispatch: a durable replay of the terminal once recovery has produced it, or another `Retained` status while it is still unresolved.
          - Recovery's later terminal receipt, for example `OutcomeUnknownAfterDispatch` after startup reconciliation, is checked like any receipt and binds the record. A second `Retained` receipt never binds, so recovery's one terminal receipt is always lowerable.
-       - **Missing field.** A deny or `Withheld` receipt without `chio_runtime.identity_disposition` is treated as `Terminal`. That fails closed: a later receipt for the same record is refused, and nothing unbound is lowered. A kernel that predates the field also fails check 2a, because it writes no `receipt_context.request_namespace_digest`, so a bound deployment always runs a kernel that emits the disposition.
+       - **Pending approval never binds.** A signed `PendingApproval` decision carries no `identity_disposition` (spec 9 M20), but it is not terminal. It is lowered as a deny with `DenyDisposition::Pending` and leaves the record sealed, like `Retained`. When the approval resolves, the operation's allow or terminal receipt is checked and binds normally.
+       - **Missing field.** A deny or `Withheld` receipt, other than a signed `PendingApproval`, without `chio_runtime.identity_disposition` is treated as `Terminal`. That fails closed: a later receipt for the same record is refused, and nothing unbound is lowered. A kernel that predates the field also fails check 2a, because it writes no `receipt_context.request_namespace_digest`, so a bound deployment always runs a kernel that emits the disposition.
 
     Any failure returns `ResponseBindingMismatch`. If concurrent response B is paired with invocation A, check 2 or 4 fails, and no verdict carrying A's digest is ever produced. If a bridge passes a binding that names model context or permit B for a response submitted under A, the constructor ignores it, check 3a confirms A from the signed receipt, and it stamps A's binding, so `lower_bound`'s rule 3 comparison with B fails. A record that names B for a receipt signed under A fails check 3a. `verdict_result_from_response` is deprecated on the schedule of `lower`.
 11. **Sealed submission records.** The optional digests are fixed when the request is submitted, not when the verdict is built:
@@ -543,8 +545,9 @@ constructed(verdict, invocation, kernel_response r) ->
 sealed(namespace, request_id, b1) and sealed(namespace, request_id, b2) -> b1 == b2
 
 bound(rec, receipt) ->
-  receipt is an allow or terminal outcome
-  or receipt.chio_runtime.identity_disposition in { Terminal, absent }
+  receipt.decision != PendingApproval
+  and (receipt is an allow or terminal outcome
+       or receipt.chio_runtime.identity_disposition in { Terminal, absent })
 
 receipt.chio_runtime.identity_disposition in { Reusable, Retained } ->
   rec.bound_receipt_id unchanged by constructing its verdict
@@ -756,6 +759,12 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187931961 | Match the response verdict to the signed decision | Fixed now. New rule 10 check 1a requires `response.verdict` and its terminal semantics to equal the receipt's signed decision, with a mismatch refused. The bound outcome's verdict is always taken from the signed decision, so a signed deny presented as `Allow` can never release output | rule 10 check 1a |
+
+### Codex review (PR #1174, round 27)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4188089207 | Leave pending-approval submissions unbound | Fixed now. A signed `PendingApproval` is never treated as `Terminal`. It is lowered with `DenyDisposition::Pending` and leaves the record sealed, and the `bound` predicate excludes it. The approval's eventual allow or terminal receipt binds normally | rule 10 check 6; predicates |
 
 ## Appendix A: FTL reference
 
