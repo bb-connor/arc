@@ -403,8 +403,8 @@ Rules:
 
 | Mode and eligibility | Path | Durable commits on the path |
 |---|---|---|
-| `!mode.covers(ReadOnly)` and `can_redispatch_unknown_read` | Check-only dispatch, then a check-only release crossing and the receipt append (as today) | 0 authority; 1 `receipts.db` |
-| `!mode.covers(ReadOnly)`, not eligible | Durable three-commit path (the call carries a consumable) | 3 authority |
+| `!mode.covers(ReadOnly)`, `can_redispatch_unknown_read`, and integrity tracking off for the calling context | Check-only dispatch, then a check-only release crossing and the receipt append (as today) | 0 authority; 1 `receipts.db` |
+| `!mode.covers(ReadOnly)`, not eligible (the call carries a consumable, or integrity tracking is on) | Durable three-commit path | 3 authority |
 | `mode.covers(ReadOnly)` (the process host), eligible, driver permits redispatch on unknown | Two-commit read: intent, outcome | 2 authority |
 | `mode.covers(ReadOnly)`, otherwise (including `invoke_known_only`) | Three-commit path | 3 authority |
 
@@ -415,6 +415,7 @@ Rules:
     - Eligibility requires `can_redispatch_unknown_read`, which excludes every pre-dispatch consumable, so no quota, nonce, DPoP proof or runtime reservation is skipped.
     - That predicate also requires matching grants without constraints, so spec 11's grant-declared `RequiredIntegrity` makes a call ineligible. The integrity check here covers only requirements from non-grant floors (spec 11's open decisions).
     - Fence refs are derived from the request inside the check, because no operation row exists.
+    - **Integrity tracking excludes the path.** When spec 11's integrity tracking (I4, rollout flag `integrity-tracking`) is enabled for the calling context, the call is not check-only eligible (spec 9 section 4.4). I4 commits the output-influence join in the same writer transaction as the outcome commit or release. The X13a release writes no authority row, so it would deliver bytes with no join, and a later consequential call could pass against stale trusted state. Such reads take the durable three-commit path, whose `OutcomeCommit` writes the join before the bytes leave.
     - **X13a. Release.** Before output is released, a second check-only crossing re-checks stop and fence. The receipt is then appended to `receipts.db` exactly as today: same fsync, same `finalize_ordinary_recovery_response` path. A refused release withholds output and appends a signed `withheld` receipt instead.
     - **X13b. D1.** D1 is closed on the success and refusal paths only if the receipt append is made infallible-or-latched. That is spec 3 phase 1 (`PostEffectObligation`, kernel-evidence latch). This path changes nothing about D1 otherwise. A crash between handoff and the receipt append still leaves no record, by design for undurable calls. Durable coverage (`All`) is the remedy.
     - **X13c. `NonDurable` calls.** Spec 9's `NonDurable` class covers calls under `Monetary` or development `Off` that no durable path covers.
@@ -422,6 +423,7 @@ Rules:
       - The integrity check covers grant-declared requirements too, because the class does not exclude grant constraints.
       - The release re-check is X13a, and the receipt append is rule 28.
       - The class exists so that spec 3 phase 1's obligation has a machine counterpart. It is not a fast path.
+      - Under integrity tracking, a would-be `NonDurable` call takes the durable three-commit path instead, for the same reason as X13: its release has no authority write to carry the I4 join.
 14. **X14. Two-commit read.** This is a contract change, behind the flag `crossing-read-two-commit`.
     - For an eligible read whose driver declares that redispatch on unknown is permitted (spec 9 `EvaluationContext`; the process runtime's `invoke`, not `invoke_known_only`), the return record fuses into the outcome commit.
     - A crash after handoff and before the outcome commit leaves `DispatchCommitted`. Recovery signs `OutcomeUnknownAfterDispatch` with `retained_dispatch_commit`, and the process runtime's bounded fresh dispatch applies unchanged.
@@ -498,7 +500,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
 ## 9. Group commit
 
 17. **X17. Writer loop.** One writer task owns the serving connection, and every write on it goes through the loop. That covers admission, revocation, stop, budget administration, the finding market, channels, FROST and fiscal, each with its commit class.
-    - Members enqueue with a reply handle.
+    - Members enqueue with a reply handle. Enqueue is the submission point (spec 9 M17). Once enqueued, the writer runs and commits the member whether or not anyone still holds its reply handle. A dropped handle never cancels a member, and spec 9's `DropReconcileJob` may take the handle over.
     - The loop takes the queue head and every member already queued (`max_batch`, default 64; at most `max_intent_members`, default 16, `DispatchIntent` members per batch).
     - It opens one IMMEDIATE transaction and runs each member as a closure inside its own `SAVEPOINT`.
     - Today's `lock_mutations` critical sections (claim, revalidate, commit) become one member closure.
@@ -671,14 +673,16 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
   - a fused intent from `Prepared` refused by a fence or revocation compensates and releases its runtime hook (X10);
   - settlement of an effect committed before a revocation or closure passes those checks, and a new authorization after the cut is refused;
   - an outcome commit under a full writer queue is never refused `Overloaded` (X17b);
-  - a re-run receipt move appends nothing (rule 24).
+  - a re-run receipt move appends nothing (rule 24);
+  - a read under integrity tracking takes the durable path, and its influence join is committed before the output is delivered (X13);
+  - a member whose reply handle is dropped after enqueue still commits, and the handle's new owner receives the reply (X17).
 
 ## 18. Alignment with sibling specs
 
 | Spec | What it must carry |
 |---|---|
 | Spec 9 | **Division:** spec 9 decides every transition and receipt; this spec executes the commits and reports `Committed`, `Refused`, `OutcomeUnknown` or `Retry` per crossing, and `Committed`, `Refused` or `Unknown` per receipt append (rule 28). **Effects:** `IntentCommit` (with the `from_prepared` flag), `ReturnRecord` (fused with begin-evaluation; also the caller report and the X14a fallback, never stop-checked), `OutcomeCommit`, `CheckOnlyCrossing` acknowledged by `CheckOnlyAcknowledged` (read-only and `NonDurable` classes), `DenyTombstone` (not for `KernelStopped`) and `ParticipantCommit`. **Events:** `CommitFailed` reasons including `Overloaded`; `CommitOutcomeUnknown` (`HaltOperation`, no compensation, reconcile at restart); `ReceiptAppendFailed`. **Inputs:** `EvaluationContext` must carry whether the driver permits redispatch on unknown (X14). **Section 6.4:** post-effect refusal handling, spec 9 M11 and M16 |
-| Spec 11 | Owns `KnowledgeIntegrity` semantics. It runs inside the intent commit and every dispatch-commit step, fast or slow. In the check-only dispatch it applies only to non-grant requirements, because grant constraints make a call ineligible (X13). The outcome commit records the output influence join |
+| Spec 11 | Owns `KnowledgeIntegrity` semantics. It runs inside the intent commit and every dispatch-commit step, fast or slow. In the check-only dispatch it applies only to non-grant requirements, because grant constraints make a call ineligible (X13). The outcome commit records the output influence join. A call under integrity tracking never takes the check-only or `NonDurable` path, so every delivery it makes has an outcome commit to carry the join (X13, X13c) |
 | Spec 3 | Spec 3 owns the affine driver contract, `LatchScope` and the ledger. Its obligation is discharged by the acknowledgement of a spec 9 M14 discharge effect that this spec executes: the outcome commit, the return record, a terminal projection, or the rule 28 receipt append. The `Reservations` check writes only `Compensable` holds and records `Commitment` entries by reference. Spec 3 phase 1's obligation and kernel-evidence latch close D1 on the check-only and `NonDurable` paths (X13b, X13c). `HaltOperation` is spec 3's `LatchScope::Operation` |
 | Spec 4 | The dispatch-commit fence is the `ClosureFence` check. Section 4.1's new crossing kinds join its section 4.3 table. Refused releases terminalize through a restrictive, non-crossing `DeniedAfterDelivery`, so its drain terminates |
 | Spec 8 | Stop and resume epochs are restrictive commits, anchored before acknowledgement, consistent with its S1, and run in the X17a priority lane. Its tier-2 check is `StopEpoch` over `(kind, scope, disposition)`, durable heads and process latches. Section 4.2's Stop column repeats its section 5 dispositions. Its tier 1 reads the per-store shared `StopHeads`. `KernelStopped` denials are temporary (X15a); the caller report and the X14a fallback are never stop-checked. Sharded stops follow section 10 S2 and S3. Check-only reads carry `chio_runtime.crossing` for its DST property, which excludes `Settle` and `AllowIfContainment` kinds |
@@ -773,6 +777,13 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | 4180731789 | Exempt prior-effect settlement from permanent authority fences | Fixed now. The settlement kinds apply the subject-before-cut test to the closure-fence and revocation checks, as they do for stop. A new authorization after the cut is still refused | section 4.2; section 17 |
 | 4180731782 (spec 8) | Continuously fence shards that lose the stop origin | Fixed here for the sharding side. A serving shard holds a 250 ms / 1 s origin-freshness lease on the monotonic clock and latches `Stopped` with `stop_origin_stale` when it falls behind or loses the origin. The acknowledgement reports `enforced` or `fenced_by_lease` (spec 8 S37) | section 10 S2, S3; section 17 |
 | (related) | Post-effect `Overloaded` | Added with spec 9's 4180435341 fix: post-effect members bypass the queue bound | X17b, X16 |
+
+### Codex review (PR #1174, round 2)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180839013 | Persist influence joins before check-only output release | Fixed now. A call whose context has integrity tracking enabled is not check-only eligible and takes the durable three-commit path, so its `OutcomeCommit` writes the I4 join before bytes leave. Would-be `NonDurable` calls under integrity tracking do the same | section 6.2 table; X13; X13c; section 18; spec 9 section 4.4 |
+| 4180839034 (spec 9) | Do not compensate while the intent commit is still in flight | Supporting change here. Enqueue is the submission point, and a dropped reply handle never cancels a member, so spec 9 M17 treats a dropped-after-submission driver as `CommitUnconfirmed` and reconciles from the writer's reply | X17; spec 9 M17 |
 
 ## Appendix A. Precedent
 

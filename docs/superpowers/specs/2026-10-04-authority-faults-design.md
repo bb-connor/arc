@@ -33,6 +33,7 @@
 
 From round 1 of the PR #1174 review (dispositions at the end of this spec):
 - **R6 no longer gates emission.** Active-defense lookups never run on the classification path. Whether a block is emitted no longer depends on whether the suspension or issuance-freeze authority is installed or online, which A5 requires. The fail-closed checks stay where authority would be granted: linked-workflow creation and capture (section 6.3 step 4).
+- **Integrity faults get their own block (round 2).** The classifier output is tagged as `FaultKind::Authority(class)` or `FaultKind::Integrity`. Spec 11's `InsufficientIntegrity` emits its own `IntegrityFaultV1` block and projects to `ExplanationFactKind::Integrity`. `AuthorityFaultClass` stays closed at four, and `AuthorityFaultV2` is unchanged (R1, section 5).
 - **A dead successor can be replaced.** Uniqueness now covers the *open* successor and the one successor that *captures*. A successor cancelled without capture frees the slot, up to a bound (sections 6.2 and 6.4).
 
 ## Revision 3 changes
@@ -131,6 +132,7 @@ Non-goals:
 | `BudgetExhausted(_)` (grant, aggregate family, monetary, D1 allocation) | `BudgetExhausted` | `Authority` remedy |
 | threshold or cumulative approval (`PendingApproval`) | `ApprovalRequired` | existing native resume (REC-15) |
 | absent required single approval (new typed `KernelError::GovernedApprovalRequired`, replacing M: `governed_validation.rs:489`, `:494`) | `ApprovalRequired` | AP2/AP3 exact approval, then a fresh request |
+| `InsufficientIntegrity { surface }` (new typed error from spec 11's `IntegrityGuard` and crossing check 4) | none: the sibling kind `FaultKind::Integrity`, with its own block (`2026-10-04-integrity-gated-admission-design.md` I18-I20) | exact integrity endorsement, or a quarantined continuation (spec 11 I21-I22) |
 
 **Never resolvable** (plain deny, no block):
 - `CapabilityRevoked`, `DelegationChainRevoked`, `InvalidSignature`, `UntrustedIssuer`, `SubjectMismatch`, `DelegationInvalid`, `CapabilityNotYetValid`, `CapturedBudgetReplay`, `DpopVerificationFailed`, `GuardDenied`;
@@ -140,11 +142,20 @@ Non-goals:
 
 **Classification rules:**
 
-1. **R1. Exhaustive.** `classify_authority_fault(&KernelError, &FaultContext) -> Option<AuthorityFaultClass>` is pure and exhaustive, with no wildcard arm returning `Some`.
+1. **R1. Exhaustive and tagged.** `classify_fault(&KernelError, &FaultContext) -> Option<FaultKind>` is pure and exhaustive, with no wildcard arm returning `Some`. `FaultKind` is closed:
+
+   ```rust
+   pub enum FaultKind {
+       Authority(AuthorityFaultClass), // emits the authority_fault block (AuthorityFaultV2, section 5)
+       Integrity,                      // emits the integrity_fault block (IntegrityFaultV1, spec 11 I19)
+   }
+   ```
+
+   `AuthorityFaultClass` stays closed at four variants, and the `Integrity` kind is never one of them.
 2. **R2. Scope.** `InsufficientScope` is emitted only when the signature, time, revocation, delegation and subject checks passed (M: `async_evaluation_core.rs:223-267`).
 3. **R3. Expiry.** `CapabilityExpired` is detected before revocation (`:239` precedes `:251`). On the fault path the kernel MUST also run the revocation, delegation and subject checks against the expired token; any failure yields a plain deny with that error.
 4. **R4. Budget.** `BudgetExhausted` is emitted only when it is the final selected error, no candidate grant recorded a guard or governed denial, and no runtime reservation was retained. This closes the precedence at `:716`.
-5. **R5. No fault on a fault.** A request carrying `RecoveryContinuationBinding`, a D1 permit for a recovery continuation, or a capability issued for an `AuthorityContinuation` workflow never yields a fault.
+5. **R5. No fault on a fault.** A request carrying `RecoveryContinuationBinding`, a D1 permit for a recovery continuation, or a capability issued for an `AuthorityContinuation` workflow never yields a fault. A request that presents an integrity endorsement never yields `FaultKind::Integrity` (spec 11 I18).
 6. **R6. Active defense acts at resolution, never at emission.** Classification never consults the suspension or issuance-freeze authority. For a given selected error, whether a block is emitted is the same whether those authorities are absent, installed, online, unavailable or holding history (A5).
    - **Fail closed where authority is granted.** Active defense is enforced at the two points where new authority could take effect:
      - linked-workflow creation (section 6.2, store validation step 3, which runs section 6.3 step 4);
@@ -190,10 +201,17 @@ pub struct AuthorityFaultV2 {
 }
 ```
 
+**Fault kinds and blocks.** The classifier output is tagged (R1), and each kind has its own block and schema:
+- `FaultKind::Authority(class)` emits the `authority_fault` block (`AuthorityFaultV2` above).
+- `FaultKind::Integrity` emits the `integrity_fault` block: `IntegrityFaultV1`, schema `chio.integrity-fault.v1`, defined in spec 11 I19. It carries only the request id, the caller's own integrity requirement, the surface (`guard` or `crossing`) and remedy classes. Those remedy classes are a function of that requirement, never of deployment configuration.
+- No integrity denial fills `AuthorityFaultV2`'s capability, subject, tool, parameter or principal-path fields, and no authority denial carries integrity fields.
+- A deny receipt carries at most one fault block.
+
 **Planner fact.**
 - When a recovery deployment covers the denied request's scope, the kernel also exposes the class through the recovery observation as the existing `ExplanationFactKind::Capability`, with value `false`. The fact gains an optional typed annotation `{ class, resolver_classes }` carrying the same values as the block.
 - The fact is derived from native flow state, not from the receipt, which keeps W:'s rule that facts never come from receipt verdicts.
 - The planner never reads the receipt.
+- `FaultKind::Integrity` projects to the new `ExplanationFactKind::Integrity`, with value `false` (spec 11 I20). Only spec 11 I20's two remedy paths may address it. The `Authority` remedy kind never addresses an `Integrity` fact, and no integrity remedy addresses a `Capability` fact.
 
 **Anti-oracle rules for the block:**
 1. **A1. Caller-held fields only.** Every field is supplied by the caller, held by the caller (its own capability, subject and chain principals), or an opaque digest of the caller's own security selection. The block never contains a policy id, guard name, grant index, remaining balance, family or sibling usage, required scope, or resolver availability.
@@ -207,6 +225,7 @@ pub struct AuthorityFaultV2 {
 
    An `Authority` candidate exposes only its resolver class and bounds, never the policy that produced the denial.
 5. **A5. Configuration-blind emission.** Whether a block is emitted must not depend on resolver configuration, online status or history.
+6. **A6. Both kinds.** A1-A5 apply to both blocks. For the integrity block, A1's caller-held set is spec 11 I19's field set, and its `remedy_classes` must not reveal which remedies a deployment has configured (A5).
 
 ## 6. Resolution through the recovery lane
 
@@ -381,7 +400,7 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
 
 - `spec/PROTOCOL.md`:
   - **Section 5:** add the `recovery_continuation_binding` constraint (shape, equality preservation, enforcer) and the `GovernedApprovalRequired` classification.
-  - **Section 6:** define the `authority_fault` v2 block.
+  - **Section 6:** define the `authority_fault` v2 block and the tagged fault kinds. Admit the `integrity_fault` block (`chio.integrity-fault.v1`, spec 11 I19) as the sibling kind.
   - **Section 8:** state that recoverable authority denials carry the block.
 - **Recovery generated schemas** (W: closed, generated vocabulary; R: `11-contract-catalog.md`):
   - `ExplanationRemedyKind::Authority`;
@@ -391,7 +410,7 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
   - the optional annotation on the `Capability` fact.
 
   Each needs negative vectors. Closed enums mean old readers refuse new values rather than misreading them.
-- **MCP.** The tool error result carries `_meta["chio/authorityFault"]`. No new JSON-RPC code.
+- **MCP.** The tool error result carries `_meta["chio/authorityFault"]` or, for the integrity kind, `_meta["chio/integrityFault"]`, never both. No new JSON-RPC code.
 - **A2A.** No change: `PendingApproval` already maps to `Working` (M: `conversion.rs:99`), and delegation-mode denials stay `Failed`.
 - **Negotiation.**
   - Add an `authority_fault_classification` feature. Without it, the kernel neither emits the block nor accepts the constraint.
@@ -417,12 +436,15 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
   - every never-resolvable variant yields `None`;
   - expired plus revoked yields a plain deny;
   - budget plus a sibling guard denial yields a plain deny;
-  - an R5 request yields no block.
+  - an R5 request yields no block;
+  - `InsufficientIntegrity` classifies as `FaultKind::Integrity`, never as an `AuthorityFaultClass`, and emits only the `integrity_fault` block;
+  - a deny receipt never carries both blocks.
 - **Planner (pure, `chio-recovery`):**
   - a `Capability` fact without an `Authority` template still yields `BlockedByCapability`;
   - with an accessible template it yields `RequiresAuthority`;
   - with an inaccessible template the public result is identical to having no template (P2 filtering);
-  - no non-`Authority` kind ever addresses a `Capability` fact.
+  - no non-`Authority` kind ever addresses a `Capability` fact;
+  - an `Integrity` fact is addressed only by spec 11 I20's two remedy paths, never by `Authority`.
 - **Store:**
   - predecessor mismatch, a second open successor, the successor bound, and changed tool or arguments are refused;
   - a successor cancelled without capture (for example after its capability expired during approval) frees the slot, and a corrected successor is accepted;
@@ -446,9 +468,10 @@ That generalization belongs to recovery P6 or later. This spec's Phase 1 is gate
 - **Anti-oracle.**
   - The block's field set equals the caller-held set (A1).
   - Blocks and explanation projections are identical with and without resolvers configured (A5).
+  - The integrity block's field set equals spec 11 I19's set, and its `remedy_classes` is the same with and without a quarantine template configured (A6).
   - Repeating one classifiable request with active-defense authorities absent, available, unavailable, and holding a suspension of the faulted capability yields the same block every time (R6, A5). Only the recovery actor's resolution result differs.
 - **Process.** A host-side sibling-spawn resolution end to end, with a sibling deployment. The worker cannot drive recovery. The faulted process's history is unchanged.
-- **Fuzz.** An `authority_fault_v2` decode target.
+- **Fuzz.** `authority_fault_v2` and `integrity_fault_v1` decode targets.
 
 ## 11. Residual risks and open decisions
 
@@ -482,6 +505,12 @@ Open decisions:
 |---|---|---|---|
 | 4180274506 | Keep fault-block emission independent of authority availability | Fixed now. Classification no longer consults active defense. Fail-closed checks stay at linked-workflow creation and capture, and refusals are disclosed only to the recovery actor | R6; section 7; section 10 anti-oracle tests |
 | 4180731799 | Allow replacement of an unused failed successor | Fixed now. Uniqueness covers the open successor and the one successor that captures. A successor cancelled without capture frees the slot, up to `max_successors_per_predecessor` | Section 6.2 store validation step 1; section 6.4; section 7; section 10 store tests |
+
+### Codex review (PR #1174, round 2)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180839016 (with spec 11) | Define an integrity-specific fault payload | Fixed now. The classifier returns a tagged `FaultKind` (`Authority(AuthorityFaultClass)` or `Integrity`). Each kind has its own block: `AuthorityFaultV2` unchanged, and `IntegrityFaultV1` defined in spec 11 I19. Each kind has its own planner projection (`Capability` and `Integrity`), and A1-A5 cover both (A6) | Section 4 table; R1; R5; section 5; section 8; section 10 |
 
 ## Appendix A. FTL reference
 

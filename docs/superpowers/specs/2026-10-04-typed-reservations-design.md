@@ -240,6 +240,8 @@ fn post_effect(ob: PostEffectObligation, ..) -> Discharged
 Discharged::deliver(self) -> Result<ToolCallResponse, DeliveryFailedAfterReceipt>   (post-receipt steps, section 4.7)
 
 Drop(AdmissionReservations) = best-effort compensate_before_dispatch with the cleanup-fault receipt; never latches (rule 6)
+Drop(boundary in flight)    = dispatch commit submitted, not acknowledged: retain everything, hand the reply to reconciliation;
+                              never compensates, never latches (rule 29)
 Drop(PostEffectObligation)  = non-durable: best-effort fault receipt, else KernelEvidence latch (rule 11)
                               durable: enqueue supervised reconciliation (rule 23); never a durable transition in Drop
 ```
@@ -312,6 +314,7 @@ Rules:
    - The in-memory items (invocation counter, runtime-admission leases and continuations, the reference-counted child-budget holder lease) have no other reclaimer. A leaked holder lease "stays permanently recorded" (M: `kernel_drop_guard.rs:328-341`). So these items are released synchronously in `Drop`.
    - The durable compensation step runs only if every earlier step succeeded, as today. When it cannot run, `Drop` enqueues the operation to the supervised reconciliation job of rule 23, whose pre-dispatch branch compensates under `PreDispatchNoEffect`. The startup sweep remains the backstop.
    - `Drop` never sets a latch. "An unconsumed ledger is a bug" survives only as a `debug_assert!` on paths that are not cancellation; there are none in the evaluators today.
+   - Rule 6 covers drops before the dispatch commit is submitted. A drop after submission and before the acknowledgement follows rule 29, because the commit may still land.
    - The work runs under rule 24.
 
 ### 4.4 `PostEffectObligation` and `Discharged`
@@ -560,7 +563,9 @@ latched(KernelEvidence(_)) -> not admits_new_dispatch(any evaluation)
 latched(KernelEvidence(_)) -> admits(compensation, terminal_receipt_recovery, session_report)
 halted(Operation(op)) -> no other operation is affected
 
-dropped_before_boundary(r) -> compensation_attempted(r) and not latched
+dropped_before_boundary(r) and not dispatch_commit_submitted(r) -> compensation_attempted(r) and not latched
+dropped_in_flight(r) -> retained(r) and reconciliation_enqueued(r) and not latched     (rule 29)
+compensated(r) and dispatch_commit_submitted(r) -> proven_not_committed(r)
 compensated(r) -> not entered_effect_boundary(r)
 commit_unconfirmed(r) -> not compensated(r)
 forall entry in Retained or Commitment: never compensated(entry)
@@ -624,7 +629,7 @@ Sequencing:
     - On the legacy evaluator, the job calls `terminalize_dispatch_committed_admission`. That call refuses when a durable outcome exists and freezes holds (M: `kernel_drop_guard.rs:530-548`).
     - Under spec 9, the job is a driver that feeds `Cut(DriverDropped)` or re-projects the operation.
     - The request id is not stranded until the next restart (M: `admission_coordinator/recovery.rs:395-399`).
-    - A dropped future before the dispatch-commit acknowledgement follows rule 6 instead.
+    - A future dropped before the dispatch commit is submitted follows rule 6. One dropped after submission and before the acknowledgement follows rule 29.
 24. **`Drop` work is contained.** Every `Drop` path in this design (ledger compensation, obligation fault receipt) runs inside `catch_unwind`, as `security_dispatch::callback` does (M: `security_dispatch.rs:8-22`). It skips host observers (`observe_runtime_trace` and the settlement observer, M: `responses/receipt_persistence.rs:457-492`). A panicking observer during unwinding would double-panic and abort, losing both the latch and the evidence.
 25. **The durable failed-return path writes no receipts.db record.** At `async_evaluation_core.rs:1919` and `nested_flow_evaluation.rs:1705`, a failed `record_durable_tool_return` no longer builds a signed `Deny` response.
     - The evaluator returns the error. The operation stays `DispatchCommitted`, and rule 23 enqueues reconciliation.
@@ -641,6 +646,11 @@ Sequencing:
     - The kernel buffers the fault record and sets `KernelEvidence(record)`. It appends no fault receipt until the writer drains and `load_chio_receipt(original_id)` reads the original back as absent.
     - If the original is present, it stands: the fault record is discarded, and that latch clears.
     - Fault receipts always name `original_receipt_id`.
+29. **Drop while the dispatch commit is in flight.** `enter_effect_boundary` tracks whether its dispatch commit (`commit_durable_dispatch` or `capture_and_commit_durable_dispatch`, or spec 10's `DispatchIntent` member) has been submitted to the store. A dropped future cannot prove that a submitted commit did not land, so this is `CommitUnconfirmed` (rule 4), never pre-dispatch compensation.
+    - Before submission, the boundary still owns an unconsumed ledger, and rule 6 applies.
+    - After submission and before the acknowledgement, `Drop` moves every entry to retained and hands the commit's reply (or the operation id, where there is no reply handle) to the supervised reconciliation job of rule 23. It compensates nothing, releases no in-memory lease and sets no latch.
+    - The job waits for the store's terminal outcome. On `DispatchCommitted` it proceeds as rule 23, and the operation ends outcome-unknown. When the outcome proves no commit (a refusal, or a read-back at the expected version or with no row under the replay key), the job compensates as rule 6 does, including the in-memory items. On an unknown outcome, the holds stay retained and restart reconciliation decides (rule 4).
+    - **Legacy window.** On M:, both dispatch-commit calls are synchronous `fn`s (M: `admission_coordinator.rs:1560`, `:1814`). An async future cannot be dropped inside them, so this window is empty on the legacy evaluator today. The rule binds as soon as the dispatch commit becomes an awaited submission: spec 10's writer loop, or any async store. Spec 9 M17 states the same rule for drivers.
 
 ## 5. Mechanism D gate: `cargo xtask check escape-hatches`
 
@@ -714,6 +724,7 @@ The gate inherits the hardening toolchain's GT1 limitation (hardening gates not 
 | Federation co-sign, trace allocation or settlement claim fails after the append | `Err` after a committed receipt | `DeliveryFailedAfterReceipt`; no second terminal receipt |
 | Durable return record fails | saga recovers, plus a contradictory `Deny` receipt | saga recovers; no receipts.db record (rule 25) |
 | Durable future dropped after dispatch | guard `Drop` terminalizes best-effort | supervised reconciliation job; same terminal, no transition in `Drop` (rule 23) |
+| Future dropped with the dispatch commit in flight | cannot happen: both dispatch-commit calls are synchronous | `CommitUnconfirmed`: retain, reconcile from the store's outcome, compensate only when it proves no commit (rule 29) |
 | Post-receipt provenance or nonce failure | bare `Err` | `DeliveryFailedAfterReceipt { receipt_id }` |
 | Panic in the post-effect region | guard `Drop` only if still armed | obligation `Drop` under `catch_unwind`: best-effort fault receipt, else latch (non-durable); reconciliation (durable) |
 | Panicking host observer during `Drop` | double panic, abort | observers skipped on `Drop` paths (rule 24) |
@@ -775,6 +786,7 @@ Following the RFC-0002 precedent, each phase ships as the only behavior.
   - `CrashBoundary::FailAppendAfterDispatch`.
   - `AppendTimeoutThenLateCommit`: no second terminal receipt, and the latch clears after read-back.
   - Post-dispatch durable drop: the request id's replay resolves without a restart.
+  - Drop with the dispatch commit submitted but unacknowledged, under an awaited store: nothing is compensated before the outcome. A commit that lands ends outcome-unknown, and a refused one compensates (rule 29).
 
   Seeds go in `tests/dst/seeds.toml`.
 - **loom** (`tests/loom_concurrency.rs`):
@@ -873,6 +885,12 @@ Open decisions:
 | 4180274494 | Preserve receipt creation time after tool execution | Fixed now. Authority time is no longer hoisted. The receipt `timestamp` is read at receipt creation (step `AuthorityTime`), which also corrects M:'s evaluation-entry stamp. The entry time travels as `chio_runtime.evaluation_started_at` | Section 2.2 item 3; rules 14 and 16; section 6; section 7 |
 | 4180274499 | Do not discard overflowed post-effect records | Fixed now. Each non-durable evaluation reserves an evidence slot before the boundary, or is denied before dispatch. The buffer's capacity equals the slot pool, so a record always fits and the drop path is gone | Rules 16 and 18; section 4.11; section 11 |
 | 4180274502 | Bind each discharge token to its obligation | Already addressed in revision 4: there is no free token. `Discharged` comes only from consuming its own obligation, and `commit_terminal_receipt` checks request id, operation id and decision. This round adds a fail-closed runtime binding check in `run_post_effect` | Rule 7; section 9 |
+
+### Codex review (PR #1174, round 2)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180839034 (spec 9) | Do not compensate while the intent commit is still in flight | Fixed in spec 9 M17. Mirrored here as rule 29, so the affine contract matches: a drop after submission and before the acknowledgement is `CommitUnconfirmed`, retains everything, and is reconciled from the store's outcome. On M: the window is empty today, because both dispatch-commit calls are synchronous, and the rule binds once the commit becomes awaited | rules 6, 23, 29; section 4.11; section 6; section 9 |
 
 ## Appendix A. FTL reference
 

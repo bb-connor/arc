@@ -38,6 +38,9 @@
 
 - **The join is a real lattice join.** Revision 1's join summed `bounded_bits_total` and chained `H(s1.commitment, s2.commitment)`. So `join(s, s)` doubled the bits, the ordered hash was neither commutative nor associative, and replaying or rebuilding one delivery could push a context over its bound. A context's state is now a canonical, deduplicated set of observations with stable ids. Every field, the commitment included, is a function of that set, and join is set union (section 4, rule I4a).
 - **Summary rows stay exact under the new join.** Per-key heads are maintained for the seven key subsets, so crossing check 4 computes the union over principal, lineage and session by inclusion-exclusion, counting each observation once (I16).
+- **Observation ids name their destination (round 2).** An id hashes the delivery record and the destination context's key values. Two contexts that read one artifact version each record an observation, and retries of one delivery stay stable (I4a).
+- **Tracked contexts are not check-only (round 2).** A call in a context with integrity tracking takes the durable path, so its output join commits before delivery. Gating requires tracking (I4b).
+- **The integrity fault has its own block (round 2).** It is `IntegrityFaultV1` (`chio.integrity-fault.v1`), a sibling of spec 2's `AuthorityFaultV2` under a tagged classifier output. It is not a fifth `AuthorityFaultClass` (I18, I19).
 - **The worker profile is consumed as a verified fact.** Spec 7 rule 6.3.5 defines its qualification and fail-closed behavior. I7 uses only the verified fact and commits the initial influence once, as an observation, when the context's scope is created.
 
 ## 1. Decision summary
@@ -68,7 +71,7 @@ This design closes all three:
 2. **Output influence joins.** Every output the kernel delivers into a mediated context joins its influence, and origin classes are assigned by operator bindings (section 5).
 3. **`Constraint::RequiredIntegrity`.** It follows the `MinimumRuntimeAssurance` precedent and is preserved monotonically under delegation (section 6).
 4. **Two checks.** A deny-only `IntegrityGuard` runs early (section 7). The authoritative check is crossing check 4 inside spec B's intent commit, in the same writer as the joins (section 8).
-5. **The fault.** `InsufficientIntegrity` joins spec 2's taxonomy (section 9). Its remedies are:
+5. **The fault.** `InsufficientIntegrity` is a sibling fault kind in spec 2's tagged classifier, with its own block (section 9). Its remedies are:
    - an exact endorsement, through the existing but unused `AuthorityObligationV1::IntegrityEndorsement`;
    - a quarantined continuation in an isolated successor fed by typed P5 returns.
 
@@ -125,7 +128,8 @@ pub enum InfluenceOriginV1 {
     ModelProvider { provider: ProviderId },  // operator-bound provider responses
 }
 
-/// One joined observation. Its id is stable across replay and rebuild of the same delivery (I4a).
+/// One joined observation. Its id names one delivery into one destination context, and is stable
+/// across retries, replays and rebuilds of that delivery (I4a).
 pub struct InfluenceObservationV1 {
     pub observation_id: CanonicalPayloadDigest,
     pub origin: Option<InfluenceOriginV1>,           // None: a trusted observation
@@ -199,16 +203,33 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
    The previously unproduced `ArtifactReleaseKindV1::CapturedOutput` becomes the release record for invoke results under enforced knowledge.
 
    **I4a. Observation identity and dedupe.**
-   - `observation_id = SHA-256("chio.influence-observation.v1\0" || source_kind || "\0" || source_record_digest)`. The source record identifies the delivery, not its bytes:
-     - the output release record (operation id plus output digest), for invoke results and session tool results;
-     - the message id, for mailbox receives;
-     - the artifact version digest, for artifact reads;
+   - The id names one delivery into one destination context:
+
+     ```text
+     observation_id = SHA-256("chio.influence-observation.v1\0" || source_kind
+                              || "\0" || delivery_record_digest
+                              || "\0" || destination_digest)
+     ```
+
+   - `destination_digest` is the canonical digest of the destination context's key values: tenant, isolation epoch, principal, lineage, and session or process id. These are the values its flow row carries and its heads are keyed by (I16).
+   - `delivery_record_digest` identifies one delivery or read, never the delivered bytes or the source object alone:
+     - the output release record (operation id plus output digest), for invoke results and session tool results. One operation has exactly one destination;
+     - the message id plus the receiver's claim (mailbox id and receiver), for mailbox receives;
+     - the read's release record, for artifact reads. That is the P4 `ReleaseIntent` of that read, which binds the artifact version digest; the version digest alone is never the source record;
      - the restore record, for model-context restores;
      - the confined-return record, which binds the child's influence `commitment` (I8), for confined returns;
      - the verified launch record digest under `source_kind = initial`, for the initial-influence observation (I7).
+   - **Distinct destinations are distinct observations.** Two contexts that read the same artifact version produce two observations, one per destination. Each context's heads therefore receive the artifact's influence, and neither context can stay trusted because another context read the version first.
+   - **Retries are stable.** A retry, replay or rebuild of one delivery (same record, same destination) yields the same id and changes nothing. Two deliveries of identical bytes yield two ids.
+   - **A retry that cannot reuse its record over-taints and never under-taints.** If a host cannot reuse the delivery record when it retries, the retry adds a second observation. That only adds influence (I2). It never double-counts bits, because `ExternalBounded` observations are keyed by the confined-return record, which is unique per return.
+   - Knowledge flow rows are unique on `(tenant, isolation_epoch, observation_id)`. The id binds the destination, so a row's principal, lineage and session or process values are a function of its id.
+   - A join whose row key values disagree with the id's `destination_digest` is refused. The join fails closed, so the delivery it belongs to is withheld (I4).
+   - A join inserts with insert-or-ignore semantics. Only a newly inserted row changes the summary heads (I16), so a duplicate join changes nothing.
 
-     A redelivery or a rebuild of one delivery yields the same id. Two deliveries of identical bytes yield two ids.
-   - Knowledge flow rows are unique on `(tenant, isolation_epoch, observation_id)`, and they carry the delivery's principal, lineage and session values. A join inserts with insert-or-ignore semantics. Only a newly inserted row changes the summary heads (I16), so a duplicate join changes nothing.
+   **I4b. Tracked contexts are not check-only or non-durable.**
+   - When integrity tracking is enabled for the calling context, the call is neither check-only eligible nor `NonDurable`, under spec 9's eligibility rule (`2026-10-04-pure-admission-machine-design.md` section 4.4) and spec 10's read-only and non-durable paths (`2026-10-04-crossing-primitive-design.md` section 6.2, X13 and X13c).
+   - It takes the durable path, whose `OutcomeCommit` writes the output-influence join (I4) in the same writer transaction, before the bytes are delivered. A check-only release only appends to `receipts.db`, so it has no authority write that could carry the join.
+   - Gating requires tracking. A gated grant evaluated for a context without tracking is denied, because untracked deliveries would leave its influence head stale.
 5. **I5. Origin assignment.** Origins come from an operator-signed `IntegrityDeploymentBindingV1`, never from the output and never solely from the tool publisher:
    - **Default.** Every route's output origin is `External`. An unbound route is `External`, never trusted (fail closed).
    - **Operator trust.** An operator may bind a route as `Trusted`, for an internal deterministic tool over operator-controlled data, or as `ModelProvider { provider }`. The binding names the server, the tool and the tool server's manifest digest. A manifest change voids it.
@@ -268,7 +289,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
 
 A join and a capture can race. A tool output can be delivered into the same context, and commit its join, between the guard's read and the dispatch. P4 already resolves the analogous confidentiality race by serializing capture and join in one writer (W: `p4/OPERATIONS.md:107-113`). Integrity uses the same point.
 
-15. **I15. Inside the intent commit.** Spec B's crossing primitive evaluates `CrossingCheck::KnowledgeIntegrity { key, requirement }` inside the intent commit's writer transaction, before `DispatchCommitted`. For a read-only call there is no intent commit. The same check runs inside spec B's check-only dispatch crossing, which reads the committed influence head in the writer without writing, so read-only tools gated by integrity are covered too. `satisfies` is computed from the influence state as committed in that same transaction.
+15. **I15. Inside the intent commit.** Spec B's crossing primitive evaluates `CrossingCheck::KnowledgeIntegrity { key, requirement }` inside the intent commit's writer transaction, before `DispatchCommitted`. A gated call always runs in a tracked context (I4b), so it is never check-only or `NonDurable`. It takes spec B's durable read path and is checked in that path's intent commit. Spec B's check-only dispatch crossing still carries the check, reading the committed influence head in the writer without writing, but under I4b it never meets a gated grant in a tracked context. `satisfies` is computed from the influence state as committed in that same transaction.
     - **Join first:** a join that commits first makes the intent commit fail with `InsufficientIntegrity`.
     - **Intent first:** the effect proceeds, and the later join affects only later calls.
 16. **I16. Summary rows.** W:'s `observed_influence` scans up to 4,096 join records per call (W: `security_participant_state/knowledge.rs:64-75`). This design adds `knowledge_influence_heads(tenant, isolation_epoch, key_subset, key_values) -> InfluenceHeadV1`. `key_subset` is one of the seven non-empty subsets of {principal, lineage, session}. Each head holds exact counters over the observations whose key values match on that subset: a `u64` bit sum, a count per origin class, an unknown count, an observation count and the additive set-hash value.
@@ -287,15 +308,38 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
 
 ## 9. Refusal, fault and remedies
 
-18. **I18. A fifth class.** `InsufficientIntegrity` joins spec 2's closed `AuthorityFaultClass` (`2026-10-04-authority-faults-design.md` section 5). It is classified from the guard or crossing-check refusal. A request that presents an integrity endorsement (I21) never yields this fault, which avoids fault-on-fault loops.
-19. **I19. Anti-oracle.** The fault block carries only:
-    - the class;
-    - the caller's own requirement, which the caller holds;
-    - the surface (`guard` or `crossing`);
-    - the remedy classes available.
+18. **I18. A sibling fault kind, not a fifth class.**
+    - Spec 2's classifier output is tagged: `FaultKind = Authority(AuthorityFaultClass) | Integrity` (`2026-10-04-authority-faults-design.md` section 4, rule R1). Each kind has its own block.
+    - `AuthorityFaultClass` stays closed at four variants, and `AuthorityFaultV2` is unchanged. No integrity denial has to fill its capability, subject, tool, parameter or principal-path fields, and the `Capability` projection never sees an integrity denial.
+    - The integrity kind is classified from the typed refusal `KernelError::InsufficientIntegrity { surface }`, which `IntegrityGuard` (I13) and crossing check 4 (I15) return. It is never classified from `GuardDenied`, which stays never-resolvable.
+    - A request that presents an integrity endorsement (I21) never yields this fault. That avoids fault-on-fault loops (spec 2 R5).
+19. **I19. The integrity fault block and its anti-oracle rule.** The block is written under receipt metadata key `integrity_fault`, and MCP carries it as `_meta["chio/integrityFault"]`:
 
-    It never carries origin classes, bit totals, the commitment, or which delivery caused the taint. With session-wide keys (I17), the cause may be another process's delivery in the same runtime, so revealing it would leak cross-process activity. `ExplainIntent`-equivalent projections follow P2's stricter rules.
-20. **I20. Planner fact.** Where a recovery deployment covers the request, the kernel exposes a new `ExplanationFactKind::Integrity` with value `false`. W:'s fact enum is closed, so this is a schema change. Only two remedy paths may address it:
+    ```rust
+    // crates/core/chio-core-types/src/capability/integrity_fault.rs (no_std + alloc)
+    pub const INTEGRITY_FAULT_SCHEMA: &str = "chio.integrity-fault.v1";
+
+    pub enum IntegrityFaultSurface { Guard, Crossing }
+    pub enum IntegrityRemedyClass { IntegrityEndorsement, QuarantinedContinuation }
+
+    #[serde(deny_unknown_fields)]
+    pub struct IntegrityFaultV1 {
+        pub schema: String,                            // the schema names the kind; no class field
+        pub request_id: String,                        // the caller's own request
+        pub requirement: IntegrityRequirementV1,       // the caller's own grant requirement
+        pub surface: IntegrityFaultSurface,
+        pub remedy_classes: Vec<IntegrityRemedyClass>, // closed, ordered, at most 2
+    }
+    ```
+
+    - **Configuration-blind remedies.** `remedy_classes` is a function of the caller's own requirement, never of deployment configuration (spec 2 A5):
+      - `Trusted` and `ProviderOnly` list `[IntegrityEndorsement]`;
+      - `BoundedExternal` lists `[IntegrityEndorsement, QuarantinedContinuation]`, because a quarantined successor can satisfy only a bounded requirement (I22).
+
+      Whether a remedy is actually available is disclosed only to the recovery actor at resolution.
+    - **Never carried.** The block never carries origin classes, bit totals, the commitment, or which delivery caused the taint. With session-wide keys (I17), the cause may be another process's delivery in the same runtime, so revealing it would leak cross-process activity.
+    - **Spec 2's rules apply.** A1-A5 apply to this block, with A1's caller-held set equal to the fields above. A deny receipt carries at most one fault block, either `authority_fault` or `integrity_fault`. `ExplainIntent`-equivalent projections follow P2's stricter rules.
+20. **I20. Planner fact.** Where a recovery deployment covers the request, the kernel exposes a new `ExplanationFactKind::Integrity` with value `false`. This is spec 2's projection for `FaultKind::Integrity`; `FaultKind::Authority` keeps projecting to `Capability`. W:'s fact enum is closed, so this is a schema change. Only two remedy paths may address it:
     - `ExactApproval` with obligation `IntegrityEndorsement` (I21);
     - `Prerequisite` with the `QuarantinedContinuation` template (I22).
 
@@ -356,7 +400,7 @@ pub enum ConfinedReturnTypeV1 {
     - the opaque influence `commitment`;
     - the floor source, when a floor applied.
 
-    Deny receipts carry the fault block (I19). Auditors can join any consequential effect to the influence commitment that admitted it.
+    Deny receipts carry the `integrity_fault` block (I19). Auditors can join any consequential effect to the influence commitment that admitted it.
 
 ## 14. Evaluation plan
 
@@ -392,6 +436,9 @@ pub enum ConfinedReturnTypeV1 {
 | Influence port or summary row unavailable | Deny |
 | Summary row mismatch at startup | Not ready (I16) |
 | The same delivery is joined twice (retry, replay, rebuild) | Insert ignored; state unchanged (I4a) |
+| Two contexts read the same artifact version | One observation per destination; both contexts gain the artifact's influence (I4a) |
+| A flow row's key values disagree with its id's destination | Join refused; the delivery is withheld (I4a) |
+| Gated grant in a context without integrity tracking | Deny (I4b) |
 | Worker-profile fact unverified | Context starts at `unknown`; gated calls deny (I7) |
 | Unbound route output | Joins `External` (I5) |
 | Manifest digest changed under an operator binding | The binding is void; output joins `External` |
@@ -403,10 +450,11 @@ pub enum ConfinedReturnTypeV1 {
 ## 16. Protocol, schema and wire impact
 
 - `spec/PROTOCOL.md` section 5: the `required_integrity` constraint (vocabulary, ordering, preservation rule I9, KG4 support condition).
-- Section 6: `chio_runtime.integrity` receipt metadata, and the `InsufficientIntegrity` fault block.
+- Section 6: `chio_runtime.integrity` receipt metadata, and the `chio.integrity-fault.v1` block under `integrity_fault`, a sibling of spec 2's `authority_fault` (I18, I19).
 - Section 8: deployment integrity bindings and floors.
 - New schemas:
   - `chio.integrity-requirement.v1`;
+  - `chio.integrity-fault.v1`;
   - `chio.influence-state.v1`;
   - `chio.integrity-deployment-binding.v1`;
   - `chio.confined-return-type.v1`.
@@ -426,6 +474,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
 
 - **Proptest.**
   - Lattice laws over generated observation sets that include duplicates and replays: join is commutative, associative and idempotent, and monotone (I2). The bit total and commitment of `join(s, s)` equal those of `s`.
+  - Fan-out identity: generated deliveries of one artifact version to several destinations give one observation per destination. Each destination's state includes that observation, and replaying any one delivery changes no state (I4a).
   - Head maintenance: incremental heads equal heads rebuilt from rows. Inclusion-exclusion over the seven heads equals a direct scan of `P union L union S`.
   - `satisfies` is antitone in state.
   - Attenuation never weakens a requirement (I9).
@@ -437,12 +486,15 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Attested mailbox inheritance.
   - Initial influence per verified worker profile. Each qualification failure starts at `unknown`.
   - Typed return capacity and projection rejection.
+  - `InsufficientIntegrity` yields the `integrity_fault` block, never an `authority_fault` block. Its field set equals I19's, and `remedy_classes` depends only on the caller's requirement (I18, I19).
 - **Conformance.**
   - An injected tool output followed by a consequential call is denied.
   - The quarantined continuation succeeds under `BoundedExternal`.
   - A same-principal endorsement replayed after new influence is refused.
   - MCP-edge gated grants deny.
   - A cross-process taint in one runtime denies, with no cause disclosed.
+  - Two contexts in one tenant and isolation epoch read the same artifact version. The second context's gated call is denied (I4a).
+  - A gated read-only call in a tracked context takes the durable path, and its output join commits before delivery (I4b).
 - **Adversarial suite.** Adaptive injection cases from section 14 are added to `chio-adversarial-suite`.
 
 ## 19. Residual risks and open decisions
@@ -468,6 +520,14 @@ Open decisions:
 |---|---|---|---|
 | 4180435333 | Define an idempotent integrity join | Fixed now. The state is a canonical deduplicated observation set with stable ids, and every field (an additive set hash for the commitment) derives from it, so join is set union. Heads use inclusion-exclusion for exact unions. The lattice-law tests now cover duplicates and replays | Section 4; I4a; I16; section 18 |
 | 4180731791 (with spec 7) | Treat worker profile as an authorization fact | Fixed now. I7 consumes only the verified fact defined by spec 7 rule 6.3.5, commits it once as an initial observation, and starts any unverified context at `unknown` | I7; section 15; section 19 |
+
+### Codex review (PR #1174, round 2)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180839009 | Include the artifact delivery in the observation ID | Fixed now. The id hashes the delivery record (for artifact reads, that read's P4 `ReleaseIntent`, never the version digest alone) and the destination context's key values. Two contexts that read one version each record an observation; retries of one delivery stay stable; a row whose key values disagree with its id is refused | I4a; section 15; section 18 proptest and conformance |
+| 4180839016 (with spec 2) | Define an integrity-specific fault payload | Fixed now. Spec 2's classifier output is tagged (`FaultKind::Authority(class)` or `FaultKind::Integrity`). The integrity kind has its own `IntegrityFaultV1` block with only the request id, the caller's requirement, the surface and configuration-blind remedy classes, and it projects to `ExplanationFactKind::Integrity`. `AuthorityFaultClass` stays at four | I18; I19; I20; sections 13 and 16; spec 2 sections 4, 5, 8 and 10 |
+| 4180839013 (spec 10 side handled there) | Persist influence joins before check-only output release | Fixed here for spec 11. A call in a tracked context is not check-only eligible, so its `OutcomeCommit` writes the join before delivery. Gating requires tracking | I4b; I15; section 15 |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

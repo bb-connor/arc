@@ -61,6 +61,7 @@
   - Knowledge-protected changes never advance `hint_revision` (S5-20).
   - H1 gains a dependency ban and a differential test (S5-24).
 - **Stop hints read spec 8's shared `StopHeads` notification**, and `Capability` posts match by lineage (S5-14).
+- **Server requests are routed by cause (Codex round 2).** Each inbound message carries a session-local sequence. The edge stamps every outgoing event with the sequence of the message it is handling, and the writer routes server-to-client requests by that cause instead of by the active slot (A1a-A1c).
 - **Factual corrections (S5-26).** `EffectObservationV1` has ten variants; the replay window holds 64 notifications, not 64 events; `:608` and `:702` are buffered collectors; `resume_generation` advances per signed record; the recovery events `sequence` column is a global cursor.
 
 ## Revision 3 changes
@@ -173,24 +174,44 @@ Part A ships as independent fixes in `chio-mcp-remote`, `chio-mcp-edge` and W: `
 Each POST request that expects a response registers a slot on the session **before** `session.send`:
 
 ```rust
+pub struct InboundSeq(u64);                              // session-local, monotonic, assigned at send (A1a)
 pub struct RequestSlot {
     request_id: Value,                                   // the JSON-RPC id of this POST
+    cause: InboundSeq,                                   // the sequence its message is sent with
     response: oneshot::Sender<RemoteSessionEvent>,       // exactly one terminal response
-    server_requests: SlotQueue<RemoteSessionEvent>,      // correlated server-to-client requests
+    server_requests: SlotQueue<RemoteSessionEvent>,      // server-to-client requests caused by this POST
 }
 impl RemoteSession {
-    fn register_request_slot(&self, request_id: Value, credential_call: Option<PendingCall>)
-        -> Result<RequestSlotReceiver, SlotError>;      // at most one active slot per session
+    fn reserve_inbound_seq(&self) -> Result<InboundSeq, SlotError>;   // checked add; exhaustion fails closed
+    fn register_request_slot(&self, cause: InboundSeq, request_id: Value,
+                             credential_call: Option<PendingCall>)
+        -> Result<RequestSlotReceiver, SlotError>;      // at most one active request slot per session
+    fn send_with_seq(&self, seq: InboundSeq, message: Value) -> Result<(), SessionSendError>;
 }
 ```
 
+The POST handler reserves the sequence, registers the slot, then sends with that sequence, all while holding `active_request_stream`, so a fast response can never precede its slot.
+
 Rules:
 
-1. **A1. Writer routing.** `BroadcastJsonRpcWriter::next_event` routes every request-correlated event before it publishes on the broadcast:
-   - a response whose id equals the active slot's `request_id` fills `response`;
-   - a server-to-client request (a message with both `method` and `id`) emitted while a slot is active is pushed to `server_requests`.
+1. **A1. Writer routing by cause.** `BroadcastJsonRpcWriter::next_event` routes every request-correlated event by its **cause** (A1a), never by which slot happens to be active, before it publishes on the broadcast:
+   - a response whose id equals a slot's `request_id` **and** whose cause equals that slot's `cause` fills `response`. Matching the cause as well as the id makes a reused JSON-RPC id harmless (M: `chio-mcp-edge/src/runtime/protocol/parsing.rs:139-146` notes that clients may reuse ids);
+   - a server-to-client request (a message with both `method` and `id`) whose cause equals a live slot's `cause` is pushed to that slot's `server_requests`;
+   - every other server-to-client request follows A1b.
 
-   The per-session `active_request_stream` lock already serializes POST requests, so at most one slot is active, and every server-to-client request emitted during it correlates with it. The broadcast still carries every event for compatibility, but POST streams no longer read request-correlated events from it.
+   The broadcast still carries every event for compatibility, but POST streams no longer read request-correlated events from it.
+
+   **Why not temporal correlation.** Revision 4 first correlated every server request emitted while a slot was active with that slot, on the grounds that `active_request_stream` serializes POSTs. Notification POSTs and client responses do not take that lock. The handler sends them even when `try_lock_owned()` fails, and on credential sessions it sends them without trying (M: `http_service.rs:363-394`; `main` `:390-399`). The edge runtime is serial, so a notification that arrives during call X is deferred, or waits in the input channel, and is handled after X's terminal response (M: `chio-mcp-edge/src/runtime.rs:426-449`; `nested_flow.rs:243-253`). A server request it causes, such as the `roots/list` that `notifications/roots/list_changed` queues (`runtime/requests.rs:127-133`, then `runtime_flow.rs:88-110`), is therefore emitted while some later POST's slot is active, and temporal correlation would hand it to that unrelated POST. Today's filter has the same defect in a weaker form: every POST stream emits every server-to-client request (`http_service_auth.rs:1-14`, the `event.message.get("method").is_some()` arm).
+   - **A1a. Causal identity.** Every message the HTTP layer hands to the session input carries a session-local `InboundSeq`, assigned by `send_with_seq` under the input sender, so channel order equals sequence order.
+     - The edge's hosted input becomes `InboundEnvelope { seq, message }`, replacing the bare `Value` of `serve_message_channels`. The stdio path assigns its own sequence in `pump_client_messages`.
+     - The edge runtime holds a cause cell shared with the writer, an `Arc<AtomicU64>` where 0 means no cause. The edge loop sets it to the envelope's sequence before handling a message, including a deferred one: `deferred_client_messages` (M: `runtime.rs:150`) stores envelopes, not bare values. The cell stays set through that message's pending actions and its terminal response. The loop clears it before background servicing, task processing and runtime-event forwarding (`runtime.rs:426-449`; `runtime/tasks.rs:710-723`).
+     - Pending actions capture their cause when queued. `EdgeAction::RefreshRoots` gains `cause: Option<InboundSeq>`, and processing the action sets the cell from it. A refresh queued at restore (`runtime.rs:318`) has no cause, so it is never attributed to the first request after restore.
+     - The writer is driven synchronously from the edge worker thread (M: `session_core.rs:1094-1110`), and the edge changes the cell only between whole lines. The value `next_event` reads is therefore exactly the cause of the line it is publishing. `RemoteSessionEvent` gains `cause: Option<InboundSeq>`.
+   - **A1b. Server requests with no request slot.** A server-to-client request caused by a notification, by a client response, by a request whose slot has already closed, or by nothing (background tasks, restore, late events) is never routed to a request slot:
+     - with a GET notification stream attached, it is delivered there, live;
+     - with none, the writer answers it locally at once with a JSON-RPC error (`-32603`, "no client stream for an uncorrelated server request") through the session input and increments `chio_mcp_remote_server_request_unroutable_total`. The edge takes its existing error path; for a roots refresh that is the `roots_refresh_failed` log (`runtime_flow.rs:96-107`).
+   - **A1c. Notification POSTs keep today's buffered response.** A notification POST that obtains the free lock (M: `http_service.rs:386-420`) registers a **notification slot** for its own sequence. The slot has no `response`, and it ends when the edge goes idle, as `collect_session_events_until_idle` does today. Server requests the notification causes, for example `roots/list` after `notifications/roots/list_changed`, still ride that POST's `post_notification_sse` response. A notification POST that finds the lock busy registers nothing and returns `202` as today, and A1b routes what it causes.
+   - **Serialization was rejected.** Making notification POSTs wait for the request lock would also correlate correctly. But cancellations and client responses must bypass the lock: a cancellation must reach the active call, and a nested flow waits on a client response (M: `http_service.rs:364-366`; `nested_flow.rs:207-226`). Every other notification would then wait for the full duration of an in-flight tool call.
 2. **A2. Non-lossy.** `response` is a `oneshot`, so it cannot overflow. `server_requests` is bounded by `max_pending_server_requests` (default 16). On overflow the writer never drops silently: it answers the excess server request locally with a JSON-RPC error (`-32603`, "server request queue full") through the session input, so the tool sees its elicitation or sampling request fail, and it increments `chio_mcp_remote_server_request_overflow_total`.
    - **A2a. Receiver loss is treated like overflow.** When the HTTP client disconnects, the POST stream drops the slot's receiving half. The receiver's `Drop` marks the slot `receiver_closed`, and the writer also checks the closed flag on every push. From that point, no server request correlated with the slot can wait forever on a client that is gone. The nested flow's `send_client_request` blocks on client input with no timeout of its own (M: `chio-mcp-edge/src/runtime/nested_flow.rs:207-226`).
      - Every server request queued in `server_requests` but never yielded to the client is answered locally at once with a JSON-RPC error (`-32603`, "client stream closed before the server request was delivered") through the session input.
@@ -199,7 +220,7 @@ Rules:
      - Each local answer increments `chio_mcp_remote_server_request_orphaned_total`. A local answer is always an error, never a fabricated result.
      - The nested flow takes its existing error path, so the tool sees its sampling or elicitation request fail and returns. The slot then receives its terminal response, and the completion task (section 4.2) terminalizes the call. A local error for each orphaned request is preferred over cancelling the parent call, because the tool decides whether it can finish without the nested result, as with overflow in A2.
    - **A2b. The slot owns the request lock.** At registration, the `active_request_stream` guard moves from the stream into the slot. The slot releases it only when its terminal response has been routed, or when the session is cancelled (A12). The response is routed when it is handed to the stream or the completion task, or discarded because both receivers are gone.
-     - A POST that arrives after its predecessor's client disconnected therefore still queues behind the running call. Every server request emitted meanwhile correlates with the right slot (A1).
+     - A POST that arrives after its predecessor's client disconnected therefore still queues behind the running call. Every server request emitted meanwhile is routed by its cause (A1), so none reaches the queued POST's slot.
      - A2a bounds that wait for a call blocked on the client to at most `orphaned_server_request_grace`.
      - A call that never talks to the client waits exactly as long as the edge's serial runtime already makes it wait today: a new request is deferred while a nested flow is in flight (`nested_flow.rs:243-254`).
 3. **A3. The stream reads the slot.** The POST stream selects over the slot receiver, the broadcast receiver (notifications only), and the session cancellation token (section 4.5). It emits the terminal response from the slot, then ends. Credential sessions emit only the terminal response, as today.
@@ -313,6 +334,8 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 |---|---|
 | Broadcast lag on any stream | Metric, coalesced resync request, burst of re-read notifications (A7-A9). Responses and server requests are unaffected (A1) |
 | Correlated server-request overflow | Excess request answered locally with a JSON-RPC error; never dropped silently (A2) |
+| Server request caused by a notification, a client response, a closed request or background work | GET stream if attached, otherwise answered locally with an error; never routed to the active request slot (A1b) |
+| Inbound sequence exhausted | Session terminated fail closed (unreachable in practice) (A1a) |
 | HTTP client disconnects mid-call | Stream dropped; the slot keeps the lock until the terminal response (A2b); completion task records the credential outcome (section 4.2) |
 | HTTP client disconnects while the tool waits on a server request | Undelivered and later server requests answered locally with an error at once; a delivered one after `orphaned_server_request_grace`; the tool returns and the call terminalizes (A2a) |
 | Session terminates before a response | Explicit outcome-unknown error on the POST stream (A13) |
@@ -331,14 +354,16 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 - **`spec/WIRE_PROTOCOL.md` section 3.2** gains:
   - a lagged stream MUST NOT drop events silently; the server emits a resync burst of re-read notifications (A8);
   - a terminal response and its correlated server requests MUST NOT be lost to lag (A1);
+  - a server-to-client request is delivered only on the POST stream of the request or notification that caused it, or on the GET stream. A client that wants server requests caused by its own lock-contended notifications (for example `roots/list` after `notifications/roots/list_changed`) keeps a GET stream open (A1b, A1c);
   - sequences MUST be monotonic across restore (section 5);
   - the client action after `409` (A11);
   - the retry rule (section 4.6).
 - **Hosted resume record:** `subscriptions` and the v3 integrity envelope (A24, A27).
 - **`WORKER_PROTOCOL.md`:** `storage` absent under enforced knowledge; `cancelled_processes` excludes confined children.
+- **Internal API, not wire:** `chio-mcp-edge` `serve_message_channels` takes `InboundEnvelope` values and a cause cell (A1a).
 - **No change** to negotiation, capability, receipt, manifest or other signed schemas.
 
-Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and cancellation, smallest diff); (2) slots and session-side completion (A1-A4, section 4.2); (3) resync (A7-A11); (4) generation seeding (section 5); (5) persisted subscriptions (section 6); (6) W: P6 and `cancel` count.
+Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and cancellation, smallest diff); (2) causal identity, slots and session-side completion (A1-A4 including A1a-A1c, section 4.2); (3) resync (A7-A11); (4) generation seeding (section 5); (5) persisted subscriptions (section 6); (6) W: P6 and `cancel` count.
 
 ## 10. Tests (Part A)
 
@@ -349,6 +374,12 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
   - a request queued behind a long streaming request receives none of the earlier request's events (A5);
   - GET replay with a notification injected between snapshot and subscribe (test hook): delivered exactly once (A6);
   - server-request overflow answers locally and increments the metric (A2);
+  - **notification-caused server request while a slot is active (A1, A1b). Fails on current code.** A tool call X sleeps without talking to the client, and the client POSTs `notifications/roots/list_changed`, which gets `202` because the lock is busy. A POST Y queues behind X.
+    - When X returns, the edge emits `roots/list` stamped with the notification's cause.
+    - With a GET stream attached it arrives on the GET stream. Without one it is answered locally, `roots_refresh_failed` is logged and the unroutable metric increments.
+    - It never appears on X's stream or Y's stream. Today's filter (`http_service_auth.rs:1-14`) emits it on Y's stream.
+  - **id reuse (A1).** Two sequential POSTs reuse one JSON-RPC id. A response stamped with the first POST's cause never fills the second slot;
+  - **free lock (A1c).** `notifications/roots/list_changed` on an idle session still returns `post_notification_sse` carrying the `roots/list` request;
   - **receiver loss (A2a), credential session.** A tool blocks on `sampling/createMessage`, then the HTTP client disconnects:
     - request not yet yielded: it is answered locally at once, the tool returns, the call ends `completed_unacknowledged`, and the next POST on the session proceeds;
     - request already yielded: a client POST answer within the grace window reaches the tool; without one, the local error arrives at the grace bound (test clock);
@@ -360,6 +391,10 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
   - expired-after-construction restore succeeds and persists the terminal record (A18);
   - generation persist failure retains that session inactive and restores the others (A19);
   - subscribe, restart, upstream resource update: the client receives `resources/updated`; a catch-up hint arrives right after restore; a subscription whose capability expired during downtime is dropped (A24-A26).
+- **`chio-mcp-edge` (A1a):**
+  - a `notifications/roots/list_changed` deferred during a nested flow is handled under its own sequence, not the outer request's;
+  - the roots refresh queued at restore runs with no cause;
+  - a cause change never splits a line (writer unit test with a recording cause cell).
 - **Fuzz:** `parse_session_event_id` over generation-seeded `u64` values and hostile session ids.
 - **`chio-process` (W:):**
   - enforced `inspect` returns a redacted snapshot without `storage`, and never fails (P6);
@@ -725,6 +760,12 @@ Open decisions:
 | 4180389985 | Make subscription arming atomic with source changes | Already addressed in revision 4. `subscribe` takes no caller-sampled level. It inserts the armed entry first, then the caller reads the level and calls `fire_if_dirty`, so a post in the window is captured and a post before insertion is visible in the later level read. `Resource` is edge-triggered by declaration | H4; section 12.1 `subscribe`/`fire_if_dirty`; section 18 unit and loom cases |
 | 4180435337 | Make external-source hint posting crash-safe | Fixed now. Processes already had no gap in revision 4 (P1 commits the revision in the change's journal transaction). Sessions now read every outside source through an existing durable monotonic cursor, with restore re-arming in the order heads, then catch-up, then tail | H2, new H10, `no_silent_loss` scope, 12.3(5), section 15, section 18 |
 | 4180731777 | Cancel nested requests when their POST stream disappears | Fixed now. Losing the receiver is treated like overflow: undelivered and later server requests fail locally at once, delivered ones after a grace bound. The slot owns the request lock until its terminal response, so correlation holds and the completion task terminalizes | A2a, A2b, section 4.2, A16, section 8, section 10 |
+
+### Codex review (PR #1174, round 2)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180839023 | Serialize notification POSTs with active request slots | Fixed now. Confirmed on M: and `main`: notification POSTs and client responses are sent without the request lock, and the serial edge handles a deferred notification after the active call, so temporal correlation misroutes what it causes. Server requests are now routed by explicit causal identity. Uncorrelated ones go to the GET stream or are answered locally, and a lock-holding notification POST keeps its buffered response. Serialization was rejected because cancellations and client responses must bypass the lock | A1, A1a, A1b, A1c, A2b, section 8, section 9, section 10 |
 
 ## Appendix A. FTL reference
 
