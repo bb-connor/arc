@@ -324,7 +324,7 @@ Restored sessions seed sequences from a fresh generation, so ids from an earlier
 
 Revision 4 persists subscriptions rather than asking clients to re-subscribe, because MCP has no "subscription ended" notification that existing clients understand.
 
-1. **A24. Persisted set.** The resume record gains `subscriptions: Vec<PersistedSubscription>`, a tagged entry `PersistedSubscription = Live { uri, capability_id } | Ended { uri, capability_id, reason, end_event_id }` (the `Ended` arm is H5a's durable end marker), added to the integrity envelope under a new schema label `chio.remote-mcp.resume-record-integrity.v3`. A successful `resources/subscribe` or `resources/unsubscribe` signs and persists a new resume record. If that persist fails, the subscribe returns an error and the registry change is rolled back, so the client never holds a subscription the store does not know.
+1. **A24. Persisted set.** The resume record gains `subscriptions: Vec<PersistedSubscription>`, a tagged entry `PersistedSubscription = Live { subscription_id, uri, capability_id } | Ended { subscription_id, uri, capability_id, reason, end_event_id }`. `subscription_id` is the client-visible id the subscription was created with: the one `chio/events/subscribe` returns and `unsubscribe` takes. It is persisted in both arms, so restore reconstructs the same id, duplicate subscriptions to one subject stay distinct, and the end marker's logical identity `(subscription_id, reason)` is well defined (the `Ended` arm is H5a's durable end marker), added to the integrity envelope under a new schema label `chio.remote-mcp.resume-record-integrity.v3`. A successful `resources/subscribe` or `resources/unsubscribe` signs and persists a new resume record. If that persist fails, the subscribe returns an error and the registry change is rolled back, so the client never holds a subscription the store does not know.
 2. **A25. Re-authorization at restore.** After A17's persist and before `insert_active`, restore branches on each persisted entry's tag:
    - **`Ended` markers** keep their logical end identity `(subscription_id, reason)`. Before the session is served, each is assigned a fresh `end_event_id` in the restored generation `g` (A17) and re-signed, and only then re-queued as `SubscriptionEnded { reason }` (H5a). A stale previous-incarnation id is never re-queued. Markers are never re-authorized or resurrected as live, and they leave the persisted set only after emission.
    - **`Live` entries** are replayed through the same path as a client `resources/subscribe`: validate the capability, check scope, check the subject exists (`session_ops.rs:320-338`), then register it, including any upstream forwarding. A `Live` entry that fails re-authorization (expired, revoked, or the subject is gone) is terminalized, not silently dropped. It becomes an `Ended` marker with the failing reason, its `SubscriptionEnded` is queued, and it is persisted as `Ended` until emitted.
@@ -959,6 +959,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187512204 | Track resync state per stream before clearing it | Fixed now. The resync flag, skipped count, pass counter and cursor are per consumer (`consumer_id`). Passes are emitted while any consumer has a pending request, and records advance and clear independently. Ending a perpetually lagging stream drops only its own record | A7; A8 |
+
+### Codex review (PR #1174, round 21)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187599047 | Persist subscription IDs in the resume record | Fixed now. Both A24 arms carry the client-visible `subscription_id`, inside the v3 integrity envelope. Restore reconstructs the same id, duplicates stay distinct, `unsubscribe` keeps working after restart, and the end marker's `(subscription_id, reason)` identity is defined | A24 |
 
 ## Appendix A. FTL reference
 

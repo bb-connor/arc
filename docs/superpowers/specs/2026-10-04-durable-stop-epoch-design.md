@@ -599,7 +599,26 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
         pub approvals: Vec<SignedApproval>, // each over H(authority_id, scope, expected_epoch, transition, roster_digest)
         pub time_attestation: Option<SignedTimeAttestation>, // required for break-glass only
     }
+
+    pub struct SignedTimeAttestation {      // signed by the pinned time source (S19 break-glass)
+        pub authority_id: DurableAuthorityId,
+        pub scope: StopScope,
+        pub expected_epoch: StopEpochId,    // equals the artifact's expected_epoch
+        pub incident_opening: StopEpochId,  // the incident's opening Stop or Migration (S19)
+        pub attested_unix_ms: u64,
+        pub nonce: [u8; 16],                // fresh per attestation
+        pub signature: Signature,
+    }
     ```
+
+    - **Break-glass binding.** When `time_attestation` is present, each approval covers `H(authority_id, scope, expected_epoch, transition, roster_digest, H(time_attestation))`. The approvals therefore sign the exact attestation, and an old attestation cannot be grafted onto a new quorum. Inside the resume transaction the writer checks five things:
+      - the attestation verifies against the time source pinned in signed deployment configuration;
+      - its `authority_id`, `scope` and `expected_epoch` equal the artifact's and the current head's;
+      - its `incident_opening` equals the incident's opening record;
+      - `attested_unix_ms` is at or after the opening record's commit, and at or above the persisted trusted-time floor;
+      - its `nonce` has not been used before, because nonces are recorded with the resume.
+
+      Any failure refuses the break-glass resume.
 
     - Verification is offline and signature-only: at least `k` distinct roster principals, no store reads, and no live clock except the attestation.
     - **Bound to the active roster.** The artifact's `roster_digest` must equal the digest of the operator roster active for the scope at the current deployment generation. The verifier takes that from the signed deployment configuration it already holds, not from the artifact. An artifact naming an older roster, even a validly signed one, is refused. After a roster rotation, principals removed from it can never form a quorum.
@@ -765,7 +784,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       A record built from an older generation does not satisfy the entry. The writer then applies the entry again, which over the now-`Stopped` head is a narrowing `Restrict` built from the current generation.
     - **Removal.** An entry is removed only after an anchored head satisfies it. A crash between that anchor and the removal leaves a satisfied entry, which boot verifies against the head and then removes. An unrelated same-scope record never retires an entry.
     - **Boot.** Every entry that the anchored head does not satisfy is honored, whatever the head's epoch: the scope is `Stopped` with the narrower of the head's and the entry's `allow_containment`, and `durability: latch_only`. The first write after verification applies each such entry as above.
-    - **Resume and relax wait for pending intents.** `Resume` and `Relax` refuse with `StopIntentPending { scope }` while the scope has any unsatisfied entry. The check runs under the journal mutex, which the writer holds from the check through the commit and anchor sync of the resume or relax. A stop or restrict intent that arrives meanwhile waits for the mutex, then records its entry and applies over the resulting head. A resume can therefore never commit between an intent's fsync and that intent's own record.
+    - **Resume and relax wait for pending intents.** `Resume` and `Relax` refuse with `StopIntentPending { scope }` while the scope has any unsatisfied entry. Under the same journal mutex, and before the widening transition commits, the writer also removes every satisfied entry for the scope and fsyncs the journal slot. If that removal fails, the widening transition is refused (`StopIntentPending { scope, reason: removal_failed }`). The journal therefore never holds an entry that a later `Resume` or `Relax` would turn from satisfied into unsatisfied, and boot can never reapply a stale intent over a validly resumed scope. The check runs under the journal mutex, which the writer holds from the check through the commit and anchor sync of the resume or relax. A stop or restrict intent that arrives meanwhile waits for the mutex, then records its entry and applies over the resulting head. A resume can therefore never commit between an intent's fsync and that intent's own record.
     - **Bound.** The journal holds at most `stop_intent_max_entries` entries (default 4096). Each entry is at most 512 bytes, so a slot stays under 2 MiB.
       - When the journal is full, a new scope's intent is not recorded. The route returns `stop_not_durable` with `durability: process_only` and reason `stop_intent_journal_full`, and readiness reports it.
       - Existing entries are never evicted to make room.
@@ -1139,6 +1158,13 @@ Open decisions:
 | 4187512211 | Define an opening incident for migrated stopped scopes | Fixed now. A `Migration` record opens an incident with an empty stopper set. `OperatorPair.stopper_epoch` names it, so any roster principal outside the set may resume, and `SamePrincipalAfter` measures from its first observation. A migrated scope keeps a resume basis after S28 | S19 |
 | 4187512221 | Bind quorum resumes to the active roster | Fixed now. The quorum artifact's `roster_digest` must equal the roster active for the scope at the current deployment generation, taken from the verifier's signed deployment configuration. Older rosters are refused, so removed principals cannot form a quorum | S29 |
 | 4187512225 | Preserve satisfied intents across rollover | Fixed now. Satisfaction is checked over the head's ancestry within the incident: a matching `satisfies_intent` record followed only by state-preserving records (`Restrict`, or a restating `Rollover`) satisfies the entry. A rollover never hides the proof, and the entry is removed at boot | S25 satisfaction |
+
+### Codex review (PR #1174, round 21)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187599062 | Remove satisfied intents before allowing resume | Fixed now. Under the journal mutex, and before a `Resume` or `Relax` commits, the writer removes every satisfied entry for the scope and fsyncs the slot. A failed removal refuses the widening transition, so no stale intent can be reapplied at boot over a resumed scope | S25 |
+| 4187599073 | Bind break-glass time attestations to the incident | Fixed now. `SignedTimeAttestation` names the authority, scope, `expected_epoch`, incident opening, time and a nonce. The quorum approvals cover its hash, so it cannot be grafted onto a new quorum. The resume transaction checks the pinned source, the incident binding, freshness against the opening commit and the trusted-time floor, and nonce reuse | S29; S19 break-glass |
 
 ## Appendix A. FTL reference
 
