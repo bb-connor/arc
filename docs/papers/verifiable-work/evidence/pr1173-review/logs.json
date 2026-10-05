@@ -1038,6 +1038,108 @@
       "observed_result": "passed",
       "bytes": 539,
       "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
+    },
+    {
+      "log": "readiness-eddd-image-failure.log.gz",
+      "observed_result": "failed-hosted-eddd3e18c6",
+      "bytes": 59121,
+      "sha256": "970de849922a69830845210405e8aaad4bf973d930105d74ae9f4b6f46978c87"
+    },
+    {
+      "log": "readiness-eddd-crypto-failure.log.gz",
+      "observed_result": "failed-hosted-inventory-eddd3e18c6",
+      "bytes": 359553,
+      "sha256": "28a597a82db9e0c43333cb62c896d70d982f004a208e416b6f3c715ed53763dc"
+    },
+    {
+      "log": "readiness-apk-closure-old.log.gz",
+      "observed_result": "failed-local-package-fetch",
+      "bytes": 52,
+      "sha256": "30d58cf930e321113c6a28f97482946a99efa4cb65451911de31ed1eff8d9d19"
+    },
+    {
+      "log": "readiness-apk-closure-new.log.gz",
+      "observed_result": "passed-resolution-only",
+      "bytes": 11044,
+      "sha256": "4d7eef2a8457eafb65c1818cd491dd7db16ae8d9e41fb44e2802c5a2acfde686"
+    },
+    {
+      "log": "readiness-apk-closure-repaired.log.gz",
+      "observed_result": "passed-resolution-only",
+      "bytes": 11116,
+      "sha256": "92ae805a0d2c21a01dba6142e9e2793617d0a1a03e149d0396d45a723c50d269"
+    },
+    {
+      "log": "readiness-security-contract-apk-controls.log.gz",
+      "observed_result": "failed-before-caller-inventory-rebinding",
+      "bytes": 1249,
+      "sha256": "9d3d93daea7c8b14556c045981aaf211269e238de476795567d95affa22bea74"
+    },
+    {
+      "log": "readiness-fips-contract-caller-migration.log.gz",
+      "observed_result": "passed",
+      "bytes": 143,
+      "sha256": "7fafa2a6c1944d63b7c762bc2b96a9cc09e6273846d33eaa0aba53d0d38e9b72"
+    },
+    {
+      "log": "readiness-security-contract-apk-caller-controls.log.gz",
+      "observed_result": "passed",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "readiness-crypto-final-tail.log.gz",
+      "observed_result": "failed-cumulative-fixture-clock-after-34-passes",
+      "bytes": 17659,
+      "sha256": "3a1f65850c51744e7426488125a9e6eed4bdc86fc439f623fb88a1e89e5ed6a4"
+    },
+    {
+      "log": "readiness-cumulative-nonce-clock-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 2107,
+      "sha256": "eb47302071c8ff60fc177379693ac9aef716ed3b01bf6a8fadb672112aab2cbc"
+    },
+    {
+      "log": "readiness-crypto-remaining.log.gz",
+      "observed_result": "passed",
+      "bytes": 25365,
+      "sha256": "c53c08f7a2fa02717560d9916ad52f016d312820f21941ceb08dc27da4b261f7"
+    },
+    {
+      "log": "readiness-cumulative-nonce-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 3682,
+      "sha256": "86cea4cbe8b5131dc868437980b5b527f86efe375b9a4007c3a475cf70b6acc3"
+    },
+    {
+      "log": "readiness-eddd-postgres-failure.log.gz",
+      "observed_result": "failed-hosted-before-broker-readiness-eddd3e18c6",
+      "bytes": 363110,
+      "sha256": "13fc43ec16cea57ab4ab99215838ddbf531f5cd9c660d0cbc0ce7194ee8e6258"
+    },
+    {
+      "log": "readiness-consumer-readiness-reproduction.log.gz",
+      "observed_result": "default-format-timeout-terse-format-passed",
+      "bytes": 213,
+      "sha256": "6d8e16f59981ff0393f4780ad6cc0b54dbe167b17f90b46529378a32061ad2ec"
+    },
+    {
+      "log": "readiness-postgres-readiness-python.log.gz",
+      "observed_result": "passed",
+      "bytes": 100,
+      "sha256": "fe008aab760eb03ccac7578e2b84665b1b50b0d7f855b17a0c7a8d039435b658"
+    },
+    {
+      "log": "readiness-native-qualification-hosted-repairs.log.gz",
+      "observed_result": "passed-source-5c6b04b079",
+      "bytes": 539,
+      "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
+    },
+    {
+      "log": "readiness-native-qualification-broker-readiness.log.gz",
+      "observed_result": "passed-source-441cfe24ab",
+      "bytes": 539,
+      "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
     }
   ]
 }

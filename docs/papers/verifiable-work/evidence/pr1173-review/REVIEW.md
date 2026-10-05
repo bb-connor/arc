@@ -258,3 +258,42 @@ child collection recovery. Its source snapshot matches the integrated candidate.
 Final acceptance still requires terminal exact-candidate x86 CI and a clean
 matching local/remote/PR head. The PR remains draft. No merge, publication or
 deployment is implied.
+
+### First integrated hosted attempt
+
+At `eddd3e18c63c26b680f5c9bb2d47ef8f6c999050`, the complete x86 Cargo Vet
+gate and Cargo Audit/OSV monitor passed. Three subsequent failures required
+repairs; their raw hosted logs remain in the `readiness-eddd-*` archives.
+
+- Alpine had retired the pinned OpenSSL and Python releases. The replacement
+  closure retains all 225 package identities and pins OpenSSL 3.5.9, Python
+  3.12.15 and the September certificate package and bundle. The reviewed musl
+  and Alpine release changes come from the already pinned Rust 1.95 base.
+  Package signatures, the certificate archive digest and the complete installed
+  inventory comparison remain required. An ARM-native resolver checked this
+  exact x86 database with install scripts disabled; that check does not qualify
+  native image execution. The historical APK archive manifest remains evidence
+  for its original September image, not this replacement closure.
+- All 34 caller-execution tests passed, then the workflow rejected its obsolete
+  33-test expectation. Its inventory now includes the existing v34 migration
+  regression. Local continuation also exposed a fixture that installed a
+  second-resolution clock after observing real milliseconds. Freezing the
+  fixture before its first authority read and advancing to exact nonce expiry
+  preserves the production regression guard. The corrected nine-test target,
+  session ownership, signing forwarding, all 20 boot-receipt tests and target
+  Clippy pass. All nine FIPS contract controls and the full security CI contract
+  mutation suite pass with the reviewed workflow identity.
+- Native filesystem, identity, deadline and cleanup enforcement passed, as did
+  the real TLS PostgreSQL public worker role/fence API. The process scenario
+  then timed out before broker readiness. Rust's default test renderer prefixes
+  the first marker with the test name. An actual Rust test subprocess reproduces
+  that timeout; terse output passes the same strict reader. The existing helper
+  now selects terse output, retaining its exact test filter and startup barrier.
+  Ownership and committed-reply-loss trajectories still require a hosted rerun.
+
+Source `5c6b04b079` passed all 21 local qualification commands. After the
+broker-readiness correction, source `441cfe24ab` passed the complete profile
+again: 21 terminal checks, 37,265 source files and 48 outputs, with no source
+drift. Both historical successful runs and the original failures remain
+attributable to their own source inputs. Hosted acceptance requires the next
+exact PR candidate, including the native PostgreSQL trajectories and image.
