@@ -316,7 +316,10 @@ Any information-flow obligations the continuation needs are approved as today.
 **Continuation identity (non-recursive).** This answers which identity the binding names, how it survives replay, and why it is not circular.
 - **Why not the action intent.** `ActionIntentV1` carries `capability_body`, the hash of the capability's signing body (W: `chio-security-types/src/recovery/authorization.rs:69-90`), and the store checks that hash against the seed capability (W: `chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs:76-83`). The signing body includes the grant scope and so the constraint (W: `chio-core-types/src/capability/token.rs:219-242`). Naming the action-intent digest inside the capability would require `x = H(ActionIntent(capability_body = H(Capability(.. x ..))))`, which has no constructible solution.
 - **The identity chain.** Each value is computed from the previous ones and from deployment facts, never from the capability:
-  1. `successor_creation_key = "authority-successor:" + hex(SHA-256("chio.recovery.authority-successor.v1" || predecessor_workflow || successor_ordinal))`. `predecessor_workflow` is written by host setup (above); `successor_ordinal` is the next unused ordinal for that predecessor.
+  1. `successor_creation_key = "authority-successor:" + hex(SHA-256("chio.recovery.authority-successor.v1" || predecessor_workflow || successor_ordinal))`. `predecessor_workflow` is written by host setup (above).
+     - **The ordinal is stable across retries.** It is allocated once, durably, by `reserve_successor_ordinal(predecessor_workflow, resolution_attempt_id)`. `resolution_attempt_id` is caller-held and stable across retries of one resolution, for example `H(fault receipt id, resolver principal, resolver nonce)`.
+     - A repeat call with the same pair returns the ordinal it allocated before. A new attempt id first checks for an existing open successor of the predecessor and reuses that successor's ordinal; it allocates the next unused ordinal only if none is open.
+     - So a resolver whose `CreateWorkflow` committed but whose response was lost rebuilds the same creation key and capability binding, and the store replays the committed workflow instead of refusing a second open successor.
   2. `workflow_id = "workflow:" + sha256_hex(scope, successor_creation_key)`, W:'s existing rule (W: `recovery/commands.rs:73-77`).
   3. `continuation_id = "continuation:" + sha256_hex(scope, workflow_id)`, W:'s existing rule (`commands.rs:97-104`).
   4. `request_id = "process:" + digest(process_namespace, process_id, "recovery:" + continuation_id)`, the request id materialization already uses (W: `chio-control-plane/src/recovery/materialize.rs:28-30`, `:76-81`; `chio-process/src/lib.rs:294-305`).
@@ -565,6 +568,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187433139 | Recheck issuance freezes for every resolver class | Fixed now. Step 4 calls the issuance-freeze authority for every resolver class, at creation and again at capture: `Delegate` for `Delegator`, and `Issue` for `ReceiverIssuer`, `AllocationHolder` and `Payer`. A successor minted before a freeze cannot capture after it | section 6.4 step 4 |
+
+### Codex review (PR #1174, round 23)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187740946 | Persist the successor ordinal before deriving retry identity | Fixed now. The ordinal is allocated once by `reserve_successor_ordinal(predecessor_workflow, resolution_attempt_id)`, keyed by a caller-held attempt id that is stable across retries, and an existing open successor is reused before a new ordinal is allocated. A lost `CreateWorkflow` response therefore replays the committed workflow | section 6.2 identity chain step 1 |
 
 ## Appendix A. FTL reference
 

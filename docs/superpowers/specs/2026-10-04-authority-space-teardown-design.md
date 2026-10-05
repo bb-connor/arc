@@ -165,7 +165,9 @@ Non-goals:
    - `process_lineage` and `principal` rows from the trusted `SecurityInvocationContextV1` (process calls supply runtime and lineage, M: `chio-process/src/security.rs:24-33`). On M: the lineage id is the tree root's capability id (`chio-process/src/lib.rs:419-431`), so it matches a closure of the whole tree but not of a subtree;
    - one `process_tree` row for every process on the calling process's path, root first, including the caller itself. chio-process already loads that path at admission (`store.lineage(process_id)`, `lib.rs:419`), and its length is bounded by the process depth limit. A `ProcessTree(p)` closure fences `process_tree = p`, so it matches every operation of every descendant of `p` by an exact join, with no ancestor lookup inside the CAS;
    - one `swarm_graph` row when a continuation was consumed;
-   - one `delegation_root` row when the D1 guard admitted the call (V: `crates/kernel/chio-kernel/src/delegated_work.rs`).
+   - for D1, the ref depends on whether the permit was already sealed (V: `crates/kernel/chio-kernel/src/delegated_work.rs`):
+     - a call admitted by the D1 guard under a permit sealed before admission records `delegation_root_sealed`, with the permit digest. No `DelegationRoot` fence ever matches it, because section 6.2 keeps sealed permits executable, so closing the root never strands receiver work it is required to honor;
+     - issuance-side operations on unsealed slots (allocation, subdivide, select, seal) record `delegation_root`, and only these are matched by the `DelegationRoot` fence.
    1a. **Operations from before the index.** The migration that creates `admission_operation_authority_refs` and `closure_fences` also adds `admission_operations.authority_refs_state` (`indexed` or `legacy_unindexed`).
    - **Backfill.** For every non-terminal operation whose persisted record holds its revocation set, session and security context, the migration writes the refs, re-derives them, compares the two, and marks the operation `indexed`.
    - **What stays legacy.** Every other non-terminal operation stays `legacy_unindexed`. New operations are `indexed` in their insertion transaction.
@@ -649,3 +651,9 @@ Where the analogy breaks:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-4-03 | Closure targets legacy D1/S1 writers without joining their planned authority migration | Fixed. The `DelegationRoot` fence and `SwarmGraph` tombstone live in W1's qualified serving store and are checked in the same canonical transaction as allocation, selection, sealing and extension. Legacy adapters call the shared domain rule and are not production writers. W1's single authorized migration retains fences, tombstones, closure generation, drain and progress state, and original references, registers them in the qualified inventories, and disables the old writer. The supported landing order is W1 first. Acceptance tests cover migration, restart, legacy entry points, interruption and a stale owner. Sealed permits are never refunded or invalidated | section 6.2 table and rule 6; section 15 phase 3; section 16; open decision 8 |
+
+### Codex review (PR #1174, round 23)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187740955 | Exclude sealed D1 permits from delegation-root fences | Fixed now. A call backed by a permit sealed before admission records `delegation_root_sealed`, which no `DelegationRoot` fence matches. Only issuance-side operations on unsealed slots record `delegation_root`, so closure stops unsealed work only, as section 6.2 requires | section 4.1 rule 1 |

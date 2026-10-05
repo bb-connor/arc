@@ -613,7 +613,7 @@ pub enum IdentityDisposition {
     | Fused `IntentCommit` from `Unbegun` refused with `KernelStopped` (M10, M15) | `Reusable` |
     | `Overloaded` before admission (M10) | `Reusable` |
     | `CheckOnlyCrossing` refusals before dispatch, for both read-only and `NonDurable` classes (M10); nothing is persisted | `Reusable` |
-    | A check-only read's `Withheld { retry: AfterResume }` (M11, M19) | `Reusable` |
+    | A check-only read's `Withheld { retry: AfterResume }` (M11) or `Withheld { reason: StoreUnavailable, retry: AfterStoreRecovery }` (M19) | `Reusable` |
     | `StoreUnavailable` deny before any row (M19) | `Reusable` |
     | `DenyTombstone` (M10, spec 10 X15) | `Terminal` |
     | `Compensate` of a persisted operation: `Prepared`-intent refusals and slow-path refusals for any reason, `KernelStopped` included (M10, M15), cut-table compensations, drop compensations | `Terminal` |
@@ -1067,6 +1067,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187663058 | Use a store-recovery retry condition for unavailable checks | Fixed now. A post-effect check-only release that meets `StoreUnavailable` returns `Withheld { reason: StoreUnavailable, retry: AfterStoreRecovery }` (`Reusable`), a transient condition defined in spec 8's `OutputWithheld`, instead of the stop-only `AfterResume` | M19 table |
+
+### Codex review (PR #1174, round 23)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187740934 | Classify AfterStoreRecovery receipts in M20 | Fixed now. M20's `Reusable` row lists both check-only withheld forms: `AfterResume` (M11) and `StoreUnavailable` with `AfterStoreRecovery` (M19). Neither falls through to `Terminal` | M20 table |
 
 ## Appendix A. External and FTL precedent
 
