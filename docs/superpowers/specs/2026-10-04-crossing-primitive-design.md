@@ -294,10 +294,10 @@ The Stop column carries spec 8's `StopDisposition`. Spec 8 section 5 is normativ
 | `CallerStart` | `Deny` | yes | yes | yes | capture before effect | crossing-authorizing |
 | `NativeCapture` | `Deny` | yes | yes | yes | capture | crossing-authorizing |
 | `RecoveryCapture`, `SemanticCapture` | `Deny` | yes | yes | yes | recovery consumption | crossing-authorizing |
-| `OutputRelease` | `Withhold` | yes | no (effect happened) | yes, for release | capture, release authority | crossing-authorizing |
-| `ArtifactRelease` | `Withhold` | yes | no | P4 join is the check | pin, release intent | crossing-authorizing |
-| `ConfinedReturn` | `Withhold` | yes | no | P5 return contract | confined consumption | crossing-authorizing |
-| `ExternalEvaluation` | `Withhold` | yes | no | yes | none | crossing-authorizing |
+| `OutputRelease` | `Withhold` | yes | yes: the release revalidates the capability before bytes leave (as M: does today, `allow_responses.rs:53`); a refusal follows X16 | yes, for release | capture, release authority | crossing-authorizing |
+| `ArtifactRelease` | `Withhold` | yes | yes: the releasing context's capability; a refusal withholds and keeps P4 pins (spec 4 section 7 item 8) | P4 join is the check | pin, release intent | crossing-authorizing |
+| `ConfinedReturn` | `Withhold` | yes | yes: the actor's capability, as P5 re-authenticates it today (W: `confinement.rs:104`); a refusal withholds and keeps confined consumption | P5 return contract | confined consumption | crossing-authorizing |
+| `ExternalEvaluation` | `Withhold` | yes | yes: output never leaves for the external step under a revoked capability; a refusal follows X16 | yes | none | crossing-authorizing |
 | `ExternalPrepare { Authorize }` | `Deny` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
 | `ExternalPrepare { Settle }` | `Settle` | subject before cut | subject before cut | where applicable | the participant's intent row | crossing-authorizing |
 | `MutationSubmit` | `Deny` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
@@ -453,7 +453,7 @@ Rules:
     | Reason | Effect |
     |---|---|
     | `KernelStopped` | The savepoint rolls back. The operation stays `Finalizing` with output withheld in release custody (the return record holds the bytes) and resumes after the stop is lifted (spec 8 S14). A return record is never stop-checked, so this refusal reaches only the outcome commit and the release crossings. For the two-commit read see X14a |
-    | `AuthoritySpaceClosed` or `InsufficientIntegrity` | Spec 9 emits `HaltOperation` for that operation, then terminalizes it as the existing `DeniedAfterDelivery` with the refusing reason and retained markers (spec 9 M11; spec 3 rule 13 is the legacy phase 1 form). That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal, and spec 4's drain terminates. The `OutputRelease` closure-fence check is spec 4 section 4.1 rule 3a, which includes spec 4 rule 1a's legacy predicate for `legacy_unindexed` operations. The same row applies when spec 9's reconciler re-emits a retained finalization |
+    | `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity` | Spec 9 emits `HaltOperation` for that operation, then terminalizes it as the existing `DeniedAfterDelivery` with the refusing reason and retained markers (spec 9 M11; spec 3 rule 13 is the legacy phase 1 form). That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal, and spec 4's drain terminates. The `OutputRelease` closure-fence check is spec 4 section 4.1 rule 3a, which includes spec 4 rule 1a's legacy predicate for `legacy_unindexed` operations. The same row applies when spec 9's reconciler re-emits a retained finalization |
     | `ReservationConflict` | `HaltOperation` plus an incident. It should be unreachable, because capture amounts were reserved before dispatch |
     | `VersionConflict` | Re-project |
     | `Overloaded` | Not produced for post-effect members (X17b). If received, the driver re-submits; never compensates |
@@ -794,3 +794,10 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 Where the analogy breaks:
 - FTL commits nothing durably and has no restore adversary.
 - Chio must survive a crash at any cutpoint and a restore to any anchored prefix without widening authority. That is why commit classes, the custody check, the return record and the cutpoint matrix exist.
+
+### Codex review (PR #1174, round 3)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180886727 | Recheck revocation before releasing tool output | Fixed now. Every release crossing (`OutputRelease`, `ArtifactRelease`, `ConfinedReturn`, `ExternalEvaluation`) rechecks revocation before bytes leave Chio custody. The effect has happened, so a refusal withholds the output and never compensates: X16's `Revoked` row (shared with closure and integrity) terminalizes as `DeniedAfterDelivery` through spec 9 M11, and P4 and P5 keep their pins and consumption | section 4.2; X16 |
+| 4180886724 (spec 9) | Treat a committed capture as post-dispatch at a cut | Fixed in spec 9 section 6.1 and M10 | spec 9 |

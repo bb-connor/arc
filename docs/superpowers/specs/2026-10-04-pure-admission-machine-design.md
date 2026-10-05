@@ -376,8 +376,9 @@ pub enum Effect {
 pub enum HaltReason {
     CommitOutcomeUnknown,                    // M12
     RefusedAfterEffect(CommitFailure),       // M11, before the DeniedAfterDelivery terminal
+    RefusedAfterCapture(CommitFailure),      // M10, intent remainder refused after a committed capture
     InvariantViolation,                      // M11 ReservationConflict after the effect
-    AuthorityCut,                            // cut table, X column, post-dispatch rows
+    AuthorityCut,                            // cut table, X column, post-dispatch rows and committed capture
     UnsettledCallerCustody,                  // cut table, AwaitingCallerReport under N and X
 }
 
@@ -461,6 +462,8 @@ pub enum ReceiptDecision {
     | `IntentCommit` (from `Unbegun`), `CheckOnlyCrossing` | `Overloaded` | stay `Unbegun`; the driver signs a deny receipt (`Overloaded`) before admission and persists no state (spec 10 X15); the request id stays usable. A `NonDurable` call first releases its in-memory ledger entries (`Compensate` against spec 3's ledger) |
     | `IntentCommit` (from `Prepared`), slow-path `ParticipantCommit` or dispatch-commit step | `Overloaded`, or `Unavailable` on a step that has no fused form | `Retain`; the driver re-submits the same planned step with bounded backoff. If the caller abandons the call first, M17's before-acknowledgement rule compensates. Never compensates on its own |
     | slow-path dispatch-commit step from `Parked` (approval resume) | `KernelStopped` | `Retain` in `Parked`. Never compensates, so the pending approval survives the stop (M15) |
+    | `IntentCommit` remainder from `CapturePending` with capture `Committed` | `KernelStopped` | `Retain` in `CapturePending`; re-emitted after the stop is resumed. Never compensates |
+    | `IntentCommit` remainder from `CapturePending` with capture `Committed` | any other policy reason (`AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict`) | Post-dispatch, as the section 6.1 `X` row: `HaltOperation { RefusedAfterCapture(reason) }`, then `Terminalize(OutcomeUnknownAfterDispatch)` with holds frozen, as a restrictive, non-crossing commit. Never `Compensate`: a committed capture cannot be undone under `PreDispatchNoEffect` (T3). This row takes precedence over the generic slow-path row below |
     | slow-path `ParticipantCommit` or dispatch-commit step, otherwise | any policy reason | `Compensate { PreDispatchNoEffect, receipt }`. The request id is terminal, as on M: today |
     | `ParticipantCommit` | the `ParticipantRefused` event | `Compensate { PreDispatchNoEffect, receipt }` |
     | `CheckOnlyCrossing` (read-only class) | any policy reason | `SignReceipt(Deny)` with the reason; nothing to compensate |
@@ -561,7 +564,7 @@ Columns: `S` = `StartupRecovery`; `A` = `RecoveryClosure` with control `Active`;
 | `Ready` | Retain if `caller_reservation_live`, else Compensate | as S | Compensate | Compensate |
 | `Parked` | Compensate if the deadline elapsed, else `Retain` plus `Fault { QuiescentParked }` (M: `recovery.rs:260-266`) | Compensate if elapsed, else Retain | Compensate | Compensate |
 | `CapturePending`, capture `NotCommitted` | Compensate | Compensate | Compensate | Compensate |
-| `CapturePending`, capture `Committed` | `IntentCommit` remainder to `DispatchCommitted` (no handoff happened yet), then as `DispatchCommitted` | as S | as S | as S |
+| `CapturePending`, capture `Committed` | `IntentCommit` remainder to `DispatchCommitted` (no handoff happened yet), then as `DispatchCommitted` | as S | as S | Post-dispatch with holds frozen (spec 4 drain table: a committed capture is post-dispatch). `HaltOperation { AuthorityCut }`; no `IntentCommit`, because the new closure fence would refuse it; never `Compensate` (T3). When owned, `Terminalize(OutcomeUnknownAfterDispatch)` as a restrictive, non-crossing commit that the fence cannot refuse. Holds are released only through `ReleaseAuthorized` (M7a) |
 | `CapturePending`, capture `Unknown` | `QueryParticipant(Capture)`, Retain | as S | as S | as S |
 | `DispatchCommitted`, durable return `Recoverable` | `Finalizing`: the next post-return stage (never terminalize; M: `recovery.rs:408-418`) | as S | as S | `HaltOperation { AuthorityCut }`, then as S |
 | `DispatchCommitted`, `caller_report_custody` | `CallerAwaitReport` to `AwaitingCallerReport` | as S | `Terminalize(OutcomeUnknownAfterDispatch)` (W:) | `HaltOperation { AuthorityCut }`, `CancelTransport`, then as S |
@@ -897,6 +900,13 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | 4180839034 | Do not compensate while the intent commit is still in flight | Fixed now. The driver tracks `SubmissionState` for its dispatch-commit crossing. A drop before submission compensates. A drop after submission and before the acknowledgement is `CommitUnconfirmed`: everything is retained, and a `DropReconcileJob` takes the reply handle, feeds the writer's reply, then `Cut(DriverDropped)`. Compensation happens only once the reply or a read-back proves the intent did not commit | M17; T3; section 7 table; section 12; section 14; spec 3 rule 29; spec 10 X17 |
 | 4180839038 | Carry the release authority through acknowledgement | Fixed now. New transient `UnknownHold::Releasing { authority, evidence }`. `Released(authority)` is set only by the `ReleaseHold` acknowledgement. A failed release returns to `Frozen` and may be retried. An unknown outcome halts and re-projects from the store. A duplicate while releasing emits no second effect. The release entry is keyed by `operation_id` in one writer transaction | sections 4.1, 5.1, 5.2; M7a; M11; T6; section 14 |
 | 4180839013 (spec 10) | Persist influence joins before check-only output release | Fixed now. Check-only eligibility gains a fifth condition: integrity tracking is not enabled for the calling context. Such reads take the durable path, whose `OutcomeCommit` writes the I4 join before delivery. Would-be `NonDurable` calls under integrity tracking do the same, because they have the same gap | section 4.4; section 14; spec 10 X13 |
+
+### Codex review (PR #1174, round 3)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180886724 | Treat a committed capture as post-dispatch at a cut | Fixed now. Under `AuthorityCut`, `CapturePending` with capture `Committed` is post-dispatch with holds frozen: `HaltOperation`, no `IntentCommit`, never `Compensate`, and, when owned, `Terminalize(OutcomeUnknownAfterDispatch)` as a restrictive, non-crossing commit. Two new M10 rows cover a refused intent remainder from that state (`KernelStopped` retains; other policy reasons take the same post-dispatch path) and take precedence over the generic slow-path compensation row | section 6.1 table; M10 |
+| 4180886727 (spec 10) | Recheck revocation before releasing tool output | Fixed in spec 10 section 4.2. The post-effect `Revoked` row of M11 already maps a refused release to `DeniedAfterDelivery` | M11 (unchanged); spec 10 section 4.2, X16 |
 
 ## Appendix A. External and FTL precedent
 
