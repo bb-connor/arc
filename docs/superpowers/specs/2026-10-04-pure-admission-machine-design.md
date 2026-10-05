@@ -459,7 +459,7 @@ pub enum IdentityDisposition {
      - **Repeats.** While `Releasing`, a `ReleaseAuthorized` with the same authority and evidence yields `Retain` and emits no second effect. One with a different authority or evidence is illegal (M2). After `Released`, a duplicate yields `Retain`. In any other phase, or with no frozen hold, the event is illegal and releases nothing.
      - **Persistence, writer-held holds.** `Releasing` is never persisted. The `ReleaseHold` member (spec 10 X17b) writes the payment-journal release entry and the operation's released fact in one writer transaction, keyed by `operation_id`, so at most one release exists per frozen hold. Because the release is a single local transaction, absence of the entry after an unknown outcome proves it did not commit, and projection yields `Frozen` or `Released`.
      - **Persistence, rail-held holds.** A release that needs an external rail call is two-phase, and absence of a local completion never means "not released":
-       - **One key per frozen hold.** The idempotency key is fixed when the hold freezes: `hold_release_key = H("chio.unknown-release.v1" || operation_id || hold_id)`. It does not depend on the authority or the evidence, so every later authorization for the same hold reuses it. There is at most one frozen hold per operation.
+       - **One key per frozen hold attempt.** The idempotency key is fixed per release attempt generation: `hold_release_key = H("chio.unknown-release.v1" || operation_id || hold_id || attempt_generation)`. `attempt_generation` starts at 1 when the hold freezes and is persisted with the hold. It does not depend on the authority or the evidence, so every later authorization for the same hold reuses it. There is at most one frozen hold per operation.
        - **Prepare.** An `ExternalPrepare { Settle }` crossing commits a durable `release_submitted` row before the external call, carrying `hold_release_key`, the authority and the evidence digest. Projection of that row yields the persisted `ReleaseSubmitted { authority, idempotency_key }`.
        - **Adapter capability (spec 10 X17b).** The prepare crossing refuses, before any rail call, when the hold's rail adapter declares neither capability below. The hold stays `Frozen`, and the driver raises `Fault { RailCapabilityMissing }` for operator settlement outside the machine.
          - **`IdempotentPerKey`.** The rail executes at most one release per key for as long as the hold can exist, whatever request body carries the key. Re-submitting with the key is safe and returns the original outcome.
@@ -471,7 +471,9 @@ pub enum IdentityDisposition {
          - `FenceByKey`: it calls `fence(key)`. "Already released" commits the completion. A successful fence with no release commits `release_abandoned` and returns to `Frozen`; the original request can no longer be accepted.
          - An ordinary status query that reports "not released", "unknown key" or no answer is not terminal. It keeps `ReleaseSubmitted` with bounded backoff and an operator incident. A query alone never returns the hold to `Frozen`, and the driver never re-submits an ambiguous request except under `IdempotentPerKey`.
          - If the adapter's declared capability is lost after submission (a configuration change), only a "released" answer is acted on. Every other answer keeps `ReleaseSubmitted`.
-       - **No re-release.** While `ReleaseSubmitted` holds, a new `ReleaseAuthorized` is illegal (M2). After a return to `Frozen`, a new authorization reuses `hold_release_key`, so the original request is either deduplicated (`IdempotentPerKey`) or fenced (`FenceByKey`) before a replacement can execute.
+       - **No re-release.** While `ReleaseSubmitted` holds, a new `ReleaseAuthorized` is illegal (M2).
+       - **Key rotation only after proof.** A return to `Frozen` happens only through a durable `release_abandoned` record, written after a definitive keyed rejection (`IdempotentPerKey`) or a successful fence (`FenceByKey`). Either one proves that the old request can never execute. The same transaction increments `attempt_generation`, so the next authorization derives a fresh `hold_release_key`. The rail neither replays the cached rejection nor refuses the replacement as fenced.
+       - **No rotation without proof.** Without that record the key never rotates. A delayed original therefore stays deduplicated or fenced, and a replacement carrying a new key is only ever submitted after the old key is provably dead.
        - **Required semantics, answering the owner's rail question.** An adapter qualifies for unknown-outcome releases only if it provides at-most-once execution per caller-supplied key for the hold's lifetime, or a terminal fence by key whose success excludes later acceptance. A current-state lookup does not qualify. Chio names no specific rail here. Each adapter declares its capability, and its conformance test covers a delayed original request delivered after a negative status query, both before and after a replacement request.
      - The driver verifies the evidence (the counterparty's signed agreement, or the contract's capture-waiver term) before it feeds the event. The machine checks only the phase and the hold fact.
      - This is how a hold frozen by M7, M12 or the cut table is released after migration. It never moves money on the machine's own authority (T4, T6).
@@ -653,7 +655,10 @@ Columns: `S` = `StartupRecovery`; `A` = `RecoveryClosure` with control `Active`;
 
 ```text
 forall cause: Compensate in classify(s, cause, f, t) -> pre_dispatch(s) and f.capture != Committed
-forall cause: Terminalize(OutcomeUnknownAfterDispatch) in classify(s, cause, f, t) -> s.phase = DispatchCommitted and f.durable_return = None
+forall cause: Terminalize(OutcomeUnknownAfterDispatch) in classify(s, cause, f, t) ->
+    effect_crossed(s, cause, f) and f.durable_return = None
+effect_crossed(s, cause, f) = s.phase = DispatchCommitted
+                           or (s.phase = CapturePending and f.capture = Committed and cause = AuthorityCut)   (section 6.1 X row)
 ```
 
 ### 6.2 Decisions where the legacy deciders disagree
@@ -1005,6 +1010,13 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | R-8-02 | Slow-path terminal stop denials are marked retryable after resume | Fixed through the shared contract. M20 `IdentityDisposition` is assigned per producing row. Compensated slow-path and `Prepared`-intent stop denials are `Terminal`, and spec 8's `retryable_after_resume` equals `identity_disposition == Reusable`. M15 gains the missing `Prepared` row. T14; separate tests for early, fused, prepared, slow, parked and post-effect cases | M15; M20; section 5.2; T14; section 14; spec 8 S15 |
 | R-6-06 (contract part) | Retryable admission denials other than stops have no binding disposition | Fixed here for the producing side. `Overloaded`, check-only refusals, `StoreUnavailable` before any row and every other pre-admission refusal that persists no state are `Reusable`, signed in `chio_runtime.identity_disposition`. Spec 6 consumes it | M20 |
 | R-6-05 / R-6-06 (cross-reference) | Kernel-reserved receipt metadata | Fixed. `receipt_context`, with a new kernel-written `request_namespace_digest` derived like `AuthenticatedRequestNamespace::bind`, and `chio_runtime` become kernel-reserved keys. This is a kernel change: M: reserves seven other keys today (`kernel/mod.rs:151-159`) | M20 |
+
+### Codex review (PR #1174, round 11)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186194337 | Include committed captures in the outcome-unknown invariant | Fixed now. The predicate uses `effect_crossed(s, cause, f)`, which covers `DispatchCommitted` and, under `AuthorityCut`, `CapturePending` with a committed capture, matching the section 6.1 `X` row | section 6.1 predicates |
+| 4186194349 | Rotate the release key after proving non-acceptance | Fixed now. `hold_release_key` includes a persisted `attempt_generation`. It is incremented only in the same transaction as `release_abandoned`, which requires a definitive keyed rejection or a successful fence, so a replacement release gets a fresh key only after the old request is provably dead | M7a |
 
 ## Appendix A. External and FTL precedent
 

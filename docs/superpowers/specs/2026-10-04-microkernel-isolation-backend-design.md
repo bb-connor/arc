@@ -380,7 +380,7 @@ Rules:
    - For `confined_reader`, `record_id` is the boundary's `EvidenceRef`, and `record_sha256` is the retained `launch` digest (W:`.../knowledge/confinement/launch.rs:125-127`).
    - It is attached to receipts the parent produces after the return is admitted, and to the exported evidence of section 6.4.
 3. An absent `worker_profile` renders as `direct` (no claim). That rendering is only for display and influence; it never satisfies a confinement requirement. Where an agreement's run plan requires the worker lane, an absent profile fails the facet (section 7 rule 3).
-4. `split_domain` may be recorded only when S5's plan binding exists and the execution tool server IDs in the plan are served under rule 5.1.3.
+4. `split_domain` may be recorded only when S5's plan binding exists and every execution tool server ID in the plan is served with a verified backend-appropriate launch reference: rule 5.1.3 (`native_launch`) for the Linux cage, or rule 5.1.6 (`confinement_launch`) for another tool-lane backend such as a Firecracker guest.
 5. **A verified fact, never a grant.** `worker_profile` grants no authority, and no guard or policy branches on it, with one consumer: integrity admission (`2026-10-04-integrity-gated-admission-design.md` rule I7) uses it to choose a context's initial influence. That makes it an allow-affecting fact for that one purpose, so integrity admission consumes it only in verified form:
    - **Qualification.** The fact is `Verified(kind)` only when every condition holds:
      - the host attribution equals the runner's per-attempt record (rule 2);
@@ -626,6 +626,12 @@ Refinements to the review directives, recorded with evidence:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4185993967 | Accept backend-neutral launch references for split-domain servers | Fixed now. The `split_domain` predicate requires a verified backend-appropriate launch reference for every execution-server call: `native_launch` for the Linux cage, or `confinement_launch` for another backend (rule 5.1.6). A Firecracker execution server can therefore yield `Verified(split_domain)`. Tests cover both | rule 6.3 predicate; section 10 tests |
+
+### Codex review (PR #1174, round 11)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186194327 | Permit backend-neutral launches for split-domain profiles | Fixed now. Rule 6.3.4 now records `split_domain` when every planned execution server has a verified backend-appropriate reference, either rule 5.1.3 `native_launch` or rule 5.1.6 `confinement_launch`, matching the round 10 predicate | rule 6.3.4 |
 
 ## Appendix A. FTL reference
 

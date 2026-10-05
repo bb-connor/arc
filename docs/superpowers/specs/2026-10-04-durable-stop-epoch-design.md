@@ -540,9 +540,9 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - **Quorum.** When configured, a `chio.stop-control-quorum.v1` artifact (S29), recorded as `Quorum`.
     - **Single operator.** A deployment may configure `SamePrincipalAfter { cooldown >= 300 s }` explicitly in signed deployment configuration.
       - The cooldown starts at the first successful authority-time observation at or after the stop commit.
-      - A supervised task retries `observe_authority_time` while a stopped head lacks that observation. On success it writes `admission_operation_stop_observations(scope_key, epoch, first_observed_at)` as a progress-only commit.
+      - A supervised task retries `observe_authority_time` while a stopped head lacks that observation. On success it writes `admission_operation_stop_observations(scope_key, chain_generation, epoch, first_observed_at)` as a progress-only commit, keyed by the full `StopEpochId`. Every insert, lookup and comparison uses `(scope_key, chain_generation, epoch)`, so an observation from an older generation's stop with the same numeric epoch can never satisfy a new stop's cooldown.
       - A stop committed with `DecisionTime::Unavailable` therefore gains a start point as soon as the clock recovers. The row survives restart, and the next boot's supervised task re-drives a missing one.
-      - The resume record copies the row into `SamePrincipalAfter.cooldown_started`. A resume whose `cooldown_started` does not equal the stored observation refuses.
+      - The resume record copies the row into `SamePrincipalAfter.cooldown_started` together with its `StopEpochId`. A resume whose `cooldown_started` does not equal the stored observation for the head's exact `(chain_generation, epoch)` refuses.
       - The row is a progress-only commit. A restore that loses it only restarts the cooldown at the next observation, so it can delay a resume but never shorten the cooldown.
     - **Break-glass.** When authority time is unavailable or below the persisted floor, so that an ordinary resume refuses (S4), a quorum artifact that also carries a signed time attestation may resume.
       - The time source is pinned in signed deployment configuration.
@@ -1041,6 +1041,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4185993956 | Block running rollover heads until their artifact is signed | Fixed now. A `Rollover` that restates `Running` signs inside its transaction, like `Resume`, and rolls back and retries if signing fails; the rollover margin and the reserved stop slot keep the chain appendable. Only a rollover that restates `Stopped` commits first with a pending obligation. A running head's chain is therefore always signed | S38 |
+
+### Codex review (PR #1174, round 11)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186194363 | Key cooldown observations by the full stop epoch | Fixed now. `admission_operation_stop_observations` is keyed by `(scope_key, chain_generation, epoch)`, and every insert, lookup and comparison uses the full `StopEpochId`. The resume record carries it, so an older generation's observation can never satisfy a new stop's cooldown | S19 |
 
 ## Appendix A. FTL reference
 
