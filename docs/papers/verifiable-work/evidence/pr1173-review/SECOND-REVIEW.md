@@ -89,12 +89,31 @@ not invent a branch-protection guarantee or change repository policy.
 
 ## Local qualification
 
-Source `2ce480588721ce206c740ff1a601c4d2a9c9889a` passes all 21 terminal
-qualification commands against 37,305 source files and 48 retained outputs.
-Before/after hashes agree. Actual parent SIGKILL, evolving funded work and all
-four earned-child payment cases pass. The funded suite retains its 96 passing
-tests and six explicit opt-in skips. All 18 artifact-tool tests pass. Historical
-successes and the interrupted pre-pin attempt retain their original evidence.
+Source `b7bdfb6ce67c62760f4e5578055f05727119ad11` passes all 21 terminal qualification
+commands against 37,307 source files and 48 retained outputs. Before/after
+hashes agree. Actual parent SIGKILL, evolving funded work and all four
+earned-child payment cases pass. The funded suite retains 96 passing tests
+and six explicit opt-in skips. All 20 artifact-tool tests pass. The earlier
+qualification of `2ce480588721ce206c740ff1a601c4d2a9c9889a` and subsequent
+complete or interrupted attempts remain historical, with their original
+inputs, counts and outputs.
+
+Follow-up platform and structural repairs pass 9 outcome-ledger tests,
+8 API-protect tests, 6 control-plane init tests, the complete 41-test
+return-context inventory and 52 threat tests, with strict affected Clippy.
+The 100-gate diagnostic retains its five initial failures; every failure
+has a passing targeted recheck. Historical terminal labels are preserved
+under an exact digest pin; mutable protocol descriptions use ACP-Client.
+The actual AWS-LC composite gate passes without a new audit exemption or
+advisory ignore. Both the real native broker regression and all x86
+acceptance boundaries still require hosted execution.
+
+The broker audit classification repair reuses the security lane's typed
+client-fault handling. All 206 default broker tests pass across every target,
+including both hostile-frame provisioning and SIGTERM/restart regressions.
+Both regressions also pass in separate test processes. Strict all-target Clippy
+with real Linux features passes. The earlier one-pass/two-failure reproduction
+remains failed. Storage, invariant and authority errors retain their fatal path.
 
 ## Final acceptance
 
@@ -113,7 +132,7 @@ signed evidence package. The missing operational prerequisite remains open until
 the protected capture and finalizer supply and verify the actual package.
 The user confirmed that the security agent owns that package. This candidate's
 CI caller uses the already merged, repository-authorized definition
-`4f3c967f04af40b5025b9222e8db95a3aee0b5f4`; repository authority variables remain
+`c009aced79d69f01880b5f7c53ed3c1754e3b7da`; repository authority variables remain
 under that separate lane's ownership.
 
 The first replacement at `28842e598e` exposed two additional qualification
@@ -123,3 +142,21 @@ are repaired with retained reproductions. All 20 paper-tool tests and the
 complete AWS-LC composite gate pass locally. Neither repair changes production
 Rust behavior or weakens an acceptance check. Renewed source qualification and
 replacement-commit hosted acceptance remain required.
+
+The historical x86 run at `28842e598e` passed both actual PostgreSQL
+trajectories. All 14 worker and nine claim-loss receipts verify independently;
+the public reports, keys and authenticated archive bytes are retained under
+`postgres-history/28842e598e`. The overall run remains failed because its
+separate broker retirement regression lacked the key-log helper environment.
+The prepared action now builds and atomically validates both candidate key-log
+services, and the privileged regression receives their paths explicitly. All
+20 native CI controls, the real export-script controls, 20 definition controls
+and the complete security CI mutation checks pass locally.
+
+The security lane's new authorized workflow also invokes closed-shard producer
+controls absent from this candidate. Its reviewed supporting-source handoff
+must be reconciled with the finalized definition and signed package before full
+enterprise acceptance. The current pin preserves the authorized definition;
+copying only a self-test, changing authority variables or bypassing that source
+closure would supply no qualification. This operational integration remains
+under the security lane's package responsibility.

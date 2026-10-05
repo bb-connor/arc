@@ -13,14 +13,14 @@
     },
     {
       "id": "artifact",
-      "status": "open",
+      "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": [
         "paper.pdf",
         "results.tex",
         "ARTIFACT.md"
       ],
-      "result": "The first replacement passed native qualification and a reproducible PDF rebuild. Broader preflight exposed four required claim-source omissions in the flat manifest. The producer is repaired with passing round-trip and rejection controls; renewed source qualification and artifact freeze are pending."
+      "result": "The repaired source passes all 21 terminal native commands against 37,307 unchanged inputs and 48 outputs, including 20 artifact-tool tests. Derived results, reproducible PDF, bibliography and the frozen source/evidence inventory agree. Historical failed campaigns and the 23 verified PostgreSQL receipts retain their original scope. Hosted production, security-lane integration and independent publication gates remain separate."
     },
     {
       "id": "funded-security-integration",

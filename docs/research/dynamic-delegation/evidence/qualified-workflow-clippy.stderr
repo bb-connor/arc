@@ -11,23 +11,4 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Checking chio-core-types v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-core-types)
-    Checking chio-listing v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-listing)
-    Checking chio-revocation-oracle v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-revocation-oracle)
-    Checking chio-finding v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-finding)
-    Checking chio-fiscal v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-fiscal)
-    Checking chio-governance v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-governance)
-    Checking chio-pheromone v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-pheromone)
-    Checking chio-appraisal v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-appraisal)
-    Checking chio-open-market v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-open-market)
-    Checking chio-underwriting v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-underwriting)
-    Checking chio-federation v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-federation)
-    Checking chio-did v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-did)
-    Checking chio-fincred v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-fincred)
-    Checking chio-credit v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-credit)
-    Checking chio-web3 v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-web3)
-    Checking chio-market v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-market)
-    Checking chio-autonomy v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/economy/chio-autonomy)
-    Checking chio-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/core/chio-core)
-    Checking chio-workflow v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-workflow)
-    Finished `dev` profile [unoptimized] target(s) in 49.89s
+    Finished `dev` profile [unoptimized] target(s) in 0.72s

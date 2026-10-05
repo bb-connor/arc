@@ -593,3 +593,52 @@ and PostgreSQL acceptance still require the replacement commit. The security
 agent owns the separate signed Linux evidence package. The PR is ready for
 review by the user's choice; this result does not establish merge, deployment
 or publication readiness.
+
+
+## October 5 final source checkpoint
+
+Frozen source `efd0bc4d8c47a1e5a5bdf0e83aa731d7925aaa4a` passes all 21 terminal commands against
+37,307 unchanged source files and 48 retained outputs. The artifact-tool
+suite passes all 20 tests. Actual parent SIGKILL, evolving funded work and
+all four earned-child cases pass. Earlier complete and interrupted campaigns
+retain their original outputs under the evidence history directory.
+
+The follow-up repairs pass 9 outcome-ledger tests, 8 API-protect tests,
+6 control-plane initialization tests, all 41 exact return-context selections
+and the complete 52-test threat target, with strict affected Clippy and
+formatting. The initial structural diagnostic has 95 passes and five failures
+among 100 terminal gates. All five failures have passing targeted rechecks;
+the failed campaign remains failed. The real composite AWS-LC gate passes
+locally, including root and standalone Cargo Vet and default/FIPS regressions.
+
+Several historical hosted jobs never acquired a runner. The native-host
+aggregate correctly fails when its binaries job is abandoned and consumers
+are skipped. These cancellations and failures supply no missing execution
+evidence. Final-SHA hosted qualification and the security-agent-owned signed
+Linux evidence package remain required. No merge, deployment or publication
+readiness is established by this local checkpoint.
+
+
+## October 5 broker and workflow follow-up
+
+Source `b7bdfb6ce67c62760f4e5578055f05727119ad11` passes all 21 terminal native commands against
+37,307 unchanged source files and 48 retained outputs. This follows the
+completed `87aa7e4a0f` checkpoint and the independently reproduced broker
+availability defect. Malformed strict audit input now remains a denied client
+fault; the daemon still performs a governed provision and drains and restarts
+correctly. All 206 default broker tests and both separately executed regressions
+pass. Real-enforcement all-target Clippy and formatting pass.
+
+The historical PostgreSQL run passed both trajectories and supplied 23 verified
+receipts, but failed its separately selected broker test on missing key-log
+helpers. Keep that overall failure and require a final-head rerun. The corrected
+fixture builds both services from the candidate and publishes their paths only
+after every executable validates. Native workflow and executable-export controls
+reproduce missing paths and pass after repair. Repository-authorized definition
+`c009aced79d69f01880b5f7c53ed3c1754e3b7da` replaces the preceding pin.
+
+The security lane still owns the absent committed Linux evidence and policy,
+including coherent integration of that definition's supporting closed-shard
+producer controls. No authority variable is changed. Final-hosted main CI,
+research matrix, fuzz, Kani and confined native acceptance remain required.
+This record establishes no merge, deployment or publication approval.

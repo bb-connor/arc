@@ -27,7 +27,7 @@ The October 3 editorial revision changed no native source, proof program,
 comparison tool or experimental output. The October 5 review subsequently
 repaired implementation and evidence boundaries, as recorded in
 [evidence/pr1173-review/SECOND-REVIEW.md](evidence/pr1173-review/SECOND-REVIEW.md).
-Its source-bound native package passes 21 commands against 37,305 source files;
+Its source-bound native package passes 21 commands against 37,307 source files;
 historical qualifications retain their original scope. Hosted production
 acceptance and the independent publication gates remain separate.
 

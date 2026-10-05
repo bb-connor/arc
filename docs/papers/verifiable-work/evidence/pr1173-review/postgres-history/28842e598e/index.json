@@ -1,0 +1,27 @@
+{
+  "schema": "chio.postgres-job.qualification-history.v1",
+  "source_head": "28842e598e87ff18dfec38949adceee231d3d890",
+  "workflow_run_id": 37361227538,
+  "job_id": 111936028936,
+  "url": "https://github.com/bb-connor/arc/actions/runs/37361227538/job/111936028936",
+  "overall_conclusion": "failure",
+  "scope": "Historical diagnostic only. Both confined PostgreSQL trajectories passed and 23 receipts were independently verified. The separately selected broker retirement regression failed before its subject because the key-log helper environment was incomplete. This does not qualify a later candidate.",
+  "receipts_verified": {
+    "worker_ownership": 14,
+    "claim_response_loss": 9
+  },
+  "artifacts": [
+    {
+      "id": 11370032140,
+      "name": "postgres-job-process-qualification",
+      "size_in_bytes": 44243,
+      "digest": "sha256:887ffe4473c8b521df14f30abcd51c66154859749fa81bc25b5319916f7f286a"
+    },
+    {
+      "id": 11369742315,
+      "name": "postgres-job-claim-loss-qualification",
+      "size_in_bytes": 30269,
+      "digest": "sha256:dc8a3668b910266803b828c8d4dae045b9a0fa12b2dfe2ec1106bd6103f9d620"
+    }
+  ]
+}

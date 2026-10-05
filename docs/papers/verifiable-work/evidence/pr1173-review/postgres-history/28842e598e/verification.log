@@ -1,0 +1,3 @@
+postgres-job-process-qualification 14 exported receipts verified
+postgres-job-claim-loss-qualification 9 exported receipts verified
+PASS: ownership, fencing, original-result replay, SIGKILL and no-redispatch control agree

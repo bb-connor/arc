@@ -1,5 +1,5 @@
 {
-  "scope": "Local diagnostic campaigns from the additional PR1173 review. Earlier failures are retained separately from corrected runs. These logs do not establish final-SHA hosted acceptance. The current native profile uses its separate source-bound qualification.json.",
+  "scope": "Local and hosted diagnostic campaigns from the additional PR1173 review. Earlier failures are retained separately from corrected runs. A hosted log qualifies only its recorded commit and attempt; these diagnostics do not establish final-candidate acceptance. The current native profile uses its separate source-bound qualification.json.",
   "logs": [
     {
       "log": "review-runtime-final.log.gz",
@@ -174,6 +174,360 @@
       "observed_result": "failed",
       "bytes": 37070,
       "sha256": "0517a8a6aa264559389d202236f63d036e2136b173a349c32bf3b924151f082d"
+    },
+    {
+      "log": "28842e-publication-gate.log.gz",
+      "observed_result": "failed: four missing claim-source manifest entries, plus expected open research gates",
+      "bytes": 915,
+      "sha256": "30068a648330602c9d11eebbf1d65bf91ce520f72db6977ba958b3506a80da4e"
+    },
+    {
+      "log": "publication-freeze-inputs-red.log.gz",
+      "observed_result": "regression setup: two import errors before the named-input collector existed",
+      "bytes": 2873,
+      "sha256": "d7263818f5ebd95d68b0a76477bb437dbb4b8d071bdf5ef1e7e408ccbed2fbbe"
+    },
+    {
+      "log": "publication-freeze-inputs-green.log.gz",
+      "observed_result": "passed: nine focused evidence tests",
+      "bytes": 1392,
+      "sha256": "7992a409e5b28b15d776b6a03cee1c3a573e7734d9e8abcbd8e0da2db07039a1"
+    },
+    {
+      "log": "publication-freeze-all-green.log.gz",
+      "observed_result": "passed: twenty paper-tool tests",
+      "bytes": 3150,
+      "sha256": "03b7d681b756eb5bb3086b7aa7af11c5c0137090f4ff836da23d935ffdc7d145"
+    },
+    {
+      "log": "28842e-vet-failure.log.gz",
+      "observed_result": "failed: hosted build-custody fixture missing shell control before audit execution",
+      "bytes": 107342,
+      "sha256": "ba67f7e2f79a35b7b137d2ac3356a2dfc6ceb599f5c1e477a685c4355e588f97"
+    },
+    {
+      "log": "28842e-fork-composite-red.log.gz",
+      "observed_result": "failed: local reproduction of missing shell-control fixture",
+      "bytes": 1180,
+      "sha256": "f8a9f212f0bffcce387287f6542a1d173fc916b38b899ad30632207d813a91df"
+    },
+    {
+      "log": "28842e-fork-composite-green.log.gz",
+      "observed_result": "passed: all nine fork-boundary controls",
+      "bytes": 107,
+      "sha256": "e7f438e9c6db596b7bbbf82e93715b0b0d7073534424e30fa7a5c2524d6ea8b9"
+    },
+    {
+      "log": "review-composite-audit-complete.log.gz",
+      "observed_result": "passed: complete local root and standalone audit composite, default and FIPS regressions",
+      "bytes": 3797,
+      "sha256": "114feab83771c689d798cefb5adee5dc7f4d78deb004dd290956c89f3cc6bb7d"
+    },
+    {
+      "log": "28842e-outcome-ledger-failure.log.gz",
+      "observed_result": "failed",
+      "bytes": 128469,
+      "sha256": "4df68fcbb554ed008230b4594463871d63b9a93ae732a4027b395422172b669b"
+    },
+    {
+      "log": "28842e-threat-coverage-failure.log.gz",
+      "observed_result": "failed",
+      "bytes": 243236,
+      "sha256": "52b8a03b4feb7c24e352e5571655e8c239044d756e39bc66fdce01b17c440c65"
+    },
+    {
+      "log": "review-structural-local.log.gz",
+      "observed_result": "failed (100 terminal gates; five failures)",
+      "bytes": 107277,
+      "sha256": "56de867202cfb3029ff45af7f3ee0df2ce2b568e8d52cf35b368e59a482f82c0"
+    },
+    {
+      "log": "review-structural-rechecks.log.gz",
+      "observed_result": "passed (9 gates)",
+      "bytes": 54094,
+      "sha256": "50203875e12df13f1c1e76b7ccb085b93caf5eeba7d326d4dc00e17e84287e51"
+    },
+    {
+      "log": "review-flow-security-green.log.gz",
+      "observed_result": "passed (69 exact inventory controls)",
+      "bytes": 58,
+      "sha256": "d62f4d6d68a811fed3faff073bdc31efddd6c46fa9b20384df30541284957659"
+    },
+    {
+      "log": "review-copy-snapshot-red.log.gz",
+      "observed_result": "failed (missing immutable evidence pin)",
+      "bytes": 2016,
+      "sha256": "95d3c92ad343d5c5b2437db8e37d86d0dd5cb3dadf693019a4b2b5fbeef4ae94"
+    },
+    {
+      "log": "review-copy-snapshot-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 101,
+      "sha256": "8eae2b9341a0dcb125032f79cad90f202e4eb531cdb3380fe7f24c8dd0b7dda6"
+    },
+    {
+      "log": "module-path-red-structural-service-init-tests.log.gz",
+      "observed_result": "failed (legacy module path resolution)",
+      "bytes": 16023,
+      "sha256": "8ec5b87be091c353baf8093a1858999db290611d3f08706b9086dc5453dbdde6"
+    },
+    {
+      "log": "outcome-platform-tests.log.gz",
+      "observed_result": "passed (9 tests)",
+      "bytes": 9462,
+      "sha256": "9cb6ad836b3075083a3bf4a6e120fdb46dfdfbc85a33c56ef144164b6652e30e"
+    },
+    {
+      "log": "outcome-platform-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 8188,
+      "sha256": "fc6e679c708108be69e0c06d1e66ad0cddcc470814b6830a91e5e420d63ad407"
+    },
+    {
+      "log": "structural-proxy-builder-tests.log.gz",
+      "observed_result": "passed (8 tests)",
+      "bytes": 2972,
+      "sha256": "f920b617984ed76a7a7e94ca98a86e5835a108067ed5221964f650a1e7bc8ea8"
+    },
+    {
+      "log": "structural-service-init-tests.log.gz",
+      "observed_result": "passed (6 tests)",
+      "bytes": 2709,
+      "sha256": "de06fad7b59da1e2583814b0e7ae3f3f649ffa0bdcc5ad5be2090e9dc5145c12"
+    },
+    {
+      "log": "structural-test-module-clippy.log.gz",
+      "observed_result": "passed (both crates, all targets)",
+      "bytes": 14047,
+      "sha256": "66e113ada4c770cdc4a1c2494eb5f5bb93bfee8b2f3a30dd6bca525f4cf8831a"
+    },
+    {
+      "log": "structural-flow-context-exact.log.gz",
+      "observed_result": "passed (41 exact tests)",
+      "bytes": 15398,
+      "sha256": "f946f73d6b4d9f207e20ed8fdda7bbb547046a5ddcf8104d41b4b2a7ed8e0dac"
+    },
+    {
+      "log": "structural-threat-conformance.log.gz",
+      "observed_result": "passed (52 tests)",
+      "bytes": 17157,
+      "sha256": "fab10749e58a7619bc454f14539e1661996dc108c00277f8fbc400e6ccb521df"
+    },
+    {
+      "log": "structural-threat-clippy.log.gz",
+      "observed_result": "passed (actual threat target)",
+      "bytes": 17256,
+      "sha256": "1c30c1919d13577502341f3ca39161d78cff9a7f0ca7b2f11086eb47bace4032"
+    },
+    {
+      "log": "28842e-native-host-failure.log.gz",
+      "observed_result": "failed aggregate (required binaries job never acquired a runner; consumers skipped)",
+      "bytes": 2516,
+      "sha256": "6f3ab5ab068c4166194d5b3d1b10e6d9469b4543b214f82c596a1521ee7bed72"
+    },
+    {
+      "log": "paper-supervisor-prefix-attempt1.status.json.gz",
+      "observed_result": "failed supervisor parser (checker returned exactly six expected research/readiness failures)",
+      "bytes": 1572,
+      "sha256": "3ea52ac8d19e415982b6ec1ebde13e040c5fa1e18dd46658b18d772078ee690b"
+    },
+    {
+      "log": "paper-supervisor-prefix-attempt1-publication.log.gz",
+      "observed_result": "blocked (four open research gates and two false flags; no artifact mismatch)",
+      "bytes": 276,
+      "sha256": "f9ab765b09d13b6e1e451a618bfdcb10928a14d8674a078ce03bc470498b3a6a"
+    },
+    {
+      "log": "paper-final-source.status.json.gz",
+      "observed_result": "passed artifact/reproducibility; publication gates remain open",
+      "bytes": 1112,
+      "sha256": "b042c0f69613dd8c8a7323178f1dfc85e0ef2df6ddb2b18083e49b74f098aa8a"
+    },
+    {
+      "log": "qualification-final-source.status.json.gz",
+      "observed_result": "passed (21 commands; frozen source efd0bc4d8c)",
+      "bytes": 268,
+      "sha256": "421f73950443a7198d502bce054f2d8a7114356c0d6eeff321ef1bb12e8112bd"
+    },
+    {
+      "log": "review-native-qualification-final-source.log.gz",
+      "observed_result": "passed (21 commands, 37307 inputs, 48 outputs)",
+      "bytes": 539,
+      "sha256": "dca66c22e723454ca899c74fd55ea53909ce0cf3c204c5683db564ab6a9938a8"
+    },
+    {
+      "log": "hosted-terminal-28842e598e.json.gz",
+      "observed_result": "failed historical campaign; all 130 checks terminal",
+      "bytes": 40325,
+      "sha256": "92890d0fd25b70e0ad83cfbab93b8ef69a65583a6a8ba0cb483b473ec44c982c"
+    },
+    {
+      "log": "28842e-security-contract-failure.log.gz",
+      "observed_result": "failed aggregate; required subjects failed or cancelled",
+      "bytes": 3250,
+      "sha256": "8f73a7ecaf6a019093d75107118b47985f948e312eedb8dd7ad5e153fd650d73"
+    },
+    {
+      "log": "28842e-postgres-broker-failure.log.gz",
+      "observed_result": "failed",
+      "bytes": 875134,
+      "sha256": "e50d5d4d2d2d1c5c010685bf0d4a94a41e51cabbb6e194661cfede74695e7e2e"
+    },
+    {
+      "log": "28842e-postgres-trajectories-verified.log.gz",
+      "observed_result": "passed historical trajectories; overall job failed",
+      "bytes": 222,
+      "sha256": "30b1eab47e023d8e909ce86500260b65bb206cbccea3ac8799d0e1c268657760"
+    },
+    {
+      "log": "28842e-build-lint-failure.log.gz",
+      "observed_result": "failed",
+      "bytes": 523666,
+      "sha256": "7d3fd1d98ab0d0d0aff93593eaf8d6bea6bcd0d50e2ecb002baf934c743d9f01"
+    },
+    {
+      "log": "28842e-nextest-failure.log.gz",
+      "observed_result": "failed",
+      "bytes": 375749,
+      "sha256": "0c9ba0df3cd334e98611da68c9e5beb9f2fca0233c9c24a92efcfdc7052e9b47"
+    },
+    {
+      "log": "postgres-helper-export-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 326,
+      "sha256": "1af1ad9fca8dba9c95c31bea4c59ee1c889769b5ca251e6eb6b20086157723ca"
+    },
+    {
+      "log": "postgres-helper-forward-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 2877,
+      "sha256": "0ffd3b2a004990b57da14fb3aeab5582e4b9912cd1b5abcae9c719d3e97acebc"
+    },
+    {
+      "log": "postgres-helper-export-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 28,
+      "sha256": "d13bd68c0e7f20c9f33aabe0fee5395e45fd956ca0cde3cc23a962e7e527a58a"
+    },
+    {
+      "log": "postgres-helper-forward-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 119,
+      "sha256": "9c1de35dbb8c39a3fa4d845815047bd7f8579a6dc62dc2048f8fc652edcda4df"
+    },
+    {
+      "log": "postgres-pin-definitions-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 2844,
+      "sha256": "1faa9718d8e9c029d5ad126ef72d52802c5641ab0128c8750f304d973d795aa3"
+    },
+    {
+      "log": "postgres-pin-contract-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "postgres-pin-actionlint.log.gz",
+      "observed_result": "passed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "broker-audit-classification-red.log.gz",
+      "observed_result": "failed",
+      "bytes": 7286,
+      "sha256": "b6652f0176ad8db2d4172bbf42aa2f2b0dc33039e92aabe9fec8c4c9dbd2faed"
+    },
+    {
+      "log": "broker-audit-classification-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 24870,
+      "sha256": "997cf6670d7020063ad29d7ecc2e5c34ac141d7544a43ef0353ac62df628b29b"
+    },
+    {
+      "log": "broker-audit-classification-clippy.log.gz",
+      "observed_result": "passed",
+      "bytes": 10247,
+      "sha256": "0eddde4cdc4c1632cc2b0cae414e11eda0af8ef57ca1f72aca87b9eb7d9cbaee"
+    },
+    {
+      "log": "broker-audit-isolated-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 417,
+      "sha256": "840d39dcd56542e4f5353c71f60d28bb0ed60c6776d91fe064a57a9a72931d03"
+    },
+    {
+      "log": "qualification-87aa7e4a0f.status.json.gz",
+      "observed_result": "passed",
+      "bytes": 268,
+      "sha256": "00a6e5b06674bcc285edc8ca06ff7d8af98386ba4d84027fbdf8c649eac3d3a2"
+    },
+    {
+      "log": "review-native-qualification-87aa7e4a0f.log.gz",
+      "observed_result": "passed",
+      "bytes": 539,
+      "sha256": "dca66c22e723454ca899c74fd55ea53909ce0cf3c204c5683db564ab6a9938a8"
+    },
+    {
+      "log": "qualification-b7bdfb6ce6.status.json.gz",
+      "observed_result": "passed",
+      "bytes": 268,
+      "sha256": "0b6c3e2e64bd95dc780c4d38401e9dd0457e4ae8332e866ba26aae27630bf80d"
+    },
+    {
+      "log": "review-native-qualification-b7bdfb6ce6.log.gz",
+      "observed_result": "passed",
+      "bytes": 539,
+      "sha256": "dca66c22e723454ca899c74fd55ea53909ce0cf3c204c5683db564ab6a9938a8"
+    },
+    {
+      "log": "paper-b7bdfb6ce6.status.json.gz",
+      "observed_result": "passed artifact supervisor; publication remains blocked",
+      "bytes": 1170,
+      "sha256": "169ad46257233a171972d44ee22ab47e80a7812ebf0b3ae3cd803c53e0c3cd68"
+    },
+    {
+      "log": "receipt-verifier-b7bdfb6ce6.status.json.gz",
+      "observed_result": "passed candidate-built receipt verifier",
+      "bytes": 528,
+      "sha256": "822b31aa6997b62da14770c63da23c0994021a74367570ddb2ee0c0468d33de2"
+    },
+    {
+      "log": "receipt-verifier-b7bdfb6ce6-build.log.gz",
+      "observed_result": "passed",
+      "bytes": 1879,
+      "sha256": "f9f3f4e096f0c31dc7b6d9fd0e5de2b567c64cc5723de6b8614435199bd51a13"
+    },
+    {
+      "log": "paper-b7bdfb6ce6-refresh.log.gz",
+      "observed_result": "passed",
+      "bytes": 56,
+      "sha256": "527d5541a76f0c49f90efd1361b6a39b41ae2a6177639f325bf16641e26a839d"
+    },
+    {
+      "log": "paper-b7bdfb6ce6-render.log.gz",
+      "observed_result": "passed",
+      "bytes": 261,
+      "sha256": "bed3172b820b641536875ca402b1d77c1239ebece6dcccdfcee9eb10ec11f647"
+    },
+    {
+      "log": "paper-b7bdfb6ce6-freeze.log.gz",
+      "observed_result": "passed",
+      "bytes": 80,
+      "sha256": "0042eeb8139089e9053e812f0b1d8726c7f7a1ac229476c90e136cec4d828796"
+    },
+    {
+      "log": "paper-b7bdfb6ce6-rebuild.log.gz",
+      "observed_result": "passed",
+      "bytes": 364,
+      "sha256": "ec65453a85249274c856be95344fd739287d3a5467778f488a8c28bf1c78a4b8"
+    },
+    {
+      "log": "paper-b7bdfb6ce6-publication.log.gz",
+      "observed_result": "blocked by four research gates and two false readiness flags",
+      "bytes": 276,
+      "sha256": "f9ab765b09d13b6e1e451a618bfdcb10928a14d8674a078ce03bc470498b3a6a"
     }
   ]
 }
