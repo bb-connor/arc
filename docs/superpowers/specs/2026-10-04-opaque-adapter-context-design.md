@@ -340,8 +340,10 @@ invocation_digest = hex(SHA256(
 ))
 
 provenance_identity = provenance without received_at
-                    = { provider, request_id, api_version, principal }
+                    = { provider, request_id, provider_call_id?, api_version, principal }
 ```
+
+**The provider call id is bound.** `provider_call_id` is the id used when the result is lowered back into the provider message (rule 1), so it is part of the digest whenever it is present. Before any response is lowered, `lower_bound` and `bound_verdict_from_response` check that `request_id` equals `{provider}_p_{lift_id}_{hex(SHA256(provider_call_id))[..32]}` for the payload's `lift_id`. A synthesized id has no `provider_call_id`, and its `request_id` must have the synthesized form. A mismatch is `InvocationDigest`. An invocation therefore cannot keep a signed namespaced `request_id` while lowering under a different provider call id.
 
 **Retry identity is stable.** `provenance.received_at` is excluded. It is the lift's observation time, sampled with `SystemTime::now()` on every lift (M: `chio-tool-call-fabric/src/types.rs:56-62`; `chio-gemini-tools-adapter/src/adapter.rs:257-268`), so it would make every re-lift a new identity. It remains on the `ToolInvocation` as observation metadata for logs and diagnostics and is never part of a digest. Excluding it loses no mis-pair detection:
 - two lifts in different turns carry different `request_id`s, because `lift_id` differs (rule 1), so their digests differ;
@@ -372,7 +374,7 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
 1. **Unique ids.** `lift` and `lift_batch` MUST mint `provenance.request_id` values that are unique across every lifted payload in the host's request namespace, not only within one payload.
    - **Why per-namespace.** `build_tool_call_request` copies `provenance.request_id` into `ToolCallRequest.request_id` (M: `crates/kernel/chio-kernel/src/provider_verdict.rs:107`; `main` `:55`). Durable admission retains `(request_namespace_digest, request_id)` for the namespace lifetime (`2026-07-12-admission-operation-design.md`, "Identity and retention"). An id reused by a later payload either replays the earlier terminal result, when the binding matches, or conflicts.
    - **Provider ids.** A provider's call id is not unique across turns: a provider may reuse it in a later turn of the same namespace. Adapters therefore namespace it with the same `lift_id` as synthesized ids: `request_id = {provider}_p_{lift_id}_{hex(SHA256(provider_call_id))[..32]}`.
-     - The provider's original id is kept in `provenance.provider_call_id` and is the id used when lowering the result back into the provider message, so the provider sees its own id.
+     - The provider's original id is kept in `provenance.provider_call_id` and is the id used when lowering the result back into the provider message, so the provider sees its own id. It is part of `provenance_identity` and so of the invocation digest, and `request_id` must derive from it (section 5.1).
      - With a `LiftContext`, re-lifting the same turn yields the same `request_id` and, because `received_at` is outside the digest, the same invocation digest (section 5.1), so a retried turn replays its bound terminal result. A later turn that reuses the provider id gets a different `lift_id` and is admitted as a new call.
      - Without a `LiftContext`, `lift_id` is fresh per lift. A host that retries a turn and needs replay instead of a new admission MUST pass a `LiftContext`; the adapter never derives turn identity from the payload.
    - **Synthesized ids.** When it does not (Ollama, Gemini), adapters mint `{provider}_{name}_call_{lift_id}_{index}`. `index` is the call's position in the payload. `lift_id` is 32 lowercase hex characters, unique per lifted payload:
@@ -604,6 +606,12 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180933155 | Namespace provider-supplied request IDs | Fixed now. Provider call ids are namespaced with the payload's `lift_id` (`{provider}_p_{lift_id}_{hash}`), so a provider id reused in a later turn never replays or conflicts with an earlier admission. Retries of the same turn stay stable under a host `LiftContext`. The original id is kept in `provenance.provider_call_id` for lowering | section 5.2 rule 1 |
+
+### Codex review (PR #1174, round 7)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185260822 | Include the original provider call ID in the binding | Fixed now. `provider_call_id` is part of `provenance_identity` and so of the invocation digest. Before lowering, `request_id` must derive from it as `{provider}_p_{lift_id}_{hash}`, and a synthesized id must have no `provider_call_id`; a mismatch is `InvocationDigest` | section 5.1; rule 1 |
 
 ### Codex review (PR #1174, round 6)
 

@@ -1,6 +1,6 @@
 # Design: integrity-gated admission
 
-- Status: PROPOSED (revision 4, 2026-10-05, after the second independent review on PR #1174; revision 3 after the first independent review and Codex review; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
+- Status: PROPOSED (revision 5, 2026-10-05, after Codex review round 7 on PR #1174; revision 4 after the second independent review; revision 3 after the first independent review and Codex review; revision 1 baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5)
 - Date: 2026-10-04
 - Scope: make "unbounded or unknown external influence cannot authorize a consequential tool call, except through an exact endorsement" a property the kernel enforces for any agent framework (the precise property is in section 11). It is built from the shipped and implemented knowledge (P4), semantic (P3) and confinement (P5) surfaces:
   - grants declare a required integrity;
@@ -33,6 +33,12 @@
   - the umbrella `2026-10-04-ftl-lessons-program-design.md`;
   - the program specs: `closed-kernel-abi`, `authority-faults`, `typed-reservations`, `authority-space-teardown`, `unified-event-queue`, `opaque-adapter-context`, `microkernel-isolation-backend`, `durable-stop-epoch`;
   - the north-star specs `2026-10-04-pure-admission-machine-design.md` (A) and `2026-10-04-crossing-primitive-design.md` (B).
+
+## Revision 5 changes
+
+From Codex review round 7 on PR #1174 (head `3672dca3b`):
+- **Lossless inheritance (4185260800).** A child no longer copies parent observation ids, which bind the parent's destination, and no longer uses one summarizing observation, which can carry only one origin and one bit bound. Each parent observation is re-keyed for the child (`source_kind = inherited`), with its origin class, provider, bit bound and `unknown` copied exactly. A parent state that cannot be enumerated and re-keyed within bounds denies scope creation (I7a).
+- **Selector inputs are bound (4185260813).** An action contract now declares ordered input slots. The call binds the exact confined-return observations that fill them. Crossing check 4 computes the expected action only from those inputs, consumes each input once, and denies a missing, extra, duplicate, consumed or ambiguous input (I22a).
 
 ## Revision 4 changes
 
@@ -255,6 +261,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
      - the restore record, for model-context restores;
      - the confined-return record, which binds the child's influence `commitment` (I8), for confined returns;
      - for each bootstrap contribution under `source_kind = bootstrap` (I7a), the context-creation record digest plus the contribution kind and the contribution digest;
+     - for each inherited parent observation under `source_kind = inherited` (I7a), the parent observation's own `observation_id`. The child's `destination_digest` completes the id, so the inherited row never collides with the parent's row under the `(tenant, isolation_epoch, observation_id)` key, and it passes the destination check below;
      - the context-creation record under `source_kind = initial`, for the initial-influence observation (I7). It is the knowledge-scope creation row written in the same transaction: scope id, context key values, creation attempt, and the worker-profile outcome, which is the verified launch record digest when `Verified`, or the `Unverified` reason (absent, mismatched, unverifiable, lookup failed, predicate false) otherwise. Every context therefore has a stable initial id, including when verification fails, and the fail-closed `unknown` start commits idempotently.
    - **Distinct destinations are distinct observations.** Two contexts that read the same artifact version produce two observations, one per destination. Each context's heads therefore receive the artifact's influence, and neither context can stay trusted because another context read the version first.
    - **Retries are stable.** A retry, replay or rebuild of one delivery (same record, same destination) yields the same id and changes nothing. Two deliveries of identical bytes yield two ids.
@@ -288,14 +295,32 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
    Kernel sessions (MCP edges) start at unknown (section 12).
 
    **I7a. Bootstrap joins before readiness.** In the same writer transaction that writes the context-creation record, and before the context becomes ready or receives its first input byte, the host joins one observation per bootstrap contribution (`source_kind = bootstrap`, I4a). This follows P5's rule, which joins parent knowledge, control and selection metadata, seeds and sensitive observations before stdin delivery (W: `implementation/p5/OPERATIONS.md:70-71`). Bootstrap contributions are:
-   - the inherited parent state: a child joins its parent's committed observation set, or one observation binding the parent's `commitment` and carrying its origins and `unknown`;
+   - the inherited parent state, re-keyed observation by observation (below);
    - the task input and any spawn or bootstrap JSON delivered on stdin (M: `chio-process/src/registry.rs:23-45`; `chio-cli/src/cli/process_host/runner/child.rs:524-530`);
    - seeds;
    - a checkpoint or restored state;
    - control and selection metadata the host passes in.
 
+   **Inherited parent state, re-keyed.** Inheritance is lossless and never summarized:
+   - **Source set.** The parent's observation set is exactly what crossing check 4 would read for the parent at this transaction: the flow rows matching the parent's principal, lineage or session within tenant and isolation epoch (I17). It is read in the same writer transaction that creates the child.
+   - **Re-keying.** For each parent observation `p` not already reachable through the child's own key union, the child inserts one inherited observation. Its id is
+
+     ```text
+     observation_id = SHA-256("chio.influence-observation.v1\0" || "inherited"
+                              || "\0" || p.observation_id
+                              || "\0" || child destination_digest)
+     ```
+
+     and its `origin` (class, provider id and `max_bits`) and `unknown` are copied from `p` exactly. A parent observation already reachable through the child's keys (a shared principal, lineage or session) already counts once in the child's union, so it is not re-keyed, and no bounded bits are counted twice.
+   - **Exactness.** The inherited observations, together with the parent rows already reachable through the child's keys, reproduce the parent's `origins`, `bounded_bits_total` and `unknown` at that transaction exactly. The child's full starting state joins that with its own initial observation and other bootstrap contributions, so it is never less tainted than the parent. The commitment differs because the ids differ. The context-creation record keeps `inherited_from { parent scope, parent commitment, parent observation_count }` for audit.
+   - **Idempotent.** Re-running inheritance for the same parent set and child destination yields the same ids. Inserts use insert-or-ignore (I4a), so a retried creation changes nothing.
+   - **Unrepresentable means deny.** One `InfluenceObservationV1` carries one origin and one bit bound, so no single summarizing observation can stand for a parent with several origin classes, several providers or accumulated bounded bits. Scope creation is therefore refused, never under-tainted, in three cases:
+     - the parent's rows are not in this writer;
+     - the parent's set exceeds the per-context history bound of 4,096 rows (W: `security_participant_state/knowledge.rs:123-141`);
+     - any parent row cannot be read.
+
    Each contribution is classified by the first rule that applies:
-   - **Inherited.** It carries the parent's influence exactly.
+   - **Inherited.** It carries the parent's influence exactly, through the re-keyed observations above.
    - **Asserted trusted.** It is trusted only under a `BootstrapTrustAssertionV1` that covers it (below).
    - **Pinned, unasserted.** A contribution whose digest is pinned in the run plan, with no assertion, joins `External`.
    - **Unclassified.** Any other contribution, including any the host cannot attribute, joins with `unknown = true`.
@@ -389,8 +414,15 @@ endorsed(op, t)        -> exact_action(approval(op), op)
                           and fresh_deployment(approval(op), t)
                           and consumed_exactly_once(continuation(op), t)
 action_ok(op)          -> req(op).action_contract = None
-                          or (action(op) = selector(contract(op), committed_returns(op))
+                          or (inputs_bound(op)
+                              and action(op) = selector(contract(op), values(selector_inputs(op)))
                               and action(op) in authorized(contract(op)))                     (I22a)
+inputs_bound(op)       -> |selector_inputs(op)| = slots(contract(op))
+                          and each input is a committed, slot-matching ExternalBounded return in key(op)
+                          and for each digest d: unconsumed(d, key(op)) = slots_d(contract(op)), filled in commit order
+                          and each input is consumed exactly once, by op, at intent_commit(op)
+inherit(parent, child) -> state(child) at creation >= state(parent) at the same transaction,
+                          with the inherited part exact on origins, bits and unknown, or creation is refused (I7a)
 in_contract(op)        -> req(op).action_contract = None or action(op) in authorized(contract(op))
 attenuate(p, c)        -> level_ge(c.level, p.level) and contract_preserved(c, p)             (I3, I9)
 forall ctx: state(ctx) only increases              (I2; SEC-05)
@@ -453,17 +485,23 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
     ```rust
     pub struct ActionSelectionContractV1 {
         pub schema: String,                                               // "chio.action-selection-contract.v1"
-        pub return_contracts: BoundedList<ReturnContractDigest, 8>,       // typed returns allowed to select
-        pub selector: SelectorTableV1,                                    // typed return values -> action template
+        pub return_contracts: BoundedList<ReturnContractDigest, 8>,       // ordered input slots: slot i takes one typed return under this digest
+        pub selector: SelectorTableV1,                                    // (slot 0 value, .., slot k-1 value) -> action template; optional no_input row
         pub authorized_actions: BoundedSet<ActionTemplateDigest, 64>,     // every action the selector can produce
     }
     ```
 
     - An action template fixes the tool, the server and every argument, except arguments the selector fills from trusted inputs.
-    - Crossing check 4 computes the expected action from the committed typed return values, through the selector. It uses the host's canonical projections (I23), never model text.
+    - **Bound inputs.** The crossing plan carries `selector_inputs: BoundedList<ObservationId, 8>`, one per slot and in slot order. Each is the I4a observation id of a committed `ExternalBounded` confined return. Inside the crossing's writer transaction, crossing check 4 requires all of the following, and otherwise refuses with `InsufficientIntegrity`:
+      - **Cardinality.** Exactly one input per slot. A missing or extra input denies.
+      - **Membership.** Each input is in the call's key state (I17), is a confined-return observation, and its return contract digest equals its slot's digest. An input from another context's state denies.
+      - **Distinct.** No observation fills two slots.
+      - **Unambiguous, in a defined order.** For each digest `d`, let `s_d` be the number of slots naming `d`. The key state must hold exactly `s_d` unconsumed returns under `d`, and they fill those slots in commit order (the confined-return admission's `batch_index` and `writer_epoch`). More unconsumed returns than slots is ambiguous and denies. A call therefore cannot pick whichever historical value makes its action pass, because at most one binding is admissible for a given state.
+      - **Consumed once.** The crossing records each input as consumed by this operation, in the same transaction. A second operation that binds a consumed input denies, and a replay of the same operation returns its bound terminal result.
+    - Crossing check 4 computes the expected action from the bound inputs' committed, host-recomputed values, in slot order, through the selector. It uses the host's canonical projections (I23), never model text. The bound ids go to the operator-only audit record (I25a), not to caller-visible receipts.
     - It admits the call only when the call's exact action equals that expected action and is in `authorized_actions`. Otherwise it refuses with `InsufficientIntegrity`.
     - A value outside the selector's domain is already refused at projection (I23).
-    - **No typed return.** When the context holds no committed return named by `return_contracts`, which is the normal case for a `Trusted` level, the selector's `no_input` row gives the expected action. If the contract defines no such row, the call is refused.
+    - **No typed return.** The selector's `no_input` row gives the expected action only when the call binds no inputs and the key state holds no unconsumed return under any slot's digest. This is the normal case for a `Trusted` level. If the contract defines no such row, the call is refused. A call that binds no inputs while such a return exists is refused, so influence cannot bypass the selector by being left unbound.
     - **The property.** External content can choose only among `authorized_actions`; it can never reach an unauthorized action. Which authorized action it chooses remains influenced, and the operator accepts that when signing the set.
 
 ## 10. Typed return contracts (generalizing P5)
@@ -578,6 +616,10 @@ pub enum ConfinedReturnTypeV1 {
 | Endorsement after a deployment, policy or contract change | Deny (I15a) |
 | Call with an action contract whose action is not the selector's output, or not authorized | Deny (I22a) |
 | Action contract with no committed typed return and no `no_input` row | Deny (I22a) |
+| Selector input missing, extra, duplicated, from another context, under the wrong contract digest, or already consumed | Deny (I22a) |
+| More unconsumed returns under a slot's digest than the contract has slots for it (ambiguous) | Deny (I22a) |
+| Call binds no inputs while an unconsumed return under a slot's digest exists | Deny (I22a) |
+| Parent state not in this writer, above the 4,096-row history bound, or unreadable at child creation | Child scope creation refused; never summarized (I7a) |
 | Portable core receives the constraint | `ConstraintError` deny (I11) |
 | Typed return outside its type | Return refused; no fallback (I23) |
 
@@ -624,6 +666,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Attested mailbox inheritance.
   - Initial influence per verified worker profile. Each qualification failure starts at `unknown`.
   - Bootstrap classification (I7a): inherited, asserted, pinned without assertion (`External`), and unclassified (`unknown`). Assertions that are expired, for another run plan or deployment, or carry a mismatched digest are ignored.
+  - **Lossless inheritance (I7a).** A parent holds `External`, `ModelProvider { p1 }`, `ModelProvider { p2 }`, and two distinct `ExternalBounded` observations of 3 and 5 bits. A child with disjoint keys and no other bootstrap contributions inherits re-keyed observations, and its `origins`, `bounded_bits_total = 8` and `unknown` equal the parent's. Each requirement the parent fails, the child fails too: `Trusted`, `ProviderOnly({p1})` and `BoundedExternal { 7 }`. A child sharing the parent's lineage does not re-key reachable rows, and its bit total stays 8. Re-running creation changes nothing. A parent above 4,096 rows refuses child creation.
   - Typed return capacity and projection rejection.
   - `InsufficientIntegrity` yields the `integrity_fault` block, never an `authority_fault` block. Its field set equals I19's, and `remedy_classes` depends only on the caller's requirement (I18, I19).
 - **Conformance.**
@@ -643,6 +686,11 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - **Attenuation with action contracts (I3, I9).**
     - **Excluded action.** The parent grant's scope permits publish and delete, but its contract authorizes only publish. A delegate that raises the level to `Trusted` and drops the contract is refused at delegation. A delegate holding `{ Trusted, Some(c) }` calls delete from a trusted context and is refused (I22a).
     - **Changed selector mapping.** Contract `d` has the same authorized action set as the parent's contract `c`, but maps a return value to the other action. A delegate that substitutes `d` is refused at delegation (digest mismatch).
+  - **Selector input binding (I22a).** A context holds two committed returns under one contract digest, with values `true` and `false`, and the contract has one slot for that digest.
+    - A call binding either return is refused as ambiguous, and so is a call binding none.
+    - After an earlier operation consumes the older return, the remaining return is the only admissible input. The expected action is computed from its value alone.
+    - Binding the consumed return is refused, and so is binding a return from another context. A replay of the admitting operation returns its bound terminal result.
+    - Missing and extra inputs are refused.
   - **Pinned external task in a fresh runtime (I7a).** A qualified `container` controller launches with a pinned external document embedded in its task input and no trust assertion. Its context starts with that contribution as `External`, and a consequential call requiring `Trusted` is denied. The same launch with a valid assertion covering that digest starts trusted.
   - **Whole-response anti-oracle differential.** Two runs differ only in which other context in the runtime received a tainting delivery, and when. Their caller-visible deny responses are byte-identical, including the body, `_meta` and all receipt metadata, except request id, timestamps and signatures (I19, I25).
   - MCP-edge gated grants deny.
@@ -703,6 +751,13 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180993951 | A verified exact endorsement must satisfy both checks | Fixed, together with R-11-01. The early guard no longer denies on influence alone when a request presents an `EndorsementRef` that passes its structure check: it defers to crossing check 4 and never admits on the reference itself. Crossing check 4 then validates, in one writer transaction, the recorded and verified approval, the roster principal's `IntegrityEndorsement` obligation, the exact action (request id, namespace, semantic digest), `influence_basis` equal to the current commitment, and a fresh deployment. It binds the continuation to exactly one operation through W:'s `native_link`, so the endorsement admits exactly one call | I13; I15a; I21; section 18 endorsement cases |
+
+### Codex review (PR #1174, round 7)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185260800 | Define a lossless parent-state inheritance encoding | Fixed now. Every parent observation not already reachable through the child's keys is re-keyed for the child (`source_kind = inherited`, id over the parent observation id and the child destination). Its origin class, provider, bit bound and `unknown` are copied exactly, so the child's derived state equals the parent's and no bits are double counted. Creation is idempotent. A parent set that is outside this writer, above the 4,096-row bound or unreadable refuses child creation; it is never summarized | I4a; I7a; section 8 predicates; section 15; section 18 |
+| 4185260813 | Bind selector inputs to specific return records | Fixed now. Contracts declare ordered input slots. The call binds exact confined-return observation ids, one per slot. Crossing check 4 requires slot-matching membership in the key state, distinct inputs, exactly `s_d` unconsumed returns per digest filled in commit order, and single-use consumption. Missing, extra, duplicate, consumed or ambiguous inputs deny, and the expected action comes only from the bound values | I22a; section 8 predicates; section 15; section 18 |
 
 ### Independent review pass 2 (PR #1174, Codex agent)
 

@@ -62,6 +62,7 @@
   - H1 gains a dependency ban and a differential test (S5-24).
 - **Stop hints read spec 8's shared `StopHeads` notification**, and `Capability` posts match by lineage (S5-14).
 - **Server requests are routed by cause (Codex round 2).** Each inbound message carries a session-local sequence. The edge stamps every outgoing event with the sequence of the message it is handling, and the writer routes server-to-client requests by that cause instead of by the active slot (A1a-A1c).
+- **Restore keeps the v3 envelope, and expiry is scheduled (Codex round 7).** A17's boot re-sign carries the complete record, `subscriptions` included, and never lowers the envelope version (A28, A29). Capability expiry has its own schedule, re-armed at restore, so a quiet expiry still ends the subscription (H7a).
 - **Factual corrections (S5-26).** `EffectObservationV1` has ten variants; the replay window holds 64 notifications, not 64 events; `:608` and `:702` are buffered collectors; `resume_generation` advances per signed record; the recovery events `sequence` column is a global cursor.
 
 ## Revision 3 changes
@@ -299,7 +300,7 @@ Restored sessions seed sequences from a fresh generation, so ids from an earlier
 1. **A17. Compute before, persist after.** In `restore_persisted_sessions`, for each loaded record:
    - require `record.resume_generation < 2^32 - 1`; otherwise retain the record inactive (A19) and log;
    - compute `g = record.resume_generation + 1` (checked) **without persisting**, and pass the seed `g << 32` (checked shift) to the restore constructor, replacing the zero seeds at `factory.rs:468` and `:684`;
-   - after the post-restore deadline check passes (`session_recovery.rs:51-64`), sign and persist a resume record carrying generation `g` under the v2 HMAC, **then** call `insert_active`.
+   - after the post-restore deadline check passes (`session_recovery.rs:51-64`), re-sign the complete loaded record with only `resume_generation` changed to `g`, under the envelope that A28 selects, and persist it, **then** call `insert_active`. Every other field, `subscriptions` included, carries over unchanged. A17 never rewrites a v3 record under the v2 HMAC.
 2. **A18. Expiry path.** If the deadline check finds the session expired, nothing with generation `g` has been persisted, so `expire_record`'s terminal epoch `record.resume_generation + 1 = g` exceeds the active generation and the store accepts it (`session_store.rs:980-985`). The session was never served.
 3. **A19. Per-session failure.** If the persist of `g` fails, the restored session's upstream transport is stopped and the record is retained inactive (the existing "retaining incompatible MCP session without activating it" branch). Startup continues for other sessions. Events the unserved incarnation produced were never visible to a client, and the next restart computes the same `g` from the unchanged persisted generation, which is safe for the same reason.
 4. **A20. Why the persist is required.** `resume_generation` advances only per signed record (section 2). Without persisting `g`, a session restored twice with no intervening write would compute the same seed twice and serve both incarnations from it.
@@ -315,6 +316,15 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 2. **A25. Re-authorization at restore.** After A17's persist and before `insert_active`, restore replays each persisted subscription through the same path as a client `resources/subscribe`: validate the capability, check scope, check the subject exists (`session_ops.rs:320-338`), then register it (including any upstream forwarding). A subscription that fails re-authorization is dropped and removed from the next persisted record.
 3. **A26. Catch-up.** Updates during downtime were lost, so restore posts one `notifications/resources/updated` for every persisted URI, including those that failed re-authorization. A client whose subscription was dropped learns it from the authorization error on its re-read.
 4. **A27. Downgrade.** A binary that predates the v3 envelope fails integrity on such a record and treats it as malformed (`session_recovery.rs:30-31` deletes it). Downgrade therefore loses sessions with subscriptions rather than restoring them without subscriptions. This is stated as a migration note.
+5. **A28. Envelope selection on every re-sign.** Today's tag covers a fixed v2 field list with no `subscriptions` (M: `session_resume.rs:801-829`). The record therefore names its envelope in `resume_integrity.envelope`, and an absent value means `v2` for records written before this change. The version is part of the MAC'd bytes, because the schema label differs, so relabeling a record changes its tag. Every re-sign applies the same rule: A17's generation bump, A24's subscribe and unsubscribe persists, and terminal records.
+   - A record with a non-empty `subscriptions` is signed `v3`.
+   - A record loaded as `v3` is signed `v3` again, even after its last subscription is removed. The version never decreases.
+   - Otherwise the writer uses the deployment's `resume_record_envelope_floor`. The default is `v3`. Set it to `v2` only during an upgrade window in which an older binary may still open the store.
+   - The signer has no path that writes a `v3` record's fields under `v2`. If the selection would ever lower the version, the re-sign is refused fail closed and the session is retained inactive (A19).
+6. **A29. Verification.** The loader verifies a record under the envelope it names.
+   - A `v3`-named record that fails `v3` verification is malformed (the existing deletion path), and it is never retried under `v2`. A relabeled record therefore cannot pass with its subscriptions stripped or unauthenticated.
+   - A `v2`-named record with a non-empty `subscriptions` is malformed, because `v2` does not authenticate that field.
+   - A27's downgrade note covers every record signed `v3`, including records upgraded by the floor.
 
 ## 7. Process worker fixes (W:)
 
@@ -355,6 +365,8 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 | Generation at `2^32 - 1`, or low bits exhausted | Retained inactive, or terminated fail closed (A17, A22) |
 | Subscribe persist fails | Subscribe returns an error; registry unchanged (A24) |
 | Subscription fails re-authorization at restore | Dropped; catch-up hint still posted; re-read fails visibly (A25, A26) |
+| A re-sign would lower a `v3` record to `v2` | Refused fail closed; session retained inactive (A28) |
+| `v3` record fails `v3` verification, or a `v2` record carries `subscriptions` | Malformed; existing deletion path; never retried under `v2` (A29) |
 | Enforced `inspect` | Redacted snapshot without `storage` (P6) |
 
 ## 9. Wire impact and rollout (Part A)
@@ -366,7 +378,7 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
   - sequences MUST be monotonic across restore (section 5);
   - the client action after `409` (A11);
   - the retry rule (section 4.6).
-- **Hosted resume record:** `subscriptions` and the v3 integrity envelope (A24, A27).
+- **Hosted resume record:** `subscriptions`, `resume_integrity.envelope` and the v3 integrity envelope; the `resume_record_envelope_floor` setting (A24, A27-A29).
 - **`WORKER_PROTOCOL.md`:** `storage` absent under enforced knowledge; `cancelled_processes` excludes confined children.
 - **Internal API, not wire:** `chio-mcp-edge` `serve_message_channels` takes `InboundEnvelope` values and a cause cell (A1a).
 - **No change** to negotiation, capability, receipt, manifest or other signed schemas.
@@ -403,7 +415,9 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
   - **D4, fails on current code:** restore, restore again with no intervening write, then emit at least as many notifications as the stale cursor's sequence; replay with the stale cursor returns `409` with the fix, and a negative control that forces seed 0 shows the aliased replay;
   - expired-after-construction restore succeeds and persists the terminal record (A18);
   - generation persist failure retains that session inactive and restores the others (A19);
-  - subscribe, restart, upstream resource update: the client receives `resources/updated`; a catch-up hint arrives right after restore; a subscription whose capability expired during downtime is dropped (A24-A26).
+  - subscribe, restart, upstream resource update: the client receives `resources/updated`; a catch-up hint arrives right after restore; a subscription whose capability expired during downtime is dropped (A24-A26);
+  - **subscriptions across two restarts (A17, A28, A29):** restore with subscriptions, restart, restart again. After each restart the record verifies under `v3`, `subscriptions` is intact and re-authorized, and `resume_generation` has advanced by one per restart. A negative control that re-signs the bumped record under `v2` fails verification at the next boot, and a `v2`-named record with non-empty `subscriptions` is rejected;
+  - **envelope floor (A28):** a `v2` record with no subscriptions stays `v2` under `resume_record_envelope_floor = v2` and becomes `v3` under the default; a `v3` record whose last subscription was removed stays `v3`.
 - **`chio-mcp-edge` (A1a):**
   - a `notifications/roots/list_changed` deferred during a nested flow is handled under its own sequence, not the outer request's;
   - the roots refresh queued at restore runs with no cause;
@@ -452,6 +466,8 @@ pub enum HintKind {
     SubscriptionEnded { reason: EndReason },  // authority withdrawn or subject gone
     Terminal { reason: TerminalReason },      // Lifecycle only; always last
 }
+
+pub enum EndReason { Revoked, Expired, AuthorityTimeUnavailable, AuthRotated, SubjectGone }
 ```
 
 A hint carries no state, tokens or arguments. Revision 4 removes `level_bps` from `ThresholdCrossed` (S5-15): it was state carried in a hint, and coalescing could understate it.
@@ -490,6 +506,10 @@ Rules H1-H10 bind every surface:
 5. **H5. Reserve on subscribe.** Capacity for one pending hint is reserved before a subscription exists. An explicit subscription that cannot reserve is denied with a typed capacity error. Posting never allocates: pending entries live in a pre-sized ring of capacity `max_subscriptions` (S5-27).
 6. **H6. Terminal is last.** A surface with a lifecycle delivers exactly one `Terminal` hint, after discarding pending hints, from a slot reserved at creation. After it, posting is a no-op and subscribing fails.
 7. **H7. Authority follows the source.** A consumer may subscribe to, or wait on, a subject only with the authority it needs to read that subject's state. Authority is revalidated at **drain time** (revocation store, plus expiry against the authority clock) before each hint is delivered; a failed revalidation delivers one `SubscriptionEnded` instead and removes the subscription. Auth rotation revalidates every subscription against the new auth context and ends those that fail (S5-06).
+   - **H7a. Expiry is scheduled, not only checked at drain.** A quiet expiry commits nothing to any store and may have no pending hint to drain. So every subscription whose authorizing capability has an `expires_at` arms an entry in the session's `ExpirySchedule`, at subscribe time and again at auth rotation. The schedule is a pre-sized min-heap over the same subscriptions, keyed by `expires_at`, so arming never allocates (H5).
+     - **Firing.** The schedule wakes on the monotonic clock at the earliest deadline and confirms it against the authority clock. When the authority clock reaches `expires_at`, it posts `SubscriptionEnded { reason: Expired }` (H3 precedence) and removes the subscription. No other hint, drain or store commit is needed. A scan every `expiry_scan_ms` (default 1000) re-checks the heap head against the authority clock, so a clock adjustment cannot postpone an expiry by more than one scan.
+     - **Restore.** Restore re-arms the schedule from the persisted subscriptions (A24, generalized to subjects in Part B) and each authorizing capability's `expires_at`. An expiry that passed while the host was down fires during restore, before the catch-up of H10's restore step 2. The consumer therefore receives `SubscriptionEnded`, never a catch-up `Changed`, for an expired subscription.
+     - **Clock failure.** If the authority clock is unavailable when the schedule fires or scans, every subscription whose capability has an `expires_at` ends fail closed with `SubscriptionEnded { reason: AuthorityTimeUnavailable }`. Subscriptions whose capability has no expiry are unaffected. An expiry is never assumed not to have happened.
 8. **H8. Gaps resync.** Any transport loss surfaces as an explicit resync: a resync burst (A8), `409`, or a revision jump. It never surfaces as silent loss.
 9. **H9. Audience.** A hint is an existence and status channel, so it obeys the audience policy of its subject.
    - It may name an artifact only by an audience-scoped opaque handle, never by digest (W: `docs/architecture/recoverable-agent-runtime/06-artifacts-memory.md:9`, `:80`, ART-10).
@@ -501,6 +521,7 @@ Rules H1-H10 bind every surface:
     |---|---|
     | `Operation` and `Approval` | The admission store's global commit sequence, `authority_global_commits.commit_sequence` (M: `chio-store-sqlite/src/serving_owner/global_commit_chain.rs:43-50`, projection kind `admission`) |
     | `Capability` (revocation) | The same chain, projection kind `revocation` |
+    | `Capability` (expiry) | None: expiry commits nothing. The H7a `ExpirySchedule`, re-armed at restore from the persisted subscriptions, is the source |
     | `Recovery` | `admission_operation_recovery_events.sequence` (W: `admission_operation_recovery.sql:30`) |
     | `Stop` | The stop chain epoch, through the shared `StopHeads` (spec 8 S1, S24) |
 
@@ -551,6 +572,7 @@ pub struct SessionEventLog {
     implicit: SubscriptionPool,                // sized from the in-flight request bound (one-shot subjects)
     pending: PendingRing,                      // pre-sized; one slot per subscription (H5)
     terminal: TerminalSlot,                    // reserved at construction
+    expiry: ExpirySchedule,                    // pre-sized min-heap by expires_at (H7a)
 }
 impl SessionEventLog {
     pub fn subscribe(&mut self, subject: HintSubject, authority: SubscriptionAuthority)
@@ -560,6 +582,7 @@ impl SessionEventLog {
     pub fn drain(&mut self, max: usize, revalidate: &dyn Fn(&SubscriptionAuthority) -> bool)
         -> Vec<SessionHint>;                                                        // H7 at drain
     pub fn revalidate_all(&mut self, revalidate: &dyn Fn(&SubscriptionAuthority) -> bool); // auth rotation
+    pub fn expire_due(&mut self, authority_now: Result<UnixMillis, AuthorityTimeError>); // H7a; Err ends expiring subscriptions
     pub fn terminate(&mut self, reason: TerminalReason);                           // H6
 }
 ```
@@ -659,6 +682,9 @@ Direction (not v1): a hint-only direct lane per treaty party reusing the lane ad
 | Explicit subscription capacity exhausted | Subscribe denied with a typed capacity error |
 | Implicit pool exhausted | Request proceeds without the implicit hint (rule 12.1(5)) |
 | Authority withdrawn | Detected at drain or rotation; one `SubscriptionEnded`, then removal (H7) |
+| Capability expires with no other activity | `ExpirySchedule` posts `SubscriptionEnded { Expired }` at the deadline (H7a) |
+| Capability expired while the host was down | Fires during restore, before the catch-up (H7a) |
+| Authority clock unavailable at an expiry check | Subscriptions with an `expires_at` end with `AuthorityTimeUnavailable`; others are unaffected (H7a) |
 | Backend cannot serve the subject | `Unsupported`; a subscription that cannot fire is never created |
 | Hint posted after a progress-only commit, then restore | Re-read shows no change; treated as resync (H2) |
 | Commit outcome unknown or refused | No hint (trailing group) |
@@ -697,7 +723,7 @@ Part B starts only after Part A ships and a second surface commits to consuming 
 
 ## 18. Tests (Part B)
 
-- **Unit (`chio-kernel`):** capacity denial for explicit subscriptions; implicit exhaustion never denies a call; infallible post after subscribe; coalescing precedence (`SubscriptionEnded` > `ThresholdCrossed` > `Changed`); subscribe-then-check catches a post between insertion and level read; one-shot retirement after delivery; terminal last and idempotent; drain-time revalidation ends a revoked or expired subscription; auth rotation revalidates; lineage matching delivers a root revocation to a descendant holder; second-session refusal.
+- **Unit (`chio-kernel`):** capacity denial for explicit subscriptions; implicit exhaustion never denies a call; infallible post after subscribe; coalescing precedence (`SubscriptionEnded` > `ThresholdCrossed` > `Changed`); subscribe-then-check catches a post between insertion and level read; one-shot retirement after delivery; terminal last and idempotent; drain-time revalidation ends a revoked or expired subscription; auth rotation revalidates; **quiet expiry:** a subscription whose capability expires with no other activity receives `SubscriptionEnded { Expired }` at the deadline (test clock), with no drain trigger or store commit; **expiry across restart:** the capability expires while the host is down, and restore delivers `SubscriptionEnded` before any catch-up and removes the subscription; **clock unavailable:** the authority clock fails at an expiry check, subscriptions with an `expires_at` end with `AuthorityTimeUnavailable`, and subscriptions without an expiry remain; a backward clock step postpones no expiry by more than one `expiry_scan_ms`; lineage matching delivers a root revocation to a descendant holder; second-session refusal.
 - **Proptest:** model-based subscribe/fire_if_dirty/post/drain/revoke/terminate sequences against a reference model, checking section 11.3's predicates.
 - **Loom:** `post` racing `drain` and `subscribe` racing `post` on `SessionEventLog` behind the session lock. `queue_tool_server_event` is `cfg(not(loom))` (`session.rs:1106`), so the loom target is the log itself or the post path is un-gated.
 - **Spec 9 integration:** no hint effect runs after `Refused`, `Retry` or `CommitOutcomeUnknown`; the no-op port changes no machine output.
@@ -785,6 +811,13 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-5-01 | Round-2 GET routing bypasses the non-lossy server-request path | Fixed. Confirmed on M: that both GET branches filter to notifications (`http_service.rs:810-812`, `:853`). GET-bound server requests now ride a bounded, non-lossy queue owned by the GET attachment, with delivery tracking, a local error on overflow, local answers on detach (immediate for undelivered, after the grace window for delivered), and no dependence on the broadcast. The live and replay filters stay notifications-only and also select the queue. The lag claim is restated. Tests cover ordinary delivery, lag, detach and overflow | A1b; A1d; A6; section 4.4; sections 8, 9, 10 |
+
+### Codex review (PR #1174, round 7)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185260831 | Persist restored subscriptions under the v3 envelope | Fixed now. A17's boot re-sign carries the complete record, `subscriptions` included, and changes only the generation. New A28 selects the envelope on every re-sign: `v3` when `subscriptions` is non-empty or the record was loaded as `v3`, otherwise the deployment floor (default `v3`). The version never decreases, and a would-be downgrade is refused fail closed. New A29 verifies under the named envelope, never retries a `v3` record under `v2`, and rejects `v2` records that carry subscriptions. Test: restore with subscriptions, restart twice, subscriptions intact and verified | A17; A28; A29; sections 8, 9, 10 |
+| 4185260873 | Schedule capability-expiry hints | Fixed now. New H7a adds a per-session `ExpirySchedule` (a pre-sized min-heap by `expires_at`). It wakes on the monotonic clock, confirms against the authority clock, and is backed by a periodic scan. It posts `SubscriptionEnded { Expired }` with no store commit needed. Restore re-arms it from the persisted subscriptions and fires expiries that passed during downtime before the catch-up. An unavailable authority clock ends expiring subscriptions fail closed. Tests cover quiet expiry, expiry across restart, and clock unavailable | H7a; H10 table; `EndReason`; section 12.1; sections 15, 18 |
 
 ## Appendix A. FTL reference
 

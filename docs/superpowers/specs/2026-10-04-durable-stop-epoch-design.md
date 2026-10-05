@@ -72,6 +72,8 @@ The adversarial review (1 Blocker, 15 Major, 11 Minor, 3 Nit) found that revisio
 
 **Codex review (PR #1174, round 1).** S6 lets a stop or restrict fill the last slot, so exhaustion always ends `Stopped`. S19 binds the resume to the stored cooldown origin. S25 keys the intent journal by scope. S37 adds an origin-freshness lease for serving shards. New S38 defines the signing obligation.
 
+**Codex review (PR #1174, round 7).** Records carry a signed `chain_generation`, and positions compare as `StopEpochId = (chain_generation, epoch)` everywhere: heads, `expected_epoch`, replicas, floors and observed epochs. A `Rollover` record starts each new generation and restates the head, so a rollover never changes `Stopped` or `Running` (S2, S6, S37).
+
 ## 1. Decision summary
 
 Today's kernel stop is a fail-closed latch with good ordering, but it is not an operational kill switch:
@@ -178,6 +180,7 @@ pub enum StopTransition {
     Restrict,  // Stopped -> Stopped, narrowing only (S31)
     Relax,     // Stopped -> Stopped, widening allow_containment; authorized like Resume
     Resume,    // Stopped -> Running
+    Rollover,  // first record of a new chain generation; restates the head's state and allow_containment, changes nothing (S6)
 }
 
 pub enum StopState { Stopped, Running }      // derived from the transition
@@ -186,10 +189,11 @@ pub struct StopEpochV1 {
     pub schema: String,                      // "chio.stop-epoch.v1"
     pub authority_id: DurableAuthorityId,    // serving authority, from the anchor
     pub scope: StopScope,
-    pub epoch: u64,                          // per scope, +1 per transition, starts at 1
+    pub chain_generation: u32,               // per scope, starts at 1, +1 per Rollover (S6); signed and part of the record identity
+    pub epoch: u64,                          // per scope and chain generation, +1 per transition, starts at 1
     pub transition: StopTransition,
     pub state: StopState,
-    pub expected_epoch: u64,                 // head epoch the transition was decided against; 0 for the first record
+    pub expected_epoch: StopEpochId,         // head id the transition was decided against; (1, 0) for a scope's first record
     pub reason_commitment: Sha256Digest,     // SHA-256(salt || text); salt and text in the note table (S1)
     pub authorizer: StopAuthorizer,
     pub decided_at: DecisionTime,
@@ -199,6 +203,9 @@ pub struct StopEpochV1 {
     pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax and Migration
     pub contributors: Vec<StopRequestRecord>,    // every request of the applied generation, at most 2 (S25); authorizer and reason_commitment above are contributors[0]
 }
+
+/// A position in a scope's chain. Ordered lexicographically: chain_generation first, then epoch.
+pub struct StopEpochId { pub chain_generation: u32, pub epoch: u64 }
 
 pub struct StopIntentRef { pub intent_id: [u8; 16], pub generation: u64 }
 pub struct StopRequestRecord {
@@ -217,30 +224,33 @@ pub enum DecisionTime {
 pub enum StopAuthorizer {
     SharedCredential { credential_id_hash: Sha256Digest }, // phases before S28; truthful about who is known
     Operator { principal: PrincipalId },                   // a roster principal (S28)
-    OperatorPair { stopper_epoch: u64, resumer: PrincipalId },
+    OperatorPair { stopper_epoch: StopEpochId, resumer: PrincipalId },
     SamePrincipalAfter { principal: PrincipalId, cooldown_ms: u64, cooldown_started: UnixMillis },
     Quorum { artifact_digest: Sha256Digest, principals: Vec<PrincipalId> },        // S29
     BreakGlass { artifact_digest: Sha256Digest, attestation: TimeAttestationRef }, // S19
     RecoveryActor { subject: PublicKeyHex },                                       // S32, Stop and Restrict only
     LegacySemanticStop,                                                            // S5 migration only
+    ChainRollover,                                                                 // S6: Rollover records only; changes no state
 }
 ```
 
 Normative rules:
 
 - **S1. Writer.**
-   - Records are appended to a new table, `admission_operation_stop_epochs(scope_key, epoch, record_digest, previous_digest, payload)`, through the admission store's `begin_write` (IMMEDIATE, active-owner and anchor checks; M: `admission_operation_store.rs:350-363`), `commit_write` and `sync_after_write`.
+   - Records are appended to a new table, `admission_operation_stop_epochs(scope_key, chain_generation, epoch, record_digest, previous_digest, payload)`, keyed by `(scope_key, chain_generation, epoch)`, through the admission store's `begin_write` (IMMEDIATE, active-owner and anchor checks; M: `admission_operation_store.rs:350-363`), `commit_write` and `sync_after_write`.
    - The table is append-only: `BEFORE UPDATE` and `BEFORE DELETE` triggers `RAISE(ABORT)`, as `authority_global_commits_immutable` does (M: `serving_owner/global_commit_chain.rs:86-96`).
    - Every transition is a restrictive commit under spec 10 section 5, anchored before acknowledgement.
-   - The salted reason text lives in `admission_operation_stop_notes(scope_key, epoch, salt, redacted_text)`. That table is operator-readable, outside the chain, and deletable for retention. The chain keeps only the commitment, so short text cannot be brute-forced from the record.
+   - The salted reason text lives in `admission_operation_stop_notes(scope_key, chain_generation, epoch, salt, redacted_text)`. That table is operator-readable, outside the chain, and deletable for retention. The chain keeps only the commitment, so short text cannot be brute-forced from the record.
 - **S2. Chain.**
-   - For each scope, `epoch` increases by exactly 1, and `previous` equals the digest of the prior record.
+   - **Identity.** A record's identity is `(authority_id, scope, chain_generation, epoch)`, and every field of it is in the signed body. Every comparison of positions in a scope's chain (heads, `expected_epoch`, replicas, floors, observed epochs) compares `StopEpochId` lexicographically, never `epoch` alone.
+   - Within a chain generation, `epoch` increases by exactly 1, and `previous` equals the digest of the prior record.
+   - A `Rollover` record is epoch 1 of generation `g + 1`. Its `previous` is the digest of generation `g`'s final record, its `expected_epoch` is that record's id, and its `state` and `allow_containment` equal that record's. The chain of digests is therefore unbroken across generations.
    - `state` follows the transition. `Restrict` and `Relax` require a `Stopped` head, and `Resume` requires a `Stopped` head.
    - A `Stop` over a stopped head is an idempotent no-op that returns the current head, unless it asks for narrower containment, in which case it is recorded as `Restrict`.
    - A `Resume` over a running head is a no-op that returns the current head.
    - The table joins the global commit chain projection coverage, as W:'s recovery projection kind does.
 - **S3. Head.**
-   - The head for a scope is its highest epoch. A scope with no record is `Running`.
+   - The head for a scope is its highest `StopEpochId`, which is always in its current chain generation. A scope with no record is `Running`.
    - The effective state for a crossing is `Stopped` if any applicable scope head is `Stopped`, or if any process latch applies (S23).
 - **S4. Time.**
    - `decided_at` comes from `observe_authority_time` inside the write transaction.
@@ -252,11 +262,15 @@ Normative rules:
    - `set_semantic_emergency_stop` becomes a thin wrapper that requires an authenticated actor (section 9) and takes the serving fence.
    - Stopping a recovery scope never depends on whether a semantic registry is installed. The `installation(&tx, scope)` precondition (W: `semantic.rs:375-376`) applies only to the legacy write path, which migration retires.
 - **S6. Bounds and headroom.**
-   - A record is at most 4 KiB, and a scope keeps at most 65,536 records (`bound`).
-   - `Resume` and `Relax` refuse once the scope holds `bound - 1` records. `Stop` and `Restrict` may append up to `bound`, because both leave the head `Stopped`.
+   - A record is at most 4 KiB, and a chain generation holds at most 65,536 records (`bound`).
+   - `Resume` and `Relax` refuse once the current generation holds `bound - 1` records. `Stop` and `Restrict` may append up to `bound`, because both leave the head `Stopped`.
    - Only `Resume` produces a `Running` head, and it never takes the last slot, so a running head always has room for one durable `Stop`. Exhaustion therefore always ends `Stopped`. It can never leave a `Running` durable head with a stop that only tier 1 holds.
-   - A scope that reaches `bound` is stopped, and stays stopped, until a chain rollover. Readiness reports `stop_chain_exhausted`.
-   - A chain rollover is an offline CLI operation authorized like a resume (S19). It archives the chain and seeds a new chain generation whose genesis record's `previous` is the archived chain's final digest.
+   - **Rollover.** When a commit leaves the current generation holding `bound - rollover_margin` records or more (`rollover_margin` default 8, at least 4), the writer appends a `Rollover` record as the scope's next commit, in the priority lane (S36).
+     - It is a restrictive commit, anchored before acknowledgement, with authorizer `ChainRollover`. It restates the head's `state` and `allow_containment` and satisfies no intent (`satisfies_intent: None`), so a rollover never changes `Stopped` or `Running` and never relaxes anything. It therefore needs no resume authority.
+     - The headroom rules above apply within each generation, so they hold before and after the rollover. Between the trigger and the rollover's commit, at least `rollover_margin - 1` slots remain, and resume and relax still refuse at `bound - 1`.
+     - If the rollover cannot commit (for example on `SQLITE_FULL`), the writer retries it with backoff. A generation that reaches `bound` meanwhile ends `Stopped` as above and stays stopped until the rollover commits. Readiness reports `stop_chain_exhausted`. The offline CLI can append the same `Rollover` record under the serving-owner lock (S30), with stop authority, because the record cannot relax anything.
+     - A pending intent (S25) applies after the rollover, at the new generation's next epoch.
+     - Earlier generations stay in the append-only table. Heads, checks and replicas read only the current generation's head, so a generation reset of `epoch` never makes two records indistinguishable: they differ in `chain_generation`, which is signed.
 
 ## 5. Two-tier enforcement
 
@@ -529,7 +543,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
         pub schema: String,                 // "chio.stop-control-quorum.v1"
         pub authority_id: DurableAuthorityId,
         pub scope: StopScope,
-        pub expected_epoch: u64,
+        pub expected_epoch: StopEpochId,    // (chain_generation, epoch)
         pub transition: StopTransition,     // Resume or Relax
         pub roster_digest: Sha256Digest,    // the signed roster the approvals are checked against
         pub approvals: Vec<SignedApproval>, // each over H(authority_id, scope, expected_epoch, transition, roster_digest)
@@ -557,7 +571,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
 - **S31. Restrict, relax and expected epoch.**
     - `Restrict` (Stopped to Stopped, new epoch) only narrows: it may set `allow_containment` from `true` to `false`. It is authorized like a stop.
     - `Relax` widens `allow_containment` from `false` to `true`. It is authorized like a resume (S19).
-    - Every record carries `expected_epoch`. `Resume` and `Relax` refuse with `StopHeadMoved { head_epoch }` when the head has moved, so a delayed resume can never clear a newer stop issued for a different incident.
+    - Every record carries `expected_epoch`. `Resume` and `Relax` refuse with `StopHeadMoved { head: StopEpochId }` when the head has moved, so a delayed resume can never clear a newer stop issued for a different incident. A `Rollover` also moves the head id. A resume decided before a rollover therefore refuses and is re-decided against the new head. That is safe, because the rollover changed no state.
     - `Stop` and `Restrict` never refuse on a moved head. They apply to the current head.
     - `Resume` and `Relax` also refuse with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25). `expected_epoch` protects against a moved head; this protects against an intent that is recorded but not yet committed.
 - **S32. Recovery-scope stop authority.**
@@ -572,12 +586,12 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
 
 ## 10. Evidence
 
-- **Artifact.** Each committed transition produces a signed `chio.stop-epoch.v1` artifact: the `StopEpochV1` body, signed by the serving authority's boot-installed receipt signer (M: `kernel-signing-authority.md:3`, `:29`).
+- **Artifact.** Each committed transition produces a signed `chio.stop-epoch.v1` artifact: the `StopEpochV1` body, signed by the serving authority's boot-installed receipt signer (M: `kernel-signing-authority.md:3`, `:29`). The artifact's identity is `(authority_id, scope, chain_generation, epoch)`, all signed, so it is unique across chain generations.
   - In the remote durable profile, the control-plane serving authority that owns the store signs. The edge kernel that relayed the request is named in `requested_via`.
 - **S38. Signing obligation.** `SigningBackend::sign_bytes` is fallible (M: `crates/core/chio-core-types/src/crypto.rs:869`). A stop therefore never waits on the signer, and a resume never commits without its evidence.
     - `record_digest` and `previous` cover the canonical `StopEpochV1` body without the signature. Attaching the signature later changes no chain digest.
     - **Stop and Restrict commit first.**
-      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, epoch, state = pending)`.
+      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, chain_generation, epoch, state = pending)`.
       - After the commit and anchor sync, the writer signs the body. It stores the artifact, and marks the obligation `signed`, in a progress-only commit.
       - A signing failure leaves the stop committed and enforced. The route still returns `stop_durable`, with `evidence: pending`.
     - **Reconciliation.**
@@ -592,9 +606,9 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - `Resume` and `Relax` refuse with `StopEvidencePending` while any earlier record of the scope has a pending obligation, and with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25).
       - A scope whose stop evidence is unsigned therefore stays `Stopped`, and the kernel never returns to `ready` for that scope until reconciliation signs the stop.
       - Only a signed resume can make a head `Running`, so a running head's whole chain is backed by signed artifacts.
-- **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, epoch, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
+- **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, id: StopEpochId, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
 - **Status route.** It returns `{ readiness, stopped, scope_heads: [...], host_latch, durability, stop_enforcement, withheld_operations, withheld_volatile }`. The existing `stopped`, `since` and `reason` fields stay as a projection of the kernel-scope head, with `reason` taken from the redacted note.
-- **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }` and `chio_runtime.identity_disposition`, which always agree (S15, spec 9 M20). The `chio_runtime` block is kernel-reserved: caller-supplied metadata carrying it is rejected before evaluation. M: does not reserve it today (`kernel/mod.rs:151-159`), so this is a kernel change. Tier 1's epoch can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
+- **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }` and `chio_runtime.identity_disposition`, which always agree (S15, spec 9 M20). The `chio_runtime` block is kernel-reserved: caller-supplied metadata carrying it is rejected before evaluation. M: does not reserve it today (`kernel/mod.rs:151-159`), so this is a kernel change. `observed_epoch` is a `StopEpochId`. Tier 1's view can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
 
 ## 11. Hints (spec 5)
 
@@ -634,22 +648,23 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - The writer loop runs in-process and reads the latches from the same `ArcSwap` in `StopHeads`.
     - So a host latch, or a stop whose write failed (`process_only` or `latch_only`), refuses store-only crossings with no tier-1 site, such as P4 artifact release, P5 `admit_confined_return`, and the recovery and semantic store checks.
 - **S36. Priority lane.**
-    - `Stop`, `Restrict`, `Relax` and `Resume` commits run in a priority lane of spec 10's writer loop, exempt from `Overloaded`, `max_batch` and per-tenant caps (spec 10 X17, X20). Overload and full disks are incident conditions.
+    - `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover` commits run in a priority lane of spec 10's writer loop, exempt from `Overloaded`, `max_batch` and per-tenant caps (spec 10 X17, X20). Overload and full disks are incident conditions.
     - Under `SQLITE_FULL` or `IOERR` retry (spec 10 X21), the route waits at most `stop_commit_wait` (default 2 s). It then returns `stop_not_durable` with the intent latch in force, and keeps the write queued.
 - **S37. Sharding** (only together with spec 10 section 10).
     - The kernel-scope chain originates in the pool shard.
     - Each tenant shard holds a verified replica: the same record bytes and digests, appended as a restrictive commit in the shard. That replica is what spec 10 X3 needs for a tier-2 check in the shard's own writer.
-    - Shard readiness requires a replica epoch at or above the origin head epoch, read from the origin at boot. An unreachable origin means the shard is not ready.
+    - Shard readiness requires the replica's head id to be at or above the origin's head id, both compared as `(chain_generation, epoch)` and read from the origin at boot. An unreachable origin means the shard is not ready.
+    - A shard that holds an old generation's high epoch is behind a newer generation's low epoch, because generation compares first. It replicates the `Rollover` record and the new generation's records before it is ready, and its freshness check (below) treats it as behind until then.
     - New shards are seeded with the head before readiness.
     - The operator acknowledgement returns after the origin commit, with per-shard `enforced` status. It never blocks on a dead shard, so stopping stays easy. A shard that misses the fan-out cannot become ready until it catches up.
     - **Origin-freshness lease.**
       - A serving tenant shard holds a lease on the origin head.
-      - It renews the lease at least every `shard_origin_refresh` (default 250 ms), either by reading the origin's kernel-scope head epoch or by receiving a fan-out heartbeat that carries it.
+      - It renews the lease at least every `shard_origin_refresh` (default 250 ms), either by reading the origin's kernel-scope head id `(chain_generation, epoch)` or by receiving a fan-out heartbeat that carries it.
       - The lease lasts `shard_origin_lease` (default 1 s), measured on the shard's monotonic clock, never on authority time.
-    - **Behind.** When a renewal shows an origin head epoch above the replica epoch, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
-    - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds, and returns to service only after a fresh read shows its replica at or above the origin head.
+    - **Behind.** When a renewal shows an origin head id above the replica's head id, the shard at once installs the kernel scope as `Stopped` in its process latches (S23), then appends the missing records. Tier 2 refuses `Deny` and `Withhold` kinds until the replica catches up.
+    - **Lost origin.** When the lease expires, the shard installs the same latch and drops to `not_ready { reason: stop_origin_stale }`. It refuses `Deny` and `Withhold` kinds, and returns to service only after a fresh read shows its replica's head id at or above the origin's.
     - **Acknowledgement bound.**
-      - The origin reports a shard as `enforced` when its replica reaches the stop epoch. Otherwise it reports `fenced_by_lease`, with the time at which that shard's lease expires.
+      - The origin reports a shard as `enforced` when its replica reaches the stop record's id. Otherwise it reports `fenced_by_lease`, with the time at which that shard's lease expires.
       - Every shard therefore enforces a kernel stop within `shard_origin_lease` plus one renewal interval, whether or not it can reach the origin.
     - A resume committed at the origin takes effect in a shard only after that shard replicates it, so a lagging shard errs toward stopped.
 
@@ -658,13 +673,13 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 - **S34. Restore and version rules.**
     - **Anchored transitions.** Stop and resume are restrictive commits, anchored before acknowledgement (spec 10 section 5). A database-only restore to before a stop does not extend the anchor, so `reconcile_startup` refuses (M: `rollback_anchor.rs:106-130`) and the host fails closed.
     - **Stop-intent journal.** It lives in the lock root beside the anchor (S25). A database-only restore therefore keeps every scope's intent entry, and the boot honors them.
-    - **Whole-volume restore.** A volume or VM snapshot that restores the database together with the anchor and the latch silently resurrects a running kernel. Later transitions then reuse epoch numbers, so two different signed artifacts can exist for the same `(authority_id, scope, epoch)`. This is a residual risk. Deployments may enable `stop_epoch_floor_check`: at boot, the head epoch per scope must be at or above the last epoch exported to SIEM or published to federation peers, read from a configured external witness. Otherwise the host is not ready.
+    - **Whole-volume restore.** A volume or VM snapshot that restores the database together with the anchor and the latch silently resurrects a running kernel. Later transitions then reuse epoch numbers, so two different signed artifacts can exist for the same `(authority_id, scope, chain_generation, epoch)`. This is a residual risk. Deployments may enable `stop_epoch_floor_check`: at boot, the head id per scope must be at or above the last id exported to SIEM or published to federation peers (compared as `(chain_generation, epoch)`), read from a configured external witness. Otherwise the host is not ready.
     - **Schema version.** Phase 1 bumps the admission schema version from 34 (M: `admission_operation_store.rs:219`), so the open gate refuses older binaries (M: `schema.rs:63-72`). An older binary never runs against a store that has a stop table.
     - **Upgrade.** The migration that bumps the version creates the stop tables in the same transaction. "Absent before migration" is a normal upgrade. "Missing after migration" means not ready (S9).
 - **S25. Stop-intent journal.**
     - Before a stop or restrict transaction begins, the stopping process records its intent in `stop-intent`, a two-slot file in the lock root. The file uses the anchor's slot discipline: write the whole journal to the inactive slot with a sequence number and checksum, fsync it, then make it current.
     - **One entry per scope: the scope's single pending transition.** The journal is a keyed set: `scope_key -> { intent_id, generation, authority_id, scope, allow_containment, contributors: [PendingStopRequest; 1..=2] }`. Each entry is that scope's intent latch, and it represents exactly one future transition: the next one.
-      - The entry stores no transition kind and no epoch. The writer computes both when it applies the entry, from the durable head at that moment: over a `Running` head it appends a `Stop` at `head.epoch + 1`; over a `Stopped` head it appends a narrowing `Restrict` at `head.epoch + 1`. The intended epoch is therefore always the next one, and an entry can never name an epoch the chain cannot reach.
+      - The entry stores no transition kind and no epoch. The writer computes both when it applies the entry, from the durable head at that moment: over a `Running` head it appends a `Stop` at the head's successor `(head.chain_generation, head.epoch + 1)`; over a `Stopped` head it appends a narrowing `Restrict` at that successor. The intended epoch is therefore always the next one, and an entry can never name an epoch the chain cannot reach.
       - `intent_id` is 128 random bits chosen when the entry is created. `generation` is the number of contributing requests.
       - **Contributors.** A request that would change the scope's state relative to its durable head plus the pending entry becomes a contributor. Only two states are reachable through stops (`Stopped` with containment allowed, then `Stopped` with containment refused), so an entry has at most two contributors: the request that created it, and at most one later request that narrows `allow_containment` to `false`, which raises `generation` to 2.
       - A request that would change nothing is an idempotent no-op, as in S2. It returns the pending entry's status (`stop_not_durable` with `latch_only` until the entry applies), and its authorizer and reason go to the trace and to `admission_operation_stop_notes`, not to the journal.
@@ -705,7 +720,9 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | Remote edge cannot refresh the head | Fail closed after `stop_head_max_staleness` (section 13) |
 | Crash after commit, before head swap | Restart loads the committed head; the kernel comes up stopped |
 | Chain at `bound - 1` | Resume and relax refuse; a stop or restrict can still append, and the head ends `Stopped` (S6) |
-| Chain at `bound` | Scope stays stopped until offline rollover (S6) |
+| Generation reaches `bound - rollover_margin` | The writer appends a `Rollover` record in the priority lane. State is unchanged, and the new generation starts with full headroom (S6) |
+| Rollover cannot commit (disk full) | Retried with backoff. Resume and relax still refuse at `bound - 1`. A generation that reaches `bound` ends `Stopped` until the rollover commits, or until the offline CLI appends it (S6) |
+| Crash around a rollover | The rollover is anchored before acknowledgement, so restart finds either generation `g`'s final record or the anchored `Rollover` record as head. Both carry the same state (S6) |
 | Delayed resume after a newer stop | Refused with `StopHeadMoved` (S31) |
 | Host latch set | Every crossing refuses `Deny` and `Withhold` kinds; containment refused (S20, S23) |
 | Shard misses the fan-out | That shard latches the kernel scope `Stopped` at its next renewal, and is not ready until its replica reaches the origin epoch (S37) |
@@ -840,6 +857,9 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - Quorum artifact verification with fewer than `k`, duplicate principals, or a wrong roster digest (S29).
   - S5 migration of a legacy `semantic-stop` record without an installed registry.
   - Resume headroom at `bound - 1`, and a stop or restrict filling the last slot ends `Stopped` (S6).
+  - **Rollover while stopped (Codex round 7).** Drive a stopped scope to `bound - rollover_margin`. The `Rollover` record is generation 2, epoch 1, still `Stopped` with the same `allow_containment`. Crossings stay refused throughout, a pending resume decided against the old head refuses with `StopHeadMoved`, and a pending intent applies at `(2, 2)`. Repeat while running: the head stays `Running`, and a stop after the rollover appends at `(2, 2)`.
+  - **Shard with an old high epoch (Codex round 7).** A shard replica at `(1, 65,530)` and an origin head at `(2, 3)`. The shard is behind, latches the kernel scope `Stopped`, and is not ready until it replicates the `Rollover` record and generation 2. A comparison of `epoch` alone would wrongly call the shard ahead; the test asserts it is not used.
+  - **Artifact identity across generations (Codex round 7).** Artifacts for `(1, 7)` and `(2, 7)` of one scope have distinct signed bodies and identities. A verifier given one cannot accept it as the other, and the SIEM floor check compares `(chain_generation, epoch)`.
   - Cooldown: a resume with a mismatched `cooldown_started` refuses, and a lost observation row restarts the cooldown (S19).
   - Constant-time credential comparison.
   - Host latch independence and its containment implication (S20).
@@ -935,6 +955,13 @@ Open decisions:
 |---|---|---|---|
 | R-8-01 | An unrelated same-scope epoch can erase a pending stop or restriction | Fixed. Each journal entry has a durable `intent_id` and a `generation` that counts its contributing requests. Stop and Restrict records carry `satisfies_intent`. An entry retires only when an anchored head proves it was applied (matching id, current generation, containment no wider), never by epoch number. Boot honors every unsatisfied entry. Resume and relax refuse with `StopIntentPending` under the journal mutex, so a resume cannot commit between an intent's fsync and its record. A `Restrict` that finds a running head applies as a `Stop`. Both counterexamples are crash tests | `StopEpochV1.satisfies_intent`; S25; S31; S38; S9 step 3; section 14 failure rows; section 17 |
 | R-1-01 (spec 1) | Caller reconciliation belongs to two different ABI operations | Fixed in spec 1. The S13 `CallerExecution` row here now states that `reconcile_caller_execution*` belongs to `CallerExecution` only | section 7 S13 row |
+
+### Codex review (PR #1174, round 7)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185260860 | Carry the chain generation through rollover | Fixed now. `StopEpochV1` carries a signed `chain_generation`, and the record identity, table key, notes, signing obligation, artifact and trace use `(chain_generation, epoch)`. `expected_epoch`, quorum approvals, `StopHeadMoved`, the SIEM floor, `observed_epoch` and shard readiness and freshness compare `StopEpochId` lexicographically. A `Rollover` record starts each generation at `bound - rollover_margin`, restates the head and satisfies no intent, so it never changes state and needs no resume authority; headroom applies per generation. Tests cover rollover while stopped and running, a shard with an old high epoch, and artifact identity across generations | section 4 types; S1, S2, S3, S6, S25, S29, S31, S34, S37, S38; section 10; section 14; section 17; spec 10 section 10 |
+| 4185260847 (spec 10) | Include Relax commits in the priority lane | Fixed in spec 10 X17a, which now lists `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover`, matching S36 | S36 (now also lists `Rollover`) |
 
 ### Independent review pass 2 (PR #1174, Codex agent)
 

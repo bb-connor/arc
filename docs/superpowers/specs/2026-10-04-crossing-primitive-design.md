@@ -31,7 +31,7 @@ The adversarial reviews of specs 3, 5 and 8 found contradictions with this spec.
   - `KernelStopped` writes no deny tombstone, and tier-1 denials sign a receipt only (X15).
   - A caller report is a progress-only return record that is never stop-checked (section 7).
   - A two-commit read refused at its outcome commit writes a return record and returns `OutputWithheld` (X14).
-- **The writer loop cannot refuse a stop (S8-03).** Stop, resume and restrict commits run in a priority lane that is exempt from `Overloaded`, `max_batch` and the tenant cap (X17, X20).
+- **The writer loop cannot refuse a stop (S8-03).** Stop, restrict, relax, resume and rollover commits run in a priority lane that is exempt from `Overloaded`, `max_batch` and the tenant cap (X17, X20).
 - **Sharded stops do not block on a dead shard (S8-13).** The stop chain originates in the pool shard and each shard holds a verified replica. A shard that is behind is not ready, and the operator acknowledgement reports `enforced` per shard (section 10).
 - **The division with specs 3 and 9 (S3-15, S3-05).**
   - Spec 9 decides and this spec executes.
@@ -511,7 +511,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
     - It opens one IMMEDIATE transaction and runs each member as a closure inside its own `SAVEPOINT`.
     - Today's `lock_mutations` critical sections (claim, revalidate, commit) become one member closure.
     - The batch commits once (one WAL fsync), syncs the anchor once if any member is crossing-authorizing or restrictive or the lag bound is reached, then replies to every member.
-    - **X17a. Priority lane.** Spec 8's stop, resume and restrict commits enter a priority lane (spec 8 S8-03).
+    - **X17a. Priority lane.** Spec 8's `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover` commits enter a priority lane (spec 8 S8-03, S36). `Relax` is included because an operator must be able to widen containment while the ordinary queue is full, and, unlike a stop, a refused relax has no intent latch to preserve it.
       - They are dequeued ahead of the FIFO queue.
       - They are never refused with `Overloaded`, and never counted against `max_batch`, `max_intent_members` or the per-tenant cap (X20).
       - A full queue therefore cannot keep an operator from stopping the kernel.
@@ -547,7 +547,7 @@ ADR-0022 names the single-writer ceiling (M: `docs/adr/ADR-0022-store-and-kernel
 |---|---|
 | S1 | Every cross-tenant aggregate on the serving connection is listed and kept in an unsharded pool shard (slow path), or is forbidden under sharding. That covers the finding market, purchases, challenges and status, channels and release publisher, fiscal, FROST and the economic-state cache (`serving_owner.rs:628-690`) |
 | S2 | **Stops (spec 8 S8-13).** The kernel-scope stop chain originates in the pool shard. Each tenant shard holds a verified replica: the same record bytes and digests, appended in that shard as a restrictive commit, so its `StopEpoch` check is authoritative over the replica (X3). The operator acknowledgement returns after the origin commit, with a per-shard status of `enforced` (the replica holds the head) or `fenced_by_lease` (the shard has not confirmed, and will latch `Stopped` when its origin-freshness lease expires, S3). It does not block on a dead shard. The lease bounds how long any shard can keep serving after a kernel stop. **Revocations** use a durable fan-out outbox, with readback per the AP8 discipline (M: `docs/superpowers/specs/2026-10-03-transport-revocation-design.md`) |
-| S3 | **Readiness.** A shard is ready only when its replica's stop epoch is at or above the origin head epoch, read from the origin at boot. If the origin is unreachable, the shard is not ready. A new shard is seeded with the origin head before it serves. Revocation heads load the same way before readiness. **While serving**, a shard holds an origin-freshness lease on the monotonic clock: renewed every 250 ms, valid for 1 s. A shard that falls behind the origin head epoch, or loses the origin past the lease, latches the kernel scope `Stopped` and goes `not_ready` with `stop_origin_stale` (spec 8 S37) |
+| S3 | **Readiness.** A shard is ready only when its replica's stop head id is at or above the origin's, compared as `(chain_generation, epoch)` (spec 8 S2, S37), read from the origin at boot. A replica holding an old chain generation's high epoch is behind any newer generation. If the origin is unreachable, the shard is not ready. A new shard is seeded with the origin head before it serves. Revocation heads load the same way before readiness. **While serving**, a shard holds an origin-freshness lease on the monotonic clock: renewed every 250 ms, valid for 1 s. A shard whose replica head id falls behind the origin's, or that loses the origin past the lease, latches the kernel scope `Stopped` and goes `not_ready` with `stop_origin_stale` (spec 8 S37) |
 | S4 | Capabilities are bound to one shard at issuance, or every revocation fans out |
 | S5 | Pool-scoped fences without a shard replica are reported `early_only` when checked from a tenant shard. Kernel-scope stops are checked against the replica (S2), and the replication window is what the `enforced` status reports |
 | S6 | The process registry's single `durable_admission_store_uuid` (M: `crates/kernel/chio-process/src/registry.rs:58-66`), receipt mover ordering, checkpoint ordering and relocation are defined per shard |
@@ -663,7 +663,7 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
 ## 17. Tests and conformance evidence
 
 - **Apalache:** the model and mutants of section 12.
-- **Loom:** batch leader and followers; savepoint isolation; `StoreUnavailable` after member retry exhaustion leaves no partial member and later members unaffected; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
+- **Loom:** batch leader and followers; savepoint isolation; `StoreUnavailable` after member retry exhaustion leaves no partial member and later members unaffected; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member, and separately a relax member, in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
 - **DST:** crash injection at C1-C7, B1, B2, R2 and P1, plus restore-from-snapshot at random anchored prefixes, under random workloads. Stops are issued under `Overloaded` and under `SQLITE_FULL` injection. Under sharding, one shard is offline during a stop fan-out and then restarts; it must not serve until its replica catches up (S3). A serving shard partitioned from the origin during a stop latches `Stopped` within its 1 s lease. A crash between the `receipts.db` append and the mover's advance re-runs as a no-op (rule 24). The properties are section 8's predicates.
 - **Differential:** generated workloads run through the legacy and fused paths must reach identical terminal states, receipts and release decisions. The two-commit read is compared under its own flag.
 - **Commit-budget gates:** these are deterministic, from store hooks, and scoped to fast-path-eligible plans:
@@ -856,3 +856,9 @@ Where the analogy breaks:
 | R-9-01 | A negative rail status query is not proof that an in-flight release can never arrive | Fixed with spec 9 M7a. X17b requires a declared `IdempotentPerKey` or `FenceByKey` capability over the per-hold key. The prepare crossing refuses an adapter without one, before any rail call | X17b; section 17 |
 | R-8-02 / R-6-06 | Identity disposition for retryable versus terminal denials | Fixed through spec 9 M20. Tombstones and `Prepared` or slow-path compensations are `Terminal`; tier-1, fused-from-`Unbegun` stop, `Overloaded` and no-row `StoreUnavailable` denials are `Reusable`. Spec 8's `retryable_after_resume` agrees. `chio_runtime` and `receipt_context` are kernel-reserved (R-6-05 cross-reference) | X15; X15a; section 15; section 18 |
 
+### Codex review (PR #1174, round 7)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4185260847 | Include Relax commits in the priority lane | Fixed now. X17a lists `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover`, matching spec 8 S36, and the Loom plan runs a relax member against a full queue | X17a; section 1; section 17 |
+| 4185260860 (spec 8) | Carry the chain generation through rollover | Fixed in spec 8. Section 10 S3 compares replica and origin stop heads as `(chain_generation, epoch)`, so a replica holding an old generation's high epoch is behind | section 10 S3 |
