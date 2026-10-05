@@ -73,6 +73,60 @@ fn verify(
     )
 }
 
+fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
+    let (_, cap, mut proof) = fixture();
+    let mut identity = [0_u8; 32];
+    identity[0] = 1;
+    let weak = chio_core::crypto::PublicKey::from_bytes(&identity).unwrap();
+    let issuer = Keypair::generate();
+    let mut body = cap.body();
+    body.issuer = issuer.public_key();
+    body.subject = weak.clone();
+    let cap = CapabilityToken::sign(body, &issuer).unwrap();
+    assert!(cap.verify_signature().unwrap());
+    proof.body.agent_key = weak;
+    let mut signature = [0_u8; 64];
+    signature[0] = 1;
+    proof.signature = chio_core::crypto::Signature::from_bytes(&signature);
+    (cap, proof)
+}
+
+#[test]
+fn durable_dpop_rejects_weak_key_forgery() {
+    let (cap, proof) = weak_key_forgery();
+    assert!(proof.body.agent_key.verify(
+        &canonical_json_bytes(&proof.body).unwrap(),
+        &proof.signature
+    ));
+    assert!(matches!(
+        verify(&proof, &cap, &authority(), NOW),
+        Err(KernelError::Dpop(crate::dpop::DpopError::Signature))
+    ));
+}
+
+#[test]
+fn legacy_dpop_rejects_weak_key_forgery_without_consuming_nonce() {
+    let (cap, mut proof) = weak_key_forgery();
+    proof.body.schema = DPOP_SCHEMA.into();
+    proof.body.replay_authority = None;
+    let clock = std::sync::Arc::new(crate::replay_retention::tests::TestClock::new(NOW));
+    let store = crate::dpop::clock_tests::store(clock, 8);
+    assert!(matches!(
+        crate::dpop::verify_dpop_proof(
+            &proof,
+            &cap,
+            "server",
+            "tool",
+            &sha256_hex(b"{}"),
+            &store,
+            &DpopConfig::default()
+        ),
+        Err(KernelError::Dpop(crate::dpop::DpopError::Signature))
+    ));
+    assert_eq!(store.utilization().unwrap().0, 0);
+    assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
+}
+
 #[test]
 fn exact_authority_signature_yields_only_non_consuming_bounded_evidence() {
     let (_, cap, proof) = fixture();

@@ -720,7 +720,11 @@ fn verify_dpop_bindings_at(
     // Step 5: Signature verification.
     let body_bytes =
         canonical_json_bytes(&proof.body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
-    if !proof.body.agent_key.verify(&body_bytes, &proof.signature) {
+    if !proof
+        .body
+        .agent_key
+        .verify_strict(&body_bytes, &proof.signature)
+    {
         return Err(KernelError::Dpop(DpopError::Signature));
     }
 

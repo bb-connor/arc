@@ -33,7 +33,9 @@ pub fn issue_capability(
     if signed.public_key != body.issuer
         || signed.algorithm != body.issuer.algorithm()
         || signed.signature.algorithm() != signed.algorithm
-        || !signed.public_key.verify(&canonical, &signed.signature)
+        || !signed
+            .public_key
+            .verify_strict(&canonical, &signed.signature)
     {
         return Err(BrokerError::Invariant(
             "capability signing backend returned a mismatched identity or signature".to_string(),
@@ -75,7 +77,7 @@ pub fn verify_capability(
         body: &capability.body,
     };
     let valid = trusted_issuer
-        .verify_canonical(&input, &capability.signature)
+        .verify_canonical_strict(&input, &capability.signature)
         .map_err(|error| {
             BrokerError::AuthorizationDenied(format!("capability verification failed: {error}"))
         })?;
@@ -154,6 +156,43 @@ mod tests {
                 nonce_ttl_seconds: 30,
             },
         }
+    }
+
+    #[test]
+    fn broker_capability_rejects_weak_key_issuer_forgery() {
+        let signer = Keypair::from_seed(&[1; 32]);
+        let mut body = body(&signer);
+        let mut identity = [0_u8; 32];
+        identity[0] = 1;
+        let weak = PublicKey::from_bytes(&identity).test_expect("identity point");
+        body.issuer = weak.clone();
+        let mut signature = [0_u8; 64];
+        signature[0] = 1;
+        let capability = SignedBrokerCapability {
+            body,
+            algorithm: SigningAlgorithm::Ed25519,
+            signature: Signature::from_bytes(&signature),
+        };
+        let input = CapabilitySigningInput {
+            domain: CAPABILITY_SIGNATURE_DOMAIN,
+            body: &capability.body,
+        };
+        assert!(weak
+            .verify_canonical(&input, &capability.signature)
+            .test_expect("canonical signing input"));
+        assert!(verify_capability(&capability, &weak, "broker-service", 20, true).is_err());
+    }
+
+    #[test]
+    fn broker_capability_refuses_weak_key_caller_at_issuance() {
+        let signer = Keypair::from_seed(&[1; 32]);
+        let mut body = body(&signer);
+        let mut identity = [0_u8; 32];
+        identity[0] = 1;
+        let weak = PublicKey::from_bytes(&identity).test_expect("identity point");
+        body.subject = weak.clone();
+        body.proof.caller_public_key = weak;
+        assert!(issue_capability(body, &Ed25519Backend::new(signer), true).is_err());
     }
 
     #[test]

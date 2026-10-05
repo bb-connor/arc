@@ -148,7 +148,7 @@ pub fn verify_request_proof(
     let valid = proof
         .body
         .authority_key
-        .verify_canonical(&signing, &proof.signature)
+        .verify_canonical_strict(&signing, &proof.signature)
         .map_err(|error| {
             BrokerError::AuthorizationDenied(format!("proof verification failed: {error}"))
         })?;
@@ -278,6 +278,40 @@ mod tests {
         let issuer_backend = Ed25519Backend::new(issuer.clone());
         let capability = issue_capability(body, &issuer_backend, true).test_expect("capability");
         (caller, capability, request)
+    }
+
+    #[test]
+    fn request_proof_rejects_weak_key_forgery() {
+        let (caller, mut capability, request) = fixture();
+        let mut proof = issue_request_proof(
+            &capability,
+            &request,
+            "nonce-abcdefghijkl".into(),
+            20,
+            &caller,
+        )
+        .test_expect("proof");
+        let mut identity = [0_u8; 32];
+        identity[0] = 1;
+        let weak = PublicKey::from_bytes(&identity).test_expect("identity point");
+        // Isolate proof authentication from the capability's independent
+        // admission checks, including refusal of weak provisioned keys.
+        capability.body.subject = weak.clone();
+        capability.body.proof.caller_public_key = weak.clone();
+        proof.body.authority_key = weak;
+        let mut signature = [0_u8; 64];
+        signature[0] = 1;
+        proof.signature = Signature::from_bytes(&signature);
+        let signing = ProofSigningInput {
+            domain: PROOF_SIGNATURE_DOMAIN,
+            body: &proof.body,
+        };
+        assert!(proof
+            .body
+            .authority_key
+            .verify_canonical(&signing, &proof.signature)
+            .test_expect("canonical signing input"));
+        assert!(verify_request_proof(&proof, &capability, &request, 21, 2).is_err());
     }
 
     #[test]

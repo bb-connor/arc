@@ -339,6 +339,11 @@ pub struct ProofBinding {
 
 impl ProofBinding {
     pub fn validate(&self, production: bool) -> Result<()> {
+        if self.caller_public_key.is_weak_ed25519() {
+            return Err(BrokerError::InvalidRequest(
+                "broker proof requires a non-weak signing key".to_string(),
+            ));
+        }
         if self.nonce_ttl_seconds == 0 || self.nonce_ttl_seconds > 300 {
             return Err(BrokerError::InvalidRequest(
                 "proof nonce lifetime must be between 1 and 300 seconds".to_string(),
@@ -394,7 +399,8 @@ impl BrokerCapabilityBody {
         ] {
             validate_identifier(value, label, MAX_IDENTIFIER_BYTES)?;
         }
-        if self.issued_at_unix_seconds > self.not_before_unix_seconds
+        if self.issuer.is_weak_ed25519()
+            || self.issued_at_unix_seconds > self.not_before_unix_seconds
             || self.not_before_unix_seconds >= self.expires_at_unix_seconds
             || self.maximum_executions == 0
             || self.provider_adapter_version == 0
