@@ -269,24 +269,16 @@ payload blob; decode with `payloadCanonicalHex.hexToByteArray()`.
 ## Errors
 
 ```kotlin
-sealed class ChioMobileException(message: String) : kotlin.Exception(message) {
-    class InvalidJson(message: String) : ChioMobileException(message)
-    class InvalidHex(message: String) : ChioMobileException(message)
-    class WeakEntropy(message: String) : ChioMobileException(message)
-    class InvalidCapability(message: String) : ChioMobileException(message)
-    class InvalidPassport(message: String) : ChioMobileException(message)
-    class AttestationUnavailable(message: String) : ChioMobileException(message)
-    class AttestationRejected(message: String) : ChioMobileException(message)
-    class KernelKeyMismatch(message: String) : ChioMobileException(message)
-    class SigningFailed(message: String) : ChioMobileException(message)
-    class EvaluationDenied(message: String) : ChioMobileException(message)
-    class Internal(message: String) : ChioMobileException(message)
-}
+val failure = ChioMobileException.InvalidJson(detail = "invalid receipt")
+val nativeDetail: String = failure.detail
+val diagnostic: String = failure.message
 ```
 
-Every variant carries a `message: String` describing the failure.
-Use `exception.message` or a custom `Throwable.toString()` adapter
-to surface it to the user. `WeakEntropy` is thrown by `signReceipt` and
+Every variant carries a `detail: String` describing the native failure.
+The crate's Kotlin-only UniFFI configuration renames this payload to avoid
+colliding with `Throwable.message`; the Rust error and FFI representation stay
+unchanged. `exception.message` remains a formatted diagnostic containing that
+detail. `WeakEntropy` is thrown by `signReceipt` and
 `signReceiptRelayingTrustedBody` when the signing seed decodes to all
 zero bytes. `AttestationUnavailable` and `EvaluationDenied` are part of
 the error surface but are not thrown by any entry point in this crate
