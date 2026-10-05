@@ -258,7 +258,7 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
     Spec 9 emits them as `KernelEvidenceLatch`, `HaltOperation` and `LatchRequest`. A revocation, closure or unknown commit never closes the whole kernel.
 15. **Spec 9 decides, spec 10 executes, spec 3 binds.**
     - The machine chooses every transition and receipt decision.
-    - `CrossingTx` executes commits and reports `Committed`, `Refused`, `OutcomeUnknown` or `Retry`.
+    - `CrossingTx` executes commits and reports `Committed`, `Refused`, `OutcomeUnknown`, `Retry` or `StoreUnavailable`. `StoreUnavailable` covers retry exhaustion, a poisoned owner and a failed recovery fence, and spec 9 M19 retains the same planned member and its holds for it. `Refused(Unavailable)` means only that the fused form is ineligible (spec 10 section 4.1).
     - Spec 3 owns the affine contract that ties a dispatched effect to its discharge, plus the latch and the Mechanism D gate (spec 3 section 4.12).
 16. **An unknown outcome never compensates.** None of these releases a hold or certifies non-execution: `CommitOutcomeUnknown`, `BoundaryFailure::CommitUnconfirmed`, or a receipt append whose outcome is unknown.
 17. **Commit classes** (spec 10 section 5).

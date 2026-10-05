@@ -261,7 +261,13 @@ After A1 and A1d, lag can skip only notifications. Correlated responses and serv
    - one `notifications/resources/updated` for each subscribed URI;
    - when the peer enabled logging, one `notifications/message` at level `warning` naming the skipped count.
 
-   The burst events take ordinary ids and are retained like any notification, so GET replay covers them. A burst that itself lags requests another resync; coalescing bounds the work to one burst per drain.
+   The burst events take ordinary ids and are retained like any notification, so GET replay covers them.
+   - **Bounded chunks.** A burst never emits more than `resync_chunk = broadcast_capacity / 4` events (64 at the default capacity of 256) in one loop iteration.
+     - The first chunk carries the catalog `list_changed` notifications and the logging warning (at most 4 events), then resource updates.
+     - Further subscribed URIs continue in later chunks from a persisted per-session `resync_cursor` over the subscription set in a stable order.
+   - **Convergence.** A `Lagged` during a burst does not restart it. It adds to the pending skipped count, and the burst resumes from `resync_cursor`. Only a lag after the burst has completed schedules a new one.
+     - Each chunk is smaller than the broadcast capacity, so a consumer that keeps pace with one chunk per iteration completes the burst in `ceil(subscriptions / resync_chunk)` iterations.
+     - The burst can never cause the lag that re-triggers it.
 3. **A9. Coverage.** Every list-changed and resource-updated meaning that a lag can skip is covered by the burst, because each is a re-read instruction. Lost progress and log messages cannot be reconstructed; the logging warning makes that loss explicit when logging is on, and progress notifications are advisory under MCP. A burst may deliver a re-read hint for something that did not change, which is always safe.
 4. **A10. Window.** The retained window grows to 256 notifications, the broadcast capacity. A lagged consumer that reconnects with `Last-Event-ID` gets replay whenever fewer than 256 notifications passed since its cursor. Adjacent duplicates in the window coalesce: a newer `list_changed` of the same kind or `resources/updated` of the same URI replaces the older retained one. Coalescing only ever raises `oldest`, so a cursor before a removed entry gets `409`, which is conservative.
 5. **A11. Client action after `409`.** WIRE_PROTOCOL 3.2 gains: after a `409` on `Last-Event-ID`, a client MUST re-list every catalog it uses, re-read every resource it is subscribed to, and reconnect without `Last-Event-ID`. Its subscriptions persist (section 6), so it does not re-subscribe.
@@ -512,9 +518,12 @@ Rules H1-H10 bind every surface:
      - It accepts no new posts: a matching post is a no-op, and H3 precedence would keep `SubscriptionEnded` anyway. It is not revalidated again, because its hint already asserts withdrawal and carries no state.
      - Its in-memory slot is returned to its pool only after a drain hands its `SubscriptionEnded` to the transport (the edge's reserved `hint_share`, section 12.1 rule 4). If the share is full, the drain stops and the entry waits for the next drain.
      - **Durable from terminalization until emitted.** The `Ended` marker is persisted when the subscription terminalizes, not at hand-off. The transition to `Terminalized` re-signs the resume record with the entry as `Ended { reason, end_event_id }` (A24, A28), before any wait for transport capacity.
-       - If that persist fails, the subscription still terminalizes in memory. The session re-attempts the re-sign before any later resume-record write, and a session that cannot persist the marker is not checkpointed as `Live`.
+       - **If that persist fails, the session fails closed.** It durably invalidates its resume record through the store's existing terminal session transition, which writes a terminal fence with a higher `resume_generation` that the store enforces (M: `session_store.rs:980-985`). It then ends with `Terminal` (H6), so the stale `Live` record can never be restored.
+       - **If the terminal transition also fails,** the store refuses every write. The session stops accepting requests and checkpoints, and the host reports the session store not ready.
+       - **What restore then guarantees.** A restore after that double failure re-authorizes each `Live` entry from scratch (A25). A permanent end cause (expiry, revocation) fails re-authorization and terminalizes with `SubscriptionEnded`. A transient cause that cleared before restore (the authority clock recovered, or the subject was recreated) yields a subscription that is valid under fresh authorization, and it receives a catch-up update.
+       - **Delivery is still checked.** H7 rechecks authorization on every delivery, so no update is ever delivered under an authorization that fails at delivery time.
        - The marker is removed only after a stream reports that the `SubscriptionEnded` frame was emitted and flushed, or after a client replay past `end_event_id`.
-       - Restore re-queues `SubscriptionEnded` from every marker before the catch-up. A crash at any point after terminalization therefore cannot resurrect the subscription as `Live` or lose the end notification, even if the clock recovers or the subject is recreated before restore.
+       - Restore re-queues `SubscriptionEnded` from every marker before the catch-up. Once the marker is persisted, a crash at any later point cannot resurrect the subscription as `Live` or lose the end notification, even if the clock recovers or the subject is recreated before restore. The only exception is the double store failure above, and there restore re-authorizes from scratch.
        - Markers count against the persisted subscription bound and expire with the session's terminal.
      - Capacity: H5 and the explicit and implicit pools count terminalized entries until removal, and `bounded(s)` counts them as subscriptions. A subscribe can therefore be denied while ended subscriptions await delivery. That is bounded, because the next drain delivers them.
      - A client unsubscribe of a terminalized subscription removes it at once. `Terminal` (H6) discards every pending hint, `SubscriptionEnded` included, and removes every subscription, because the terminal subsumes them.
@@ -698,7 +707,10 @@ A `Work { handle_ref }` hint means "re-query `WorkQueryV1::Work`". It is posted 
 ### 12.5 Stop and revocation sources
 
 - **Stop.** Spec 8 makes `StopHeads` shared per store across every kernel attached to it in a process (spec 8). Its change notification (`watch`) is the only source of `Stop` hints. Each session's log subscribes to it, so a stop committed by any component reaches every session in scope, without a cross-session router. Remote durable admission inherits spec 8's polling staleness bound.
-- **Revocation.** Revocations committed in the same store notify through the store handle; sessions in other processes observe them at drain-time revalidation (H7), bounded by the revocation head's polling interval. `Capability` posts match by lineage (section 12.1 rule 3).
+- **Revocation.** Revocations committed in the same store notify through the store handle.
+  - **Other processes.** Sessions in other processes poll the revocation head (H10's admission-chain cursor). When the head advances, the poller reads the new revocation entries and posts `Changed` on `Capability(id)` for every subscription whose authorizing capability, or any capability in its lineage, appears in them. Posts match by lineage (section 12.1 rule 3).
+  - **What the post does.** It makes the subscription dirty, so a drain runs, and H7's drain-time revalidation then ends the subscription with `SubscriptionEnded { Revoked }`. A quiet subscription therefore learns of a cross-process revocation within one polling interval, and no event of its own is needed.
+  - **Missed polls.** A poll missed across a crash is replayed from the cursor at restore (H10).
 
 ## 13. Transport and edge (Part B)
 
@@ -912,6 +924,14 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186909736 | Persist terminalization before hand-off | Fixed now. The `Ended` marker is persisted by re-signing the resume record at the moment of terminalization, before any wait for transport capacity, and it is retained until emission. A crash after terminalization can no longer leave a `Live` entry that restore might re-authorize | H5a |
+
+### Codex review (PR #1174, round 16)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187050279 | Fail closed when persisting an end marker fails | Fixed now. A failed `Ended` persist durably invalidates the resume record through the store's terminal session transition (higher `resume_generation`) and ends the session. If that also fails, the session store is not ready. After that double failure only, restore re-authorizes from scratch: permanent causes end, a transient cause that cleared yields a validly re-authorized subscription, and H7 still checks every delivery | H5a |
+| 4187050292 | Trigger a pending hint for cross-process revocations | Fixed now. The cross-process revocation poller posts a lineage-matched `Changed` on `Capability(id)` for each affected subscription. That triggers a drain, and H7 revalidation ends the subscription with `SubscriptionEnded { Revoked }`, even when the subscription is otherwise quiet | section 12.5 |
+| 4187050296 | Bound resync bursts below the broadcast capacity | Fixed now. A resync burst emits at most `broadcast_capacity / 4` events per iteration, catalog and logging events first, and continues from a persisted `resync_cursor`. A lag during a burst resumes it instead of restarting it, so the burst converges and cannot re-trigger itself | A8 |
 
 ## Appendix A. FTL reference
 
