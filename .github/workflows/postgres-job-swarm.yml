@@ -118,6 +118,19 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/claim-loss/kernel.pub
           if-no-files-found: warn
+      - name: Preserve recorded operator evidence after qualification failure
+        if: ${{ failure() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: postgres-job-operator-responses
+          # These fixed fixture responses also enter the successful public
+          # report. Private connection files, requests and service logs stay local.
+          path: |
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/response.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/receipts.ndjson
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/verification.json
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/operator-*/kernel.pub
+          if-no-files-found: warn
       - name: Stop only this job's database container
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
         run: |
