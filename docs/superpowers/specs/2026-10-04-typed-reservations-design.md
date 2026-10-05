@@ -595,7 +595,12 @@ Receipts are classified by spec 9 M20's signed `chio_runtime.identity_dispositio
 
 ```text
 replay_identity(r) = (request_namespace_digest(r), request_id(r))
-terminal_receipts(ns, id) = { r : identity_disposition(r) = Terminal and replay_identity(r) = (ns, id) }
+final(r) = decision(r) = Allow
+        or decision(r) in { DenyDelivery, Cancelled, Incomplete, Withheld, OutcomeUnknownAfterDispatch, NotAcceptedAfterDispatchCommit }
+        or identity_disposition(r) = Terminal
+        (an Allow carries no identity_disposition (spec 9 M20), so it is counted by its decision;
+         Retained, Reusable and PendingApproval receipts are never final)
+terminal_receipts(ns, id) = { r : final(r) and replay_identity(r) = (ns, id) }
 forall (ns, id): |terminal_receipts(ns, id)| <= 1
 retained(r) -> eventually (exists t in terminal_receipts(replay_identity(r))) or proven_uncommitted(replay_identity(r))
 ```
@@ -934,6 +939,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186767784 | Scope terminal receipts to the replay identity | Fixed now. The predicate filters by `replay_identity(r) = (request_namespace_digest, request_id)`. At most one `Terminal` receipt exists per replay identity, and legal reuse of a request id across namespaces is not conflated | section 4.11 |
+
+### Codex review (PR #1174, round 15)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186909727 | Count successful outcomes as terminal receipts | Fixed now. The predicate counts `final(r)`: an `Allow`, which carries no disposition under spec 9 M20, any terminal outcome decision, or a `Terminal` disposition. `Retained`, `Reusable` and `PendingApproval` are never final, so an `Allow` plus a second terminal receipt for one replay identity violates the predicate | section 4.11 |
 
 ## Appendix A. FTL reference
 

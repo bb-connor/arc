@@ -511,8 +511,10 @@ Rules H1-H10 bind every surface:
      - A terminalized subscription keeps its slot, subject, audience and authority metadata, so a later drain can still deliver its hint.
      - It accepts no new posts: a matching post is a no-op, and H3 precedence would keep `SubscriptionEnded` anyway. It is not revalidated again, because its hint already asserts withdrawal and carries no state.
      - Its in-memory slot is returned to its pool only after a drain hands its `SubscriptionEnded` to the transport (the edge's reserved `hint_share`, section 12.1 rule 4). If the share is full, the drain stops and the entry waits for the next drain.
-     - **Durable until emitted.** A persisted subscription is not deleted at hand-off. Its entry in the resume record becomes a durable `ended { reason, end_event_id }` marker. The marker is removed only after a stream reports that the `SubscriptionEnded` frame was emitted and flushed, or after a client replay past `end_event_id`.
-       - Restore re-queues `SubscriptionEnded` from every marker before the catch-up, so a crash between hand-off and emission cannot lose the end notification.
+     - **Durable from terminalization until emitted.** The `Ended` marker is persisted when the subscription terminalizes, not at hand-off. The transition to `Terminalized` re-signs the resume record with the entry as `Ended { reason, end_event_id }` (A24, A28), before any wait for transport capacity.
+       - If that persist fails, the subscription still terminalizes in memory. The session re-attempts the re-sign before any later resume-record write, and a session that cannot persist the marker is not checkpointed as `Live`.
+       - The marker is removed only after a stream reports that the `SubscriptionEnded` frame was emitted and flushed, or after a client replay past `end_event_id`.
+       - Restore re-queues `SubscriptionEnded` from every marker before the catch-up. A crash at any point after terminalization therefore cannot resurrect the subscription as `Live` or lose the end notification, even if the clock recovers or the subject is recreated before restore.
        - Markers count against the persisted subscription bound and expire with the session's terminal.
      - Capacity: H5 and the explicit and implicit pools count terminalized entries until removal, and `bounded(s)` counts them as subscriptions. A subscribe can therefore be denied while ended subscriptions await delivery. That is bounded, because the next drain delivers them.
      - A client unsubscribe of a terminalized subscription removes it at once. `Terminal` (H6) discards every pending hint, `SubscriptionEnded` included, and removes every subscription, because the terminal subsumes them.
@@ -904,6 +906,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186767776 | Reconcile the restore failure contract | Fixed now. The failure-table row and the restore test now require terminalization: an `Ended` marker with the reason, `SubscriptionEnded` queued and persisted until emitted, and no catch-up update | section 8 failure table; section 10 tests |
+
+### Codex review (PR #1174, round 15)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4186909736 | Persist terminalization before hand-off | Fixed now. The `Ended` marker is persisted by re-signing the resume record at the moment of terminalization, before any wait for transport capacity, and it is retained until emission. A crash after terminalization can no longer leave a `Live` entry that restore might re-authorize | H5a |
 
 ## Appendix A. FTL reference
 
