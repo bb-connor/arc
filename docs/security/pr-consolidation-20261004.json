@@ -2672,7 +2672,12 @@
         1160
       ],
       "open_review_requirements": [],
-      "head_in_foundation": false
+      "head_in_foundation": false,
+      "semantic_reconciliation": {
+        "path": "docs/security/legacy-integration-reconciliation-20261005.json",
+        "sha256": "6c24ebd218c11d97a8a408b83b9f0ca4925d5012631f91abb60c0e049c380de9",
+        "status": "six bounded semantic assessments; original 219 patch-unique commits and 78 threads remain preserved and unretired"
+      }
     },
     {
       "pr": 959,

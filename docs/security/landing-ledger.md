@@ -25,12 +25,38 @@ workbench duplicates are closed as superseded. The verified open count is 22.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
-1585 ledger requirements, including 201 carried review records and two new
-foundation findings from the October 5 independent review.
+1587 ledger requirements, including 201 carried review records and four new
+foundation findings from the October 5 independent reviews.
 The original 1,382 identities and source records remain preserved. Later repairs
 update acceptance without erasing the historical dispositions.
 
 ## Foundation repair batch after consolidation
+
+Source `6428fac61a1bcb18b1d764f9a74591a8e226610d` carries the rebuilt Swift
+framework and the next independent-review repairs. Source `60ec98d6fd` passed
+all five native Swift consumer tests in rebuild job `111582101361`, run
+`37252196996`. Artifact `11321617698` was downloaded with its GitHub ZIP digest,
+manifest and installed file hashes verified. The separate old committed-package
+job failed, so the overall run remains failed. The installed candidate still
+requires its own passing package check and final independent review.
+
+Codex's review of `60ec98d6fd` found incomplete Swift dependency triggers and
+weak Ed25519 sender constraints. The workflow now covers all workspace crates,
+vendored sources and root Cargo inputs. A shared sender-key decoder rejects weak
+keys at registration, decoding and runtime; DPoP and the adjacent JWT verifier
+use strict signatures. Four attack regressions failed before the repair; all
+137 MCP remote tests and all-target Clippy now pass. The
+[sender and mobile evidence](audits/foundation-sender-mobile-qualification-20261005.json.gz)
+retains those results and the unsuccessful attempts separately. This is component
+qualification, with final hosted/native/trusted and merge acceptance still open.
+
+The [legacy integration comparison](legacy-integration-reconciliation-20261005.json)
+records six bounded assessments of two #1029 repair commits. Current source
+already contains cumulative-approval checks and a different retry runtime with
+millisecond scheduling. Transcript validation and the composition of legacy
+credit evaluation with facility-backed minting still need reconciliation.
+#1029 remains open with all 219 patch-unique commits and 78 review threads
+preserved; this comparison does not establish whole-PR equivalence.
 
 GitHub Codex completed independent review of `19df31ad93` with two P1 findings:
 stale generated proof coverage and a bundled Swift framework behind the wrapper
@@ -49,8 +75,8 @@ reader authenticates schema-6 archives without rewriting them at startup. All
 restart. No duplicate production migration was added. Swift's former test
 accepted `bindingUnavailable` as success; stronger tests now require real Rust
 calls. Native run `37251015566` failed all three Rust consumer tests with the
-unavailable binding; both App Attest wrapper tests passed. Rebuilt bundled
-artifacts and final review remain open. The ledger also maps issue-summary findings to their original requirements,
+unavailable binding; both App Attest wrapper tests passed. The rebuilt artifact
+and remaining candidate acceptance are recorded above. The ledger also maps issue-summary findings to their original requirements,
 so findings outside inline threads retain an explicit owner and acceptance.
 
 Source `1ae6920d14f7e3e5c59122a189f26bfdb81bffbd` repairs the consumer findings
@@ -65,7 +91,7 @@ separately. This is not final independent, hosted, native or merge qualification
 | PB5 / registry thread | Stream within the 16 MiB reader limit, sync a staged file and publish atomically. Exact-bound reopen and oversized-write preservation pass. | Review and supported filesystem qualification; task-ID and retention policy remain separate PB5 work. |
 | PB9 / discovery thread | Enforce the 8 MiB OpenAPI limit before sized or chunked buffering. The CI-style serial API Protect suite passes 257 tests. | Independent candidate review and hosted acceptance. |
 | PR10 / recursive reader thread | Borrow raw subtrees instead of retaining depth-multiplied owned copies. Three controls pass, including a 12 MiB nested value under a 512 MiB process limit. | Final review; depth-bounded rescanning remains, with no single-pass CPU claim. |
-| TR9 / mobile thread | Swift, Kotlin and React Native source wrappers and binding guides match the current exports. TypeScript builds; 31 host Rust FFI tests pass. | Rebuild Apple framework artifacts and qualify the supported native Swift/Kotlin consumers. |
+| TR9 / mobile thread | Swift, Kotlin and React Native source wrappers and binding guides match the current exports. TypeScript builds; 31 host Rust FFI tests and five rebuilt native Swift tests pass. | Qualify the final committed Swift package and supported Kotlin consumers; complete final review and landing. |
 
 The four affected consumer packages pass all-target Clippy with warnings denied.
 Private authority-directory and monotonic-clock fixtures pass four and nine
@@ -553,8 +579,10 @@ retains 62 records, including unsuccessful attempts, with SHA-256
 
 | Order | PR | Responsibility | Acceptance |
 | --- | --- | --- | --- |
-| 1 | [#1167](https://github.com/bb-connor/arc/pull/1167) | Trusted workflow definitions | Dependency base is merged; exact-head hosted checks, refreshed review and protected merge remain |
-| Waiting | [#1160](https://github.com/bb-connor/arc/pull/1160) | Bounded process/security foundation | Both histories, required security repairs, independent review, native/trusted evidence, exact-candidate CI |
+| 1 | [#1160](https://github.com/bb-connor/arc/pull/1160) | Bounded process/security foundation | Final independent review, PostgreSQL native repair, Linux/trusted evidence, exact-candidate CI and protected merge remain |
+
+Prerequisites #1168 and #1167 are merged. The second landing slot is unused;
+valuable separate tracks remain open with named destinations.
 
 Later hardening and product-evidence slices receive a PR only when an active
 slot becomes available. Their source remains in the preserved reference.

@@ -1,0 +1,132 @@
+{
+  "schema": "chio.legacy-integration-semantic-reconciliation.v1",
+  "foundation_source": "60ec98d6fd92eb1edfeefb6ede985865ecf8dd49",
+  "original_pr": 1029,
+  "original_head": "cbbba8cf2178cbbdd7b6b38a121e59365eb452ac",
+  "destination_pr": 1029,
+  "status": "open-preserved-partial-reconciliation",
+  "scope": "Source comparison of two named review-repair commits. No tests rerun by this record, no full patch equivalence, retirement or landing claim. All 219 patch-unique commits and 78 original review threads remain preserved.",
+  "requirements": [
+    {
+      "requirement": "Cumulative-approval negotiation and authenticated family-root verification",
+      "original_commit": "692e32a19970f32cec735344a86d5f80f6d6e5b0",
+      "disposition": "corresponding-current-source-present",
+      "witnesses": [
+        {
+          "path": "crates/kernel/chio-kernel-core/src/capability_verify.rs",
+          "sha256": "88f385e0801c3c12bd1df4a2e8b7cf3f7a94e4a705e7fc5760ce9aaf272af03c",
+          "symbols": [
+            "verify_negotiated_cumulative_approval",
+            "verify_cumulative_approval_constraints"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel-core/src/capability_verify_tests.rs",
+          "sha256": "ba778ca98bb86617f9ce18ecbd5028a3613d0350eb994cd0aaa70d902aa4613b",
+          "symbols": [
+            "cumulative_approval_requires_negotiation",
+            "delegated_cumulative_approval_requires_authenticated_root"
+          ]
+        }
+      ],
+      "remaining": "Run the owning final-candidate constraints and lineage suites; compare every original scope/token change before declaring full commit equivalence."
+    },
+    {
+      "requirement": "Reject invalid retry policy during runtime construction",
+      "original_commit": "e2202455c704597a74b75dacfec3157a97c36254",
+      "disposition": "reworked-in-current-owner",
+      "witnesses": [
+        {
+          "path": "crates/kernel/chio-kernel/src/settlement_routing.rs",
+          "sha256": "4eeeed146b7703501c6d87e52db8f4ab3abe45c0c8858243f82ca275fe581cff",
+          "symbols": [
+            "struct SettlementObserverRuntime",
+            "retry_policy.validate()?",
+            "InvalidRetryPolicy"
+          ]
+        }
+      ],
+      "remaining": "Qualify current observer configuration; do not restore the older duplicate SettlementRuntime abstraction."
+    },
+    {
+      "requirement": "Preserve fractional retry delay without scheduling early",
+      "original_commit": "e2202455c704597a74b75dacfec3157a97c36254",
+      "disposition": "reworked-in-current-owner",
+      "witnesses": [
+        {
+          "path": "crates/platform/chio-store-sqlite/src/settle_attempts.rs",
+          "sha256": "17f5d06fbed5625cce1775053476580329a6546b54bc80c1a984730438f46660",
+          "symbols": [
+            ".as_millis()",
+            "retries_preserve_reason_and_millisecond_backoff"
+          ]
+        }
+      ],
+      "remaining": "Qualify current millisecond outcome-store API rather than adding a second seconds-based rounding helper."
+    },
+    {
+      "requirement": "Receipt-ID idempotency across settlement lease recovery",
+      "original_commit": "e2202455c704597a74b75dacfec3157a97c36254",
+      "disposition": "partial-current-controls-require-semantic-review",
+      "witnesses": [
+        {
+          "path": "crates/economy/chio-settle/src/hook.rs",
+          "sha256": "305217b72e339dedd013cb29c198cbdd9544d6ee435428c5423c2412d97eded6",
+          "symbols": [
+            "hooks MUST deduplicate effects by `receipt_id` across row versions",
+            "idempotency_key: &SettlementIdempotencyKey"
+          ]
+        },
+        {
+          "path": "crates/kernel/chio-kernel/src/kernel/settlement_observer.rs",
+          "sha256": "0371f45c829ab4ebc610a18f2411bfb092bf1a671b836a8ef316138cf5449f69",
+          "symbols": [
+            "idempotency_key.receipt_id != observation.receipt_id",
+            "idempotency_key.row_version == 0"
+          ]
+        }
+      ],
+      "remaining": "Reconcile concrete effectful hooks and recovery tests. The required argument and claim binding are not proof of downstream effect idempotency."
+    },
+    {
+      "requirement": "Validate accepted settlement transcript identifiers before routing",
+      "original_commit": "e2202455c704597a74b75dacfec3157a97c36254",
+      "disposition": "original-boundary-not-equivalent",
+      "witnesses": [
+        {
+          "path": "crates/kernel/chio-kernel/src/settlement_routing.rs",
+          "sha256": "4eeeed146b7703501c6d87e52db8f4ab3abe45c0c8858243f82ca275fe581cff",
+          "symbols": [
+            "!outcome.has_supported_schema()",
+            "SettlementOutcome::Accepted { .. } => SettlementRoutingInput::Accepted"
+          ]
+        }
+      ],
+      "remaining": "The current routing owner checks schema but ignores accepted transcript contents. Determine the retained transcript contract and repair/test its owning boundary before retiring this obligation."
+    },
+    {
+      "requirement": "Credit-facility election and prevention of duplicate legacy IOU effects",
+      "original_commit": "e2202455c704597a74b75dacfec3157a97c36254",
+      "disposition": "distinct-current-paths-require-composition-review",
+      "witnesses": [
+        {
+          "path": "crates/economy/chio-credit/src/local_account.rs",
+          "sha256": "b2930c8bb8158c4d1c08cb7f53fa003bb9a2cf3ab6239f0907880a5fba707428",
+          "symbols": [
+            "fn evaluate(",
+            "financial.cost_charged",
+            "mint_obligation_iou_v2"
+          ]
+        },
+        {
+          "path": "crates/economy/chio-credit/src/iou_v2.rs",
+          "sha256": "84a2f9b218657f2104ce8f2ccdfc3ad90e8238afd10b02d1d70ed19553fa623b",
+          "symbols": [
+            "atom.credit_election()"
+          ]
+        }
+      ],
+      "remaining": "Compare legacy evaluation and explicit obligation-v2 minting call sites and facility custody. Do not infer whole-feature equivalence from either path alone."
+    }
+  ]
+}

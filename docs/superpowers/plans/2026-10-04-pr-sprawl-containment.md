@@ -155,11 +155,29 @@ Neither a completed review with findings nor a self-authored repair reply is app
   test incorrectly accepted `bindingUnavailable` as success. Native run
   `37251015566` fails all three Rust consumer tests with that error, while both
   App Attest wrapper tests pass. Preserve this red result separately.
-- [ ] Use the workspace-locked UniFFI generator, build the Apple static
+- [x] Use the workspace-locked UniFFI generator, build the Apple static
   libraries, expose their C module correctly, and compile generated Swift as
   a real package target. Rebuild the bundled framework and test that exact SDK.
 - [ ] Preserve native build provenance, renew final independent review and
   complete hosted, Linux/native/trusted and protected-merge acceptance.
+
+The rebuilt SDK from `60ec98d6fd` passes all five native tests in run
+`37252196996`, job `111582101361`; the artifact's exact ZIP and installed-file
+hashes are retained. Source `6428fac61a` installs that tested bundle. The old
+committed-package job failed separately, so the run remains failed. The final
+committed candidate needs its own passing package tests.
+
+The independent review of `60ec98d6fd` adds two P1 obligations. Source
+`6428fac61a` expands Swift triggers to all local Rust sources and rejects weak
+MCP sender keys, using strict DPoP and JWT signatures. Four attack controls fail
+before repair; all 137 owning tests and all-target Clippy pass afterward.
+Independent rereview and foundation qualification remain open.
+
+Six source comparisons for #1029 are recorded in
+`docs/security/legacy-integration-reconciliation-20261005.json`. They identify
+current cumulative-approval and retry owners while retaining unresolved
+transcript and credit-path composition obligations. This is a partial semantic
+comparison, with all unmatched valuable source still open.
 
 ## Execution rulings
 

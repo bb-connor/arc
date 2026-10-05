@@ -88,8 +88,9 @@ The subsequent source repair `1ae6920d14` now carries bounded atomic A2A
 registry writes, unsigned JSON-RPC/SSE numeric compatibility, a streaming
 OpenAPI discovery ceiling and borrowed recursive JSON subtrees. These local
 repairs do not close their broader original requirements. Mobile wrappers now
-match the current FFI, while the Apple artifact rebuild and supported native
-consumer matrix remain open. The authoritative
+match the current FFI. Source `6428fac61a` installs a rebuilt Apple framework
+that passes five native tests, with exact source and artifact hashes retained.
+The final committed-package check and supported Kotlin matrix remain open. The authoritative
 [repair ledger](landing-ledger.md#foundation-repair-batch-after-consolidation)
 records each component result and remaining acceptance.
 
