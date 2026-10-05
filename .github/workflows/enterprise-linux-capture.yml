@@ -823,7 +823,6 @@ jobs:
           [[ "${EVIDENCE_SOURCE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           test "$(/usr/bin/git -C candidate rev-parse HEAD)" = "${EVIDENCE_SOURCE_SHA}"
           test "$(/usr/bin/git -C authorized-security rev-parse HEAD)" = "${AUTHORIZED_SOURCE_SHA}"
-          test "${AUTHORIZED_SOURCE_SHA}" = "${EVIDENCE_SOURCE_SHA}"
           test "$(uname -s):$(uname -m)" = "Linux:x86_64"
           test -f authorized-security/scripts/aggregate-security-evidence-shards.py
           test ! -L authorized-security/scripts/aggregate-security-evidence-shards.py
@@ -908,12 +907,14 @@ jobs:
 
       - name: Compose exact shards and require isolated complete validation
         env:
+          AUTHORIZED_SOURCE_SHA: ${{ needs.authorize-capture.outputs.authorized_source_sha }}
           EVIDENCE_SOURCE_SHA: ${{ needs.authorize-capture.outputs.source_sha }}
           SECURITY_EXECUTION_IMAGE: ${{ steps.security-image.outputs.image }}
         run: |
           set -euo pipefail
           /usr/bin/python3 -I \
             authorized-security/scripts/aggregate-security-evidence-shards.py \
+            --authorized-source-sha "${AUTHORIZED_SOURCE_SHA}" \
             --candidate candidate \
             --expected-sha "${EVIDENCE_SOURCE_SHA}" \
             --image "${SECURITY_EXECUTION_IMAGE}" \
