@@ -56,21 +56,21 @@ required capability, quota, recovery and receipt machinery.
 
 ## Implementation and acceptance
 
-- [ ] Add failing payload-binding controls: worker-selected metadata cannot
+- [x] Add failing payload-binding controls: worker-selected metadata cannot
   replace the original capability hash; tool identity comes from the installed
   route; JSON and model mappings preserve their existing output.
-- [ ] Implement the mapping and expose the existing HTTPS adapter interface with
+- [x] Implement the mapping and expose the existing HTTPS adapter interface with
   documentation of its trusted-host contract. Keep errors typed and redacted.
-- [ ] Implement the PostgreSQL host adapter as a separate example module. Use a
+- [x] Implement the PostgreSQL host adapter as a separate example module. Use a
   bounded async deadline and strict duplicate-aware input parsing. Preserve
   typed lease-loss/conflict results; uncertain database failures must not imply
   that no effect occurred.
-- [ ] Replace native gateway launch with broker fixture composition in the two
+- [x] Replace native gateway launch with broker fixture composition in the two
   qualification drivers. Save the actual prepared request for response binding
   and recovery. Verify original signed receipts and unchanged caller identity.
-- [ ] Add credential-isolation, forged-caller, route-denial and cut-point
+- [x] Add credential-isolation, forged-caller, route-denial and cut-point
   controls. Inspect private versus shareable evidence for secret leakage.
-- [ ] Run the PostgreSQL worker API, payload tests, example/CLI Clippy and
+- [x] Run the PostgreSQL worker API, payload tests, example/CLI Clippy and
   protocol workflow contract tests. Update CI to build and provision the existing
   prepared native broker fixture.
 - [ ] Run both real trajectories on Linux x86_64 with TLS PostgreSQL, enforced
@@ -79,3 +79,8 @@ required capability, quota, recovery and receipt machinery.
   after recovery, and a successful explicit new-intent control.
 - [ ] Review the full change against the production readiness spec. Retain every
   unsuccessful attempt and bind final evidence to the exact committed source.
+
+The profile and launch-thread follow-up is recorded in the parent readiness
+plan. Implementation and local boundary checks are complete. Final native
+trajectory acceptance remains tied to the exact x86 candidate and its public
+reports; earlier failed attempts do not satisfy those two remaining items.

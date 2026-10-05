@@ -73,7 +73,7 @@
 **Interfaces:** Preserve public worker lease API, tenant/owner/fence inputs, `qualify.py` and `qualify_claim_loss.py` evidence contracts, and signed receipt verification. Reuse the original admission authority.
 
 - [x] Write and self-review a focused design/plan after tracing the existing prepared broker and resource adapter implementation; pin exact modules and custody interfaces before transport implementation.
-- [ ] Add failing boundary tests for credential isolation, forged caller, wrong tenant/lease fence, denied direct networking and lost committed replies.
+- [x] Add failing boundary tests for credential isolation, forged caller, wrong tenant/lease fence, denied direct networking and lost committed replies.
 - [x] Implement the smallest mediated composition preserving these properties and the real TLS PostgreSQL resource.
 - [ ] Run the public worker API suite and both native qualification trajectories on Linux x86_64, including actual host termination and recovery without redispatch.
 - [ ] Verify receipts and nonsecret artifact contents, update operator documentation, run relevant Clippy and workflow contract tests, then commit.
