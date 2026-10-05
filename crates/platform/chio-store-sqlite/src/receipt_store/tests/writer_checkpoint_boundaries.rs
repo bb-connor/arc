@@ -243,6 +243,46 @@ fn downgrade_checkpoint_column_to_v6(connection: &Connection) -> TestResult {
     Ok(())
 }
 
+#[test]
+fn retained_v6_checkpoints_can_rotate_again_after_restart() -> TestResult {
+    for downgrade_live in [true, false] {
+        let (directory, path) = temp_db("chio-retained-checkpoint-upgrade")?;
+        let archive_path = directory.path().join("archive.sqlite3");
+        seed_checkpoint_chain(&path)?;
+        let store = SqliteReceiptStore::open(&path)?;
+        assert_eq!(
+            store.archive_receipts_before(2, archive_path.to_str().ok_or("archive path")?)?,
+            2
+        );
+        drop(store);
+        let archive = Connection::open(&archive_path)?;
+        let before = signed_checkpoint_rows(&archive)?;
+        downgrade_checkpoint_column_to_v6(&archive)?;
+        drop(archive);
+        if downgrade_live {
+            downgrade_checkpoint_column_to_v6(&Connection::open(&path)?)?;
+        }
+
+        let store = SqliteReceiptStore::open(&path)?;
+        store.wait_for_writer_ready(Duration::from_secs(5))?;
+        store.append_chio_receipt(&sample_receipt_with_id("after-archive-upgrade"))?;
+        store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
+        assert_eq!(
+            store.archive_receipts_before(2, archive_path.to_str().ok_or("archive path")?)?,
+            1
+        );
+        let archive = Connection::open(&archive_path)?;
+        assert_eq!(&signed_checkpoint_rows(&archive)?[..2], before.as_slice());
+        let version: i32 = archive.query_row(
+            "SELECT version FROM chio_store_schema_versions WHERE store_key = 'receipt'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(version, RECEIPT_STORE_SUPPORTED_SCHEMA_VERSION);
+    }
+    Ok(())
+}
+
 fn assert_checkpoint_column_constraints(connection: &Connection) -> TestResult {
     use rusqlite::types::Value;
     for (table, guard) in [

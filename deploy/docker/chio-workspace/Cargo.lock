@@ -2329,6 +2329,7 @@ dependencies = [
  "rcgen 0.13.2",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "ureq 2.12.1",

@@ -726,6 +726,11 @@ fn validate_config(config: &FrostCeremonyConfig) -> Result<(), FrostCeremonyErro
                 "transport keys must use Ed25519",
             ));
         }
+        if participant.transport_public_key.is_weak_ed25519() {
+            return Err(FrostCeremonyError::InvalidConfig(
+                "transport keys must not be weak Ed25519 keys",
+            ));
+        }
         if index > 0 && config.participants[index - 1].participant_id >= participant.participant_id
         {
             return Err(FrostCeremonyError::InvalidConfig(
@@ -872,7 +877,7 @@ fn validate_package(
         canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
     if !sender
         .transport_public_key
-        .verify(&signing_bytes, &signature)
+        .verify_strict(&signing_bytes, &signature)
     {
         return Err(package_authentication_error(
             &package.sender_participant_id,

@@ -92,6 +92,78 @@ fn expect_error(
     );
 }
 
+fn weak_transport_forgery() -> Result<(PublicKey, Signature), FrostCeremonyError> {
+    let mut identity = [0_u8; 32];
+    identity[0] = 1;
+    let mut signature = [0_u8; 64];
+    signature[0] = 1;
+    Ok((
+        PublicKey::from_bytes(&identity).map_err(crypto_error)?,
+        Signature::from_bytes(&signature),
+    ))
+}
+
+#[test]
+fn ceremony_roster_rejects_weak_transport_keys() -> TestResult {
+    let n = network()?;
+    let mut config = n.configs[1].clone();
+    config.participants[0].transport_public_key = weak_transport_forgery()?.0;
+    assert!(matches!(
+        config.validate(),
+        Err(FrostCeremonyError::InvalidConfig(
+            "transport keys must not be weak Ed25519 keys"
+        ))
+    ));
+    Ok(())
+}
+
+#[test]
+fn round_one_authentication_rejects_weak_transport_forgery() -> TestResult {
+    let n = network()?;
+    let (key, signature) = weak_transport_forgery()?;
+    let mut config = n.configs[1].clone();
+    config.participants[0].transport_public_key = key.clone();
+    // Isolate signature verification from the independent roster check.
+    let context = ValidatedCeremony {
+        config: &config,
+        ..ValidatedCeremony::new_without_key(&n.configs[1])?
+    };
+    let mut package = n.round1[0].0.clone();
+    package.transport_signature = signature.to_hex();
+    let message =
+        canonical_prefixed_bytes(DKG_PACKAGE_SIGNING_PREFIX, &package.signing_preimage())?;
+    assert!(
+        key.verify(&message, &signature),
+        "fixture must reproduce permissive verification"
+    );
+    assert!(validate_package(&context, &package, FrostDkgRound::Round1).is_err());
+    Ok(())
+}
+
+#[test]
+fn sealed_round_two_authentication_rejects_weak_transport_forgery() -> TestResult {
+    let n = network()?;
+    let (key, signature) = weak_transport_forgery()?;
+    let mut config = n.configs[1].clone();
+    config.participants[0].transport_public_key = key.clone();
+    // Isolate signature verification from the independent roster check.
+    let context = ValidatedCeremony {
+        config: &config,
+        ..ValidatedCeremony::new_without_key(&n.configs[1])?
+    };
+    let mut package = n.round2[0].clone();
+    package.transport_signature = signature.to_hex();
+    assert!(
+        key.verify(&package.signing_bytes()?, &signature),
+        "fixture must reproduce permissive verification"
+    );
+    assert!(matches!(
+        package.verify_context(&context, false),
+        Err(FrostCeremonyError::Sealing(FrostSealingError::Signature))
+    ));
+    Ok(())
+}
+
 #[test]
 fn every_three_of_five_pair_matches_vectors_and_produces_a_working_threshold_key() -> TestResult {
     let n = network()?;

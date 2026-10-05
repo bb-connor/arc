@@ -230,7 +230,7 @@ impl SealedFrostRound2Package {
             .map_err(|_| FrostSealingError::Signature)?;
         if !sender
             .transport_public_key
-            .verify(&self.signing_bytes()?, &signature)
+            .verify_strict(&self.signing_bytes()?, &signature)
         {
             return Err(FrostSealingError::Signature.into());
         }
