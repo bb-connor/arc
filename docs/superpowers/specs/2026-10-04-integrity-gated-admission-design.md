@@ -218,7 +218,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
      - the read's release record, for artifact reads. That is the P4 `ReleaseIntent` of that read, which binds the artifact version digest; the version digest alone is never the source record;
      - the restore record, for model-context restores;
      - the confined-return record, which binds the child's influence `commitment` (I8), for confined returns;
-     - the verified launch record digest under `source_kind = initial`, for the initial-influence observation (I7).
+     - the context-creation record under `source_kind = initial`, for the initial-influence observation (I7). It is the knowledge-scope creation row written in the same transaction: scope id, context key values, creation attempt, and the worker-profile outcome, which is the verified launch record digest when `Verified`, or the `Unverified` reason (absent, mismatched, unverifiable, lookup failed, predicate false) otherwise. Every context therefore has a stable initial id, including when verification fails, and the fail-closed `unknown` start commits idempotently.
    - **Distinct destinations are distinct observations.** Two contexts that read the same artifact version produce two observations, one per destination. Each context's heads therefore receive the artifact's influence, and neither context can stay trusted because another context read the version first.
    - **Retries are stable.** A retry, replay or rebuild of one delivery (same record, same destination) yields the same id and changes nothing. Two deliveries of identical bytes yield two ids.
    - **A retry that cannot reuse its record over-taints and never under-taints.** If a host cannot reuse the delivery record when it retries, the retry adds a second observation. That only adds influence (I2). It never double-counts bits, because `ExternalBounded` observations are keyed by the confined-return record, which is unique per return.
@@ -241,7 +241,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
 7. **I7. Initial influence of a context.** It comes from the **verified** worker-profile fact (`2026-10-04-microkernel-isolation-backend-design.md` rule 6.3.5), never from the raw attribution.
    - **Qualification.** The fact is `Verified(kind)` only when the host attribution equals the runner's per-attempt record, the referenced launch record verifies (pinned signer, digest, enforcement state), its attempt equals the context's attempt, and the kind's own predicate holds (spec 7 rule 6.3.5).
    - **Failure behavior.** Any failure (absent, mismatched, unverifiable, lookup failed, predicate false) is `Unverified` and is treated as `direct` below. A failure can only make the start less trusted.
-   - **Committed once.** The host verifies the fact when the context's knowledge scope is created. In the same writer transaction, it inserts the initial observation (`source_kind = initial`, I4a). Crossings read the committed state and never re-derive it, and a later attribution can only add influence (I2).
+   - **Committed once.** The host verifies the fact when the context's knowledge scope is created. In the same writer transaction, it writes the context-creation record and inserts the initial observation keyed by it (`source_kind = initial`, I4a), whether the outcome is `Verified` or `Unverified`. A scope cannot exist without its initial observation. Crossings read the committed state and never re-derive it, and a later attribution can only add influence (I2).
 
    Starting states by verified kind:
    - **`direct`, or `Unverified`,** starts at `unknown = true`. The worker can ingest anything outside mediation.
@@ -544,3 +544,9 @@ Open decisions:
 - into a cage, for the quarantine.
 
 Here the analogy holds exactly.
+
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933157 | Define an ID for unverified initial observations | Fixed now. The initial observation is keyed by the durable context-creation record, which records the worker-profile outcome (the verified launch record digest, or the `Unverified` reason). Every context gets a stable initial id, including on verification failure, and scope creation commits it in the same transaction | I4a; I7 |

@@ -519,6 +519,13 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
 21. **X21. Savepoint failure protocol.**
     - After any non-refusal SQLite error, the loop checks `sqlite3_get_autocommit()`. SQLite rolls back the whole transaction on `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM`.
     - If the transaction is gone, every member gets `Retry` (known not committed) and re-queues. No member ever runs outside the batch transaction.
+    - **If the transaction is still active,** the error was statement-scoped. Before anything else, the loop runs `ROLLBACK TO` and then `RELEASE` for that member's savepoint, discarding every write the member made. Then:
+      - a uniqueness or CAS-guard constraint answers `Refused(VersionConflict)`, which spec 9 re-projects;
+      - any other error answers that member `Retry`, known not committed. After `member_fault_retries` (default 2) consecutive failures of the same planned member, it is answered `Refused(Unavailable)` instead and a store incident is raised. Spec 9 never compensates on either reason by itself (M10, M11);
+      - the next member runs only after the savepoint rollback succeeds, so no member executes against a partially applied predecessor.
+    - **If `ROLLBACK TO` or `RELEASE` fails,** the loop issues `ROLLBACK` for the whole transaction. No `COMMIT` was issued, so every member is known not committed and gets `Retry`. The writer discards the connection and reopens it through the X9 connection-recovery fence before the next batch.
+      - If the fence fails, the owner is poisoned. Queued members are answered `Refused(Unavailable)`, so pre-dispatch drivers deny and post-effect drivers retain (spec 9 M10, M11).
+      - A stop or resume in the priority lane is still covered by spec 8's stop-intent journal (S25).
     - In-memory side effects of a member (the trusted-time fence, caches) are buffered and applied only after `COMMIT`.
 22. **X22. Unknown outcomes.**
     - If `COMMIT` fails with an unknown outcome, the owner is poisoned and every member gets `OutcomeUnknown`. The same happens when the anchor sync fails after a successful `COMMIT` (`serving_owner.rs:284-289`).
@@ -584,6 +591,8 @@ These extend M: `native-restart-safety.md`'s matrix:
 | C7. Restore to a prefix at or above the anchor | Progress-only suffix lost | X6: no refused crossing becomes allowed. A lost return record becomes unknown |
 | B1. Batch `COMMIT` outcome unknown | Unknown for every member | Owner poisoned; restart reconciles each member |
 | B2. Batch transaction lost before `COMMIT` | Nothing from the batch | Members get `Retry` (X21) |
+| B2a. Statement error with the transaction still active | That member's savepoint is rolled back; other members are unaffected | That member gets `VersionConflict`, `Retry`, or `Unavailable` after `member_fault_retries` (X21) |
+| B2b. Savepoint rollback fails | The whole transaction is rolled back | Members get `Retry`; the connection is reopened through X9; the owner is poisoned if the fence fails (X21) |
 | R1. Receipt not yet materialized | Receipt in the terminal projection | The mover resumes; status `signed_but_not_durable` |
 | R1a. Crash after the `receipts.db` append, before the mover advances | Receipt in the log and in the terminal projection | The re-run append conflicts on `(namespace, log_sequence)` and `receipt_id`, the digests match, and nothing is appended (rule 24) |
 | R2. Check-only or `NonDurable` receipt append outcome unknown | The append may or may not commit | Spec 9 M16: `KernelEvidenceLatch` with a buffered fault record; read back the original id before appending any fault receipt (rule 28) |
@@ -794,6 +803,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 Where the analogy breaks:
 - FTL commits nothing durably and has no restore adversary.
 - Chio must survive a crash at any cutpoint and a restore to any anchored prefix without widening authority. That is why commit classes, the custody check, the return record and the cutpoint matrix exist.
+
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933166 | Handle errors that leave the batch transaction open | Fixed now. X21 defines the active-transaction branch: the member's savepoint is rolled back and released before anything else, the member gets `VersionConflict`, `Retry`, or `Unavailable` after bounded retries, and no later member runs against an unrecovered savepoint. If the savepoint rollback fails, the whole transaction rolls back (`Retry` for all, connection reopened through X9, owner poisoned if the fence fails). New crash rows B2a and B2b | X21; section 13 |
 
 ### Codex review (PR #1174, round 3)
 

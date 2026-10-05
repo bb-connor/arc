@@ -268,6 +268,7 @@ pub(crate) enum CompensableReservation<'k> {
     ChildBudgetLease(ChildLeaseToken),
     RuntimeAdmission(RuntimeAdmissionLeaseToken),
     DispatchCredentials(DispatchCredentialReservation<'k>),
+    EvidenceSlot(EvidenceSlot),          // rule 18; moved into the obligation at the boundary
 }
 
 pub(crate) struct RetainedEntry<'k> {
@@ -307,7 +308,7 @@ Rules:
 
    - `RejectedBeforeCommit` compensates the `compensable` entries and returns the report, as `build_pre_commit_credential_rejection_response` does today (M: `dispatch_commit_failure.rs:11-37`).
    - `CommitUnconfirmed` moves every entry to retained, signs the ambiguous deny with retained markers through `ambiguous_dispatch_receipt_metadata`, and calls `record_dispatch_failed`, exactly as M: does (`dispatch_commit_failure.rs:40-75`). It never compensates: "Do not infer nonexecution from an error returned after entering the store" (`:52-54`). If the CAS to `DispatchCommitted` landed, recovery terminalizes the operation as `OutcomeUnknownAfterDispatch` with the holds still frozen. This is the same rule as spec 9 M12: an unknown commit outcome halts the operation with no compensation.
-   - On success, every entry moves into `RetainedReservations`, which post-effect paths read to stamp retained markers and which nothing can release.
+   - On success, every entry moves into `RetainedReservations`, which post-effect paths read to stamp retained markers and which nothing can release. The one exception is the `EvidenceSlot` entry, which moves into the obligation's `evidence_slot` field (rule 18). `RejectedBeforeCommit` returns it to the pool with the rest of the compensation. `CommitUnconfirmed` carries it with the retained entries, so the ambiguous deny can buffer into it if its own append fails.
 5. Every `match` over `CompensableReservation`, `RetentionCause` and `ExternalCommitment` is exhaustive, under `#[deny(clippy::wildcard_enum_match_arm)]`. A new kind cannot compile without choosing its class. A `Commitment` or a retained entry has no compensator to call.
 6. **`Drop` on an unconsumed `AdmissionReservations` compensates best-effort and never latches.** An unconsumed ledger is type-level proof that `enter_effect_boundary` never ran, so no effect is possible. R: `02-rust-design.md:124` forbids `Drop` from certifying no effect after capture, not from attempting compensation before the boundary. Dropping an evaluation future before dispatch is routine: a client disconnects, or an outer timeout or `select!` fires. M: guards every pre-dispatch await for that reason (section 2.1).
    - `Drop` runs `compensate_before_dispatch` best-effort, with the existing cleanup-fault receipt, in M:'s order.
@@ -331,6 +332,7 @@ pub(crate) struct PostEffectObligation<'k> {
     security_lifecycle: Option<SecurityRequestLifecycleHandle>,
     durable: Option<DurableToolAdmission>,         // owned, not borrowed (rule 8)
     charge: Option<BudgetChargeResult>,            // owned, not borrowed (rule 8)
+    evidence_slot: Option<EvidenceSlot>,           // rule 18: Some for non-durable calls, None for durable
 }
 
 /// Mechanism A. Private fields, no Default, Clone or Deserialize; constructed
@@ -521,7 +523,12 @@ Rules:
 18. **Reserved evidence slots; no drop path.** The buffer never drops a record.
     - Each kernel owns a fixed pool of `post_effect_evidence_slots` (default 1024, configurable, at least 1). The buffer's capacity equals the pool.
     - A non-durable evaluation acquires one slot before `enter_effect_boundary`, as a ledger token (rule 21). If none is free, the call is denied before dispatch with the signed persistence deny and reason `post_effect_evidence_capacity`, and the ledger compensates. Durable calls take no slot, because the saga owns their evidence.
-    - The obligation owns its slot. The slot returns to the pool when the obligation discharges with a committed terminal or fault receipt, or after its buffered record flushes. `Drop` and `fail` buffer only into their own slot.
+    - **The slot is a move-only token.** `EvidenceSlot` has private fields, no `Clone`, `Copy`, `Default` or `Deserialize`, and is returned only by `acquire_evidence_slot` (rule 21). Its `Drop` returns it to the pool. Its lifecycle is by move:
+      - acquired before the boundary as the `CompensableReservation::EvidenceSlot` ledger entry, so pre-dispatch compensation, or the ledger's `Drop`, returns it;
+      - moved into `PostEffectObligation::evidence_slot` by `enter_effect_boundary` (rule 4), so every obligation past the boundary owns exactly one slot;
+      - dropped, and so returned, when `commit_terminal_receipt` or a fault receipt commits;
+      - moved into the `BufferedPostEffectRecord` when `fail` or the obligation's `Drop` must buffer. The record owns the slot until it flushes, and flushing drops it.
+    - `Drop` and `fail` can buffer only by moving their own slot, so a buffered record always has capacity and a slot can never be released while its record is pending.
     - Every evaluation past the boundary therefore holds a slot, and at most one record per slot can exist, so a buffered record always fits. The bound is per kernel, and so is the buffer. A host that builds one kernel per hosted session (M: `chio-mcp-remote` `session_core/factory.rs:381`) gets one pool and one buffer per session kernel, with no global session limit required.
     - While a `KernelEvidence` latch is set, new non-durable dispatch is already denied (rule 17), so the pool drains as records flush.
 
@@ -911,3 +918,9 @@ Where the analogy breaks:
 - **What commit means.** FTL's commit is an in-memory push into held capacity, so it truly cannot fail. Chio's commits are durable writes, so the Chio equivalent is "cannot fail silently".
 - **Drop.** FTL's `Drop` releases capacity it fully owns, under `panic = "abort"` (`Cargo.toml:26`, `:29`). Chio's pre-dispatch `Drop` may compensate best-effort, because nothing crossed the boundary, but its post-dispatch `Drop` may only record evidence, latch, or hand off to supervised reconciliation (rules 6, 11 and 23). Some Chio reservations (`ExternalCommitment`) have no owner the kernel could release them to at all.
 - **Ownership.** FTL's reservations live under one spinlock. Chio's ledger is only the in-process view of reservations whose truth lives in the stores.
+
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933161 | Carry the reserved evidence slot into the obligation | Fixed now. `EvidenceSlot` is a move-only token: a `CompensableReservation::EvidenceSlot` ledger entry before the boundary, moved into `PostEffectObligation::evidence_slot` by `enter_effect_boundary`, dropped (returned) when a terminal or fault receipt commits, and moved into the buffered record on `fail` or `Drop` until it flushes. `RejectedBeforeCommit` returns it; `CommitUnconfirmed` carries it | section 4.3 enum; rule 4; section 4.4 struct; rule 18 |

@@ -162,7 +162,8 @@ Non-goals:
 1. **Authority refs.** `AdmissionOperationStore::begin` writes `admission_operation_authority_refs(operation_id, ref_kind, ref_id)` in the operation's insertion transaction. The rows are:
    - every id in the admission's `CanonicalRevocationSet` (M: `supplemental_quota.rs:732-752`);
    - one `session` row;
-   - `process_lineage` and `principal` rows from the trusted `SecurityInvocationContextV1` (process calls supply runtime and lineage, M: `chio-process/src/security.rs:24-33`);
+   - `process_lineage` and `principal` rows from the trusted `SecurityInvocationContextV1` (process calls supply runtime and lineage, M: `chio-process/src/security.rs:24-33`). On M: the lineage id is the tree root's capability id (`chio-process/src/lib.rs:419-431`), so it matches a closure of the whole tree but not of a subtree;
+   - one `process_tree` row for every process on the calling process's path, root first, including the caller itself. chio-process already loads that path at admission (`store.lineage(process_id)`, `lib.rs:419`), and its length is bounded by the process depth limit. A `ProcessTree(p)` closure fences `process_tree = p`, so it matches every operation of every descendant of `p` by an exact join, with no ancestor lookup inside the CAS;
    - one `swarm_graph` row when a continuation was consumed;
    - one `delegation_root` row when the D1 guard admitted the call (V: `crates/kernel/chio-kernel/src/delegated_work.rs`).
    1a. **Operations from before the index.** The migration that creates `admission_operation_authority_refs` and `closure_fences` also adds `admission_operations.authority_refs_state` (`indexed` or `legacy_unindexed`).
@@ -587,3 +588,9 @@ Where the analogy breaks:
 - **Durability.** FTL close is synchronous and in memory on one kernel. Chio spans durable stores, owners and external tools, so it needs fences, records and a ledger.
 - **Running work.** FTL terminates threads, with an admitted SMP gap for a thread running elsewhere (`thread.rs:279-280`). Chio cannot stop a dispatched effect or a sealed permit held by another owner. The fence and the drain stop new effects and account for the rest.
 - **Economic state.** FTL has none. Chio's earned claims and sealed allocations must survive closure untouched, which FTL never has to express.
+
+### Codex review (PR #1174, round 4)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4180933163 | Index process-tree ancestors for closure fences | Fixed now. Each operation records one `process_tree` ref for every process on its path, root first, from the path chio-process already loads at admission. A `ProcessTree(p)` fence on `p` therefore matches every descendant's operations by an exact join, and the dispatch CAS cannot commit a descendant after the closure. The rule 1a backfill derives the same rows | section 4.1 rule 1 |
