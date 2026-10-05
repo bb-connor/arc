@@ -255,7 +255,9 @@ Rules:
 
 After A1 and A1d, lag can skip only notifications. Correlated responses and server requests ride POST slots, and uncorrelated server requests ride the GET server-request queue; neither depends on the broadcast. Notifications are re-read hints (list changed, resource updated) plus advisory progress and log messages. Revision 4 answers lag with a resync in standard MCP vocabulary instead of terminating streams, because termination with a 64-notification window almost always yields `409` and a reconnect loop against the per-IP rate limiter (S5-12).
 
-1. **A7. Resync request.** On `RecvError::Lagged(n)` at `:517`, `:702`, `:817` or `:860`, the consumer increments `chio_mcp_remote_stream_lag_total`, calls `session.request_resync(n)`, and keeps going. A resync request is a coalesced flag: at most one is pending per session, and further lags add to its skipped count.
+1. **A7. Resync request.** On `RecvError::Lagged(n)` at `:517`, `:702`, `:817` or `:860`, the consumer increments `chio_mcp_remote_stream_lag_total`, calls `session.request_resync(consumer_id, n)`, and keeps going.
+   - **Resync state is per consumer.** Each attached broadcast consumer, such as a GET stream or a POST stream's notification channel, has its own `consumer_id` and its own resync record: a pending flag, a skipped count, a pass counter and a pass cursor. At most one request is pending per consumer, and further lags add to that consumer's skipped count.
+   - **Shared emission.** The session emits a pass while any consumer has a pending request, and a pass's events reach every consumer. Each consumer's record advances and clears independently. Clearing or terminating one consumer never discards another consumer's pending resync, and a detached consumer's record is dropped with it.
 2. **A8. Resync burst.** The edge runtime, which owns the kernel session, services a pending resync on its next loop iteration by emitting through the normal writer:
    - one `notifications/{tools,resources,prompts}/list_changed` for each catalog whose `listChanged` capability the server declared;
    - one `notifications/resources/updated` for each subscribed URI;
@@ -269,7 +271,7 @@ After A1 and A1d, lag can skip only notifications. Correlated responses and serv
      - The current pass runs to completion from `resync_cursor`, and one full follow-up pass is queued, starting again from the catalog events. Coalescing keeps at most one follow-up pending, however many lags occur during the pass. Every hint a lag skipped is therefore re-sent by the follow-up.
      - Each chunk is smaller than the broadcast capacity, so a pass cannot itself cause the lag that queues the next one. A consumer that keeps pace with one chunk per iteration completes a pass with no lag, and resync then stops.
      - **Perpetual lag ends the stream.** If one stream lags during `resync_max_passes` consecutive passes (default 3), the server terminates that stream. A GET stream ends with a final `event: chio-resync-required` frame and is closed. A POST stream's notification channel is closed, while its terminal response still arrives through the non-lossy slot (A1).
-       - The resync flag for that consumer is then cleared, so the session stops emitting passes for it.
+       - That consumer's own resync record is dropped with the stream. The session keeps emitting passes only while some other consumer still has a pending request, and no other consumer's pending resync is cleared.
        - The client reconnects, and A10 and A11 take over: `Last-Event-ID` gets replay, or a `409` with a full client re-read.
 3. **A9. Coverage.** Every list-changed and resource-updated meaning that a lag can skip is covered by the burst, because each is a re-read instruction. Lost progress and log messages cannot be reconstructed; the logging warning makes that loss explicit when logging is on, and progress notifications are advisory under MCP. A burst may deliver a re-read hint for something that did not change, which is always safe.
 4. **A10. Window.** The retained window grows to 256 notifications, the broadcast capacity. A lagged consumer that reconnects with `Last-Event-ID` gets replay whenever fewer than 256 notifications passed since its cursor. Adjacent duplicates in the window coalesce: a newer `list_changed` of the same kind or `resources/updated` of the same URI replaces the older retained one. Coalescing only ever raises `oldest`, so a cursor before a removed entry gets `409`, which is conservative.
@@ -951,6 +953,12 @@ Open decisions:
 | 4187433104 | Rebase ended markers in the normative restore path | Fixed now. A25 keeps the logical end identity, assigns a fresh `end_event_id` in the restored generation and re-signs, and only then re-queues. A stale id is never re-queued, matching H5a | A25 |
 | 4187433110 | Define when a perpetually lagging consumer disconnects | Fixed now. After lag during `resync_max_passes` (default 3) consecutive passes, the server ends that stream with a `chio-resync-required` frame, or closes a POST stream's notification channel while keeping its non-lossy terminal response. It clears that consumer's resync flag, and A10 and A11 take over on reconnect | A8 |
 | 4187433136 | Scope stop hint cursors by stop scope | Fixed now. The `Stop` source tails stop records by the store-global commit sequence, not by epoch, and matches each record to sessions by its scope. A higher epoch in tenant A can no longer hide tenant B's first stop | H10 table |
+
+### Codex review (PR #1174, round 20)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187512204 | Track resync state per stream before clearing it | Fixed now. The resync flag, skipped count, pass counter and cursor are per consumer (`consumer_id`). Passes are emitted while any consumer has a pending request, and records advance and clear independently. Ending a perpetually lagging stream drops only its own record | A7; A8 |
 
 ## Appendix A. FTL reference
 

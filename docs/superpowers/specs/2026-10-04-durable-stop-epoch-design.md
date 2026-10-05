@@ -552,7 +552,11 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - Stop never calls `current_unix_timestamp_ms()` or its `unwrap_or(0)` fallback (W: `kernel/mod.rs:1798-1805`). Accepting a token that expired between the floor and true time is an accepted risk, because a stop only restricts.
 - **S19. Resume.** Resume is deliberate. It always carries `expected_epoch` (S31), and it depends explicitly on S28. Before S28, resume uses the shared credential and is recorded as `SharedCredential`. The phase 1 claim limit states "no two-person resume".
     - **Default, `OperatorPair`.** A roster principal different from every principal in the incident's stopper set.
-      - **The incident.** It begins at the first `Stop` after the scope's last `Resume`. It covers every later `Restrict` and `Rollover` until the resume.
+      - **The incident.** It begins at the first `Stop` after the scope's last `Resume`, or at a `Migration` record, which opens the incident of a migrated legacy stop. It covers every later `Restrict` and `Rollover` until the resume.
+      - **Migrated incidents.** A `Migration` opener records no principal, because the legacy toggle had none (S5). Its stopper set starts empty, and later `Restrict` contributors join it as usual.
+        - `OperatorPair.stopper_epoch` names the `Migration` record, so any roster principal outside the set may resume.
+        - `SamePrincipalAfter` measures from the `Migration` record's first authority-time observation, which the supervised task writes as for a stop.
+        - That is stricter than the legacy toggle, which required no actor at all. Once S28 retires the shared credential, a migrated scope still has a defined resume basis.
       - **The stopper set** is the union of the authorizers and contributors of every `Stop` and `Restrict` in that incident, across chain generations. `Rollover` and `Migration` records contribute no principal, and they never hide one, because the set is collected through them.
       - `OperatorPair.stopper_epoch` names the incident's opening `Stop`, not the head. The resumer must differ from every principal in the set.
       - `SamePrincipalAfter` measures its cooldown from the opening `Stop`'s observation.
@@ -598,6 +602,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     ```
 
     - Verification is offline and signature-only: at least `k` distinct roster principals, no store reads, and no live clock except the attestation.
+    - **Bound to the active roster.** The artifact's `roster_digest` must equal the digest of the operator roster active for the scope at the current deployment generation. The verifier takes that from the signed deployment configuration it already holds, not from the artifact. An artifact naming an older roster, even a validly signed one, is refused. After a roster rotation, principals removed from it can never form a quorum.
     - It is not the tool-call `ThresholdApprovalCollector`, which binds approvals to an original agent request and refuses while stopped (M: `collection_context.rs:13-66`).
 - **S30. Operator reach.**
     - **Mounted routes** for stop, restrict, relax, resume and status on:
@@ -750,10 +755,12 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       - **Applying.** The appended record carries the entry's final, most restrictive state: the entry's `allow_containment`, `satisfies_intent = { intent_id, generation }` for the generation it was built from, and `contributors` listing every request of that generation, with each request's authorizer and reason commitment.
       - **Why the application is always a valid S2 transition.** Every `Stop` and `Restrict` record of a scope applies that scope's entry, and `Resume` and `Relax` are refused while an entry is pending (below). So the head cannot reach the entry's state by any other record, and the application is either a `Stop` over `Running` or a narrowing `Restrict` over `Stopped`.
       - An intent for one scope never overwrites another scope's entry. With tenant A's stop pending as `latch_only` under `SQLITE_FULL`, a stop for tenant B adds a second entry, and a crash restores both.
-    - **Satisfaction.** An entry is satisfied only by proof, never by an epoch number. `satisfied(entry, head)` holds when the scope's anchored head:
-      - is `Stopped`;
+    - **Satisfaction.** An entry is satisfied only by proof, never by an epoch number. `satisfied(entry, head)` holds when the scope's anchored head is `Stopped`, and some record `r` in the head's ancestry within the current incident:
       - carries `satisfies_intent = { intent_id: entry.intent_id, generation: g }` with `g >= entry.generation`, so its `contributors` cover the entry's merged set;
-      - has `allow_containment` no wider than the entry's (`false` when the entry says `false`).
+      - has `allow_containment` no wider than the entry's (`false` when the entry says `false`);
+      - is followed only by records that preserve a state at least as narrow: `Restrict`, or a `Rollover` that restates the head. No `Relax` or `Resume` follows `r`.
+
+      A rollover after the applying record therefore never hides the proof, and a fulfilled entry is removed at boot rather than re-applied or left blocking resume.
 
       A record built from an older generation does not satisfy the entry. The writer then applies the entry again, which over the now-`Stopped` head is a narrowing `Restrict` built from the current generation.
     - **Removal.** An entry is removed only after an anchored head satisfies it. A crash between that anchor and the removal leaves a satisfied entry, which boot verifies against the head and then removes. An unrelated same-scope record never retires an entry.
@@ -1124,6 +1131,14 @@ Open decisions:
 |---|---|---|---|
 | 4187433114 | Check the opening-stop observation for cooldown resumes | Fixed now. A `SamePrincipalAfter` resume binds the incident's opening `Stop` id and is checked against that stop's observation, not the head's. Restrictions and rollovers neither reject the valid observation nor restart the cooldown | S19 |
 | 4187433127 | Add a journal-bypass form for offline Restrict | Fixed now. The no-intent offline form (`requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`) covers both `Stop` and `Restrict`. The bypass path appends a `Stop` over a running head or a narrowing `Restrict` over a stopped head | S2; S25 |
+
+### Codex review (PR #1174, round 20)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187512211 | Define an opening incident for migrated stopped scopes | Fixed now. A `Migration` record opens an incident with an empty stopper set. `OperatorPair.stopper_epoch` names it, so any roster principal outside the set may resume, and `SamePrincipalAfter` measures from its first observation. A migrated scope keeps a resume basis after S28 | S19 |
+| 4187512221 | Bind quorum resumes to the active roster | Fixed now. The quorum artifact's `roster_digest` must equal the roster active for the scope at the current deployment generation, taken from the verifier's signed deployment configuration. Older rosters are refused, so removed principals cannot form a quorum | S29 |
+| 4187512225 | Preserve satisfied intents across rollover | Fixed now. Satisfaction is checked over the head's ancestry within the incident: a matching `satisfies_intent` record followed only by state-preserving records (`Restrict`, or a restating `Rollover`) satisfies the entry. A rollover never hides the proof, and the entry is removed at boot | S25 satisfaction |
 
 ## Appendix A. FTL reference
 
