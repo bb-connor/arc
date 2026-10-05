@@ -812,7 +812,7 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 | T10 `replay_uniqueness` | an operation in a terminal phase, including a deny tombstone, never reaches `Dispatch` again for the same binding | saga rule 4 and its predicates |
 | T11 `stop_is_temporary` | a `KernelStopped` refusal never emits `DenyTombstone` or `Terminalize`, and never emits `Compensate` from `Parked` or a post-dispatch phase | spec 8 S14, S15 |
 | T12 `hints_trail_commits` | a `Hint` effect appears only in the last group of a list, after a group whose commit was acknowledged `Committed`; no transition reads a hint | spec 5 H1, H2 |
-| T13 `store_failure_is_not_policy` | `StoreUnavailable` never yields `Compensate`, `Terminalize`, `DenyTombstone`, `ReleaseHold` or a phase change; the next state retains the same planned member with its expected version | spec 10 X21 |
+| T13 `store_failure_is_not_policy` | for every persisted member, `StoreUnavailable` never yields `Compensate`, `Terminalize`, `DenyTombstone`, `ReleaseHold` or a phase change, and the next state retains the same planned member with its expected version. The one exception is M19's no-row case: a `NonDurable` or check-only attempt from `Unbegun`, which persisted nothing. It may release driver-local in-memory ledger entries (`Compensate` against spec 3's ledger, no store write) before its `Reusable` deny | spec 10 X21 |
 | T14 `identity_disposition_truthful` | a receipt is `Reusable` exactly when its producing transition leaves no operation row, tombstone, custody or executed effect bound to the request id; `Retained` exactly when it is the ambiguous deny of an unknown pre-dispatch commit; `Terminal` otherwise. A request id has at most one `Terminal` receipt, and a `Retained` receipt is followed by either that terminal or a proof that no row committed | spec 8 S15, spec 6 rule 10, spec 3 section 4.11 |
 
 **Model checking.**
@@ -1055,6 +1055,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-1-03 (cross-reference) | The recovery inventory stops before implemented P6 setup and signed maintenance | Applied here. M10 gains a row for a fused `IntentCommit` refused by a participant precondition such as spec 10 X5b's setup gate. From `Unbegun` it gives a `Reusable` deny with nothing persisted; from `Prepared` it compensates | M10 |
+
+### Codex review (PR #1174, round 19)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187433118 | Exempt no-row cleanup from T13 | Fixed now. T13 is scoped to persisted members and explicitly permits M19's no-row in-memory ledger release for a `NonDurable` or check-only attempt from `Unbegun`, so the theorem and the cleanup no longer conflict | T13 |
 
 ## Appendix A. External and FTL precedent
 

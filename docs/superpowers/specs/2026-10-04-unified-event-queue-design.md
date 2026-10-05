@@ -268,7 +268,9 @@ After A1 and A1d, lag can skip only notifications. Correlated responses and serv
    - **Convergence.** A `Lagged` during a burst means the consumer missed part of a chunk that was already emitted, so the current pass can no longer cover everything.
      - The current pass runs to completion from `resync_cursor`, and one full follow-up pass is queued, starting again from the catalog events. Coalescing keeps at most one follow-up pending, however many lags occur during the pass. Every hint a lag skipped is therefore re-sent by the follow-up.
      - Each chunk is smaller than the broadcast capacity, so a pass cannot itself cause the lag that queues the next one. A consumer that keeps pace with one chunk per iteration completes a pass with no lag, and resync then stops.
-     - A consumer that lags on every pass is slower than one chunk per iteration. It falls back to the reconnect path (A10, A11), where `Last-Event-ID` gets replay or a `409` with a full client re-read.
+     - **Perpetual lag ends the stream.** If one stream lags during `resync_max_passes` consecutive passes (default 3), the server terminates that stream. A GET stream ends with a final `event: chio-resync-required` frame and is closed. A POST stream's notification channel is closed, while its terminal response still arrives through the non-lossy slot (A1).
+       - The resync flag for that consumer is then cleared, so the session stops emitting passes for it.
+       - The client reconnects, and A10 and A11 take over: `Last-Event-ID` gets replay, or a `409` with a full client re-read.
 3. **A9. Coverage.** Every list-changed and resource-updated meaning that a lag can skip is covered by the burst, because each is a re-read instruction. Lost progress and log messages cannot be reconstructed; the logging warning makes that loss explicit when logging is on, and progress notifications are advisory under MCP. A burst may deliver a re-read hint for something that did not change, which is always safe.
 4. **A10. Window.** The retained window grows to 256 notifications, the broadcast capacity. A lagged consumer that reconnects with `Last-Event-ID` gets replay whenever fewer than 256 notifications passed since its cursor. Adjacent duplicates in the window coalesce: a newer `list_changed` of the same kind or `resources/updated` of the same URI replaces the older retained one. Coalescing only ever raises `oldest`, so a cursor before a removed entry gets `409`, which is conservative.
 5. **A11. Client action after `409`.** WIRE_PROTOCOL 3.2 gains: after a `409` on `Last-Event-ID`, a client MUST re-list every catalog it uses, re-read every resource it is subscribed to, and reconnect without `Last-Event-ID`. Its subscriptions persist (section 6), so it does not re-subscribe.
@@ -322,7 +324,7 @@ Revision 4 persists subscriptions rather than asking clients to re-subscribe, be
 
 1. **A24. Persisted set.** The resume record gains `subscriptions: Vec<PersistedSubscription>`, a tagged entry `PersistedSubscription = Live { uri, capability_id } | Ended { uri, capability_id, reason, end_event_id }` (the `Ended` arm is H5a's durable end marker), added to the integrity envelope under a new schema label `chio.remote-mcp.resume-record-integrity.v3`. A successful `resources/subscribe` or `resources/unsubscribe` signs and persists a new resume record. If that persist fails, the subscribe returns an error and the registry change is rolled back, so the client never holds a subscription the store does not know.
 2. **A25. Re-authorization at restore.** After A17's persist and before `insert_active`, restore branches on each persisted entry's tag:
-   - **`Ended` markers** are re-queued as `SubscriptionEnded { reason }` with their `end_event_id` (H5a). They are never re-authorized or resurrected as live, and they leave the persisted set only after emission.
+   - **`Ended` markers** keep their logical end identity `(subscription_id, reason)`. Before the session is served, each is assigned a fresh `end_event_id` in the restored generation `g` (A17) and re-signed, and only then re-queued as `SubscriptionEnded { reason }` (H5a). A stale previous-incarnation id is never re-queued. Markers are never re-authorized or resurrected as live, and they leave the persisted set only after emission.
    - **`Live` entries** are replayed through the same path as a client `resources/subscribe`: validate the capability, check scope, check the subject exists (`session_ops.rs:320-338`), then register it, including any upstream forwarding. A `Live` entry that fails re-authorization (expired, revoked, or the subject is gone) is terminalized, not silently dropped. It becomes an `Ended` marker with the failing reason, its `SubscriptionEnded` is queued, and it is persisted as `Ended` until emitted.
 3. **A26. Catch-up.** Updates during downtime were lost, so restore posts one `notifications/resources/updated` for every `Live` entry that passed re-authorization. Entries that are `Ended`, or that were terminalized at restore, get their `SubscriptionEnded` instead and no catch-up update.
 4. **A27. Downgrade.** A binary that predates the v3 envelope fails integrity on such a record and treats it as malformed (`session_recovery.rs:30-31` deletes it). Downgrade therefore loses sessions with subscriptions rather than restoring them without subscriptions. This is stated as a migration note.
@@ -558,7 +560,7 @@ Rules H1-H10 bind every surface:
     | `Capability` (revocation) | The same chain, projection kind `revocation` |
     | `Capability` (expiry) | None: expiry commits nothing. The H7a `ExpirySchedule`, re-armed at restore from the persisted subscriptions, is the source |
     | `Recovery` | `admission_operation_recovery_events.sequence` (W: `admission_operation_recovery.sql:30`) |
-    | `Stop` | The stop chain epoch, through the shared `StopHeads` (spec 8 S1, S24) |
+    | `Stop` | The store-global `authority_global_commits.commit_sequence` of stop records, which cover every scope, through the shared `StopHeads` (spec 8 S1, S24). Epochs are monotonic only within one scope, so a per-source epoch cursor could skip tenant B's first stop after observing tenant A at a higher epoch. The cursor is the global commit sequence, and each tailed record is matched to sessions by its scope |
 
     The rules:
     - **Tail.** The delivering process holds one in-memory cursor per source and store. It advances the cursor by tailing records above it, every `hint_source_poll_ms` (default 250) and immediately on the in-process notify. Each tailed record maps to its audience and posts. If the source process crashes after its commit and before its notify, the tail still delivers the hint.
@@ -941,6 +943,14 @@ Open decisions:
 |---|---|---|---|
 | 4187315386 | Schedule a full follow-up resync after mid-burst lag | Fixed now. A lag during a pass lets the pass finish and queues one full follow-up pass, coalesced to at most one pending, which re-sends every hint the lag skipped. A pass cannot cause its own lag, and a consumer that lags on every pass uses the reconnect path | A8 convergence |
 | 4187315390 | Rebase restored end notifications onto the new generation | Fixed now. Each marker keeps a logical end identity, `(subscription_id, reason)`. Before serving, restore assigns the re-queued `SubscriptionEnded` a fresh event id in the restored generation and re-signs the marker, so replay-past removal compares against an id the client can actually hold | H5a |
+
+### Codex review (PR #1174, round 19)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187433104 | Rebase ended markers in the normative restore path | Fixed now. A25 keeps the logical end identity, assigns a fresh `end_event_id` in the restored generation and re-signs, and only then re-queues. A stale id is never re-queued, matching H5a | A25 |
+| 4187433110 | Define when a perpetually lagging consumer disconnects | Fixed now. After lag during `resync_max_passes` (default 3) consecutive passes, the server ends that stream with a `chio-resync-required` frame, or closes a POST stream's notification channel while keeping its non-lossy terminal response. It clears that consumer's resync flag, and A10 and A11 take over on reconnect | A8 |
+| 4187433136 | Scope stop hint cursors by stop scope | Fixed now. The `Stop` source tails stop records by the store-global commit sequence, not by epoch, and matches each record to sessions by its scope. A higher epoch in tenant A can no longer hide tenant B's first stop | H10 table |
 
 ## Appendix A. FTL reference
 

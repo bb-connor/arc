@@ -204,7 +204,7 @@ pub struct StopEpochV1 {
     pub allow_containment: bool,             // section 7.1, S12
     pub requested_via: StopRequestPath,
     pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
-    pub offline_bypass: bool,                    // true only for an offline-CLI Stop appended without a journal entry (S2, S25); then satisfies_intent is None
+    pub offline_bypass: bool,                    // true only for an offline-CLI Stop or Restrict appended without a journal entry (S2, S25); then satisfies_intent is None
     pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
 }
 
@@ -261,7 +261,7 @@ Normative rules:
    - A `Stop` over a stopped head is an idempotent no-op that returns the current head, unless it asks for narrower containment, in which case it is recorded as `Restrict`.
    - A `Resume` over a running head is a no-op that returns the current head.
    - **Field rules per transition.** The writer constructs, and every verifier checks, the rule for the record's transition. A record that breaks its rule is invalid. A verifier refuses it, and the writer never appends it:
-     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`, and it retires no journal entry. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
+     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` or `Restrict` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`, and it retires no journal entry. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
      - **`Rollover`.** No request exists, so `contributors` is empty and `satisfies_intent` is `None`. `authorizer` is `ChainRollover { serving_owner, writer_epoch }`, naming the serving owner and serving epoch that appended it. `requested_via` is `SystemRollover`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
        - `state`, `allow_containment` and `expected_epoch` restate the previous generation's final record (its state, its containment flag, and its id).
        - `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" || canonical(expected_epoch) || previous)`. That is a fixed domain string plus the restated head id and digest, with no salt and no note row, because there is no operator text to protect. A verifier recomputes it.
@@ -561,7 +561,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - The cooldown starts at the first successful authority-time observation at or after the stop commit.
       - A supervised task retries `observe_authority_time` while a stopped head lacks that observation. On success it writes `admission_operation_stop_observations(scope_key, chain_generation, epoch, first_observed_at)` as a progress-only commit, keyed by the full `StopEpochId`. Every insert, lookup and comparison uses `(scope_key, chain_generation, epoch)`, so an observation from an older generation's stop with the same numeric epoch can never satisfy a new stop's cooldown.
       - A stop committed with `DecisionTime::Unavailable` therefore gains a start point as soon as the clock recovers. The row survives restart, and the next boot's supervised task re-drives a missing one.
-      - The resume record copies the row into `SamePrincipalAfter.cooldown_started` together with its `StopEpochId`. A resume whose `cooldown_started` does not equal the stored observation for the head's exact `(chain_generation, epoch)` refuses.
+      - The resume record copies the row into `SamePrincipalAfter.cooldown_started` together with its `StopEpochId`. The resume binds the incident's opening `Stop` id, not the head id. A resume whose `cooldown_started` does not equal the stored observation for that opening `Stop`'s exact `(chain_generation, epoch)` refuses. Later `Restrict` and `Rollover` records therefore neither reject the valid observation nor restart the cooldown.
       - The row is a progress-only commit. A restore that loses it only restarts the cooldown at the next observation, so it can delay a resume but never shorten the cooldown.
     - **Break-glass.** When authority time is unavailable or below the persisted floor, so that an ordinary resume refuses (S4), a quorum artifact that also carries a signed time attestation may resume.
       - The time source is pinned in signed deployment configuration.
@@ -765,7 +765,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - **Writer.** The serving owner, which holds the lock root, serializes journal writes. The offline CLI takes the same owner lock (S30).
     - A failed intent write leaves only the process latch (`process_only`), and the route reports it. This applies only to a serving host, whose process keeps the latch.
     - **Offline CLI.** The offline CLI never reports `process_only`, because its process exits and no latch survives. With the host down and the owner lock held (S30), it appends the durable stop record itself:
-      - when the journal is full or the intent write fails, it skips the journal and appends the stop record directly, since a down host has no queue to overload. That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
+      - when the journal is full or the intent write fails, it skips the journal and appends the transition directly: a `Stop` over a running head, or a narrowing `Restrict` over a stopped head. A down host has no queue to overload. That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
       - success requires the record committed and anchored, and the CLI reports `stop_durable`;
       - if that append also fails, the CLI exits non-zero and reports `stop_not_in_force`. It states that no stop is recorded and that the operator must keep the host down or retry. It never claims a stop is in force.
     - This extends AC6's "publish first" rule from memory to durability.
@@ -1117,6 +1117,13 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187315432 | Preserve stopper identities across stopped rollovers | Fixed now. S19 defines the incident (from the first `Stop` after the last `Resume`) and its stopper set: the authorizers and contributors of every `Stop` and `Restrict` in it, collected across generations and through `Rollover` records. `OperatorPair.stopper_epoch` names the opening stop, and the resumer must differ from every principal in the set | S19 |
+
+### Codex review (PR #1174, round 19)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187433114 | Check the opening-stop observation for cooldown resumes | Fixed now. A `SamePrincipalAfter` resume binds the incident's opening `Stop` id and is checked against that stop's observation, not the head's. Restrictions and rollovers neither reject the valid observation nor restart the cooldown | S19 |
+| 4187433127 | Add a journal-bypass form for offline Restrict | Fixed now. The no-intent offline form (`requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`) covers both `Stop` and `Restrict`. The bypass path appends a `Stop` over a running head or a narrowing `Restrict` over a stopped head | S2; S25 |
 
 ## Appendix A. FTL reference
 

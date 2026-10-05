@@ -322,12 +322,11 @@ Capability issuance is not a crossing here. It runs in the capability authority 
 
 Rules:
 
-1. **X1. One shape.** Every crossing in section 4.2 is a `CrossingTx`. A new kind needs:
-   - a row here;
-   - a spec 4 section 4.3 entry;
-   - a spec 1 registry entry;
-   - a commit class;
-   - a spec 8 section 5 stop disposition.
+1. **X1. One shape.** Every crossing in section 4.2 is a `CrossingTx`. **Section 4.2 is the registry of crossing kinds.** A new kind needs:
+   - a row here, with its checks and commit class;
+   - a spec 8 section 5 stop disposition;
+   - an ordering point. By default it is the kind's own `CrossingTx` commit, ordered by `CrossingOrder` (X4). A spec 4 section 4.3 entry is needed only for a kind whose bytes or effects leave Chio custody at a different point, or that needs closure semantics beyond the fence check. Today that is dispatch, output release, recovery continuation, P5 confined return and P4 artifact release;
+   - the L0 op in spec 1 that drives it. Spec 1 registers ops, not crossing kinds, and each crossing is reached only through an op it already classifies.
 2. **X2. Order.** Checks run in `CrossingCheck` order, before any mutation, and the first refusal ends the crossing.
 3. **X3. Same writer.** A check is authoritative only when its state lives in the crossing's writer. Otherwise it is an early read, reported `early_only` (spec 8 section 13).
 4. **X4. Record and crossing order.** `crossing_records(crossing_id, kind, operation_id, scope_digest, checks_digest, store_uuid, commit_sequence, member_ordinal)` is written last in the same savepoint. It is operational, not signed evidence.
@@ -944,3 +943,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187315424 | Bound lost-transaction retries before requeueing | Fixed now. Consecutive whole-transaction losses count toward `batch_loss_retries` (default 2). After that the writer answers members `StoreUnavailable` and raises a store incident, so M19's fail-closed retention applies. Stop requests stay protected by the intent journal | X21 |
+
+### Codex review (PR #1174, round 19)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187433143 | Complete the cross-spec crossing registry | Fixed by narrowing X1 to the owning registry. Section 4.2 is the registry of crossing kinds. The default ordering point is the kind's own `CrossingTx` commit under `CrossingOrder`. Spec 4 section 4.3 lists only kinds whose custody-exit point differs. Spec 1 registers the driving L0 ops, not crossings | X1 |

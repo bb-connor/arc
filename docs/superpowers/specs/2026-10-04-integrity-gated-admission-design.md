@@ -260,7 +260,7 @@ New records carry the new state in a separate, versioned field (`influence_state
 
 **Legacy seed observations.** The migration that enables tracking turns every existing journal record into one seed observation:
 - `observation_id = H("chio.influence-legacy-seed.v1\0" || journal_record_id || destination_digest)`, with the record's own key values and its record id as provenance, so the id is stable and a re-run inserts nothing new.
-- The classification is conservative: `externally_influenced` gives `External`, and `unknown` gives `unknown = true`. A record with both flags false seeds no extra influence, but it does not prove trust either.
+- The classification is conservative: `externally_influenced` gives `External`, and `unknown` gives `unknown = true`. **A record with both flags false projects `unknown = true`** unless the complete mediated history of the context that produced it is independently proven. That proof needs a producing context created under tracking, or a journal showing every input of that context. This covers pre-migration artifacts read by contexts created after migration: such an artifact may derive from the same unjournaled tool output, so reading it taints the reader as unknown.
 - **Missing history is not trust.** Before tracking, tool output delivered to a worker was not journaled (N25, section 5). So every context that is live at migration also receives one seed observation with `unknown = true`, `H("chio.influence-legacy-context.v1\0" || destination_digest)`, whatever its legacy rows say, including when it has none.
   - The only exception is a context whose complete mediated history can be shown: one created after tracking was enabled, or one restarted in a fresh isolation epoch after migration.
   - A pre-tracking context can therefore never satisfy a `Trusted` requirement merely because nothing tainted it on record.
@@ -959,6 +959,12 @@ Open decisions:
 |---|---|---|---|
 | 4187315397 | Seed legacy contexts as unknown before enabling gating | Fixed now. Every context live at migration receives an `unknown` seed observation, whatever its legacy rows say, because tool output was not journaled before tracking. A both-false legacy record no longer counts as trust. Only contexts with provably complete mediated history (created after tracking, or in a fresh post-migration epoch) start without it | section 4.1 legacy seeds |
 | 4187315408 | Remove the receipt ID from its own metadata commitment | Fixed now. `commitment_ref` binds a 128-bit `receipt_nonce`, drawn before the id is computed, instead of the receipt id. The audit row is keyed by `(namespace, request_id, receipt_nonce)` and records the receipt id after signing. No fixed point remains | I25; I25a |
+
+### Codex review (PR #1174, round 19)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187433097 | Treat untracked legacy artifacts as unknown | Fixed now. A legacy record with both flags false now projects `unknown = true` unless its producing context's complete mediated history is independently proven. A post-migration context that reads a pre-migration artifact is therefore tainted as unknown and cannot satisfy `Trusted` through it | section 4.1 legacy seeds |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

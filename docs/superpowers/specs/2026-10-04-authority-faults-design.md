@@ -342,7 +342,10 @@ These run in the recovery capture participant for `AuthorityContinuation` workfl
    - **Scope.** This is not a defect of implemented recovery, which reuses the seed capability. It arises only from this kind. A remedy never outlives the authority whose denial it answers.
 4. **Active defense.**
    - Deny if the predecessor seed's `capability_id` is in an active suspended set. A fresh capability id would otherwise escape suspension (M: `capability_set_suspension.rs:41-60`).
-   - For `Delegator` remedies, also call the issuance-freeze authority with `CapabilityIssuanceOperation::Delegate`, using the delegation's parent capability and the trusted tenant and lineage. This is the only place an agent-signed delegation meets a freeze (umbrella D5).
+   - For every resolver class, call the issuance-freeze authority, at linked-workflow creation and again at capture, with the trusted tenant and lineage. The operation follows how the successor capability was minted (M: `ports/issuance.rs:111-114`):
+     - `Delegator` uses `CapabilityIssuanceOperation::Delegate`, with the delegation's parent capability. This is the only place an agent-signed delegation meets a freeze (umbrella D5).
+     - `ReceiverIssuer`, `AllocationHolder` and `Payer` use `CapabilityIssuanceOperation::Issue`.
+     - A successor minted before a freeze was installed is refused at capture once the freeze covers it, whatever its class.
    - If either authority is unavailable, deny.
    - Implemented recovery consults neither authority directly, which is why this step is needed for the new kind.
 5. **Cancellation.**
@@ -556,6 +559,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186364961 | Persist the selection digest in recovery state | Fixed now. The native planner fact's annotation carries `security_binding_digest` from native flow state. The predecessor record stores it in `predecessor_fault { class, security_binding_digest }` at linked-workflow creation, and capture step 3 compares against that record. Missing binding evidence refuses | section 5 planner fact; section 6.4 capture step 3 |
+
+### Codex review (PR #1174, round 19)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187433139 | Recheck issuance freezes for every resolver class | Fixed now. Step 4 calls the issuance-freeze authority for every resolver class, at creation and again at capture: `Delegate` for `Delegator`, and `Issue` for `ReceiverIssuer`, `AllocationHolder` and `Payer`. A successor minted before a freeze cannot capture after it | section 6.4 step 4 |
 
 ## Appendix A. FTL reference
 
