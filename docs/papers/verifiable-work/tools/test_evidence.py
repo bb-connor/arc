@@ -83,6 +83,56 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(verify_files(Path(d), {'../outside': 'a'*64}), ['outside root: ../outside'])
 
 class PublicationEvidenceTests(unittest.TestCase):
+    def test_freeze_collects_claim_sources_outside_the_paper_tree(self):
+        import hashlib
+        import json
+        from publication import required_files, verify
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paper = root / 'paper'
+            paper.mkdir()
+            source = root / 'implementation.rs'
+            source.write_text('source-backed regression')
+            (paper / 'result.json').write_text('{"verified":true}')
+            claims = {'claims': [dict(claim_id=name, status=['locally-tested'],
+                                     evidence_paths=['implementation.rs'])
+                                  for name in ('E01', 'E02')]}
+            release = {'gates': [dict(id='funded-security-integration',
+                                     status='passed', acceptance='criterion',
+                                     result='observed', evidence='result.json')]}
+            (paper / 'PUBLICATION.json').write_text(json.dumps(release))
+            (paper / 'CLAIMS.json').write_text(json.dumps(claims))
+            paths = required_files(release, claims, root=root, paper=paper)
+            self.assertEqual(set(paths), {source, paper / 'result.json',
+                                         paper / 'PUBLICATION.json', paper / 'CLAIMS.json'})
+            manifest = {'files': {p.relative_to(root).as_posix():
+                                   hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}}
+            errors = verify(release, claims, manifest, root=root, paper=paper)
+            self.assertTrue(all(e.startswith('missing publication gate:')
+                                or e.endswith('is not true') for e in errors), errors)
+            source.write_text('substituted source')
+            self.assertTrue(any(e.startswith('publication evidence hash mismatch:')
+                                for e in verify(release, claims, manifest, root=root, paper=paper)))
+
+    def test_freeze_rejects_missing_and_escaping_named_claim_sources(self):
+        from publication import required_files
+        with tempfile.TemporaryDirectory() as directory:
+            outer = Path(directory)
+            root = outer / 'repo'
+            root.mkdir()
+            for name in ('PUBLICATION.json', 'CLAIMS.json', 'result.json'):
+                (root / name).write_text('{}')
+            (outer / 'outside').write_text('outside repository')
+            (root / 'link').symlink_to(outer / 'outside')
+            release = {'gates': [dict(id='funded-security-integration',
+                                     status='passed', evidence='result.json')]}
+            for name in ('missing', '../outside', 'link'):
+                with self.subTest(name=name):
+                    claims = {'claims': [dict(claim_id=key, evidence_paths=[name])
+                                         for key in ('E01', 'E02')]}
+                    with self.assertRaisesRegex(ValueError, 'publication evidence'):
+                        required_files(release, claims, root=root, paper=root)
+
     def test_frozen_named_evidence_and_claims_are_required(self):
         import copy
         import hashlib

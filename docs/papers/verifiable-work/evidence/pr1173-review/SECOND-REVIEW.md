@@ -115,3 +115,11 @@ The user confirmed that the security agent owns that package. This candidate's
 CI caller uses the already merged, repository-authorized definition
 `4f3c967f04af40b5025b9222e8db95a3aee0b5f4`; repository authority variables remain
 under that separate lane's ownership.
+
+The first replacement at `28842e598e` exposed two additional qualification
+defects: the publication freeze omitted four named claim sources, and the
+composite build-custody test lacked a newly invoked shell-control fixture. Both
+are repaired with retained reproductions. All 20 paper-tool tests and the
+complete AWS-LC composite gate pass locally. Neither repair changes production
+Rust behavior or weakens an acceptance check. Renewed source qualification and
+replacement-commit hosted acceptance remain required.

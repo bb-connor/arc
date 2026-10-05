@@ -114,6 +114,12 @@ class ForkBoundaryTests(unittest.TestCase):
         scripts.mkdir()
         wrapper = scripts / "check-supply-chain.sh"
         shutil.copyfile(SCRIPT.parent / wrapper.name, wrapper)
+        # This fixture tests build-output custody. Policy controls run for real
+        # in the enclosing composite gate, alongside this test. Model the shell
+        # control consistently with the Python controls stubbed below.
+        controls = scripts / "tests"
+        controls.mkdir()
+        (controls / "check-cargo-vet-exemptions.test.sh").write_text("exit 0\n")
         binaries = self.root / "bin"
         binaries.mkdir()
         # Model Cargo's documented target-directory selection. The real source

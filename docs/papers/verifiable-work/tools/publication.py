@@ -16,6 +16,41 @@ CLAIM_REQUIREMENTS = {
 }
 
 
+def required_files(release, claims, *, root, paper):
+    """Collect mandatory freeze inputs without granting publication authority."""
+    root, paper = Path(root).resolve(), Path(paper).resolve()
+    paths = {(paper / name).resolve() for name in ('PUBLICATION.json', 'CLAIMS.json')}
+    by_id = {}
+    for claim in claims.get('claims', []):
+        name = claim.get('claim_id')
+        if name in by_id:
+            raise ValueError('duplicate publication claim: ' + str(name))
+        by_id[name] = claim
+
+    def include(names, base):
+        if isinstance(names, str):
+            names = [names]
+        if not isinstance(names, list) or not names:
+            raise ValueError('missing named publication evidence')
+        for name in names:
+            if not isinstance(name, str) or not name:
+                raise ValueError('missing named publication evidence')
+            paths.add((base / name).resolve())
+
+    for gate in release.get('gates', []):
+        if gate.get('status') != 'passed':
+            continue
+        include(gate.get('evidence'), paper)
+        for claim_id in CLAIM_REQUIREMENTS.get(gate.get('id'), {}):
+            include(by_id.get(claim_id, {}).get('evidence_paths'), root)
+    for path in paths:
+        if not path.is_relative_to(root):
+            raise ValueError('publication evidence outside repository: ' + str(path))
+        if not path.is_file():
+            raise ValueError('missing publication evidence: ' + str(path))
+    return sorted(paths)
+
+
 def verify(release, claims, manifest, *, root, paper):
     errors, seen = [], set()
     files = manifest.get('files', {})

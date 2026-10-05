@@ -15,6 +15,7 @@ from provenance import (
 )
 from upstream_capture import verify_capture
 from publication import verify as verify_publication_evidence
+from publication import required_files as required_publication_files
 from counts import historical_chain_counts, native_counts
 from claim_replay import OUT as CLAIM_REPLAY, validate as validate_claim_replay
 
@@ -253,7 +254,14 @@ def main():
         errors.append("missing PDF")
     manifest = PAPER / "artifact-manifest.json"
     if args.freeze:
+        publication_inputs = required_publication_files(
+            json.loads((PAPER / "PUBLICATION.json").read_text()),
+            json.loads((PAPER / "CLAIMS.json").read_text()),
+            root=ROOT,
+            paper=PAPER,
+        )
         candidates = [
+            *publication_inputs,
             *PAPER.rglob("*"),
             *(ROOT / "examples/funded-work-model").glob("*.py"),
             *(ROOT / "docs/research/dynamic-delegation").rglob("*"),

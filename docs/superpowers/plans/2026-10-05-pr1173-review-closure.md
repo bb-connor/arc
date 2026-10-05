@@ -146,3 +146,15 @@ present in this branch's ancestry. No repository authority variable is changed.
 The first replacement qualification was interrupted after three passing commands
 when the stale caller pin was found; retain its partial outputs and rerun the
 entire source-bound package after this correction.
+
+The first pushed replacement, `28842e598e`, passed the local package and PDF
+rebuild. Broader publication preflight then found four claim source files absent
+from the flat artifact manifest. Collect passed-gate evidence and its required
+claim sources explicitly during freeze, rejecting missing or escaping files;
+preserve the verifier's existing evidence and open-gate requirements. Add
+producer/verifier round-trip and substituted-source controls before rebuilding.
+The hosted composite audit also exposed an incomplete build-custody test fixture:
+its copied shell wrapper lacked the new exemption-control fixture. Model that
+control consistently with the fixture's existing Python stubs, keeping the real
+control mandatory in the enclosing gate. Require the complete composite gate,
+then repeat source qualification and hosted acceptance on the repaired candidate.
