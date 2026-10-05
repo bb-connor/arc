@@ -26,7 +26,59 @@ All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
 actual closures, surviving candidates and source-ref verification. The only active landing candidate is #1160. There are now
 1583 ledger requirements, including 201 newly carried review records.
-The original 1,382 rows and their source/acceptance dispositions remain intact.
+The original 1,382 identities and source records remain preserved. Later repairs
+update acceptance without erasing the historical dispositions.
+
+## Foundation repair batch after consolidation
+
+Source `1ae6920d14f7e3e5c59122a189f26bfdb81bffbd` repairs the consumer findings
+and the reproduced qualification regressions. The
+[repair evidence](audits/foundation-sprawl-repairs-20261004.json.gz) retains
+original failures, intermediate failures and subsequent local component results
+separately. This is not final independent, hosted, native or merge qualification.
+
+| Obligation | Source repair and local verification | Remaining acceptance |
+| --- | --- | --- |
+| PR2 / A2A thread | Duplicate-aware unsigned JSON-RPC and SSE decoding; ordinary decimals pass and tampered embedded authority still denies. Edge: 105 tests; adapter: 117. | Final candidate review; broader unsigned HTTP-reader inventory remains open. |
+| PB5 / registry thread | Stream within the 16 MiB reader limit, sync a staged file and publish atomically. Exact-bound reopen and oversized-write preservation pass. | Review and supported filesystem qualification; task-ID and retention policy remain separate PB5 work. |
+| PB9 / discovery thread | Enforce the 8 MiB OpenAPI limit before sized or chunked buffering. The CI-style serial API Protect suite passes 257 tests. | Independent candidate review and hosted acceptance. |
+| PR10 / recursive reader thread | Borrow raw subtrees instead of retaining depth-multiplied owned copies. Three controls pass, including a 12 MiB nested value under a 512 MiB process limit. | Final review; depth-bounded rescanning remains, with no single-pass CPU claim. |
+| TR9 / mobile thread | Swift, Kotlin and React Native source wrappers and binding guides match the current exports. TypeScript builds; 31 host Rust FFI tests pass. | Rebuild Apple framework artifacts and qualify the supported native Swift/Kotlin consumers. |
+
+The four affected consumer packages pass all-target Clippy with warnings denied.
+Private authority-directory and monotonic-clock fixtures pass four and nine
+tests respectively. Extracted control-plane initialization tests pass all six.
+The keyring event, response-type and pending-approval inventories pass eight,
+16 and six tests. A later JSON rerun initially selected zero tests; the corrected
+invocation passes all three, and the zero-test result remains unqualified.
+The production egress, wire schema, formal workflow, ledger, reader census and
+complete security CI-contract regression checks pass. Cargo Vet passes without
+added exemptions: the lockfile adds only the existing audited `tempfile`
+dependency edge. Both image and structural-checker lock digests are updated;
+fresh source-bound image qualification is still required.
+
+The real Drogon smoke passes its C++ contract, allowed/denied calls and durable
+receipt projection using explicit private signing custody. An unsafe checkout
+ancestor still refuses authority custody; the smoke supports a private artifact
+root without changing those permissions or weakening the check.
+
+**Foundation remains blocked.** Native C++ and PostgreSQL workflow consumers
+now receive the existing enforced fixture and enforcing CLI build. This repairs
+their missing inputs, but is not an execution pass. The PostgreSQL demo still
+opens direct database connections that the enforced cage forbids; it needs a
+mediated database boundary and native qualification. No socket permission or
+required check is relaxed. The local host is ARM64, so it cannot supply the
+required trusted Linux x86_64 campaign or hosted provenance. Source authorization
+remains unrotated pending independent candidate review and qualification.
+The repository's trusted-definition variable now selects the actual #1167
+merge, after exact blob equality was verified for all five authority workflows.
+
+All 22 survivors have explicit open destinations. #1136's original repair is
+already carried by exact patch equivalence at `1898aa9d5fb0`; it remains open
+until the foundation landing and native obligations are accounted for. #1029
+retains 219 distinct non-merge patches and 78 review threads. Its path/blob
+inventory is in the repair bundle, while semantic reconciliation remains open.
+No unmatched valuable work is closed.
 
 **Current landing state (October 4):** #1168 is merged to `main` at
 `4e3d94f07df30f37f364dd562b3e793c5cbf4e68`. All 25 exact-head workflow runs
@@ -51,9 +103,9 @@ not landed.
 
 The bounded-candidate review of `bc10d2b523` produced seven threads. Production
 repair `dcae5d7ba4` uses the shared authority clock for worker issuance and
-authentication, retires stale ACP contexts before every capability check, and
+authentication, retires stale ACP-Client contexts before every capability check, and
 keeps malformed audit frames from terminating the broker daemon. Six worker
-controls reproduce the original defect; all 18 worker protocol tests, 206 ACP
+controls reproduce the original defect; all 18 worker protocol tests, 206 ACP-Client
 library tests, and three broker process tests pass. The broker process tests
 reject wrong shapes, malformed JSON, duplicate keys and invalid UTF-8 before
 valid provisioning, and retain graceful restart and no-secret-crossing checks.
@@ -81,9 +133,9 @@ zero-matching-harness invocation remain retained. The complete final proof sweep
 is still required.
 
 The [bounded review repair bundle](audits/foundation-bounded-review-repairs-20261004.json.gz)
-retains these results and the unsuccessful hosted campaign. The ledger now has
-**1,382 requirement records**, including all seven current threads, the repair
-boundaries and the incomplete native campaign. The worker and ACP threads have
+retains these results and the unsuccessful hosted campaign. That historical ledger had
+**1,382 requirement records**, including all seven then-current threads, the repair
+boundaries and the incomplete native campaign. The worker and ACP-Client threads have
 source repairs and their resolution is verified in the live API; five consumer
 threads remain open under PR2, PB5, PB9, PR10 and TR9. Their original acceptance
 and earlier foundation review assignment are preserved in each row's history.
@@ -614,11 +666,11 @@ M10/M11 completion, FIPS certification, broad privacy compliance or a release.
 **Interfaces:** Consume requirement coverage and proven ancestry from Task 3;
 produce fewer open PRs with preserved source and explicit follow-up ownership.
 
-- [ ] Verify each retirement against current heads and transfer every review
+- [x] Verify each retirement against current heads and transfer every review
   obligation to its replacement record.
-- [ ] Retarget surviving dependents, close superseded PRs with replacement links
+- [x] Retarget surviving dependents, close superseded PRs with replacement links
   and preserve branches containing unique source.
-- [ ] Keep at most two PRs active; assign later security slices in dependency
+- [x] Keep at most two PRs active; assign later security slices in dependency
   order and leave unrelated product/research tracks separate.
 - [ ] Refresh main/remote/PR identities and report completed and remaining
   requirements with their actual acceptance boundaries.

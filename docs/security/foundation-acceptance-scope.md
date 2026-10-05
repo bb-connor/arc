@@ -84,6 +84,21 @@ also repaired in that commit and remain subject to final foundation qualificatio
 
 ## Landing and release truth
 
+The subsequent source repair `1ae6920d14` now carries bounded atomic A2A
+registry writes, unsigned JSON-RPC/SSE numeric compatibility, a streaming
+OpenAPI discovery ceiling and borrowed recursive JSON subtrees. These local
+repairs do not close their broader original requirements. Mobile wrappers now
+match the current FFI, while the Apple artifact rebuild and supported native
+consumer matrix remain open. The authoritative
+[repair ledger](landing-ledger.md#foundation-repair-batch-after-consolidation)
+records each component result and remaining acceptance.
+
+The PostgreSQL native demo still needs a mediated database boundary: its direct
+connection conflicts with the selected enforced cage profile. Adding its
+missing native fixture does not resolve this behavior or qualify the job. Its
+valuable source remains preserved, and neither the cage nor required checks
+are weakened to obtain a pass.
+
 A foundation merge establishes only the reviewed and executed foundation
 contract for its named source and supported profile. It is not full roadmap
 completion, hardware quote verification, a FIPS-validated executable, complete

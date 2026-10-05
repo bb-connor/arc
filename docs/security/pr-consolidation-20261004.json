@@ -3256,5 +3256,13 @@
       }
     ],
     "disposition": "Source repair already carried by the foundation. Preserve the original native macOS evidence and keep #1136 open until foundation qualification/merge accounts for this boundary; do not implement the repair again."
+  },
+  "legacy_source_inventory": {
+    "path": "docs/security/audits/foundation-sprawl-repairs-20261004.json.gz",
+    "sha256": "093f8616d23d1a219ffaca24bfe49c2ef44f27aef710c9c2c36ece9205e54665",
+    "source_commit": "1ae6920d14f7e3e5c59122a189f26bfdb81bffbd",
+    "scope": "Paths of all recorded distinct/equivalent commits remain assigned to their open destinations. #1136 exact patch preservation supersedes a naive comparison of later file bytes. #1029 semantic reconciliation remains open.",
+    "entry": "legacy-source-reconciliation.json",
+    "entry_sha256": "ae8606aa833c1d043eaac00ccdb18a31acf6f2403b2ea2b5becac79b2a43081b"
   }
 }

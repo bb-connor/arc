@@ -86,11 +86,11 @@ Produces one surviving workbench candidate, separate from foundation acceptance.
 **Interfaces:** Consumes the 22 surviving PRs and current main/foundation source.
 Produces explicit landing destinations, dependency order and remaining acceptance.
 
-- [ ] Give every survivor a named open destination or an active landing slot.
-- [ ] Keep #1155 and #1136's unique changes accounted for and open.
+- [x] Give every survivor a named open destination or an active landing slot.
+- [x] Keep #1155 and #1136's unique changes accounted for and open.
 - [ ] Reconcile #1029 and other legacy changes against main and the security
   histories by requirement and patch; do not retire unmatched valuable source.
-- [ ] Verify every PR appears exactly once and no useful track is closed merely
+- [x] Verify every PR appears exactly once and no useful track is closed merely
   because it is outside the active two-PR queue.
 
 ### Task 4: Repair and qualify the foundation
@@ -113,6 +113,25 @@ foundation merge with post-merge source verification.
   under their existing isolation and acceptance rules.
 - [ ] Obtain terminal passing required checks for the exact candidate, merge
   through protection, and verify the actual main ancestry and remaining ledger.
+
+## Qualification findings from this execution
+
+- #1136 is already carried by exact patch equivalence at
+  `1898aa9d5fb0a0be486b9f1d3b439ac1049405fa`. Preserve its original native
+  macOS evidence and verify the eventual landing; do not reimplement its repair.
+- #1029 retains 219 distinct non-merge patches and all 78 original review
+  threads. Its explicit open destination satisfies containment. Semantic
+  reconciliation remains a prerequisite to its later consolidation or landing.
+- The PostgreSQL native demo opens a direct database connection before tool
+  discovery, but the enforced cage denies socket creation and connection. The
+  workflow now supplies the missing enforcement fixture, but a mediated
+  database integration still needs design, source and native qualification.
+  Preserve the profile, required checks and useful demo source.
+- The current local host and Docker daemon are ARM64. The required trusted
+  Linux x86_64 campaign and hosted provenance remain separate acceptance.
+- Mobile source wrappers now match the current FFI. The checked-in Apple
+  framework and supported native Swift/Kotlin build matrix still need rebuilding
+  and qualification; TypeScript and host Rust FFI results cannot replace them.
 
 ## Execution rulings
 
