@@ -7,6 +7,9 @@ use serde_json::{json, Value};
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum PayloadConfig {
     Json,
+    CallerBoundResource {
+        route: chio_secret_broker::host_resource::HostResourceRoute,
+    },
     MiniSweChat {
         model_id: String,
         model: String,
@@ -27,6 +30,9 @@ struct ModelQuery {
 
 impl PayloadConfig {
     pub fn validate(&self) -> Result<(), ProcessError> {
+        if let Self::CallerBoundResource { route } = self {
+            route.validate().map_err(|error| ProcessError::Preparation(Box::new(error)))?;
+        }
         if let Self::MiniSweChat {
             model_id,
             model,
@@ -55,9 +61,13 @@ impl PayloadConfig {
         Ok(())
     }
 
-    pub fn body(&self, input: &Value) -> Result<Vec<u8>, ProcessError> {
+    pub fn body_for_caller(&self, input: &Value, caller: &str) -> Result<Vec<u8>, ProcessError> {
         let value = match self {
             Self::Json => input.clone(),
+            Self::CallerBoundResource { route } => {
+                return route.encode(input, caller)
+                    .map_err(|error| ProcessError::Preparation(Box::new(error)));
+            }
             Self::MiniSweChat {
                 model_id,
                 model,
@@ -93,6 +103,36 @@ impl PayloadConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resource_mapping_pins_the_route_and_rejects_worker_authority_fields(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let config: PayloadConfig = serde_json::from_value(json!({
+            "kind": "caller_bound_resource",
+            "route": {"resource": "postgres-jobs", "tenant": "tenant-one", "operation": "complete"}
+        }))?;
+        config.validate()?;
+        let input = json!({"job_id": "one", "expected_fence": 2, "result": {"p95": 12.5}});
+        // Authority is supplied by the host's durable preparation closure.
+        let caller = "ab".repeat(32);
+        let request: Value = serde_json::from_slice(&config.body_for_caller(&input, &caller)?)?;
+        assert_eq!(request["route"]["tenant"], "tenant-one");
+        assert_eq!(request["route"]["operation"], "complete");
+        assert_eq!(request["caller_capability_sha256"], caller);
+        assert_eq!(request["arguments"], input);
+        for field in ["_meta", "route", "caller_capability_sha256"] {
+            let mut forged = input.clone();
+            forged[field] = json!("worker-selected");
+            assert!(config.body_for_caller(&forged, &caller).is_err(), "{field}");
+        }
+        assert!(config.body_for_caller(&input, "not-a-digest").is_err());
+        let other: Value = serde_json::from_slice(
+            &config.body_for_caller(&input, &"cd".repeat(32))?,
+        )?;
+        assert_ne!(request["caller_capability_sha256"], other["caller_capability_sha256"]);
+        Ok(())
+    }
+
     #[test]
     fn model_requests_cannot_select_provider_options_or_carry_worker_metadata(
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -105,7 +145,7 @@ mod tests {
         };
         config.validate()?;
         let input = json!({"schema":"chio.mini-swe.model-query.v1","model_id":"fixed","turn":1,"messages":[{"role":"user","content":"hello","extra":{"private":"metadata"}}]});
-        let request: Value = serde_json::from_slice(&config.body(&input)?)?;
+        let request: Value = serde_json::from_slice(&config.body_for_caller(&input, "")?)?;
         assert_eq!(request["model"], "selected");
         assert_eq!(request["max_completion_tokens"], 32);
         assert_eq!(request["stream"], false);
@@ -118,7 +158,7 @@ mod tests {
         ] {
             let mut changed = input.clone();
             changed[field] = value;
-            assert!(config.body(&changed).is_err());
+            assert!(config.body_for_caller(&changed, "").is_err());
         }
         Ok(())
     }

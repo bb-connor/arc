@@ -1,6 +1,7 @@
 # PostgreSQL native resource mediation repair
 
-Status: required repair design and execution plan. Implementation and native
+Status: the caller projection, host resource and scripted qualification wiring
+are implemented with bounded local evidence. Full native composition and final
 qualification are incomplete. This plan stays inside #1160's existing blocked
 PostgreSQL acceptance; it creates no additional landing PR or product track.
 Use Superpowers inline execution. Do not spawn subagents.
@@ -106,12 +107,12 @@ the established mediation and credential-custody boundaries.
 - [ ] Add hostile projection tests before changing preparation: forged caller,
   tenant or operation; duplicate/unknown envelope fields; oversized arguments;
   wrong route; replay under a different process; and configuration drift.
-- [ ] Implement the minimal fixed mapping using the original capability inside
+- [x] Implement the minimal fixed mapping using the original capability inside
   durable preparation. Verify repeat preparation returns the same signed body.
 - [ ] Add adapter tests for credential rejection, fixed tenant and operation,
   typed argument refusal, bounded responses and deadlines. Reuse the existing
   HTTPS parser and credential custody rather than duplicating them.
-- [ ] Implement the host-owned PostgreSQL adapter and explicit private route
+- [x] Implement the host-owned PostgreSQL adapter and explicit private route
   provisioning. Validate route/credential exclusivity during provisioning.
 - [ ] Port the handoff qualification without reducing its assertions. Show
   superseded worker refusal, successful replacement completion, fence integrity,
@@ -145,3 +146,22 @@ This repair does not add a general database connector, new worker operations,
 new settlement behavior, workbench features or a new remote service product.
 #1160 remains blocked until the implementation and required native/trusted
 qualification are complete.
+
+## Current execution evidence
+
+The broker library passes all 179 tests. Five CLI broker tests pass, including
+original caller binding, durable preparation after a real journal reopen,
+argument/configuration drift refusal and separate process identities. The real
+TLS/PostgreSQL worker-role component passes four hostile-request refusals plus
+lease handoff, supersession, completion and resource deduplication. Two Python
+contract tests, 13 native workflow contract methods and owning Clippy pass.
+An initial component harness omitted BrokenPipeError from expected closed-channel
+refusals; the corrected run is separate from that failure. Early test compilation
+errors are retained separately from the passing recovery test.
+
+Both native scenarios are wired to the existing prepared-broker fixture. Their
+full execution has not passed yet. The fixture uses test identities and is not a
+production migration or deployment approval. The original live framework
+consumers remain present; their broker adaptation and product evidence are still
+open outside this scripted foundation qualification. No native isolation,
+credential custody, review or final trusted gate has been waived.

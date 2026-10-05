@@ -26,6 +26,7 @@ tracing = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
+chio-secret-broker = { workspace = true }
 chio-spec-validate = { workspace = true }
 chio-test-support = { workspace = true }
 serde_json = { workspace = true }

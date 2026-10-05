@@ -10,6 +10,10 @@ use chio_finding_market_store_postgres::{
 };
 use serde_json::{json, Value};
 
+#[cfg(target_os = "linux")]
+mod adapter;
+#[cfg(target_os = "linux")]
+mod fault;
 mod resource;
 mod tools;
 
@@ -20,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut arguments = std::env::args().skip(1);
     let mode = arguments
         .next()
-        .ok_or("expected migrate, seed, worker or operator")?;
+        .ok_or("expected migrate, seed, worker, operator or serve")?;
     let tenant = arguments.next();
     if arguments.next().is_some() {
         return Err("unexpected arguments".into());
@@ -31,6 +35,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         std::env::var("CHIO_JOB_DATABASE_CA").map_err(|_| "CHIO_JOB_DATABASE_CA is required")?,
     );
     let config = HostedPostgresConfig::new(url)?.with_ca_certificate(ca)?;
+    #[cfg(target_os = "linux")]
+    if mode == "serve" {
+        chio_secret_broker::daemon_runtime::harden_broker_process_custody()?;
+        let path = PathBuf::from(tenant.ok_or("resource configuration is required")?);
+        let store = PostgresFindingMarketStore::connect_worker(&config).await?;
+        return adapter::serve(&path, store);
+    }
     if mode == "migrate" {
         PostgresFindingMarketMigrator::connect(&config)
             .await?

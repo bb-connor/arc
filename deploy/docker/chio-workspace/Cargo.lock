@@ -3510,6 +3510,7 @@ dependencies = [
  "chio-finding-market-migrations",
  "chio-finding-market-port",
  "chio-open-market",
+ "chio-secret-broker",
  "chio-spec-validate",
  "chio-test-support",
  "serde",

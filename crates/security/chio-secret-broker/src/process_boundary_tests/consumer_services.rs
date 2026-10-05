@@ -18,6 +18,8 @@ struct ConsumerRoute {
     adapter: crate::generic_https::LocalHttpsAdapterConfig,
     path: String,
     credential_file: PathBuf,
+    #[serde(default)]
+    credential_id: Option<String>,
     payload: Value,
 }
 
@@ -39,6 +41,7 @@ struct Service {
     gate: Option<std::process::ChildStdin>,
     fixture: BoundaryFixture,
     credential: Vec<u8>,
+    credential_ref: CredentialRef,
 }
 
 fn cli(binary: &Path, args: &[String]) -> TestResult<Value> {
@@ -168,6 +171,15 @@ fn native_consumer_services_helper_process() -> TestResult {
     let mut grants = Vec::new();
     let mut policy = String::from("kernel:\n  max_capability_ttl: 3600\n  delegation_depth_limit: 8\n  durable_admission_mode: all\ncapabilities:\n  default:\n    tools:\n");
     for (index, route) in campaign.routes.iter().enumerate() {
+        let credential_ref = CredentialRef {
+            provider: CREDENTIAL_PROVIDER.into(),
+            credential_id: route
+                .credential_id
+                .clone()
+                .unwrap_or_else(|| CREDENTIAL_ID.into()),
+            version: 1,
+        };
+        credential_ref.validate()?;
         let root = campaign.directory.join(format!("broker-{index}"));
         fs::create_dir(&root)?;
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
@@ -211,7 +223,7 @@ fn native_consumer_services_helper_process() -> TestResult {
         routes.push(json!({
             "quota":{"issuer":issuer.public_key(),"audience":fixture.config.broker_audience,"server_id":route.server,"tool_name":route.tool,"provider_adapter_id":PROVIDER_ADAPTER_ID,"provider_adapter_version":1,"credential_placement":"bearer_authorization"},
             "broker_identity":key.public_key(),"revocation_authority_domain":AUTHORITY_DOMAIN,"ipc_timeout_ms":3000,"authority_socket_name":socket_name,
-            "preparation":{"issuer_seed_file":issuer_seed,"credential":{"provider":CREDENTIAL_PROVIDER,"credentialId":CREDENTIAL_ID,"version":1},
+            "preparation":{"issuer_seed_file":issuer_seed,"credential":credential_ref,
                 "destination":{"scheme":"https","normalizedHost":route.adapter.server_name,"explicitPort":route.adapter.port,"method":"POST","exactPathAndQuery":route.path},
                 "maximum_body_bytes":131072,"response_limit_bytes":route.response_limit_bytes,"timeout_ms":route.timeout_ms,"lifetime_seconds":300,"payload":route.payload}
         }));
@@ -223,6 +235,7 @@ fn native_consumer_services_helper_process() -> TestResult {
             gate,
             fixture,
             credential,
+            credential_ref,
         });
     }
     let policy_path = campaign.directory.join("policy.yaml");
@@ -255,11 +268,7 @@ fn native_consumer_services_helper_process() -> TestResult {
         wait_for_broker(&mut service.child, &service.fixture.config);
         provision_credential(
             &service.fixture.config.ipc_socket_path,
-            &CredentialRef {
-                provider: CREDENTIAL_PROVIDER.into(),
-                credential_id: CREDENTIAL_ID.into(),
-                version: 1,
-            },
+            &service.credential_ref,
             &service.credential,
             &service.fixture.approver,
             &service.fixture.admin_subject,

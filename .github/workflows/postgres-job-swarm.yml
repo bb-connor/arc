@@ -10,6 +10,9 @@ on:
       - "crates/kernel/chio-process/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
+      - "crates/security/chio-secret-broker/**"
+      - ".github/actions/prepared-native-broker/**"
+      - ".github/actions/enforced-native-fixture/**"
       - "Cargo.lock"
       - ".github/workflows/postgres-job-swarm.yml"
   push:
@@ -22,6 +25,9 @@ on:
       - "crates/kernel/chio-process/**"
       - "crates/protocol/chio-mcp-adapter/**"
       - "crates/products/chio-cli/**"
+      - "crates/security/chio-secret-broker/**"
+      - ".github/actions/prepared-native-broker/**"
+      - ".github/actions/enforced-native-fixture/**"
       - "Cargo.lock"
       - ".github/workflows/postgres-job-swarm.yml"
   workflow_dispatch:
@@ -55,9 +61,13 @@ jobs:
         run: |
           cargo fmt -p chio-finding-market-store-postgres -- --check
           cargo test --locked -p chio-finding-market-store-postgres --lib
+          cargo test --locked -p chio-finding-market-store-postgres --example agent_jobs
+          PYTHONPATH=sdks/python/chio-process/src python3 -m unittest discover -s examples/postgres-job-swarm -p 'test_*.py'
           cargo clippy --locked -p chio-finding-market-store-postgres --example agent_jobs --test worker_lease_api -- -D warnings
           cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
           cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
+      - name: Build the existing confined broker and supervised service fixture
+        uses: ./.github/actions/prepared-native-broker
       - name: Install the process package and create a dedicated TLS fixture
         run: |
           umask 077
@@ -76,6 +86,7 @@ jobs:
       - name: Exercise the public worker role and actual native process host
         run: |
           python3 examples/postgres-job-swarm/check_api.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json"
+          "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_resource.py --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/resource-component"
           "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/qualification"
       - name: Lose a committed claim response and recover without redispatch
         run: |
@@ -89,6 +100,7 @@ jobs:
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/qualification.json
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/receipts.ndjson
             ${{ env.CHIO_JOB_FIXTURE_ROOT }}/qualification/kernel.pub
+            ${{ env.CHIO_JOB_FIXTURE_ROOT }}/resource-component/component.json
           if-no-files-found: warn
       - name: Preserve only nonsecret claim response loss evidence
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}

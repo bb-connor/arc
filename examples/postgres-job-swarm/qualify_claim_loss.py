@@ -19,7 +19,8 @@ from pathlib import Path
 import host
 import postgres
 from chio_process import WorkerError
-from chio_process.invocation import invoke_recorded
+from invocation import invoke_resource_recorded as invoke_recorded
+from resources import QualificationResources, server
 from qualify import value
 
 HERE = Path(__file__).resolve().parent
@@ -77,202 +78,191 @@ def main():
         )
         assert seed["created"]
     environment = postgres.database_env(state, "worker")
-    key, connections = host.prepare(
-        chio,
-        gateway,
-        tenant,
-        directory,
-        environment,
-        operator_command=[
-            sys.executable,
-            str(HERE / "claim_proxy.py"),
-            "--evidence",
-            str(fault),
-            str(gateway),
-            tenant,
-        ],
-    )
-    original_connection = connections["root"]
-    connection = original_connection
-    request = {
-        "operation_key": "claim-original",
-        "server_id": "jobs-admin",
-        "tool_name": "assign",
-        "arguments": {
-            "owner_capability_sha256": connections["superseded"][
-                "caller_capability_sha256"
+    with QualificationResources(chio, gateway, tenant, directory, environment, fault=fault) as resources:
+        key, connections = host.prepare(chio, gateway, tenant, directory, environment, resources=resources)
+        original_connection = connections["root"]
+        connection = original_connection
+        request = {
+            "operation_key": "claim-original",
+            "server_id": server("assign"),
+            "tool_name": "assign",
+            "arguments": {
+                "owner_capability_sha256": connections["superseded"][
+                    "caller_capability_sha256"
+                ],
+                "lease_seconds": 600,
+                "limit": 1,
+            },
+            "known_outcome_only": True,
+        }
+        receipts, observations = [], []
+
+        def operate(retained, name):
+            response = invoke_recorded(
+                chio, connection, key + "\n", retained, directory / name
+            )
+            receipts.append(response["receipt_json"])
+            observations.append({"request": retained, "response": response})
+            return response
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            with host.serve(chio, directory, key, environment) as process:
+                invocation = executor.submit(operate, request, "original")
+                committed = wait_for(fault / "committed.json", invocation=invocation)
+                assert committed["response_forwarded"] is False
+                process.kill()
+                assert process.wait(timeout=10) == -signal.SIGKILL
+            try:
+                invocation.result(timeout=15)
+            except WorkerError as error:
+                transport_error = error.code
+            else:
+                raise AssertionError(
+                    "the original invocation unexpectedly returned an outcome"
+                )
+        (fault / "release").write_text("release\n")
+        stopped = wait_for(fault / "released.json")
+        assert stopped == {"withheld_exchange_closed": True}
+        unresolved = json.loads((directory / "original" / "unresolved.json").read_text())
+        assert unresolved == {
+            "error": transport_error,
+            "completed_response": False,
+            "automatic_retry": False,
+        }
+        assert not (directory / "original" / "response.json").exists()
+        assert not (directory / "original" / "receipts.ndjson").exists()
+        retained = json.loads((directory / "original" / "logical-request.json").read_text())
+        assert retained == request
+        socket_path = directory / "recovery.sock"
+        resumed_path = directory / "root" / "connection-resumed.json"
+        host.command(
+            [
+                chio,
+                "process",
+                "credential",
+                "--state",
+                directory / "host",
+                "--process",
+                "root",
+                "--socket",
+                socket_path,
+                "--out",
+                resumed_path,
             ],
-            "lease_seconds": 600,
-            "limit": 1,
-        },
-        "known_outcome_only": True,
-    }
-    receipts, observations = [], []
-
-    def operate(retained, name):
-        response = invoke_recorded(
-            chio, connection, key + "\n", retained, directory / name
+            directory,
         )
-        receipts.append(response["receipt_json"])
-        observations.append({"request": retained, "response": response})
-        return response
-
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        with host.serve(chio, directory, key, environment) as process:
-            invocation = executor.submit(operate, request, "original")
-            committed = wait_for(fault / "committed.json", invocation=invocation)
-            assert committed["response_forwarded"] is False
-            process.kill()
-            assert process.wait(timeout=10) == -signal.SIGKILL
-        try:
-            invocation.result(timeout=15)
-        except WorkerError as error:
-            transport_error = error.code
-        else:
-            raise AssertionError(
-                "the original invocation unexpectedly returned an outcome"
-            )
-    stopped = wait_for(fault / "stopped.json")
-    assert stopped == {"host_pipe_closed": True, "gateway_exit_code": 0}
-    unresolved = json.loads((directory / "original" / "unresolved.json").read_text())
-    assert unresolved == {
-        "error": transport_error,
-        "completed_response": False,
-        "automatic_retry": False,
-    }
-    assert not (directory / "original" / "response.json").exists()
-    assert not (directory / "original" / "receipts.ndjson").exists()
-    retained = json.loads((directory / "original" / "request.json").read_text())
-    assert retained == request
-    socket_path = directory / "recovery.sock"
-    resumed_path = directory / "root" / "connection-resumed.json"
-    host.command(
-        [
-            chio,
-            "process",
-            "credential",
-            "--state",
-            directory / "host",
-            "--process",
-            "root",
-            "--socket",
-            socket_path,
-            "--out",
-            resumed_path,
-        ],
-        directory,
-    )
-    connection = json.loads(resumed_path.read_text())
-    assert connection["credential"] != original_connection["credential"]
-    assert (
-        connection["caller_capability_sha256"]
-        == original_connection["caller_capability_sha256"]
-    )
-
-    def inspect(job, phase):
-        return value(
-            operate(
-                {
-                    "operation_key": f"inspect-{phase}-{job}",
-                    "server_id": "jobs-admin",
-                    "tool_name": "inspect",
-                    "arguments": {"job_id": job},
-                },
-                f"inspect-{phase}-{job}",
-            )
-        )
-
-    with host.serve(chio, directory, key, environment, socket_path=socket_path):
-        before = [inspect(job, "before") for job in jobs]
-        withheld = committed["response"]["result"]["structuredContent"]["jobs"][0]
-        claimed = next(job for job in before if job["job_id"] == withheld["job_id"])
-        pending = next(job for job in before if job["job_id"] != withheld["job_id"])
-        assert claimed == withheld
-        assert claimed["state"] == "leased" and claimed["lease_fence"] == 1
+        connection = json.loads(resumed_path.read_text())
+        assert connection["credential"] != original_connection["credential"]
         assert (
-            claimed["owner_capability_sha256"]
-            == request["arguments"]["owner_capability_sha256"]
+            connection["caller_capability_sha256"]
+            == original_connection["caller_capability_sha256"]
         )
-        assert pending["state"] == "pending" and pending["lease_fence"] == 0
-        recovery_ids = []
-        for attempt in range(2):
-            response = operate(retained, f"recovery-{attempt}")
-            receipt = json.loads(response["receipt_json"])
-            recovery_ids.append(response["request_id"])
-            assert response["verdict"] == "deny" and response["output"] is None
-            assert (
-                receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
-                and receipt["metadata"]["admission_operation"]["projected_state"]
-                == "outcome_unknown_after_dispatch"
+
+        def inspect(job, phase):
+            return value(
+                operate(
+                    {
+                        "operation_key": f"inspect-{phase}-{job}",
+                        "server_id": server("inspect"),
+                        "tool_name": "inspect",
+                        "arguments": {"job_id": job},
+                    },
+                    f"inspect-{phase}-{job}",
+                )
             )
+
+        with host.serve(chio, directory, key, environment, socket_path=socket_path):
+            before = [inspect(job, "before") for job in jobs]
+            withheld = committed["resource_result"]["jobs"][0]
+            claimed = next(job for job in before if job["job_id"] == withheld["job_id"])
+            pending = next(job for job in before if job["job_id"] != withheld["job_id"])
+            assert claimed == withheld
+            assert claimed["state"] == "leased" and claimed["lease_fence"] == 1
             assert (
-                receipt["metadata"]["chio_process"]["recovery_policy"]
-                == "known_outcome_only"
+                claimed["owner_capability_sha256"]
+                == request["arguments"]["owner_capability_sha256"]
             )
-            assert (
-                receipt["metadata"]["chio_process"]["operation_key"]
-                == retained["operation_key"]
+            assert pending["state"] == "pending" and pending["lease_fence"] == 0
+            recovery_ids = []
+            for attempt in range(2):
+                response = operate(retained, f"recovery-{attempt}")
+                receipt = json.loads(response["receipt_json"])
+                recovery_ids.append(response["request_id"])
+                assert response["verdict"] == "deny" and response["output"] is None
+                assert (
+                    receipt["metadata"]["admission_operation"]["schema"] == "chio.admission-receipt.v1"
+                    and receipt["metadata"]["admission_operation"]["projected_state"]
+                    == "outcome_unknown_after_dispatch"
+                )
+                assert (
+                    receipt["metadata"]["chio_process"]["recovery_policy"]
+                    == "known_outcome_only"
+                )
+                assert (
+                    receipt["metadata"]["chio_process"]["operation_key"]
+                    == retained["operation_key"]
+                )
+            assert len(set(recovery_ids)) == 1
+            after = [inspect(job, "after") for job in jobs]
+            assert before == after
+            deliveries = [
+                json.loads(path.read_text()) for path in fault.glob("delivery-*.json")
+            ]
+            assert deliveries == [
+                {
+                    "arguments": request["arguments"],
+                    "caller": connection["caller_capability_sha256"],
+                }
+            ]
+            # This is deliberately new work, not a retry of the uncertain claim.
+            # If the pending job were not claimable, a broken recovery path could
+            # appear safe merely because there was no second effect to observe.
+            control = value(
+                operate(
+                    {**request, "operation_key": "explicit-new-intent-control"}, "control"
+                )
             )
-        assert len(set(recovery_ids)) == 1
-        after = [inspect(job, "after") for job in jobs]
-        assert before == after
-        deliveries = [
-            json.loads(path.read_text()) for path in fault.glob("delivery-*.json")
-        ]
-        assert deliveries == [
+            assert len(control["jobs"]) == 1
+            assert control["jobs"][0]["job_id"] == pending["job_id"]
+            assert control["jobs"][0]["lease_fence"] == 1
+            final = [inspect(job, "final") for job in jobs]
+            assert all(
+                job["state"] == "leased" and job["lease_fence"] == 1 for job in final
+            )
+            assert len(list(fault.glob("delivery-*.json"))) == 2
+        host.verify(chio, directory, receipts)
+        host.write(
+            directory / "qualification.json",
             {
-                "arguments": request["arguments"],
-                "caller": connection["caller_capability_sha256"],
-            }
-        ]
-        # This is deliberately new work, not a retry of the uncertain claim.
-        # If the pending job were not claimable, a broken recovery path could
-        # appear safe merely because there was no second effect to observe.
-        control = value(
-            operate(
-                {**request, "operation_key": "explicit-new-intent-control"}, "control"
-            )
+                "schema": "chio.postgres-job.claim-loss-qualification.v1",
+                "mediation": resources.evidence(),
+                "evidence_kind": "scripted_native_postgres_committed_claim_response_loss",
+                "live_model": False,
+                "tenant": tenant,
+                "chio_sha256": hashlib.sha256(chio.read_bytes()).hexdigest(),
+                "gateway_sha256": gateway_hash,
+                "request": retained,
+                "withheld_gateway_response": committed,
+                "unresolved": unresolved,
+                "host_sigkill": True,
+                "fresh_socket_and_rotated_credential": True,
+                "caller_and_signer_unchanged": True,
+                "withheld_exchange_release": stopped,
+                "before_recovery": before,
+                "after_recovery": after,
+                "after_new_intent_control": final,
+                "claim_deliveries_after_recovery": 1,
+                "claim_deliveries_after_control": 2,
+                "original_claim_deliveries": deliveries,
+                "recovery_request_ids": recovery_ids,
+                "observations": observations,
+                "all_exported_receipts_verified": True,
+                "original_claim_receipt_recovered": False,
+            },
         )
-        assert len(control["jobs"]) == 1
-        assert control["jobs"][0]["job_id"] == pending["job_id"]
-        assert control["jobs"][0]["lease_fence"] == 1
-        final = [inspect(job, "final") for job in jobs]
-        assert all(
-            job["state"] == "leased" and job["lease_fence"] == 1 for job in final
+        print(
+            json.dumps({"qualified": True, "report": str(directory / "qualification.json")})
         )
-        assert len(list(fault.glob("delivery-*.json"))) == 2
-    host.verify(chio, directory, receipts)
-    host.write(
-        directory / "qualification.json",
-        {
-            "schema": "chio.postgres-job.claim-loss-qualification.v1",
-            "evidence_kind": "scripted_native_postgres_committed_claim_response_loss",
-            "live_model": False,
-            "tenant": tenant,
-            "chio_sha256": hashlib.sha256(chio.read_bytes()).hexdigest(),
-            "gateway_sha256": gateway_hash,
-            "request": retained,
-            "withheld_gateway_response": committed,
-            "unresolved": unresolved,
-            "host_sigkill": True,
-            "fresh_socket_and_rotated_credential": True,
-            "caller_and_signer_unchanged": True,
-            "proxy_shutdown": stopped,
-            "before_recovery": before,
-            "after_recovery": after,
-            "after_new_intent_control": final,
-            "claim_deliveries_after_recovery": 1,
-            "claim_deliveries_after_control": 2,
-            "original_claim_deliveries": deliveries,
-            "recovery_request_ids": recovery_ids,
-            "observations": observations,
-            "all_exported_receipts_verified": True,
-            "original_claim_receipt_recovered": False,
-        },
-    )
-    print(
-        json.dumps({"qualified": True, "report": str(directory / "qualification.json")})
-    )
 
 
 if __name__ == "__main__":

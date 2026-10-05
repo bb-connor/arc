@@ -1,185 +1,102 @@
 # PostgreSQL jobs under Chio process authority
 
-This second resource adapter uses the existing `PostgresFindingMarketStore`
-lease API. The native MCP adapter binds a worker's lease owner to the exact
-capability digest supplied by the Chio kernel. Worker tool arguments cannot
-select an owner. PostgreSQL checks owner, fence and expiry in the transaction
-that commits a result. The adapter adds no database tables or replay journal.
+The enforced native qualification uses a host-owned PostgreSQL resource adapter
+behind the existing credential broker. Six fixed routes expose only `task`,
+`complete`, `renew`, `assign`, `release` and `inspect`. Each route has a dedicated
+credential and server ID (`jobs-task`, `jobs-complete`, and so on). Children
+receive only the first three grants; the root receives the operator grants.
 
-The operator gets `assign`, `release` and `inspect` on `jobs-admin`.
-Child workers get only `task`, `complete` and `renew` on `jobs`. Both tool
-servers use the production worker database role. Migration and initial job
-creation use separate roles before the host starts.
+The confined static MCP target receives neither a database credential nor
+socket permission. The host derives the caller digest from the original process
+capability inside durable preparation. The authenticated resource channel pins
+the tenant and operation. PostgreSQL checks owner, fence and expiry in the same
+transaction that commits a result. Migration and initial job creation use
+separate operator roles. The adapter adds no database tables or replay journal.
 
-## Run the native qualification
+## Qualification boundaries
 
-Requires Docker, OpenSSL, Rust and uv. Run from the repository root.
-The example uses a dedicated PostgreSQL container and named volume. It never
-resets another database. Choose a private output directory with ancestry that
-passes Chio's native launch checks.
+`qualify_resource.py` exercises the real TLS adapter and worker database role.
+It does not qualify a cage, kernel receipt or broker proof. It refuses invalid
+credentials, another tenant, another operation and worker-supplied caller
+metadata, then exercises assignment, supersession, release and completion.
+
+`qualify.py` and `qualify_claim_loss.py` additionally require the enforcing native
+fixture and prepared-broker helper supplied by
+[the PostgreSQL workflow](../../.github/workflows/postgres-job-swarm.yml).
+Run that workflow on a real Linux x86_64 host. Its adjacent native fixture gate
+must pass before the complete scenarios execute. The broker helper supplies
+explicit isolated qualification identities and migration fixtures; it does not
+supply production deployment approval. Every serving broker, process host and
+resource uses its production implementation.
+
+The native scenarios require:
+
+- Rejection of a superseded caller using the replacement's current fence.
+- Refusal of caller spoofing and a child's operator request.
+- Completion by the replacement and byte-identical receipt recovery after restart.
+- Separation of the original `completed` outcome from `already_completed` on a
+  deliberately new logical call.
+- A host SIGKILL after a committed claim and before its response, followed by
+  recovery of the original operation without claiming a second queued job.
+- A separate new-intent control that proves the second job was claimable.
+
+The fault directory and credential files are outside the empty native working
+directory. The supervisor keeps brokers alive across process-host restarts and
+closes their control pipe before stopping its service children. Logical intent
+and the exact prepared wire request are retained separately; the receipt
+verifier checks the wire request without rewriting signed evidence.
+
+The committed-claim-loss control uses an explicit host-owned fault gate. Once
+PostgreSQL returns the committed result, the gate records it and withholds the
+HTTPS response. The driver kills the process host and releases that exchange.
+Two recovery attempts must retain `outcome_unknown_after_dispatch`, one original
+request identity and no resource output. The first job stays leased and the
+second stays pending. The explicit new-intent control then claims the second job.
+The withheld resource result is test evidence, not a recovered kernel receipt
+or an atomic transaction across Chio and PostgreSQL.
+
+## Local resource component check
+
+Requires Docker, OpenSSL and Rust. This command checks the TLS/database component
+on the local host; complete native qualification still requires the workflow.
 
 ```sh
-cargo build --locked -p chio-cli --bin chio
 cargo build --locked -p chio-finding-market-store-postgres --example agent_jobs
 umask 077
 job_root=$(mktemp -d)
-cp target/debug/chio "$job_root/chio"
 cp target/debug/examples/agent_jobs "$job_root/agent-jobs"
-chmod 700 "$job_root/chio" "$job_root/agent-jobs"
-uv build sdks/python/chio-process --wheel --out-dir "$job_root/wheels"
-uv venv "$job_root/venv"
-uv pip install --python "$job_root/venv/bin/python" --no-deps \
-  "$job_root/wheels/chio_process-0.1.0-py3-none-any.whl"
 docker pull postgres:17.11
 python3 examples/postgres-job-swarm/postgres.py start \
   --binary "$job_root/agent-jobs" --output "$job_root/database"
-python3 examples/postgres-job-swarm/check_api.py \
-  --database-state "$job_root/database/state.json"
-"$job_root/venv/bin/python" examples/postgres-job-swarm/qualify.py \
-  --chio "$job_root/chio" --database-state "$job_root/database/state.json" \
-  --output "$job_root/qualification"
-"$job_root/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py \
-  --chio "$job_root/chio" --database-state "$job_root/database/state.json" \
-  --output "$job_root/claim-loss"
+python3 examples/postgres-job-swarm/qualify_resource.py \
+  --database-state "$job_root/database/state.json" --output "$job_root/component"
 python3 examples/postgres-job-swarm/postgres.py stop \
   --state "$job_root/database/state.json"
 ```
 
-On macOS, use an OpenSSL 3 executable through `--openssl` if the system
-OpenSSL lacks the certificate options. The image's local content ID is frozen
-before startup; the report records that ID and repository digests. Container
-stop preserves its data volume. Private state contains database credentials
-and signing material. Export only the qualification report, receipts and
-public verification key.
+The fixture freezes the local PostgreSQL image by content ID. It provisions only
+its own container and named volume, copies bootstrap files through the Docker
+API, and requires reachable loopback networking. Stop preserves its data volume.
+Private state contains credentials and signing material; export only selected
+qualification reports, receipts and public verification keys.
 
-Fixture bootstrap files are copied through the Docker API into its own stopped
-container before startup. The daemon does not need access to the client's
-temporary paths. The published database port must still be reachable through
-local loopback, as with Docker Desktop, Colima or a local Linux daemon.
+## Live and operator consumers
 
-The public API regression exercises all six job transitions using
-`connect_worker`, including forbidden runtime writes and disabled tenants.
-The native qualification then checks:
+The existing `live.py` cross-framework handoff is retained, but its framework
+consumer adaptation and live qualification remain open. Isolated qualification
+identities must not become a production deployment recipe. Production
+provisioning requires `CHIO_JOB_BROKER_CONFIG` to name an operator-owned
+process-host configuration with the six fixed mappings for its tenant, and
+operator supervision of those brokers and the resource. This configuration is
+necessary, but does not by itself qualify the live consumer path.
 
-- Operator assignment, release to a pending state, and replacement assignment.
-- Rejection of an old caller using the replacement's current fence.
-- Rejection of owner spoofing, missing caller metadata and a child's operator call.
-- Completion by the replacement and byte-identical receipt recovery after a
-  real host restart.
-- The difference between original operation replay (`completed`) and a new
-  logical call for an already-retained result (`already_completed`).
+Native callers prepare through the trusted process host before invocation.
+`invocation.py` preserves logical arguments separately from the signed prepared
+request and delegates receipt verification to `chio_process.invocation` using
+that exact wire request. Keep the original operation key and recovery policy;
+an uncertain effect does not authorize a new logical operation.
 
-These checks use scripted tool requests and synthetic job evidence. They do
-not establish a live-model success rate, an independent adopter, or a
-performance improvement over an application already using correctly fenced
-PostgreSQL jobs.
-
-`qualify_claim_loss.py` exercises a different failure boundary. Its test-only
-stdio proxy receives a successful response from the real Rust claim API after
-PostgreSQL commits, then withholds that response. The driver kills the actual
-native host with SIGKILL. The installed SDK retains the unresolved request.
-After restarting with a fresh socket and rotated credential, two attempts to
-recover the identical request must return a verified signed denial retaining
-`outcome_unknown_after_dispatch`. The first job remains leased; a second queued
-job must remain pending, and the proxy must have delivered exactly one claim.
-
-A deliberately new operation then claims the second job. This control proves
-that an accidental redispatch could have caused an observable second effect.
-It is new work in an isolated fixture, not a supported retry technique.
-The withheld gateway response is test evidence, not a recovered kernel receipt.
-This check proves refusal to repeat an uncertain claim. It does not recover
-the missing claim outcome or supply an atomic transaction across Chio and
-PostgreSQL. The test proxy is not part of the application deployment.
-
-The signed uncertainty response can have `terminal_state.state: completed`:
-the kernel has completed that evaluation with a denial. This is not evidence
-that the resource operation completed or had no effect. Check the verdict and
-the receipt's `metadata.admission_operation.projected_state`; this case retains
-`outcome_unknown_after_dispatch` and has no resource output.
-
-## Live cross-framework handoff
-
-After preparing the fixture above, install the locked LangGraph environment
-and an [AI SDK consumer](../shared-resource-swarm/README.md). Supply the provider
-credential in the model worker environment, then run:
-
-```sh
-uv sync --project sdks/python/chio-langgraph --locked --extra dev --extra process
-sdks/python/chio-langgraph/.venv/bin/python examples/postgres-job-swarm/live.py \
-  --chio "$job_root/chio" --gateway "$job_root/agent-jobs" \
-  --database-state "$job_root/database/state.json" \
-  --consumer /path/to/installed/ai7 --provider openrouter \
-  --model openai/gpt-4.1-mini --old-framework langgraph \
-  --output "$job_root/live-handoff"
-```
-
-The database must still be running. Choose `--old-framework ai-sdk` and a fresh
-output directory to reverse the handoff. Each run uses a new tenant and job.
-The old worker resumes and finishes before the replacement starts. Acceptance
-requires a live old-worker completion attempt with the **current** fence that
-returns `superseded`, followed by the replacement's correct committed result.
-All original model responses and tool receipts are retained; the report checks
-exact receipt replay and verifies the kernel signatures. The task remains a
-synthetic assessment, and a passing run is not a population success rate.
-
-## Operator client
-
-`chio_process.invocation` uses the public `ProcessClient`, requires a stable
-operation key, retains the request before invoking, and verifies the returned
-receipt against an operator-selected kernel public key.
-
-A request file has this shape:
-
-```json
-{
-  "operation_key": "assign-release-assessment-1",
-  "server_id": "jobs-admin",
-  "tool_name": "assign",
-  "arguments": {
-    "owner_capability_sha256": "<digest from the child's private connection descriptor>",
-    "lease_seconds": 600,
-    "limit": 1
-  },
-  "known_outcome_only": true
-}
-```
-
-```sh
-"$job_root/venv/bin/python" -m chio_process.invocation \
-  --chio "$job_root/chio" \
-  --connection "$job_root/qualification/root/connection.json" \
-  --trusted-kernel-pubkey "$job_root/qualification/kernel.pub" \
-  --request request.json --output "$job_root/operator-attempt-1"
-```
-
-This invocation requires the corresponding host to be running. The
-qualification starts and stops its host internally; retained credentials do
-not start a host.
-
-Keep the same key, arguments **and recovery policy** on every recovery
-attempt. `known_outcome_only` defaults to true here. It permits the first
-dispatch and recovery of a completed result, but refuses automatic
-redispatch of an unknown outcome. It is not a read-only outcome query.
-Changing the policy on an existing key conflicts.
-
-The resource's claim operation has no request identity parameter. A lost
-claim outcome therefore cannot be repaired by submitting a new key and
-pretending it is a retry. Inspecting a job is an observation, not proof that
-a particular uncertain claim committed. Releasing and claiming are separate
-transactions with an explicit pending intermediate state.
-
-## Boundary and measured integration defect
-
-The metadata digest is an identity binding on a trusted kernel-owned pipe.
-It is neither a bearer credential nor an independently signed assertion.
-The demo's signed native launch policy does not provide OS containment.
-Arbitrary code running as the host's OS user is outside this qualification.
-
-The first actual worker-role invocation exposed a pre-existing Rust API
-mismatch: `begin_tenant` issued `SELECT ... FOR SHARE`, which requires an
-UPDATE privilege deliberately withheld from worker logins. The worker
-connection passed role checks, then job assignment failed. Job transitions
-now perform a nonlocking preliminary tenant read; their existing privileged
-SQL functions retain the authoritative tenant lock and enabled-state check.
-Job reads and readiness probes use the existing read-only snapshot boundary.
-No role grants or migrations were expanded.
+A signed uncertainty response can have `terminal_state.state: completed` because
+the kernel completed its evaluation with a denial. Check both the verdict and
+`metadata.admission_operation.projected_state`. This fixture proves no
+population success rate, live-model advantage or independent adoption.

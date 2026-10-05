@@ -30,19 +30,19 @@ use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
 /// A fixed host-owned JSON operation. The bearer never reaches this adapter.
-pub(crate) trait JsonAdapter: Send + Sync + 'static {
+pub trait JsonAdapter: Send + Sync + 'static {
     fn timeout_ms(&self) -> u64;
     fn execute_json(&self, bytes: &[u8]) -> Result<Vec<u8>>;
 }
 
-pub(crate) struct HttpsEndpoint {
+pub struct HttpsEndpoint {
     pub bind: SocketAddr,
     pub certificate_der: Vec<u8>,
     pub private_key_file: PathBuf,
     pub bearer_file: PathBuf,
 }
 
-pub(crate) struct HostHttpsServer {
+pub struct HostHttpsServer {
     listener: TcpListener,
     tls: Arc<ServerConfig>,
     bearer: Zeroizing<Vec<u8>>,
@@ -80,7 +80,13 @@ pub(crate) fn private_bytes(path: &std::path::Path, maximum: u64) -> Result<Zero
 }
 
 impl HostHttpsServer {
-    pub(crate) fn bind(config: HttpsEndpoint, adapter: impl JsonAdapter) -> Result<Self> {
+    /// Compare credential identity without exposing bearer material. Operators
+    /// composing fixed resource endpoints use this to refuse shared authority.
+    pub fn shares_credential_with(&self, other: &Self) -> bool {
+        bool::from(self.bearer.as_slice().ct_eq(other.bearer.as_slice()))
+    }
+
+    pub fn bind(config: HttpsEndpoint, adapter: impl JsonAdapter) -> Result<Self> {
         if !config.bind.ip().is_loopback()
             || config.bind.port() == 0
             || config.certificate_der.len() > 16_384

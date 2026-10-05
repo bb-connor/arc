@@ -12,6 +12,10 @@ use chio_secret_broker::{
 };
 use serde_json::Value;
 
+#[cfg(test)]
+#[path = "preparation_tests.rs"]
+mod tests;
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PreparationConfig {
@@ -114,12 +118,6 @@ impl InvocationPreparer for Preparer {
                 "broker input exceeds the installed JSON object bound",
             ));
         }
-        let body = route.config.payload.body(input.arguments)?;
-        if body.len() as u64 > route.config.maximum_body_bytes {
-            return Err(ProcessError::Invalid(
-                "mapped provider request exceeds the installed bound",
-            ));
-        }
         let invocation_id = runtime.request_id(input.process, input.operation_key)?;
         let binding = sha256_hex(&canonical_json_bytes(&(
             "chio.process.broker-preparation.v1",
@@ -133,7 +131,18 @@ impl InvocationPreparer for Preparer {
             input.process,
             input.operation_key,
             &binding,
-            |parent, subject| route.issue(parent, subject, &binding, invocation_id, body),
+            |parent, subject| {
+                // Only the original retained capability supplies caller identity.
+                // Recovery returns the original prepared envelope unchanged.
+                let caller = sha256_hex(&canonical_json_bytes(parent)?);
+                let body = route.config.payload.body_for_caller(input.arguments, &caller)?;
+                if body.len() as u64 > route.config.maximum_body_bytes {
+                    return Err(ProcessError::Invalid(
+                        "mapped provider request exceeds the installed bound",
+                    ));
+                }
+                route.issue(parent, subject, &binding, invocation_id, body)
+            },
         )
     }
 }

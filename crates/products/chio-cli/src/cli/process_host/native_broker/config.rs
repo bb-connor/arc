@@ -111,7 +111,21 @@ impl Config {
         let mut servers = std::collections::BTreeSet::new();
         let mut audiences = std::collections::BTreeSet::new();
         let mut sockets = std::collections::BTreeSet::new();
+        let mut credential_users = BTreeMap::new();
         for route in &self.routes {
+            if let Some(preparation) = &route.preparation {
+                let credential = &preparation.credential;
+                let resource = matches!(
+                    preparation.payload,
+                    super::payload::PayloadConfig::CallerBoundResource { .. }
+                );
+                let identity = (&credential.provider, &credential.credential_id, credential.version);
+                if credential_users.insert(identity, resource)
+                    .is_some_and(|previous| previous || resource)
+                {
+                    return Err(error("caller-bound resource routes require exclusive credentials"));
+                }
+            }
             if !servers.insert(&route.quota.server_id)
                 || !audiences.insert(&route.quota.audience)
                 || !sockets.insert(&route.authority_socket_name)

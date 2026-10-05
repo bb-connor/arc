@@ -6,7 +6,6 @@ import os
 import select
 import subprocess
 
-from chio_process.launch import provision_native_demo
 
 ROLES = ("superseded", "replacement")
 
@@ -34,59 +33,40 @@ def command(arguments, directory, *, env=None, input=None):
     return result.stdout
 
 
-def prepare(chio, gateway, tenant, directory, environment, *, operator_command=None):
+def prepare(chio, gateway, tenant, directory, environment, *, resources=None):
+    from resources import OPERATIONS, WORKER_OPERATIONS, server
+
     chio = chio.resolve(strict=True)
-    gateway = gateway.resolve(strict=True)
-    (directory / "policy.yaml").write_text("""kernel:
-  max_capability_ttl: 3600
-  delegation_depth_limit: 2
-  durable_admission_mode: all
-capabilities:
-  default:
-    tools:
-      - server: jobs
-        tool: '*'
-        operations: [invoke, delegate]
-        ttl: 3600
-      - server: jobs-admin
-        tool: '*'
-        operations: [invoke, delegate]
-        ttl: 3600
-""")
-    servers = [
-        provision_native_demo(
-            chio,
-            server,
-            operator_command
-            if mode == "operator" and operator_command is not None
-            else [str(gateway), mode, tenant],
-            directory / ("launch-" + mode),
-            directory,
-            environment=environment,
-        )
-        for server, mode in (("jobs", "worker"), ("jobs-admin", "operator"))
+    if resources is None:
+        configured = environment.get("CHIO_JOB_BROKER_CONFIG")
+        if not configured:
+            raise ValueError("PostgreSQL native execution requires a provisioned broker config")
+        with open(configured) as stream:
+            config = json.load(stream)
+    else:
+        config = json.loads(json.dumps(resources.config))
+    routes = config["native_broker"]["routes"]
+    if len(routes) != len(OPERATIONS):
+        raise ValueError("expected six fixed PostgreSQL broker routes")
+    observed = set()
+    for route in routes:
+        operation = route["quota"]["tool_name"]
+        if operation not in OPERATIONS or operation in observed:
+            raise ValueError("unexpected or repeated PostgreSQL route")
+        observed.add(operation)
+        if (route["quota"]["server_id"] != server(operation)
+                or route["preparation"]["payload"] != {
+                    "kind": "caller_bound_resource", "route": {
+                        "resource": "postgres-jobs", "tenant": tenant, "operation": operation}}):
+            raise ValueError("PostgreSQL route differs from the fixed host mapping")
+    config["limits"] = {"max_processes": 3, "max_depth": 1, "max_calls": 100}
+    config["children"] = [
+        {"id": name, "parent": "root", "budget_share_bps": 4000,
+         "tools": [{"server_id": server(tool), "tool_name": tool}
+                   for tool in WORKER_OPERATIONS]}
+        for name in ROLES
     ]
-    write(
-        directory / "host-config.json",
-        {
-            "schema": "chio.process.host.v1",
-            "policy": "policy.yaml",
-            "servers": servers,
-            "limits": {"max_processes": 3, "max_depth": 1, "max_calls": 100},
-            "children": [
-                {
-                    "id": name,
-                    "parent": "root",
-                    "budget_share_bps": 4000,
-                    "tools": [
-                        {"server_id": "jobs", "tool_name": tool}
-                        for tool in ("task", "complete", "renew")
-                    ],
-                }
-                for name in ROLES
-            ],
-        },
-    )
+    write(directory / "host-config.json", config)
     initialized = json.loads(
         command(
             [
@@ -124,6 +104,8 @@ capabilities:
             directory,
         )
         connections[name] = json.loads(path.read_text())
+    if resources is not None:
+        resources.start(initialized["kernel_key"])
     return initialized["kernel_key"], connections
 
 
@@ -150,7 +132,8 @@ def serve(chio, directory, key, environment, *, socket_path=None):
                 "--socket",
                 str(socket_path or directory / "worker.sock"),
             ],
-            env=environment,
+            env={name: value for name, value in environment.items()
+                 if not name.startswith("CHIO_JOB_DATABASE_")},
             stdout=subprocess.PIPE,
             stderr=log,
         )
