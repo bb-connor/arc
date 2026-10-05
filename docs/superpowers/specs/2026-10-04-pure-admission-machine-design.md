@@ -498,6 +498,7 @@ pub enum IdentityDisposition {
     | `IntentCommit` remainder from `CapturePending` with capture `Committed` | any other policy reason (`AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict`) | Post-dispatch, as the section 6.1 `X` row: `HaltOperation { RefusedAfterCapture(reason) }`, then `Terminalize(OutcomeUnknownAfterDispatch)` with holds frozen, as a restrictive, non-crossing commit. Never `Compensate`: a committed capture cannot be undone under `PreDispatchNoEffect` (T3). This row takes precedence over the generic slow-path row below |
     | slow-path `ParticipantCommit` or dispatch-commit step, otherwise | any policy reason | `Compensate { PreDispatchNoEffect, receipt }`. The request id is terminal, as on M: today |
     | `ParticipantCommit` | the `ParticipantRefused` event | `Compensate { PreDispatchNoEffect, receipt }` |
+    | `IntentCommit` (fused), refused by a participant precondition inside the savepoint (for example spec 10 X5b's setup gate) | the `ParticipantRefused` event | From `Unbegun`: the savepoint rolled back and nothing persisted, so stay `Unbegun` and sign `Deny { ParticipantRefused }` with `Reusable` (M20). The precondition can clear, for example when setup completes qualification. From `Prepared`: `Compensate { PreDispatchNoEffect, receipt }`, as the slow path does. Never dispatches |
     | `CheckOnlyCrossing` (read-only class) | any policy reason | `SignReceipt(Deny)` with the reason; nothing to compensate |
     | `CheckOnlyCrossing` (`NonDurable`) | any policy reason | `Compensate { PreDispatchRefusal, PreDispatchNoEffect, receipt }`, which the driver executes against spec 3's in-memory ledger; there is no row to project |
     | `CheckOnlyCrossing` | `Unavailable`, `VersionConflict` | Not produced: the crossing writes nothing and plans no version (spec 10 X13). If received, it fails closed: `Fault { IllegalEvent }`, then the read-only and `NonDurable` policy rows above with reason `Unavailable` |
@@ -595,7 +596,7 @@ pub enum IdentityDisposition {
 
     | Effect | Next and effects |
     |---|---|
-    | `IntentCommit` from `Unbegun`, `CheckOnlyCrossing` before dispatch | stay `Unbegun`; no dispatch. The driver signs `Deny { StoreUnavailable }` with `Reusable` (M20) if the receipt path is up; otherwise it returns a fail-closed error with no effect. Nothing was persisted, so nothing is compensated |
+    | `IntentCommit` from `Unbegun`, `CheckOnlyCrossing` before dispatch | stay `Unbegun`; no dispatch. Nothing was persisted. A `NonDurable` call first releases its driver-local ledger entries (invocation, budget, payment, credential and runtime reservations, section 4.4) by `Compensate` against spec 3's in-memory ledger, exactly as M10 does for `Overloaded`, because that compensation needs no store. The driver then signs `Deny { StoreUnavailable }` with `Reusable` (M20) if the receipt path is up; otherwise it returns a fail-closed error with no effect |
     | `DenyTombstone` | stay `Unbegun`; the deny receipt is signed `Reusable`, because no tombstone committed. A retry re-evaluates and meets the same committed fences |
     | Every other pre-dispatch effect (`IntentCommit` from `Prepared`, `ParticipantCommit`, slow-path dispatch-commit step, `Park`) | `Retain` the same planned member with its expected version. Every hold stays. Never `Compensate` because of the failure. If the caller abandons the call, M17's rules apply: the member is known not committed, so abandonment compensates through its own `Compensate` member, which M19 retains in turn while the store is down |
     | Post-effect crossings (`ReturnRecord`, `OutcomeCommit`, release crossings) | `Retain` in the phase with output withheld in custody; the same plan is re-submitted. Never terminalize because of the failure |
@@ -1042,6 +1043,18 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-6-07 (producing side) | An ambiguous commit denial binds the adapter before recovery produces the terminal receipt | Fixed. `IdentityDisposition` gains `Retained`. M12's ambiguous deny (and spec 3's `CommitUnconfirmed`, spec 10 X22) carries it. Reconciliation resolves a `Retained` identity to the one `Terminal` record or to a proof that nothing committed. Spec 8 equality, spec 3 counting and spec 6 binding are stated for all three values. T14 and tests are updated | section 5.2 enum; M12; M20; T14; section 14 tests |
+
+### Codex review (PR #1174, round 17)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187142756 | Compensate no-row NonDurable calls before returning | Fixed now. On `StoreUnavailable` before dispatch, a `NonDurable` call first releases its driver-local ledger entries through spec 3's in-memory ledger (no store needed), as M10 does for `Overloaded`, then signs the reusable deny | M19 table |
+
+### Independent review pass 4 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-1-03 (cross-reference) | The recovery inventory stops before implemented P6 setup and signed maintenance | Applied here. M10 gains a row for a fused `IntentCommit` refused by a participant precondition such as spec 10 X5b's setup gate. From `Unbegun` it gives a `Reusable` deny with nothing persisted; from `Prepared` it compensates | M10 |
 
 ## Appendix A. External and FTL precedent
 

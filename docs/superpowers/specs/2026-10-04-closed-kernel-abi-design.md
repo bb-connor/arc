@@ -1,6 +1,6 @@
 # Design: layered kernel ABI registry and TCB budget
 
-- Status: PROPOSED (revision 3, re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
+- Status: PROPOSED (revision 3, re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P6 (W:))
 - Date: 2026-10-04
 - Scope: declare every closed trusted operation set as one layered registry:
   - L0, the in-process kernel;
@@ -27,7 +27,7 @@ Citations:
 - `M:` = `origin/integration/process-security-m4` @ `19df31ad9` (#1160).
 - `V:` = `origin/work/verifiable-work-session-20261003` @ `14477aaac` (#1173).
 - `R:` = `origin/research/openappa-recovery-20261001` @ `de84fc306` (#1172), recovery design documents.
-- `W:` = the uncommitted working tree of `standalone/arc-worktrees/recoverable-agent-runtime-20261002` (branch `feat/recoverable-agent-runtime-20261002`, committed HEAD `de84fc306`, built on the #1160 checkpoint `f25cd61f4`). Recovery P0-P5 are implemented there. Line references reflect that tree on 2026-10-04 and may drift. W: is treated as shipped.
+- `W:` = the uncommitted working tree of `standalone/arc-worktrees/recoverable-agent-runtime-20261002` (branch `feat/recoverable-agent-runtime-20261002`, committed HEAD `de84fc306`, built on the #1160 checkpoint `f25cd61f4`). Recovery P0-P5 and the P6 product surface (protected setup and qualification, decision reports, maintenance proposals and separately signed policy application) are implemented there. Line references reflect that tree on 2026-10-04 and may drift. W: is treated as shipped.
 - `P:` = `feat/process-command-experience-20260924` @ `e24596543`.
 - Bare paths are `main` @ `f5a9d2ab2` and are used only for closure measurements.
 - W1-W4 APIs have no code on these refs and are cited as **assumed shipped (contract anchor)**. Recovery names documented in R: but absent from W: code are marked **doc-only (not implemented in W:)**.
@@ -106,7 +106,8 @@ This does not replace:
 | W: components | `chio-recovery`: "A directive cannot execute, close, settle, sign or release", with a `compile_fail` doctest refusing report-to-grant conversion (W: `crates/security/chio-recovery/src/lib.rs:1-10`). `chio-semantic-contracts`: "No provider, plugin, filesystem, store or clock" (W: `crates/security/chio-semantic-contracts/src/lib.rs:1`). The semantic HTTP client is a `reqwest` client in `chio-control-plane` (W: `semantic/http.rs:11`, `:34-35`), not in the kernel |
 | chio-process trust inputs | `ProcessRegistry::caller` (M: `chio-process/src/registry.rs:114`) selects caller identity for mailbox sender attestation and spawn. `provision_signers` (`:85`) holds native-delegation subject signing keys |
 | L2 work ABI (assumed shipped, contract anchor) | V: `2026-10-03-work-runtime-design.md:32` (`WorkRequestV1 { Prepare, Submit, Query }`), `:56` (`WorkPreparationV1`), `:73` (`WorkActionV1`), `:87` (`WorkQueryV1`), `:155` (negotiated alongside `chio.process.v1`, no second listener). No `WorkRequestV1` exists in V: `crates/` or `sdks/` |
-| L3 recovery ABI (implemented in W:) | `RecoveryCommandBodyV1` has seven variants, `CreateWorkflow`, `InspectWorkflow`, `SelectOffer`, `SubmitApproval`, `ResumeWorkflow`, `CancelWorkflow`, `ReportDecision`, with wire names `create` through `report` (W: `chio-security-types/src/recovery/commands.rs:26-58`, `:69-75`). Endpoints: `/v1/recovery/commands`, `/review`, `/settle` (W: `chio-control-plane/src/recovery/transport.rs:50-52`) and `/v1/recovery/explain` (W: `recovery/explanation/transport.rs:37`). `RecoveryPermission` has 15 variants, `Create`, `Inspect`, `Select`, `Approve`, `Resume`, `Cancel`, `Report`, `Settle`, `KnowledgeRead`/`Write`/`Adopt`/`Admin`, `ConfinedLaunch`/`Return`/`Cancel`, whose wire names are grant tool names on server `chio.recovery` (W: `chio-kernel/src/recovery/records.rs:52-68`). R:'s `ExplainIntent` command is doc-only (not implemented in W:) |
+| L3 recovery ABI (implemented in W:) | `RecoveryCommandBodyV1` has seven variants, `CreateWorkflow`, `InspectWorkflow`, `SelectOffer`, `SubmitApproval`, `ResumeWorkflow`, `CancelWorkflow`, `ReportDecision`, with wire names `create` through `report` (W: `chio-security-types/src/recovery/commands.rs:26-58`, `:69-75`). Endpoints: `/v1/recovery/commands`, `/review`, `/settle` (W: `chio-control-plane/src/recovery/transport.rs:50-52`) and `/v1/recovery/explain` (W: `recovery/explanation/transport.rs:37`). `RecoveryPermission` has 16 variants, `Create`, `Inspect`, `Select`, `Approve`, `Resume`, `Cancel`, `Report`, `Settle`, `KnowledgeRead`/`Write`/`Adopt`/`Admin`, `ConfinedLaunch`/`Return`/`Cancel` and P6's `Maintain`, whose wire names are grant tool names on server `chio.recovery` (W: `chio-kernel/src/recovery/records.rs:52-88`). R:'s `ExplainIntent` command is doc-only (not implemented in W:) |
+| P6 product surface (W:) | P6 adds no `ChioKernel` method. It adds control-plane routes and store mutations. **Setup:** `RecoverySetupService` (W: `chio-control-plane/src/recovery/setup.rs:35`) mounts `/v1/recovery/setup/probe` and `/qualify` (`recovery/setup/transport.rs:30-37`) over the store's `pin_setup_creation`, `configure_protected_setup`, `commit_setup_probe`, `prepare_setup_report` and `accept_setup_report` (W: `chio-store-sqlite/src/admission_operation_store/setup/service.rs:8-283`). **Gate:** `setup/gate.rs` `require_ready`, `require_command` and `require_capture` (`:4-124`) gate commands and captures on the selected deployment and its qualification, with a narrow selected self-test allowed before readiness. Native capture calls `require_capture` at `security_participant_state/dispatch_ledger/capture.rs:45-51`; semantic and knowledge paths call `require_ready` (`semantic.rs:274`, `knowledge.rs:228`). **Maintenance:** `RecoveryMaintenanceRuntime` (`chio-control-plane/src/recovery/maintenance.rs:20`) mounts `/v1/recovery/reports/submit`, `/reports/read` and `/policy/propose` (`recovery/maintenance/transport.rs:41-47`), and none of these routes applies a policy. **Application:** the store method `apply_reviewed_semantic_deployment` (`semantic/policy.rs:99-185`) verifies an independently selected operator's signature, the exact proposal, base and generation, and the writer fence, keeps original-ID readback, and installs the reviewed deployment in the qualified writer |
 | Adapter support dimensions | V: `2026-10-03-work-developer-surface-design.md:13` (admission, owned dispatch, durable observation, output-release enforcement, recovery continuation, work-command transport, funded settlement), reusing `docs/standards/CHIO_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json` (`:17`) |
 | Owner services run outside the kernel | V: `2026-10-03-work-owner-services-design.md:9-13`, inside `chio-control-plane` |
 | Component op enums | M: `chio-keyring/src/ipc.rs:323` (`WitnessServiceOperation`), `:543` (`AuditServiceOperation`); M: `chio-secret-broker/src/authority_ipc.rs:42` (`AuthorityOperation`) |
@@ -141,7 +142,7 @@ This does not replace:
 | L0 | `KernelOp` (section 5): `ChioKernel` live methods, core free functions, binding exports, native wire messages, sidecar endpoints | `KERNEL_ABI_VERSION` (new) | `spec/PROTOCOL.md` section 8.6 (new) |
 | L1 | Worker ops `inspect`, `invoke`, `checkpoint`, `blob_put`, `blob_read`, `cancel`; reserved native-tool namespaces `chio-process/*`, `chio-ipc/*`. Under durable knowledge, the raw state routes refuse | `PROCESS_ABI`, recorded as `chio.process.abi.v4` for the M ∪ W union (the two v3s are incompatible) | M: `chio-process/WORKER_PROTOCOL.md`, M: `chio-cli/PROCESS_HOST.md` |
 | L2 | `WorkRequestV1` variants, `WorkPreparationV1` proposals, `WorkActionV1`, `WorkQueryV1` (assumed shipped) | `chio.work.v1` | V: `2026-10-03-work-runtime-design.md` |
-| L3 | `RecoveryCommandBodyV1` (7 variants); endpoints `review`, `settle`, `explain`; `RecoveryPermission` (15 variants, grant tool names on `chio.recovery`) | the `V1` command schema and the recovery deployment profile | W: `chio-security-types/src/recovery/commands.rs`, W: `docs/architecture/recoverable-agent-runtime/` |
+| L3 | `RecoveryCommandBodyV1` (7 variants); endpoints `review`, `settle`, `explain`; `RecoveryPermission` (16 variants, including P6's `maintain`; grant tool names on `chio.recovery`; W: `chio-kernel/src/recovery/records.rs:52-88`) | the `V1` command schema and the recovery deployment profile | W: `chio-security-types/src/recovery/commands.rs`, W: `docs/architecture/recoverable-agent-runtime/` |
 | C | Component op enums: keyring witness/audit, broker authority, active-response authority, verifiers, W2 owner-service routes. Connector coverage census: each P3 semantic package classifies every exposed operation `covered`, `operator-authorized dynamic resolution` or `refused` (W: `05-semantic-contracts.md:15`) | per component | each component's design |
 
 Normative rules (R1-R10 from revision 1 are retained and now apply per layer):
@@ -290,6 +291,23 @@ Rules:
 10. **R10. No new handle exports.** The four existing ones are migrated in phase 2.
 11. **R13. No network client implementations in `chio-kernel`.** `custody` and `fact_source` implementations that perform network I/O live outside the kernel crate, which holds only their traits. Today the kernel compiles `ureq` clients for x402, ACP and approval webhooks (section 2). Phase 2 moves them, for example to a payment-adapter crate and the approval-channel owner, and drops `ureq` from the closure.
 
+### P6 component operations (W:)
+
+P6 is a control-plane and store component surface. It is classified in the C layer, keyed by route or store method, and it does not grow `KernelOp`. The census (section 7.1) generates these rows from the landed routes and store methods, and an unlisted route or mutation fails the census.
+
+| Group | Owning entry point | Authorization | Stop disposition | Mutable generation or readiness predicates |
+|---|---|---|---|---|
+| Setup and qualification | `RecoverySetupService` routes `setup/probe` and `setup/qualify`; store `pin_setup_creation`, `configure_protected_setup`, `commit_setup_probe`, `accept_setup_report` (mutations); `setup_preparation`, `prepare_setup_report` (preparation reads) | Host operator key: `configure_protected_setup` refuses unless the deployment profile's root equals the selected operator (`service.rs:107-125`); probes and reports are signed with that operator key (`setup.rs:240`, `:295`) | Mutations `deny` (they advance a scope toward readiness and run the benign self-test capture). Preparation reads `allow` | The protected setup selection (scope, benign workflow, creation digest, operator root) and its qualification (`gate.rs` `ready`, `current`). These gate every command and capture in the scope until qualified |
+| Setup gate (participant precondition) | `require_ready`, `require_command`, `require_capture` (`gate.rs:4-124`) | Not an entry point: a transaction-local precondition of native, recovery, semantic and knowledge participants | Inherits its caller's disposition | Selected deployment identity, security-context fields and context generation, qualification, and the one selected self-test. Spec 10 X5b keeps it inside `CrossingTx` |
+| Decision reports | `reports/submit` (store `submit_decision_report`, `product/reports.rs:45`); `reports/read` (`read_decision_report`, `:121`) | Submit: `RecoveryPermission::Report` with a matching scope. Read: `Inspect` plus `KnowledgeRead` (`maintenance.rs`) | Submit `deny` (a mutation, consistent with R5a's `ReportDecision`). Read `allow` (audience-checked observation) | The report record under the scope's intake headroom |
+| Maintenance proposals | `policy/propose` (store `propose_policy_maintenance`, `product/proposals.rs:5`); `policy_basis` read | `RecoveryPermission::Maintain` plus `KnowledgeRead` (`maintenance.rs`); `proposal.validate()` | Propose `deny` (inert, but a mutation). Basis read `allow` | The proposal record against the current policy basis (deployment, policy, generation) |
+| Signed policy application | Store `apply_reviewed_semantic_deployment` (`semantic/policy.rs:99-185`); no route mounts it | An independently selected operator's signature over `SignedPolicyDeploymentChangeV1`. The target scope, authority domain, store UUID, tenant, deployment, policy and generation must all match, and the writer fence must be current | `deny` while stopped: it installs a new deployment generation. Applying a reviewed change waits for resume | `target_generation` must equal the installed generation. Original-ID readback is keyed `product-policy-change:{scope}:{proposal_id}`, so a lost acknowledgement replays rather than re-applies |
+
+Rules:
+- **No second owner.** New policy or deployment configuration for later specs, including spec 11's integrity deployment fields, goes through `apply_reviewed_semantic_deployment` with explicit fields and validation. It never goes through a new activation service with its own operator authority, generations or lost-acknowledgement handling.
+- **Separate access rules are kept.** Historical inspection (`reports/read`, `Inspect`) and settlement keep their separate current-access rules. A stop disposition never removes them.
+- **No growth of `KernelOp`.** P6 adds no `ChioKernel` method. If a later change routes a P6 decision through the kernel, it joins L0 under R1 like any other entry point.
+
 ### Placement of components (updated from revision 1 section 7)
 
 - **Linked into the kernel.** `chio-security-types` and `chio-response-model` are tier-1 allowlist entries. `chio-workflow` is a tier-1 allowlist entry for `chio_workflow::delegation`: on `main` its own closure is 123 packages, and its non-workspace dependencies are `serde`, `thiserror`, `tracing` and `rusqlite`.
@@ -397,6 +415,10 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
   - `class()` agrees with the catalog.
 - The ADR-0019 wildcard test is extended to every layer's op enum.
 - Emergency-stop conformance: every `deny` entry point has a registered refusal case.
+- **P6 census and gates (R-1-03).**
+  - The census detects all 16 `RecoveryPermission` variants and every P6 route and store mutation in the section 6 table, and an unlisted one fails.
+  - Native capture, semantic capture and artifact operations keep the setup gate after spec 10 refactors them (spec 10 X5b).
+  - Stale deployment generation, wrong operator, a lost acknowledgement of `apply_reviewed_semantic_deployment` (it replays, never re-applies), a stop (mutations refuse, reads succeed) and a restart each exercise the existing owners.
 - No new `chio-conformance` verdict scenarios, since there is no wire change.
 
 ## 12. Residual risks and open decisions
@@ -410,6 +432,13 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
 - GT1 means none of this is enforced on hosted CI today.
 
 ### Open decisions
+
+0. **P6 integration (resolved, independent review open question 4).** The owners are the existing ones in section 6's P6 table:
+   - `RecoverySetupService` and the store setup methods own setup qualification;
+   - `RecoveryMaintenanceRuntime` and `propose_policy_maintenance` own policy proposal;
+   - `apply_reviewed_semantic_deployment` owns signed policy application.
+
+   The layered registry records them as C-layer component operations with the stop dispositions above. Fresh authorization, historical inspection and settlement keep their distinct access rules, and stop or crossing checks are added around these owners, never in place of them.
 
 1. Keep `ProviderId` and `Principal` as typed L0 vocabulary, or reduce them to an opaque principal digest.
 2. Census implementation language. A Python source inventory matches `check-trust-boundaries.py` and needs no new toolchain. `syn` in `xtask` (already a dependency) hashes signatures more faithfully. This draft picks Python for consistency, and switches to H8 snapshots for `chio-kernel-core` once H8 lands.
@@ -448,6 +477,12 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-1-02 | The hosted gate rollout statement is stale against current #1160 evidence | Fixed. The M-baseline GT1 history is kept with its source. The current status is recorded as verified: hosted job `111748798722` at `89e4641f6` passed structural (13), formal traceability (14) and temporal security (15) steps, then failed at workspace tests (33). Overall qualification stays open | section 2 table; section 7.3 GT1 |
+
+### Independent review pass 4 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-1-03 | The recovery inventory stops before implemented P6 setup and signed maintenance | Fixed, checked against W:. The baseline says P0-P6 and lists 16 `RecoveryPermission` variants (with `maintain`). A section 2 row records the P6 routes, store mutations and setup gate. A new section 6 table classifies setup, the setup gate, reports, maintenance proposals and signed policy application separately, with owner, authorization, stop disposition and mutable predicates, as C-layer component operations that do not grow `KernelOp`. Spec 11's integrity deployment configuration goes through the existing P6 policy owner. Section 11 adds the acceptance tests, and open decision 0 answers open question 4 | baseline; section 2; section 4 L3; section 6; section 11; open decision 0 |
 
 ## Appendix: FTL reference
 

@@ -596,9 +596,11 @@ Receipts are classified by spec 9 M20's signed `chio_runtime.identity_dispositio
 ```text
 replay_identity(r) = (request_namespace_digest(r), request_id(r))
 final(r) = decision(r) = Allow
-        or decision(r) in { DenyDelivery, Cancelled, Incomplete, Withheld, OutcomeUnknownAfterDispatch, NotAcceptedAfterDispatchCommit }
+        or decision(r) in { DenyDelivery, Cancelled, Incomplete, OutcomeUnknownAfterDispatch, NotAcceptedAfterDispatchCommit }
         or identity_disposition(r) = Terminal
         (an Allow carries no identity_disposition (spec 9 M20), so it is counted by its decision;
+         Withheld is final only through its disposition: a NonDurable Withheld { retry: Never } is Terminal,
+         a check-only Withheld { retry: AfterResume } is Reusable;
          Retained, Reusable and PendingApproval receipts are never final)
 terminal_receipts(ns, id) = { r : final(r) and replay_identity(r) = (ns, id) }
 forall (ns, id): |terminal_receipts(ns, id)| <= 1
@@ -945,6 +947,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186909727 | Count successful outcomes as terminal receipts | Fixed now. The predicate counts `final(r)`: an `Allow`, which carries no disposition under spec 9 M20, any terminal outcome decision, or a `Terminal` disposition. `Retained`, `Reusable` and `PendingApproval` are never final, so an `Allow` plus a second terminal receipt for one replay identity violates the predicate | section 4.11 |
+
+### Codex review (PR #1174, round 17)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187142778 | Exclude reusable withheld receipts from the final set | Fixed now. `Withheld` is no longer counted by decision. It is final only through its disposition: `Terminal` for a `NonDurable` `retry: Never` withheld, `Reusable` for a check-only `retry: AfterResume` withheld. A later `Allow` after a reusable withheld therefore satisfies the at-most-one invariant | section 4.11 |
 
 ## Appendix A. FTL reference
 

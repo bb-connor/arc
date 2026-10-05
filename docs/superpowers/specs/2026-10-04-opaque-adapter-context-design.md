@@ -519,9 +519,10 @@ correlation(response) is a function of invocation only,
   never of ToolResult bytes
 
 lowered(response, binding, verdict, result) ->
-  result.binding_digest == binding_digest(binding)
-  and (verdict = Allow { result_sha256: Some(h) } -> sha256(result.bytes) == h)
-  and (verdict = Deny -> result.bytes is empty)
+  (verdict = Deny -> result = None)
+  and (verdict = Allow -> result = Some(r)
+       and r.binding_digest == binding_digest(binding)
+       and (verdict.result_sha256 = Some(h) -> sha256(r.bytes) == h))
 
 constructed(verdict, invocation, kernel_response r) ->
   verified(r.receipt) and r.receipt.kernel_key in trusted_kernel_keys
@@ -735,6 +736,12 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186619827 | Allow deny lowering without a tool result | Fixed now. `lower_bound` takes `result: Option<BoundToolResult>`: `Some` for an `Allow`, `None` for a `Deny`, so a deny `BoundOutcome` passes straight through. A mismatched pairing is `ResultBindingMismatch` | section 5.1 API; rule 9 |
+
+### Codex review (PR #1174, round 17)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187142767 | Model denied outcomes without a result value | Fixed now. The predicate's deny branch is `result = None`, and the binding and byte-hash checks apply only to an `Allow`'s `Some(r)`, matching rule 9 and the `Option<BoundToolResult>` API | section 9 predicates |
 
 ## Appendix A: FTL reference
 

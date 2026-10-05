@@ -360,6 +360,15 @@ Rules:
      - That final read is not a stop check (spec 8 S8-10).
      - A durable stop committed after the return-admission commit and before `sink.deliver` does not withhold the bytes.
      - The final read also consults the process latches, so a host latch set in that window does withhold them.
+   - **X5b. Participant preconditions are preserved.** Moving a participant into a `CrossingTx` keeps every transaction-local precondition that participant checks today. Those preconditions stay with the participant and run inside the crossing's savepoint, before the crossing record. They are not new `CrossingKind`s or global `CrossingCheck`s. The recovery P6 setup gate is the case that exists today (W:):
+     - **`NativeCapture`** keeps `setup::require_capture` (W: `chio-store-sqlite/src/admission_operation_store/setup/gate.rs:80-124`), called in the capture transaction at `security_participant_state/dispatch_ledger/capture.rs:45-51`. When a protected setup selection exists for the tenant's `native-capture` scope, it checks:
+       - the selection is current;
+       - the native authority binding and the security context (tenant, session, principal, lineage root, isolation epoch, context generation) equal the selected deployment's;
+       - the scope is qualified (`ready`), or else the capture is the one selected benign self-test (workflow, creation digest, not yet captured).
+     - **`RecoveryCapture` and `SemanticCapture`** keep `setup::require_command` and `setup::require_ready` (W: `gate.rs:4-79`; `admission_operation_store/semantic.rs:274`).
+     - **`ArtifactRelease`** and the knowledge paths keep `setup::require_ready` (W: `admission_operation_store/knowledge.rs:228`).
+     - **Refusal.** A precondition refusal rolls back the savepoint and surfaces as that participant's refusal (`ParticipantRefused`, spec 9), so it compensates before dispatch and nothing crosses. Removing or weakening a participant precondition is a regression that X5b forbids, and the differential suite (section 17) compares the legacy and fused paths on the setup gate's refusal cases.
+     - **Integrity deployment.** Configuration that spec 11 adds goes through the existing P6 policy owner (`apply_reviewed_semantic_deployment`, spec 1 section 6), with explicit fields and validation. `CrossingTx` reads the installed generation; it never activates policy itself.
 
 ## 5. Commit classes and the anchor
 
@@ -688,6 +697,13 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
 - **Loom:** batch leader and followers; savepoint isolation; `StoreUnavailable` after member retry exhaustion leaves no partial member and later members unaffected; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member, and separately a relax member, in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
 - **DST:** crash injection at C1-C7, B1, B2, R2 and P1, plus restore-from-snapshot at random anchored prefixes, under random workloads. Stops are issued under `Overloaded` and under `SQLITE_FULL` injection. Under sharding, one shard is offline during a stop fan-out and then restarts; it must not serve until its replica catches up (S3). A serving shard partitioned from the origin during a stop latches `Stopped` within its 1 s lease. A crash between the `receipts.db` append and the mover's advance re-runs as a no-op (rule 24). The properties are section 8's predicates.
 - **Differential:** generated workloads run through the legacy and fused paths must reach identical terminal states, receipts and release decisions. The two-commit read is compared under its own flag.
+- **Participant preconditions (X5b):** under the fused path, these must refuse exactly as on the legacy path:
+  - native capture with a protected setup selection and an unqualified scope;
+  - native capture whose security context differs from the selected deployment in any field;
+  - a second selected self-test capture;
+  - a semantic capture and an artifact release on an unqualified scope.
+
+  Native capture on a qualified scope and the one selected self-test must pass. Each case is repeated after a stale deployment generation, a stop and a restart.
 - **Commit-budget gates:** these are deterministic, from store hooks, and scoped to fast-path-eligible plans:
 
   | Path | Commits | Anchor syncs |
@@ -916,3 +932,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186767763 | Make check ordinals restart-stable | Fixed now. `check_ordinal` is `(store_owner_epoch, owner_check_counter)`. The persisted owner fence epoch strictly increases on each acquisition, so a restarted owner observing the same head can never reuse a key | X4 check-only crossings |
+
+### Independent review pass 4 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-1-03 (spec 10 part) | The recovery inventory stops before implemented P6 setup and signed maintenance | Fixed. New rule X5b keeps every participant's transaction-local preconditions inside its `CrossingTx`: native capture keeps `setup::require_capture`, recovery and semantic capture keep `require_command` and `require_ready`, and artifact release keeps `require_ready`. They stay named participant preconditions, not new crossing kinds. Integrity deployment configuration goes through the existing P6 policy owner. Differential tests cover the setup gate | X5b; section 17 |

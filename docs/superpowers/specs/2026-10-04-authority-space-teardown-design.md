@@ -328,8 +328,8 @@ pub struct AuthoritySpaceClosureV1 {
 | `Session`, hosted MCP | AP8 `POST /admin/sessions/{id}/trust` (session-wide revocation with readback, M: `admin.rs:24-27`); then kernel session forced close (latch, rotate anchor, drain, `close_persisted`); fence row on the session | Every capability issued to that session |
 | `Session`, in-process kernel | Forced close only; fence row on the session | Nothing |
 | `ProcessTree` | `ProcessRuntime::cancel(root)` (M: `chio-process/src/lib.rs:570`); fence row `(process_tree, root_process_id)`, keyed on the requested process id (section 4.1 rule 1), never on the security lineage. On M: that lineage is the tree root's capability id (`chio-process/src/lib.rs:419-431`), so a lineage fence would also stop the requested process's siblings and ancestors. `ProcessLivenessGuard` | Nothing; the runner revokes worker credentials |
-| `SwarmGraph` | Tombstone checked at continuation consumption (V: `admission_hook/swarm_authority.rs:12`) and inside `extend_swarm_authority_bundle` (V: `swarm_authority_bundles.rs:88`), so a closed graph cannot grow; deny code `chio_swarm_graph_closed` | Nothing |
-| `DelegationRoot` | Fence row in the D1 allocator database; `subdivide`, `select` and `seal_dispatch` (V: `delegation/store.rs:112`, `:176`, `:271`) reject under a fenced ancestor in their immediate transaction | Nothing |
+| `SwarmGraph` | Tombstone in W1's qualified graph issuer, checked at continuation consumption (V: `admission_hook/swarm_authority.rs:12`) and inside the canonical graph-extension transaction of the serving store, so a closed graph cannot grow; deny code `chio_swarm_graph_closed`. The legacy `extend_swarm_authority_bundle` (V: `chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs:88-132`) calls the same shared rule and is not a production writer (rule 6) | Nothing |
+| `DelegationRoot` | Fence row in W1's qualified D1 store (the delegation module in `chio-store-sqlite` under the serving connection, V: `2026-10-03-work-runtime-design.md:123-131`). `subdivide`, `select` and `seal_dispatch` reject under a fenced ancestor in the same canonical transaction that commits the allocation, selection or permit. The legacy `chio-workflow` delegation store (V: `delegation/store.rs:10-47`, `:112`, `:176`, `:271`) calls the same shared rule and is not a production writer (rule 6) | Nothing |
 
 Rules:
 
@@ -342,6 +342,24 @@ Rules:
 3. **Closure is not completion.** A closed graph is not terminal in S1's sense: S1 terminal receipts are completion evidence with budget rollups (V: `types.rs:320`). The extension verifier treats a tombstone as it treats a terminal graph, and rejects the extension. The closure artifact copies existing rollups when a terminal receipt exists.
 4. **Manual only.** No automatic response effect may close a space (M: `active-defense-rollout.md:23`). Reversible pause is the emergency stop or an overlay.
 5. **Taint survives.** A closed session or process does not reset principal or lineage taint. Closure is not an isolation-epoch transition (M: `active-defense-rollout.md:19`).
+6. **D1 and S1 closure composes with W1's qualified issuer (R-4-03).** W1 moves production D1 allocation and S1 graph issuance into the qualified serving store and retires the legacy writers (V: `2026-10-03-work-runtime-design.md:123-131`). Closure joins that plan rather than targeting the legacy surfaces.
+   - **One canonical transaction.**
+     - The live closure predicate (fence row or tombstone, plus closure generation) is a row of the qualified serving store.
+     - It is checked in the same transaction as the operation it gates: allocation (`subdivide`), selection, permit sealing (`seal_dispatch`) and graph extension.
+     - A refusal commits nothing. There is no second closure database acting as issuance authority, and no transaction spans two stores.
+   - **One rule, two callers.**
+     - The predicate is a shared domain function in `chio-workflow`, next to the D1 and S1 transition rules W1 already shares.
+     - The legacy `chio-workflow` delegation store and the runtime-core swarm-authority bundles call it as example adapters. Neither stays a writable production owner.
+     - Runtime graph copies remain lookup and evidence sources (W1). A copy cannot issue after a closure or after its owner lease is lost.
+   - **One authorized migration.** W1's owner-authorized, quiesced migration already preserves allocator namespace, roots, allocation digests, revisions, selections and exact permit bytes. It is extended to also retain, with their original references:
+     - fence rows and tombstones;
+     - each closure's generation;
+     - the closure record and its drain and progress state (section 6.3);
+     - the stranded-capacity snapshots (section 8).
+
+     These records are registered in the qualified store's projection and global-commit inventory, integrity verification, and snapshot and relocation paths, exactly as W1 requires for its own mutations. The migration then disables the legacy writer. A source that is missing or untrusted is rejected, never replaced with empty closure state.
+   - **Supported landing order (answers open decision 8).** The recommended order is W1's qualified issuer first, then phase 3 against it, so no closure state ever exists in a legacy writer. If phase 3 must land first, its fences and tombstones live in the legacy stores only until W1's migration, which then imports them under the rule above. The legacy writer is retired in the same step. The two plans never advertise two production issuance heads at once.
+   - **Unchanged.** Closure never refunds, reclaims or invalidates sealed capacity, and offline sealed permits keep their documented semantics (rule 2, section 7). Historical reads of migrated state keep their access rules.
 
 ### 6.3 Ordering
 
@@ -522,6 +540,7 @@ This is a proposal. No Lean coverage is claimed.
    - Hosted session closure over AP8; in-process forced close; `ProcessTree` closure; process, workflow and work triggers; delegator and holder authorization.
 3. **Phase 3.**
    - `SwarmGraph` tombstone (consumption plus extension); `DelegationRoot` fence; stranded-capacity accounting.
+   - Lands against W1's qualified D1 store and graph issuer, in the same canonical transactions, with closure state added to W1's migration inventory (section 6.2 rule 6). If phase 3 lands before W1, W1's migration imports its fences and tombstones and retires the legacy writers in the same step.
 4. **Phase 4.**
    - Production `CausalLineageStore`; reactive drain on lane b; event-queue hints.
 
@@ -544,6 +563,13 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
   - A space closure issues `CancelWorkflow` for a bound recovery workflow, and a delayed original submission is fenced by the tombstone.
   - `extend_swarm_authority_bundle` rejects a tombstoned graph.
   - D1 `seal_dispatch` rejects under a fenced root, while a previously sealed permit still verifies.
+  - W1 composition (section 6.2 rule 6):
+    - close a graph and a D1 root;
+    - migrate through W1's authorized migration;
+    - restart;
+    - attempt subdivide, select, seal and extend through the public W1 facade and through the legacy entry points.
+
+    Every new prohibited authority stays refused. Historical reads and already sealed permits keep their documented semantics. Further cases cover interruption mid-migration (the migration resumes or rejects, and never yields empty closure state), a stale legacy owner that writes after retirement (refused by the continuity checks), and both landing orders.
   - AP8 partial progress keeps the record in `Fencing`.
   - A closure committed after `DispatchCommitted` and before release withholds the output, for caller-executed, native and ordinary durable returns, and the operation terminalizes as `DeniedAfterDelivery`. A restart between the refusal and the terminal completes the terminal.
   - Migration backfill: indexed operations re-derive equal refs. A `legacy_unindexed` operation whose coordinator holds the lease fails its dispatch CAS once any closure fence exists.
@@ -572,6 +598,7 @@ Open decisions and pushback:
 5. **Emergency stop persistence.** Resolved by `2026-10-04-durable-stop-epoch-design.md`. It defines a hash-chained `StopEpochV1` in the admission writer, checked inside every crossing transaction from section 4.3, and loaded before readiness. A stop never closes, revokes or drains. Closure stays this spec's manual operation, and closure ops remain allowed while stopped (stop spec S17). Background follows (EV11/AC6). A shipped precedent exists in W:: `set_semantic_emergency_stop(scope, bool)` persists a scoped stop as a recovery `command` record, and capture and submission transactions check it (W: `admission_operation_store/semantic.rs:355-372`; `semantic/capture.rs:47`, `:294`, `:336`). A kernel-wide stop should reuse that shape: persisted in the serving writer, and checked inside each capture or dispatch-commit transaction.
 6. **Reclamation.** Should a future design permit reclamation of `d1_unsealed_remainder` after a `Closed` artifact proves no outstanding seals? Section 7 rule 4 forbids it today.
 7. **Federated drain defaults.** What should be the default for reactive drain on federated revocation, and how long should closure records be retained?
+8. **Closure landing order versus W1 (resolved).** W1's qualified issuer lands first, and phase 3 targets it. If phase 3 must land first, W1's migration imports the existing closure state and retires the legacy writer in the same step. Section 6.2 rule 6 holds the contract and section 16 the tests.
 
 ## Review disposition
 
@@ -616,3 +643,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186767792 | Remove the impossible second terminalization | Fixed now. The drain table is split by phase and matches spec 9's cut table. An owned `DispatchCommitted` gets exactly one terminal under the `X` row. Only `Finalizing`, including a caller report that reached it, terminalizes as `DeniedAfterDelivery` when its release meets the fence. No operation is terminalized twice | section 5 drain table |
+
+### Independent review pass 4 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-4-03 | Closure targets legacy D1/S1 writers without joining their planned authority migration | Fixed. The `DelegationRoot` fence and `SwarmGraph` tombstone live in W1's qualified serving store and are checked in the same canonical transaction as allocation, selection, sealing and extension. Legacy adapters call the shared domain rule and are not production writers. W1's single authorized migration retains fences, tombstones, closure generation, drain and progress state, and original references, registers them in the qualified inventories, and disables the old writer. The supported landing order is W1 first. Acceptance tests cover migration, restart, legacy entry points, interruption and a stale owner. Sealed permits are never refunded or invalidated | section 6.2 table and rule 6; section 15 phase 3; section 16; open decision 8 |

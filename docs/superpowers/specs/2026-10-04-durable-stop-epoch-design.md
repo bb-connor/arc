@@ -204,6 +204,7 @@ pub struct StopEpochV1 {
     pub allow_containment: bool,             // section 7.1, S12
     pub requested_via: StopRequestPath,
     pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
+    pub offline_bypass: bool,                    // true only for an offline-CLI Stop appended without a journal entry (S2, S25); then satisfies_intent is None
     pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
 }
 
@@ -260,7 +261,7 @@ Normative rules:
    - A `Stop` over a stopped head is an idempotent no-op that returns the current head, unless it asks for narrower containment, in which case it is recorded as `Restrict`.
    - A `Resume` over a running head is a no-op that returns the current head.
    - **Field rules per transition.** The writer constructs, and every verifier checks, the rule for the record's transition. A record that breaks its rule is invalid. A verifier refuses it, and the writer never appends it:
-     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set exactly for `Stop` and `Restrict` (S25). A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
+     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`, and it retires no journal entry. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
      - **`Rollover`.** No request exists, so `contributors` is empty and `satisfies_intent` is `None`. `authorizer` is `ChainRollover { serving_owner, writer_epoch }`, naming the serving owner and serving epoch that appended it. `requested_via` is `SystemRollover`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
        - `state`, `allow_containment` and `expected_epoch` restate the previous generation's final record (its state, its containment flag, and its id).
        - `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" || canonical(expected_epoch) || previous)`. That is a fixed domain string plus the restated head id and digest, with no salt and no note row, because there is no operator text to protect. A verifier recomputes it.
@@ -443,6 +444,19 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | `observe_recovery_capability_liveness` | `allow` | observation |
 | `reserve_recovery_review` (W: `recovery_runtime.rs:267`) | `deny` | it advances a workflow toward an effect |
 | `acknowledge_recovery_reservation` (W: `recovery_runtime.rs:91`) | `deny` | it binds a process reservation to a workflow |
+
+P6 component operations (control plane and store, not `KernelOp`). Spec 1 section 6 holds the full classification:
+
+| Operation | Disposition | Rationale |
+|---|---|---|
+| Setup and qualification mutations (`pin_setup_creation`, `configure_protected_setup`, `commit_setup_probe`, `accept_setup_report`) | `deny` | they change the selected deployment or its qualification |
+| Setup preparation reads (`setup_preparation`, `prepare_setup_report`) | `allow` | observation |
+| Setup gate (`require_ready`, `require_command`, `require_capture`) | inherits its caller's disposition | a transaction-local participant precondition, not an entry point (spec 10 X5b) |
+| Decision report submit (`submit_decision_report`) | `deny` | a durable mutation |
+| Decision report read (`read_decision_report`) | `allow` | observation |
+| Maintenance proposal (`propose_policy_maintenance`) | `deny` | a mutation, even though it is inert until applied |
+| Policy basis read | `allow` | observation |
+| Signed policy application (`apply_reviewed_semantic_deployment`) | `deny` | it installs a new deployment generation; it waits for resume |
 
 - **S12. Containment during a stop.** `AdmitGovernedActiveResponse` and the `ActiveResponseExecute` crossing are allowed only while all three conditions hold:
     - the closed `GovernedResponseEffect` enum (M: `governance.rs:769-775`) contains only authority-narrowing effects;
@@ -747,7 +761,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - **Writer.** The serving owner, which holds the lock root, serializes journal writes. The offline CLI takes the same owner lock (S30).
     - A failed intent write leaves only the process latch (`process_only`), and the route reports it. This applies only to a serving host, whose process keeps the latch.
     - **Offline CLI.** The offline CLI never reports `process_only`, because its process exits and no latch survives. With the host down and the owner lock held (S30), it appends the durable stop record itself:
-      - when the journal is full or the intent write fails, it skips the journal and appends the stop record directly, since a down host has no queue to overload;
+      - when the journal is full or the intent write fails, it skips the journal and appends the stop record directly, since a down host has no queue to overload. That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
       - success requires the record committed and anchored, and the CLI reports `stop_durable`;
       - if that append also fails, the CLI exits non-zero and reports `stop_not_in_force`. It states that no stop is recorded and that the operator must keep the host down or retry. It never claims a stop is in force.
     - This extends AC6's "publish first" rule from memory to durability.
@@ -1081,6 +1095,18 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186767809 | Do not rely on a process latch for offline stops | Fixed now. The offline CLI never falls back to a process latch. On a full journal or a failed intent write it appends the durable stop record directly. If that also fails it exits non-zero with `stop_not_in_force`, stating that no stop is recorded | S25 writer; S30 |
+
+### Codex review (PR #1174, round 17)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187142791 | Define a valid record for journal-bypass offline stops | Fixed now. S2 defines a verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`. Verifiers accept it only from the offline CLI, it retires no journal entry, and the bypass append uses it. No intent reference is fabricated | S2; S25 offline CLI |
+
+### Independent review pass 4 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-1-03 (cross-reference) | The recovery inventory stops before implemented P6 setup and signed maintenance | Applied here. Section 7 gains P6 stop-disposition rows matching spec 1 section 6: mutations `deny`, reads `allow`, and the setup gate inherits its caller's disposition | section 7 |
 
 ## Appendix A. FTL reference
 

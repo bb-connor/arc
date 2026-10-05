@@ -11,7 +11,7 @@
   - `M:` = `origin/integration/process-security-m4` at `19df31ad9` (#1160): security foundation and agent processes.
   - `V:` = `origin/work/verifiable-work-session-20261003` at `14477aaac` (#1173): verifiable work (D1 dynamic delegation, S1 swarm evolution, F1 funded work), verifiers, iroh lanes, and the W1-W4 designs. W1-W4 have no code and are cited as contract anchors.
   - `R:` = `origin/research/openappa-recovery-20261001` at `de84fc306` (#1172): the recovery design docs.
-  - `W:` = the **uncommitted** working tree at `standalone/arc-worktrees/recoverable-agent-runtime-20261002`. It implements recovery P0-P5 and is built on the #1160 checkpoint `f25cd61f4`. Line references reflect the working tree on 2026-10-04 and may drift. Several R: doc names (a signed `RemedyOfferV1`, the `recovery_deliveries` outbox and its cursors, an `ExplainIntent` command, emergency revocation that withdraws approvals) are not implemented in W:. The child specs use W:'s implemented names.
+  - `W:` = the **uncommitted** working tree at `standalone/arc-worktrees/recoverable-agent-runtime-20261002`. It implements recovery P0-P5, plus P6 protected setup, product reports, maintenance proposals and separately signed policy application (16 `RecoveryPermission`s, including `Maintain`). It is built on the #1160 checkpoint `f25cd61f4`. Line references reflect the working tree on 2026-10-04 and may drift. Several R: doc names (a signed `RemedyOfferV1`, the `recovery_deliveries` outbox and its cursors, an `ExplainIntent` command, emergency revocation that withdraws approvals) are not implemented in W:. The child specs use W:'s implemented names.
   - `P:` = `feat/process-command-experience-20260924` at `e24596543`: a portable CLI runner with no kernel change.
 - Follow-on:
   - `docs/research/2026-10-04-ftl-lessons-brainstorm.md`: candidates on the shipped baseline.
@@ -81,6 +81,14 @@ The pass audited 40 defect rows: 37 confirmed, and 3 correctly reclassified as n
 - GT1 is restated with current #1160 hosted evidence (N5, spec 1);
 - the north star's read-path summary is corrected.
 
+**Revision 4f, independent review pass 4 (2026-10-05, head `c98641ddd`).** It found 0 Blockers and raised 4 findings, all applied:
+- spec 11 admits endorsements only through one `VerifiedEndorsementFactV1` adapter, and the automatic P3 claim is withdrawn (R-11-07);
+- spec 11 freezes the LtHash16 commitment and adds a versioned migration contract over the P4 journal (R-11-08);
+- spec 4 closure joins W1's qualified issuer and its one migration (R-4-03);
+- spec 1 and spec 10 cover the P6 setup, maintenance and signed-policy surface and keep the setup gate as a participant precondition (R-1-03).
+
+The review's architecture judgment and recommended order are in section 9.
+
 
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.
 - **Spec 2 (faults)** now plugs in as a recovery planner fact. W: maps an unsatisfied capability fact to the terminal `BlockedByCapability`, and the new `Authority` remedy kind is the upcall tier for exactly that case. W: pins one capability per workflow, so a resolution runs as a linked `AuthorityContinuation` workflow. Because recovery refuses delegated control tokens, an operator-assigned actor drives it.
@@ -130,7 +138,7 @@ Across three revisions, each child spec narrowed to the gap that shipped and imp
 
 | # | Spec | Scope | Status |
 |---|---|---|---|
-| 1 | `2026-10-04-closed-kernel-abi-design.md`: layered kernel ABI registry and TCB budget | L0 `KernelOp` has 29 ops, adding `RecoveryControl` and `RecoveryDisclosureIssuance`, over 254 classified methods. The other layers are L1 `chio.process.abi.v4` (the union of two incompatible v3s), L2 `chio.work.v1`, and L3 recovery (7 `RecoveryCommandBodyV1` variants, 3 endpoints, 15 `RecoveryPermission`s), plus component op enums. Rules R11-R13 and R5a (per-command stop dispositions). Recovery, knowledge, semantic and confinement seams are classified by polarity. Gates extend H11 and the trust-boundary census | PROPOSED (revision 3) |
+| 1 | `2026-10-04-closed-kernel-abi-design.md`: layered kernel ABI registry and TCB budget | L0 `KernelOp` has 29 ops, adding `RecoveryControl` and `RecoveryDisclosureIssuance`, over 254 classified methods. The other layers are L1 `chio.process.abi.v4` (the union of two incompatible v3s), L2 `chio.work.v1`, and L3 recovery (7 `RecoveryCommandBodyV1` variants, 3 endpoints, 16 `RecoveryPermission`s, including P6's `Maintain`), plus component op enums. Rules R11-R13 and R5a (per-command stop dispositions). Recovery, knowledge, semantic and confinement seams are classified by polarity. Gates extend H11 and the trust-boundary census | PROPOSED (revision 3) |
 | 2 | `2026-10-04-authority-faults-design.md`: authority fault classification for the recovery lane | A closed fault class and anti-oracle rules on the deny receipt, kept as audit evidence. The planner fact feeds a new `ExplanationRemedyKind::Authority` and assessment `RequiresAuthority`. Resolution runs as a linked `AuthorityContinuation` workflow (step 3a checks the predecessor's capability), with an operator-assigned actor and out-of-band delegators. `RecoveryContinuationBinding` is kept. It depends on generalizing the recovery profile | PROPOSED (revision 4) |
 | 3 | `2026-10-04-typed-reservations-design.md`: post-effect discharge and typed reservations | Unrepresentable-defects Mechanisms A, C and D for every call that runs without durable admission, including `Monetary` and development `Off` modes. Phase 1 closes D1, N2, N28 and N29 on the legacy evaluator. The obligation is a consuming `post_effect -> Discharged` region bound to its request, and the discharge is minted at the receipt commit point. `BoundaryFailure` separates `RejectedBeforeCommit` from `CommitUnconfirmed`, and only the first compensates. A pre-dispatch drop compensates and never latches. `LatchScope` covers kernel evidence, a single operation and a session request. The ledger holds private-constructor tokens with a `retain` state. The Mechanism D gate is fully specified. Later phases follow spec 9's drivers (section 4.12) | PROPOSED (revision 4) |
 | 4 | `2026-10-04-authority-space-teardown-design.md`: closing authority spaces | Uses the dispatch-commit fence (recovery's tombstone is the shipped instance) and one classifier unifying three copies. Closure covers five kinds plus recovery workflows (through `CancelWorkflow`) and confined children (through `NativeConfinedRuntime::cancel`). Adds a table of named release crossings, funded-work and knowledge invariants, stranded capacity, and the paper lemma | PROPOSED (revision 4) |
@@ -140,7 +148,7 @@ Across three revisions, each child spec narrowed to the gap that shipped and imp
 | 8 | `2026-10-04-durable-stop-epoch-design.md`: durable stop epoch | Replaces the process-local kill switch with a hash-chained `StopEpochV1` in the admission serving writer, scoped by kernel, tenant or recovery.<br>- **Startup.** Heads load before the startup sweep. A host restarted during a stop serves `ready_stopped`, and withheld output stays in durable custody.<br>- **Shared heads.** One set of heads per store serves every kernel in the host, including api-protect's proxy kernel.<br>- **Durability under load.** An fsynced stop-intent latch and a writer priority lane keep a stop durable under overload.<br>- **Dispositions.** Each crossing kind is `Deny`, `Withhold`, `Settle` or `AllowIfContainment`. `KernelStopped` is a temporary refusal that burns no request id.<br>- **Resume.** Asymmetric resume waits on an operator identity prerequisite and records `SharedCredential` until then. Stop authentication works without the clock.<br>- **Other.** Rules for restore and downgrade, and a process-host control socket.<br>- **Phasing.** Phase 0 closes AC6. Phase 1 closes EV11 | PROPOSED (revision 2) |
 | 9 | `2026-10-04-pure-admission-machine-design.md`: pure admission machine (north-star bet 1) | One sans-IO `transition(&AdmissionState, AdmissionEvent) -> (AdmissionState, EffectList)` in `chio-kernel-core`, over one operation model: the union of the 19-state tool-dispatch and 15-state security models.<br>- The three classifiers become one cut function, which holds the single normative drain table that spec 4 cites.<br>- The 16 evaluators become one `evaluate` plus a blocking adapter.<br>- **Operation classes:** `Durable`, `ReadOnlyCheckOnly` and `NonDurable`.<br>- **Latch scopes:** `HaltOperation`, `LatchRequest` and `KernelEvidenceLatch`.<br>- Post-effect step and receipt-append events, driver-drop rules, trailing hint groups, and `KernelStopped` as a temporary refusal.<br>- **Proof:** Aeneas extraction to Lean with twelve theorems, a new `AdmissionMachine.tla`, differential tests against the legacy predicates, and DST.<br>- **Migration** starts with the startup classifier | PROPOSED (revision 3) |
 | 10 | `2026-10-04-crossing-primitive-design.md`: crossing primitive and fused-commit hot path (north-star bet 2) | One `CrossingTx` with ordered checks for every crossing: stop epoch with per-kind dispositions, closure fence, revocation, knowledge integrity, reservations, and record.<br>- **Commit classes.** Crossing-authorizing and restrictive commits anchor before acknowledgement. Progress-only commits anchor within a bounded lag.<br>- **Side-effecting calls** take three commits: intent, return record and outcome.<br>- **Eligible read-only calls** outside durable coverage take a check-only dispatch plus a release write. D1's closure stays with spec 3 phase 1.<br>- **Refusals.** Unknown commit outcomes halt the operation and never compensate. Policy refusals on the fused path write a deny tombstone, except `KernelStopped`.<br>- **Writer.** Group commit with savepoints, and a priority lane for stop control. Sharding is a later phase with preconditions.<br>- **Targets:** 3 commits and at most 5 fsyncs per side-effecting call, a `read` median of 95 ms or less, and at least 4x throughput at 16 callers | PROPOSED (revision 3) |
-| 11 | `2026-10-04-integrity-gated-admission-design.md`: integrity-gated admission (north-star bet 3) | `Constraint::RequiredIntegrity` over W:'s `ArtifactInfluenceV1` lattice, refined with origin classes and `ExternalBounded` for typed confined returns. A deny-only `IntegrityGuard` checks early, and the authoritative check runs inside spec 10's intent commit and check-only dispatch, using a new `knowledge_influence_heads` row. Every delivery records an output influence join. `InsufficientIntegrity` is a sibling fault kind in spec 2's tagged classifier, with its own `IntegrityFaultV1` block, with remedies through endorsement or a quarantined continuation. MCP edges start at unknown, so integrity-gated grants deny there Revision 2 makes the influence state a deduplicated observation set, so the join is idempotent set union. Revision 3 makes a verified exact endorsement part of the authoritative check (I15a). It states the guarantee precisely: unbounded or unknown influence cannot authorize a gated call except by endorsement, `BoundedExternal` is an explicit bounded allowance, and `BoundedSelection` adds an action-selection contract. Allow and deny receipts get separate disclosure rules. Revision 4 makes a requirement a pair: integrity level and action contract. Attenuation may raise the level but must keep the parent's contract. Bootstrap contributions are joined before a context is ready (I7a): pinning gives reproducibility, and trust needs an operator-signed `BootstrapTrustAssertionV1`. | PROPOSED (revision 5) |
+| 11 | `2026-10-04-integrity-gated-admission-design.md`: integrity-gated admission (north-star bet 3) | `Constraint::RequiredIntegrity` over W:'s `ArtifactInfluenceV1` lattice, refined with origin classes and `ExternalBounded` for typed confined returns. A deny-only `IntegrityGuard` checks early, and the authoritative check runs inside spec 10's intent commit and check-only dispatch, using a new `knowledge_influence_heads` row. Every delivery records an output influence join. `InsufficientIntegrity` is a sibling fault kind in spec 2's tagged classifier, with its own `IntegrityFaultV1` block, with remedies through endorsement or a quarantined continuation. MCP edges start at unknown, so integrity-gated grants deny there Revision 2 makes the influence state a deduplicated observation set, so the join is idempotent set union. Revision 3 makes a verified exact endorsement part of the authoritative check (I15a). It states the guarantee precisely: unbounded or unknown influence cannot authorize a gated call except by endorsement, `BoundedExternal` is an explicit bounded allowance, and `BoundedSelection` adds an action-selection contract. Allow and deny receipts get separate disclosure rules. Revision 4 makes a requirement a pair: integrity level and action contract. Attenuation may raise the level but must keep the parent's contract. Bootstrap contributions are joined before a context is ready (I7a): pinning gives reproducibility, and trust needs an operator-signed `BootstrapTrustAssertionV1`. Revision 5 admits endorsements only through one `VerifiedEndorsementFactV1` (I15b), adapted from recovery approval or P3 evidence after every binding is checked. The automatic P3 claim is withdrawn. It also freezes the LtHash16 influence commitment and adds a versioned migration contract over the P4 journal (section 4.1). | PROPOSED (revision 5) |
 
 ## 3. Defects and findings
 
@@ -176,7 +184,7 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
 | N18 | Doc-to-code drift in recovery: `RemedyOfferV1`, `recovery_deliveries`, cursors, `ExplainIntent`, adapter states and approval-withdrawing emergency revocation exist only in docs. V:'s W1 `WorkRecoveryLinkV1` routes to these names | Open | R:/W: `03-recovery-protocol.md:55`, `:114`; `08-protocol-operations.md:19`, `:57` | Recovery and work owners |
 | N19 | The recovery profile is narrow: one template (`SupportTicketPublicIssue`) and one server, tool and purpose per process scope. V:'s work kernel assumes general recovery links | Design gap | W: `chio-security-types/src/recovery/commands.rs:12-14` | Spec 2 section 6.9 dependency |
 | N20 | The drain classifier logic is duplicated. Startup reconciliation and recovery's original-operation closure classify separately today, and the proposed drain would add a third copy. The independent review notes there are two shipped classifiers, not three | Design gap | W: `kernel/admission_coordinator/recovery_runtime.rs:212-244` | Spec 4 (rule 5.6); spec 9's single cut function |
-| N21 | The recovery P0-P5 implementation exists only as uncommitted changes in one worktree. An earlier estimate put it at about 117K lines, but no frozen diff manifest backs that count, so treat it as unverified | Risk | W: `docs/architecture/recoverable-agent-runtime/implementation/p5/FRESH-REVIEW.md:7`, `RULINGS.md:7`; W-only source | Repository owner (commit with a frozen diff manifest) |
+| N21 | The recovery P0-P6 implementation exists only as uncommitted changes in one worktree. An earlier estimate put it at about 117K lines, but no frozen diff manifest backs that count, so treat it as unverified | Risk | W: `docs/architecture/recoverable-agent-runtime/implementation/p5/FRESH-REVIEW.md:7`, `RULINGS.md:7`; W-only source | Repository owner (commit with a frozen diff manifest) |
 | N22 | The kernel stop's HTTP handlers (`/emergency-stop`, `/emergency-resume`, `/emergency-status`) exist in `chio-http-core`, but no server mounts them. This is the concrete cause of EV11 | Open | M: `chio-http-core/src/routes.rs:33`; no non-test consumer of `handle_emergency_*` | Spec 8 S18 |
 | N23 | The emergency handlers compare `X-Admin-Token` with `==`, not in constant time. This contradicts the sidecar control-credential precedent | Open | M: `chio-http-core/src/emergency.rs:193`; `docs/security/sidecar-control-authority.md:8-24` | Spec 8 S18 |
 | N24 | W:'s `set_semantic_emergency_stop(scope, bool)` takes no actor, records no reason, authorizer or time, and has only a test caller | Open (W:) | W: `chio-store-sqlite/src/admission_operation_store/semantic.rs:369-386`; `chio-control-plane/src/recovery/tests/semantic.rs:513` | Spec 8 S5 (unify as the recovery scope behind an authenticated wrapper) |
@@ -303,6 +311,7 @@ after recovery generalizes beyond one template (N19):
 
 after W1/W2 land:
   spec 2 AllocationHolder and Payer templates; spec 4 work trigger; spec 5 work hints
+  spec 4 phase 3 joins W1's qualified D1/S1 issuer and its one migration (spec 4 section 6.2 rule 6)
 ```
 
 Review status:
@@ -348,3 +357,48 @@ Review status:
 | 7. Verifiers as reference monitors | Fold into spec 1 |
 | 8. Cross-owner hints | Deferred |
 | 9. Crossing-point registry | Shared rule for specs 1 and 4. Spec 4 already has the crossing table |
+
+## 9. Architecture fit and implementation order
+
+The fourth independent review (2026-10-05, head `c98641ddd`) compared the program with #1160, #1173, #1170, W1-W4, recovery through P6, and the accepted decomposition and runtime boundaries. Its judgment, adopted here, is to keep the following and add no parallel engine:
+- **One native admission machine.** Spec 9 is extracted from the existing coordinator and drives live, startup recovery and closure paths.
+- **One qualified writer per authority store.** Spec 10's executor works inside the existing serving owner and global commit chain, and registers every new record in the integrity, snapshot and migration catalogs.
+- **The existing recovery and work owners.** Remedies, approvals, custody, D1/S1/F1 issuance and P6 policy application stay with the owners already selected.
+
+**Where each spec lands.** Every spec extends an existing or already-selected owner:
+
+| Spec | Owner it extends |
+|---|---|
+| 1 | Layered inventory generated from landed symbols, including the P6 surface (R-1-03) |
+| 2 | `chio-recovery` planner and the store recovery owner |
+| 3 | Existing hold, capture and reservation lifecycles |
+| 4 | Revocation, session and process owners, plus W1's qualified D1/S1 issuer (R-4-03) |
+| 5 | MCP session, approval store, recovery event chain and process journal |
+| 6 | `chio-tool-call-fabric` and `provider_verdict` |
+| 7 | Cage, process runner and appraisal families |
+| 8 | Serving-owner lease, fence, chain and anchor |
+| 9 | Admission coordinator |
+| 10 | `SqliteAuthorityStore` and `SqliteServingOwner` |
+| 11 | P4 knowledge journal, P3 verification, P5 returns, recovery approval and P6 policy (R-11-07, R-11-08) |
+
+**Avoid creating new owners.** None of these is needed:
+- generic orchestrators;
+- a universal cross-owner transaction;
+- a second approval workflow, influence ledger or closure database;
+- a policy-activation service;
+- another sandbox supervisor or attestation verifier.
+
+**Recommended order:**
+1. Freeze the owner and source contract: the exact M/V/W union, process ABI, P6 inventory, supported profiles and public schemas. Keep the bug-fix lane (section 6) independent of the refactor.
+2. Extract and share the deterministic rules (spec 9), following ADR-0022's rule of moving domain logic before persistence.
+3. Introduce the crossing executor inside the qualified foundation (spec 10). Preserve participant preconditions, including P6 setup gates. Establish recovery at every commit and acknowledgement cut before tuning batching.
+4. Join closure with W1's issuer migration (spec 4): one issuer transaction owns the fence, and one authorized migration retains it.
+5. Land one versioned influence model and the endorsement adapter (spec 11) before freezing the integrity schema.
+6. Qualify the real composed paths, calling public owners. Cover:
+   - P3 connector, then endorsement, then capture;
+   - P4 old-state restore, then the new integrity head;
+   - P5 return, then selector, then exactly one action;
+   - a P6 policy change, then capture;
+   - a W1 closed issuer, then migration, then a refused mutation;
+   - protocol lift, then exact request, then a retained or terminal outcome.
+7. Measure on one shared authority writer at concurrency 1 and 16, then extract stores incrementally under ADR-0022. The 95 ms median remains plausible but unmeasured, and the 4x throughput target is not yet established.

@@ -36,6 +36,11 @@
 
 ## Revision 5 changes
 
+- **Independent review pass 4 and Codex round 17.**
+  - Crossing check 4's endorsement branch reads one `VerifiedEndorsementFactV1`, built by a recovery-approval adapter or a P3 adapter. I21's automatic P3 claim is withdrawn (I15b, R-11-07).
+  - New section 4.1 freezes the LtHash16 commitment and names the P4 journal as the canonical owner, with versioned projections, conservative legacy seeds and readiness gating (R-11-08).
+  - `commitment_ref` and the audit rows bind the full replay identity (I25, I25a).
+
 From Codex review round 10 on PR #1174 (head `f7242409b`):
 - **The quarantined successor is the one exception to inheritance (4185993940).** I7a's lossless inheritance made the I22 successor inherit its tainted parent, so the remedy always denied. A verified isolation-epoch transition is now an explicit, fail-closed exception. It needs a verified remedy record, a fresh epoch and no parent channel other than P5 returns. When it applies, only P5 typed returns and the successor's own classified bootstrap contributions cross. Any failed condition falls back to full inheritance.
 - **Return types are validated at load (4185993976).** Every return type is validated at load: an `Enum` is non-empty and distinct, an `Integer` has `min <= max`, and an `Identifier` has valid bounds and charset. `N >= 1` therefore always holds, and a malformed contract is rejected at policy load.
@@ -174,14 +179,14 @@ pub struct InfluenceStateV1 {
 pub enum InfluenceOriginClass { External, ExternalBounded, ModelProvider { provider: ProviderId } }
 ```
 
-`SetHash` is an additive homomorphic set hash, such as LtHash or MuHash, over `SHA-256("chio.influence-set.v1\0" || observation_id)`. Its value depends only on the set, not on insertion order. The origin-class space is bounded by the deployment binding (I5): an `IntegrityDeploymentBindingV1` naming more than 30 providers is refused at configuration time, so `origins` never overflows at runtime.
+`SetHash` is the frozen additive set hash of section 4.1, over the observation ids. Its value depends only on the set, not on insertion order. The origin-class space is bounded by the deployment binding (I5): an `IntegrityDeploymentBindingV1` naming more than 30 providers is refused at configuration time, so `origins` never overflows at runtime.
 
 Projection from the implemented record:
 - `unknown` maps to `unknown`;
 - `externally_influenced` maps to `External` in `origins`;
 - otherwise the state is trusted, with empty origins.
 
-The proposed refinement adds `ExternalBounded` and `ModelProvider`. It is additive, as W: requires ("requires new native participant evidence before deployment").
+The proposed refinement adds `ExternalBounded` and `ModelProvider`. It is additive, as W: requires ("requires new native participant evidence before deployment"). The enum change is additive. The representation change it brings (a versioned projection, a frozen commitment and a migration of existing state) is specified in section 4.1.
 
 Order and join. The abstract state of a context is its observation set `O`, keyed by `observation_id`, and `state(O)` derives every field above:
 
@@ -232,6 +237,46 @@ Normative rules:
    Raising the level never removes an action restriction. `Trusted` alone is not stronger than `BoundedSelection { n, c }`; the stronger form is `{ level: Trusted, action_contract: Some(c) }`.
    - **Why digest equality.** Comparing authorized action sets is not enough. Two contracts with the same set can map the same typed return to different actions, so a set check would let a child change which action an influenced value selects.
    - **Future refinement.** A relation that admits a refined contract (the same selector over a subset of actions, with a checked proof) is a later decision. Version 1 requires equal digests and allows only a stricter bit bound.
+
+### 4.1 Commitment algorithm, canonical owner and migration
+
+**Frozen commitment algorithm.** The algorithm is fixed before anything is persisted or signed. Changing it requires a new domain version and a migration under the rules below.
+- **Accumulator.** LtHash16: 1024 lanes of `u16`, 2048 bytes. Adding an element adds lane-wise modulo 2^16, and removing it subtracts. LtHash is chosen over MuHash because I16's inclusion-exclusion subtracts, and MuHash would need modular inversion.
+- **Element map.** `E(id) = SHA-256("chio.influence-set.v1\0" || id || 0x00) || ... || SHA-256("chio.influence-set.v1\0" || id || 0x3f)`, which is 64 blocks giving 2048 bytes, read as 1024 little-endian `u16` lanes. It uses only SHA-256, which the workspace already ships.
+- **Final digest.** `commitment = SHA-256("chio.influence-commitment.v1\0" || accumulator_le_bytes || u64_le(|O|))`, as a `CanonicalPayloadDigest` tagged with its domain. Heads store the accumulator and the count, and receipts carry only the final digest (blinded, I25).
+- **Conformance vectors** ship with the schema: the empty set; one element; two elements added in both orders; add then remove; and an inclusion-exclusion example over overlapping principal, lineage and session keys. An implementation that fails a vector refuses readiness.
+
+**One canonical owner.** The P4 knowledge journal (W: `security_participant_state/knowledge.rs`, flow rows) is the only writable truth about what influenced a context.
+- Every consumer reads it through one versioned projection, `project(journal, projection_version) -> InfluenceStateV1`. The consumers are crossing check 4, the I16 heads, artifact and checkpoint influence, releases, archive import, semantic materialization and confined returns.
+- I16 heads are derived caches. Only the journal-insert transaction and the startup rebuild write them, a rebuild reproduces them exactly, and they are never a second writable truth.
+
+**Historical domains are immutable.** No existing signed byte or historical digest is rewritten or reinterpreted:
+- `ArtifactInfluenceV1 { commitment, externally_influenced, unknown }` inside immutable artifact metadata (W: `knowledge/artifact.rs:13-19`), checkpoints (`knowledge/checkpoint.rs:16`) and releases (`knowledge/release.rs:72`);
+- the journal's `chio.knowledge.observed-influence.v1` commitment (W: `security_participant_state/knowledge.rs:82`);
+- traversal commitments (`knowledge/traversal.rs:43-73`);
+- P3's `chio.knowledge.semantic-influence.v1` digests (W: `recovery/knowledge.rs`).
+
+New records carry the new state in a separate, versioned field (`influence_state: chio.influence-state.v1`) beside the old one, never in place of it. The old reducers stay available as projections of the same journal under their own domains, so P3 materialization and P4 provenance keep producing exactly the digests they produce today.
+
+**Legacy seed observations.** The migration that enables tracking turns every existing journal record into one seed observation:
+- `observation_id = H("chio.influence-legacy-seed.v1\0" || journal_record_id || destination_digest)`, with the record's own key values and its record id as provenance, so the id is stable and a re-run inserts nothing new.
+- The classification is conservative: `externally_influenced` gives `External`, `unknown` gives `unknown = true`, and only a record with both false is trusted.
+- Refinements cannot be recovered from legacy state, so a legacy external record stays `External`, never `ExternalBounded` or `ModelProvider`. That is more restrictive, never less.
+- A record whose kind or influence cannot be classified seeds `unknown = true`. A record that cannot be read refuses readiness.
+
+**Consistent projections for every consumer:**
+- **Live heads** are built from seeds plus new observations in the migration transaction.
+- **Artifacts, checkpoints and releases.** A read or restore of an artifact or checkpoint written before migration joins an observation whose origin is projected from its stored `ArtifactInfluenceV1` by the conservative rule above.
+- **Archive import** projects imported influence the same way, and refuses an archive whose influence or projection version it does not support.
+- **Semantic materialization** keeps its own domain, computed from the same journal state that the heads project (I15b recomputes it in the same writer).
+- **Confined returns** record their `ExternalBounded` observation through the journal (I8).
+
+**Readiness and downgrade:**
+- The migration records `knowledge_projection_version` only after seeds and heads are complete and the startup rebuild matches.
+- `integrity-gating` cannot be enabled, and a gated grant does not load, unless that version is current. A partial migration, or an unsupported commitment or projection version, refuses readiness.
+- The admission schema version is bumped, so an older binary refuses to open the store instead of writing journal rows that bypass the heads.
+
+**Owner's open question 2, resolved.** The P4 knowledge journal is the canonical owner. `chio.influence-state.v1` is a versioned projection beside `ArtifactInfluenceV1`, which it extends rather than replaces. The commitment algorithm and old-state migration are frozen above, before any signed schema is published. The old artifact, approval and semantic domains are kept as history.
 
 ## 5. Output influence joins
 
@@ -388,7 +433,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
     - **Missing context.** It always denies. Unlike `FlowPreInvocationGuard`, there is no `MissingContextPolicy::Allow`, because the requirement is signed into the grant.
     - **Unavailable port.** It denies.
     - **Revalidation.** It sets `requires_dispatch_revalidation() = true` and repeats the read before dispatch (M: `kernel/mod.rs:882`).
-    - **Presented endorsement.** When the request carries an `EndorsementRef` (I15a) and the context does not satisfy the requirement, the guard does not deny on influence alone. It checks only structure: the reference names a recovery workflow continuation for this request's scope. If that check passes, it defers the decision to crossing check 4. It never treats a reference as satisfying the requirement, and it denies when the structure check fails.
+    - **Presented endorsement.** When the request carries an `EndorsementRef` (I15a) and the context does not satisfy the requirement, the guard does not deny on influence alone. It checks only structure: the reference names either a recovery workflow continuation, or (once the I15b P3 adapter ships) a P3 `ScopedEndorsementV1` evidence reference, for this request's scope. If that check passes, it defers the decision to crossing check 4. It never treats a reference as satisfying the requirement, and it denies when the structure check fails.
 14. **I14. Advisory only.** The early read and the revalidation are best-effort latency savers. Neither decides an effect (section 8).
 
 ## 8. Authoritative check: crossing check 4
@@ -401,15 +446,41 @@ A join and a capture can race. A tool output can be delivered into the same cont
 
     **I15a. Endorsed admission.** Crossing check 4 admits when either condition holds inside the crossing's writer transaction:
     - **By context.** `satisfies(state, requirement)` holds for the committed state of the call's key, and, when `requirement.action_contract` is set, I22a's action condition also holds, whatever the level. The receipt records `satisfied_by = context`, or `bounded` when the satisfying origins are `ExternalBounded`.
-    - **By endorsement.** The crossing plan carries `EndorsementRef { workflow_id, continuation_id }`, and every check below passes in this transaction. The receipt records `satisfied_by = endorsement`.
-      - **Recorded and verified.** The approval is recorded on that recovery workflow record in the same writer. Its signatures and coverage were verified when it was submitted (W: `admission_operation_store/recovery/validation.rs:274-286`, `validate_approval`).
-      - **Fresh deployment.** `fresh_basis` holds now: deployment, policy and contract digests unchanged (W: `validation.rs:287-300`).
-      - **Integrity authority.** Its `obligations` include `IntegrityEndorsement { principal }`, and `principal` is on the deployment's integrity roster (W: `recovery/authorization.rs:40-45`).
-      - **Exact action.** Its `ActionIntentV1` names this call's request id, request namespace and semantic request digest (W: `authorization.rs:69-90`). An endorsement for another action never applies.
+    - **By endorsement.** The crossing plan carries an `EndorsementRef`, and an adapter (I15b) builds a `VerifiedEndorsementFactV1` from it inside this transaction. The branch admits only on that fact, never on raw approval or evidence bytes. Every check below passes in this transaction, and the receipt records `satisfied_by = endorsement`.
+      - **Integrity authority.** `fact.integrity_authority` is on the deployment's integrity roster at `fact.deployment_generation`. The roster and the other integrity deployment fields are configured only through the existing P6 signed policy owner, `apply_reviewed_semantic_deployment`, with explicit fields and validation (spec 1 section 6). There is no separate activation service. That generation must be the current one (`fresh_basis`: deployment, policy and contract digests unchanged; W: `validation.rs:287-300`).
+      - **Exact action.** `fact.native_binding` names this call's request namespace, request id and semantic request digest. An endorsement for another action never applies.
       - **Action contract still applies.** When `requirement.action_contract` is set, I22a's full action condition `action_ok` holds in this transaction, exactly as on the context branch: the selector inputs are bound (cardinality, membership, distinctness, commit order, single consumption), the call's exact action equals the selector's output for those bound values, and that action is in `authorized_actions`. An endorsement replaces only the level condition `satisfies(state, requirement)`. A human approved this action despite the influence, but no endorsement overrides the selector or authorizes an action the contract excludes. An endorsed call whose action differs from the selector's output is refused.
-      - **Current influence.** Its `influence_basis` equals the commitment of the call's key state as committed in this transaction, not the state when the approval was made. Any join after approval makes it stale.
-      - **Single use.** The continuation has not been consumed by another operation. W: binds each recovery workflow to exactly one native operation, through `native_link`, set in the same writer when the continuation's operation begins (W: `admission_operation_store/recovery/native.rs:49-86`, which also re-runs `fresh_basis`). The crossing that carries the call (`RecoveryCapture`, or `SemanticCapture` for P3 connectors) sets or verifies that link in this same transaction. A different operation naming the same continuation fails the check, and a replay of the same operation returns its bound terminal result.
-    - **Otherwise** the check refuses with `InsufficientIntegrity`. A refused endorsement is not a new fault (I18). The recovery actor learns the reason at resolution: `stale`, `consumed`, `wrong_action`, `deployment_changed` or `unrecorded`.
+      - **Current influence.** `fact.context_commitment` equals the I16 commitment of the call's key state as committed in this transaction, not the state when the endorsement was made. Any join after the endorsement makes it stale.
+      - **Single use.** `fact.continuation` has not been consumed by another operation, and the crossing that carries the call consumes it in this transaction. For a recovery approval this is W:'s `native_link`, which binds each recovery workflow to exactly one native operation (W: `admission_operation_store/recovery/native.rs:49-86`, which also re-runs `fresh_basis`) and is set or verified by `RecoveryCapture`. For a P3 endorsement it is the semantic operation's own consumption record, set by `SemanticCapture` (I15b). A different operation naming the same continuation fails the check, and a replay of the same operation returns its bound terminal result.
+
+    **I15b. The verified endorsement fact and its two adapters.** Crossing check 4 reads one narrow fact, whatever produced the endorsement:
+
+    ```rust
+    /// Built inside the crossing's writer transaction by one adapter below. Never deserialized
+    /// from a caller, never persisted as an authority input, never compared across digest domains.
+    pub struct VerifiedEndorsementFactV1 {
+        pub source: EndorsementSourceV1,                 // RecoveryApproval | SemanticEndorsement
+        pub integrity_authority: IntegrityAuthorityId,   // the roster entry that authorized it (principal or key)
+        pub deployment_generation: DeploymentGeneration, // roster and policy generation it was checked against
+        pub native_binding: NativeActionBindingV1,       // request_namespace_digest, request_id, semantic request digest
+        pub context_commitment: CanonicalPayloadDigest,  // the I16 commitment (chio.influence-commitment.v1) checked in this transaction
+        pub continuation: EndorsementContinuationV1,     // Recovery { workflow_id, continuation_id } | Semantic { operation_id }
+    }
+    ```
+
+    - **Recovery approval adapter.** It reuses the existing recovery approval and custody owner, with no second approval workflow:
+      - the approval is recorded on that workflow in the same writer, and its signatures and coverage were verified at submission (W: `admission_operation_store/recovery/validation.rs:274-286`, `validate_approval`);
+      - its `obligations` include `IntegrityEndorsement { principal }` for a principal on the integrity roster (W: `recovery/authorization.rs:40-45`), which becomes `integrity_authority`;
+      - its `ActionIntentV1` (W: `authorization.rs:69-90`) supplies `native_binding`;
+      - for an `IntegrityEndorsement` obligation, its `influence_basis` is, by this spec, a tagged digest in the `chio.influence-commitment.v1` domain. An approval whose basis carries any other domain tag does not adapt. The adapter copies the basis into `context_commitment` only after checking it equals the current commitment.
+    - **P3 semantic endorsement adapter.** It first runs P3's existing verification unchanged (W: `chio-semantic-contracts/src/verification.rs:237-282`): route `endorsement_key`, signature, `SemanticActionDigest`, `body.influence == action.influence`, destination, purpose, assertion coverage and validity time. That success alone is not the fact. The adapter then checks each binding P3 does not establish:
+      - **Integrity authority.** The integrity roster names the endorser key, or the principal bound to it, as an integrity authority at the current deployment generation. A route key that is not on the integrity roster does not adapt, however valid its signature.
+      - **Native binding.** The endorsed `SemanticActionDigest` belongs to this call's native operation: its request namespace, request id and semantic request digest equal the call's.
+      - **Relation to the current context.** In this writer transaction, the adapter recomputes the semantic action influence from the current committed journal state, exactly as P3 materialization does (W: `semantic/materialization.rs:47-134`, then `knowledge_semantic_influence`, domain `chio.knowledge.semantic-influence.v1`). It requires equality with the endorsed `body.influence`. It then records, as `context_commitment`, the I16 commitment of the same committed state. The two digests stay in their own domains: equality is only ever checked within one domain, and a semantic-influence digest is never compared with a context commitment.
+      - **Single use.** `SemanticCapture` consumes the semantic operation once in the same transaction.
+    - **Until the P3 adapter ships,** I21's automatic P3 compatibility is withdrawn. A gated P3 call needs a recovery integrity approval (the first adapter), even when a valid P3 endorsement exists.
+    - **Owner's open question 1, resolved.** P3 endorsements are adapted into the complete predicate through the adapter above. Signer selection is the integrity roster at the current deployment generation, not the P3 route alone. The action and context binding is the native binding plus a same-writer recomputation of the semantic influence. Consumption is one `SemanticCapture`. Until that adapter is implemented, the first gated release requires a separate recovery integrity approval.
+    - **Otherwise** the check refuses with `InsufficientIntegrity`. A refused endorsement is not a new fault (I18). The recovery actor learns the reason at resolution: `stale`, `consumed`, `wrong_action`, `deployment_changed`, `unrecorded`, `not_integrity_authority` or `domain_mismatch`.
 16. **I16. Summary rows.** W:'s `observed_influence` scans up to 4,096 join records per call (W: `security_participant_state/knowledge.rs:64-75`). This design adds `knowledge_influence_heads(tenant, isolation_epoch, key_subset, key_values) -> InfluenceHeadV1`. `key_subset` is one of the seven non-empty subsets of {principal, lineage, session}. Each head holds exact counters over the observations whose key values match on that subset: a `u64` bit sum, a count per origin class, an unknown count, an observation count and the additive set-hash value.
     - **Update.** A newly inserted observation (I4a) adds its terms to the seven heads of its key triple, in the same transaction. A duplicate insert changes nothing.
     - **Read.** Crossing check 4 computes the state of `P union L union S` (I17) exactly, by inclusion-exclusion over the seven heads of the call's triple, for every counter and for the set hash. That is seven row reads, which is O(1), and an observation reachable through several keys counts once. A class is in `origins` when its resulting count is positive. `bounded_bits_total` saturates only after the exact sum. The resulting set hash is the receipt `commitment` (I25).
@@ -424,10 +495,12 @@ committed(join(ctx, s)) before intent_commit(op) and key(op) = ctx and not satis
 DispatchCommitted(op) -> action_ok(op)
                          and (satisfies(state_at(intent_commit(op)), req(op))
                               or endorsed(op, intent_commit(op)))                 (I15a, I22a)
-endorsed(op, t)        -> exact_action(approval(op), op)
-                          and influence_basis(approval(op)) = commitment(state_at(t))
-                          and fresh_deployment(approval(op), t)
-                          and consumed_exactly_once(continuation(op), t)
+endorsed(op, t)        -> exists f = fact(op, t) built by an I15b adapter in the transaction at t:
+                              on_integrity_roster(f.integrity_authority, f.deployment_generation)
+                          and f.deployment_generation = current_generation(t)
+                          and f.native_binding = native_binding(op)
+                          and f.context_commitment = commitment(state_at(t))          (one domain: chio.influence-commitment.v1)
+                          and consumed_exactly_once(f.continuation, t)
 action_ok(op)          -> req(op).action_contract = None
                           or (inputs_bound(op)
                               and action(op) = selector(contract(op), values(selector_inputs(op)))
@@ -493,7 +566,7 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
 21. **I21. Endorsement.** An approver on the deployment's integrity roster signs an exact approval whose `AuthorizationRequirementsV1.obligations` contains `IntegrityEndorsement { principal }`. Its `influence_basis` equals the context's committed influence digest (W: `authorization.rs:44`, `:55`). The approval authorizes exactly one continuation despite the influence.
     - **Admission.** Crossing check 4 accepts it under I15a. The approval binds the exact action, the current commitment, the deployment and one continuation, and it is consumed in the same transaction.
     - **History.** The context's state is unchanged (SEC-05). The next consequential call needs its own endorsement.
-    - **Semantic connectors.** For P3 connectors, the existing `ScopedEndorsementV1` over `ExactAction` (W: `semantic/evidence.rs:84-87`) is the same rule, already implemented, and satisfies the crossing check for that action.
+    - **Semantic connectors.** A P3 `ScopedEndorsementV1` over `ExactAction` (W: `semantic/evidence.rs:84-101`) is not the same rule. It binds a route key, a `SemanticActionDigest` and a semantic-influence digest, not an integrity-roster authority and the context commitment. It satisfies crossing check 4 only through the I15b P3 adapter, after every missing binding is checked. Until that adapter ships, a gated P3 call needs a recovery integrity approval.
 22. **I22. Quarantined continuation.** The remedy that recovers utility without a human:
     1. A verified isolation-epoch transition starts an isolated successor whose influence starts trusted (M: `active-defense-rollout.md:19`). This is I7a's single exception to parent inheritance. The parent's observation set does not cross into the new epoch; only P5 typed returns and the successor's own classified bootstrap contributions do. If the transition cannot be verified, the epoch is not fresh, or the parent keeps any other channel into the successor, the child inherits in full, and a `BoundedExternal` requirement then denies.
     2. The tainted parent hands its untrusted artifacts only to P5 confined readers.
@@ -591,11 +664,11 @@ pub enum ConfinedReturnTypeV1 {
       - `required`;
       - `satisfied_by`: `context`, `bounded` or `endorsement`;
       - the action contract digest, when `action_contract` is set;
-      - `commitment_ref = HMAC(audit_key, commitment || request_id)`. The ref is blinded per receipt, so two receipts cannot be compared for equality without the audit key;
+      - `commitment_ref = HMAC(audit_key, "chio.integrity-commitment-ref.v1\0" || request_namespace_digest || request_id || receipt_id || commitment)`. It binds the full replay identity and the receipt id, so it is blinded per receipt: two receipts, including two that reuse one request id in different authenticated namespaces, cannot be compared for equality without the audit key;
       - the floor source, when a floor applied.
     - **Caller-visible deny receipts** carry only `required`, `outcome: denied` and the floor source, plus the `integrity_fault` block (I19). They carry no `commitment`, `commitment_ref`, `context_generation` or `satisfied_by`.
 
-    **I25a. Audit basis.** The raw `commitment`, the `context_generation` and the head digests used by crossing check 4 are written to `integrity_admission_audit(request_id, decision, commitment, context_generation, heads_digest)`, in the admission writer, in the decision's transaction (for a guard-only deny, in the deny receipt's transaction). The table is operator audience: it is exported only through operator-authenticated audit and SIEM paths, never to the caller. An auditor joins any consequential effect to the commitment that admitted it by recomputing `commitment_ref` with the audit key.
+    **I25a. Audit basis.** The raw `commitment`, the `context_generation` and the head digests used by crossing check 4 are written to `integrity_admission_audit(request_namespace_digest, request_id, receipt_id, decision, commitment, context_generation, heads_digest)`, keyed by `(request_namespace_digest, request_id, receipt_id)`, in the admission writer, in the decision's transaction (for a guard-only deny, in the deny receipt's transaction). The table is operator audience: it is exported only through operator-authenticated audit and SIEM paths, never to the caller. An auditor joins any consequential effect to the commitment that admitted it by recomputing `commitment_ref` with the audit key.
 
 ## 14. Evaluation plan
 
@@ -659,6 +732,9 @@ pub enum ConfinedReturnTypeV1 {
 | Parent state not in this writer, above the 4,096-row history bound, or unreadable at child creation | Child scope creation refused; never summarized (I7a) |
 | Quarantined successor with an unverified remedy record, a reused isolation epoch, or a parent channel into the successor (capability, delegation, mailbox, shared key, parent-authored task) | The exception does not apply; the child inherits the parent's full state, and a `BoundedExternal` requirement denies (I7a, I22) |
 | Return type with an empty or invalid value domain (empty or duplicate `Enum` variants, `Integer` with `min > max`, invalid `Identifier` bounds or charset) | Rejected at policy load; the contract and every grant referencing it do not load (I23) |
+| P3 endorsement valid under P3 but its key is not on the integrity roster, its semantic influence no longer matches the current state, or its native binding differs | The P3 adapter builds no fact, and crossing check 4 refuses (I15b) |
+| Recovery approval whose `influence_basis` is in another digest domain | No fact; refused with `domain_mismatch` (I15b) |
+| Knowledge migration partial, commitment or projection version unsupported, or a legacy record unreadable | Not ready; `integrity-gating` cannot be enabled (section 4.1) |
 | Portable core receives the constraint | `ConstraintError` deny (I11) |
 | Typed return outside its type | Return refused; no fallback (I23) |
 
@@ -674,14 +750,16 @@ pub enum ConfinedReturnTypeV1 {
   - `chio.integrity-deployment-binding.v1`;
   - `chio.confined-return-type.v1`;
   - `chio.action-selection-contract.v1`.
-- Changes to W: closed enums: `ExplanationFactKind::Integrity`, the `QuarantinedContinuation` template, and `InfluenceOriginV1`. These are additive.
+- Changes to W: closed enums: `ExplanationFactKind::Integrity`, the `QuarantinedContinuation` template, `InfluenceOriginV1` and `EndorsementSourceV1`. The enum changes are additive.
+- The influence representation itself is not just additive. It adds a versioned projection, the frozen `chio.influence-commitment.v1` algorithm with conformance vectors, legacy seed observations and a schema-version bump (section 4.1). Existing signed artifacts, checkpoints, releases and digest domains are unchanged.
 - Process ABI: no new op. Influence travels in existing invoke and receive outcomes.
 
 ## 17. Rollout
 
+0. **Migration (section 4.1)**: legacy seed observations, head build, `knowledge_projection_version`, and conformance vectors. Tracking and gating stay off until it completes.
 1. **Output joins (I4-I8)** behind `integrity-tracking`, recording influence without gating. This also replaces the unconditional external marking.
 2. **The constraint, the guard, and crossing check 4 (I9-I17)** behind `integrity-gating`. Grants opt in.
-3. **The fault, endorsement and quarantined continuation (I18-I22)**, with typed returns (I23-I24).
+3. **The fault, the recovery-approval endorsement adapter and the quarantined continuation (I18-I22)**, with typed returns (I23-I24). The P3 endorsement adapter (I15b) follows separately. Until it ships, gated P3 calls need a recovery integrity approval.
 4. **Evaluation publication**, then optional deployment floors (I12).
 
 GT1 applies: no guarantee is claimed until the conformance scenarios run in hosted CI.
@@ -698,6 +776,18 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - A post-join intent with no endorsement fails (I15).
   - **Approval, then new join, then intent:** the endorsement is stale and the intent fails (I15a).
   - **Join, then fresh approval over the post-join commitment, then intent:** admitted once (I15a).
+- **Endorsement adapter acceptance (I15b).** These use an actual P3 exact-action endorsement:
+  - with the correct route key but a key that is not on the integrity roster: refused (`not_integrity_authority`);
+  - with the context commitment changed by a join after endorsement: refused (`stale`);
+  - with a different native request, or an already-consumed semantic operation: refused (`wrong_action`, `consumed`);
+  - with a recovery approval whose `influence_basis` is in another digest domain: refused (`domain_mismatch`);
+  - correctly adapted: it allows exactly its bound action once and leaves the influence history unchanged;
+  - before the P3 adapter ships, a gated P3 call with only a valid P3 endorsement is refused, and one with a recovery integrity approval is admitted.
+- **Migration acceptance (section 4.1).**
+  - Upgrade a database containing an external artifact read and a checkpoint, then restart, restore the checkpoint and import an old archive.
+  - Evaluate a P3 and a generic gated action. History and old artifact references remain valid, and every live projection keeps the external and unknown restrictions.
+  - A rebuild gives the identical new commitment, and the conformance vectors pass.
+  - A partial migration, an unsupported commitment version or an unreadable legacy record refuses readiness, and an older binary refuses to open the migrated store.
 - **Kani.** `satisfies` is total, and `unknown` always fails.
 - **Unit.**
   - Unbound routes join `External`.
@@ -846,6 +936,19 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-10-03 (consumer side) | The crossing index lacks the ordering contract required by its consumers | Fixed. I22a fills selector slots in spec 10 X4's `CrossingOrder` of the `ConfinedReturn` crossings, `(store_uuid, commit_sequence, member_ordinal)`, which is a total order within the store. Two returns in one batch, or in consecutive batches, therefore have one defined slot order | I22a; section 8 predicates |
+
+### Codex review (PR #1174, round 17)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187142804 | Bind integrity audit references to the replay namespace | Fixed now. `commitment_ref` is an HMAC over a fixed domain, `request_namespace_digest`, `request_id`, `receipt_id` and the commitment. `integrity_admission_audit` is keyed by `(request_namespace_digest, request_id, receipt_id)`. Receipts that reuse a request id across namespaces are therefore unlinkable, and their audit rows stay distinct | I25; I25a |
+
+### Independent review pass 4 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-11-07 | A valid P3 endorsement does not establish the new integrity-approval predicate | Fixed. Crossing check 4's endorsement branch reads one `VerifiedEndorsementFactV1`, built in the writer by one of two adapters. The recovery-approval adapter reuses the existing approval and custody owner. The P3 adapter runs P3's existing verification, then checks integrity-roster authority at the current generation, the native binding, a same-writer recomputation of the semantic influence, and single-use `SemanticCapture`. Digest domains stay distinct. I21's automatic P3 claim is withdrawn: until the P3 adapter ships, gated P3 calls need a recovery integrity approval. Acceptance tests added; open question 1 answered | I13; I15a; I15b; I21; section 8 predicates; section 15; section 18 |
+| R-11-08 | The influence refinement lacks a versioned migration contract for existing P3/P4/P5 state | Fixed. New section 4.1: the frozen LtHash16 commitment (SHA-256 element map, final digest domain, conformance vectors); the P4 journal as the one canonical owner with versioned projections and derived heads; immutable historical domains; conservative legacy seed observations; consistent projections for every consumer; readiness gating; downgrade refusal. Rollout gains a migration step 0. Acceptance tests added; open question 2 answered | section 4.1; section 16; section 17; section 18 |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 
