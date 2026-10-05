@@ -1320,6 +1320,84 @@
       "observed_result": "passed-77-tested-69-caught-8-unviable-41c33618d7",
       "bytes": 136080,
       "sha256": "7567d8c9d148ad1bc352e9d17159d13b500afe9ad86e3dc696bfcc00c22fc4f6"
+    },
+    {
+      "log": "readiness-2e296-postgres-failure.log.gz",
+      "observed_result": "failed-consumer-mcp-wrapper-assumption-2e296de197",
+      "bytes": 364098,
+      "sha256": "b2dd1cfeac99133bf990bcf8eb17c1f744597e3723b6330faefc3d64d280bc00"
+    },
+    {
+      "log": "readiness-2e296-kani-manifest.log.gz",
+      "observed_result": "passed-21-hosted-non-core-kani-harnesses-2e296de197",
+      "bytes": 9818895,
+      "sha256": "5774656acacd856f4b431408936252a5bb3d6eda311173a158e1a59eb61b7659"
+    },
+    {
+      "log": "readiness-2e296-security-image.log.gz",
+      "observed_result": "passed-native-x86-image-build-2e296de197",
+      "bytes": 157580,
+      "sha256": "4a95afe08055cdfccf5e39b6d0ed716fc6ce8a7735c74914926fcb619f11a711"
+    },
+    {
+      "log": "readiness-2e296-advisories.log.gz",
+      "observed_result": "passed-hosted-advisory-selection-2e296de197",
+      "bytes": 77755,
+      "sha256": "2467b632e7d0b3a459053abdbcb67463e044257de2bdb42595cbf8419a8fc26b"
+    },
+    {
+      "log": "readiness-2e296-cargo-vet.log.gz",
+      "observed_result": "passed-six-deployments-and-locked-vet-2e296de197",
+      "bytes": 58377,
+      "sha256": "4c6d61d08de77aae56657ddf9e3edb11454993eaa97d31a77a1e30f984c8d423"
+    },
+    {
+      "log": "readiness-2e296-crypto-floor.log.gz",
+      "observed_result": "passed-complete-native-crypto-floor-2e296de197",
+      "bytes": 412684,
+      "sha256": "bd15eae5b0a7ef9de24ed10e130161a657b55d896bd7c2c261991723764652b2"
+    },
+    {
+      "log": "readiness-2e296-fuzz-sampling-failure.log.gz",
+      "observed_result": "runner-shutdown-during-build-before-fuzz-execution-2e296de197",
+      "bytes": 1905282,
+      "sha256": "9c4a9ce52161280a2b18d7ad555b3e5c3389732926df54e5f3cafb7bafeedf30"
+    },
+    {
+      "log": "readiness-2e296-cve-artifacts-cargo-audit.json.gz",
+      "observed_result": "zero-rust-vulnerabilities-2e296de197",
+      "bytes": 5260,
+      "sha256": "0b3d390cda84d5be8461d7163d9b572c7f5a204b8449ef84cbe537285d144a9b"
+    },
+    {
+      "log": "readiness-2e296-cve-artifacts-osv-scanner-unfiltered.json.gz",
+      "observed_result": "zero-unfiltered-osv-results-2e296de197",
+      "bytes": 124,
+      "sha256": "54345d5194d238b6017d0f3181f392109ce35023cc6b4bdfa8c134943dcb578e"
+    },
+    {
+      "log": "readiness-postgres-response-red.log.gz",
+      "observed_result": "failed-direct-broker-consumer-regressions-before-repair",
+      "bytes": 5083,
+      "sha256": "16cb7571a3f9a4dc4767b16140eaaeee784ba353ac786d23f3808cbb853e5a6f"
+    },
+    {
+      "log": "readiness-graph-response-red.log.gz",
+      "observed_result": "failed-direct-broker-graph-regression-before-repair",
+      "bytes": 1026,
+      "sha256": "9918905d81bdfd15dc0b2b992e61b279bf50e60289bc81a950661aaaace1b023"
+    },
+    {
+      "log": "readiness-postgres-response-green.log.gz",
+      "observed_result": "passed-five-postgres-consumer-and-custody-checks",
+      "bytes": 103,
+      "sha256": "d03ce458f2a6cd2b4f27522f3aacad03ce1872c028853507c3ad02ca621bdcad"
+    },
+    {
+      "log": "readiness-graph-response-green.log.gz",
+      "observed_result": "passed-34-shared-resource-tests",
+      "bytes": 133,
+      "sha256": "199f02b72a41adfbbd724eb74d48393d9cad3aa0d0d3517a550dc8f380d4da51"
     }
   ]
 }

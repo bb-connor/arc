@@ -366,3 +366,37 @@ with no survivors. All 218 retained diagnostic streams authenticate correctly.
 A separate inline review of the final prerequisite and budget repairs finds no
 additional P0/P1/P2 issue. The PostgreSQL end-to-end scenarios, both Kani sweeps
 and terminal CI must still pass on the replacement pushed candidate.
+
+### Verified broker response consumption
+
+Candidate `2e296de197` passes the native x86 execution-image build, the complete
+AWS-LC source/deployment/Vet gate, and the full crypto-floor workflow. Its actual
+advisory artifacts contain zero Rust vulnerabilities and zero unfiltered OSV
+result groups. The cold Kani installation succeeds, and all 21 selected non-core
+PR harnesses pass. These successes remain attributed to this candidate.
+
+The PostgreSQL lane passes native enforcement and initialization, then its
+consumer rejects the first allowed result. `BrokerMcpConnection` already
+consumes the transport's MCP wrapper and verifies the signed broker completion
+before returning `BrokerExecuteResponse` directly. The qualifier incorrectly
+expects a second wrapper. The shared prepared-resource LangGraph decoder and
+its synthetic fixture had the same mismatch. Source `9a78f5c855` aligns both
+consumers with the existing Rust contract, preserving the original response
+and receipt artifact. Direct-value regressions fail before the repair; five
+PostgreSQL tests and all 34 shared-resource tests pass afterward. Extra wrappers,
+incomplete broker evidence, kernel denials and resource errors remain refused.
+No Rust verification, native policy, credential custody or retry behavior changes.
+
+The same candidate's changed-target fuzz job fails when its hosted runner
+receives a shutdown signal during compilation. Target execution never starts;
+this is retained as an infrastructure failure, not a completed fuzz campaign.
+The review manifest authenticates 231 diagnostic streams. Both complete
+PostgreSQL trajectories and the full selected CI still require terminal results
+on the replacement candidate, including a fresh fuzz campaign.
+
+Frozen source `9a78f5c855` passes all 21 terminal qualification commands against
+37,265 source files, retaining 48 outputs with unchanged before/after source
+hashes. The funded suite reports 92 passed and six explicitly ignored. Native
+parent SIGKILL, evolving funded work and the four child-payment interruption
+cases pass. A separate inline review of the consumer correction finds no
+additional P0/P1/P2 issue; the hosted acceptance boundary above remains open.

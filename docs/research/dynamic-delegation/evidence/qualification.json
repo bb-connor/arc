@@ -19243,7 +19243,7 @@
     "docs/superpowers/plans/2026-10-03-work-owner-services.md": "988a60a210b09cc0f18a49780c4a35058b5049c302ad745681df6e9afa3bc8fc",
     "docs/superpowers/plans/2026-10-03-work-runtime.md": "2b4ad1ccde8e3678172b5f5e3db56e0c66de91541836cc5ae31f7451dc273b63",
     "docs/superpowers/plans/2026-10-04-confined-postgres-qualification.md": "900e54ca18149bc1f1ec4dc9c66f23a69e523e6342b26ca384b6984762f43d04",
-    "docs/superpowers/plans/2026-10-04-pr1173-production-readiness.md": "baab3c955b45545739a33d92daf9c51719c06fd711e1bf9023a69baff95cb3e7",
+    "docs/superpowers/plans/2026-10-04-pr1173-production-readiness.md": "14fa56e60cf6c3483939714b3545b76a92183795d4ca1b6ee97ce6b1a15f0c79",
     "docs/superpowers/specs/2026-07-07-chio-next-directions/A-authoritative-enforcement-wired-end-to-end.md": "77b36a37c857fcccf4aff2e167ceb151031eb5153a67c468d59b165c937a0624",
     "docs/superpowers/specs/2026-07-07-chio-next-directions/B-flagship-proof-demo-+-unified-spend-expo.md": "dd4d55838932f45b9e34b2edf787698a45c852cd83592fed6375e5854bd893fa",
     "docs/superpowers/specs/2026-07-07-chio-next-directions/C-governed-x402-outbound-rail.md": "67281ac7436b9925fa60bf7318eb4dac049b3833d20a4111dc0e2eb54ce67a7d",
@@ -20327,11 +20327,12 @@
     "examples/postgres-job-swarm/live.py": "90ee2be230b0d9257bf63bfadc9e6b3461b69d155eb5f58af4ef4ee84cb2b619",
     "examples/postgres-job-swarm/migrator-role.sql": "d0746461bf3411999a81154f3fdeffe431e32cd569972c96df256f192268e339",
     "examples/postgres-job-swarm/postgres.py": "a81f430d9e4ddb04c1ec29077618afe225f8173417e2f4dd27f0d90139b547fe",
-    "examples/postgres-job-swarm/qualify.py": "ed88fcdc038f3e7b0b7fa78fa65e424fb7adeda80ab96bce479047fe7595385c",
+    "examples/postgres-job-swarm/qualify.py": "a5da22886210b83b6f31df01c21c4d981f14db2905510550d40ceea17cc13f1e",
     "examples/postgres-job-swarm/qualify_claim_loss.py": "a2aea7dce82a6593786bbd5d0a3b96ccd4d7ef0fe6d0de636b725e995968ed44",
     "examples/postgres-job-swarm/runtime-role.sql": "037aebeb070598538348058b4cd2b2060e7683d08fc8678bf77048e672d818fa",
     "examples/postgres-job-swarm/services.py": "ee574e40041e6543fd1b553bb7e5fdd4f62367b9f6db8cfc92d7de9846413057",
     "examples/postgres-job-swarm/test_host.py": "b25ba82fcd26be9555cd6f6793d58f4e8a70b195f264bf2bace90fccb2e0c9b4",
+    "examples/postgres-job-swarm/test_qualification.py": "b90e8963c3d82e16cf824091ef7a18e270418e7ddf5a54e23d7673f6eca6ad4d",
     "examples/postgres-job-swarm/worker-role.sql": "4a797e0d5059bee27fd0c449804635a30842f814628600bb35490468429e8477",
     "examples/process-starter/ARCHITECTURE.md": "62cbf75757f38a9fcd7528d5002859daf4ad089da8afc0ad49410f643ec9afb0",
     "examples/process-starter/README.md": "a2981ab10f3d0c42f3b5c95b07b2c8c04d3a25b5a74f413e77ed6a973d103219",
@@ -20416,7 +20417,7 @@
     "examples/shared-resource-swarm/assess.py": "ba0f8a138dd50d07dbff958b00735db71b41be37167bd3d628cdba2e065e43ab",
     "examples/shared-resource-swarm/assignment.py": "bb396dcb2b9e8a88266ed512a2a68175c8f7665ab8b4c476339b28908a9e2379",
     "examples/shared-resource-swarm/contract.py": "58caca2836cad180739cf8a41eeb327b1bea7f401393bf2792eac56b9bee44da",
-    "examples/shared-resource-swarm/graph.py": "aa15add2c79a3772e478c3865261ec42d0e06215ad7dc1409380173b1249831b",
+    "examples/shared-resource-swarm/graph.py": "257714a61fd741a33870c67614978eb774af24749231876bf7e759406dfeb817",
     "examples/shared-resource-swarm/handoff.py": "fbf7b370b3e1077f396fb60f315a9e6c0cc86c0ba49770b4b5c3a3866e615fca",
     "examples/shared-resource-swarm/install_ai_sdk.py": "114e650ff9ba8e7a99b776a577393bac787d6c239c8a3f303bb6653c4f8eadd5",
     "examples/shared-resource-swarm/langgraph_worker.py": "e7b95659b44fe8c4c65adfac1184c8aefd1ffd760bf17f62c2ca83f83cdb670d",
@@ -20430,7 +20431,7 @@
     "examples/shared-resource-swarm/server.py": "e35bb4a231b30ee498345ba3181349748588b6b634b9fdc5c34045d61f00f2ac",
     "examples/shared-resource-swarm/store.py": "4b640c483a65cc754949458e5a0417754d3650c914b532d9424fbcd16e177e7a",
     "examples/shared-resource-swarm/test_acceptance.py": "ab1aecdbfaaa2577e0f386ae07e7f666d2e448fb08d488fed1a10a8e9320086b",
-    "examples/shared-resource-swarm/test_graph.py": "05c293193d80aacdb38286adb3d3d4f3fb295413c58499e4a9d328decd914984",
+    "examples/shared-resource-swarm/test_graph.py": "bfd9c0b7538ec3a16caee555f8aa1b5bbc11e4dc7a60bc732f8389f01342c991",
     "examples/shared-resource-swarm/test_handoff.py": "61ee0a3bc006c70268e9f1e5f82ced30062251a76b993dfe892e7c7c88a12fb5",
     "examples/shared-resource-swarm/test_operator.py": "939c20b6091e3f4db2834bf06906568740643ffd855105e770c9cbb0490dbb59",
     "examples/shared-resource-swarm/test_ownership.py": "6b60093440441ea6ccfc57e62ca87520f54211e8d09313b6e1093cd5a47eb589",
@@ -37274,7 +37275,7 @@
         "docs/papers/verifiable-work/tools/qualify_environment.py"
       ],
       "exit_code": 0,
-      "seconds": 0.313,
+      "seconds": 0.281,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-environment.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-environment.stderr"
     },
@@ -37287,7 +37288,7 @@
         "chio-workflow"
       ],
       "exit_code": 0,
-      "seconds": 1.578,
+      "seconds": 1.414,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-workflow-tests.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-workflow-tests.stderr"
     },
@@ -37304,7 +37305,7 @@
         "dynamic_delegation"
       ],
       "exit_code": 0,
-      "seconds": 27.202,
+      "seconds": 26.927,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-native-tests.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-native-tests.stderr"
     },
@@ -37321,7 +37322,7 @@
         "three_owner_composition"
       ],
       "exit_code": 0,
-      "seconds": 101.206,
+      "seconds": 102.187,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-native-regression.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-native-regression.stderr"
     },
@@ -37337,7 +37338,7 @@
         "chio-runtime-core"
       ],
       "exit_code": 0,
-      "seconds": 162.17,
+      "seconds": 160.235,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-evolution-tests.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-evolution-tests.stderr"
     },
@@ -37354,7 +37355,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 0.995,
+      "seconds": 0.806,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-workflow-clippy.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-workflow-clippy.stderr"
     },
@@ -37377,7 +37378,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 1.293,
+      "seconds": 0.979,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-native-clippy.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-native-clippy.stderr"
     },
@@ -37396,7 +37397,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 1.232,
+      "seconds": 1.081,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-evolution-clippy.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-evolution-clippy.stderr"
     },
@@ -37412,7 +37413,7 @@
         "--check"
       ],
       "exit_code": 0,
-      "seconds": 0.884,
+      "seconds": 0.876,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-evolution-format.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-evolution-format.stderr"
     },
@@ -37429,7 +37430,7 @@
         "crates/kernel/chio-kernel/examples/dynamic_delegation.rs"
       ],
       "exit_code": 0,
-      "seconds": 0.085,
+      "seconds": 0.082,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-format.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-format.stderr"
     },
@@ -37444,7 +37445,7 @@
         "dynamic_delegation"
       ],
       "exit_code": 0,
-      "seconds": 5.985,
+      "seconds": 6.211,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-example.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-example.stderr"
     },
@@ -37461,7 +37462,7 @@
         "execution_evidence"
       ],
       "exit_code": 0,
-      "seconds": 1.426,
+      "seconds": 1.53,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-execution-export-tests.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-execution-export-tests.stderr"
     },
@@ -37478,7 +37479,7 @@
         "durable_admission_sqlite"
       ],
       "exit_code": 0,
-      "seconds": 78.555,
+      "seconds": 74.607,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-durable-regression.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-durable-regression.stderr"
     },
@@ -37491,7 +37492,7 @@
         "examples/federated-work/Cargo.toml"
       ],
       "exit_code": 0,
-      "seconds": 139.176,
+      "seconds": 135.518,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-funded-tests.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-funded-tests.stderr"
     },
@@ -37508,7 +37509,7 @@
         "warnings"
       ],
       "exit_code": 0,
-      "seconds": 0.839,
+      "seconds": 0.726,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-funded-clippy.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-funded-clippy.stderr"
     },
@@ -37545,7 +37546,7 @@
         "examples/federated-work/src/main.rs"
       ],
       "exit_code": 0,
-      "seconds": 0.141,
+      "seconds": 0.139,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-funded-format.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-funded-format.stderr"
     },
@@ -37558,7 +37559,7 @@
         "examples/federated-work/Cargo.toml"
       ],
       "exit_code": 0,
-      "seconds": 0.636,
+      "seconds": 0.628,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-funded-build.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-funded-build.stderr"
     },
@@ -37569,7 +37570,7 @@
         "contracts/scripts/work-claim-native-wire.test.mjs"
       ],
       "exit_code": 0,
-      "seconds": 0.35,
+      "seconds": 0.337,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-rail-pins.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-rail-pins.stderr"
     },
@@ -37580,7 +37581,7 @@
         "examples/federated-work/test_evolving_work.py"
       ],
       "exit_code": 0,
-      "seconds": 41.785,
+      "seconds": 42.33,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-evolving-funded.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-evolving-funded.stderr"
     },
@@ -37591,7 +37592,7 @@
         "examples/federated-work/funded_child.py"
       ],
       "exit_code": 0,
-      "seconds": 126.217,
+      "seconds": 126.891,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-funded-child-regression.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-funded-child-regression.stderr"
     },
@@ -37608,59 +37609,59 @@
         "test_*.py"
       ],
       "exit_code": 0,
-      "seconds": 0.458,
+      "seconds": 0.456,
       "stdout": "docs/research/dynamic-delegation/evidence/qualified-artifact-tests.stdout",
       "stderr": "docs/research/dynamic-delegation/evidence/qualified-artifact-tests.stderr"
     }
   },
   "outputs": {
-    "docs/research/dynamic-delegation/evidence/qualified-artifact-tests.stderr": "86fe3468c248290a15df1011b6406f175178c923af68480330552bb18777e400",
+    "docs/research/dynamic-delegation/evidence/qualified-artifact-tests.stderr": "672729dce26b4cd09e4701beafdf63f365b622fb2a4317bfaea33a289bf71c1f",
     "docs/research/dynamic-delegation/evidence/qualified-artifact-tests.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-durable-regression.stderr": "a52d740be1c4959b1a6e53639ebbe9d654795fae5e3834575b3803fc9bbbf50b",
-    "docs/research/dynamic-delegation/evidence/qualified-durable-regression.stdout": "b73c17649dae51ec484dcc809b2ff71949365acf9bdd5e3cd84ac9faa31bae63",
-    "docs/research/dynamic-delegation/evidence/qualified-earned-child-none.json": "0f8e83f29e062d267e56384e964bbc725d42376b0aaab500b4a0b680b3de7d50",
-    "docs/research/dynamic-delegation/evidence/qualified-earned-child-pay-after-broadcast.json": "6bc194cb4acd2e94d7d16647de260b6119184123d96eca4a682ce537e3bd8097",
-    "docs/research/dynamic-delegation/evidence/qualified-earned-child-pay-after-observation.json": "01d16cddaf9310945af91f7c8e9b6ed1c266c3fcb78816fbd6f0f3d4ef2dfe09",
-    "docs/research/dynamic-delegation/evidence/qualified-earned-child-pay-after-prepare.json": "db97a283c22fa747d66c3a411feec338862340ac1d7c3faeaf78754aaeec4694",
+    "docs/research/dynamic-delegation/evidence/qualified-durable-regression.stdout": "c7410529e28fe2369e25298bad09959fbec98120d5dea3ea02e1577b33d3a04e",
+    "docs/research/dynamic-delegation/evidence/qualified-earned-child-none.json": "7223a4e8a7f57fa551acebe66df85db826990b9135b3292b903eacc9d0cc7724",
+    "docs/research/dynamic-delegation/evidence/qualified-earned-child-pay-after-broadcast.json": "1e7b613302fbe627d156aced53cb893919029255c21155b1c0afe14ccfdd516a",
+    "docs/research/dynamic-delegation/evidence/qualified-earned-child-pay-after-observation.json": "aa1a2e6e6b635d4214ba679abd4c7f14528a42bba69c4f1e3abcad854c7f55a5",
+    "docs/research/dynamic-delegation/evidence/qualified-earned-child-pay-after-prepare.json": "b32ccc491b0b452397cde281659477f38f12b68d26bd7a5ab136c34f1b0ea9b0",
     "docs/research/dynamic-delegation/evidence/qualified-environment.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-environment.stdout": "6af4c5ed7882246262f6fbf54bce98eda299514a98969d377b5a9ab5df66662e",
-    "docs/research/dynamic-delegation/evidence/qualified-evolution-clippy.stderr": "faeeea2e797dc0d1680e9bfd0125fc14872bee930e84060bdce7c032db823fc8",
+    "docs/research/dynamic-delegation/evidence/qualified-evolution-clippy.stderr": "259c9a0e812edf2faac42236853248294f6da128bd41826e580913f52d2e0710",
     "docs/research/dynamic-delegation/evidence/qualified-evolution-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-evolution-format.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-evolution-format.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-evolution-tests.stderr": "8a0398c4a5f8d58330ba4a0e91244dee0af00ebf8e4a6e00b9fe15a90a932999",
-    "docs/research/dynamic-delegation/evidence/qualified-evolution-tests.stdout": "d0aa3e240c763c5192742d2a3f9f8cee104fa5cffcdc2cefcab6c53063be6759",
-    "docs/research/dynamic-delegation/evidence/qualified-evolving-funded-work.json": "e0dc7d27d2c601f261b0fd03b66ce16b7983cd9bc0f7691c88d8b46a49d85436",
-    "docs/research/dynamic-delegation/evidence/qualified-evolving-funded.stderr": "5043eb3ce76630ab307feb3d97eff2af83df3d5c3bf28113ce29f024a0d6192a",
+    "docs/research/dynamic-delegation/evidence/qualified-evolution-tests.stderr": "de0171040394cfc36414437f8f9c7970c988539c0e1ba04028f9786aa58e98d4",
+    "docs/research/dynamic-delegation/evidence/qualified-evolution-tests.stdout": "433f52a07ea2d6f537542b8b8b0e70bc620a9cbf6da842e78f3d053818b3f25c",
+    "docs/research/dynamic-delegation/evidence/qualified-evolving-funded-work.json": "54444c8f7576138cb2ab775274ab6e94e65bde64330232c79249b1fb0cc7ed50",
+    "docs/research/dynamic-delegation/evidence/qualified-evolving-funded.stderr": "d916ae5dda6a61b33a1b8a62d356ffa4f5828af173d2cb5c6eee300d7ff3c38f",
     "docs/research/dynamic-delegation/evidence/qualified-evolving-funded.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-example.stderr": "0da586beaf78f2dd78eae96bba6b14ea0bde8ce5a04ebb62d1b8192bc2d8f2f2",
-    "docs/research/dynamic-delegation/evidence/qualified-example.stdout": "99542fe7526a48b2efc8e58fa613132130c5180b2da8725e2e06296f9e8e0596",
-    "docs/research/dynamic-delegation/evidence/qualified-execution-export-tests.stderr": "59b5b7275f05e2c9696e8dc042d2c554df5e42cb8a9f8b2b4b1838c2bf904ea4",
-    "docs/research/dynamic-delegation/evidence/qualified-execution-export-tests.stdout": "3b4ae4bdcbaccbb1777bcc6c01f0c842f14bb82f47684ac111b8ddca5f5ebede",
+    "docs/research/dynamic-delegation/evidence/qualified-example.stderr": "9bb52e7b62d72e6622e804169b1e6e8bba873e0602bb89286dfad959b0b81893",
+    "docs/research/dynamic-delegation/evidence/qualified-example.stdout": "94520239a4c8ed2fcf477558bf1c111d779ba24f72aece267f5495175e1716ac",
+    "docs/research/dynamic-delegation/evidence/qualified-execution-export-tests.stderr": "cc6567ab161efb0c3606bec20d6ac4fa972f04fb36b9ce2f90ff30d829dd9f7c",
+    "docs/research/dynamic-delegation/evidence/qualified-execution-export-tests.stdout": "48aec3ef84df517067b378a551f98a81e89a665f7ca9967e225612a2f5545cf1",
     "docs/research/dynamic-delegation/evidence/qualified-format.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-format.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-funded-build.stderr": "afb5e4c62a9a33554d8c9d5e5eb2459ac5468f91c2e743d623f39fa1355368a2",
+    "docs/research/dynamic-delegation/evidence/qualified-funded-build.stderr": "1c8d1f786821918fdcf1365da4e2279f678760ad63fee273a38ff82977f19ffb",
     "docs/research/dynamic-delegation/evidence/qualified-funded-build.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-funded-child-regression.stderr": "3cd0ff8ca9b431391dfd08ae7d014896e646228d696afb4226375e615152025f",
+    "docs/research/dynamic-delegation/evidence/qualified-funded-child-regression.stderr": "1ebd248fd8055f7ff385eff61791ae100f0e1835f92ab429dbb1479d40b359ae",
     "docs/research/dynamic-delegation/evidence/qualified-funded-child-regression.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-funded-clippy.stderr": "8b2cc1bbf321d2137a7d14033f52cb8edea3e351e56c2ef79876af7530b89caf",
+    "docs/research/dynamic-delegation/evidence/qualified-funded-clippy.stderr": "2a7f2bc267ab84a783d3e33a26c82086964c4f5a781be885b3a698fdde636801",
     "docs/research/dynamic-delegation/evidence/qualified-funded-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-funded-format.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "docs/research/dynamic-delegation/evidence/qualified-funded-format.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-funded-tests.stderr": "56939cb834b7a8382c5b38741339e81529283796907eb90575745116d21da77f",
-    "docs/research/dynamic-delegation/evidence/qualified-funded-tests.stdout": "9b3f6e8b164421f2936cef9dce80e25fd836b3dc83099225bd24386a6d796558",
-    "docs/research/dynamic-delegation/evidence/qualified-native-clippy.stderr": "87c4cb956bb33c9da7f8e25aca367dd9dbb07732a9ac71afc691f299aff13b23",
+    "docs/research/dynamic-delegation/evidence/qualified-funded-tests.stderr": "c8a301f84d2061b3b6ebc7ae6aa3a8f3485c347727806375b195fb817d701929",
+    "docs/research/dynamic-delegation/evidence/qualified-funded-tests.stdout": "a783073d090d62672eb1ae7dda5f4ccdf688151c34fdcafc03bf04c68eba86ab",
+    "docs/research/dynamic-delegation/evidence/qualified-native-clippy.stderr": "259c9a0e812edf2faac42236853248294f6da128bd41826e580913f52d2e0710",
     "docs/research/dynamic-delegation/evidence/qualified-native-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-native-recovery.json": "48e0a8c3295bf221dc961460a8e56d86da0ed040c4700675e5c3ba2815bd347a",
-    "docs/research/dynamic-delegation/evidence/qualified-native-regression.stderr": "fa58be4b4ab87d9ae877a371366ce9fd6ad04f8f35d4a98cb5a05fdb09107445",
-    "docs/research/dynamic-delegation/evidence/qualified-native-regression.stdout": "e054b043658765e7a40779009e57680b49a49fe0448c6f95844846fddc9ad1bd",
-    "docs/research/dynamic-delegation/evidence/qualified-native-tests.stderr": "31c4f08d6c1a9eb7570c64a0686ca86b79f3323ca661b3f686b25d4c96374c12",
-    "docs/research/dynamic-delegation/evidence/qualified-native-tests.stdout": "a2deecac0ce2ef580e3a6878c5d83cfc241f794eaf9bb24f25d95e51fdd2f00c",
+    "docs/research/dynamic-delegation/evidence/qualified-native-recovery.json": "2e98b7ea251b1e269898516e6b50804e229cd7ed19e18f1823061628d484460b",
+    "docs/research/dynamic-delegation/evidence/qualified-native-regression.stderr": "45135cef79c86e6f09d093fab3e4c01ce30bb9a95f0324e713a02143faa2c561",
+    "docs/research/dynamic-delegation/evidence/qualified-native-regression.stdout": "892915fd4c94aaf3e3a5ba9c1490f4520a3cb65dbcb3a0ff9a5175901e9a8803",
+    "docs/research/dynamic-delegation/evidence/qualified-native-tests.stderr": "bbd9723528474debb899ea1cc671a210c1821ea377011761196961f5d96236a9",
+    "docs/research/dynamic-delegation/evidence/qualified-native-tests.stdout": "4d75180c6572024f96a61d46c064b164de07f9f1b0ff0f1b28381e6093e09f63",
     "docs/research/dynamic-delegation/evidence/qualified-rail-pins.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-rail-pins.stdout": "b30b942bd52e9eea0d118480c98381244af4d6d3c75416549dc42ca5f12361d9",
-    "docs/research/dynamic-delegation/evidence/qualified-workflow-clippy.stderr": "503e1b9847d0c2aa4a0d1ce360577d58ba0fa27fc592b582688665cfb419aa6d",
+    "docs/research/dynamic-delegation/evidence/qualified-rail-pins.stdout": "f13a0205e4c5e7aaeabc75dbe143d8b78e41239e9236f45c33442598c54b2fb6",
+    "docs/research/dynamic-delegation/evidence/qualified-workflow-clippy.stderr": "4728023db584a835030255d64ffe142d9fd489ad0968cb49983c37a00983f7a8",
     "docs/research/dynamic-delegation/evidence/qualified-workflow-clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "docs/research/dynamic-delegation/evidence/qualified-workflow-tests.stderr": "d0083403038a7685514e22cf4d6d59e256f839e9fa6b4353487a7203f44014d4",
-    "docs/research/dynamic-delegation/evidence/qualified-workflow-tests.stdout": "7e2a1edc06bd33706908492fbec81adff0c186d5fb8944dd2fe99c27f44df842"
+    "docs/research/dynamic-delegation/evidence/qualified-workflow-tests.stderr": "75fb5bf2d234611c532360808a8e7b638909df0e016756abaad5cc23a22c8369",
+    "docs/research/dynamic-delegation/evidence/qualified-workflow-tests.stdout": "3a46a74312b67f00ed7ae19bbfb54b36c5cdbcf0f329610a99cad31ef40a8bf3"
   }
 }

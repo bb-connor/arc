@@ -1,0 +1,274 @@
+{
+  "afterParentRefund": {
+    "child": {
+      "beneficiaryBalance": "0",
+      "escrowBalance": "100",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "fundingTransaction": "0xc79757497f64b5b372cd3591f67f699fa4e2d5d27c27b43c81f9e2b502607ea9",
+      "paid": "0",
+      "payerBalance": "900",
+      "refunded": "0",
+      "state": "Payable",
+      "transactions": {
+        "pay": [],
+        "record": [
+          {
+            "hash": "0xdef97e4c6cd325d692b9bfe70153c6519a368ca5b9dfe6678f6da7cf26e4b08d",
+            "nonce": 0,
+            "status": 1
+          }
+        ],
+        "refund": [],
+        "submit": [
+          {
+            "hash": "0x9afe0c5414f971e51ace18075ff959b4407fe290e109110f38671b791a3d00df",
+            "nonce": 0,
+            "status": 1
+          }
+        ]
+      }
+    },
+    "parent": {
+      "beneficiaryBalance": "900",
+      "escrowBalance": "100",
+      "events": {
+        "ClaimSubmitted": 0,
+        "DecisionRecorded": 0,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 1,
+        "TimedOut": 1
+      },
+      "fundingTransaction": "0xa642a69d0dec17c076904435608b709085c0876222535522efb31dbaf9acc819",
+      "paid": "0",
+      "payerBalance": "1000",
+      "refunded": "100",
+      "state": "Refunded",
+      "transactions": {
+        "pay": [],
+        "record": [],
+        "refund": [
+          {
+            "hash": "0x25ee7e2720b67bda14c72a11ee14171f573364f73ff1e1553b38c814fa6ddde7",
+            "nonce": 2,
+            "status": 1
+          }
+        ],
+        "submit": []
+      }
+    }
+  },
+  "child": {
+    "allocationId": "0x4436d6d54e9afc717f08acdf6ee26c49581f543bcae3dc6391d15f38bdfcab8d",
+    "authorityUuid": "01a10a93-5200-7e10-be3b-ab08b627bb8b",
+    "authorizationId": "funded-4436d6d54e9afc717f08acdf6ee26c49581f543bcae3dc6391d15f38bdfcab8d",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:afb84dbaaf0f42de50305d246ec2c1cd234ef4b24641e234931cda2205813f53:0",
+    "nativeAuthorizationId": "funded-4436d6d54e9afc717f08acdf6ee26c49581f543bcae3dc6391d15f38bdfcab8d",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "afb84dbaaf0f42de50305d246ec2c1cd234ef4b24641e234931cda2205813f53",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-child",
+    "runtimeClaimHistory": null,
+    "settlementObservationError": null,
+    "settlementTransaction": "0xd9ec50a17ae51999efa6516538d0d277d54418baeb3242b2147db8a3762b65d1",
+    "startupReconciliationError": null
+  },
+  "childPayKilledSignal": null,
+  "earned": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "200",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0xc79757497f64b5b372cd3591f67f699fa4e2d5d27c27b43c81f9e2b502607ea9",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Payable",
+    "transactions": {
+      "pay": [],
+      "record": [
+        {
+          "hash": "0xdef97e4c6cd325d692b9bfe70153c6519a368ca5b9dfe6678f6da7cf26e4b08d",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [],
+      "submit": [
+        {
+          "hash": "0x9afe0c5414f971e51ace18075ff959b4407fe290e109110f38671b791a3d00df",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "final": {
+    "balances": {
+      "buyer": "1000",
+      "child": "100",
+      "escrow": "0",
+      "intermediary": "900",
+      "supply": "2000"
+    },
+    "child": {
+      "beneficiaryBalance": "100",
+      "escrowBalance": "0",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 1,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "fundingTransaction": "0xc79757497f64b5b372cd3591f67f699fa4e2d5d27c27b43c81f9e2b502607ea9",
+      "paid": "100",
+      "payerBalance": "900",
+      "refunded": "0",
+      "state": "Paid",
+      "transactions": {
+        "pay": [
+          {
+            "hash": "0xd9ec50a17ae51999efa6516538d0d277d54418baeb3242b2147db8a3762b65d1",
+            "nonce": 1,
+            "status": 1
+          }
+        ],
+        "record": [
+          {
+            "hash": "0xdef97e4c6cd325d692b9bfe70153c6519a368ca5b9dfe6678f6da7cf26e4b08d",
+            "nonce": 0,
+            "status": 1
+          }
+        ],
+        "refund": [],
+        "submit": [
+          {
+            "hash": "0x9afe0c5414f971e51ace18075ff959b4407fe290e109110f38671b791a3d00df",
+            "nonce": 0,
+            "status": 1
+          }
+        ]
+      }
+    },
+    "parent": {
+      "beneficiaryBalance": "900",
+      "escrowBalance": "0",
+      "events": {
+        "ClaimSubmitted": 0,
+        "DecisionRecorded": 0,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 1,
+        "TimedOut": 1
+      },
+      "fundingTransaction": "0xa642a69d0dec17c076904435608b709085c0876222535522efb31dbaf9acc819",
+      "paid": "0",
+      "payerBalance": "1000",
+      "refunded": "100",
+      "state": "Refunded",
+      "transactions": {
+        "pay": [],
+        "record": [],
+        "refund": [
+          {
+            "hash": "0x25ee7e2720b67bda14c72a11ee14171f573364f73ff1e1553b38c814fa6ddde7",
+            "nonce": 2,
+            "status": 1
+          }
+        ],
+        "submit": []
+      }
+    }
+  },
+  "original": {
+    "child": {
+      "allocationId": "0x4436d6d54e9afc717f08acdf6ee26c49581f543bcae3dc6391d15f38bdfcab8d",
+      "authorityUuid": "01a10a93-5200-7e10-be3b-ab08b627bb8b",
+      "authorizationId": "funded-4436d6d54e9afc717f08acdf6ee26c49581f543bcae3dc6391d15f38bdfcab8d",
+      "executions": 1,
+      "externalFundsTransferred": false,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:afb84dbaaf0f42de50305d246ec2c1cd234ef4b24641e234931cda2205813f53:0",
+      "nativeAuthorizationId": "funded-4436d6d54e9afc717f08acdf6ee26c49581f543bcae3dc6391d15f38bdfcab8d",
+      "nativePaymentAction": "capture",
+      "nativePaymentState": "Settling",
+      "nativeState": "Finalizing",
+      "operationId": "afb84dbaaf0f42de50305d246ec2c1cd234ef4b24641e234931cda2205813f53",
+      "paymentState": "pending",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "funded-native-child",
+      "runtimeClaimHistory": null,
+      "settlementObservationError": null,
+      "settlementTransaction": null,
+      "startupReconciliationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending"
+    },
+    "parent": {
+      "allocationId": "0xe5a5f0bc12a728cfd355405dd099e1be3d99cf2b8a514364123f7a9d10432510",
+      "authorityUuid": "01a10a93-443a-7fd1-8d7c-f6af964ab560",
+      "authorizationId": "funded-e5a5f0bc12a728cfd355405dd099e1be3d99cf2b8a514364123f7a9d10432510",
+      "executions": 1,
+      "externalFundsTransferred": false,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:b1ba746ad73cb1a3b6cca31e746110d672a61c343df415e15d68aa33e4899d53:0",
+      "nativeAuthorizationId": "funded-e5a5f0bc12a728cfd355405dd099e1be3d99cf2b8a514364123f7a9d10432510",
+      "nativePaymentAction": null,
+      "nativePaymentState": "Authorized",
+      "nativeState": "OutcomeUnknownAfterDispatch",
+      "operationId": "b1ba746ad73cb1a3b6cca31e746110d672a61c343df415e15d68aa33e4899d53",
+      "paymentState": "pending",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "funded-native-parent",
+      "runtimeClaimHistory": null,
+      "settlementObservationError": null,
+      "settlementTransaction": null,
+      "startupReconciliationError": null
+    }
+  },
+  "parent": {
+    "allocationId": "0xe5a5f0bc12a728cfd355405dd099e1be3d99cf2b8a514364123f7a9d10432510",
+    "authorityUuid": "01a10a93-443a-7fd1-8d7c-f6af964ab560",
+    "authorizationId": "funded-e5a5f0bc12a728cfd355405dd099e1be3d99cf2b8a514364123f7a9d10432510",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:b1ba746ad73cb1a3b6cca31e746110d672a61c343df415e15d68aa33e4899d53:0",
+    "nativeAuthorizationId": "funded-e5a5f0bc12a728cfd355405dd099e1be3d99cf2b8a514364123f7a9d10432510",
+    "nativePaymentAction": null,
+    "nativePaymentState": "Authorized",
+    "nativeState": "OutcomeUnknownAfterDispatch",
+    "operationId": "b1ba746ad73cb1a3b6cca31e746110d672a61c343df415e15d68aa33e4899d53",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "funded-native-parent",
+    "runtimeClaimHistory": null,
+    "settlementObservationError": null,
+    "settlementTransaction": "0x25ee7e2720b67bda14c72a11ee14171f573364f73ff1e1553b38c814fa6ddde7",
+    "startupReconciliationError": null
+  },
+  "parentKilledSignal": 9,
+  "retired": {
+    "parentActionsDisabled": true,
+    "verifierSigningDisabled": true
+  }
+}
