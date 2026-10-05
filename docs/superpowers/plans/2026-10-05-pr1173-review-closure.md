@@ -161,6 +161,25 @@ then repeat source qualification and hosted acceptance on the repaired candidate
 
 ## Replacement-candidate preflight repairs
 
+The subsequent x86 PostgreSQL attempt on `28842e598e` passed both actual
+confined trajectories, then failed its separate broker retirement test before
+execution because its witnessed parent authority had no candidate-built
+key-log service paths. Build both services in the prepared-broker action,
+validate all executable paths before publishing any environment entries, and
+forward only the required paths explicitly across `sudo`. Extend the real
+export-script controls and the native workflow mutation controls. Preserve the
+failed job and require a terminal final-candidate rerun, including the broker
+regression and independently verified receipts.
+
+During this qualification the security lane advanced its authorized reusable
+definition to `c009aced79d69f01880b5f7c53ed3c1754e3b7da`, merged in PR 1175.
+Its native consumers now require the enforcing fixture and retain complete
+generated-vector selection. Use that reviewed immutable definition in the CI
+caller; leave the security lane's evidence package and authority variables
+under their existing owner. Renew source-bound qualification after these
+workflow repairs, then regenerate the artifact without changing the paper's
+open publication gates.
+
 The `28842e598e` candidate exposed additional failures in actual hosted and
 local qualification. Complete these repairs before the next source freeze:
 

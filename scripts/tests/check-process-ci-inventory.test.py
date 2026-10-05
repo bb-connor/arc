@@ -138,6 +138,8 @@ with tempfile.TemporaryDirectory(prefix="broker export ") as temporary:
         / "x86_64-unknown-linux-musl/debug/chio-broker-mcp",
         "CHIO_DOCKER_ADAPTER": target / "docker-release/chio-docker-adapter",
         "CHIO_REPOSITORY_ADAPTER": target / "docker-release/chio-repository-adapter",
+        "CHIO_KEYLOG_WITNESS": target / "docker-release/chio-keylog-witness",
+        "CHIO_KEYLOG_AUDIT": target / "docker-release/chio-keylog-audit",
     }
     for path in paths.values():
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -55,7 +55,7 @@ BROKER_LIFETIME_NAME = "Confined broker survives preparation runtime retirement"
 BROKER_LIFETIME_RUN = '''set -euo pipefail
 test_name=process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime
 "$CHIO_BROKER_TEST_BINARY" --list --exact "$test_name" > "$RUNNER_TEMP/broker-preparation.list"
-sudo env CHIO_CAGE_TEST_HELPER="$CHIO_CAGE_INIT" CHIO_BROKER_MCP_TOOL="$CHIO_BROKER_MCP_TOOL" "$CHIO_BROKER_TEST_BINARY" --exact "$test_name" --nocapture 2>&1 | tee "$RUNNER_TEMP/broker-preparation.log"
+sudo env CHIO_CAGE_TEST_HELPER="$CHIO_CAGE_INIT" CHIO_BROKER_MCP_TOOL="$CHIO_BROKER_MCP_TOOL" CHIO_KEYLOG_WITNESS="$CHIO_KEYLOG_WITNESS" CHIO_KEYLOG_AUDIT="$CHIO_KEYLOG_AUDIT" "$CHIO_BROKER_TEST_BINARY" --exact "$test_name" --nocapture 2>&1 | tee "$RUNNER_TEMP/broker-preparation.log"
 python3 scripts/check-exact-cargo-test-inventory.py --label "confined broker preparation lifetime" --allow-filtered --list-output "$RUNNER_TEMP/broker-preparation.list" --run-output "$RUNNER_TEMP/broker-preparation.log" "$test_name"'''
 POSTGRES_CLAIM_RUN = (
     '"$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"'

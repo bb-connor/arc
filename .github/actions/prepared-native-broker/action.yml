@@ -16,6 +16,7 @@ runs:
         command -v x86_64-linux-musl-gcc
         rustup target add x86_64-unknown-linux-musl
         cargo build --locked --profile docker-release -p chio-secret-broker --bin chio-docker-adapter --bin chio-repository-adapter
+        cargo build --locked --profile docker-release -p chio-keyring --bins
         cargo build --locked --target x86_64-unknown-linux-musl -p chio-secret-broker --bin chio-broker-mcp
         cargo test --locked --profile docker-release -p chio-secret-broker --features real-linux-enforcement --lib --no-run --message-format=json > "$RUNNER_TEMP/consumer-helper.jsonl"
         python3 - "$RUNNER_TEMP/consumer-helper.jsonl" "$GITHUB_ENV" <<'PY'
@@ -30,6 +31,8 @@ runs:
                 "CHIO_BROKER_MCP_TOOL": target / "x86_64-unknown-linux-musl/debug/chio-broker-mcp",
                 "CHIO_DOCKER_ADAPTER": target / "docker-release/chio-docker-adapter",
                 "CHIO_REPOSITORY_ADAPTER": target / "docker-release/chio-repository-adapter",
+                "CHIO_KEYLOG_WITNESS": target / "docker-release/chio-keylog-witness",
+                "CHIO_KEYLOG_AUDIT": target / "docker-release/chio-keylog-audit",
         }
         for key, value in executables.items():
             path = pathlib.Path(value)

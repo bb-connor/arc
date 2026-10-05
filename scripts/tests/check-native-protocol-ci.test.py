@@ -56,6 +56,14 @@ class NativeProtocolCiTests(unittest.TestCase):
                 else:
                     steps[index]["if" if mutation == "conditional" else "continue-on-error"] = True
                 self.rejected(changed, "confined preparation lifetime|Confined broker survives preparation runtime retirement")
+        for variable in ("CHIO_KEYLOG_WITNESS", "CHIO_KEYLOG_AUDIT"):
+            with self.subTest(missing=variable):
+                changed = copy.deepcopy(LIVE)
+                step = changed[5]["jobs"]["native"]["steps"][index]
+                argument = f' {variable}="${variable}"'
+                self.assertIn(argument, step["run"])
+                step["run"] = step["run"].replace(argument, "", 1)
+                self.rejected(changed, "confined preparation lifetime")
 
     def test_cpp_conformance_requires_qualified_native_fixture(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/chio-cpp.yml").read_text())
