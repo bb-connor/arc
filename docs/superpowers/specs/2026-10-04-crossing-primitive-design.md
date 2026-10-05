@@ -419,7 +419,7 @@ Rules:
     - That predicate also requires matching grants without constraints, so spec 11's grant-declared `RequiredIntegrity` makes a call ineligible. The integrity check here covers only requirements from non-grant floors (spec 11's open decisions).
     - Fence refs are derived from the request inside the check, because no operation row exists.
     - **Integrity tracking excludes the path.** When spec 11's integrity tracking (I4, rollout flag `integrity-tracking`) is enabled for the calling context, the call is not check-only eligible (spec 9 section 4.4). I4 commits the output-influence join in the same writer transaction as the outcome commit or release. The X13a release writes no authority row, so it would deliver bytes with no join, and a later consequential call could pass against stale trusted state. Such reads take the durable three-commit path, whose `OutcomeCommit` writes the join before the bytes leave.
-    - **X13a. Release.** Before output is released, a second check-only crossing re-checks stop and fence. The receipt is then appended to `receipts.db` exactly as today: same fsync, same `finalize_ordinary_recovery_response` path. A refused release withholds output and appends a signed `withheld` receipt instead.
+    - **X13a. Release.** Before output is released, a second check-only crossing re-checks stop, fence and revocation, the same checks as the durable `OutputRelease` row (section 4.2). A `Revoked` refusal takes spec 9 M11's post-effect handling: the output is withheld under a signed `Withheld` receipt naming `Revoked`. The receipt is then appended to `receipts.db` exactly as today: same fsync, same `finalize_ordinary_recovery_response` path. A refused release withholds output and appends a signed `withheld` receipt instead.
     - **X13b. D1.** D1 is closed on the success and refusal paths only if the receipt append is made infallible-or-latched. That is spec 3 phase 1 (`PostEffectObligation`, kernel-evidence latch). This path changes nothing about D1 otherwise. A crash between handoff and the receipt append still leaves no record, by design for undurable calls. Durable coverage (`All`) is the remedy.
     - **X13c. `NonDurable` calls.** Spec 9's `NonDurable` class covers calls under `Monetary` or development `Off` that no durable path covers.
       - These calls also dispatch through a `CheckOnlyDispatch` crossing, which writes nothing and linearizes stop, fence and revocation.
@@ -834,3 +834,9 @@ Where the analogy breaks:
 |---|---|---|---|
 | 4180993960 (spec 9) | Make stopped non-durable effects terminal to retries | Fixed with spec 9 M11. X16 now separates the redispatch-safe check-only read (`retry: AfterResume`) from the terminal `NonDurable` effect (`retry: Never`, `effect_executed: true`) | X16 |
 | 4180993966 (spec 9) | Reconcile an external hold release before retrying it | Fixed with spec 9 M7a. X17b requires rail adapters used for unknown-outcome releases to support idempotent submission or status query by key | X17b |
+
+### Codex review (PR #1174, round 6)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4181461517 | Recheck revocation on check-only release | Fixed now. The X13a release crossing rechecks stop, fence and revocation, matching the durable `OutputRelease` row. A revocation after dispatch withholds the output under spec 9 M11's post-effect handling, for both check-only reads and `NonDurable` calls | X13a |

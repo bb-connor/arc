@@ -389,7 +389,7 @@ When both optional digests are absent, `binding_digest = invocation_digest`, so 
 9. **The result is bound.** `lower_bound` MUST check its `BoundToolResult` before lowering, and correlation never comes from the bytes (rule 2):
    - `result.binding_digest` equals the recomputed binding digest;
    - for `Allow` with `result_sha256 = Some(h)`, `SHA256(result.result.0) == h`;
-   - for `Allow` with `result_sha256 = None`, the kernel did not observe the output (the receipt's content is the null digest, for example a caller-executed tool). The executor that ran the invocation stamps `binding_digest` from the `ToolInvocation` it executed, at execution time;
+   - for `Allow` with `result_sha256 = None`, the kernel did not observe the output (the receipt's content is the null digest, for example a caller-executed tool). The executor stamps the sealed record's complete `binding_digest`, at execution time. The digest is handed to it through `BoundOutcome` together with the verdict, because a v2 binding that includes a permit or model-context digest cannot be recomputed from the `ToolInvocation` alone. An executor never derives the digest itself;
    - for `Deny`, `result.result.0` MUST be empty. A deny is lowered from its `reason` alone.
 
    Any mismatch returns `ResultBindingMismatch`, and nothing is lowered. Passing invocation and verdict B with result A therefore fails: A's binding digest differs, and A's bytes do not hash to B's signed `content_hash`.
@@ -401,7 +401,9 @@ When both optional digests are absent, `binding_digest = invocation_digest`, so 
     4. The signed `action.parameter_hash` equals the hash of the canonical arguments, decoded exactly as `build_tool_call_request` decodes `invocation.arguments`.
     5. For an `Allow` with a value output, `SHA256(canonical_json(output))` equals the signed `content_hash` (M: `receipt_support/receipt_content.rs:8-16`). The shim builds the `ToolResult` from those bytes, wraps it in a `BoundToolResult` carrying the binding digest, and sets `result_sha256`. For a streamed output, the shim recomputes the stream digest with the receipt's own function (`receipt_content.rs:29`), and the stream gate emits the final frame only on a match.
 
-    6. The verdict's `invocation_digest` and the `BoundToolResult`'s `binding_digest` are the record's `binding_digest`, never a digest computed from optional values the caller passes at this point. The record is then bound to this receipt id. A later call with a different receipt for the same record fails `ReceiptAlreadyBound`. A replay of the same receipt returns the same outcome.
+    6. The verdict's `invocation_digest` and the `BoundToolResult`'s `binding_digest` are the record's `binding_digest`, never a digest computed from optional values the caller passes at this point. Only a **terminal** receipt binds the record:
+       - **Terminal receipts.** An `Allow`, a terminal `Deny`, `Cancelled`, `Incomplete`, or a `Withheld` receipt with `retry: Never` binds the record to its receipt id. A later call with a different receipt for that record fails `ReceiptAlreadyBound`, and a replay of the same receipt returns the same outcome.
+       - **Retryable denials.** A deny whose signed `chio_runtime.stop.retryable_after_resume = true` (a temporary `KernelStopped`, spec 8 S15), or a `Withheld` receipt with `retry: AfterResume`, is lowered as a deny but does not bind the record. The record stays sealed with the same binding, so a retry after resume with the same request id and binding produces a new receipt, and that receipt is checked and bound normally. A retry with a different binding still fails `SubmissionConflict` (rule 11).
 
     Any failure returns `ResponseBindingMismatch`. If concurrent response B is paired with invocation A, check 2 or 4 fails, and no verdict carrying A's digest is ever produced. If a bridge passes a binding that names model context or permit B for a response submitted under A, the constructor ignores it, check 3a confirms A from the signed receipt, and it stamps A's binding, so `lower_bound`'s rule 3 comparison with B fails. A record that names B for a receipt signed under A fails check 3a. `verdict_result_from_response` is deprecated on the schedule of `lower`.
 11. **Sealed submission records.** The optional digests are fixed when the request is submitted, not when the verdict is built:
@@ -556,6 +558,13 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4180933155 | Namespace provider-supplied request IDs | Fixed now. Provider call ids are namespaced with the payload's `lift_id` (`{provider}_p_{lift_id}_{hash}`), so a provider id reused in a later turn never replays or conflicts with an earlier admission. Retries of the same turn stay stable under a host `LiftContext`. The original id is kept in `provenance.provider_call_id` for lowering | section 5.2 rule 1 |
+
+### Codex review (PR #1174, round 6)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4181461505 | Allow a new receipt after retryable denials | Fixed now. Only terminal receipts bind the submission record. A retryable denial (`retryable_after_resume = true`, or `Withheld` with `retry: AfterResume`) is lowered as a deny but leaves the record sealed, so the same request id and binding can produce and bind a new receipt after resume | rule 10 check 6 |
+| 4181461526 | Give executors the complete v2 binding digest | Fixed now. For caller-executed `Allow` results, the executor stamps the sealed record's complete `binding_digest`, handed to it through `BoundOutcome`, and never recomputes it from the `ToolInvocation` | rule 9 |
 
 ### Codex review (PR #1174, round 5)
 
