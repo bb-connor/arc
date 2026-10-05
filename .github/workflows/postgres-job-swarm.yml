@@ -98,6 +98,19 @@ jobs:
       - name: Lose a committed claim response and recover without redispatch
         run: |
           "$CHIO_JOB_FIXTURE_ROOT/venv/bin/python" examples/postgres-job-swarm/qualify_claim_loss.py --chio "$CHIO_JOB_FIXTURE_ROOT/chio" --database-state "$CHIO_JOB_FIXTURE_ROOT/database/state.json" --output "$CHIO_JOB_FIXTURE_ROOT/claim-loss"
+      - name: Report fixed capture stages and reason digests
+        if: ${{ failure() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
+        run: |
+          python3 - <<'PYDIAG'
+          import os, pathlib
+          root = pathlib.Path(os.environ["CHIO_JOB_FIXTURE_ROOT"])
+          for relative in ("qualification/host.log", "claim-loss/host.log"):
+              path = root / relative
+              if path.is_file():
+                  for line in path.read_text(errors="replace").splitlines():
+                      if line.startswith("CHIO_NATIVE_DIAGNOSTIC "):
+                          print(line)
+          PYDIAG
       - name: Preserve only nonsecret qualification evidence
         if: ${{ always() && env.CHIO_JOB_FIXTURE_ROOT != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

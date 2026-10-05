@@ -195,6 +195,11 @@ impl NativeFlowResolver {
         if prepared_at < custody.observation().observed_at_unix_ms()
             || valid_until > MAX_CANONICAL_TIME
         {
+            eprintln!(
+                "CHIO_NATIVE_DIAGNOSTIC clock-rejected location={}:{}",
+                file!(),
+                line!()
+            );
             return Err(NativeFlowError::ClockChanged);
         }
         let policy_inputs = policy::PreparedInputs::capture(self, &custody, &resolved)?;
@@ -279,8 +284,30 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
                 "native lifecycle is not selected".into(),
             ));
         }
-        self.prepare_dispatch(authority.prepare_egress()?)
-            .and_then(|prepared| prepared.capture_invocation(authority))
+        let custody = authority.prepare_egress().inspect_err(|error| {
+            eprintln!(
+                "CHIO_NATIVE_DIAGNOSTIC stage=prepare-egress kind={:?} digest={}",
+                std::mem::discriminant(error),
+                chio_core::sha256(error.to_string().as_bytes()).to_hex()
+            );
+        })?;
+        self.prepare_dispatch(custody)
+            .inspect_err(|error| {
+                eprintln!(
+                    "CHIO_NATIVE_DIAGNOSTIC stage=prepare-flow kind={:?} digest={}",
+                    std::mem::discriminant(error),
+                    chio_core::sha256(error.to_string().as_bytes()).to_hex()
+                );
+            })
+            .and_then(|prepared| {
+                prepared.capture_invocation(authority).inspect_err(|error| {
+                    eprintln!(
+                        "CHIO_NATIVE_DIAGNOSTIC stage=capture-flow kind={:?} digest={}",
+                        std::mem::discriminant(error),
+                        chio_core::sha256(error.to_string().as_bytes()).to_hex()
+                    );
+                })
+            })
             .map(|_| ())
             .map_err(|error| {
                 if let NativeFlowError::Policy(denial) = &error {
@@ -526,17 +553,24 @@ impl NativeFlowCustody {
     }
 }
 
+#[track_caller]
 fn require_time(
     earliest: u64,
     sampled: u64,
     validated: u64,
     deadline: u64,
 ) -> Result<(), NativeFlowError> {
+    eprintln!("CHIO_NATIVE_DIAGNOSTIC time location={} earliest={earliest} sampled={sampled} validated={validated} deadline={deadline}", std::panic::Location::caller());
     if sampled < earliest
         || sampled > validated
         || validated >= deadline
         || deadline > MAX_CANONICAL_TIME
     {
+        eprintln!(
+            "CHIO_NATIVE_DIAGNOSTIC clock-rejected location={}:{}",
+            file!(),
+            line!()
+        );
         return Err(NativeFlowError::ClockChanged);
     }
     Ok(())

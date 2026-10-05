@@ -592,6 +592,12 @@ fn require_deadline(deadline: u64, now: u64) -> Result<(), KernelError> {
     Ok(())
 }
 
+#[track_caller]
 fn invalid(detail: &str) -> KernelError {
+    eprintln!(
+        "CHIO_NATIVE_DIAGNOSTIC invalid location={} digest={}",
+        std::panic::Location::caller(),
+        chio_core::sha256(detail.as_bytes()).to_hex()
+    );
     KernelError::DurableAdmission(detail.into())
 }

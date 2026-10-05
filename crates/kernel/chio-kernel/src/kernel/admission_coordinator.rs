@@ -1792,9 +1792,16 @@ fn invocation_output_to_server_output(output: &InvocationOutputV1) -> ToolServer
     }
 }
 
+#[track_caller]
 fn durable_store_error(
     error: crate::admission_operation::AdmissionOperationStoreError,
 ) -> KernelError {
+    eprintln!(
+        "CHIO_NATIVE_DIAGNOSTIC store location={} kind={:?} digest={}",
+        std::panic::Location::caller(),
+        std::mem::discriminant(&error),
+        chio_core::sha256(error.to_string().as_bytes()).to_hex()
+    );
     KernelError::DurableAdmission(error.to_string())
 }
 
