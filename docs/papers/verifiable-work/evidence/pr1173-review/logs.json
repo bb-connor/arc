@@ -1011,6 +1011,33 @@
       "observed_result": "passed",
       "bytes": 539,
       "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
+    },
+    {
+      "log": "readiness-formal-path-enrollment-red.log.gz",
+      "observed_result": "failed",
+      "scope": "Initial registry check found missing open-market workflow enrollment.",
+      "bytes": 94,
+      "sha256": "260d6f953982a10bcbe2558dcde2a02005f2554270981fb68fe285d41e985ec0"
+    },
+    {
+      "log": "readiness-formal-path-classifier-mutant.log.gz",
+      "observed_result": "failed",
+      "scope": "Expected rejection after removing the security-types route from the actual shell classifier.",
+      "bytes": 104,
+      "sha256": "3b5683945bd14dcec6777ea07201ac357a8f4e8465ba758323aa3e5bb9d21637"
+    },
+    {
+      "log": "readiness-formal-path-enrollment-green.log.gz",
+      "observed_result": "passed",
+      "scope": "Every registered PR proof crate triggers its workflow and selects its lane.",
+      "bytes": 39,
+      "sha256": "ef4928c704e54506c3368bde07c627c61597511a2b83830e5342685da386652f"
+    },
+    {
+      "log": "readiness-native-qualification-workflow-final.log.gz",
+      "observed_result": "passed",
+      "bytes": 539,
+      "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
     }
   ]
 }

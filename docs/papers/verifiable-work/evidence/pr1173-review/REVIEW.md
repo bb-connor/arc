@@ -243,6 +243,11 @@ results; they are not hosted or release acceptance.
   and the generated coverage contains 66 rows and 182 artifacts. These are
   declared abstraction anchors, with their limits recorded in
   `docs/formal/PR1173-SOURCE-REVIEW.md`; they do not establish Rust refinement.
+- The formal workflow now enrolls the registered open-market and security-types
+  crates in both its trigger and lane classifier. The existing wiring test
+  exercises the actual shell classifier for every PR crate discovered from the
+  harness manifest and workspace. Removing the security-types route fails the
+  control. The scope job executes this contract before classifying changes.
 - The security evidence image pins Rust 1.95 and its component archives, source
   lock and toolchain. A dedicated x86 build qualifies the actual image without
   publishing it. Local aarch64 execution cannot supply that result.

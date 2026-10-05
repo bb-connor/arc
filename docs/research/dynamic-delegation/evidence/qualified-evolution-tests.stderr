@@ -11,18 +11,7 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-   Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
-   Compiling chio-runtime-proof-parity v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-proof-parity)
-   Compiling chio-attest-loopback v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-attest-loopback)
-   Compiling chio-swarm-authority v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-swarm-authority)
-   Compiling chio-finding-verifier v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/trust/chio-finding-verifier)
-   Compiling chio-transaction-passport v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-transaction-passport)
-   Compiling chio-risk-comptroller v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-risk-comptroller)
-   Compiling chio-commerce-order v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-commerce-order)
-   Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
-   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
-   Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-core)
-    Finished `test` profile [unoptimized] target(s) in 3m 09s
+    Finished `test` profile [unoptimized] target(s) in 0.98s
      Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_runtime_core-c9175e0b9a88f4fe)
      Running tests/lease_boundaries.rs (/home/connor/chio-pr1173-target/debug/deps/lease_boundaries-477600a758bd54ea)
      Running tests/lease_write_fencing.rs (/home/connor/chio-pr1173-target/debug/deps/lease_write_fencing-7e2ba70294cf8428)
