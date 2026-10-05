@@ -1140,6 +1140,72 @@
       "observed_result": "passed-source-441cfe24ab",
       "bytes": 539,
       "sha256": "3efe01a701828cd734737a4fddfba56ad65dcb8d7f6f22606a12ceb8e06d5671"
+    },
+    {
+      "log": "readiness-41c3-cargo-vet.log.gz",
+      "observed_result": "passed-composite-hosted-41c33618d7",
+      "bytes": 58306,
+      "sha256": "143598f6916c7fc176964ae9f0d0048549bcc1c3c51607e2d840be78216741fd"
+    },
+    {
+      "log": "readiness-41c3-security-image.log.gz",
+      "observed_result": "passed-native-x86-image-41c33618d7",
+      "bytes": 157308,
+      "sha256": "68877027d398dfdb045eaa488951b0e14f557d7bbd53de3c361c7efd87bc8b11"
+    },
+    {
+      "log": "readiness-41c3-advisories.log.gz",
+      "observed_result": "passed-existing-policy-41c33618d7",
+      "bytes": 78272,
+      "sha256": "5b523c63a3175addeb6d33e2d4cdf03d507202b9160f8d414d168e429cada65d"
+    },
+    {
+      "log": "readiness-41c3-cve-artifacts-osv-scanner-unfiltered.json.gz",
+      "observed_result": "one-inherited-accepted-advisory-41c33618d7",
+      "bytes": 7386,
+      "sha256": "e82a72ac1bc662ec1787d7a63efc5308b75da08288c11d5f19ed4360539fa4c8"
+    },
+    {
+      "log": "readiness-ai5-after-initial-update-osv.json.gz",
+      "observed_result": "failed-ai5-latest-transitive-advisories",
+      "bytes": 80978,
+      "sha256": "e9774d023abd7da7dca022e3e3f009a568111b00adfe8c7fe02c520dd24c1804"
+    },
+    {
+      "log": "readiness-ai5-after-initial-update-osv.log.gz",
+      "observed_result": "failed-ai5-latest-transitive-advisories",
+      "bytes": 380,
+      "sha256": "9b949f82a0a2fd90f0de5cc1caf620a73aa498e93ec274ebc4121c80297e2f38"
+    },
+    {
+      "log": "readiness-ai5-missing-config-osv.log.gz",
+      "observed_result": "failed-missing-empty-config",
+      "bytes": 240,
+      "sha256": "0c8c21983af86ecf62461ac5814bccb1f436358b7b3f2f34e6f3f2706218f376"
+    },
+    {
+      "log": "readiness-ai5-peer-verification.log.gz",
+      "observed_result": "passed-build-typecheck-and-42-tests",
+      "bytes": 407,
+      "sha256": "034da930aa12fce088e4c6abfdf16bd8a3ff724b500ebbfac12ffe1fa040c074"
+    },
+    {
+      "log": "readiness-ai5-aligned-unfiltered-osv.json.gz",
+      "observed_result": "passed-unfiltered-zero-findings",
+      "bytes": 124,
+      "sha256": "54345d5194d238b6017d0f3181f392109ce35023cc6b4bdfa8c134943dcb578e"
+    },
+    {
+      "log": "readiness-ai5-aligned-unfiltered-osv.log.gz",
+      "observed_result": "passed-unfiltered-zero-findings",
+      "bytes": 2346,
+      "sha256": "494dfb3a2062ef9fb4ff033a0c6f19c1b0e893193fde6dab9391d8a25ef8d9c4"
+    },
+    {
+      "log": "readiness-native-qualification-ai5-waiver.log.gz",
+      "observed_result": "passed-source-d6dbdf1c5d",
+      "bytes": 539,
+      "sha256": "e994dd665da5c3aa8de08b4c755a20bc91701877a7c726652f3552cbc5e20d00"
     }
   ]
 }

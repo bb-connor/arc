@@ -297,3 +297,31 @@ again: 21 terminal checks, 37,265 source files and 48 outputs, with no source
 drift. Both historical successful runs and the original failures remain
 attributable to their own source inputs. Hosted acceptance requires the next
 exact PR candidate, including the native PostgreSQL trajectories and image.
+
+### Unfiltered advisory closure
+
+At `41c33618d7f349a66d18a562ac980fd5b9fd32a5`, the complete x86 AWS-LC/Cargo
+Vet composite and the security execution-image build pass. The actual image
+build accepts the exact 225-package inventory, pinned Rust components and
+locked workspace fetch; it does not publish or activate the image. Cargo Audit
+and OSV also pass their existing policy, including original-source authentication,
+upstream advisory monitoring and all three installed npm repair regressions.
+
+Review of that run's unfiltered OSV artifact finds one inherited accepted
+advisory: `GHSA-866g-f22w-33x8` in the standalone AI SDK peer-test lock. The
+waiver's claim that remediation requires AI SDK 6 is stale. Aligning this lock
+with the workspace's AI SDK 5.0.210 and provider-utils 3.0.28 selects the upstream
+response-size repair without changing the published peer range. The waiver is
+removed. A trial of the latest AI SDK 5 release introduced affected Undici 5
+dependencies and is retained as a failed scan; the selected graph instead uses
+the existing compatible workspace dependency line.
+
+The standalone package's build, type check and all 42 tests pass. The complete
+Python/npm OSV selection, run with an empty configuration to disable every
+waiver, reports zero findings. An initial invocation omitted that empty config
+file and failed; its diagnostic is retained separately. Source `d6dbdf1c5d`
+then passes all 21 local qualification commands against 37,264 source files,
+retaining 48 outputs and unchanged before/after source hashes. The review
+manifest authenticates 199 diagnostic streams. Every hosted success remains
+attributed to its actual candidate; final acceptance requires terminal checks
+on the final pushed PR revision.
