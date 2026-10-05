@@ -1,5 +1,10 @@
 # Security Engineering Excellence Addendum
 
+> **October 4 landing order:** Follow the [authoritative landing ledger](../../security/landing-ledger.md).
+> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
+> foundation. Status and evidence below retain their original source boundaries;
+> they do not authorize another implementation batch or establish a main merge.
+
 > **For agentic workers:** Use superpowers:executing-plans. This extends the
 > [assurance closeout plan](2026-09-25-security-assurance-closeout.md); it does not
 > replace it. Preserve the single-agent execution instruction and one Cargo owner

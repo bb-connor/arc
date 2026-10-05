@@ -1,5 +1,10 @@
 # Security launch: current execution status
 
+> **October 4 landing order:** Follow the [authoritative landing ledger](landing-ledger.md).
+> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
+> foundation. Status and evidence below retain their original source boundaries;
+> they do not authorize another implementation batch or establish a main merge.
+
 **October 3 review-remediation continuation:** current source work is on
 `packet/3-retention-accounting` in `/tmp/arc-security-launch`. AP9/AP10/AP11 and the
 API/start receipt lifecycle continuation are tracked in the

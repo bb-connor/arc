@@ -1,5 +1,10 @@
 # Remaining security engineering work
 
+> **October 4 landing order:** Follow the [authoritative landing ledger](../security/landing-ledger.md).
+> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
+> foundation. Status and evidence below retain their original source boundaries;
+> they do not authorize another implementation batch or establish a main merge.
+
 Source base: `a3217b9145`, with the four-owner authority batch on `packet/3-retention-accounting`,
 `/tmp/arc-security-launch`. Reconciled on September 28 against the September
 25-28 plans, review passes, implementation records and current source/config.
@@ -60,19 +65,14 @@ reads and the API/start portion of EV5. The
 owns EV6 package signatures and external signer pins, EV7 external anchor
 acceptance, EV12 strict signatures and EV13 receipt/checkpoint signer binding.
 
-**Next substantial batch: certificate and downstream proof verification (EV8,
-EV17, the remaining EV6 certificate case and Mercury proof-package trust).** Read real retained Chio receipts by signed
-session metadata; derive or require evaluation policy; verify guard outcomes,
-capability scope and delegation; validate per-session continuity and timestamp
-ordering; reject empty/incomplete full bundles and require independent signer
-trust through native certificate workflows. Carry authenticated Chio envelope
-provenance into the separate Mercury proof format and require verifier-owned
-anchor inputs there; its historical self-declared anchor behavior is not closed
-by this ingestion migration. EV5's remaining launchers,
-independent child inclusion proofs, EV1/EV2 secret minimization, EV3/EV4 denial
-evidence, SIEM defects and other KG/RL findings remain open. The
-[compliance/product review](2026-10-01-compliance-product-truth-review.md)
-retains the historical findings.
+**Current substantial batch: the October 4 landing sequence.** Complete the
+ledger, dependency and trusted-definition prerequisites, then qualify and land
+the bounded process/security foundation. Certificate work (EV8, EV17 and the
+remaining EV6 certificate case), remaining EV5 launchers, independent child
+inclusion proofs, EV1/EV2 minimization, EV3/EV4 denial evidence, SIEM and other
+KG/RL findings remain assigned to later security slices in the landing ledger.
+Mercury proof-feature work is outside this queue. Historical review findings stay
+preserved in the [compliance/product review](2026-10-01-compliance-product-truth-review.md).
 
 Remaining TCB reader semantics, proof-result sealing and error provenance remain
 engineering work. Full required hosted CI, branch decomposition, other

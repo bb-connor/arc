@@ -120,7 +120,10 @@ a trust-policy authority. Full-bundle certificates, independent child Merkle
 proofs, equivalent Windows filesystem race protection, downstream Mercury proof
 trust and hosted/release/operational acceptance remain outside this qualification.
 
-## Next execution chunk
+## Deferred certificate work after foundation landing
+
+The [October 4 landing ledger](../security/landing-ledger.md) owns the current
+execution order. The following scope is preserved for a later security slice.
 
 Implement non-vacuous session certificates (EV8, EV17 and the remaining EV6
 certificate case): collect real retained receipts by signed session metadata,

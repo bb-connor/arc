@@ -1,5 +1,10 @@
 # Security roadmap: outcome-based execution plan
 
+> **October 4 landing order:** Follow the [authoritative landing ledger](landing-ledger.md).
+> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
+> foundation. Status and evidence below retain their original source boundaries;
+> they do not authorize another implementation batch or establish a main merge.
+
 Status: accepted for local execution on 2026-09-10. M0 is consolidated. M1's
 implementation and local acceptance are complete under the explicit confinement
 qualification deferral below. M2's native failure/restart safety acceptance is
