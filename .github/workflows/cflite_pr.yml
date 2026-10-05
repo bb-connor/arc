@@ -36,6 +36,8 @@ on:
       - ".github/workflows/cflite_pr.yml"
       - ".clusterfuzzlite/**"
       - "scripts/check-fuzz-budget.sh"
+      - "scripts/tests/check-cflite-builder.test.py"
+      - "scripts/tests/check-fuzz-manifest-selection.test.py"
 
 permissions:
   contents: read
@@ -101,6 +103,7 @@ jobs:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
+          rm -f .clusterfuzzlite/selected-targets.txt
           if printf '%s' "${LABELS_JSON}" | grep -q '"fuzz: full"'; then
             echo "fuzz: full label present; promoting to all-target sweep"
             {
@@ -147,7 +150,7 @@ jobs:
           # can break changed-target sampling without matching a source
           # trigger. Every member manifest can change feature/dependency
           # unification, even without a lockfile edit, so it selects all targets.
-          if grep -qE '^(\.cargo/|\.clusterfuzzlite/|\.github/workflows/cflite_pr\.yml$|([^/]+/)*Cargo\.toml$|Cargo\.lock$|fuzz/target-map\.toml$|Makefile$|scripts/(ci-pr-tier|spec-drift-check|check-review-slices)\.(sh|py)$)' changed.txt; then
+          if grep -qE '^(\.cargo/|\.clusterfuzzlite/|\.github/workflows/cflite_pr\.yml$|([^/]+/)*Cargo\.toml$|Cargo\.lock$|fuzz/target-map\.toml$|Makefile$|scripts/(ci-pr-tier|spec-drift-check|check-review-slices)\.(sh|py)$|scripts/tests/check-(cflite-builder|fuzz-manifest-selection)\.test\.py$)' changed.txt; then
             echo "fuzz inventory edit detected; firing the full inventory"
             fired=("${targets[@]}")
           fi
@@ -157,12 +160,18 @@ jobs:
             printf '%s\n' "${fired[@]}" | sort -u > fired.txt
           fi
           fired_count="$(wc -l < fired.txt | tr -d ' ')"
+          cp fired.txt .clusterfuzzlite/selected-targets.txt
           printf 'fired targets: %s\n' "${fired_count}"
           cat fired.txt
           {
             echo "count=${fired_count}"
             printf 'targets<<EOF\n%s\nEOF\n' "$(cat fired.txt)"
           } >> "${GITHUB_OUTPUT}"
+
+      - name: Check builder selection and inventory
+        run: |
+          python3 scripts/tests/check-fuzz-manifest-selection.test.py
+          python3 scripts/tests/check-cflite-builder.test.py
 
       - name: Fail if no targets fired (changed-target mode)
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
@@ -175,8 +184,6 @@ jobs:
       - name: Build ClusterFuzzLite changed-target fuzzers
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
         with:
           language: rust
           sanitizer: address

@@ -21,6 +21,8 @@ for path in paths + [
     "crates/guards/chio-data-guards/redactors/default/Cargo.toml",
     "Cargo.lock",
     "fuzz/target-map.toml",
+    "scripts/tests/check-cflite-builder.test.py",
+    "scripts/tests/check-fuzz-manifest-selection.test.py",
 ]:
     assert selector.search(path), (
         f"manifest/control edit does not select full fuzz inventory: {path}"
@@ -41,12 +43,14 @@ inventory = sorted(
 )
 assert inventory, "fuzz target inventory must not be empty"
 fallback_start = workflow.index("          if grep -qE '")
-fallback_end = workflow.index("          fired_count=", fallback_start)
+fallback_end = workflow.index("          {\n", fallback_start)
 fallback = "\n".join(
     line[10:] for line in workflow[fallback_start:fallback_end].splitlines()
 )
 with tempfile.TemporaryDirectory() as temporary:
     directory = Path(temporary)
+    (directory / ".clusterfuzzlite").mkdir()
+    handoff = directory / ".clusterfuzzlite/selected-targets.txt"
     for path in [
         "crates/guards/chio-data-guards/redactors/default/Cargo.toml",
         "crates/future/deep/new/member/Cargo.toml",
@@ -66,6 +70,10 @@ with tempfile.TemporaryDirectory() as temporary:
             text=True,
         )
         assert (directory / "fired.txt").read_text().splitlines() == inventory, path
+        assert handoff.is_file(), (
+            "selected targets never reach the nested build container"
+        )
+        assert handoff.read_text().splitlines() == inventory, path
     (directory / "changed.txt").write_text("docs/Cargo.toml.example\n")
     subprocess.run(
         [

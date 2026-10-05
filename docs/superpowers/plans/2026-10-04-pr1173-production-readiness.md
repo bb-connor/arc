@@ -141,6 +141,26 @@ set the outer PR budget to 120 minutes without changing selection, concurrency,
 per-mutant timeout, or score requirements. These are interrupted historical
 campaigns, not passing evidence; require terminal reruns on the new source.
 
+### Fuzz selection across the nested build container
+
+The retained `2e296de197` and `2ae8ee2979` runs stopped with runner shutdown
+signals while compiling the response-authority feature graph. Neither reached
+fuzz execution. The logs do not establish the shutdown cause. Investigation
+also found two independently reproducible selection defects: the pinned action
+does not forward `CHIO_CFLITE_TARGETS` into its nested builder, and the CFLite
+builder omits the mapped FROST round-two target.
+
+Pass the selection through a generated file in the existing Docker source
+context, reject conflicting or empty selection inputs, and restore builder
+inventory parity. Execute the real shell builder with only Cargo replaced at
+the expensive compiler boundary. Require the exact selected output set,
+unchanged sanitizer and feature flags, rejection before compilation for invalid
+selectors, and complete agreement with the owning target map. Exercise the
+actual workflow selector's file output as well. Run these controls in the fuzz
+workflow itself, including stacked PRs that do not select the main-only CI job.
+Require a terminal hosted build and fuzz run; local orchestration controls do
+not establish that the runner shutdown is resolved.
+
 ### Security execution image reconciliation
 
 The merged workspace requires Rust 1.95, but the evidence image still binds

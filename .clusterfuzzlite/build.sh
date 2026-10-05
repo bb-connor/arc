@@ -45,6 +45,7 @@ TARGETS=(
     federation_trust_establishment
     bilateral_dsse_verify
     finding_worker_protocol
+    frost_round2_envelope
     response_authority_protocol
     response_lifecycle
     underwriting_policy_input
@@ -57,6 +58,22 @@ TARGETS=(
     peers_lock_decode
     fuzz_tool_action
 )
+
+# The action builds in a nested container and does not forward arbitrary
+# step environment variables. The workflow puts this file in the Docker
+# source context; local builds can still use the explicit environment inputs.
+selection_file="$SRC/chio/.clusterfuzzlite/selected-targets.txt"
+if [ -e "$selection_file" ]; then
+    if [ -n "${CHIO_CFLITE_TARGETS:-}" ] || [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
+        echo "file and environment fuzz selections cannot be combined" >&2
+        exit 1
+    fi
+    CHIO_CFLITE_TARGETS="$(cat "$selection_file")"
+    if [ -z "$CHIO_CFLITE_TARGETS" ]; then
+        echo "fuzz selection file is empty" >&2
+        exit 1
+    fi
+fi
 
 selected_targets=("${TARGETS[@]}")
 if [ -n "${CHIO_CFLITE_TARGETS:-}" ] && [ -n "${CHIO_CFLITE_TARGET:-}" ]; then
