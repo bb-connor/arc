@@ -2,7 +2,7 @@
 
 This artifact accompanies *Chio: A Peer-to-Peer Economy of Verifiable Work*.
 The title was approved on 2026-09-14. The manuscript was first completed as a
-research draft on 2026-10-02. The current revision, dated 2026-10-03, presents
+research draft on 2026-10-02. The architecture revision, dated 2026-10-03, presents
 the kernel architecture, programmable sovereignty and preserved work commitments
 before developing the supporting construction and experiment. Earlier editorial
 revisions retain their records in `PROGRESS.md`. Publication readiness is
@@ -23,8 +23,13 @@ model coverage and matched alternatives. This companion supplies the exact
 source paths and reproduction commands. The
 [architecture review](ARCHITECTURE-REVIEW.md) records the current manuscript review
 and repairs; the [earlier prose review](PROSE-REVIEW.md) retains its original scope.
-This revision changes no native source, proof program, comparison tool
-or experimental output; the existing qualifications keep their original scope.
+The October 3 editorial revision changed no native source, proof program,
+comparison tool or experimental output. The October 5 review subsequently
+repaired implementation and evidence boundaries, as recorded in
+[evidence/pr1173-review/SECOND-REVIEW.md](evidence/pr1173-review/SECOND-REVIEW.md).
+Its source-bound native package passes 21 commands against 37,305 source files;
+historical qualifications retain their original scope. Hosted production
+acceptance and the independent publication gates remain separate.
 
 ## Sources and profiles
 

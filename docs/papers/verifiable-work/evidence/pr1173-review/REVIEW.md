@@ -1,5 +1,10 @@
 # PR #1173 code review and repairs
 
+This is a chronological review record. Earlier candidate counts, draft states
+and acceptance judgments remain historical. The current local result appears
+in the final section and in [SECOND-REVIEW.md](SECOND-REVIEW.md); hosted acceptance
+must name the replacement PR commit.
+
 This review follows the executable changes in the verifiable-work session,
 including native admission and settlement, delegated continuations, federation,
 protocol adapters, the funded-work and comparison programs, and the evidence
@@ -566,3 +571,25 @@ evidence findings against the same earlier candidate. These are not covered by
 the preceding passes. The closure plan is
 `docs/superpowers/plans/2026-10-05-pr1173-review-closure.md`; final source freeze
 and hosted acceptance remain open until its findings are resolved.
+
+
+## October 5 replacement source qualification
+
+Frozen source `2ce480588721ce206c740ff1a601c4d2a9c9889a` passes all 21
+terminal commands against 37,305 source files with 48 retained outputs and
+unchanged before/after source hashes. The current source-bound record is
+`docs/research/dynamic-delegation/evidence/qualification.json`. It includes
+15 delegation lifecycle tests, five three-owner composition tests, 29 durable
+admission tests, the full runtime/swarm selections, and 96 funded tests with six
+explicit opt-in skips. Actual parent SIGKILL, evolving funded work and all four
+earned-child payment cases pass, followed by all 18 artifact-tool tests.
+
+The complete previous campaign and the interrupted attempt before the authorized
+workflow-definition correction remain under the evidence history directory.
+The interruption is not counted as a successful qualification. The additional
+review disposition records repaired boundaries and bounded disagreements.
+Final hosted main CI, research workspaces, native x86, fuzz, Kani, supply-chain
+and PostgreSQL acceptance still require the replacement commit. The security
+agent owns the separate signed Linux evidence package. The PR is ready for
+review by the user's choice; this result does not establish merge, deployment
+or publication readiness.

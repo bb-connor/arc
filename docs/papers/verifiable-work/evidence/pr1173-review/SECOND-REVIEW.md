@@ -2,8 +2,8 @@
 
 The external static review of `5dc7921d3c6437db40a01ceea20a9fdb1396ba31`
 reported 37 additional findings (four P1, 30 P2 and three P3). This disposition
-records the repairs separately from the earlier review. Source changes await
-final candidate qualification; passing historical jobs do not qualify them.
+records the repairs separately from the earlier review. Source changes pass the current local source-bound package. Final hosted
+candidate qualification remains pending; passing historical jobs do not qualify it.
 
 ## Runtime and protocol repairs
 
@@ -86,6 +86,15 @@ not invent a branch-protection guarantee or change repository policy.
   to their historical source inventory. Publication checks require frozen named
   evidence and claim-register agreement; changing status flags alone fails.
   Publication and foundational claims remain open.
+
+## Local qualification
+
+Source `2ce480588721ce206c740ff1a601c4d2a9c9889a` passes all 21 terminal
+qualification commands against 37,305 source files and 48 retained outputs.
+Before/after hashes agree. Actual parent SIGKILL, evolving funded work and all
+four earned-child payment cases pass. The funded suite retains its 96 passing
+tests and six explicit opt-in skips. All 18 artifact-tool tests pass. Historical
+successes and the interrupted pre-pin attempt retain their original evidence.
 
 ## Final acceptance
 

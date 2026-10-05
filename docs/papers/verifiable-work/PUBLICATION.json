@@ -13,14 +13,14 @@
     },
     {
       "id": "artifact",
-      "status": "open",
+      "status": "passed",
       "acceptance": "PDF, bibliography, reproducibility commands, source hashes and derived results agree.",
       "evidence": [
         "paper.pdf",
         "results.tex",
         "ARTIFACT.md"
       ],
-      "result": "The revised candidate requires a fresh 21-command native source qualification and rebuilt artifact inventory. Historical records remain retained; no publication promotion follows from their success."
+      "result": "The October 5 source-bound campaign passes all 21 commands against 37,305 unchanged source files and retains 48 outputs. Current claim replay, appendix counts, PDF, bibliography and artifact inventory are authenticated by the rebuilt artifact checks. Historical and interrupted records retain their original scope. Independent publication gates remain open."
     },
     {
       "id": "funded-security-integration",
