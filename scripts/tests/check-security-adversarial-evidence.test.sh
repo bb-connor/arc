@@ -8,6 +8,8 @@ bash -n scripts/check-security-adversarial-evidence.sh
 python3 -m py_compile scripts/check-security-adversarial-evidence.py
 python3 scripts/tests/check-cargo-mutants-source-paths.test.py
 python3 scripts/tests/check-cargo-mutants-control-packages.test.py
+python3 scripts/tests/check-cargo-mutants-refresh-scope.test.py
+python3 scripts/tests/check-security-evidence-derived-inputs.test.py
 
 if enterprise_promotion_output="$(
   CHIO_ENTERPRISE_SECURITY_RUNNER=1 \

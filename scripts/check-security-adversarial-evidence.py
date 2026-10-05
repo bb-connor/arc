@@ -85,13 +85,21 @@ BINARY_REPLACEMENTS: dict[str, frozenset[str]] = {
 }
 MANIFEST_SCHEMA_VERSION = 1
 MANIFEST_PRODUCER = "chio-adversarial-suite"
-INPUT_BINDING_SCHEMA = "chio.adversarial-mutation-inputs.v6"
+INPUT_BINDING_SCHEMA = "chio.adversarial-mutation-inputs.v7"
 DERIVED_CASES_ROOT = PurePosixPath("crates/core/chio-adversarial-suite/cases")
 DERIVED_MANIFEST_PATH = PurePosixPath(
     "crates/core/chio-adversarial-suite/manifest.json"
 )
 DERIVED_MUTATION_ROOT = PurePosixPath("audits/evidence/mutants/security")
 DERIVED_THREATS_ROOT = PurePosixPath("audits/evidence/threats")
+DERIVED_LINUX_EVIDENCE_ROOT = PurePosixPath("audits/evidence/enterprise-linux")
+DERIVED_LINUX_EVIDENCE_FILES = frozenset(
+    {
+        "enterprise-migration-canary.json",
+        "enterprise-migration-canary.json.sha256",
+        "enterprise-migration-binding-digest.txt",
+    }
+)
 REFRESH_STATE_ROOTS = frozenset(
     {
         ".chio-security-adversarial-evidence.refresh-transaction",
@@ -418,6 +426,11 @@ def is_derived_or_state_input(relative: PurePosixPath) -> bool:
     if parts[: len(DERIVED_THREATS_ROOT.parts)] == DERIVED_THREATS_ROOT.parts:
         return True
     if (
+        parts[: len(DERIVED_LINUX_EVIDENCE_ROOT.parts)]
+        == DERIVED_LINUX_EVIDENCE_ROOT.parts
+    ):
+        return True
+    if (
         len(parts) > len(DERIVED_MUTATION_ROOT.parts)
         and parts[: len(DERIVED_MUTATION_ROOT.parts)] == DERIVED_MUTATION_ROOT.parts
     ):
@@ -427,9 +440,58 @@ def is_derived_or_state_input(relative: PurePosixPath) -> bool:
     return False
 
 
+def validate_derived_linux_evidence_directory(root: Path) -> None:
+    """Permit only the fixed output namespace of the evidence-only descendant.
+
+    Signature and source-policy verification belong to the committed-evidence
+    gate. Here, reject extra inputs rather than hiding them from the source
+    digest. Compilation references to this namespace are rejected separately.
+    """
+
+    label = "derived Linux evidence"
+    path = lexical_path_below_root(
+        root, root / DERIVED_LINUX_EVIDENCE_ROOT, label, allow_missing_parents=True
+    )
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise EvidenceError(f"{label}: output path cannot be inspected: {error}") from error
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise EvidenceError(f"{label}: output path is not a directory")
+    parent = open_parent_directory_below_root(root, path, label)
+    descriptor: int | None = None
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+        flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        descriptor = os.open(path.name, flags, dir_fd=parent)
+        identity = metadata_identity(os.fstat(descriptor))
+        with os.scandir(descriptor) as entries:
+            for entry in entries:
+                if entry.name not in DERIVED_LINUX_EVIDENCE_FILES:
+                    raise EvidenceError(f"{label}: unexpected derived evidence entry")
+                if not stat.S_ISREG(entry.stat(follow_symlinks=False).st_mode):
+                    raise EvidenceError(
+                        f"{label}: derived evidence entry is not a regular file"
+                    )
+        named = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        if metadata_identity(named) != identity:
+            raise EvidenceError(f"{label}: output directory identity changed")
+    except OSError as error:
+        raise EvidenceError(
+            f"{label}: unable to inspect no-follow output directory: {error}"
+        ) from error
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(parent)
+
+
 def repository_input_closure(root: Path) -> tuple[set[Path], set[Path]]:
     """Inventory every non-derived regular file and directory in the repository."""
 
+    validate_derived_linux_evidence_directory(root)
     inputs: set[Path] = set()
     directories: set[Path] = set()
 
@@ -3897,6 +3959,8 @@ def validate_campaign(
     controls: dict[str, dict[str, Any]],
     case_id: str,
     source_inventory: CargoMutantsSourceInventory | None = None,
+    *,
+    refresh_campaign: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise EvidenceError(f"{case_id}: mutation campaign is not an object")
@@ -3967,14 +4031,23 @@ def validate_campaign(
     if source_inventory is None:
         source_inventory = CargoMutantsSourceInventory()
     production_path = require_under_package(root, package_dirs, package, source)
-    production_payload = require_mutation_source_discoverable(
-        root,
-        package_dirs[package],
-        package,
-        source,
-        source_inventory,
-        f"{case_id}: mutation source",
-    )
+    if refresh_campaign is None or campaign_id == refresh_campaign:
+        production_payload = require_mutation_source_discoverable(
+            root,
+            package_dirs[package],
+            package,
+            source,
+            source_inventory,
+            f"{case_id}: mutation source",
+        )
+    else:
+        # Untouched campaigns are not being qualified by this refresh. Retain
+        # their path, function, schema and stored-outcome checks without starting
+        # unrelated Cargo commands. Ordinary validation still discovers every
+        # source, including the complete gate after a multi-campaign refresh.
+        production_payload = read_regular_file_below_root(
+            root, root / source, f"{case_id}: mutation source"
+        )
     rust_function_exists(
         production_path,
         selector,
@@ -4412,6 +4485,7 @@ def validate_case(
             controls,
             case_id,
             source_inventory,
+            refresh_campaign=refresh_campaign,
         )
         campaign_id = campaign["id"]
         if campaign_id in campaigns:
