@@ -560,7 +560,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
       - a uniqueness or CAS-guard constraint answers `Refused(VersionConflict)`, which spec 9 re-projects;
       - any other error answers that member `Retry`, known not committed. After `member_fault_retries` (default 2) consecutive failures of the same planned member, it is answered `StoreUnavailable` instead and a store incident is raised. `StoreUnavailable` is distinct from `Refused(Unavailable)`, which means only that a fused form is ineligible. Spec 9 retains the same member for every effect and never compensates or terminalizes because of it (spec 9 M19);
       - the next member runs only after the savepoint rollback succeeds, so no member executes against a partially applied predecessor.
-    - **If `ROLLBACK TO` or `RELEASE` fails,** the loop issues `ROLLBACK` for the whole transaction. No `COMMIT` was issued, so every member is known not committed and gets `Retry`. The writer discards the connection and reopens it through the X9 connection-recovery fence before the next batch.
+    - **If `ROLLBACK TO` or `RELEASE` fails,** the loop issues `ROLLBACK` for the whole transaction. No `COMMIT` was issued, so every member is known not committed and gets `Retry`. The writer discards the connection and reopens it through the X9 connection-recovery fence before the next batch. This forced whole-transaction rollback counts toward `batch_loss_retries`, like an automatic rollback. After that many consecutive losses of either kind, every queued member is answered `StoreUnavailable` and a store incident is raised, so the batch can never loop forever and `DropReconcileJob` always gets a final reply.
       - If the fence fails, the owner is poisoned. Queued members are answered `StoreUnavailable` (spec 9 M19). Pre-dispatch drivers with no row deny with a `Reusable` receipt; every other member is retained with its holds until `StartupReconciler` re-drives it after restart.
       - A stop or resume in the priority lane is still covered by spec 8's stop-intent journal (S25).
     - In-memory side effects of a member (the trusted-time fence, caches) are buffered and applied only after `COMMIT`.
@@ -956,3 +956,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187829615 (spec 9) | Do not compensate while a Retry member is requeued | Supporting change. The writer gains an explicit `withdraw(member)` for queued, not-yet-executing members, including ones re-queued after `Retry`. It answers `Withdrawn` (known not committed) or `TooLate`. Spec 9 M17 and spec 8 S36 use it | X17 |
+
+### Codex review (PR #1174, round 25)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187931934 | Bound retries after savepoint cleanup failures | Fixed now. A forced whole-transaction rollback after a failed `ROLLBACK TO` or `RELEASE` counts toward `batch_loss_retries`, like an automatic rollback. After that bound, members get `StoreUnavailable` and a store incident is raised, so the batch cannot loop and reconcilers get a final reply | X21 |

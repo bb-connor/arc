@@ -264,7 +264,10 @@ Normative rules:
    - A `Stop` over a stopped head is an idempotent no-op that returns the current head, unless it asks for narrower containment, in which case it is recorded as `Restrict`.
    - A `Resume` over a running head is a no-op that returns the current head.
    - **Field rules per transition.** The writer constructs, and every verifier checks, the rule for the record's transition. A record that breaks its rule is invalid. A verifier refuses it, and the writer never appends it:
-     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` or `Restrict` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`, and it retires no journal entry. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
+     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` or `Restrict` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`. It never retires a journal entry through `satisfies_intent`. It retires entries only through its two proof fields, which S25's satisfaction rule validates:
+       - every `StopIntentRef` in `subsumes_intents` must name an entry the CLI read, at that entry's generation, and the record's `allow_containment` is no wider than any listed entry's;
+       - with `subsumes_unread: true`, boot reconciles the then-unread entries against the record (S25), satisfying only entries no narrower than the head.
+       - A non-bypass record must have an empty `subsumes_intents` and `subsumes_unread: false`. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
      - **`Rollover`.** No request exists, so `contributors` is empty and `satisfies_intent` is `None`. `authorizer` is `ChainRollover { serving_owner, writer_epoch }`, naming the serving owner and serving epoch that appended it. `requested_via` is `SystemRollover`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
        - `state`, `allow_containment` and `expected_epoch` restate the previous generation's final record (its state, its containment flag, and its id).
        - `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" || canonical(expected_epoch) || previous)`. That is a fixed domain string plus the restated head id and digest, with no salt and no note row, because there is no operator text to protect. A verifier recomputes it.
@@ -1194,6 +1197,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187829605 | Make unreadable-journal bypasses retire pending intents | Fixed now. An unreadable-journal bypass record carries a signed `subsumes_unread: true`. Once readable, boot treats each entry no narrower than the head as satisfied by that record, records its contributors in a note and removes it, and applies a narrower entry as a `Restrict`. This is sound because entries present while stopped belong to the current incident. Unread entries can no longer block readiness or resume | record fields; S25 offline CLI |
+
+### Codex review (PR #1174, round 25)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187931947 | Align bypass field rules with intent retirement | Fixed now. S2's field rule says a bypass record never retires entries through `satisfies_intent`, only through its proof fields. Each `subsumes_intents` ref must name a read entry at its generation, with no wider containment, and `subsumes_unread` triggers S25's boot reconciliation. Non-bypass records must leave both fields empty | S2 |
 
 ## Appendix A. FTL reference
 

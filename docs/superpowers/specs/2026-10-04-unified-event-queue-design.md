@@ -539,7 +539,12 @@ Rules H1-H10 bind every surface:
      1. **Log.** `terminate` discards pending hints, writes `Terminal { reason }` into the reserved terminal slot with a fixed sequence number, and refuses further posts and subscriptions.
      1a. **Persist.** Before any flush wait, the session's terminal store transition (the existing terminal fence, M: `session_store.rs:980-985`) durably records `terminal_event { event_id, reason, retention_deadline, replay_consumed: false }` in the terminal tombstone.
         - After a crash during the flush wait, the tombstone, not the lost in-memory log, serves the retained replay: the first reconnect presenting a `Last-Event-ID` below `event_id`, before `retention_deadline`, receives the `Terminal` once, and `replay_consumed` is set durably.
-        - If this persist fails, termination still proceeds fail-closed, as A19 does for a failed persist, but the spec claims no crash-survivable replay for that session.
+        - **If this persist fails, the old resume record is still fenced.** The terminal transition is the durable fence against restoring the session, so its failure is handled like H5a's double failure, not skipped.
+          - The session still terminates in memory.
+          - The session store is reported not ready, and the terminal transition is retried with backoff. No new session is served from this store until it commits.
+          - **The pending termination is recorded outside SQLite first.** Before termination proceeds, the session writes `(session_id, terminal_generation)` to a small fsynced `pending_terminal` file in the session store's lock root. It works like spec 8's stop-intent journal, outside the failing database. At boot, every listed transition is completed before any session is restored, and the entry is removed after its transition commits.
+          - If even that file write fails, the host stops serving the session store entirely, fail-closed. That double failure is the only residual case.
+          - A terminated session can therefore never be restored from its still-valid resume record. Crash-survivable replay of the `Terminal` itself is claimed only once the transition commits.
      2. **Stream slots.** The transport copies the terminal hint into each attached stream's reserved terminal frame. Every stream reserves one at attach, so this step never blocks or allocates. A POST stream still waiting for its response first emits A13's outcome-unknown error for its request id.
      3. **Flush.** Each stream emits the frames already handed to it, then the terminal frame as its last frame, then acknowledges once the frame is written and flushed to the HTTP body. Streams poll their terminal frame before the cancellation token (a biased select), so a stream that observes both emits the terminal first.
      4. **Await.** The session waits for every attached stream's acknowledgement, bounded by `terminal_flush_deadline_ms` (default 2000).
@@ -986,6 +991,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187829610 | Persist terminal hints before waiting for stream flushes | Fixed now. H6a step 1a durably records the terminal event (id, reason, retention deadline, consumed flag) in the terminal tombstone before any flush wait. After a crash, the tombstone serves the one retained replay, and consumption is recorded durably | H6a |
+
+### Codex review (PR #1174, round 25)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187931952 | Prevent restore after terminal persistence fails | Fixed now. A failed terminal-transition persist no longer just proceeds. The session store goes not ready and the transition is retried, and boot completes any pending terminal transition before restoring sessions, so a terminated session can never be restored from its old record | H6a step 1a |
 
 ## Appendix A. FTL reference
 

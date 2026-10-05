@@ -458,6 +458,7 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
    Any mismatch returns `ResultBindingMismatch`, and nothing is lowered. Passing invocation and verdict B with result A therefore fails: A's binding digest differs, and A's bytes do not hash to B's signed `content_hash`.
 10. **The kernel response is bound before the verdict exists.** `bound_verdict_from_response` checks in this order, and constructs nothing until every check passes:
     1. `response.receipt` verifies, and its `kernel_key` is in `trusted_kernel_keys`.
+    1a. `response.verdict` and its terminal semantics equal the receipt's signed decision: a signed `Allow` with an `Allow` verdict; a signed `Deny`, `Withheld` or other terminal deny with a `Deny` verdict carrying the same reason and disposition; and the same `PendingApproval` or terminal state. A mismatch is `ResponseBindingMismatch`, and no `BoundOutcome` is built. The outcome's verdict is always derived from the signed decision, never from the envelope, so a signed deny presented as `Allow` can never release output, on the caller-executed path included.
     2. The receipt's signed `metadata.receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:138-145`) and `response.request_id` both equal `invocation.provenance.request_id`. The constructor then looks up the sealed record by `(signed request_namespace_digest, signed request id)` (check 2a, rule 11). The caller never chooses the record, and the caller's `namespace` argument must equal the signed one (`RequestNamespace`). A missing record fails `SubmissionRecord`. The invocation digest recomputed from `invocation` must equal the record's (`InvocationDigest`). When the record holds a governed-intent hash, the receipt's signed `governed_transaction.intent_hash` (M: `receipt_support/receipt_metadata.rs:563-585`) must equal it (`GovernedIntent`). That compares the D1 permit, which travels inside the governed intent, against kernel-signed evidence. When the record holds none, the receipt must carry no `governed_transaction` block (`GovernedIntent`), so an intent added after sealing is refused.
     2a. **Kernel-authenticated identity.** Three receipt fields are derived by the kernel, never from caller input, and each must equal the record:
        - `metadata.receipt_context.request_namespace_digest` equals the record's `request_namespace_digest` (`RequestNamespace`). The kernel writes it beside `receipt_context.request_id` (M: `kernel/responses/receipt_persistence.rs:137-144`), computing it from the evaluation's authenticated tenant and coordinator authority with the same derivation as `AuthenticatedRequestNamespace::bind` (M: `admission_operation/identity.rs:122-172`). It does this for durable and non-durable evaluations alike. `receipt_context` joins the kernel's reserved receipt-metadata keys, so no caller metadata can pre-set it; M: does not reserve it today (`kernel/mod.rs:152-160`). A receipt without the field fails;
@@ -749,6 +750,12 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187315412 | Reject duplicate provider call IDs within one lift | Fixed now. A lift whose payload repeats a `provider_call_id` fails with `InvalidIdentity { duplicate_provider_call_id }` before any request is built, so two calls never share a request id or a lowering target | rule 1 |
+
+### Codex review (PR #1174, round 25)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187931961 | Match the response verdict to the signed decision | Fixed now. New rule 10 check 1a requires `response.verdict` and its terminal semantics to equal the receipt's signed decision, with a mismatch refused. The bound outcome's verdict is always taken from the signed decision, so a signed deny presented as `Allow` can never release output | rule 10 check 1a |
 
 ## Appendix A: FTL reference
 
