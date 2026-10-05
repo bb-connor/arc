@@ -416,6 +416,7 @@ binding_digest = hex(SHA256("chio.tool-invocation-binding.v3\0"
    - **Why per-namespace.** `build_tool_call_request` copies `provenance.request_id` into `ToolCallRequest.request_id` (M: `crates/kernel/chio-kernel/src/provider_verdict.rs:107`; `main` `:55`). Durable admission retains `(request_namespace_digest, request_id)` for the namespace lifetime (`2026-07-12-admission-operation-design.md`, "Identity and retention"). An id reused by a later payload either replays the earlier terminal result, when the binding matches, or conflicts.
    - **Provider ids.** A provider's call id is not unique across turns: a provider may reuse it in a later turn of the same namespace. Adapters therefore namespace it with the same `lift_id` as synthesized ids: `request_id = {provider}_p_{lift_id}_{hex(SHA256(provider_call_id))[..32]}`.
      - The provider's original id is kept in `provenance.provider_call_id` and is the id used when lowering the result back into the provider message, so the provider sees its own id. It is part of `provenance_identity` and so of the invocation digest, and `request_id` must derive from it (section 5.1).
+     - **Duplicates within one payload are rejected.** Two calls in one lifted payload with the same `provider_call_id` would share a `request_id` and could not be lowered unambiguously. The lift fails with `InvalidIdentity { duplicate_provider_call_id }` before any request is built.
      - With a `LiftContext`, re-lifting the same turn yields the same `request_id` and, because `received_at` is outside the digest, the same invocation digest (section 5.1), so a retried turn replays its bound terminal result. A later turn that reuses the provider id gets a different `lift_id` and is admitted as a new call.
      - Without a `LiftContext`, `lift_id` is fresh per lift. A host that retries a turn and needs replay instead of a new admission MUST pass a `LiftContext`; the adapter never derives turn identity from the payload.
    - **Synthesized ids.** When it does not (Ollama, Gemini), adapters mint `{provider}_{name}_call_{lift_id}_{index}`. `index` is the call's position in the payload. `lift_id` is 32 lowercase hex characters, unique per lifted payload:
@@ -742,6 +743,12 @@ Today `ToolInvocation` carries all the correlation every adapter needs: the prov
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187142767 | Model denied outcomes without a result value | Fixed now. The predicate's deny branch is `result = None`, and the binding and byte-hash checks apply only to an `Allow`'s `Some(r)`, matching rule 9 and the `Option<BoundToolResult>` API | section 9 predicates |
+
+### Codex review (PR #1174, round 18)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187315412 | Reject duplicate provider call IDs within one lift | Fixed now. A lift whose payload repeats a `provider_call_id` fails with `InvalidIdentity { duplicate_provider_call_id }` before any request is built, so two calls never share a request id or a lowering target | rule 1 |
 
 ## Appendix A: FTL reference
 

@@ -260,7 +260,10 @@ New records carry the new state in a separate, versioned field (`influence_state
 
 **Legacy seed observations.** The migration that enables tracking turns every existing journal record into one seed observation:
 - `observation_id = H("chio.influence-legacy-seed.v1\0" || journal_record_id || destination_digest)`, with the record's own key values and its record id as provenance, so the id is stable and a re-run inserts nothing new.
-- The classification is conservative: `externally_influenced` gives `External`, `unknown` gives `unknown = true`, and only a record with both false is trusted.
+- The classification is conservative: `externally_influenced` gives `External`, and `unknown` gives `unknown = true`. A record with both flags false seeds no extra influence, but it does not prove trust either.
+- **Missing history is not trust.** Before tracking, tool output delivered to a worker was not journaled (N25, section 5). So every context that is live at migration also receives one seed observation with `unknown = true`, `H("chio.influence-legacy-context.v1\0" || destination_digest)`, whatever its legacy rows say, including when it has none.
+  - The only exception is a context whose complete mediated history can be shown: one created after tracking was enabled, or one restarted in a fresh isolation epoch after migration.
+  - A pre-tracking context can therefore never satisfy a `Trusted` requirement merely because nothing tainted it on record.
 - Refinements cannot be recovered from legacy state, so a legacy external record stays `External`, never `ExternalBounded` or `ModelProvider`. That is more restrictive, never less.
 - A record whose kind or influence cannot be classified seeds `unknown = true`. A record that cannot be read refuses readiness.
 
@@ -664,11 +667,11 @@ pub enum ConfinedReturnTypeV1 {
       - `required`;
       - `satisfied_by`: `context`, `bounded` or `endorsement`;
       - the action contract digest, when `action_contract` is set;
-      - `commitment_ref = HMAC(audit_key, "chio.integrity-commitment-ref.v1\0" || request_namespace_digest || request_id || receipt_id || commitment)`. It binds the full replay identity and the receipt id, so it is blinded per receipt: two receipts, including two that reuse one request id in different authenticated namespaces, cannot be compared for equality without the audit key;
+      - `commitment_ref = HMAC(audit_key, "chio.integrity-commitment-ref.v1\0" || request_namespace_digest || request_id || receipt_nonce || commitment)`. `receipt_nonce` is a 128-bit CSPRNG value carried in the receipt metadata and drawn before the receipt id is computed. The receipt id is a hash over the canonical body including this metadata (`chio-core-types/src/receipt/body.rs:180-243`), so binding the id itself would be a fixed point. It binds the full replay identity and the receipt id, so it is blinded per receipt: two receipts, including two that reuse one request id in different authenticated namespaces, cannot be compared for equality without the audit key;
       - the floor source, when a floor applied.
     - **Caller-visible deny receipts** carry only `required`, `outcome: denied` and the floor source, plus the `integrity_fault` block (I19). They carry no `commitment`, `commitment_ref`, `context_generation` or `satisfied_by`.
 
-    **I25a. Audit basis.** The raw `commitment`, the `context_generation` and the head digests used by crossing check 4 are written to `integrity_admission_audit(request_namespace_digest, request_id, receipt_id, decision, commitment, context_generation, heads_digest)`, keyed by `(request_namespace_digest, request_id, receipt_id)`, in the admission writer, in the decision's transaction (for a guard-only deny, in the deny receipt's transaction). The table is operator audience: it is exported only through operator-authenticated audit and SIEM paths, never to the caller. An auditor joins any consequential effect to the commitment that admitted it by recomputing `commitment_ref` with the audit key.
+    **I25a. Audit basis.** The raw `commitment`, the `context_generation` and the head digests used by crossing check 4 are written to `integrity_admission_audit(request_namespace_digest, request_id, receipt_nonce, receipt_id, decision, commitment, context_generation, heads_digest)`, keyed by `(request_namespace_digest, request_id, receipt_nonce)`, with `receipt_id` recorded once the receipt is signed, in the admission writer, in the decision's transaction (for a guard-only deny, in the deny receipt's transaction). The table is operator audience: it is exported only through operator-authenticated audit and SIEM paths, never to the caller. An auditor joins any consequential effect to the commitment that admitted it by recomputing `commitment_ref` with the audit key.
 
 ## 14. Evaluation plan
 
@@ -949,6 +952,13 @@ Open decisions:
 |---|---|---|---|
 | R-11-07 | A valid P3 endorsement does not establish the new integrity-approval predicate | Fixed. Crossing check 4's endorsement branch reads one `VerifiedEndorsementFactV1`, built in the writer by one of two adapters. The recovery-approval adapter reuses the existing approval and custody owner. The P3 adapter runs P3's existing verification, then checks integrity-roster authority at the current generation, the native binding, a same-writer recomputation of the semantic influence, and single-use `SemanticCapture`. Digest domains stay distinct. I21's automatic P3 claim is withdrawn: until the P3 adapter ships, gated P3 calls need a recovery integrity approval. Acceptance tests added; open question 1 answered | I13; I15a; I15b; I21; section 8 predicates; section 15; section 18 |
 | R-11-08 | The influence refinement lacks a versioned migration contract for existing P3/P4/P5 state | Fixed. New section 4.1: the frozen LtHash16 commitment (SHA-256 element map, final digest domain, conformance vectors); the P4 journal as the one canonical owner with versioned projections and derived heads; immutable historical domains; conservative legacy seed observations; consistent projections for every consumer; readiness gating; downgrade refusal. Rollout gains a migration step 0. Acceptance tests added; open question 2 answered | section 4.1; section 16; section 17; section 18 |
+
+### Codex review (PR #1174, round 18)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187315397 | Seed legacy contexts as unknown before enabling gating | Fixed now. Every context live at migration receives an `unknown` seed observation, whatever its legacy rows say, because tool output was not journaled before tracking. A both-false legacy record no longer counts as trust. Only contexts with provably complete mediated history (created after tracking, or in a fresh post-migration epoch) start without it | section 4.1 legacy seeds |
+| 4187315408 | Remove the receipt ID from its own metadata commitment | Fixed now. `commitment_ref` binds a 128-bit `receipt_nonce`, drawn before the id is computed, instead of the receipt id. The audit row is keyed by `(namespace, request_id, receipt_nonce)` and records the receipt id after signing. No fixed point remains | I25; I25a |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

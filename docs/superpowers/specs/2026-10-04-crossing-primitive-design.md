@@ -555,7 +555,7 @@ deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensat
 20. **X20. Fairness.** Members dequeue FIFO, after the X17a priority lane, with a per-tenant cap of a quarter of a contended batch. The cap reorders across tenants only, and X19's order is the dequeue order after the cap. In the single-tenant process host (`LOCAL_SYSTEM_TENANT_ID`) the cap is inert.
 21. **X21. Savepoint failure protocol.**
     - After any non-refusal SQLite error, the loop checks `sqlite3_get_autocommit()` and acts on what it reports. On `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM`, SQLite may roll back the whole transaction automatically, or may leave it active with only the failing statement rolled back (SQLite, "Response To Errors Within A Transaction"). The loop never assumes either outcome.
-    - If the transaction is gone, every member gets `Retry` (known not committed) and re-queues. No member ever runs outside the batch transaction.
+    - If the transaction is gone, every member gets `Retry` (known not committed) and re-queues. No member ever runs outside the batch transaction. Whole-transaction losses are bounded too. After `batch_loss_retries` (default 2) consecutive losses, the writer answers every queued member `StoreUnavailable` and raises a store incident, and spec 9 M19 retains them. Priority-lane stop and resume members stay covered by spec 8's stop-intent journal.
     - **If the transaction is still active,** SQLite kept it open, whatever the error code. Before anything else, the loop runs `ROLLBACK TO` and then `RELEASE` for that member's savepoint, discarding every write the member made. Then:
       - a uniqueness or CAS-guard constraint answers `Refused(VersionConflict)`, which spec 9 re-projects;
       - any other error answers that member `Retry`, known not committed. After `member_fault_retries` (default 2) consecutive failures of the same planned member, it is answered `StoreUnavailable` instead and a store incident is raised. `StoreUnavailable` is distinct from `Refused(Unavailable)`, which means only that a fused form is ineligible. Spec 9 retains the same member for every effect and never compensates or terminalizes because of it (spec 9 M19);
@@ -938,3 +938,9 @@ Where the analogy breaks:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-1-03 (spec 10 part) | The recovery inventory stops before implemented P6 setup and signed maintenance | Fixed. New rule X5b keeps every participant's transaction-local preconditions inside its `CrossingTx`: native capture keeps `setup::require_capture`, recovery and semantic capture keep `require_command` and `require_ready`, and artifact release keeps `require_ready`. They stay named participant preconditions, not new crossing kinds. Integrity deployment configuration goes through the existing P6 policy owner. Differential tests cover the setup gate | X5b; section 17 |
+
+### Codex review (PR #1174, round 18)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187315424 | Bound lost-transaction retries before requeueing | Fixed now. Consecutive whole-transaction losses count toward `batch_loss_retries` (default 2). After that the writer answers members `StoreUnavailable` and raises a store incident, so M19's fail-closed retention applies. Stop requests stay protected by the intent journal | X21 |

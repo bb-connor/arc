@@ -551,7 +551,11 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - A token stop checks its signature, subject, roster membership and scope. It checks expiry against the live authority time when available, and otherwise against the persisted trusted-time floor (a monotone lower bound). A token expired relative to the floor is refused.
       - Stop never calls `current_unix_timestamp_ms()` or its `unwrap_or(0)` fallback (W: `kernel/mod.rs:1798-1805`). Accepting a token that expired between the floor and true time is an accepted risk, because a stop only restricts.
 - **S19. Resume.** Resume is deliberate. It always carries `expected_epoch` (S31), and it depends explicitly on S28. Before S28, resume uses the shared credential and is recorded as `SharedCredential`. The phase 1 claim limit states "no two-person resume".
-    - **Default, `OperatorPair`.** A roster principal different from every authorizer of the stop being resumed.
+    - **Default, `OperatorPair`.** A roster principal different from every principal in the incident's stopper set.
+      - **The incident.** It begins at the first `Stop` after the scope's last `Resume`. It covers every later `Restrict` and `Rollover` until the resume.
+      - **The stopper set** is the union of the authorizers and contributors of every `Stop` and `Restrict` in that incident, across chain generations. `Rollover` and `Migration` records contribute no principal, and they never hide one, because the set is collected through them.
+      - `OperatorPair.stopper_epoch` names the incident's opening `Stop`, not the head. The resumer must differ from every principal in the set.
+      - `SamePrincipalAfter` measures its cooldown from the opening `Stop`'s observation.
     - **Quorum.** When configured, a `chio.stop-control-quorum.v1` artifact (S29), recorded as `Quorum`.
     - **Single operator.** A deployment may configure `SamePrincipalAfter { cooldown >= 300 s }` explicitly in signed deployment configuration.
       - The cooldown starts at the first successful authority-time observation at or after the stop commit.
@@ -1107,6 +1111,12 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-1-03 (cross-reference) | The recovery inventory stops before implemented P6 setup and signed maintenance | Applied here. Section 7 gains P6 stop-disposition rows matching spec 1 section 6: mutations `deny`, reads `allow`, and the setup gate inherits its caller's disposition | section 7 |
+
+### Codex review (PR #1174, round 18)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187315432 | Preserve stopper identities across stopped rollovers | Fixed now. S19 defines the incident (from the first `Stop` after the last `Resume`) and its stopper set: the authorizers and contributors of every `Stop` and `Restrict` in it, collected across generations and through `Rollover` records. `OperatorPair.stopper_epoch` names the opening stop, and the resumer must differ from every principal in the set | S19 |
 
 ## Appendix A. FTL reference
 
