@@ -48,6 +48,9 @@ jobs:
 
   rebuild-framework:
     name: Rebuild and test locked iOS framework
+    # Produce one source-bound artifact from the pushed commit. The PR job
+    # independently tests the committed package at its merge candidate.
+    if: github.event_name == 'push'
     runs-on: macos-latest
     timeout-minutes: 90
     env:
