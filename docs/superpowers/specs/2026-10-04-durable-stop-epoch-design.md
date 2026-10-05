@@ -206,7 +206,7 @@ pub struct StopEpochV1 {
     pub requested_via: StopRequestPath,
     pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
     pub offline_bypass: bool,                    // true only for an offline-CLI Stop or Restrict appended without a journal entry (S2, S25); then satisfies_intent is None
-    pub subsumes_intents: Vec<StopIntentRef>,    // offline_bypass only: the scope's pending journal entries the CLI read and folded in (S25); empty otherwise
+    pub subsumes_intents: Vec<SubsumedIntent>,   // offline_bypass only: a signed snapshot of each pending journal entry the CLI read and folded in (S25); empty otherwise
     pub subsumes_unread: bool,                   // offline_bypass only: the journal was unreadable, so boot reconciles the unread entries against this record (S25)
     pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
 }
@@ -265,7 +265,9 @@ Normative rules:
    - A `Resume` over a running head is a no-op that returns the current head.
    - **Field rules per transition.** The writer constructs, and every verifier checks, the rule for the record's transition. A record that breaks its rule is invalid. A verifier refuses it, and the writer never appends it:
      - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` or `Restrict` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`. It never retires a journal entry through `satisfies_intent`. It retires entries only through its two proof fields, which S25's satisfaction rule validates:
-       - every `StopIntentRef` in `subsumes_intents` must name an entry the CLI read, at that entry's generation, and the record's `allow_containment` is no wider than any listed entry's;
+       - each `SubsumedIntent { intent_ref, allow_containment, entry_digest }` in `subsumes_intents` is a signed snapshot of an entry the CLI read. `entry_digest` is the SHA-256 of the entry's canonical journal bytes as read, and `allow_containment` is that entry's value. The record's own `allow_containment` must be no wider than any snapshot's.
+         - Verification uses the snapshot in the signed record, never the journal, because S25 removes the entries afterward. A later boot or replica can therefore re-verify the proof after journal cleanup.
+         - At the time of removal, boot also checks each live entry's bytes against its `entry_digest`; a mismatch is refused;
        - with `subsumes_unread: true`, boot reconciles the then-unread entries against the record (S25), satisfying only entries no narrower than the head.
        - A non-bypass record must have an empty `subsumes_intents` and `subsumes_unread: false`. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
      - **`Rollover`.** No request exists, so `contributors` is empty and `satisfies_intent` is `None`. `authorizer` is `ChainRollover { serving_owner, writer_epoch }`, naming the serving owner and serving epoch that appended it. `requested_via` is `SystemRollover`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
@@ -499,8 +501,8 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     - **Two-commit read** (spec 10 X14, no return record):
       - a `KernelStopped` refusal of the outcome commit rolls back the savepoint, then writes a progress-only return record that holds the bytes;
       - the operation is then `Finalizing` with output withheld, so recovery never signs `OutcomeUnknownAfterDispatch` for it and the process runtime never re-dispatches the read.
-    - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed_epoch } | StoreUnavailable, retry: AfterResume | AfterStoreRecovery | Never, effect_executed: bool }`. `AfterStoreRecovery` is the transient condition for a reusable check-only read whose release met `StoreUnavailable` (spec 9 M19). The client retries after a backoff once the store is healthy, with no stop involved:
-      - on JSON-RPC surfaces, an error with code `output_withheld` and data `{ operation_id, scope, observed_epoch, retry, effect_executed }`;
+    - **Client-visible result.** A request whose output is withheld completes with `OutputWithheld { operation_id, reason: KernelStopped { scope, observed } | StoreUnavailable | AuthoritySpaceClosed | Revoked | InsufficientIntegrity, retry: AfterResume | AfterStoreRecovery | Never, effect_executed: bool }`. `AfterStoreRecovery` is the transient condition for a reusable check-only read whose release met `StoreUnavailable` (spec 9 M19). The client retries after a backoff once the store is healthy, with no stop involved:
+      - on JSON-RPC surfaces, an error with code `output_withheld` and data `{ operation_id, scope, observed, retry, effect_executed }`;
       - on the process ABI, `invoke` returns status `withheld` with the same fields.
       - **`retry: AfterResume`** applies to durable operations (the output stays in release custody) and to check-only reads (no effect, so a retry is safe). After resume, a replay with the same request id (or the same process operation key) returns the released output through the bound durable result. A surface without that replay path delivers the outcome only through the terminal receipt and is named in the claim limit.
       - **`retry: Never`, with `effect_executed: true`,** applies to a `NonDurable` side-effecting call whose release a stop refused (spec 9's `NonDurable` class, spec 10 X13c). Its effect has already run, and no custody holds the output or a replay key, so a retry after resume would dispatch the effect again (spec 5 confirms that a non-durable retry redispatches). The client must treat the call as executed with its output lost.
@@ -508,7 +510,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
 
     | Path | Where refused | Result | Request id |
     |---|---|---|---|
-    | Tier 1 early, before any durable row | any existing check site | `SignReceipt(Deny { kernel_stopped })` with `observed_epoch`; no tombstone | not burned; the same id proceeds after resume |
+    | Tier 1 early, before any durable row | any existing check site | `SignReceipt(Deny { kernel_stopped })` with `observed`; no tombstone | not burned; the same id proceeds after resume |
     | Fused intent commit (spec 9 M10, spec 10 X15) | tier 2 in `IntentCommit` | savepoint rolls back; deny receipt only; no `DenyTombstone` | not burned |
     | Check-only read | tier 1 or the check-only crossing | deny receipt only | not burned |
     | Fused intent commit from `Prepared` (spec 10 X10, spec 9 M10) | tier 2 in `IntentCommit` | compensate the persisted operation under `PreDispatchNoEffect`; deny receipt | terminal, as on M: today |
@@ -518,7 +520,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
     | Caller report | never stop-checked (S27) | return record persisted | unchanged |
     | `NonDurable` side-effecting call, release refused | the release crossing, after the effect ran | signed withheld receipt with `retryable_after_resume: false`; `OutputWithheld { retry: Never, effect_executed: true }`. **Terminal, not temporary**: there is no custody to resume from | terminal for that call; a retry is a new, deliberate dispatch |
 
-    - A stop receipt carries `chio_runtime.stop = { scope, observed_epoch, retryable_after_resume }` beside `chio_runtime.identity_disposition` (spec 9 M20). `retryable_after_resume` MUST equal `identity_disposition == Reusable`:
+    - A stop receipt carries `chio_runtime.stop = { scope, observed, retryable_after_resume }`, with `observed: StopObservation` (section 10), beside `chio_runtime.identity_disposition` (spec 9 M20). `retryable_after_resume` MUST equal `identity_disposition == Reusable`:
       - `true` (`Reusable`) only on the tier-1, fused-from-`Unbegun` and check-only rows, and on a check-only read's `Withheld { retry: AfterResume }`. No row, tombstone or custody binds the request id there;
       - `false` (`Terminal`) on the `Prepared`-intent and slow-path rows, whose compensated row now holds the request id, and on the `NonDurable` effect row, whose effect already ran;
       - the `Parked`, post-dispatch and caller-report rows sign no stop receipt at the refusal. The operation stays live, and its later terminal receipt carries `Terminal`.
@@ -685,7 +687,12 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - Only a signed resume can make a head `Running`, and it can commit only when every earlier record is signed. A running head's whole chain, across every generation, is therefore backed by signed artifacts.
 - **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, id: StopEpochId, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
 - **Status route.** It returns `{ readiness, stopped, scope_heads: [...], host_latch, durability, stop_enforcement, withheld_operations, withheld_volatile }`. The existing `stopped`, `since` and `reason` fields stay as a projection of the kernel-scope head, with `reason` taken from the redacted note.
-- **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed_epoch, decided_by: tier1 | tier2, retryable_after_resume }` and `chio_runtime.identity_disposition`, which always agree (S15, spec 9 M20). The `chio_runtime` block is kernel-reserved: caller-supplied metadata carrying it is rejected before evaluation. M: does not reserve it today (`kernel/mod.rs:151-159`), so this is a kernel change. `observed_epoch` is a `StopEpochId`. Tier 1's view can be stale, which is why the field is named `observed_epoch`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
+- **Deny receipts.** Every stop deny receipt carries `chio_runtime.stop = { scope, observed, decided_by: tier1 | tier2, retryable_after_resume }`. `observed` is a discriminated `StopObservation`:
+  - `Epoch(StopEpochId)`, the durable head that refused;
+  - `HostLatch { latch_id }`, for S20's host latch, which has no epoch;
+  - `PendingIntent(StopIntentRef)`, for a `process_only` or `latch_only` stop whose record has not committed.
+
+  A latch-only denial therefore never names an unrelated or running head. Each receipt also carries `chio_runtime.identity_disposition`, and the two always agree (S15, spec 9 M20). The `chio_runtime` block is kernel-reserved: caller-supplied metadata carrying it is rejected before evaluation. M: does not reserve it today (`kernel/mod.rs:151-159`), so this is a kernel change. For `Epoch`, the value is a `StopEpochId`. Tier 1's view can be stale, which is why the field is named `observed`. An auditor joins a refused request to the transition that refused it, or to a later one when tier 1 lagged.
 
 ## 11. Hints (spec 5)
 
@@ -693,7 +700,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 
 - **Source.** The `watch` change notification on the shared `StopHeads` (S24) is the only source of Stop hints for sessions. It fires after each acknowledged transition and on host-latch changes. No hint source reads a per-kernel field.
 - **Kernel sessions.** Each session in an affected scope receives it after the transition's `Committed` acknowledgement (spec 5 H2; stop transitions are restrictive commits, so they are anchored).
-- **Processes.** There is no process `Stop` hint: spec 5 Part B limits the process projection to `Lifecycle` and `Budget`. Processes learn of a stop from `kernel_stopped` (with `observed_epoch`) on `invoke`; operators read the control socket's status.
+- **Processes.** There is no process `Stop` hint: spec 5 Part B limits the process projection to `Lifecycle` and `Budget`. Processes learn of a stop from `kernel_stopped` (with `observed`) on `invoke`; operators read the control socket's status.
 - **H9 audience.** Tenant-scope stop hints reach only that tenant's sessions. Kernel-scope hints reach all sessions.
 
 ## 12. Federation
@@ -801,7 +808,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       - when the journal is full or the intent write fails, it skips the journal and appends the transition directly: a `Stop` over a running head, or a narrowing `Restrict` over a stopped head. A down host has no queue to overload.
       - **Pending entries are folded in first.** Before a bypass append, the CLI reads the scope's existing journal entries. Reading still works when a write does not. The bypass record folds them in:
         - its `allow_containment` is the narrowest of the request and every pending entry;
-        - `subsumes_intents` lists each entry's `{ intent_id, generation }`.
+        - `subsumes_intents` holds a signed snapshot of each entry: `{ intent_ref: { intent_id, generation }, allow_containment, entry_digest }`.
 
         Satisfaction (below) treats a listed entry as satisfied, so a stale entry can neither be re-applied over an already narrow head nor block `Resume` or `Relax`. If the journal cannot even be read, the CLI still appends the bypass record, with an empty list and the signed flag `subsumes_unread: true`, and reports `stop_durable` with `journal_unreadable`. Boot then refuses readiness until the journal is readable (S9).
         - **Recoverable proof.** Once the journal is readable, boot reconciles each entry for that scope against the `subsumes_unread` record.
@@ -1080,7 +1087,7 @@ Open decisions:
 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
-| 4185260860 | Carry the chain generation through rollover | Fixed now. `StopEpochV1` carries a signed `chain_generation`, and the record identity, table key, notes, signing obligation, artifact and trace use `(chain_generation, epoch)`. `expected_epoch`, quorum approvals, `StopHeadMoved`, the SIEM floor, `observed_epoch` and shard readiness and freshness compare `StopEpochId` lexicographically. A `Rollover` record starts each generation at `bound - rollover_margin`, restates the head and satisfies no intent, so it never changes state and needs no resume authority; headroom applies per generation. Tests cover rollover while stopped and running, a shard with an old high epoch, and artifact identity across generations | section 4 types; S1, S2, S3, S6, S25, S29, S31, S34, S37, S38; section 10; section 14; section 17; spec 10 section 10 |
+| 4185260860 | Carry the chain generation through rollover | Fixed now. `StopEpochV1` carries a signed `chain_generation`, and the record identity, table key, notes, signing obligation, artifact and trace use `(chain_generation, epoch)`. `expected_epoch`, quorum approvals, `StopHeadMoved`, the SIEM floor, the `Epoch` arm of `observed` and shard readiness and freshness compare `StopEpochId` lexicographically. A `Rollover` record starts each generation at `bound - rollover_margin`, restates the head and satisfies no intent, so it never changes state and needs no resume authority; headroom applies per generation. Tests cover rollover while stopped and running, a shard with an old high epoch, and artifact identity across generations | section 4 types; S1, S2, S3, S6, S25, S29, S31, S34, S37, S38; section 10; section 14; section 17; spec 10 section 10 |
 | 4185260847 (spec 10) | Include Relax commits in the priority lane | Fixed in spec 10 X17a, which now lists `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover`, matching S36 | S36 (now also lists `Rollover`) |
 
 ### Independent review pass 2 (PR #1174, Codex agent)
@@ -1203,6 +1210,14 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187931947 | Align bypass field rules with intent retirement | Fixed now. S2's field rule says a bypass record never retires entries through `satisfies_intent`, only through its proof fields. Each `subsumes_intents` ref must name a read entry at its generation, with no wider containment, and `subsumes_unread` triggers S25's boot reconciliation. Non-bypass records must leave both fields empty | S2 |
+
+### Codex review (PR #1174, round 26)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187992998 | Persist evidence needed to verify bypass intent references | Fixed now. `subsumes_intents` holds signed `SubsumedIntent { intent_ref, allow_containment, entry_digest }` snapshots. Verification uses the snapshot in the signed record, so later boots and replicas can re-verify after S25 removes the entries, and boot checks live entry bytes against the digest before removal | record fields; S2; S25 |
+| 4187993012 | Represent latch-only denials without a stop epoch | Fixed now. Stop deny receipts carry `observed: StopObservation`: `Epoch(StopEpochId)`, `HostLatch { latch_id }` or `PendingIntent(StopIntentRef)`. A host-latch or latch-only denial is truthfully represented and never names an unrelated head | section 10 deny receipts; S15; S14 |
+| 4187993006 (spec 9) | Match retry advice to the actual release refusal | `OutputWithheld.reason` also admits `AuthoritySpaceClosed`, `Revoked` and `InsufficientIntegrity` for spec 9's reason-specific check-only release refusals | S14 |
 
 ## Appendix A. FTL reference
 

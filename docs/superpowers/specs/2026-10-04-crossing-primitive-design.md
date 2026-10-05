@@ -477,7 +477,7 @@ Rules:
     - **Identity disposition (spec 9 M20).** The tombstone's receipt, and the compensation receipt of a refusal from `Prepared` (X10), carry `chio_runtime.identity_disposition = Terminal`. The `Overloaded` deny carries `Reusable`. So does a `StoreUnavailable` deny before any row, because no tombstone could commit.
 
     - **X15a. Stop denials are temporary (spec 8 S15, S8-17).** `KernelStopped` writes no tombstone on either tier.
-      - A tier-1 early denial, and a fused intent commit refused with `KernelStopped`, sign a deny receipt carrying `observed_epoch` and persist no operation row. The request id stays usable after resume.
+      - A tier-1 early denial, and a fused intent commit refused with `KernelStopped`, sign a deny receipt carrying `observed` and persist no operation row. The request id stays usable after resume.
       - This keeps today's behavior: M:'s early stop check runs before any begin commit. It also avoids an anchored write per denied request in the middle of an incident.
       - A slow-path operation that already has a begin row still compensates, as today, and its id is terminal (spec 9 M10, M15). The same holds for a fused intent from `Prepared` (X10).
       - **Identity disposition (spec 9 M20).** The tier-1 and fused-from-`Unbegun` stop denials carry `identity_disposition = Reusable`, and spec 8's `retryable_after_resume = true`. The `Prepared` and slow-path stop compensations carry `Terminal` and `retryable_after_resume = false`. The two fields always agree.
@@ -672,7 +672,7 @@ The B: kernel-only and sustained-load figures stay as context (section 2.8).
 ## 15. Protocol, schema and wire impact
 
 - **Native wire, verdicts and receipt format:** none, except spec 8's `OutputWithheld` result for a stop-withheld two-commit read (X14a), which spec 8 defines.
-- **Receipt metadata:** `chio_runtime.crossing { kind, store_uuid, observed_commit_sequence, check_ordinal }` on check-only reads and `NonDurable` calls (X4), a `withheld` decision reason on refused releases, the stop head's `observed_epoch` on `KernelStopped` denials (X15a), and `chio_runtime.identity_disposition` on every non-allow receipt (spec 9 M20). `chio_runtime` and `receipt_context` are kernel-reserved keys that caller metadata cannot set (spec 9 M20).
+- **Receipt metadata:** `chio_runtime.crossing { kind, store_uuid, observed_commit_sequence, check_ordinal }` on check-only reads and `NonDurable` calls (X4), a `withheld` decision reason on refused releases, the stop head's `observed` on `KernelStopped` denials (X15a), and `chio_runtime.identity_disposition` on every non-allow receipt (spec 9 M20). `chio_runtime` and `receipt_context` are kernel-reserved keys that caller metadata cannot set (spec 9 M20).
 - **`spec/PROTOCOL.md` section 6:** durable-before-allow is satisfied by the receipt in the anchored terminal projection. A receipt is audit-complete when the receipt store and a checkpoint cover it.
 - **Admission design amendments:** X14 and X14a (the opt-in two-commit read and its stop fallback), X15 and X15a (deny tombstones on the fused path except for `KernelStopped`; rule 4 unchanged), the caller report as a progress-only return record (section 7), and the commit classes of section 5.
 - **ADR-0013:** no rule change. The authority writer is the local WAL under rules 23 to 25.

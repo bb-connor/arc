@@ -486,7 +486,7 @@ pub enum IdentityDisposition {
     | Failed effect | Reason | Next and effects |
     |---|---|---|
     | `IntentCommit` (fused, from `Unbegun`) | `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict` | `DenyTombstone` with the refusing reason, then `Terminal(CompensatedBeforeDispatch)`. The tombstone keeps the request id terminal (saga rule 4). Nothing was acquired outside the savepoint, so nothing needs compensation |
-    | `IntentCommit` (fused, from `Unbegun`) | `KernelStopped` | stay `Unbegun`; `SignReceipt(Deny { KernelStopped })` with the head's `observed_epoch`. No tombstone, so the request id stays usable after resume (M15) |
+    | `IntentCommit` (fused, from `Unbegun`) | `KernelStopped` | stay `Unbegun`; `SignReceipt(Deny { KernelStopped })` with the head's `observed` (spec 8 `StopObservation`). No tombstone, so the request id stays usable after resume (M15) |
     | `IntentCommit` (from `Prepared`, spec 10 X10) | any policy reason, `KernelStopped` included | `Compensate { PreDispatchRefusal { reason }, PreDispatchNoEffect, receipt }` against the persisted operation. It releases every participant acquired against `Prepared` before the fused steps, including the nonce preflight and an operation-owned runtime hook (`RuntimeParticipantLedger`), as the slow path does; a hook held outside the writer is released in a first `ParticipantCommit` group. No deny tombstone is written, because the compensated row is the tombstone. The id is terminal, as on M: today |
     | `IntentCommit` (from `Unbegun` or `Prepared`) | `Unavailable` | stay in the phase; the driver feeds `Replan { slow_path: true }`, and the machine emits slow-path `ParticipantCommit` steps. Never compensates |
     | any pre-dispatch effect | `VersionConflict` | `Retain`; the driver re-projects from the store and re-feeds. Never compensates |
@@ -520,7 +520,10 @@ pub enum IdentityDisposition {
       - `Terminalize`, `Compensate` and `ReleaseHold` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project), `CommitOutcomeUnknown` (M12) and `StoreUnavailable` (M19) can fail them. A refused or unknown `ReleaseHold` follows M7a: back to `Frozen`, or `HaltOperation` while `Releasing`. A `StoreUnavailable` keeps `Releasing` and re-submits the same `ReleaseHold` (M19).
       - Every `Retain` above has a re-feed source. The `FinalizingRetryDriver` (section 7) feeds `Tick` when the stop is resumed and with bounded backoff. `StartupReconciler` covers restart.
     - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that. Whether a retry is safe differs by class:
-      - **Read-only (check-only).** The call is eligible only when `can_redispatch_unknown_read` holds (section 4.4), so a retry after resume is safe. The driver returns `OutputWithheld { retry: AfterResume }` (spec 8).
+      - **Read-only (check-only).** The call is eligible only when `can_redispatch_unknown_read` holds (section 4.4), so a retry is safe whenever the refusal's cause can clear. The retry advice follows the actual reason:
+        - `KernelStopped`: `OutputWithheld { reason: KernelStopped, retry: AfterResume }`, `Reusable`;
+        - `StoreUnavailable`: `retry: AfterStoreRecovery`, `Reusable` (M19);
+        - `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`: `retry: Never`, `Terminal`. A resume cannot clear these, so the client is never told to wait for one.
       - **`NonDurable`.** The effect has executed and nothing binds a retry to it. A retry would redispatch the side effect, as spec 5 confirms for non-durable calls. The `Withheld` receipt therefore records `effect_executed: true`, and its stop block sets `retryable_after_resume: false` (spec 8 S15). The driver returns the terminal `OutputWithheld { retry: Never, effect_executed: true }`, and the result is final for that request. `KernelStopped` is temporary only for refusals before dispatch. A deployment that cannot accept dropped output must not run `Monetary` or development `Off` modes (spec 3 open decision 1).
 12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect yields `HaltOperation { CommitOutcomeUnknown }`, with no compensation, no dispatch and no state change.
     - This is the machine form of spec 3's `BoundaryFailure::CommitUnconfirmed`: every hold and credential is retained.
@@ -546,7 +549,7 @@ pub enum IdentityDisposition {
 
     | Path | Behavior |
     |---|---|
-    | Tier-1 early stop check, before `Begin` | A driver pre-check outside the machine, like `Overloaded`. It signs `Deny { KernelStopped }` with `observed_epoch`, persists no state, and leaves the request id usable after resume |
+    | Tier-1 early stop check, before `Begin` | A driver pre-check outside the machine, like `Overloaded`. It signs `Deny { KernelStopped }` with `observed` (spec 8 `StopObservation`), persists no state, and leaves the request id usable after resume |
     | Fused `IntentCommit` | M10: receipt only, id usable after resume |
     | `CheckOnlyCrossing` | M10: receipt only; the read-only class has no id to burn |
     | Fused `IntentCommit` from `Prepared` (spec 10 X10) | M10: compensates the persisted operation; the id is terminal, as on M: today |
@@ -614,6 +617,7 @@ pub enum IdentityDisposition {
     | `Overloaded` before admission (M10) | `Reusable` |
     | `CheckOnlyCrossing` refusals before dispatch, for both read-only and `NonDurable` classes (M10); nothing is persisted | `Reusable` |
     | A check-only read's `Withheld { retry: AfterResume }` (M11) or `Withheld { reason: StoreUnavailable, retry: AfterStoreRecovery }` (M19) | `Reusable` |
+    | A check-only read's `Withheld { reason: AuthoritySpaceClosed \| Revoked \| InsufficientIntegrity, retry: Never }` (M11) | `Terminal` |
     | `StoreUnavailable` deny before any row (M19) | `Reusable` |
     | `DenyTombstone` (M10, spec 10 X15) | `Terminal` |
     | `Compensate` of a persisted operation: `Prepared`-intent refusals and slow-path refusals for any reason, `KernelStopped` included (M10, M15), cut-table compensations, drop compensations | `Terminal` |
@@ -1079,6 +1083,12 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187829615 | Do not compensate while a Retry member is requeued | Fixed now. `Retry` is not a final reply for `DropReconcileJob`. It keeps the reply handle across X21's requeue, or obtains the writer's confirmed withdrawal of the member, and compensates only after a final `Refused`/`StoreUnavailable` or a confirmed withdrawal plus an empty read-back | M17 |
+
+### Codex review (PR #1174, round 26)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4187993006 | Match retry advice to the actual release refusal | Fixed now. A check-only release refusal gets reason-specific advice: `KernelStopped` gives `AfterResume`, `StoreUnavailable` gives `AfterStoreRecovery` (both `Reusable`), and `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity` give `retry: Never` (`Terminal`). M20 lists the new row, and spec 8's `OutputWithheld` admits the reasons | M11; M20 |
 
 ## Appendix A. External and FTL precedent
 
