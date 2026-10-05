@@ -42,7 +42,7 @@
 - **New closure members.**
   - Recovery workflows, including `Quarantined` ones.
   - P5 confined children. The drain calls `NativeConfinedRuntime::cancel`, which commits the native disposition and then the process cancel (W: `crates/platform/chio-control-plane/src/confinement.rs:258-274`).
-  - P5's final journal activity read (`:234-236`) is named as a second linearization point beside `DispatchCommitted` (section 4.3).
+  - P5's return-admission commit (`store.admit_confined_return`, `:214-226`; spec 10 `ConfinedReturn`) is the stop and fence linearization point beside `DispatchCommitted`. The final journal activity read (`:234-236`) stays the cancellation ordering point only, because it is a process-journal read outside the admission writer (section 4.3).
 - **Knowledge invariants.** Closure clears no knowledge, removes no pin, and leaves uncertain releases pinned (section 7). Confined-child reservations join stranded accounting (section 8).
 - **Durable stop precedent.** The scoped semantic emergency stop is persisted and checked inside capture transactions (W: `crates/platform/chio-store-sqlite/src/admission_operation_store/semantic.rs:355-372`; `semantic/capture.rs:47`, `:294`, `:336`). Open decision 5 cites it.
 
@@ -192,10 +192,10 @@ Every crossing where bytes or effects leave Chio custody has one named ordering 
 |---|---|---|
 | Tool dispatch (durable) | `DispatchCommitted` CAS, with the section 4.1 fence | M: `admission_coordinator.rs:1560`, `:1814` |
 | Recovery continuation | Same-writer tombstone at begin and capture | W: `admission_operation_store/recovery/native.rs:286-293` |
-| Confined return (P5) | The final serialized journal activity read before sink I/O. An earlier completed cancellation withholds bytes and retains the native join and consumption | W: `crates/platform/chio-control-plane/src/confinement.rs:234-236` |
+| Confined return (P5) | The return-admission commit (`store.admit_confined_return`, spec 10 `ConfinedReturn`) is the stop and fence point. The final serialized journal activity read before sink I/O stays the cancellation ordering point: an earlier completed cancellation withholds bytes and retains the native join and consumption | W: `crates/platform/chio-control-plane/src/confinement.rs:214-226`, `:234-236` |
 | Artifact release (P4) | Commit of the knowledge join and `ReleaseIntent` before sink delivery | W: `docs/architecture/recoverable-agent-runtime/implementation/p4/OPERATIONS.md:98-106` |
 
-Every new crossing must name its point before it ships. This adopts P5's rule and closes FTL's admitted SMP gap for Chio.
+Every new crossing must name its point before it ships. This adopts P5's rule and closes FTL's admitted SMP gap for Chio. The full crossing registry is spec 10 section 4.2 plus this table (spec 10 X1). What each crossing does while the kernel is stopped is spec 8 section 5, which is normative for stop dispositions.
 
 ## 5. Admitted-work drain
 
@@ -225,7 +225,7 @@ Rules:
 
    The unified function takes W:'s shape. It acts only after `try_own_operation` succeeds, so it never steals a live lease, and then dispatches on state. Two differences must be resolved in the merge:
    - **`CapturePending`.** W: compensates it directly, relying on the compensation CAS to lose against a committed capture. The unified function keeps that form when the capture authority shares the admission writer, and adds the lookup-by-operation step when it does not.
-   - **`DispatchCommitted`.** W: terminalizes it immediately (`terminalize_dispatch_committed_admission`). The drain does the same once it owns the operation, which yields the conservative outcome-unknown terminal with holds frozen. Without ownership it latches and defers to the coordinator.
+   - **`DispatchCommitted`.** W: terminalizes it immediately (`terminalize_dispatch_committed_admission`). The drain does the same once it owns the operation, which yields the conservative outcome-unknown terminal with holds frozen. Without ownership it halts the operation (spec 9 `HaltOperation`, spec 3 `LatchScope::Operation`) and defers to the coordinator.
 
    **Normative source.** The single normative cut and drain table is the cut function of `2026-10-04-pure-admission-machine-design.md` (spec 9), evaluated with `CutCause::AuthorityCut`. The table below is an informative summary of this spec's intent. Where the two differ, spec 9 governs, and a change to the drain behavior is made there, not here. Spec 9 revision 2 records the review of the differences (S9-06), including:
    - `Parked` compensates under `AuthorityCut`;
@@ -234,9 +234,9 @@ Rules:
 
    | Observed state | Action |
    |---|---|
-   | `Prepared` through `ReadyToDispatch`, or `ApprovalRequired` | Compensate (M: `admission_coordinator.rs:1607`) with cause `authority-cut`; latch the session request if one exists |
+   | `Prepared` through `ReadyToDispatch`, or `ApprovalRequired` | Compensate (M: `admission_coordinator.rs:1607`) with cause `authority-cut`; latch the session request if one exists (spec 9 `LatchRequest`) |
    | `CapturePending` | Look up by operation. No capture: compensate. Capture committed: post-dispatch |
-   | `DispatchCommitted`, `Finalizing`, `AwaitingCallerReport` | Latch; cooperative transport cancel where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`); if owned, terminalize `DispatchCommitted` as outcome-unknown with holds frozen (W: precedent); never redispatch, release or compensate |
+   | `DispatchCommitted`, `Finalizing`, `AwaitingCallerReport` | Halt the operation (spec 9 `HaltOperation`); cooperative transport cancel where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`); if owned, terminalize `DispatchCommitted` as outcome-unknown with holds frozen (W: precedent); never redispatch, release or compensate |
    | Recovery workflow bound to the space | `CancelWorkflow` by the closure actor (section 6.5); the same-writer tombstone fences begin and capture |
    | Confined child in the space | `NativeConfinedRuntime::cancel`: native disposition first, then process cancel and pidfd termination (W: `crates/platform/chio-control-plane/src/confinement.rs:258-274`). A plain `ProcessRuntime::cancel` alone would leave the native confined record unterminated |
    | Security operation model, dispatch `NotStarted` | That model's own compensation path |
@@ -392,11 +392,11 @@ Each entry is computed from the owning store at `Fenced` time, and it is evidenc
 ## 9. Exit hints and evidence
 
 - **Kernel sessions.** Hints project onto the closed `HintSubject` vocabulary of `2026-10-04-unified-event-queue-design.md` (section 4):
-  - `Changed` on `Capability(root)` for each session holding the root or a descendant;
+  - `Changed` on `Capability(id)` for every capability id in the closed lineage that a session holds. Lineage fan-out happens at post time, so a session subscribed to a descendant's own id is reached (spec 5 Part B, S5-14);
   - `Terminal` on `Lifecycle` for closed sessions;
   - `Changed` on `Operation` for drained operations the session owns.
-- **Processes.** A `ProcessTree` closure changes `ProcessState`, which advances the process `hint_revision` in the same transaction (event-queue spec section 5.2, rule P1). A waiting `inspect` returns, and a worker whose credential was revoked sees `unauthenticated`. Child exit observations still come from runner outcomes and `wait_children`.
-- **Workflows and work.** Workflows use R: delivery cursors. Work uses W1 queries.
+- **Processes.** A `ProcessTree` closure changes `ProcessState`, which advances the process `hint_revision` in the same transaction (spec 5 Part B, rule P1; `Lifecycle` is one of the two subjects the process projection keeps). A waiting `inspect` returns, and a worker whose credential was revoked sees `unauthenticated`. Child exit observations still come from runner outcomes and `wait_children`.
+- **Workflows and work.** Workflows use the recovery event chain (W: `admission_operation_recovery.sql`, whose global monotonic `sequence` column is the cursor). Work uses W1 queries.
 - **No authority.** Hints carry no authority. Consumers re-read the closure record.
 - **Artifact.** The kernel signs `chio.authority-space-closure.v1` at `Fenced` and at `Closed`, listing:
   - fence commits;
@@ -428,7 +428,7 @@ This proposes a closure extension to the Proposition (V: `docs/papers/verifiable
 
 **Proof sketch:**
 - Closure adds fence rows and terminal records only. It never mutates an allocation, seal, graph allocation or claim, so properties 1-3 follow from the Proposition.
-- The drain performs only pre-dispatch compensation, which is an existing recovery transition, and latching.
+- The drain performs only pre-dispatch compensation, which is an existing recovery transition, plus operation halts and session-request latches (spec 3 `LatchScope::Operation` and `LatchScope::SessionRequest`). It never sets the kernel-wide evidence latch.
 - Property 4 is section 4.1's CAS ordering.
 - Property 5 is section 5 rule 2 plus section 7.
 

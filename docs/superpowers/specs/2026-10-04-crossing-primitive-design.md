@@ -1,6 +1,6 @@
 # Design: crossing primitive and fused-commit hot path
 
-- Status: PROPOSED (revision 2, after adversarial review 2026-10-04)
+- Status: PROPOSED (revision 3, after the wave 2 cross-spec review of specs 3, 5 and 8, 2026-10-05)
 - Date: 2026-10-04
 - Scope:
   - One kernel primitive, `CrossingTx`, that executes every point where an effect or a byte leaves Chio custody, as one transaction shape in the serving writer.
@@ -17,6 +17,28 @@
 - Citations: `M:` = `integration/process-security-m4` at `19df31ad9`; `V:` = `origin/work/verifiable-work-session-20261003` at `14477aaac`; `R:` = #1172 docs; `W:` = the uncommitted recovery worktree `standalone/arc-worktrees/recoverable-agent-runtime-20261002` as of 2026-10-04; `B:` = `origin/wip/bench-results-2026-09-13` (#1163). Unprefixed kernel paths are under M: `crates/kernel/chio-kernel/src/`, unprefixed store paths under M: `crates/platform/chio-store-sqlite/src/`.
 - Origin: `docs/research/2026-10-04-chio-kernel-north-star.md` bet 2. Reviewed in `review-spec10` (S10-01 to S10-29); see the review disposition section.
 - Siblings: the umbrella `2026-10-04-ftl-lessons-program-design.md`; specs 1 to 8 (`closed-kernel-abi`, `authority-faults`, `typed-reservations`, `authority-space-teardown`, `unified-event-queue`, `opaque-adapter-context`, `microkernel-isolation-backend`, `durable-stop-epoch`); spec 9 `pure-admission-machine`; spec 11 `integrity-gated-admission`. All are `2026-10-04-*-design.md`.
+
+## Revision 3 changes
+
+The adversarial reviews of specs 3, 5 and 8 found contradictions with this spec. The wave 2 shared decisions resolve them here, and the review disposition section lists each finding under "Wave 2 (cross-spec)".
+
+- **Stop dispositions per crossing kind (S8-11, S8-27).**
+  - The Stop column of section 4.2 now carries spec 8's `StopDisposition`: `Deny`, `Withhold`, `Settle` or `AllowIfContainment`. Spec 8 section 5 is normative.
+  - Containment is no longer refused by the check that spec 8 allows. Settlement of earlier effects stays available.
+  - `ExternalPrepare` carries a purpose, `Authorize` or `Settle`.
+  - `StopEpoch` takes `(kind, scope, disposition)` and reads durable heads together with process-local latches (S8-02).
+- **A stop is a temporary refusal (S8-12, S8-17, S8-18).**
+  - `KernelStopped` writes no deny tombstone, and tier-1 denials sign a receipt only (X15).
+  - A caller report is a progress-only return record that is never stop-checked (section 7).
+  - A two-commit read refused at its outcome commit writes a return record and returns `OutputWithheld` (X14).
+- **The writer loop cannot refuse a stop (S8-03).** Stop, resume and restrict commits run in a priority lane that is exempt from `Overloaded`, `max_batch` and the tenant cap (X17, X20).
+- **Sharded stops do not block on a dead shard (S8-13).** The stop chain originates in the pool shard and each shard holds a verified replica. A shard that is behind is not ready, and the operator acknowledgement reports `enforced` per shard (section 10).
+- **The division with specs 3 and 9 (S3-15, S3-05).**
+  - Spec 9 decides and this spec executes.
+  - This spec executes the receipts append for check-only and `NonDurable` calls and reports `Committed`, `Refused` or `Unknown` (rule 28).
+  - `ReceiptCommitted` is reported at the commit point.
+- **Latch naming (S3-03).** X16 and X22 use spec 9's `HaltOperation`, which halts one operation and never the kernel.
+- **Hints (S5-11).** A `Committed` reply is the only point after which spec 9 may post a hint. Section 18 states what that guarantees per commit class.
 
 ## Revision 2 changes
 
@@ -90,7 +112,7 @@ Targets (section 14):
 | 3 | Budget hold, `-> BudgetAuthorized` (already one joint transaction) | `authorize_durable_budget_hold` (`:1337`) calling `claim_and_authorize_budget_and_commit_admission` (`:1364`; store `admission_operation_store.rs:673`) |
 | 4 | `BudgetAuthorized -> ReadyToDispatch` | `mark_durable_capture_pending` (`:1536`) |
 | 5 | `ReadyToDispatch -> CapturePending` | `mark_durable_capture_pending` (`:1544`) |
-| 6 | Capture plus `-> DispatchCommitted` (joint) | `capture_and_commit_durable_dispatch` (`:1814`) calling `claim_and_capture_invocation_and_commit_dispatch` (`:1869`). Without capture, `commit_durable_dispatch` (`:1598`) |
+| 6 | Capture plus `-> DispatchCommitted` (joint) | `capture_and_commit_durable_dispatch` (`:1814`) calling `claim_and_capture_invocation_and_commit_dispatch` (`:1869`). Without capture, `commit_durable_dispatch` (`:1560`) |
 | 7 | Tool return: blob, outcome, `DispatchCommitted -> Finalizing` | `record_durable_tool_return` (`admission_coordinator/terminal.rs:142`) calling `claim_and_record_tool_returned` (`:312`; store `tool_outcome_store.rs:417`) |
 | 8 | Begin post-return evaluation, which freezes the evaluation record | `claim_and_begin_post_return_evaluation` (`terminal.rs:1183`; store `tool_outcome_store.rs:441`) |
 | 9 | All pure post-return results plus outcome resolution (one transaction) | `finalize_post_return_with_pure_results` (`terminal.rs:1343`; store `tool_outcome_store.rs:567`). `record_next_pure_result` (`:1301`) is in-memory |
@@ -218,7 +240,7 @@ pub enum CrossingKind {
     OutputRelease,             // the outcome commit; also records the output influence join (spec 11, rule I4)
     ArtifactRelease,           // W: P4 knowledge join + ReleaseIntent
     ConfinedReturn,            // W: P5 return admission (P5's final activity read is kept, X5a)
-    ExternalPrepare,           // cross-store prepare before a payment-rail or remote-budget call
+    ExternalPrepare { purpose: PreparePurpose }, // cross-store prepare before a payment-rail or remote-budget call
     MutationSubmit,            // MutationReady -> MutationSubmitted before the mutation service call
     ExternalEvaluation,        // begin-evaluation record before sending output to an ExternalStateful step
     ActiveResponseExecute,     // governed active response execution
@@ -226,8 +248,13 @@ pub enum CrossingKind {
     ChannelReleasePublish,     // channel release publication
 }
 
+pub enum PreparePurpose {
+    Authorize,                 // a new authorization before dispatch
+    Settle,                    // capture or release that settles an effect committed before the call
+}
+
 pub enum CrossingCheck {
-    StopEpoch,           // spec 8 tier 2
+    StopEpoch,           // spec 8 tier 2: (kind, scope, disposition) over durable heads and process latches
     ClosureFence,        // spec 4 section 4.1
     Revocation,          // chain walk; capability lineage where installed
     KnowledgeIntegrity,  // spec 11, authoritative check
@@ -239,7 +266,7 @@ pub enum CrossingResult {
     Committed(CrossingCommitted),          // acknowledged after COMMIT and, if required, the anchor sync
     Refused(CrossingRefused),              // typed reason, no state change
     OutcomeUnknown,                        // COMMIT or the post-COMMIT anchor sync failed; owner poisoned
-    Retry,                                 // the batch transaction was lost before COMMIT (X15b); re-queue
+    Retry,                                 // the batch transaction was lost before COMMIT (X21); re-queue
 }
 ```
 
@@ -254,18 +281,35 @@ Spec 9 receives refusals as `CommitFailed { reason }`, `OutcomeUnknown` as the d
 
 ### 4.2 Checks per kind
 
+The Stop column carries spec 8's `StopDisposition`. Spec 8 section 5 is normative, and this table repeats its values:
+- `Deny`: refused while stopped.
+- `Withhold`: the operation is retained (`Finalizing` or `Parked`) with output held, and proceeds after resume.
+- `Settle`: allowed only to complete or settle an effect committed before the stop head. A new authorization is `Deny`.
+- `AllowIfContainment`: allowed only when the head has `allow_containment = true`. A host latch implies `false` (spec 8 S20).
+
 | Kind | Stop | Fence | Revocation | Integrity | Reservations | Commit class |
 |---|---|---|---|---|---|---|
-| `DispatchIntent` | yes | yes | yes | yes | holds, capture | crossing-authorizing |
-| `CheckOnlyDispatch` | yes | yes | yes | yes (see X11) | none | no write |
-| `CallerStart` | yes | yes | yes | yes | capture before effect | crossing-authorizing |
-| `NativeCapture` | yes | yes | yes | yes | capture | crossing-authorizing |
-| `RecoveryCapture`, `SemanticCapture` | yes | yes | yes | yes | recovery consumption | crossing-authorizing |
-| `OutputRelease` | yes | yes | no (effect happened) | yes, for release | capture, release authority | crossing-authorizing |
-| `ArtifactRelease` | yes | yes | no | P4 join is the check | pin, release intent | crossing-authorizing |
-| `ConfinedReturn` | yes | yes | no | P5 return contract | confined consumption | crossing-authorizing |
-| `ExternalPrepare`, `MutationSubmit`, `ActiveResponseExecute`, `FederationCosign`, `ChannelReleasePublish` | yes | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
-| `ExternalEvaluation` | yes | yes | no | yes | none | crossing-authorizing |
+| `DispatchIntent` | `Deny` | yes | yes | yes | holds, capture | crossing-authorizing |
+| `CheckOnlyDispatch` | `Deny` | yes | yes | yes (see X13) | none | no write |
+| `CallerStart` | `Deny` | yes | yes | yes | capture before effect | crossing-authorizing |
+| `NativeCapture` | `Deny` | yes | yes | yes | capture | crossing-authorizing |
+| `RecoveryCapture`, `SemanticCapture` | `Deny` | yes | yes | yes | recovery consumption | crossing-authorizing |
+| `OutputRelease` | `Withhold` | yes | no (effect happened) | yes, for release | capture, release authority | crossing-authorizing |
+| `ArtifactRelease` | `Withhold` | yes | no | P4 join is the check | pin, release intent | crossing-authorizing |
+| `ConfinedReturn` | `Withhold` | yes | no | P5 return contract | confined consumption | crossing-authorizing |
+| `ExternalEvaluation` | `Withhold` | yes | no | yes | none | crossing-authorizing |
+| `ExternalPrepare { Authorize }` | `Deny` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+| `ExternalPrepare { Settle }` | `Settle` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+| `MutationSubmit` | `Deny` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+| `FederationCosign`, `ChannelReleasePublish` | `Settle` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+| `ActiveResponseExecute` | `AllowIfContainment` | yes | yes | where applicable | the participant's intent row | crossing-authorizing |
+
+**The `StopEpoch` check.**
+- It evaluates `(kind, scope, disposition)`.
+- Its effective state is the durable stop heads read in the transaction, together with the process-local latches: spec 8's host latch, and a stop whose write has not yet become durable (spec 8 S20, S8-02). The writer loop runs in-process, so it reads the latches from an `ArcSwap`.
+- A process latch can only tighten the result. It never relaxes a durable head.
+- `Settle` requires the operation to have committed its effect, or its authorization, at an epoch before the current `Stopped` head. The crossing record carries that epoch.
+- Tier 1, spec 8's early check, reads the per-store shared `StopHeads` (spec 8 S8-08). It never reads a per-kernel field, and it is never authoritative.
 
 Capability issuance is not a crossing here. It runs in the capability authority store, so under X3 it is `early_only`: spec 8 S8 applies, with no anchor in this writer.
 
@@ -275,14 +319,18 @@ Rules:
    - a row here;
    - a spec 4 section 4.3 entry;
    - a spec 1 registry entry;
-   - a commit class.
+   - a commit class;
+   - a spec 8 section 5 stop disposition.
 2. **X2. Order.** Checks run in `CrossingCheck` order, before any mutation, and the first refusal ends the crossing.
 3. **X3. Same writer.** A check is authoritative only when its state lives in the crossing's writer. Otherwise it is an early read, reported `early_only` (spec 8 section 13).
 4. **X4. Record.** `crossing_records(crossing_id, kind, operation_id, scope_digest, checks_digest, batch_index, writer_epoch)` is written last in the same savepoint. It is operational, not signed evidence.
    - `CheckOnlyDispatch` is exempt, because it writes nothing.
    - Its linearization index (`batch_index`, `writer_epoch`) travels in the call's receipt metadata as `chio_runtime.crossing`. Spec 8's property "no crossing with an index after a `Stopped` head" is evaluated over both sources.
 5. **X5. Spec 9 boundary.** `CrossingTx` executes spec 9's planned commit effects and never decides an admission transition. Each plan carries the expected operation version.
-   - **X5a. P5.** `ConfinedReturn` covers stop and fence at the return-admission commit. P5's final serialized activity read before `sink.deliver` stays as written, so a late cancellation still withholds bytes.
+   - **X5a. P5.** `ConfinedReturn` covers stop and fence at the return-admission commit (W: `store.admit_confined_return`, `chio-control-plane/src/confinement.rs:214-226`). P5's final serialized activity read before `sink.deliver` (`:234-236`, a process-journal read outside this writer) stays as written, so a late cancellation still withholds bytes.
+     - That final read is not a stop check (spec 8 S8-10).
+     - A durable stop committed after the return-admission commit and before `sink.deliver` does not withhold the bytes.
+     - The final read also consults the process latches, so a host latch set in that window does withhold them.
 
 ## 5. Commit classes and the anchor
 
@@ -291,7 +339,7 @@ The rollback anchor detects a database restored behind its last anchored state, 
 | Class | Commits | Anchor |
 |---|---|---|
 | Crossing-authorizing | Every `CrossingTx` with a write, including every commit that precedes an external call | Synced before acknowledgement |
-| Restrictive | Revocations; stop and resume epochs (spec 8 S1); closure fences (spec 4); recovery cancellation tombstones; deny tombstones (X12a); `DeniedAfterDelivery` terminals reached by refusal (X13c); knowledge and taint joins; isolation-epoch changes; export seals | Synced before acknowledgement |
+| Restrictive | Revocations; stop and resume epochs (spec 8 S1); closure fences (spec 4); recovery cancellation tombstones; deny tombstones (X15); `DeniedAfterDelivery` terminals reached by refusal (X16); knowledge and taint joins; isolation-epoch changes; export seals | Synced before acknowledgement |
 | Progress-only | Begin and attachments on slow paths; pre-dispatch budget holds of operations that have not crossed; parked states; the return record; finalize records of pure post-return results that are not fused; external-step journal entries after the external call | Synced within bounded lag (X7) |
 
 Rules:
@@ -360,19 +408,33 @@ Rules:
     - That predicate also requires matching grants without constraints, so spec 11's grant-declared `RequiredIntegrity` makes a call ineligible. The integrity check here covers only requirements from non-grant floors (spec 11's open decisions).
     - Fence refs are derived from the request inside the check, because no operation row exists.
     - **X13a. Release.** Before output is released, a second check-only crossing re-checks stop and fence. The receipt is then appended to `receipts.db` exactly as today: same fsync, same `finalize_ordinary_recovery_response` path. A refused release withholds output and appends a signed `withheld` receipt instead.
-    - **X13b. D1.** D1 is closed on the success and refusal paths only if the receipt append is made infallible-or-latched. That is spec 3 phase 1 (`PostEffectObligation`, latch). This path changes nothing about D1 otherwise. A crash between handoff and the receipt append still leaves no record, by design for undurable calls. Durable coverage (`All`) is the remedy.
+    - **X13b. D1.** D1 is closed on the success and refusal paths only if the receipt append is made infallible-or-latched. That is spec 3 phase 1 (`PostEffectObligation`, kernel-evidence latch). This path changes nothing about D1 otherwise. A crash between handoff and the receipt append still leaves no record, by design for undurable calls. Durable coverage (`All`) is the remedy.
+    - **X13c. `NonDurable` calls.** Spec 9's `NonDurable` class covers calls under `Monetary` or development `Off` that no durable path covers.
+      - These calls also dispatch through a `CheckOnlyDispatch` crossing, which writes nothing and linearizes stop, fence and revocation.
+      - The integrity check covers grant-declared requirements too, because the class does not exclude grant constraints.
+      - The release re-check is X13a, and the receipt append is rule 28.
+      - The class exists so that spec 3 phase 1's obligation has a machine counterpart. It is not a fast path.
 14. **X14. Two-commit read.** This is a contract change, behind the flag `crossing-read-two-commit`.
     - For an eligible read whose driver declares that redispatch on unknown is permitted (spec 9 `EvaluationContext`; the process runtime's `invoke`, not `invoke_known_only`), the return record fuses into the outcome commit.
     - A crash after handoff and before the outcome commit leaves `DispatchCommitted`. Recovery signs `OutcomeUnknownAfterDispatch` with `retained_dispatch_commit`, and the process runtime's bounded fresh dispatch applies unchanged.
     - This amends the admission design's "persist returned bytes before post-return work" for this class only (section 15).
+    - **X14a. Stop at the outcome commit.** When the fused outcome commit is refused with `KernelStopped`, the savepoint rolls back. The driver then commits a progress-only return record with the returned bytes, which is never stop-checked (spec 9 M11).
+      - The operation is `Finalizing` with output withheld, so it is never re-dispatched (spec 8 S8-18).
+      - The client receives spec 8's `OutputWithheld { operation_id, reason: KernelStopped }`.
+      - The same fallback applies to an infrastructure failure after the return and before the outcome commit (spec 9 M16).
 
 ### 6.3 Denials on the fast path
 
-15. **X15. Deny tombstones.** A policy refusal of a fused intent commit, or a deny decided during evaluation of a durable-coverage call, writes a deny tombstone in one **restrictive** commit:
+15. **X15. Deny tombstones.** A policy refusal of a fused intent commit for `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity` or `ReservationConflict`, or a deny decided during evaluation of a durable-coverage call, writes a deny tombstone in one **restrictive** commit:
     - an operation row in `CompensatedBeforeDispatch`, with the same replay key semantics as today;
     - the signed deny receipt, as its terminal evidence.
 
-    Admission rule 4 ("terminal tombstones retained") and `unique(request_namespace_digest, request_id) -> one operation_id` hold unchanged. Spec 8 S15's burned request ids stay true. `Unavailable` re-plans with no tombstone, `VersionConflict` re-projects, and `Overloaded` denies with a receipt before admission.
+    Admission rule 4 ("terminal tombstones retained") and `unique(request_namespace_digest, request_id) -> one operation_id` hold unchanged for these reasons. `Unavailable` re-plans with no tombstone, `VersionConflict` re-projects, and `Overloaded` denies with a receipt before admission.
+
+    - **X15a. Stop denials are temporary (spec 8 S15, S8-17).** `KernelStopped` writes no tombstone on either tier.
+      - A tier-1 early denial, and a fused intent commit refused with `KernelStopped`, sign a deny receipt carrying `observed_epoch` and persist no operation row. The request id stays usable after resume.
+      - This keeps today's behavior: M:'s early stop check runs before any begin commit. It also avoids an anchored write per denied request in the middle of an incident.
+      - A slow-path operation that already has a begin row still compensates, as today, and its id is terminal (spec 9 M10, M15).
 
 ### 6.4 Refusals after the effect
 
@@ -380,20 +442,20 @@ Rules:
 
     | Reason | Effect |
     |---|---|
-    | `KernelStopped` | The savepoint rolls back. The operation stays `Finalizing` with output withheld in release custody (the return record holds the bytes) and resumes after the stop is lifted (spec 8 S14) |
-    | `AuthoritySpaceClosed` or `InsufficientIntegrity` | Spec 9 latches, then terminalizes as the existing `DeniedAfterDelivery` with the refusing reason and retained markers (spec 3 rule 12). That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal, and spec 4's drain terminates |
-    | `ReservationConflict` | Latch plus an incident. It should be unreachable, because capture amounts were reserved before dispatch |
+    | `KernelStopped` | The savepoint rolls back. The operation stays `Finalizing` with output withheld in release custody (the return record holds the bytes) and resumes after the stop is lifted (spec 8 S14). A return record is never stop-checked, so this refusal reaches only the outcome commit and the release crossings. For the two-commit read see X14a |
+    | `AuthoritySpaceClosed` or `InsufficientIntegrity` | Spec 9 emits `HaltOperation` for that operation, then terminalizes it as the existing `DeniedAfterDelivery` with the refusing reason and retained markers (spec 9 M11; spec 3 rule 13 is the legacy phase 1 form). That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal, and spec 4's drain terminates |
+    | `ReservationConflict` | `HaltOperation` plus an incident. It should be unreachable, because capture amounts were reserved before dispatch |
     | `VersionConflict` | Re-project |
 
-    For a check-only read, refusal yields the signed `withheld` receipt (X13a).
+    For a check-only read or a `NonDurable` call, refusal yields the signed `withheld` receipt (X13a), `KernelStopped` included. No custody holds the output. `HaltOperation` halts one operation; it never closes the kernel to new dispatch (spec 3's `LatchScope::Operation`).
 
 ## 7. Slow paths keep their semantics
 
 | Path | Commits | What changes |
 |---|---|---|
-| Approval parking | Park commit (`Prepared -> ApprovalRequired` with the hold), progress-only. Then one resume intent commit (`ApprovalReserved -> ReadyToDispatch -> CapturePending -> DispatchCommitted`) | Fewer commits after resume |
+| Approval parking | Park commit (`Prepared -> ApprovalRequired` with the hold), progress-only. Then one resume intent commit (`ApprovalReserved -> ReadyToDispatch -> CapturePending -> DispatchCommitted`) | Fewer commits after resume. A resume intent commit refused with `KernelStopped` leaves the operation parked (spec 9 M10) |
 | Cross-store participant (remote budget, payment rail) | `ExternalPrepare` crossing (operation row plus payment journal intent, anchored before the external call), the external authorization, then the intent commit | The prepare is anchored, so a restore cannot orphan a rail hold |
-| Caller execution (M3) | Reserve (no permission), `CallerStart` crossing (capture before the effect), authenticated report (outcome commit) | Start and report become `CrossingTx` instances |
+| Caller execution (M3) | Reserve (no permission), `CallerStart` crossing (capture before the effect), the authenticated report as a progress-only return record that is never stop-checked, then the outcome commit with its `OutputRelease` crossing (`Withhold` while stopped) | Start and release become `CrossingTx` instances. A report that arrives during a stop is recorded, not lost; only the release waits for resume (spec 8 S8-12; spec 9 M11) |
 | Recovery continuation | `reserve_recovery_call` in `process.db` (W:), then the continuation's fast path with `RecoveryCapture` checks | The tombstone check moves into the check list |
 | External stateful post-return step | Return record, `ExternalEvaluation` crossing (anchored before output leaves), the external step under its journal, then the outcome commit | The pre-call commit is anchored |
 | Economic mutation | `MutationSubmit` crossing before the mutation service call, then the applied or not-applied result | The pre-call commit is anchored |
@@ -405,7 +467,7 @@ Rules:
 | 1. `Prepared` before the first participant mutation | Strengthened on the fused path (atomic). Unchanged on slow paths |
 | 2. Participants keyed by `operation_id` | Unchanged |
 | 3. `DispatchCommitted` before any handoff | Unchanged: the anchored intent commit precedes handoff |
-| 4. Terminal tombstones retained | Unchanged, including fast-path denials (X15) |
+| 4. Terminal tombstones retained | Unchanged, including fast-path denials (X15). `KernelStopped` denials create no tombstone, as today's early stop check creates no row (X15a) |
 | 5. Receipt-side projections in one typed transaction | Unchanged: the outcome commit is that transaction |
 | 6. Holds released only by named release authority | Unchanged |
 | Durable outcome before post-return work | Unchanged, except for the opt-in two-commit read (X14) |
@@ -419,7 +481,8 @@ publish_allow(op)          -> receipt(op) in outcome_commit(op) and sequence_ass
 committed(fence or stop for s) before cas(op) and s in scopes(op) -> not crossed(op)
 restore(db to prefix >= anchor) -> forall crossing c refused before restore: c still refused
 refused(c)                 -> state_after(batch) | c = state_before(batch) | c
-deny(op) on fused path     -> tombstone(op) and anchored(tombstone(op))
+deny(op) on fused path and reason(op) != KernelStopped -> tombstone(op) and anchored(tombstone(op))
+deny(op) and reason(op) = KernelStopped -> no_row(op) or parked(op) or compensated_slow_path(op)
 ```
 
 ## 9. Group commit
@@ -430,16 +493,21 @@ deny(op) on fused path     -> tombstone(op) and anchored(tombstone(op))
     - It opens one IMMEDIATE transaction and runs each member as a closure inside its own `SAVEPOINT`.
     - Today's `lock_mutations` critical sections (claim, revalidate, commit) become one member closure.
     - The batch commits once (one WAL fsync), syncs the anchor once if any member is crossing-authorizing or restrictive or the lag bound is reached, then replies to every member.
+    - **X17a. Priority lane.** Spec 8's stop, resume and restrict commits enter a priority lane (spec 8 S8-03).
+      - They are dequeued ahead of the FIFO queue.
+      - They are never refused with `Overloaded`, and never counted against `max_batch`, `max_intent_members` or the per-tenant cap (X20).
+      - A full queue therefore cannot keep an operator from stopping the kernel.
+      - Under X21, a lost transaction answers `Retry`, and the lane re-runs first. A stop that cannot become durable (for example on `SQLITE_FULL`) is covered by spec 8's fsynced stop-intent latch, written before the transaction. Boot honors that latch until a durable head supersedes it.
 18. **X18. No added latency at low load.** The loop never waits to fill a batch. At concurrency 1, latency is unchanged.
 19. **X19. Linearization.** Members execute serially in dequeue order, each seeing earlier members' effects. Every CAS keeps its meaning.
-20. **X20. Fairness.** Members dequeue FIFO, with a per-tenant cap of a quarter of a contended batch. The cap reorders across tenants only, and X19's order is the dequeue order after the cap. In the single-tenant process host (`LOCAL_SYSTEM_TENANT_ID`) the cap is inert.
+20. **X20. Fairness.** Members dequeue FIFO, after the X17a priority lane, with a per-tenant cap of a quarter of a contended batch. The cap reorders across tenants only, and X19's order is the dequeue order after the cap. In the single-tenant process host (`LOCAL_SYSTEM_TENANT_ID`) the cap is inert.
 21. **X21. Savepoint failure protocol.**
     - After any non-refusal SQLite error, the loop checks `sqlite3_get_autocommit()`. SQLite rolls back the whole transaction on `SQLITE_FULL`, `SQLITE_IOERR`, `SQLITE_BUSY` and `SQLITE_NOMEM`.
     - If the transaction is gone, every member gets `Retry` (known not committed) and re-queues. No member ever runs outside the batch transaction.
     - In-memory side effects of a member (the trusted-time fence, caches) are buffered and applied only after `COMMIT`.
 22. **X22. Unknown outcomes.**
     - If `COMMIT` fails with an unknown outcome, the owner is poisoned and every member gets `OutcomeUnknown`. The same happens when the anchor sync fails after a successful `COMMIT` (`serving_owner.rs:284-289`).
-    - Spec 9 halts each operation without dispatch or compensation, latches, and reconciles at restart.
+    - Spec 9 emits `HaltOperation` for each member's operation: no dispatch, no compensation, holds and credentials retained (spec 3's `BoundaryFailure::CommitUnconfirmed`). Restart reconciles each one. The halt is per operation; the poisoned owner, not a kernel latch, is what stops further writes until restart.
     - A `DispatchIntent` member reconciled as `DispatchCommitted` is terminalized as outcome-unknown with holds frozen, even though the driver never handed off. This is the batch's blast radius, bounded by `max_intent_members`. Release then needs the existing counterparty authorities (section 19).
 
 ## 10. Writer sharding (later phase, with preconditions)
@@ -449,10 +517,10 @@ ADR-0022 names the single-writer ceiling (M: `docs/adr/ADR-0022-store-and-kernel
 | # | Precondition |
 |---|---|
 | S1 | Every cross-tenant aggregate on the serving connection is listed and kept in an unsharded pool shard (slow path), or is forbidden under sharding. That covers the finding market, purchases, challenges and status, channels and release publisher, fiscal, FROST and the economic-state cache (`serving_owner.rs:628-690`) |
-| S2 | Global fences (kernel-scope stop and resume, revocations) use a durable fan-out outbox. The operator acknowledgement completes only after every shard reads them back (the AP8 discipline, M: `docs/superpowers/specs/2026-10-03-transport-revocation-design.md`) |
-| S3 | A shard loads the global stop and revocation heads before readiness |
+| S2 | **Stops (spec 8 S8-13).** The kernel-scope stop chain originates in the pool shard. Each tenant shard holds a verified replica: the same record bytes and digests, appended in that shard as a restrictive commit, so its `StopEpoch` check is authoritative over the replica (X3). The operator acknowledgement returns after the origin commit, with an `enforced` status per shard. It does not block on a dead shard; a shard that is behind is reported, not waited for. **Revocations** use a durable fan-out outbox, with readback per the AP8 discipline (M: `docs/superpowers/specs/2026-10-03-transport-revocation-design.md`) |
+| S3 | **Readiness.** A shard is ready only when its replica's stop epoch is at or above the origin head epoch, read from the origin at boot. If the origin is unreachable, the shard is not ready. A new shard is seeded with the origin head before it serves. Revocation heads load the same way before readiness |
 | S4 | Capabilities are bound to one shard at issuance, or every revocation fans out |
-| S5 | Pool-scoped fences and stops checked from a tenant shard are reported `early_only` |
+| S5 | Pool-scoped fences without a shard replica are reported `early_only` when checked from a tenant shard. Kernel-scope stops are checked against the replica (S2), and the replication window is what the `enforced` status reports |
 | S6 | The process registry's single `durable_admission_store_uuid` (M: `crates/kernel/chio-process/src/registry.rs:58-66`), receipt mover ordering, checkpoint ordering and relocation are defined per shard |
 
 Under sharding:
@@ -471,6 +539,7 @@ The existing path is kept and made asynchronous behind the gate `async-receipt-m
 | 25 | **Saturation fails closed.** A mover backlog above `receipt_backlog_max` (default 4,096) denies new mediated allows before admission. This succeeds today's `receipt_store_serving_closed` gate. Status reports a receipt `signed_but_not_durable` (ADR-0013 wording) until its `receipts.db` commit |
 | 26 | **Slim at rest.** Only substructures that no report queries are deduplicated into a content table by digest, for example capability snapshots and delegation chains, with references counted for retention and erasure. Phase 0 attributes the 11.9 KB per call and lists the `json_extract` paths before choosing. Fields the reports query stay in `raw_json`, or move to generated columns. `raw_json` is reconstituted byte-exactly on read |
 | 27 | **Signatures stay.** Checkpoint batches align with group-commit batches and emit C2SP-compatible checkpoint notes (north-star bet 6) |
+| 28 | **Receipt append for classes with no row.** Check-only reads and `NonDurable` calls (spec 9) have no terminal projection, so their `receipts.db` append is the discharge (spec 9 M16). This spec executes it and reports one of three results. `Committed` is reported at the commit point, right after the append returns `Ok`, and before federation co-sign, trace sequence allocation and the settlement claim; failures of those steps are post-receipt (spec 3, S3-05). `Refused` means known not committed. `Unknown` means the append timed out or was lost; the receipt writer actor may still commit it (chio-store-sqlite `receipt_store.rs:918-924`). Spec 9 maps `Unknown` to `KernelEvidenceLatch` and appends no fault receipt until a read-back of the original id |
 
 ## 12. Formal model
 
@@ -478,10 +547,10 @@ A new `formal/apalache/AdmissionCrossing.tla` models one or two operations, the 
 
 | Kind | Content |
 |---|---|
-| Invariants | Handoff only after an anchored intent commit; release only after an anchored outcome commit. Allow only after the receipt is in the outcome commit with a sequence (refining `ReceiptBeforeAllow`). No crossing after a committed fence or stop in its scope, **including after any `Restore`** (X6). No hold release outside named release authorities. Savepoint isolation for refused members, and no member effect after a lost transaction (X21). Fast-path denials leave anchored tombstones (X15) |
+| Invariants | Handoff only after an anchored intent commit; release only after an anchored outcome commit. Allow only after the receipt is in the outcome commit with a sequence (refining `ReceiptBeforeAllow`). No crossing of a `Deny` or `Withhold` kind after a committed fence or stop in its scope, **including after any `Restore`** (X6); `Settle` and `AllowIfContainment` kinds pass only under their spec 8 conditions. No hold release outside named release authorities. Savepoint isolation for refused members, and no member effect after a lost transaction (X21). Fast-path denials other than `KernelStopped` leave anchored tombstones (X15); `KernelStopped` denials leave none (X15a). A stop-refused outcome commit leaves a return record and is never re-dispatched (X14a). The priority lane is never refused with `Overloaded` (X17a) |
 | Recovery set | Absent, `Prepared` or `BrokerAttemptRegistered` (slow paths), `ApprovalRequired`, `CapturePending`, `DispatchCommitted`, `AwaitingCallerReport`, `Finalizing`, `Completed`, `CompensatedBeforeDispatch`, `DeniedAfterDelivery`, `OutcomeUnknownAfterDispatch` |
 | Refinement | Each crossing commit step refines a sequence of spec 9's `AdmissionMachine.tla` transitions; the model also maps to `PostAdmissionDropGuard` and `KernelTransitionCancelSafe` |
-| Negative mutants | Acknowledge before the anchor sync; classify a revocation, stop or fence as progress-only; publish allow before the outcome commit; reply before `COMMIT`; continue a batch after the transaction was lost; skip the fence check in a fused intent commit; drop the deny tombstone |
+| Negative mutants | Acknowledge before the anchor sync; classify a revocation, stop or fence as progress-only; publish allow before the outcome commit; reply before `COMMIT`; continue a batch after the transaction was lost; skip the fence check in a fused intent commit; drop the deny tombstone; tombstone a `KernelStopped` denial; refuse a stop member with `Overloaded`; stop-check a return record; ignore the process latch in `StopEpoch` |
 
 The model lands in phase 0, before any rule changes behavior.
 
@@ -501,10 +570,12 @@ These extend M: `native-restart-safety.md`'s matrix:
 | B1. Batch `COMMIT` outcome unknown | Unknown for every member | Owner poisoned; restart reconciles each member |
 | B2. Batch transaction lost before `COMMIT` | Nothing from the batch | Members get `Retry` (X21) |
 | R1. Receipt not yet materialized | Receipt in the terminal projection | The mover resumes; status `signed_but_not_durable` |
+| R2. Check-only or `NonDurable` receipt append outcome unknown | The append may or may not commit | Spec 9 M16: `KernelEvidenceLatch` with a buffered fault record; read back the original id before appending any fault receipt (rule 28) |
+| P1. Stop committed while a two-commit read is in flight | `DispatchCommitted`, then the return record after the refused outcome commit | `Finalizing`, output withheld; released after resume (X14a) |
 
 Other failures:
 - A refused crossing returns its typed reason with no state change.
-- A full writer queue gives `Overloaded` before any write.
+- A full writer queue gives `Overloaded` before any write, except to the X17a priority lane.
 - A full mover backlog denies new allows (rule 25).
 
 ## 14. Acceptance targets
@@ -536,10 +607,10 @@ The B: kernel-only and sustained-load figures stay as context (section 2.8).
 
 ## 15. Protocol, schema and wire impact
 
-- **Native wire, verdicts and receipt format:** none.
-- **Receipt metadata:** `chio_runtime.crossing { kind, batch_index, writer_epoch }` on check-only reads, and a `withheld` decision reason on refused releases.
+- **Native wire, verdicts and receipt format:** none, except spec 8's `OutputWithheld` result for a stop-withheld two-commit read (X14a), which spec 8 defines.
+- **Receipt metadata:** `chio_runtime.crossing { kind, batch_index, writer_epoch }` on check-only reads and `NonDurable` calls, a `withheld` decision reason on refused releases, and the stop head's `observed_epoch` on `KernelStopped` denials (X15a).
 - **`spec/PROTOCOL.md` section 6:** durable-before-allow is satisfied by the receipt in the anchored terminal projection. A receipt is audit-complete when the receipt store and a checkpoint cover it.
-- **Admission design amendments:** X14 (the opt-in two-commit read), X15 (deny tombstones on the fused path; rule 4 unchanged), and the commit classes of section 5.
+- **Admission design amendments:** X14 and X14a (the opt-in two-commit read and its stop fallback), X15 and X15a (deny tombstones on the fused path except for `KernelStopped`; rule 4 unchanged), the caller report as a progress-only return record (section 7), and the commit classes of section 5.
 - **ADR-0013:** no rule change. The authority writer is the local WAL under rules 23 to 25.
 - **Store schema:** new tables `crossing_records` and the receipt content table, and a receipt sequence counter per namespace. Fence and stop tables belong to specs 4 and 8.
 - **Formal:** the new model and its manifest entries.
@@ -559,8 +630,8 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
 ## 17. Tests and conformance evidence
 
 - **Apalache:** the model and mutants of section 12.
-- **Loom:** batch leader and followers; savepoint isolation; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
-- **DST:** crash injection at C1-C7, B1 and B2, plus restore-from-snapshot at random anchored prefixes, under random workloads. The properties are section 8's predicates.
+- **Loom:** batch leader and followers; savepoint isolation; acknowledgement strictly after `COMMIT` and the required anchor sync; a stop commit racing a fused intent commit; a stop member in the priority lane against a full queue (X17a); a host latch set while a `StopEpoch` check reads the `ArcSwap`; commit, anchor sync and expected-head verification races (X9); a lost-transaction batch (X21).
+- **DST:** crash injection at C1-C7, B1, B2, R2 and P1, plus restore-from-snapshot at random anchored prefixes, under random workloads. Stops are issued under `Overloaded` and under `SQLITE_FULL` injection. Under sharding, one shard is offline during a stop fan-out and then restarts; it must not serve until its replica catches up (S3). The properties are section 8's predicates.
 - **Differential:** generated workloads run through the legacy and fused paths must reach identical terminal states, receipts and release decisions. The two-commit read is compared under its own flag.
 - **Commit-budget gates:** these are deterministic, from store hooks, and scoped to fast-path-eligible plans:
 
@@ -572,21 +643,34 @@ Every phase ships behind its own flag: `crossing-anchor-classes`, `crossing-prim
 
   Each slow path has its own budget table: approval adds the park commit, cross-store adds the prepare, caller execution adds start and report, external evaluation adds its crossing.
 - **Benchmarks:** the process-host and shared-writer harnesses report the section 14 rows per run.
-- **chio-conformance:** a stop or revocation committed and then restored-around still denies; a fast-path deny burns the request id; a read-only call always yields a receipt or a latched fault; a crash after handoff yields outcome-unknown, never redispatch for side-effecting tools.
+- **chio-conformance:**
+  - a stop or revocation committed and then restored-around still denies;
+  - a fast-path policy deny other than `KernelStopped` burns the request id;
+  - a `KernelStopped` deny leaves the id usable after resume;
+  - containment (`ActiveResponseExecute`) passes a stop with `allow_containment = true` and is refused under a host latch;
+  - settlement of an earlier call (`ExternalPrepare { Settle }`, `ChannelReleasePublish`) passes a stop, and `ExternalPrepare { Authorize }` is refused;
+  - a caller report during a stop is recorded and released after resume;
+  - a two-commit read refused at its outcome commit returns `OutputWithheld` and is never re-dispatched;
+  - a read-only or `NonDurable` call always yields a receipt or a buffered fault behind `KernelEvidenceLatch`;
+  - a receipt append that times out and later commits yields exactly one terminal receipt;
+  - a crash after handoff yields outcome-unknown, never redispatch for side-effecting tools.
 
 ## 18. Alignment with sibling specs
 
 | Spec | What it must carry |
 |---|---|
-| Spec 9 | **Effects:** `IntentCommit` (with the `from_prepared` flag), `ReturnRecord` (fused with begin-evaluation), `OutcomeCommit`, `CheckOnlyCrossing` acknowledged by `CheckOnlyAcknowledged`, `DenyTombstone` and `ParticipantCommit`. **Events:** `CommitFailed` reasons including `Overloaded`, and `CommitOutcomeUnknown` (halt, latch, no compensation, reconcile at restart). **Inputs:** `EvaluationContext` must carry whether the driver permits redispatch on unknown (X14). **Section 6.4:** post-effect refusal handling |
+| Spec 9 | **Division:** spec 9 decides every transition and receipt; this spec executes the commits and reports `Committed`, `Refused`, `OutcomeUnknown` or `Retry` per crossing, and `Committed`, `Refused` or `Unknown` per receipt append (rule 28). **Effects:** `IntentCommit` (with the `from_prepared` flag), `ReturnRecord` (fused with begin-evaluation; also the caller report and the X14a fallback, never stop-checked), `OutcomeCommit`, `CheckOnlyCrossing` acknowledged by `CheckOnlyAcknowledged` (read-only and `NonDurable` classes), `DenyTombstone` (not for `KernelStopped`) and `ParticipantCommit`. **Events:** `CommitFailed` reasons including `Overloaded`; `CommitOutcomeUnknown` (`HaltOperation`, no compensation, reconcile at restart); `ReceiptAppendFailed`. **Inputs:** `EvaluationContext` must carry whether the driver permits redispatch on unknown (X14). **Section 6.4:** post-effect refusal handling, spec 9 M11 and M16 |
 | Spec 11 | Owns `KnowledgeIntegrity` semantics. It runs inside the intent commit and every dispatch-commit step, fast or slow. In the check-only dispatch it applies only to non-grant requirements, because grant constraints make a call ineligible (X13). The outcome commit records the output influence join |
-| Spec 3 | `PostEffectDischarge` is produced by the outcome commit. The `Reservations` check writes only `Compensable` holds and records `Commitment` entries by reference. Spec 3's obligation and latch close D1 on the check-only path (X13b) |
+| Spec 3 | Spec 3 owns the affine driver contract, `LatchScope` and the ledger. Its obligation is discharged by the acknowledgement of a spec 9 M14 discharge effect that this spec executes: the outcome commit, the return record, a terminal projection, or the rule 28 receipt append. The `Reservations` check writes only `Compensable` holds and records `Commitment` entries by reference. Spec 3 phase 1's obligation and kernel-evidence latch close D1 on the check-only and `NonDurable` paths (X13b, X13c). `HaltOperation` is spec 3's `LatchScope::Operation` |
 | Spec 4 | The dispatch-commit fence is the `ClosureFence` check. Section 4.1's new crossing kinds join its section 4.3 table. Refused releases terminalize through a restrictive, non-crossing `DeniedAfterDelivery`, so its drain terminates |
-| Spec 8 | Stop and resume epochs are restrictive commits, anchored before acknowledgement, consistent with its S1. Its tier-2 check is `StopEpoch`. Check-only reads carry `chio_runtime.crossing` for its DST property |
+| Spec 8 | Stop and resume epochs are restrictive commits, anchored before acknowledgement, consistent with its S1, and run in the X17a priority lane. Its tier-2 check is `StopEpoch` over `(kind, scope, disposition)`, durable heads and process latches. Section 4.2's Stop column repeats its section 5 dispositions. Its tier 1 reads the per-store shared `StopHeads`. `KernelStopped` denials are temporary (X15a); the caller report and the X14a fallback are never stop-checked. Sharded stops follow section 10 S2 and S3. Check-only reads carry `chio_runtime.crossing` for its DST property, which excludes `Settle` and `AllowIfContainment` kinds |
+| Spec 5 | A crossing's `Committed` reply is the only point after which spec 9 posts a hint (spec 9 M18). For crossing-authorizing and restrictive commits, `Committed` implies anchored, so a re-read observes the hinted change. For progress-only commits, a `Restore` within the anchor lag (X7) can undo it, and spec 5 consumers treat absence as a resync |
 
 ## 19. Residual risks and open decisions
 
 Residual risks:
+- **Settlement during a stop.** `Settle` kinds (section 4.2) move funds and evidence while the kernel is stopped. They are limited to effects committed before the stop head. No disposition in this revision freezes settlement as well. Spec 8 owns that choice, and this spec enforces whatever disposition spec 8 assigns to a kind.
+- **Withheld output in classes with no row.** A stop or fence that refuses the release of a check-only or `NonDurable` call drops the output, with a `withheld` receipt, because there is no custody to hold it (X16). Durable coverage (`All`) is the remedy.
 - **Batch blast radius.** One unknown `COMMIT` freezes the holds of up to `max_intent_members` intent members whose drivers never handed off. Release needs `MutuallyAgreedUnknown` or `ContractualCaptureWaiver` (counterparty authorities), plus an operator incident path.
 - **Progress-only loss on restore.** A restore can turn completed calls into outcome-unknown. That is bounded by the anchor lag, and it is always the conservative branch.
 - **Non-fsync time.** It dominates after this design (about 69 ms for `read`). The latency targets are honest about it.
@@ -636,6 +720,31 @@ Open decisions:
 | S10-27 | Applied: `mailboxes.db`, `runner.db` and canonical receipts in `authority.db` added (section 2.3) |
 | S10-28 | Applied: X20 states that the cap reorders across tenants only and is inert in the single-tenant host |
 | S10-29 | Applied: "staged projection" removed; the classes are defined in section 5 |
+
+### Wave 2 (cross-spec)
+
+Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per the wave 2 shared decisions:
+
+| Finding | Disposition |
+|---|---|
+| S3-03 | Applied: X16 and X22 use spec 9's `HaltOperation` (spec 3 `LatchScope::Operation`); no kernel-wide latch on post-effect refusals or unknown outcomes |
+| S3-05 | Applied: rule 28 reports `ReceiptCommitted` at the commit point, and `Unknown` for an append that may still commit; R2 cutpoint |
+| S3-15 | Applied: section 18 states the division (spec 9 decides, this spec executes, spec 3 owns the affine contract); rule 28 executes the receipts append for classes with no row |
+| S3-16 | Applied: X13c routes spec 9's `NonDurable` class through a check-only crossing |
+| S3-25 | Applied: X16 cites spec 9 M11 and spec 3 rule 13. The umbrella row and spec 3's commit count are outside this file |
+| S5-11 | Applied: section 18 spec 5 row states what `Committed` guarantees per commit class |
+| S8-02 | Applied: `StopEpoch` reads durable heads and process latches (section 4.2); P5's final read consults the latches (X5a) |
+| S8-03 | Applied: X17a priority lane, exempt from `Overloaded`, `max_batch`, `max_intent_members` and the tenant cap; X20 amended |
+| S8-08 | Applied: tier 1 reads the per-store shared `StopHeads` (section 4.2) |
+| S8-10 | Applied: X5a cites `admit_confined_return` and states that the final journal read is not a stop check |
+| S8-11 | Applied: the Stop column carries `StopDisposition` per kind, citing spec 8 section 5; `ExternalPrepare` split by purpose; X1 requires a disposition for new kinds; model invariant excludes `Settle` and `AllowIfContainment` |
+| S8-12 | Applied: the caller report is a progress-only return record, never stop-checked (section 7) |
+| S8-13 | Applied: section 10 S2, S3 and S5 replaced (pool-shard origin, verified replicas, readiness by epoch, non-blocking acknowledgement) |
+| S8-17 | Applied: X15a, no tombstone for `KernelStopped` on either tier |
+| S8-18 | Applied: X14a, return record on a stop-refused outcome commit, `OutputWithheld` |
+| S8-19 | Applied: section 7 approval row; spec 9 M10 retains `Parked` |
+| S8-27 | Applied: `AllowIfContainment`; a host latch implies `allow_containment = false` |
+| S8-28 | Applied: `commit_durable_dispatch` cited at `:1560`. Also fixed three stale sub-rule labels from revision 2: the `Retry` comment and the restrictive-class row cited X15b, X12a and X13c for what are X21, X15 and X16. The label X13c now names the new `NonDurable` rule |
 
 ## Appendix A. Precedent
 

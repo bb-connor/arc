@@ -354,7 +354,7 @@ later (research-grade or large):
 | Fine-grained taint inside model reasoning | Heuristic. Process-level labels plus quarantine and endorsement are sound (bet 3) |
 | LLM scheduling or context management inside the TCB (AIOS-style) | Efficiency logic widens the TCB. Keep it in personalities |
 | Static task tables (Hubris) for agents | Agents are dynamic. Keep static templates and routes, with dynamic instances (bet 10) |
-| Edge-triggered notifications | Lost transitions (Zircon documents this). Keep spec 5 H4 level-triggered |
+| Edge-triggered notifications | Lost transitions (Zircon documents this). Keep spec 5 H4 level-triggered: subscribe, then check the level. `Resource` is the documented edge-triggered exception |
 | More campaign scope before gates are real | Four of the five October 1 Highs were self-inflicted (bet 9) |
 
 ## 7. Proposed next specs

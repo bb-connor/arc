@@ -1,6 +1,6 @@
 # Design: pure admission machine
 
-- Status: PROPOSED (revision 2, after adversarial review 2026-10-04)
+- Status: PROPOSED (revision 3, after the wave 2 cross-spec review of specs 3, 5 and 8, 2026-10-05)
 - Date: 2026-10-04
 - Scope: one sans-IO transition function over one admission operation model. It becomes the single source of truth for every path that decides what happens to a mediated request: the tool-dispatch evaluators, nested flow, caller-execution reserve, start and report, startup reconciliation, parked-approval retirement, governed active response recovery, recovery's original-operation closure, the closure drain (spec 4) and the stop failure path (spec 8). The seventeen public evaluation methods collapse to one `evaluate` and one blocking adapter. The extractable core is lowered to Lean, checked against a new Apalache model, and used as the deterministic simulation substrate.
 - Out of scope: how commits execute (`2026-10-04-crossing-primitive-design.md`) and what the integrity check means (`2026-10-04-integrity-gated-admission-design.md`).
@@ -14,6 +14,29 @@
 - Citation convention: `M:` = `integration/process-security-m4` at `19df31ad9`, with paths under `crates/kernel/chio-kernel/src/` unless stated. `W:` = the uncommitted recovery working tree at `standalone/arc-worktrees/recoverable-agent-runtime-20261002`; its line references reflect 2026-10-04 and may drift.
 - Origin: `docs/research/2026-10-04-chio-kernel-north-star.md` bet 1 (keystone), lever 3 of the internal assessment.
 - Siblings: umbrella `2026-10-04-ftl-lessons-program-design.md`; program specs 1-8 (`closed-kernel-abi`, `authority-faults`, `typed-reservations`, `authority-space-teardown`, `unified-event-queue`, `opaque-adapter-context`, `microkernel-isolation-backend`, `durable-stop-epoch`, each `2026-10-04-<name>-design.md`); north-star specs `2026-10-04-crossing-primitive-design.md` (spec 10) and `2026-10-04-integrity-gated-admission-design.md` (spec 11).
+
+## Revision 3 changes
+
+The adversarial reviews of specs 3, 5 and 8 (`review-spec3`, `review-spec5`, `review-spec8`) found contradictions with this spec. The wave 2 shared decisions resolve them here; section 16 records each finding under "Wave 2 (cross-spec)". The main changes:
+
+- **The latch has three scopes (S3-03).** `Effect::Latch` is gone. `HaltOperation` halts one operation, `LatchRequest` latches one session request (spec 4), and `KernelEvidenceLatch` closes new dispatch kernel-wide only while an unpersisted post-effect evidence record is buffered (spec 3 section 4.8). Every refusal after the effect, every unknown commit outcome and every post-dispatch cut row uses `HaltOperation`, so a revocation or a drain never closes the kernel to other tenants.
+- **Spec 9 decides post-effect receipts (S3-15).**
+  - New events: `PostEffectStepFailed` and `ReceiptAppendFailed { Refused | Unknown }`.
+  - A new `NonDurable` class for calls under `Monetary` or development `Off` that no durable or check-only path covers (S3-16).
+  - The step-to-receipt mapping is now transition rows (M16). T8 is the discharge predicate.
+  - Spec 3 keeps the affine driver contract, the latch scopes and the ledger. Spec 10 executes the commits.
+- **Driver drop (S3-01, S3-14).**
+  - A future dropped before the dispatch-commit acknowledgement compensates and never latches.
+  - A future dropped after it enqueues supervised reconciliation through `Cut(DriverDropped)`, so request ids are not stranded until restart.
+- **Receipt append outcomes (S3-05).** An append that times out may still commit. It is `ReceiptAppendFailed { Unknown }`, which buffers a fault record behind `KernelEvidenceLatch` and appends nothing until a read-back shows the original absent.
+- **A stop is a temporary refusal (S8-01, S8-12, S8-17, S8-18, S8-19).**
+  - `KernelStopped` writes no deny tombstone and burns no request id.
+  - A parked operation is retained.
+  - A caller report is a progress-only return record that is never stop-checked.
+  - A two-commit read refused at its outcome commit writes a return record, so it is never re-dispatched.
+  - The legacy startup reconciler adopts the M11 retain rule in spec 8 phase 1, so a host restarted during a stop still starts.
+- **Hints are typed and trail commits (S5-11).** `Effect::Hint { hint: Hint }` uses spec 5's `HintPort` vocabulary and runs only in a trailing group after the commit group's `Committed` acknowledgement. The port is a no-op until spec 5 Part B lands.
+- **Check-only eligibility excludes `require_durable_request_retention` (S3-24).** Kernels with that setting deny reads outside durable coverage, as today.
 
 ## Revision 2 changes
 
@@ -104,7 +127,7 @@ Non-goals:
 // chio-kernel-core::admission_machine (no_std + alloc; closed enums, no wildcard arms)
 pub struct AdmissionState {
     pub kind: OperationKind,              // ToolDispatch | GovernedActiveResponse | GovernedEconomicMutation
-    pub class: OperationClass,            // Durable | ReadOnlyCheckOnly (section 4.4)
+    pub class: OperationClass,            // Durable | ReadOnlyCheckOnly | NonDurable (section 4.4)
     pub phase: Phase,
     pub plan: ParticipantPlan,            // ordered participants required for this request (data)
     pub facts: ParticipantFacts,          // which participants are acknowledged, by digest
@@ -154,6 +177,7 @@ Rules for the plan and facts:
 - Plan order is the tool model's order: broker, then the parked approval path or the budget hold, then the approval set. The security model's order (budget, delegated budget, payment, approval) is the order for its kind.
 - **The cumulative-approval path** acknowledges `BudgetHold` and `ApprovalSet` as one combined acknowledgement out of `Parked`. That is the legacy `BudgetAuthorized -> ReadyToDispatch` step with `requirements.approval` set (M: `state.rs:669-675`).
 - `CaptureKind` is derived from attachments: `Caller` when a `CallerDispatchContext` attachment is present, otherwise `Native`.
+- **Driver-local in-memory items are not participants.** The invocation counter, runtime-admission leases and continuations, and the reference-counted child-budget holder lease hold no persisted state. The driver owns them as spec 3 ledger tokens (spec 3 section 4.12). A `Compensate` effect releases them through the driver's ledger, in M:'s pre-dispatch order, and the machine never sees them.
 
 ### 4.2 Projection and persistence
 
@@ -196,12 +220,26 @@ The cleanup-action queue (`Pending`, `Claimed`, `Completed`, with claim tokens) 
 ### 4.4 Operation classes
 
 - `Durable`: every phase above. Dispatch requires `DispatchCommitAcknowledged`.
-- `ReadOnlyCheckOnly`: the class for spec 10's check-only read path. It is eligible only when all three hold, and the driver decides that at `Begin`:
+- `ReadOnlyCheckOnly`: the class for spec 10's check-only read path. It is eligible only when all four hold, and the driver decides that at `Begin`:
   - the deployment's `DurableAdmissionMode` does not cover `ReadOnly`, which excludes the process host because it runs `All`;
+  - the kernel does not set `require_durable_request_retention` (V: `kernel/construction.rs:794-795`);
   - `can_redispatch_unknown_read` holds (M: `kernel/validation.rs:256-305`);
   - no pre-dispatch consumable applies: no `max_invocations`, cost, DPoP, nonce, approval, aggregate or supplemental quota, runtime hook or swarm admission.
 
   It has no persisted row: `Unbegun`, then `CheckOnlyAcknowledged`, then dispatch, then a release outcome.
+- **Retention kernels deny uncovered reads, as today.** When `require_durable_request_retention` is set and the mode does not cover `ReadOnly`, a read is in no class. The driver denies it before `Begin`, with the existing structured-admission refusal (V: `admission_coordinator.rs:526`, `:564-569`). Such kernels need a mode that covers `ReadOnly`, such as `All` (spec 3 rule 19).
+- `NonDurable`: the class for calls that no durable path covers and that are not check-only eligible. It exists only in two configurations:
+  - under `Monetary`, whose `covers` excludes `SideEffecting`, every non-monetary side-effecting tool runs here (M: `admission_operation/identity.rs:387`; `kernel/admission_coordinator.rs:569-581`);
+  - under `Off` with unsafe development mode, every call that is not check-only eligible runs here.
+
+  Reads that are not check-only eligible under `Monetary` take spec 10's durable three-commit path, as they do under `SideEffecting`.
+
+  A `NonDurable` operation has no persisted row:
+  - Its participants are spec 3's in-memory ledger entries, mapped one to one to `Participant`, and they are acknowledged through participant ports.
+  - Dispatch still requires `CheckOnlyAcknowledged`: a spec 10 check-only crossing that runs every `CrossingCheck` with no write. Its integrity check covers grant-declared requirements too, because this class does not exclude grant constraints.
+  - Discharge is the receipt append (M16, T8), under spec 3's obligation.
+
+  `NonDurable` is the region where D1 is worst, because a mutating effect can end with no receipt. Spec 3 phase 1 closes that region on the legacy evaluator. Spec 3's open decisions consider forbidding `Monetary` in production profiles.
 
 ## 5. Events and effects
 
@@ -218,7 +256,7 @@ pub enum AdmissionEvent {
     ApprovalSupplied { approval_set: Digest },
     CaptureCommitted { kind: CaptureKind },
     DispatchCommitAcknowledged { committed_version: u64 },
-    CheckOnlyAcknowledged,                    // read-only class only
+    CheckOnlyAcknowledged,                    // read-only and NonDurable classes only
     EffectAcknowledged { effect: EffectId, committed_version: u64 },
     CallerStartAuthenticated, CallerReportAuthenticated { outcome: OutcomeDigest },
     ToolReturned { outcome: OutcomeDigest, cost: CostFact },
@@ -230,6 +268,9 @@ pub enum AdmissionEvent {
     MutationResult { applied: bool, result_digest: Digest },
     CommitFailed { effect: EffectId, reason: CommitFailure },
     CommitOutcomeUnknown { effect: EffectId },
+    PostEffectStepFailed { step: PostEffectStep, cause: PostEffectCause },  // M16
+    ReceiptAppendFailed { outcome: AppendFailure },                         // M16; spec 10 receipts append
+    ReceiptReadBack { original_present: bool },                             // after AppendFailure::Unknown drains
     Cut { cause: CutCause, facts: CutFacts, now: AuthorityTime },
     Tick { now: AuthorityTime },
 }
@@ -238,6 +279,17 @@ pub enum CommitFailure {  // spec 10 CrossingRefused, plus two non-policy reason
     KernelStopped, AuthoritySpaceClosed, Revoked, InsufficientIntegrity, ReservationConflict,
     VersionConflict, Unavailable, Overloaded,
 }
+
+pub enum AppendFailure {   // spec 10 reports the receipts append as Committed, Refused or Unknown
+    Refused,              // known not committed
+    Unknown,              // timed out or lost; the writer may still commit it (spec 3, S3-05)
+}
+
+pub enum PostEffectCause {
+    Rejected(PostEffectRejection), // spec 3 section 4.5: a typed post-effect rule refused the step
+    Infrastructure,                // clock, key, store or I/O failure; no policy meaning
+}
+// PostEffectStep and PostEffectRejection are spec 3's closed enums (spec 3 section 4.5).
 
 pub enum AmbiguityCause {
     Cancelled { reason: ReasonCode },
@@ -252,6 +304,7 @@ pub enum CutCause {
     GovernedResponseRecovery,
     RecoveryClosure { control: WorkflowControl },   // W: Active | CancelRequested | Cancelled | Quarantined
     AuthorityCut { trigger: TriggerDigest },        // spec 4 drain
+    DriverDropped,                                  // M17: a driver future dropped after the dispatch-commit acknowledgement
 }
 
 pub struct CutFacts {
@@ -278,11 +331,11 @@ pub struct EffectGroup { effects: [Option<Effect>; 4] }      // executed as one 
 
 pub enum Effect {
     IntentCommit(IntentCommitPlan),          // Prepared..DispatchCommitted, including capture, in one crossing (spec 10)
-    ReturnRecord(ReturnRecordPlan),          // durable tool return before post-return work (spec 10)
+    ReturnRecord(ReturnRecordPlan),          // durable tool return before post-return work; also the caller report (progress-only, never stop-checked, M11)
     OutcomeCommit(OutcomeCommitPlan),        // post-return stages, terminal projection, receipt, influence join
-    CheckOnlyCrossing(CheckOnlyPlan),        // read-only class: checks with no write (spec 10)
+    CheckOnlyCrossing(CheckOnlyPlan),        // read-only and NonDurable classes: checks with no write (spec 10)
     ParticipantCommit(ParticipantStep),      // slow path: one participant step
-    DenyTombstone { reason: CommitFailure, receipt: ReceiptPlan },   // fused-path policy refusal
+    DenyTombstone { reason: CommitFailure, receipt: ReceiptPlan },   // fused-path policy refusal, except KernelStopped (M15)
     Park { proposal: ProposalDigest, deadline: AuthorityTime, expected_version: u64 },
     RequestApproval { proposal: ProposalDigest },
     Dispatch,
@@ -294,11 +347,23 @@ pub enum Effect {
     FlushChildReceipts,                      // nested flow, before the parent's receipt
     ReplayTerminal,                          // return the bound terminal result
     SignReceipt { decision: ReceiptDecision, metadata: ReceiptMetadataPlan }, // receipts not bound to a state change
-    Latch { reason: LatchReason },           // spec 3 fail-closed latch
+    HaltOperation { reason: HaltReason },    // spec 3 LatchScope::Operation: halts this operation only
+    LatchRequest { request_id: RequestId, reason: LatchReason },  // spec 3 LatchScope::SessionRequest (spec 4)
+    KernelEvidenceLatch { record: BufferedRecordId },             // spec 3 LatchScope::KernelEvidence (spec 3 section 4.8)
     Fault { kind: FaultKind },               // operator-visible fault; no state change
-    Hint { subject: HintSubjectRef },        // spec 5, after commit (H2)
+    Hint { hint: Hint },                     // spec 5 Part B HintPort; trailing group only (M18)
     Retain,
 }
+
+pub enum HaltReason {
+    CommitOutcomeUnknown,                    // M12
+    RefusedAfterEffect(CommitFailure),       // M11, before the DeniedAfterDelivery terminal
+    InvariantViolation,                      // M11 ReservationConflict after the effect
+    AuthorityCut,                            // cut table, X column, post-dispatch rows
+    UnsettledCallerCustody,                  // cut table, AwaitingCallerReport under N and X
+}
+
+pub enum LatchReason { AuthorityCut }        // spec 4 session-request latch
 
 pub enum MachineRelease { PreDispatchNoEffect, TransportNotAccepted, ContractualZeroCharge }
 
@@ -314,13 +379,15 @@ pub enum ReceiptDecision {
 - Every state-mutating effect carries the expected operation version. A mismatch returns `CommitFailed { VersionConflict }`.
 - `Compensate` and `Terminalize` carry their receipt, so the terminal projection binds the no-effect proof and the receipt atomically (saga rule 5).
 - A compensation that needs an external rail release first is two groups: the rail release (`ParticipantCommit`), then the projection. A partially completed compensation is driven again by the next `Cut`.
-- Capacity is fixed: at most 4 groups of 4 effects. Every arm builds a literal list, so exceeding capacity is a compile error.
+- Capacity is fixed: at most 4 groups of 4 effects. Every arm builds a literal list, so exceeding capacity is a compile error. A trailing hint group (M18) counts toward the four.
+- `HaltOperation` changes no persisted state. The driver stops acting on that operation; a later re-projection from the store or a `Cut` clears the halt. It never gates other operations or new dispatch. Only `KernelEvidenceLatch` gates new dispatch, and only while its buffered record is unpersisted (spec 3 section 4.8).
+- `Hint` effects form the last group of a list and run only after the commit group before them is acknowledged with `Committed`. They never run after a savepoint, `Retry`, a refusal or `CommitOutcomeUnknown` (M18).
 
 **The plan types.**
 - `IntentCommitPlan` lists the ordered steps the fast path commits atomically: begin, participant acknowledgements, ready, capture when `budget_capture` is set (`CapturePending` and the capture itself), then the dispatch commit (M: `state.rs:676-685` requires `CapturePending` before `DispatchCommitted` under capture). It runs only when every participant has an in-transaction form in the admission writer (spec 10).
-- `ReturnRecordPlan` makes the returned bytes and cost durable, and binds the post-return evaluation time, frozen steps and normalized context, before post-return work.
+- `ReturnRecordPlan` makes the returned bytes and cost durable, and binds the post-return evaluation time, frozen steps and normalized context, before post-return work. The same plan records an authenticated caller report, and the bytes of a two-commit read whose outcome commit a stop refused (M11). It is a progress-only commit with no `StopEpoch` check.
 - `OutcomeCommitPlan` lists the pure post-return results, the terminal projection with its payment plan, the receipt, and spec 11's output influence join.
-- `CheckOnlyPlan` lists the crossing checks for a read-only call. The receipt rides the release commit.
+- `CheckOnlyPlan` lists the crossing checks for a read-only or `NonDurable` call. The receipt rides the release commit for a read, and the receipt append (M16) for a `NonDurable` call.
 - Each plan carries the expected operation version (spec 10 rule X5).
 
 **Release authorities.**
@@ -349,7 +416,7 @@ pub enum ReceiptDecision {
    - `Begin` against a terminal yields `ReplayTerminal`.
    - Any other event illegal in the phase yields `next == state` and a `Fault { IllegalEvent }`. It never yields a partial state.
 3. **M3. Prepared first.** No step that mutates a participant precedes the `Prepared` step of the same operation (saga rule 1). On the fast path both are in one `IntentCommit`.
-4. **M4. Commit before handoff.** `Dispatch` is emitted only in the transition consuming `DispatchCommitAcknowledged`. For the read-only class it is emitted only on `CheckOnlyAcknowledged`.
+4. **M4. Commit before handoff.** `Dispatch` is emitted only in the transition consuming `DispatchCommitAcknowledged`. For the read-only and `NonDurable` classes it is emitted only on `CheckOnlyAcknowledged`.
 5. **M5. Plan order.** A participant is acknowledged only when every earlier participant in the plan is acknowledged, except through the combined cumulative-approval acknowledgement. `Authorized` is entered exactly when the plan is complete. `Ready` is entered exactly when `ReadyToDispatch` is persisted.
 6. **M6. Absorbing terminals.** No transition leaves a terminal phase. A terminal accepts `Tick` (`Retain`) and `Begin` (`ReplayTerminal`).
 7. **M7. Unknown stays unknown.** `TransportAmbiguous` after dispatch commit moves to `Terminal(OutcomeUnknownAfterDispatch)` with no release, and the receipt carries the typed `AmbiguityCause`. No `Dispatch` follows. Holds stay frozen, and any later release happens in the payment journal outside the machine.
@@ -359,23 +426,83 @@ pub enum ReceiptDecision {
 
     | Failed effect | Reason | Next and effects |
     |---|---|---|
-    | `IntentCommit` (fused) | `KernelStopped`, `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict` | `DenyTombstone` with the refusing reason, then `Terminal(CompensatedBeforeDispatch)`. The tombstone keeps the request id terminal (saga rule 4; spec 8 S15) |
+    | `IntentCommit` (fused) | `AuthoritySpaceClosed`, `Revoked`, `InsufficientIntegrity`, `ReservationConflict` | `DenyTombstone` with the refusing reason, then `Terminal(CompensatedBeforeDispatch)`. The tombstone keeps the request id terminal (saga rule 4) |
+    | `IntentCommit` (fused) | `KernelStopped` | stay `Unbegun`; `SignReceipt(Deny { KernelStopped })` with the head's `observed_epoch`. No tombstone, so the request id stays usable after resume (M15) |
     | `IntentCommit` | `Unavailable` | stay `Unbegun`; the driver feeds `Replan { slow_path: true }`, and the machine emits slow-path `ParticipantCommit` steps |
     | any | `VersionConflict` | `Retain`; the driver re-projects from the store and re-feeds. Never compensates |
     | `IntentCommit` | `Overloaded` | stay `Unbegun`; the driver returns the overload error with no receipt and no state, as a pre-admission refusal |
-    | slow-path dispatch-commit step | any policy reason | `Compensate { PreDispatchNoEffect, receipt }` |
+    | slow-path dispatch-commit step from `Parked` (approval resume) | `KernelStopped` | `Retain` in `Parked`. Never compensates, so the pending approval survives the stop (M15) |
+    | slow-path dispatch-commit step, otherwise | any policy reason | `Compensate { PreDispatchNoEffect, receipt }`. The request id is terminal, as on M: today |
     | `ParticipantCommit` | `ParticipantRefused` | `Compensate { PreDispatchNoEffect, receipt }` |
-    | `CheckOnlyCrossing` | any policy reason | `SignReceipt(Deny)` with the reason; nothing to compensate |
+    | `CheckOnlyCrossing` (read-only class) | any policy reason | `SignReceipt(Deny)` with the reason; nothing to compensate |
+    | `CheckOnlyCrossing` (`NonDurable`) | any policy reason | `Compensate { PreDispatchRefusal, PreDispatchNoEffect, receipt }`, which the driver executes against spec 3's in-memory ledger; there is no row to project |
 
-11. **M11. Refusals after the effect.** For `ReturnRecord`, `OutcomeCommit` and the release crossings:
-    - `KernelStopped`: `Retain` in `Finalizing(stage)`, with output withheld. The next `Tick` or `Cut` after the stop is resumed re-emits the commit (spec 8 S14).
-    - `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`: `Latch`, then `Terminalize(DeniedAfterDelivery)` with a `DenyDelivery` receipt naming the reason and retained markers, matching spec 3 rule 12. The release follows the terminal payment plan.
-    - `ReservationConflict`: `Latch` and `Fault`. It is unreachable after the effect, because reservations commit in the intent commit, so reaching it is an invariant violation.
-    - `VersionConflict`: re-project.
-    - For the read-only class: a refused release signs a `Withheld` receipt through a non-crossing commit.
-12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect: `Latch`, no compensation, no dispatch and no state change. The driver halts the operation, and restart re-projects it from the store.
+11. **M11. Refusals after the effect.** For `ReturnRecord`, `OutcomeCommit` and the release crossings. Spec 9 owns these rows. Spec 3 rule 13 is the same mapping, implemented on the legacy evaluator in spec 3 phase 1.
+    - **`KernelStopped`.** The release crossings carry spec 8's `Withhold` disposition (spec 10 section 4.2).
+      - From `Finalizing(stage)`: `Retain` with output withheld. The next `Tick` or `Cut` after the stop is resumed re-emits the commit (spec 8 S14).
+      - On the outcome commit of a two-commit read (spec 10 X14), from `DispatchCommitted` with no return record: emit `ReturnRecord` with the returned bytes, which moves the operation to `Finalizing(stage)` with output withheld. The driver returns `OutputWithheld { operation_id, reason: KernelStopped }` (spec 8). The read is never re-dispatched (S8-18).
+      - `ReturnRecord` is progress-only and never stop-checked, so a stop cannot refuse it. That includes the caller report: `CallerReportAuthenticated` in `AwaitingCallerReport` emits `ReturnRecord` and moves to `Finalizing`. Only the later `OutputRelease` inside `OutcomeCommit` is stop-checked (S8-12).
+      - The legacy startup reconciler adopts this rule in spec 8 phase 1, before this machine replaces it. The stop heads load before the sweep, and a `KernelStopped` finalization error during the sweep retains the operation instead of failing startup (S8-01; M: `kernel/admission_coordinator/recovery.rs:295-358`).
+    - **`AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`.** `HaltOperation { RefusedAfterEffect(reason) }`, then `Terminalize(DeniedAfterDelivery)` with a `DenyDelivery` receipt naming the reason and retained markers. The release follows the terminal payment plan, and the terminal clears the halt.
+    - **`ReservationConflict`.** `HaltOperation { InvariantViolation }` and `Fault`. It is unreachable after the effect, because reservations commit in the intent commit, so reaching it is an invariant violation.
+    - **`VersionConflict`.** Re-project.
+    - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that.
+12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect yields `HaltOperation { CommitOutcomeUnknown }`, with no compensation, no dispatch and no state change.
+    - This is the machine form of spec 3's `BoundaryFailure::CommitUnconfirmed`: every hold and credential is retained.
+    - When the unknown commit is pre-dispatch (an `IntentCommit` or a slow-path dispatch-commit step), a second group signs the ambiguous `SignReceipt(Deny)` with retained markers, as M: does today (M: `kernel/evaluation/dispatch_commit_failure.rs:40-75`).
+    - When the unknown commit is post-effect, no receipt is signed, because the unknown commit may hold it.
+    - Restart re-projects the operation from the store.
 13. **M13. Integrity at every dispatch commit.** Every dispatch-commit step, fast or slow, and every `CheckOnlyCrossing`, is a crossing that carries spec 10's full `CrossingCheck` list, including `KnowledgeIntegrity` (spec 11 rule I15). No earlier acknowledgement satisfies it.
-14. **M14. Post-effect discharge (safety form).** Every post-dispatch phase has an enabled transition to a terminal, a durable-outcome acknowledgement or a `Latch`, under the fair events named in section 10. No transition returns a post-dispatch operation to a pre-dispatch phase. The discharge set matches spec 3 section 4.8: terminal, durable outcome, terminalized admission, post-effect fault receipt, or buffered fault plus latch.
+14. **M14. Post-effect discharge (safety form).** Every post-dispatch phase has an enabled transition to a discharge, or to `HaltOperation`, under the fair events named in section 10. No transition returns a post-dispatch operation to a pre-dispatch phase.
+    - The discharge set is the acknowledgement of one of these:
+      - `OutcomeCommit`;
+      - `ReturnRecord`, after which the saga owns the rest;
+      - `Terminalize`;
+      - an appended `SignReceipt`, for classes with no row;
+      - `KernelEvidenceLatch` with a buffered record, for classes with no row.
+
+      This is spec 3 section 4.11's `exactly_one_of` and spec 3's affine driver contract.
+    - `HaltOperation` is not a discharge. For a durable operation, the persisted record is the evidence, and restart or the next `Cut` re-projects it.
+15. **M15. A stop is a temporary refusal (spec 8 S15).** `KernelStopped` never writes a deny tombstone, never terminalizes, and never compensates a parked or post-dispatch operation.
+
+    | Path | Behavior |
+    |---|---|
+    | Tier-1 early stop check, before `Begin` | A driver pre-check outside the machine, like `Overloaded`. It signs `Deny { KernelStopped }` with `observed_epoch`, persists no state, and leaves the request id usable after resume |
+    | Fused `IntentCommit` | M10: receipt only, id usable after resume |
+    | `CheckOnlyCrossing` | M10: receipt only; the read-only class has no id to burn |
+    | Slow path with a persisted begin row, not parked | M10: compensates; the id is terminal, as on M: today |
+    | `Parked` | `Retain`. While the driver's stop read says stopped, approval resolutions are refused at the edge before any event, without consuming the approval (S8-19). `ApprovalSupplied` is therefore never fed during a stop |
+    | After the effect | M11: withheld and retained, or a `Withheld` receipt for classes with no row |
+
+    Consequence for processes: chio-process retries with the same request id (M: `crates/kernel/chio-process/ARCHITECTURE.md:40-45`). A tier-1 or fused stop denial leaves that id usable after resume. A slow-path compensation burns it, as today.
+16. **M16. Post-effect step failures and receipt appends.** These rows are the step-to-receipt mapping. Spec 3 owns the closed `PostEffectStep` and `PostEffectRejection` enums; spec 10 executes the commits. Durable means a class with a persisted row.
+
+    | Event | Durable class | Classes with no row (read-only, `NonDurable`) |
+    |---|---|---|
+    | `PostEffectStepFailed { cause: Rejected(PostInvocationBlocked or OutputContract or StreamLimit) }` | the pure result enters `OutcomeCommit`, which terminalizes `DeniedAfterDelivery` with a `DenyDelivery` receipt and retained markers (M: `responses/finalization.rs:43`) | `SignReceipt(DenyDelivery)` with retained markers, appended |
+    | `PostEffectStepFailed { cause: Rejected(Revoked) }` | as M11 `Revoked` | `SignReceipt(DenyDelivery)`, matching M: `allow_responses.rs:53` |
+    | `PostEffectStepFailed { cause: Rejected(ReleaseRefused(r)) }` | as M11 for `r` | as M11 for `r` |
+    | `PostEffectStepFailed { step: CredentialCommit, .. }` | not reachable: the intent commit holds the credentials | `SignReceipt(Cancelled)` with today's `POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON` and `execution_outcome: "unknown"` |
+    | `PostEffectStepFailed { cause: Infrastructure }` | With a return record: `Retain` in `Finalizing(stage)` plus `Fault { PostEffectInfrastructure }`. The next `Tick` or `Cut` re-runs from the frozen inputs (spec 10 X11). Without one (X14): `ReturnRecord` first, then the same | `SignReceipt(Cancelled)` with `chio_runtime.post_effect_fault = { step, code, retained_ids }`, appended |
+    | `ReceiptAppendFailed { Refused }` | not reachable: the receipt rides the terminal projection, and the mover materializes it (spec 10 section 11) | append the fault receipt (`Cancelled`, step `Append`). If that append also fails, `KernelEvidenceLatch { record }` buffers it |
+    | `ReceiptAppendFailed { Unknown }` | not reachable, as above | `KernelEvidenceLatch { record }` buffers the fault record. Nothing is appended until `ReceiptReadBack`. `original_present: true` makes the original the discharge, and the buffered record is dropped with an `audit_fault`. `original_present: false` appends the fault receipt naming the original receipt id |
+
+    Failures after the receipt (spec 3 rule 15) never re-enter the machine: security release, final release, provenance append and nonce mint. The receipt stands, and the driver returns `DeliveryFailedAfterReceipt`.
+17. **M17. Driver drop.** No durable transition runs inside `Drop`.
+    - **Before the acknowledgement.** A driver future dropped before `DispatchCommitAcknowledged` (or before `CheckOnlyAcknowledged` for classes with no row) compensates pre-dispatch participants under `PreDispatchNoEffect`. The compensation runs best-effort from `Drop` with the cleanup-fault receipt, or as a supervised job enqueued from `Drop` (spec 3, S3-01). It never latches.
+      - With a persisted row, the job drives this machine's `Compensate` row.
+      - On the fused path before the intent commit, nothing was persisted, so only spec 3's in-memory ledger entries are released.
+    - **After the acknowledgement.** A driver future dropped after the acknowledgement enqueues a supervised reconciliation job. The job takes the lease and feeds `Cut { cause: DriverDropped, .. }`, which the cut table classifies by its `S` column.
+      - A `DispatchCommitted` operation with no return record therefore terminalizes as outcome-unknown, as M:'s guard does today (M: `kernel_drop_guard.rs:530-548`), without waiting for a restart (S3-14).
+      - For classes with no row, spec 3's obligation `Drop` applies: a best-effort cancellation receipt, else `KernelEvidenceLatch`.
+18. **M18. Hints trail commits (spec 5 Part B).**
+    - `Effect::Hint { hint }` carries spec 5's `Hint { subject: HintSubject, kind: HintKind, audience: HintAudience }`. It is posted through `HintPort::post`, which is infallible, non-blocking and best-effort. The machine fills `audience` from the request's owner: `HintAudience::Owner(HintOwnerRef::Session | Process | Operation)`.
+    - A hint group is the last group of its `EffectList`. It runs only after the commit group before it is acknowledged `Committed`, and never after a savepoint, `Retry`, a refusal or `CommitOutcomeUnknown`.
+    - **Spec 5 H2, per spec 10 commit class.**
+      - After a crossing-authorizing or restrictive commit, `Committed` implies anchored, so a re-read observes the hinted change.
+      - After a progress-only commit (return record, park), a `Restore(k)` can undo the change. Consumers re-read and treat absence as a resync.
+    - No `AdmissionEvent` is derived from a hint (spec 5 H1). The differential suite drops and forges hints and asserts identical transitions.
+    - Until spec 5 Part B lands, drivers install a no-op `HintPort`.
 
 ### 6.1 The normative cut table
 
@@ -392,21 +519,21 @@ Columns: `S` = `StartupRecovery`; `A` = `RecoveryClosure` with control `Active`;
 | `CapturePending`, capture `NotCommitted` | Compensate | Compensate | Compensate | Compensate |
 | `CapturePending`, capture `Committed` | `IntentCommit` remainder to `DispatchCommitted` (no handoff happened yet), then as `DispatchCommitted` | as S | as S | as S |
 | `CapturePending`, capture `Unknown` | `QueryParticipant(Capture)`, Retain | as S | as S | as S |
-| `DispatchCommitted`, durable return `Recoverable` | `Finalizing`: the next post-return stage (never terminalize; M: `recovery.rs:408-418`) | as S | as S | `Latch`, then as S |
-| `DispatchCommitted`, `caller_report_custody` | `CallerAwaitReport` to `AwaitingCallerReport` | as S | `Terminalize(OutcomeUnknownAfterDispatch)` (W:) | `Latch`, `CancelTransport`, then as S |
-| `DispatchCommitted`, otherwise | `NotAccepted` proof in `dispatch_status`: `Terminalize(NotAcceptedAfterDispatchCommit, TransportNotAccepted)`; else `Terminalize(OutcomeUnknownAfterDispatch)` | as S | as S | `Latch`, `CancelTransport`, then as S |
-| `AwaitingCallerReport` | Retain | Retain | `Latch` plus `Fault { UnsettledCallerCustody }` (open decision 1) | `Latch` plus the same fault |
-| `Finalizing`, return `Recoverable` | next post-return stage | as S | as S | `Latch`, then as S |
+| `DispatchCommitted`, durable return `Recoverable` | `Finalizing`: the next post-return stage (never terminalize; M: `recovery.rs:408-418`) | as S | as S | `HaltOperation { AuthorityCut }`, then as S |
+| `DispatchCommitted`, `caller_report_custody` | `CallerAwaitReport` to `AwaitingCallerReport` | as S | `Terminalize(OutcomeUnknownAfterDispatch)` (W:) | `HaltOperation { AuthorityCut }`, `CancelTransport`, then as S |
+| `DispatchCommitted`, otherwise | `NotAccepted` proof in `dispatch_status`: `Terminalize(NotAcceptedAfterDispatchCommit, TransportNotAccepted)`; else `Terminalize(OutcomeUnknownAfterDispatch)` | as S | as S | `HaltOperation { AuthorityCut }`, `CancelTransport`, then as S |
+| `AwaitingCallerReport` | Retain | Retain | `HaltOperation { UnsettledCallerCustody }` plus `Fault { UnsettledCallerCustody }` (open decision 1) | `HaltOperation { UnsettledCallerCustody }` plus the same fault |
+| `Finalizing`, return `Recoverable` | next post-return stage | as S | as S | `HaltOperation { AuthorityCut }`, then as S |
 | `Finalizing`, return `Unrecoverable` | Retain plus `Fault { UnrecoverableReturn }` (M: claims recovery and continues, `recovery.rs:308-318`) | as S | as S | as S |
 | `Compensating` | Compensate (drive again) | as S | as S | as S |
 | `Mutation(Ready)` | `QueryParticipant(Mutation)`, then Applied or NotApplied by result | as S | as S | as S |
 | `Mutation(Submitted)` | `QueryParticipant(Mutation)`, Retain until the result | as S | as S | as S |
-| `Authorized` (governed active response), approval reservation `Committed` | roll forward to `DispatchCommitted`; a committed approval cannot be cancelled (M: `admission_cleanup.rs:551-599`, `:602-607`) | as S | as S | as S, then `Latch`; the closed space refuses the execution crossing |
+| `Authorized` (governed active response), approval reservation `Committed` | roll forward to `DispatchCommitted`; a committed approval cannot be cancelled (M: `admission_cleanup.rs:551-599`, `:602-607`) | as S | as S | as S, then `HaltOperation { AuthorityCut }`; the closed space refuses the execution crossing |
 | `Authorized` (governed active response), approval reservation `None` or `Reserved` | Compensate (M: `admission_cleanup.rs:661-676`) | Compensate | Compensate | Compensate |
-| `DispatchCommitted` (governed active response) | `QueryParticipant(ApprovalReservation)`, commit it if still `Reserved`, Retain; never terminalize while the executor can resume (M: `admission_cleanup.rs:602-627`) | as S | as S | `Latch`, then as S |
+| `DispatchCommitted` (governed active response) | `QueryParticipant(ApprovalReservation)`, commit it if still `Reserved`, Retain; never terminalize while the executor can resume (M: `admission_cleanup.rs:602-627`) | as S | as S | `HaltOperation { AuthorityCut }`, then as S |
 | Terminal | Retain | Retain | Retain | Retain |
 
-`ApprovalRetirement` on `Parked` with an elapsed deadline compensates with cause `ApprovalRetirement`. `GovernedResponseRecovery` uses the `S` column. For the governed active response kind, its own rows take precedence over the generic `Authorized` and `DispatchCommitted` rows.
+`ApprovalRetirement` on `Parked` with an elapsed deadline compensates with cause `ApprovalRetirement`. `GovernedResponseRecovery` and `DriverDropped` (M17) use the `S` column. Under `X`, every row whose operation has a live session request also emits `LatchRequest { request_id, AuthorityCut }` in its first group, so the session cannot re-submit the request into the closed space (spec 4 section 5). Every `HaltOperation` in this table halts only the named operation; none gates other operations or new dispatch. For the governed active response kind, its own rows take precedence over the generic `Authorized` and `DispatchCommitted` rows.
 
 ```text
 forall cause: Compensate in classify(s, cause, f, t) -> pre_dispatch(s) and f.capture != Committed
@@ -423,6 +550,7 @@ forall cause: Terminalize(OutcomeUnknownAfterDispatch) in classify(s, cause, f, 
 | Wildcard phases | `claim_admission_recovery` | no action | no wildcard; every phase has a row |
 | Governed `ApprovalReserved` with a committed approval | startup recovery stages compensation (`admission_cleanup.rs:661-676`); the resume path rolls forward (`:551-599`) | not covered | roll forward under every cause |
 | Clock | fallible authority clock | infallible system clock (W: `admission_coordinator.rs:192-194`) | authority clock only (umbrella N15) |
+| `Finalizing` while the kernel is stopped | the finalization error fails startup (M: `recovery.rs:295-358`), so a host restarted during a stop never starts | not covered | Retain with output withheld (M11); spec 8 phase 1 adopts this in the legacy reconciler (S8-01) |
 
 ## 7. Drivers and ports
 
@@ -432,17 +560,22 @@ forall cause: Terminalize(OutcomeUnknownAfterDispatch) in classify(s, cause, f, 
 | `BlockingAdapter` | none of its own: wraps `EvaluationDriver` on the existing blocking runtime | as above |
 | `NestedFlowDriver` | the same events, with nested-flow client callbacks as an event source | as above, plus `NestedFlowClient` |
 | `CallerExecutionDriver` | reserve, `CallerStartAuthenticated` and `CallerReportAuthenticated`, under the caller dispositions | `CrossingPort` |
-| `StartupReconciler` | `Cut(StartupRecovery)` per recoverable operation, after the lease claim | `CrossingPort`, `SigningPort` |
+| `StartupReconciler` | `Cut(StartupRecovery)` per recoverable operation, after the lease claim and after spec 8's stop heads load | `CrossingPort`, `SigningPort` |
 | `ApprovalRetirementDriver` | `Cut(ApprovalRetirement)` | as above |
 | `GovernedResponseRecoveryDriver` | `Cut(GovernedResponseRecovery)`, and the committed active-response resume (M: `kernel/active_response_committed_recovery.rs:204`, `:424`) | as above |
 | `RecoveryClosureDriver` (W:) | `Cut(RecoveryClosure { control })` | as above |
 | `DrainDriver` (spec 4) | `Cut(AuthorityCut { trigger })` | as above |
 | `ReservationReconcileDriver` | settlement of a reserved authorization by nonce (M: `kernel/reconciliation.rs:148`) | as above |
+| `DropReconcileJob` | `Cut(DriverDropped)` for a driver dropped after its dispatch-commit acknowledgement (M17) | as above |
 
 The rules for drivers:
 - Drivers own leases (the existing `mutation_sequencer.try_own_operation`), the clock, fact lookups, identity allocation, and every port call.
 - A driver never chooses a next state. It persists `next` through the commit effects that spec 10 executes, using `persist` and the version CAS.
 - A crash between an effect and its acknowledgement is resolved by re-projecting the persisted record and re-feeding only the events the driver can prove (participant lookup by `operation_id`). It is never resolved by assumption.
+- **Affine driver contract (spec 3).** A driver that hands off to a tool holds spec 3's obligation. It is minted on the acknowledgement of `Dispatch`, `DispatchCommitAcknowledged` or `CheckOnlyAcknowledged`, and it is discharged only by the acknowledgement of an M14 discharge effect. Spec 3 owns the obligation type, the latch scopes and the ledger; this spec owns the decisions; spec 10 executes the commits.
+- **Drop** follows M17. No durable transition runs inside `Drop`, and a pre-dispatch drop never latches.
+- **Halts.** A driver that receives `HaltOperation` stops acting on that operation and releases its lease. It keeps serving every other operation.
+- **Hints.** The `HintPort` is a no-op until spec 5 Part B lands (M18).
 
 ## 8. One evaluation entry point
 
@@ -508,11 +641,11 @@ Each phase keeps the suite green and changes no wire, receipt or persisted forma
      - the cumulative combined acknowledgement;
      - the governed active response `ReadyToDispatch` insertion;
      - the dormant security states, covered by projection only;
-     - the five divergences of section 6.2.
-2. **Phase 1: startup reconciler and approval retirement.** Effects must equal today's behavior on the DST seeds and the existing recovery tests, including the durable `AwaitingCallerReport` transition.
+     - the divergences of section 6.2.
+2. **Phase 1: startup reconciler and approval retirement.** Effects must equal today's behavior on the DST seeds and the existing recovery tests, including the durable `AwaitingCallerReport` transition. The one intended difference is the stop row of section 6.2, which spec 8 phase 1 has already landed in the legacy reconciler.
 3. **Phase 2: recovery closure and governed active response recovery.** These follow the section 6.1 rows.
-4. **Phase 3: drain and stop.** Spec 4's drain and spec 8's stop path are built on the machine from the start.
-5. **Phase 4: evaluators.** `EvaluationDriver`, `NestedFlowDriver`, `CallerExecutionDriver` and `ReservationReconcileDriver` replace their legacy code. The `evaluate` entry point lands and the seventeen wrappers are deprecated.
+4. **Phase 3: drain and stop.** Spec 4's drain is built on the machine from the start. Spec 8 phase 1 lands earlier, in the bug-fix lane, on the legacy code: it adopts the M11 retain rule in the legacy reconciler and needs nothing else from this spec. Spec 8 phase 2 (the `StopEpoch` crossing check, with spec 10) and its later phases are built on the machine.
+5. **Phase 4: evaluators.** `EvaluationDriver`, `NestedFlowDriver`, `CallerExecutionDriver`, `ReservationReconcileDriver` and `DropReconcileJob` replace their legacy code. The `evaluate` entry point lands and the seventeen wrappers are deprecated. Spec 3 phase 1 lands earlier, in the bug-fix lane, as the D1 fix on the legacy evaluator. Spec 3's later phases are re-specified against these drivers.
 6. **Phase 5: one persisted model** (open decision 2).
 
 **Compatibility period.** Through phase 5, the store's CAS keeps asserting the legacy predicate for the record's model. When the predicate rejects a machine-chosen step, that operation is handed to the retained legacy driver, with an `audit_fault`. It is never blocked, and holds are never stranded. The assertions and the legacy drivers are removed only after one release with zero recorded disagreements in CI, DST and production traces.
@@ -525,26 +658,28 @@ Each phase keeps the suite green and changes no wire, receipt or persisted forma
 - `admission_machine::core`: phases and participants as codes, facts as fixed-width bitsets, digests as `[u8; 32]`, effects as codes. It is extractable: no `serde_json`, no attachments and no heap collections, consistent with the hub's rule (M: `formal_aeneas.rs:1-5`).
 - `admission_machine::hydrate`: builds `IntentCommitPlan`, receipt metadata and attachments from core codes. It is not extracted, and it is covered by differential tests and Kani.
 
-Phase 0 extracts a prototype core with payload-carrying enums before committing T1-T10. The Lean statements live in `Chio/Admission/Machine.lean`.
+Phase 0 extracts a prototype core with payload-carrying enums before committing T1-T12. The Lean statements live in `Chio/Admission/Machine.lean`.
 
 **Theorems** (safety, over the extracted core):
 
 | Theorem | Statement | Closes |
 |---|---|---|
 | T1 `prepared_first` | no participant-mutating step precedes `Prepared` | saga rule 1 |
-| T2 `commit_before_dispatch` | `Dispatch` only on `DispatchCommitAcknowledged`, or on `CheckOnlyAcknowledged` for the read-only class | saga rule 3 |
+| T2 `commit_before_dispatch` | `Dispatch` only on `DispatchCommitAcknowledged`, or on `CheckOnlyAcknowledged` for the read-only and `NonDurable` classes | saga rule 3 |
 | T3 `no_compensation_after_commit` | `Compensate` only from pre-dispatch phases with capture not committed | spec 4 section 5 |
 | T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`, and the last only on a zero recomputed amount or `DeniedAfterDelivery` | saga rule 6 |
 | T5 `terminal_absorbing` | no transition leaves a terminal phase | saga rule 4 |
 | T6 `unknown_stays_unknown` | no `Dispatch` and no machine release after `OutcomeUnknownAfterDispatch` | saga rule 6 |
 | T7 `fence_dominance` | a policy refusal on any dispatch-commit step (fast or slow) or check-only crossing never leads to `Dispatch`; a refusal on an outcome or release commit never leads to an `Allow` receipt | spec 8 S7/S15, spec 4 section 4.1, spec 11 |
-| T8 `post_effect_discharge` | every post-dispatch phase has an enabled discharge transition under the named fair events, and none returns to a pre-dispatch phase | spec 3 section 4.8 |
+| T8 `post_effect_discharge` | every post-dispatch phase has an enabled transition to the M14 discharge set, or to `HaltOperation`, under the named fair events; none returns to a pre-dispatch phase; each handed-off operation acknowledges exactly one discharge | spec 3 section 4.11 |
 | T9 `plan_order` | participants are acknowledged in plan order or by the combined acknowledgement; `Authorized` exactly when the plan is complete | both legacy orderings |
 | T10 `replay_uniqueness` | an operation in a terminal phase, including a deny tombstone, never reaches `Dispatch` again for the same binding | saga rule 4 and its predicates |
+| T11 `stop_is_temporary` | a `KernelStopped` refusal never emits `DenyTombstone` or `Terminalize`, and never emits `Compensate` from `Parked` or a post-dispatch phase | spec 8 S14, S15 |
+| T12 `hints_trail_commits` | a `Hint` effect appears only in the last group of a list, after a group whose commit was acknowledged `Committed`; no transition reads a hint | spec 5 H1, H2 |
 
 **Model checking.**
-- Add `formal/apalache/AdmissionMachine.tla` for two operations and these concurrent drivers racing through version CAS: evaluator, startup reconciler, recovery closure, caller execution, the drain, and the governed active response resume.
-- Safety invariants T2, T3, T5, T7 and T10 are checked under interleaving, with a negative model for each.
+- Add `formal/apalache/AdmissionMachine.tla` for two operations and these concurrent drivers racing through version CAS: evaluator, startup reconciler, recovery closure, caller execution, the drain, the drop-reconcile job, and the governed active response resume.
+- Safety invariants T2, T3, T5, T7, T10 and T11 are checked under interleaving, with a negative model for each. The model includes a stop committed and resumed at any point, so T11 is checked against a parked operation and a stop-withheld release.
 - **Liveness** is checked here, not in Lean, under weak fairness on these events:
   - eventually a caller report, or the open decision 1 deadline edge;
   - eventually a transport answer or ambiguity;
@@ -556,8 +691,8 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 **Trace validation.** Today's commit log retains digests, not states (section 2). Phase 1 validates that machine-produced states hash to the retained operation digests. Full replay of production histories needs per-version snapshots or an event log (open decision 6).
 
 **Deterministic simulation.**
-- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, and clock unavailability.
-- The oracles are T1-T10 as runtime assertions, plus the legacy predicates during compatibility.
+- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, and clock unavailability.
+- The oracles are T1-T12 as runtime assertions, plus the legacy predicates during compatibility.
 
 ## 11. Performance
 
@@ -575,7 +710,11 @@ Acceptance:
 | Illegal event for the phase | `Fault { IllegalEvent }` and no state change. Duplicates and replays are idempotent, not faults (M2) |
 | Machine and legacy predicate disagree (compatibility) | the operation is handed to the legacy driver, with an `audit_fault`; never blocked |
 | Commit effect refused | M10 before the effect, M11 after it |
-| Commit outcome unknown | M12: latch and halt; re-project at restart |
+| Commit outcome unknown | M12: `HaltOperation`, holds retained, ambiguous deny if pre-dispatch; re-project at restart |
+| Post-effect step failure | M16: durable classes retain and re-run from frozen inputs or terminalize `DeniedAfterDelivery`; classes with no row append a fault receipt |
+| Receipt append outcome unknown | M16: `KernelEvidenceLatch` with the buffered fault record; nothing appended until the read-back |
+| Driver future dropped | M17: compensate before the acknowledgement; `Cut(DriverDropped)` after it; never a durable transition in `Drop` |
+| Kernel stopped | M15: receipt only, no tombstone; parked and post-effect operations retained; a host restarted during a stop still starts (section 6.2) |
 | Crash between effect and acknowledgement | re-project and re-feed provable events only (section 7) |
 | Clock unavailable | the driver cannot construct the event, so no transition occurs. Pre-dispatch work fails closed through the existing authority-time errors |
 | Partially completed compensation | the next `Cut` drives it again from `Compensating` or the persisted phase |
@@ -587,23 +726,34 @@ Acceptance:
 | 0 | Vocabulary, projection, persistence, prototype extraction, differential | Prototype extracts; zero unexplained disagreements |
 | 1 | Startup and approval-retirement drivers; Lean skeleton; `AdmissionMachine.tla` | T3, T5, T10 proven; Apalache positive and negative pass |
 | 2 | Recovery closure and governed active response drivers | W: recovery suites and governed active response recovery tests green |
-| 3 | Drain and stop drivers (with specs 4 and 8) | Spec 4 and 8 conformance |
-| 4 | Evaluation, nested, caller-execution and reservation-reconcile drivers; `evaluate`; deprecations | Benchmark acceptance; T1-T10 proven; liveness checked |
+| 3 | Drain driver (spec 4) and the stop path from spec 8 phase 2 onward; spec 8 phase 1 has already landed on the legacy reconciler | Spec 4 and 8 conformance |
+| 4 | Evaluation, nested, caller-execution, reservation-reconcile and drop-reconcile drivers; `evaluate`; deprecations | Benchmark acceptance; T1-T12 proven; liveness checked |
 | 5 | Persisted model decision; compatibility assertions and legacy drivers removed | One release with zero disagreements |
 
 Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI.
 
 ## 14. Tests and conformance evidence
 
-- **Unit:** projection totality over all 19 tool-model and 15 security-model states with their dispatch pairs; `persist(project(r), r, ..) == r` for every reachable record, including security forward actions; rules M1-M14 by example; every row of the cut table.
+- **Unit:** projection totality over all 19 tool-model and 15 security-model states with their dispatch pairs; `persist(project(r), r, ..) == r` for every reachable record, including security forward actions; rules M1-M18 by example; every row of the cut table, including `DriverDropped` and the `LatchRequest` emissions under `X`; every M16 row for both class groups.
 - **Differential:** the two inclusions of phase 0, over the live transition space.
-- **Proptest:** random event sequences per kind, class and plan, checking T1-T10 as executable assertions.
+- **Proptest:** random event sequences per kind, class and plan, checking T1-T12 as executable assertions.
 - **Kani:** `transition` never panics; `classify` is total; the hydrator's plans are well formed.
-- **Lean:** T1-T10, with mirrors registered.
-- **Apalache:** `AdmissionMachine.tla`, with negative mutants: drop the T2 guard, compensate after commit, leave a terminal, dispatch after a deny tombstone.
-- **Loom:** two drivers racing on one operation through the CAS adapter; a cut racing a caller report.
+- **Lean:** T1-T12, with mirrors registered.
+- **Apalache:** `AdmissionMachine.tla`, with negative mutants: drop the T2 guard, compensate after commit, leave a terminal, dispatch after a deny tombstone, tombstone a `KernelStopped` refusal, compensate a parked operation on `KernelStopped`.
+- **Loom:** two drivers racing on one operation through the CAS adapter; a cut racing a caller report; a driver dropped while its dispatch-commit acknowledgement is in flight, racing the drop-reconcile job.
 - **DST:** one fault-injection seed per effect group and failure reason, added to `tests/dst/seeds.toml`.
-- **Conformance:** the existing verdict-matrix and recovery scenarios pass unchanged through `evaluate`; one case for each section 6.2 decision; fused-path deny tombstone replay; read-only class eligibility refusal.
+- **Conformance:**
+  - the existing verdict-matrix and recovery scenarios pass unchanged through `evaluate`;
+  - one case for each section 6.2 decision;
+  - fused-path deny tombstone replay;
+  - read-only class eligibility refusal, including a kernel with `require_durable_request_retention`;
+  - a `KernelStopped` fused denial followed by resume and a retry with the same request id, which is admitted;
+  - a parked operation that survives a stop and an approval refused at the edge during it;
+  - a caller report accepted during a stop and released after resume;
+  - a two-commit read refused at its outcome commit, which returns `OutputWithheld` and is never re-dispatched;
+  - restart during a stop with caller, native and ordinary operations in `Finalizing` (spec 8 S8-01);
+  - a receipt append that times out and then commits, which yields exactly one terminal receipt;
+  - a `NonDurable` call under `Monetary` with every M16 failure.
 
 ## 15. Residual risks and open decisions
 
@@ -613,10 +763,12 @@ Residual risks:
 - **Extraction limits.** If the prototype fails to extract, the core's types narrow further, or the plan falls back to a hand-written Lean reference with differential tests (open decision 4).
 - **Migration risk.** Phase 4 touches the two largest evaluator files. The legacy-driver fallback and the differential gate bound the risk, but cannot remove it.
 - **Unsettled caller custody.** Under recovery closure with non-`Active` control, an `AwaitingCallerReport` operation stays non-terminal until a caller report arrives, with its holds frozen. It is visible through a fault, not resolved, until open decision 1.
+- **Withheld output in classes with no row.** A stop or fence that refuses the release of a read-only or `NonDurable` call drops the output, because there is no durable custody to hold it. The `Withheld` receipt records that. Durable coverage (`All`) is the remedy.
+- **Unknown commit outcomes halt one operation, not the kernel.** A halted operation keeps its holds frozen until restart re-projects it. The blast radius is spec 10's batch bound (X22).
 
 Open decisions:
 
-1. **Deadline for caller custody.** Should `AwaitingCallerReport` gain a deadline-bounded edge to `OutcomeUnknownAfterDispatch`, so that a quarantined or cancelled workflow can settle? This is a saga change and needs the admission-operation owners. Without it, the machine keeps W:'s terminalization for `DispatchCommitted` under non-`Active` closure, and latches with a fault for `AwaitingCallerReport` (section 6.1).
+1. **Deadline for caller custody.** Should `AwaitingCallerReport` gain a deadline-bounded edge to `OutcomeUnknownAfterDispatch`, so that a quarantined or cancelled workflow can settle? This is a saga change and needs the admission-operation owners. Without it, the machine keeps W:'s terminalization for `DispatchCommitted` under non-`Active` closure, and halts the operation with a fault for `AwaitingCallerReport` (section 6.1).
 2. **Persisted model.** Migrate both stores to the canonical schema, or keep two tables behind `project`/`persist`? Recommendation: keep both through phase 4, then migrate in one schema version.
 3. **Recovery and work machines.** Should recovery workflows and work handles get pure machines in the same style? This spec keeps them as drivers.
 4. **Extraction or model.** Extract the core with Aeneas, or hand-write a Lean model and test the Rust differentially? Recommendation: extract the core if the phase 0 prototype succeeds, and keep a hand-written reference either way.
@@ -655,6 +807,30 @@ Open decisions:
 | S9-25 proof-hub citation | Nit | Applied: both sources cited; startup range corrected to `:133-352` |
 | S9-26 ADR-0019 scope | Nit | Applied: adopted by extension |
 | S9-27 umbrella says `Vec<Effect>` | Nit | Applied differently: this spec uses `EffectList`. The umbrella is outside this revision's file scope, so the parent aligns it |
+
+### Wave 2 (cross-spec)
+
+Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per the wave 2 shared decisions:
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| S3-01 pre-dispatch drop latches and leaks holds | Blocker | Applied: M17, a drop before the acknowledgement compensates under `PreDispatchNoEffect` and never latches |
+| S3-02 compensation on an unconfirmed dispatch commit | Blocker | Applied: M12 is the machine form of `BoundaryFailure::CommitUnconfirmed`; holds and credentials retained; ambiguous deny only for pre-dispatch commits |
+| S3-03 "latch" means three things | Blocker | Applied: `Effect::Latch` split into `HaltOperation`, `LatchRequest` and `KernelEvidenceLatch` (section 5.2); M11, M12 and every post-dispatch cut row use `HaltOperation`; `LatchRequest` under `X` |
+| S3-05 receipt append can commit after a timeout | Major | Applied: `ReceiptAppendFailed { Unknown }` and `ReceiptReadBack`; M16 buffers behind `KernelEvidenceLatch` and appends nothing until the read-back |
+| S3-14 drop after dispatch strands request ids | Major | Applied: M17, `CutCause::DriverDropped`, `DropReconcileJob` |
+| S3-15 overlap with specs 9 and 10 | Major | Applied: spec 9 decides (M16 rows, `PostEffectStepFailed`, `ReceiptAppendFailed`, `NonDurable`); spec 10 executes; spec 3 owns the affine driver contract, latch scopes and ledger (section 7); spec 3 phase 1 sequenced in the bug-fix lane (section 9) |
+| S3-16 `Monetary` runs mutating tools without durable admission | Major | Applied: `OperationClass::NonDurable` (section 4.4) |
+| S3-24 retention kernels deny uncovered reads | Minor | Applied: check-only eligibility excludes `require_durable_request_retention`; such reads are denied as today (section 4.4) |
+| S3-25 stale cross-references | Nit | Applied: M11 owns the mapping and cites spec 3 rule 13 as the legacy phase 1 form; M14 and T8 cite spec 3 section 4.11 |
+| S5-11 hint integration undefined | Major | Applied: `Effect::Hint { hint: Hint }` over spec 5 Part B's `HintPort` vocabulary; trailing group after `Committed` (M18); H2 per commit class; T12 |
+| S5-24 H1 not enforced | Minor | Applied in part: no `AdmissionEvent` is hint-derived, and the differential suite drops and forges hints (M18). The crate dependency ban belongs to spec 5 |
+| S8-01 restart during a stop never starts | Blocker | Applied: M11 retain adopted by the legacy reconciler in spec 8 phase 1; section 6.2 row; `StartupReconciler` runs after the stop heads load |
+| S8-12 caller report lost when refused | Major | Applied: the caller report is a progress-only `ReturnRecord`, never stop-checked (M11) |
+| S8-17 S15 stale for fused, check-only and tier-1 paths | Minor | Applied: M15 per path; `KernelStopped` writes no tombstone (M10) |
+| S8-18 two-commit read re-dispatched after a stop | Minor | Applied: `ReturnRecord` on a stop-refused outcome commit; `OutputWithheld` (M11) |
+| S8-19 parked operation killed by a stop | Minor | Applied: `Parked` plus `KernelStopped` retains (M10); approvals refused at the edge without consumption (M15); T11 |
+| S8-24 spec 9 dependency of spec 8 phases unstated | Minor | Applied: section 9 phase 3 names spec 8 phase 1 (legacy, bug-fix lane) and phase 2 onward (on the machine) |
 
 ## Appendix A. External and FTL precedent
 
