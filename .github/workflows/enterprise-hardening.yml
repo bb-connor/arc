@@ -291,7 +291,7 @@ jobs:
       - name: Install native prerequisites
         uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler ripgrep
+          packages: protobuf-compiler ripgrep musl-tools
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
@@ -326,6 +326,7 @@ jobs:
           bash scripts/tests/check-response-recovery.test.sh
           bash scripts/tests/check-active-defense-conformance.test.sh
           python3 scripts/tests/check-exact-cargo-test-inventory.test.py
+          python3 scripts/tests/security-evidence-shards.test.py
           bash scripts/tests/check-protocol-peer-negotiation.test.sh
           bash scripts/tests/check-consumer-boundaries.test.sh
           python3 scripts/tests/check-consumer-sdk-inventory.test.py
@@ -352,10 +353,14 @@ jobs:
           make codegen-check
           cargo xtask freeze-vectors --check
 
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
+
       - name: Native security conformance
         run: |
           set -euo pipefail
-          cargo test --locked -p chio-conformance --all-targets
+          cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement
+          cargo test --locked -p chio-conformance --all-targets --no-fail-fast
 
           generated_vector_list_output="$(mktemp)"
           generated_vector_run_output="$(mktemp)"
@@ -371,6 +376,7 @@ jobs:
             --run-output "${generated_vector_run_output}" \
             active_defense_schema_and_semantics_reject_mutation_corpus \
             generated_active_defense_types_decode_reencode_and_reject \
+            generated_response_plan_requires_exact_execution_binding \
             legacy_response_transition_canonical_digest_is_unchanged \
             native_receipt_types_reject_unsafe_json_integers
 
@@ -413,7 +419,7 @@ jobs:
       - name: Install native prerequisites
         uses: ./.github/actions/apt-install
         with:
-          packages: protobuf-compiler
+          packages: protobuf-compiler musl-tools
 
       - name: Install Java runtime
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
@@ -460,6 +466,9 @@ jobs:
 
       - name: Protocol peer negotiation
         run: ./scripts/check-protocol-peer-negotiation.sh
+
+      - name: Qualify enforcing host and prepare native consumer fixture
+        uses: ./.github/actions/enforced-native-fixture
 
       - name: Durable consumer boundaries
         run: ./scripts/check-consumer-boundaries.sh
