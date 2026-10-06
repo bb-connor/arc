@@ -462,7 +462,7 @@ async fn revocation_during_dispatch_withholds_output_and_a_new_credential_recove
 }
 
 #[tokio::test]
-async fn oversized_response_retains_the_original_effect_identity() -> Result {
+async fn oversized_output_is_withheld_but_its_verdict_and_receipt_return() -> Result {
     let dir = tempfile::tempdir()?;
     let calls = Arc::new(AtomicUsize::new(0));
     let kernel = kernel(dir.path(), server(&calls))?;
@@ -472,13 +472,20 @@ async fn oversized_response_retains_the_original_effect_identity() -> Result {
     let token = service.issue_credential("root", cap.expires_at)?;
     let mut operation = invoke("large");
     operation["arguments"] = json!({"large": true});
+    let mut request_ids = Vec::new();
     for _ in 0..2 {
         let response = request(&service, token.expose_secret(), operation.clone()).await?;
-        assert_eq!(
-            response["error"]["code"], "response_too_large",
-            "{response}"
-        );
+        assert_eq!(response["ok"], true, "{response}");
+        let result = &response["result"];
+        assert_eq!(result["verdict"], "allow");
+        assert_eq!(result["output"], Value::Null);
+        assert_eq!(result["output_withheld"], "too_large");
+        assert!(result["receipt_json"]
+            .as_str()
+            .is_some_and(|receipt| !receipt.is_empty()));
+        request_ids.push(result["request_id"].clone());
     }
+    assert_eq!(request_ids[0], request_ids[1]);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(runtime.process("root")?.tree_calls, 1);
     Ok(())

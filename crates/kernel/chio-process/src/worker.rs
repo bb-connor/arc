@@ -330,11 +330,31 @@ impl WorkerService {
         // A bounded writer avoids an unbounded second copy of large outputs.
         let mut bytes = BoundedBytes(Vec::new());
         if serde_json::to_writer(&mut bytes, &result).is_err() {
-            return error_frame("response_too_large");
+            // A retry replays the same stored outcome, so an oversized output
+            // would never fit. Return the verdict and receipt without it.
+            let Some(withheld) = withhold_output(result) else {
+                return error_frame("response_too_large");
+            };
+            bytes = BoundedBytes(Vec::new());
+            if serde_json::to_writer(&mut bytes, &withheld).is_err() {
+                return error_frame("response_too_large");
+            }
         }
         bytes.0.push(b'\n');
         bytes.0
     }
+}
+
+/// Drop an invoke result's output and mark it withheld. Other results have
+/// no output to drop.
+fn withhold_output(mut result: Value) -> Option<Value> {
+    let invocation = result.get_mut("result")?.as_object_mut()?;
+    if !invocation.contains_key("receipt_json") || invocation.get("output")?.is_null() {
+        return None;
+    }
+    invocation.insert("output".to_owned(), Value::Null);
+    invocation.insert("output_withheld".to_owned(), json!("too_large"));
+    Some(result)
 }
 
 fn error_code(error: &ProcessError) -> &'static str {
