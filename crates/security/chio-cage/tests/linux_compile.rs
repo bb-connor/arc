@@ -702,7 +702,7 @@ fn compile_creates_a_pending_write_grant_owned_by_the_execution_identity() {
 }
 
 #[test]
-fn a_failed_compile_removes_only_the_grants_it_created() {
+fn a_failed_compile_keeps_its_created_grant_and_the_other_creators_file() {
     let tree = TestTree::new();
     let first = tree.root.join("a-output.data");
     let second = tree.root.join("b-output.data");
@@ -723,11 +723,58 @@ fn a_failed_compile_removes_only_the_grants_it_created() {
         None,
     )
     .is_err());
-    assert!(!first.exists());
+    // Compile never removes a name: a pathname cannot be deleted conditionally
+    // on the inode it names, so the created grant stays as an owned empty file.
+    let created = std::fs::symlink_metadata(&first).test_unwrap();
+    assert!(created.file_type().is_file());
+    assert_eq!(created.len(), 0);
+    assert_eq!(created.permissions().mode() & 0o777, 0o600);
+    assert_eq!(created.uid(), creatable_identity().uid());
     assert_eq!(
         std::fs::read(&second).test_unwrap(),
         b"created by someone else"
     );
+}
+
+#[test]
+fn the_next_compile_retains_a_grant_left_by_a_failed_compile() {
+    let tree = TestTree::new();
+    let first = tree.root.join("a-output.data");
+    let second = tree.root.join("b-output.data");
+    let keypair = Keypair::from_seed(&[55; 32]);
+    let (signed, ceilings) = write_grant_manifest(
+        &keypair,
+        Vec::new(),
+        vec![first.clone(), second.clone()],
+        BTreeSet::new(),
+    );
+    std::fs::write(&second, b"created by someone else").test_unwrap();
+    assert!(compile(
+        admit(&signed, &keypair.public_key(), &ceilings).test_unwrap(),
+        retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
+        &BTreeMap::new(),
+        None,
+    )
+    .is_err());
+    let left = std::fs::symlink_metadata(&first).test_unwrap();
+    std::fs::remove_file(&second).test_unwrap();
+    let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
+    assert_eq!(admitted.pending_write_grants().len(), 1);
+    let compiled = compile(
+        admitted,
+        retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
+        &BTreeMap::new(),
+        None,
+    )
+    .test_unwrap();
+    let retained = compiled
+        .admitted()
+        .write_resources()
+        .iter()
+        .find(|resource| resource.path() == first.as_path())
+        .test_unwrap();
+    assert_eq!(retained.identity().inode(), left.ino());
+    assert!(retained.creation_parent().is_none());
 }
 
 #[test]
