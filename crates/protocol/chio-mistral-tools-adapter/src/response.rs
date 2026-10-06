@@ -48,13 +48,11 @@ fn extract_function_calls(body: &Value) -> Result<Vec<FunctionCallPart>, Provide
                 .and_then(Value::as_array);
             if let Some(tool_calls) = tool_calls {
                 for entry in tool_calls {
-                    if let Some(part) =
-                        openai_tool_call_to_function_call(entry, "Mistral", |id, name, args| {
-                            FunctionCallPart { id, name, args }
-                        })?
-                    {
-                        calls.push(part);
-                    }
+                    calls.push(openai_tool_call_to_function_call(
+                        entry,
+                        "Mistral",
+                        |id, name, args| FunctionCallPart { id, name, args },
+                    )?);
                 }
             }
         }

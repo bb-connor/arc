@@ -486,3 +486,29 @@ fn protocol_boundary_provenance_uses_injected_clock_and_rejects_faults() {
         Err(ProviderError::Clock(ClockError::Unavailable))
     ));
 }
+
+#[test]
+fn lift_batch_rejects_a_client_executed_item_it_cannot_evaluate() {
+    let adapter = OpenAiAdapter::new(OpenAiAdapterConfig::new("org_chio_demo"));
+    let result = adapter.lift_batch(raw(json!({
+        "id": "resp_mixed",
+        "object": "response",
+        "output": [
+            {
+                "type": "function_call",
+                "call_id": "call_weather_1",
+                "name": "get_weather",
+                "arguments": "{\"location\":\"NYC\"}"
+            },
+            {
+                "type": "local_shell_call",
+                "call_id": "call_shell_1",
+                "action": {"type": "exec", "command": ["rm", "-rf", "/work"]}
+            }
+        ]
+    })));
+    assert!(
+        result.is_err(),
+        "mixed output must not silently drop the shell call"
+    );
+}
