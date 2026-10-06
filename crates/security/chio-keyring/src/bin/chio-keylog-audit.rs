@@ -1,7 +1,5 @@
 #[cfg(unix)]
 use std::io::ErrorKind;
-#[cfg(unix)]
-use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -172,10 +170,12 @@ fn run() -> chio_keyring::Result<()> {
             return Err(KeyringError::Storage(error));
         }
         match listener.accept() {
-            Ok((mut stream, _)) => {
+            Ok((stream, _)) => {
                 let result = (|| {
-                    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
-                    stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+                    let mut stream = chio_keyring::DeadlineUnixStream::new(
+                        stream,
+                        chio_keyring::KEY_LOG_IPC_REQUEST_DEADLINE,
+                    )?;
                     handle_connection(
                         &mut stream,
                         AuditConnectionContext {
@@ -469,7 +469,7 @@ fn synchronization_is_pending_tail(
 
 #[cfg(unix)]
 fn handle_connection(
-    stream: &mut UnixStream,
+    stream: &mut chio_keyring::DeadlineUnixStream,
     context: AuditConnectionContext<'_>,
 ) -> chio_keyring::Result<()> {
     let AuditConnectionContext {

@@ -880,3 +880,69 @@ fn a_witness_store_replaced_by_a_copy_is_refused() {
     };
     assert!(!status.success());
 }
+
+#[test]
+fn a_trickling_client_cannot_hold_the_witness_past_its_request_deadline() {
+    let fixture = Fixture::new();
+    let _children = Children(vec![fixture.spawn_witness(0, true)]);
+    let client = fixture.witness_client(0);
+    wait_for_witness(&client, "before-trickle");
+    let socket = client.socket_path().to_path_buf();
+    let trickler = thread::spawn(move || {
+        let Ok(mut stream) = UnixStream::connect(&socket) else {
+            return;
+        };
+        if stream.write_all(&1_048_576_u32.to_be_bytes()).is_err() {
+            return;
+        }
+        for _ in 0..15 {
+            if stream.write_all(b"x").is_err() {
+                return;
+            }
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
+    thread::sleep(Duration::from_millis(200));
+    wait_for_witness(&client, "after-trickle");
+    let _ = trickler.join();
+}
+
+#[test]
+fn a_witness_socket_in_a_group_writable_directory_is_refused() {
+    let fixture = Fixture::new();
+    let shared = fixture.path("shared");
+    std::fs::create_dir(&shared).test_unwrap();
+    std::fs::set_permissions(&shared, Permissions::from_mode(0o770)).test_unwrap();
+    let config_path = fixture.witness_config(0, true);
+    let mut config: WitnessServiceConfig =
+        serde_json::from_slice(&std::fs::read(&config_path).test_unwrap()).test_unwrap();
+    config.socket_path = shared.join("witness.sock");
+    std::fs::remove_file(&config_path).test_unwrap();
+    write_private_file(
+        config_path.as_path(),
+        serde_json::to_vec(&config).test_unwrap(),
+    )
+    .test_unwrap();
+    let mut children = Children(vec![Command::new(env!(
+        "CARGO_BIN_EXE_chio-keylog-witness"
+    ))
+    .arg("--config")
+    .arg(&config_path)
+    .stdin(Stdio::null())
+    .stdout(Stdio::null())
+    .stderr(Stdio::inherit())
+    .spawn()
+    .test_unwrap()]);
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = children.0[0].try_wait().test_unwrap() {
+            break status;
+        }
+        assert!(
+            started.elapsed() < WAIT_LIMIT,
+            "witness served from a socket other users can replace"
+        );
+        thread::sleep(Duration::from_millis(20));
+    };
+    assert!(!status.success());
+}

@@ -1452,9 +1452,33 @@ pub fn durable_storage_identity(path: &Path) -> Result<Hash> {
     Ok(storage_file.identity())
 }
 
+/// Total time a service connection has for its request and response.
+pub const KEY_LOG_IPC_REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// A bound service socket and the lifecycle lock that keeps another instance
+/// from unlinking it.
 #[cfg(unix)]
-pub fn bind_private_unix_listener(path: &Path) -> Result<std::os::unix::net::UnixListener> {
-    use std::os::unix::fs::{FileTypeExt, PermissionsExt};
+pub struct PrivateUnixListener {
+    listener: std::os::unix::net::UnixListener,
+    _lifecycle_lock: std::fs::File,
+}
+
+#[cfg(unix)]
+impl std::ops::Deref for PrivateUnixListener {
+    type Target = std::os::unix::net::UnixListener;
+
+    fn deref(&self) -> &Self::Target {
+        &self.listener
+    }
+}
+
+/// Bind a service socket in a directory only the service user can enter, so
+/// no other user can connect, even before the socket's own mode is set, or
+/// replace the socket. A lifecycle lock serializes instances, so one cannot
+/// unlink another's live socket.
+#[cfg(unix)]
+pub fn bind_private_unix_listener(path: &Path) -> Result<PrivateUnixListener> {
+    use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
     use std::os::unix::net::{UnixListener, UnixStream};
 
     if !path.is_absolute() {
@@ -1462,6 +1486,41 @@ pub fn bind_private_unix_listener(path: &Path) -> Result<std::os::unix::net::Uni
             "service socket path must be absolute",
         ));
     }
+    let parent = path.parent().ok_or(KeyringError::StateInvariant(
+        "service socket path has no parent directory",
+    ))?;
+    let parent_metadata = std::fs::symlink_metadata(parent)?;
+    if !parent_metadata.file_type().is_dir()
+        || parent_metadata.uid() != rustix::process::geteuid().as_raw()
+        || parent_metadata.mode() & 0o077 != 0
+    {
+        return Err(KeyringError::StateInvariant(
+            "service socket directory must be private to the service user",
+        ));
+    }
+    let mut lock_name = path
+        .file_name()
+        .ok_or(KeyringError::StateInvariant(
+            "service socket path has no file name",
+        ))?
+        .to_os_string();
+    lock_name.push(".lock");
+    let lifecycle_lock = std::fs::File::from(
+        rustix::fs::open(
+            path.with_file_name(lock_name),
+            rustix::fs::OFlags::RDWR
+                | rustix::fs::OFlags::CREATE
+                | rustix::fs::OFlags::NOFOLLOW
+                | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )
+        .map_err(std::io::Error::from)?,
+    );
+    rustix::fs::flock(
+        &lifecycle_lock,
+        rustix::fs::FlockOperation::NonBlockingLockExclusive,
+    )
+    .map_err(|_| KeyringError::StateInvariant("another service instance holds this socket"))?;
     if let Ok(metadata) = std::fs::symlink_metadata(path) {
         if !metadata.file_type().is_socket() || metadata.file_type().is_symlink() {
             return Err(KeyringError::StateInvariant(
@@ -1477,5 +1536,60 @@ pub fn bind_private_unix_listener(path: &Path) -> Result<std::os::unix::net::Uni
     }
     let listener = UnixListener::bind(path)?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    Ok(listener)
+    Ok(PrivateUnixListener {
+        listener,
+        _lifecycle_lock: lifecycle_lock,
+    })
+}
+
+/// A service connection with one absolute deadline for its request and
+/// response. A per-read timeout alone lets a peer that trickles bytes hold a
+/// single-threaded service indefinitely.
+#[cfg(unix)]
+pub struct DeadlineUnixStream {
+    stream: std::os::unix::net::UnixStream,
+    deadline: std::time::Instant,
+}
+
+#[cfg(unix)]
+impl DeadlineUnixStream {
+    pub fn new(
+        stream: std::os::unix::net::UnixStream,
+        budget: std::time::Duration,
+    ) -> std::io::Result<Self> {
+        let deadline = std::time::Instant::now()
+            .checked_add(budget)
+            .ok_or_else(|| std::io::Error::other("request deadline overflows"))?;
+        Ok(Self { stream, deadline })
+    }
+
+    fn remaining(&self) -> std::io::Result<std::time::Duration> {
+        self.deadline
+            .checked_duration_since(std::time::Instant::now())
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::TimedOut, "request deadline elapsed")
+            })
+    }
+}
+
+#[cfg(unix)]
+impl Read for DeadlineUnixStream {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.stream.set_read_timeout(Some(self.remaining()?))?;
+        self.stream.read(buffer)
+    }
+}
+
+#[cfg(unix)]
+impl Write for DeadlineUnixStream {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.stream.set_write_timeout(Some(self.remaining()?))?;
+        self.stream.write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.stream.set_write_timeout(Some(self.remaining()?))?;
+        self.stream.flush()
+    }
 }

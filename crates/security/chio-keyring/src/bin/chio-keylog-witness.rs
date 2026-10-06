@@ -1,9 +1,6 @@
-#[cfg(unix)]
-use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::time::Duration;
 
 #[cfg(unix)]
 use chio_keyring::bind_private_unix_listener;
@@ -69,10 +66,12 @@ fn run() -> chio_keyring::Result<()> {
 
     for connection in listener.incoming() {
         match connection {
-            Ok(mut stream) => {
+            Ok(stream) => {
                 let result = (|| {
-                    stream.set_read_timeout(Some(Duration::from_secs(3)))?;
-                    stream.set_write_timeout(Some(Duration::from_secs(3)))?;
+                    let mut stream = chio_keyring::DeadlineUnixStream::new(
+                        stream,
+                        chio_keyring::KEY_LOG_IPC_REQUEST_DEADLINE,
+                    )?;
                     handle_connection(
                         &mut stream,
                         &witness,
@@ -106,7 +105,7 @@ fn run() -> chio_keyring::Result<()> {
 
 #[cfg(unix)]
 fn handle_connection(
-    stream: &mut UnixStream,
+    stream: &mut chio_keyring::DeadlineUnixStream,
     witness: &SqliteKeyLogWitness,
     readiness_backend: &dyn chio_core_types::SigningBackend,
     configuration_binding: chio_core_types::Hash,
