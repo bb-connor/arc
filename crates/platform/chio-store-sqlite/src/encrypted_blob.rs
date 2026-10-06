@@ -215,13 +215,14 @@ pub enum BlobStoreError {
     InvalidTenantId,
     /// Stored nonce length was not the required 12 bytes.
     InvalidNonceLength(usize),
-    /// Opaque reference namespace or key was malformed.
+    /// Opaque reference namespace or key was malformed, or a stored reference
+    /// does not bind a blob row in its tenant.
     InvalidReference,
     /// The handle did not identify a row in its tenant scope.
     NotFound,
     /// A durable mutation id was reused for different mutation content.
     MutationConflict,
-    /// The reference already binds a blob, enabled or disabled.
+    /// The reference already binds a stored blob, enabled or disabled.
     ReferenceExists,
     /// AEAD authentication failed.
     Decrypt(DecryptError),
@@ -532,7 +533,8 @@ impl SqliteEncryptedBlobStore {
 
     /// Atomically write encrypted bytes and bind an opaque service reference.
     /// A reference that already exists, enabled or disabled, returns
-    /// [`BlobStoreError::ReferenceExists`] without writing.
+    /// [`BlobStoreError::ReferenceExists`] without writing; one whose blob row
+    /// is missing returns [`BlobStoreError::InvalidReference`].
     pub fn write_encrypted_blob_with_reference(
         &self,
         reference: &BlobReference,
@@ -588,7 +590,8 @@ impl SqliteEncryptedBlobStore {
     /// operation and mutation digest. Exact retries return the original
     /// handle. Reuse of an operation id for different content fails closed.
     /// A new operation for a reference that already exists, enabled or
-    /// disabled, returns [`BlobStoreError::ReferenceExists`] without writing.
+    /// disabled, returns [`BlobStoreError::ReferenceExists`] without writing;
+    /// one whose blob row is missing returns [`BlobStoreError::InvalidReference`].
     pub fn write_encrypted_blob_with_reference_once(
         &self,
         reference: &BlobReference,
@@ -1050,28 +1053,40 @@ fn exact_reference_mutation(
     Ok(Some(blob_id))
 }
 
-/// Reads the reference's primary-key row inside the caller's immediate write
-/// transaction, so no other writer can bind the same key before the insert.
+/// Reads the reference's primary-key row and the blob row it binds inside the
+/// caller's immediate write transaction, so no other writer can bind the same
+/// key before the insert. Only a reference whose blob row exists in its tenant
+/// is an existing reference; one without it is
+/// [`BlobStoreError::InvalidReference`].
 fn reference_exists(
     transaction: &rusqlite::Transaction<'_>,
     reference: &BlobReference,
 ) -> Result<bool, BlobStoreError> {
-    let existing = transaction
+    let binding = transaction
         .query_row(
             r#"
-            SELECT 1
-            FROM chio_encrypted_blob_references
-            WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+            SELECT blob.blob_id
+            FROM chio_encrypted_blob_references AS reference
+            LEFT JOIN chio_encrypted_blobs AS blob
+                ON blob.blob_id = reference.blob_id
+               AND blob.tenant_id = reference.tenant_id
+            WHERE reference.namespace = ?1
+              AND reference.tenant_id = ?2
+              AND reference.reference_key = ?3
             "#,
             params![
                 reference.namespace(),
                 reference.tenant_id().as_str(),
                 reference.reference_key().as_slice(),
             ],
-            |_| Ok(()),
+            |row| row.get::<_, Option<String>>(0),
         )
         .optional()?;
-    Ok(existing.is_some())
+    match binding {
+        None => Ok(false),
+        Some(Some(_)) => Ok(true),
+        Some(None) => Err(BlobStoreError::InvalidReference),
+    }
 }
 
 struct ReferenceMutation<'a> {
@@ -1598,5 +1613,77 @@ mod tests {
             store.write_encrypted_blob_with_reference(&reference, &key, b"payload"),
             Err(BlobStoreError::Sqlite(_))
         ));
+    }
+
+    /// The fault runs on an independent connection, whose foreign keys are off.
+    fn existing_reference_after_fault(
+        fault: &str,
+    ) -> (tempfile::TempDir, SqliteEncryptedBlobStore, BlobReference) {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("blobs.sqlite");
+        let store = SqliteEncryptedBlobStore::open(&path).unwrap();
+        let reference = BlobReference::new(
+            "chio.secret-broker.credentials.v1",
+            TenantId::new("tenant-a"),
+            [7; 32],
+        )
+        .unwrap();
+        store
+            .write_encrypted_blob_with_reference_once(
+                &reference,
+                &TenantKey::from_bytes([9; 32]),
+                b"original",
+                &"11".repeat(32),
+                &"22".repeat(32),
+            )
+            .unwrap();
+        Connection::open(&path)
+            .unwrap()
+            .execute_batch(&format!("PRAGMA foreign_keys = OFF; {fault}"))
+            .unwrap();
+        (directory, store, reference)
+    }
+
+    #[test]
+    fn a_missing_blob_table_under_an_existing_reference_stays_sqlite() {
+        let (_directory, store, reference) =
+            existing_reference_after_fault("DROP TABLE chio_encrypted_blobs;");
+        let key = TenantKey::from_bytes([9; 32]);
+        let error = store
+            .write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"replacement",
+                &"33".repeat(32),
+                &"44".repeat(32),
+            )
+            .unwrap_err();
+        assert!(matches!(error, BlobStoreError::Sqlite(_)), "{error}");
+        let error = store
+            .write_encrypted_blob_with_reference(&reference, &key, b"replacement")
+            .unwrap_err();
+        assert!(matches!(error, BlobStoreError::Sqlite(_)), "{error}");
+    }
+
+    #[test]
+    fn an_existing_reference_without_its_blob_row_is_invalid_not_a_duplicate() {
+        let (_directory, store, reference) =
+            existing_reference_after_fault("DELETE FROM chio_encrypted_blobs;");
+        let key = TenantKey::from_bytes([9; 32]);
+        let error = store
+            .write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"replacement",
+                &"33".repeat(32),
+                &"44".repeat(32),
+            )
+            .unwrap_err();
+        assert!(matches!(error, BlobStoreError::InvalidReference), "{error}");
+        let error = store
+            .write_encrypted_blob_with_reference(&reference, &key, b"replacement")
+            .unwrap_err();
+        assert!(matches!(error, BlobStoreError::InvalidReference), "{error}");
+        assert_eq!(blob_and_mutation_rows(&store), (0, 1));
     }
 }

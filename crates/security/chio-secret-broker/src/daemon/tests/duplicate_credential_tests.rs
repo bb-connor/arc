@@ -63,6 +63,29 @@ fn reprovisioning_a_disabled_version_is_a_contained_conflict() {
     existing_version_write_is_contained(CredentialMutationKind::Provision, true);
 }
 
+fn native_store_cause(error: &BrokerError) -> Option<&chio_store_sqlite::BlobStoreError> {
+    let mut source = std::error::Error::source(error);
+    while let Some(cause) = source {
+        if let Some(store) = cause.downcast_ref::<chio_store_sqlite::BlobStoreError>() {
+            return Some(store);
+        }
+        source = cause.source();
+    }
+    None
+}
+
+fn assert_fatal_credential_storage(
+    error: &BrokerError,
+    expected: fn(&chio_store_sqlite::BlobStoreError) -> bool,
+) {
+    assert!(matches!(error, BrokerError::CredentialStorage(_)));
+    assert_eq!(error.diagnostic_code(), "storage");
+    assert!(
+        native_store_cause(error).is_some_and(expected),
+        "real native storage source was discarded or reclassified"
+    );
+}
+
 #[test]
 fn a_reference_store_fault_during_provision_remains_fatal_with_native_cause() {
     let fixture = Fixture::new();
@@ -87,19 +110,60 @@ fn a_reference_store_fault_during_provision_remains_fatal_with_native_cause() {
             "corrupt-store",
         ))
         .test_expect_err("real storage fault remains fatal");
-    assert!(matches!(error, BrokerError::CredentialStorage(_)));
-    assert_eq!(error.diagnostic_code(), "storage");
-    let mut source = std::error::Error::source(&error);
-    let mut native = None;
-    while let Some(cause) = source {
-        if let Some(store) = cause.downcast_ref::<chio_store_sqlite::BlobStoreError>() {
-            native = Some(store);
-            break;
-        }
-        source = cause.source();
-    }
+    assert_fatal_credential_storage(&error, |cause| {
+        matches!(cause, chio_store_sqlite::BlobStoreError::Sqlite(_))
+    });
+}
+
+fn existing_version_with_broken_binding_is_fatal(
+    kind: CredentialMutationKind,
+    fault: &str,
+    expected: fn(&chio_store_sqlite::BlobStoreError) -> bool,
+) {
+    let fixture = Fixture::new();
+    let credential = Fixture::credential(1);
     assert!(
-        matches!(native, Some(chio_store_sqlite::BlobStoreError::Sqlite(_))),
-        "real native storage source was discarded"
+        fixture
+            .rpc(&fixture.mutation(CredentialMutationKind::Provision, &credential, "initial"))
+            .test_expect("provision")
+            .accepted
+    );
+    rusqlite::Connection::open(&fixture.secret_path)
+        .test_expect("own temporary database")
+        .execute_batch(fault)
+        .test_expect("actual durable integrity fault");
+    let error = match fixture.rpc(&fixture.mutation(kind, &credential, "broken-binding")) {
+        Err(error) => error,
+        Ok(response) => {
+            panic!("a broken existing binding must end the endpoint, answered {response:?}")
+        }
+    };
+    assert_fatal_credential_storage(&error, expected);
+}
+
+#[test]
+fn a_duplicate_provision_over_a_missing_blob_table_remains_fatal() {
+    existing_version_with_broken_binding_is_fatal(
+        CredentialMutationKind::Provision,
+        "PRAGMA foreign_keys = OFF; DROP TABLE chio_encrypted_blobs;",
+        |cause| matches!(cause, chio_store_sqlite::BlobStoreError::Sqlite(_)),
+    );
+}
+
+#[test]
+fn a_rotation_onto_a_version_over_a_missing_blob_table_remains_fatal() {
+    existing_version_with_broken_binding_is_fatal(
+        CredentialMutationKind::Rotate,
+        "PRAGMA foreign_keys = OFF; DROP TABLE chio_encrypted_blobs;",
+        |cause| matches!(cause, chio_store_sqlite::BlobStoreError::Sqlite(_)),
+    );
+}
+
+#[test]
+fn a_duplicate_provision_of_a_version_without_its_blob_row_remains_fatal() {
+    existing_version_with_broken_binding_is_fatal(
+        CredentialMutationKind::Provision,
+        "PRAGMA foreign_keys = OFF; DELETE FROM chio_encrypted_blobs;",
+        |cause| matches!(cause, chio_store_sqlite::BlobStoreError::InvalidReference),
     );
 }
