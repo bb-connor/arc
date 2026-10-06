@@ -609,7 +609,7 @@ final(r) = decision(r) = Allow
         or identity_disposition(r) = Terminal
         (an Allow carries no identity_disposition (spec 9 M20), so it is counted by its decision;
          Withheld is final only through its disposition: a NonDurable Withheld { retry: Never } is Terminal,
-         a check-only Withheld { retry: AfterResume } is Reusable;
+         every refused check-only read is Reusable, including retry: Never guidance (spec 9 M20);
          Retained, Reusable and PendingApproval receipts are never final)
 terminal_receipts(ns, id) = { r : final(r) and replay_identity(r) = (ns, id) }
 forall (ns, id): |terminal_receipts(ns, id)| <= 1
@@ -991,3 +991,9 @@ Where the analogy breaks:
 - **What commit means.** FTL's commit is an in-memory push into held capacity, so it truly cannot fail. Chio's commits are durable writes, so the Chio equivalent is "cannot fail silently".
 - **Drop.** FTL's `Drop` releases capacity it fully owns, under `panic = "abort"` (`Cargo.toml:26`, `:29`). Chio's pre-dispatch `Drop` may compensate best-effort, because nothing crossed the boundary, but its post-dispatch `Drop` may only record evidence, latch, or hand off to supervised reconciliation (rules 6, 11 and 23). Some Chio reservations (`ExternalCommitment`) have no owner the kernel could release them to at all.
 - **Ownership.** FTL's reservations live under one spinlock. Chio's ledger is only the in-process view of reservations whose truth lives in the stores.
+
+### PR #1174 review round 33
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4198110084 (spec 3 side) | Align the terminal-count predicate with stateless reads | Fixed. The predicate counts a Withheld receipt only when its disposition is Terminal; all check-only refusals are Reusable even when automatic retry is discouraged | Section 4.11; spec 9 M20 |

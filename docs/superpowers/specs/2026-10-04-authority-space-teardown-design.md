@@ -159,7 +159,7 @@ Non-goals:
 
 ### 4.1 Dispatch-commit fence (durable operations)
 
-1. **Authority refs.** `AdmissionOperationStore::begin` writes `admission_operation_authority_refs(operation_id, ref_kind, ref_id)` in the operation's insertion transaction. The rows are:
+1. **Authority refs and insertion fence.** Before creating a new operation, `AdmissionOperationStore::begin` derives its complete trusted authority refs and checks them against `closure_fences` in the same serving-writer transaction that would insert the operation and refs. An existing matching fence returns `AuthoritySpaceClosed { closure_id }` before any operation, replay binding, participant reservation or approval is inserted. Driver-local pre-begin holds are compensated under the existing pre-dispatch-no-effect rule. Exact replay of an already stored operation remains readback and never revives it; binding conflicts retain their existing refusal. The check uses derived refs, never a caller assertion that the operation is unrelated. On success, `begin` writes `admission_operation_authority_refs(operation_id, ref_kind, ref_id)` atomically with the operation. The rows are:
    - every id in the admission's `CanonicalRevocationSet` (M: `supplemental_quota.rs:732-752`);
    - one `session` row;
    - `process_lineage` and `principal` rows from the trusted `SecurityInvocationContextV1` (process calls supply runtime and lineage, M: `chio-process/src/security.rs:24-33`). On M: the lineage id is the tree root's capability id (`chio-process/src/lib.rs:419-431`), so it matches a closure of the whole tree but not of a subtree;
@@ -174,7 +174,7 @@ Non-goals:
    - **Legacy predicate.** The dispatch CAS (rule 3) and the release check (rule 3a) refuse a `legacy_unindexed` operation when any row exists in `closure_fences`. Every fence row postdates every legacy operation, because the same migration creates the fence table. So this refuses dispatch only for closures that could have covered the operation, and it over-fences rather than under-fences. The coordinator compensates on its own path with `AuthoritySpaceClosed { closure_id }`, naming the earliest fence.
    - **Why not the drain alone.** The drain cannot close this gap: it never steals a live lease (section 5 rule 3), and a coordinator holding the lease sees no refs.
    - **Removal.** A later migration removes the legacy predicate only once `count(non-terminal and legacy_unindexed) = 0`.
-2. **Fence rows.** A closure writes `closure_fences(ref_kind, ref_id, closure_id, fence_commit)` into the same SQLite writer.
+2. **Fence rows.** A closure writes `closure_fences(ref_kind, ref_id, closure_id, fence_commit)` into the same SQLite writer. New insertion and fence installation therefore serialize: an operation inserted first is indexed before the fence and included in the drain; a fence installed first prevents insertion. All native creation paths, including the fused intent path, use this check. No later authority-ref extension may attach a nonterminal operation to a fenced space. A post-fence refusal may still produce its ordinary deny evidence, but cannot add a new drainable operation or pending approval. Existing dispatch/release checks remain necessary for operations inserted before the fence.
 3. **Fence check.** `commit_durable_dispatch` and `capture_and_commit_durable_dispatch` (M: `admission_coordinator.rs:1560`, `:1814`) add `NOT EXISTS` over the join of the operation's refs and `closure_fences` to their CAS.
    - A fenced operation fails the CAS with `AuthoritySpaceClosed { closure_id }`.
    - The coordinator then compensates on its own path.
@@ -318,8 +318,8 @@ pub struct AuthoritySpaceClosureV1 {
     pub authorizer: ClosureAuthorizer,
     pub reason_hash: AdmissionDigest,
     pub state: AuthoritySpaceClosureState, // Fencing, Fenced, Draining, Closed
-    pub fence_commits: Vec<ClosureFenceCommit>,
-    pub drain: DrainLedger,
+    pub fence_commits: ClosurePageSetRef<ClosureFenceCommit>,
+    pub drain: ClosurePageSetRef<DrainEntry>, // owner keeps indexed mutable progress; artifact binds its snapshot
     pub stranded_at_fence: StrandedCapacity,         // section 8: snapshot at Fenced
     pub stranded_final: Option<StrandedCapacity>,    // section 8: recomputed after the drain; Some only in Closed
     pub enumeration: EnumerationCompleteness,
@@ -327,6 +327,16 @@ pub struct AuthoritySpaceClosureV1 {
     pub version: u64,
 }
 ```
+
+### 6.1a Bounded evidence pages
+
+The closure owner keeps its existing indexed drain/progress rows; large evidence sets are streamed from that owner into immutable pages. There is no second drain or authority log. `ClosurePageSetRef<T>` is a fixed-size manifest reference containing `{ closure_id, snapshot_kind, snapshot_revision, collection, page_count, item_count, tail_digest }`. `snapshot_kind` distinguishes Fenced and Closed evidence; the collection tag distinguishes fence commits, drain entries and each stranded-capacity field. The signed `AuthoritySpaceClosureV1` contains these references and bounded scalar fields, never all entries inline.
+
+- **Bounds and commitment.** A page contains at most 128 items and at most 64 KiB of canonical JSON, including its header. Each entry schema is bounded to 16 KiB and uses native ids/digests rather than embedding unbounded requests or results. An empty collection has a domain-separated empty digest and zero counts. Page `i` binds the identity tuple `(closure_id, snapshot_kind, snapshot_revision, collection)`, `i`, its item count, the preceding page digest and ordered entries. It never includes the aggregate tail digest in its own input; the first page uses the domain-separated empty digest as its predecessor. Compute its digest with the existing canonical JSON/SHA-256 primitives under `chio.authority-space-closure-page.v1`; the manifest commits the final digest and checked `u64` counts. Sorting by each collection's stable native key is strict, including across page boundaries. A verifier checks the complete chain, order and counts; missing, duplicated, reordered or substituted pages cannot prove complete enumeration. Verification and export stream one bounded page at a time.
+- **Snapshot and publication.** Stream all collections newly captured for a phase from one consistent snapshot of the closure owner's indexed rows and retained participant readbacks. A Closed manifest retains the earlier immutable stranded_at_fence references unchanged and captures its drain and stranded_final collections at the new revision. External-owner readbacks retain their native version/cut evidence and existing completeness label; this does not claim an atomic snapshot across independent stores or strengthen an early-only fence. Capture its closure version and a scoped `closure_evidence_revision`; mutations that change membership, drain disposition, fence evidence or stranded accounting increment that revision in their existing writer transaction. Page-staging writes do not. Before signing/publishing, a short writer CAS checks the expected closure version, unchanged evidence revision and the predicate for the target phase: installed fences for Fenced; additionally, a completed authority-ref/legacy drain scan and the section 6.3 drain predicate for Closed. Fenced publication never requires an already completed drain. Descendant hint/withdrawal enumeration may still be explicitly Incomplete under section 5; pages cannot relabel that evidence Complete. Changed source evidence invalidates the candidate and causes a new snapshot, not a mixed-version artifact. Only the qualified owner publishes the manifest; incoming page digests are never accepted as authoritative state.
+- **Atomic evidence.** Pages are immutable and persisted through the existing qualified store before their manifest can be acknowledged. The publishing commit anchors the manifest and its referenced pages under spec 10's restrictive-commit rules. No exit hint or Closed acknowledgement precedes it. The final CAS records the snapshot revision, so section 8's final payment readback and stranded accounting refer to that exact cut; later payment completion stays in its own evidence. Signing happens over the bounded candidate manifest, then the CAS verifies the candidate's expected versions before installing those exact signed bytes. A stale signed candidate is not published.
+- **Restart and migration.** Stage pages under `(closure_id, snapshot_kind, snapshot_revision, collection, page_index)` with exact-byte idempotency. A crash resumes or discards an unpublished candidate; it never clears fences or a published root. At most one unpublished candidate per closure/phase is staged at once, and discarded staging pages are reclaimed before staging its replacement; referenced published pages are never reclaimed by this path. Retain every referenced page as long as its artifact is retained, and register pages, roots and staging progress in the same W1 projection, integrity, snapshot and migration inventory as the closure record. Missing/corrupt referenced pages are an incomplete-evidence error, never an empty collection or a valid Closed proof. Storage failure retains Fencing/Draining with the existing fences; retry needs only bounded memory and the missing pages. Schema/codec qualification covers item and manifest bounds before closure is enabled.
+- **Queries.** Closure inspection returns the bounded manifest and authenticated page cursors under existing closure-read authority. The signed manifest is at most 64 KiB; its fixed collection set contains every page-set reference. Consumers needing the complete drain or capacity inventory fetch and verify its pages. The ClosureV1 artifact is still proposed, so publish this bounded representation as its initial schema rather than first publishing an unbounded format.
 
 ### 6.2 Fence per kind
 
@@ -373,10 +383,10 @@ Rules:
 
 1. Insert the record in `Fencing`, idempotent on `closure_id`.
 2. Apply the kind fence plus fence rows. Readback is required, following AP8: a fence that cannot be read back keeps the record in `Fencing` and returns non-2xx with per-ref status.
-3. CAS the record to `Fenced`.
+3. Capture `stranded_at_fence`, stage its bounded evidence pages and publish the signed `Fenced` manifest with the version checks of section 6.1a. This CAS does not wait for the drain.
 4. CAS to `Draining` and run the drain.
 5. Withdraw (section 6.5).
-6. When every ledger entry is terminal, delivery-refused (spec 9 M11a) or incident-bound, recompute `stranded_final` (section 8), sign the artifact, CAS to `Closed`, and emit exit hints. A delivery-refused entry needs no financial settlement before `Closed`: its output can never be released, and its payment, whether `Open` or `InFlight`, is recorded in `stranded_final.delivery_obligations` with its stage (section 8). Closure never waits for a payment rail.
+6. When the authority-ref/legacy drain scan is complete and every ledger entry is terminal, delivery-refused (spec 9 M11a) or incident-bound, recompute `stranded_final` in the consistent evidence snapshot (section 8), stage its bounded pages, then sign and publish the version-checked manifest as `Closed` under section 6.1a. Only then emit exit hints. A delivery-refused entry needs no financial settlement before `Closed`: its output can never be released, and its payment, whether `Open` or `InFlight`, is recorded in `stranded_final.delivery_obligations` with its stage (section 8). Closure never waits for a payment rail.
 
 ```text
 fenced(c) and binds(op, space(c)) and durable(op) and fence_in_admission_store(c)
@@ -439,13 +449,13 @@ D1, S1 and processes all strand capacity on purpose. Closure makes that cost aud
 
 ```rust
 pub struct StrandedCapacity {
-    pub d1_unsealed_remainder: Vec<SlotRemainder>,   // fenced, now unusable, by currency
-    pub d1_sealed_outstanding: Vec<SealedPermitRef>, // still dispatchable at receivers (6.2 rule 2)
-    pub s1_unissued_allocations: Vec<PoolAllocationRef>,
-    pub process_retained_shares: Vec<ProcessShareRef>,
-    pub frozen_holds: Vec<OperationHoldRef>,          // outcome-unknown; released only per 7.2
-    pub delivery_obligations: Vec<DeliveryObligationRef>, // delivery-refused known returns whose payment is not confirmed Final (spec 9 M11a)
-    pub confined_reservations: Vec<ConfinedChildRef>, // P5: at most 16 per scope, never refunded
+    pub d1_unsealed_remainder: ClosurePageSetRef<SlotRemainder>,   // fenced, now unusable, by currency
+    pub d1_sealed_outstanding: ClosurePageSetRef<SealedPermitRef>, // still dispatchable at receivers (6.2 rule 2)
+    pub s1_unissued_allocations: ClosurePageSetRef<PoolAllocationRef>,
+    pub process_retained_shares: ClosurePageSetRef<ProcessShareRef>,
+    pub frozen_holds: ClosurePageSetRef<OperationHoldRef>,          // outcome-unknown; released only per 7.2
+    pub delivery_obligations: ClosurePageSetRef<DeliveryObligationRef>, // delivery-refused known returns whose payment is not confirmed Final (spec 9 M11a)
+    pub confined_reservations: ClosurePageSetRef<ConfinedChildRef>, // P5: at most 16 per scope, never refunded
     pub pinned_artifacts: u64,                        // P4 pins retained by the space (count only)
     pub completeness: EnumerationCompleteness,
 }
@@ -468,7 +478,7 @@ pub struct DeliveryObligationRef {                   // read back from the nativ
 
 The accounting has two snapshots. Both are evidence only.
 - **`stranded_at_fence`** is computed from the owning stores at `Fenced`. It records what the fence cut off, and it is carried in the `Fenced` artifact.
-- **`stranded_final`** is recomputed after every ledger entry is terminal, delivery-refused or incident-bound (section 6.3 step 6), immediately before the CAS to `Closed`, and it is carried in the `Closed` artifact. Recomputing matters because the drain changes the picture:
+- **`stranded_final`** is recomputed after every ledger entry is terminal, delivery-refused or incident-bound (section 6.3 step 6), from the consistent snapshot whose evidence revision must still match at the CAS to `Closed` (section 6.1a), and its page roots are carried in the `Closed` artifact. Recomputing matters because the drain changes the picture:
   - an operation observed as `DispatchCommitted` at the fence can complete and settle under its live lease, or become outcome-unknown and freeze its hold;
   - an in-flight knowledge operation can add a pin after the fence.
 
@@ -485,7 +495,7 @@ The accounting has two snapshots. Both are evidence only.
 - **Processes.** A `ProcessTree` closure changes `ProcessState`, which advances the process `hint_revision` in the same transaction (spec 5 Part B, rule P1; `Lifecycle` is one of the two subjects the process projection keeps). A waiting `inspect` returns, and a worker whose credential was revoked sees `unauthenticated`. Child exit observations still come from runner outcomes and `wait_children`.
 - **Workflows and work.** Workflows use the recovery event chain (W: `admission_operation_recovery.sql`, whose global monotonic `sequence` column is the cursor). Work uses W1 queries.
 - **No authority.** Hints carry no authority. Consumers re-read the closure record.
-- **Artifact.** The kernel signs `chio.authority-space-closure.v1` at `Fenced` and at `Closed`, listing:
+- **Artifact.** The kernel signs the bounded `chio.authority-space-closure.v1` manifest at `Fenced` and at `Closed`. Its page-set roots, counts and authenticated bounded pages (section 6.1a) collectively enumerate:
   - fence commits;
   - compensated operations with receipt ids;
   - post-dispatch operations with terminal or incident ids, and flags `admitted_before_cut` or `dispatched_after_fence_unlinearized`;
@@ -579,6 +589,8 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
   - Closure cases: reach `Closed` with a delivery-refused entry whose payment is `Open`, and separately `InFlight` (including `ReconcileFailed` or a lost acknowledgement), retaining the obligation and original intent in `stranded_final.delivery_obligations` under section 8. Include terminal and incident-bound entries in the same ledger. Closure neither starts settlement nor waits for the rail, and the refused output stays unavailable. An entry satisfying none of the three predicates must prevent `Closed`; a mutant that omits that entry from the closure predicate must fail.
   - Mutants: drop the `NOT EXISTS` clause; drop it from the release check; drop the legacy predicate; compensate a `DispatchCommitted` operation.
   - Negative example for property 4 under an `early_only` fence: guard check reads the remote fence store, the remote fence commits, then the local dispatch CAS commits. The model must report property 4 violated and property 4' satisfied, with the operation flagged `dispatched_after_fence_unlinearized`.
+- **Insertion fence:** pause a new begin immediately before its writer transaction, fence and enumerate the space, then resume begin. It returns AuthoritySpaceClosed with no operation/ref row or parked approval, and closure can finish. Reverse the order: begin and refs commit first and enumeration includes that operation; its later park/dispatch meets the same closure/drain version checks. Cover fused intent, each ref kind, exact replay, binding conflict and restart, plus a mutant that omits only the begin check.
+- **Bounded evidence:** close a tree whose drain and capacity inventory require many pages. Every page and manifest respects its byte/item bounds, peak encoding memory is page-bounded, and the signed root/counts verify the complete inventory. Crash between pages and before/after publication; duplicate staging is idempotent. Mutate a relevant row while pages are built: the final revision CAS rejects the stale candidate. Drop/reorder/substitute a page or alter its collection/snapshot tag: verification fails. Migrate and restore all roots/pages; missing referenced evidence never becomes an empty successful closure. Include Open/InFlight payment obligations spanning pages and completion racing the final snapshot.
 - **Loom.** Race fence commit against the `DispatchCommitted` CAS, and against the release-bearing finalization commit; exactly one order wins and the loser reclassifies.
 - **Kani.** The shared classifier is total and never maps a post-dispatch or capture-committed state to compensation.
 - **Proptest.** Random trees, process cancels, D1 subdivisions and seals, and S1 extensions under closure. Sealed permits and earned claims are unchanged, and the stranded ledger matches the store.
@@ -710,3 +722,10 @@ Where the analogy breaks:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-4-04 | Closed evidence omits an unresolved in-flight delivery payment | Fixed with round 28's comment 4190476130 (above). Acceptance cases cover persistent `ReconcileFailed`, rail unavailability, a lost capture acknowledgement and a restart before `stranded_final` | section 8; section 16 tests |
+
+### PR #1174 review round 33
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4198091703 | Fence operation insertion before enumeration | Fixed. Begin and all native/fused creation paths serialize derived-ref checks with fence installation before any new operation or pending approval. Pre-fence inserts are indexed for the drain; exact replay cannot revive them | Section 4.1; section 16 |
+| 4198110118 | Bound closure evidence | Fixed. All large collections use bounded canonical pages committed by a fixed signed manifest. Existing-owner snapshot revisions and publication CAS prevent mixed evidence, preserve completeness and retain roots/pages through restart and migration | Sections 6.1a, 6.3, 8-9, 16 |

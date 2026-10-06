@@ -485,7 +485,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | `observe_recovery_capability_liveness` | `allow` | observation |
 | `reserve_recovery_review` (W: `recovery_runtime.rs:267`) | `deny` | it advances a workflow toward an effect |
 | `acknowledge_recovery_reservation` (W: `recovery_runtime.rs:91`) | `deny` | it binds a process reservation to a workflow |
-| `reserve_successor_ordinal` (spec 2 section 6.10 O4, proposed) | `deny` | it mutates the original's origin claim toward a linked continuation. Checked for the verified predecessor scope and the authenticated successor scope persisted in the link, in the claim's writer transaction before any mutation. An authenticated replay matching the stored successor scope is a readback and is allowed; a scope change conflicts. `CreateWorkflow` must use that stored scope. Root supersession happens only in the stop-gated `CreateWorkflow` (spec 2 O3) |
+| `reserve_successor_ordinal` (spec 2 section 6.10 O4, proposed) | allocation `deny`; exact authenticated readback `allow` | it mutates the original's origin claim toward a linked continuation. Checked for the verified predecessor scope and the authenticated successor scope persisted in the link, in the claim's writer transaction before any mutation. Tier 1 authenticates and performs the exact stored attempt/scope lookup before the allocation stop check; the writer repeats that lookup before mutation. A matching replay is readback and is allowed even after cancellation or capture; a missing attempt cannot claim this branch, and a scope change conflicts. `CreateWorkflow` must use that stored scope. Root supersession happens only in the stop-gated `CreateWorkflow` (spec 2 O3) |
 
 P6 component operations (control plane and store, not `KernelOp`). Spec 1 section 6 holds the full classification:
 
@@ -508,7 +508,7 @@ P6 component operations (control plane and store, not `KernelOp`). Spec 1 sectio
     The disposition function matches that enum exhaustively, so adding a variant forces a new decision. Admission still requires its threshold approval.
 
     Containment mutates state (suspensions, egress restrictions). For a forensic freeze, operators stop with `allow_containment = false`. The status route surfaces the flag per scope. An existing stop can be tightened to `false` in place with `Restrict` (S31).
-- **S13. Per-entry-point dispositions.** This is spec 1 rule R5b. An op whose entry points differ in direction (begin versus observe), or in authority profile (agent versus control), declares a disposition per entry point. It is used today by `CallerExecution`, `IssueCapability` (after S28) and `RecoveryControl`.
+- **S13. Per-entry-point dispositions.** This is spec 1 rule R5b. An op whose entry points differ in direction (begin versus observe), or in authority profile (agent versus control), declares a disposition per entry point. It is used today by `CallerExecution`, `IssueCapability` (after S28) and `RecoveryControl`. A state-dependent entry point declares exhaustive owner-verified branches with one disposition per branch: `reserve_successor_ordinal` permits exact authenticated readback and denies allocation while stopped. Both the tier-1 lookup and writer classification are covered by the generated census; a caller cannot select the readback branch for a missing attempt.
 
 ### 7.2 Higher layers (rule R12 inheritance)
 
@@ -1323,3 +1323,9 @@ Where the analogy breaks:
 - **Durability.** FTL has no persistent state, and a reboot always starts fresh. A Chio restart must come up stopped, so the flag must be durable and verified before the reconciliation sweep.
 - **Reversibility.** FTL's `destroyed` flag is terminal. A Chio stop is reversible, so it needs epochs, a chain, and an authorization asymmetry between stop and resume.
 - **Ordering writers.** FTL has one lock per object. Chio has several writers, and a crossing in a different writer than the stop gets only the early check (section 13).
+
+### PR #1174 review round 33
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4198091687 (spec 8 side) | Register both reservation branches | Fixed. The RecoveryControl table and S13 distinguish allocation deny from exact authenticated readback allow. Both stop tiers and the generated census use that verified classifier | Section 7; S13; spec 1 R5b |

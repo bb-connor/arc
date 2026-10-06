@@ -96,7 +96,7 @@ The pass audited 40 defect rows: 37 confirmed, and 3 correctly reclassified as n
 - spec 5 removes the last restore exception and states the journal-write limit once (R-5-02).
 
 **Revision 4h, independent review pass 6 and PR round 28 (2026-10-06, head `0118c31a6`).** Three Major findings, each also raised by a bot comment, and one Minor, all applied through the existing owners:
-- spec 2 makes `reserve_successor_ordinal` a stop-gated `deny` `RecoveryControl` entry point, checked before any claim mutation. It moves root supersession from the reservation to the stop-gated `CreateWorkflow`, so a stopped or failed creation never disables the root. Specs 8, 1 and 10 register it (R-2-03);
+- spec 2 makes reservation allocation in `reserve_successor_ordinal` a stop-gated `deny` `RecoveryControl` branch, checked before any claim mutation (round 33 makes exact authenticated readback explicitly `allow`). It moves root supersession from the reservation to the stop-gated `CreateWorkflow`, so a stopped or failed creation never disables the root. Specs 8, 1 and 10 register it (R-2-03);
 - spec 4's closure no longer waits for a rail and no longer drops an unresolved payment. `stranded_final.delivery_obligations` lists every `DeliveryRefused` payment not confirmed `Final` by readback, as `Open` or `InFlight` (including `ReconcileFailed`) with its original intent (R-4-04);
 - spec 5 Part A restores standard resource subscriptions by URI with no client-visible id. A failed re-authorization durably terminalizes the session with `subscription_not_restored` before it can be served; reconnect receives the terminal-state response and the client initializes a new session. `resources/updated` and a read cannot signal subscription termination, because read and subscribe grants are independent. Negotiated ids and `SubscriptionEnded` stay in Part B, which extends the same record (R-5-03, corrected by R-5-04);
 - spec 11 I20a applies native-origin eligibility to both recovery-backed integrity remedies, and spec 2 adds `origin_retained` to the `Integrity` fact (R-11-09).
@@ -130,8 +130,8 @@ The review's architecture judgment and recommended order are in section 9.
 **Revision 4l, PR round 32 (2026-10-06, reviewed head `45f19d48a`).** Three comments corrected remaining cross-contract gaps:
 
 - specs 1 and 8 require exhaustive stop coverage for both recovery-command profiles, with one disposition table, every wire profile/variant pair tested through the decoder and writer, and identical dispositions for shared kinds (4197876467);
-- spec 5 keeps each resync cursor and follow-up in its consumer's attachment record. A later consumer starts at the catalog prefix, while shared emission remains bounded by one session-wide chunk budget (4197876482);
-- spec 10's check-only release now explicitly rechecks `KnowledgeIntegrity` against current release policy and committed state. Failed integrity withholds output with a signed reason and terminal retry advice; a policy or tracking change cannot reuse the dispatch-time decision to release (4197876499).
+- spec 5 keeps each resync cursor and follow-up in its consumer's attachment record. A later consumer starts at the catalog prefix, while emission remains bounded by one session-wide chunk budget. Round 33 additionally directs each synthetic pass only to its requesting consumer, without rebroadcast (4197876482);
+- spec 10's check-only release now explicitly rechecks `KnowledgeIntegrity` against current release policy and committed state. Failed integrity withholds output with a signed reason and `retry: Never` guidance; round 33 clarifies that a refused check-only read retains a reusable identity; a policy or tracking change cannot reuse the dispatch-time decision to release (4197876499).
 
 
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.
@@ -152,6 +152,19 @@ The review's architecture judgment and recommended order are in section 9.
 - Spec 4 became the paper's missing closure rule.
 - Spec 1 became a layered registry.
 - Spec 7 reused `native_launch` and added worker confinement.
+
+**Revision 4m, PR round 33 (2026-10-06, reviewed head `d851859a0`).** Ten unresolved comments are addressed through the existing session, admission, recovery and closure owners:
+
+- spec 5 sends synthetic resync passes only to the consumer that requested them, with shared sequence/replay ownership, bounded transport slots and one fair session budget. Recovery traffic cannot create another consumer's broadcast lag. Its in-memory cursor covers the catalog/warning prefix as well as the URI suffix (4198048487, 4198110097);
+- spec 10 maps a newly required output join on the no-write release path to typed `InsufficientIntegrity`, even if the current integrity level meets the floor (4198091675);
+- specs 9, 10 and 3 keep all refused check-only reads `Reusable`: reason-specific `retry: Never` is guidance, not a durable tombstone or adapter binding (4198110084);
+- specs 1, 2 and 8 classify reservation allocation and exact authenticated readback separately. New allocation rechecks active predecessor/original eligibility and absence of root or prior successor capture in its append transaction (4198091687, 4198091695);
+- specs 4 and 10 check closure fences in the same writer transaction as every new operation insertion, before refs, reservations or approval parking can escape enumeration (4198091703);
+- spec 4 replaces unbounded closure-artifact vectors with bounded evidence pages and a signed fixed manifest. Existing-owner snapshot revisions, counts, chained digests, publication CAS and migration inventory preserve complete evidence without materializing the entire ledger (4198110118);
+- spec 5 separates the 32-bit event seed from native full-width persistence generations, reserves terminal counter/event headroom and covers the last legal seed (4198110108);
+- Part B retains ended-subscription markers through flush and replay until authenticated explicit `chio/events/ack`, committed unsubscribe or session termination. Signed removal, unique subscription ids and rebase-before-reattachment preserve at-least-once ends without treating another stream's higher cursor as acknowledgement (4198110130).
+
+These are specification changes and acceptance scenarios, not implemented or executed runtime tests.
 
 ## 1. Summary
 

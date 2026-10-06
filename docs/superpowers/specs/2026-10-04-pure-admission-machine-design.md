@@ -712,7 +712,7 @@ pub enum IdentityDisposition {
     | `Overloaded` before admission (M10) | `Reusable` |
     | `CheckOnlyCrossing` refusals before dispatch, for both read-only and `NonDurable` classes (M10); nothing is persisted | `Reusable` |
     | A check-only read's `Withheld { retry: AfterResume }` (M11) or `Withheld { reason: StoreUnavailable, retry: AfterStoreRecovery }` (M19) | `Reusable` |
-    | A check-only read's `Withheld { reason: AuthoritySpaceClosed \| Revoked \| InsufficientIntegrity, retry: Never }` (M11) | `Terminal` |
+    | A check-only read's `Withheld { reason: AuthoritySpaceClosed \| Revoked \| InsufficientIntegrity, retry: Never }` (M11) | `Reusable`; retry guidance is not a durable identity claim |
     | `StoreUnavailable` deny before any row (M19) | `Reusable` |
     | `DenyTombstone` (M10, spec 10 X15) | `Terminal` |
     | `Compensate` of a persisted operation: `Prepared`-intent refusals and slow-path refusals for any reason, `KernelStopped` included (M10, M15), cut-table compensations, drop compensations | `Terminal` |
@@ -726,6 +726,7 @@ pub enum IdentityDisposition {
       - `Retained` exactly when the receipt is the ambiguous deny of a submitted commit whose outcome is unknown (M12);
       - every other non-allow receipt is `Terminal`.
     - Spec 8 S15's `chio_runtime.stop.retryable_after_resume` must equal `identity_disposition == Reusable`, so it is `false` for `Retained`. A stop refusal is definite, so a stop receipt is never `Retained`.
+    - Every refused check-only read is `Reusable`, independently of its reason-specific retry advice. It leaves no operation row, tombstone, custody or executed effect to burn the replay key. `retry: Never` tells a client not to automatically repeat the currently refused call; if an independently authorized policy change later permits a deliberate retry, the same id is freshly evaluated and may succeed. An adapter leaves its sealed submission unbound on that reusable receipt under spec 6 rule 10. No terminal-replay promise is made for a stateless read.
     - Spec 3's per-request predicates count only `Terminal` receipts (spec 3 section 4.11).
     - Spec 6 rule 10 binds a sealed submission only on a `Terminal` disposition, or on an allow or terminal outcome. On `Reusable` it lowers the deny and leaves the record sealed. On `Retained` it lowers an unresolved-status deny and also leaves the record sealed, so the later recovery terminal receipt binds normally.
     - **Kernel-reserved metadata keys.** Two receipt-metadata keys are written only by the kernel. Caller-supplied metadata that carries either is rejected before evaluation through the existing `reject_reserved_receipt_metadata` path:
@@ -983,6 +984,7 @@ Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI
 
 - **Unit:** projection totality over all 19 tool-model and 15 security-model states with their dispatch pairs; `persist(project(r), r, ..) == r` for every reachable record, including security forward actions; rules M1-M20 by example; every row of the cut table, including `DriverDropped` and the `LatchRequest` emissions under `X`; every M16 row for both class groups.
 - **Differential:** the two inclusions of phase 0, over the live transition space.
+- **Check-only refusal identity:** for closure, revocation and insufficient integrity separately, assert `Reusable` with reason-specific `retry: Never`, no operation/tombstone/custody write and no adapter terminal binding. Repeat the same replay key before and after restart: fresh evaluation may produce another reusable refusal. Where a legitimate authority/policy change permits it, a later evaluation may allow that same key without a preceding Terminal receipt. No-row reads must never satisfy a burned-identity assertion merely because retry guidance is Never.
 - **Proptest:** random event sequences per kind, class and plan, checking T1-T14 as executable assertions.
 - **Kani:** `transition` never panics; `classify` is total; the hydrator's plans are well formed.
 - **Lean:** T1-T14, with mirrors registered.
@@ -1201,7 +1203,7 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
-| 4187993006 | Match retry advice to the actual release refusal | Fixed now. A check-only release refusal gets reason-specific advice: `KernelStopped` gives `AfterResume`, `StoreUnavailable` gives `AfterStoreRecovery` (both `Reusable`), and `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity` give `retry: Never` (`Terminal`). M20 lists the new row, and spec 8's `OutputWithheld` admits the reasons | M11; M20 |
+| 4187993006 | Match retry advice to the actual release refusal | Fixed now. A check-only release refusal gets reason-specific advice: `KernelStopped` gives `AfterResume`, `StoreUnavailable` gives `AfterStoreRecovery` (both `Reusable`), and `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity` give `retry: Never` guidance (`Reusable`, corrected in round 33 because check-only reads have no durable identity owner). M20 lists the new row, and spec 8's `OutputWithheld` admits the reasons | M11; M20 |
 
 ### Independent review pass 5 (PR #1174, Codex agent)
 
@@ -1226,3 +1228,9 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 - **AWS PObserve** validates production logs against P specifications ([Systems Correctness Practices at AWS](https://dl.acm.org/doi/abs/10.1145/3815784)). Section 10's trace validation is the same idea, limited today by the digest-only commit log.
 
 Where the analogy breaks: FTL's dispatch has no durable state or crash recovery. Chio's machine must be re-entrant from any persisted version, which is why projection, persistence plans, cut facts and acknowledgement events exist.
+
+### PR #1174 review round 33
+
+| Review | Issue | Disposition | Contract |
+|---|---|---|---|
+| 4198110084 | Do not burn a stateless read identity | Fixed. M20 makes closure, revocation and integrity check-only refusals Reusable. Retry Never remains guidance; repeated or post-restart evaluation makes no terminal replay promise and leaves the adapter submission unbound | M20; conformance; specs 3 and 10 |
