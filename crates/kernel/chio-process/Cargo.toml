@@ -11,7 +11,7 @@ publish = false
 [features]
 default = []
 worker-server = ["dep:tokio", "dep:rand", "dep:hex", "dep:base64"]
-mailboxes = ["dep:async-trait", "dep:chio-manifest"]
+mailboxes = ["dep:async-trait", "dep:chio-manifest", "dep:tokio"]
 
 [dependencies]
 chio-core-types = { workspace = true }
