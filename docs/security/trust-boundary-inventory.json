@@ -1157,6 +1157,7 @@
     "crates/guards/chio-guards/src/embedding_anomaly.rs::from_json_file::from_wire",
     "crates/guards/chio-wasm-guards/src/blocklist.rs::store::from_wire",
     "crates/guards/chio-wasm-guards/src/input.rs::decode::from_wire",
+    "crates/kernel/chio-kernel-browser/src/pure.rs::verify_receipt_pure::new",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc::validate_cleanup_payload::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire",
@@ -1165,6 +1166,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::native_release_custody::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::validate::from_wire",
+    "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs::from_ledger::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs::verify_projection_body::from_wire",
     "crates/kernel/chio-kernel/src/admission_operation/projection/authorization.rs::from_canonical_record_verified::from_wire",
@@ -1201,6 +1203,7 @@
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_output.rs::validate_original::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::committed_caller_authorization::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::decode_caller_return_payload::from_wire",
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs::completed_compacted_value_response::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::recover_terminal_receipt_outboxes_with_store::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_staged_compensation_receipt::from_wire",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_terminal_compensation_receipt::from_wire",
@@ -1371,7 +1374,9 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_observer_projection::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_terminal_projection::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_terminal_projection::from_wire",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs::load::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::decode::from_wire",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::decode::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::decode::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::validate_owned_declassification::from_wire",
@@ -1466,6 +1471,8 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs::load_verified_projection::from_wire",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_evaluation_connection::from_wire",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_connection::from_wire",
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::authenticated_owner_envelope::from_wire",
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::qualified_replay_owners::from_wire",
     "crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json::from_wire",
     "crates/platform/chio-transaction-passport/src/minimal.rs::transparency_anchor_state::from_wire",
     "crates/products/chio-api-protect/src/proxy/approval_authority.rs::load::from_wire",
@@ -1490,6 +1497,7 @@
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire",
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire",
+    "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file::new",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire",
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire",
@@ -1498,6 +1506,8 @@
     "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire",
     "crates/protocol/chio-acp-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire",
     "crates/protocol/chio-acp-proxy/src/input.rs::decode::from_wire",
+    "crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields::from_wire",
+    "crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields::from_wire",
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs::parse_token::from_wire",
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire",
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire",
@@ -1519,6 +1529,8 @@
     "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames::from_wire",
     "crates/protocol/chio-provider-conformance/src/bin/record/bedrock.rs::bedrock_converse::from_wire",
     "crates/protocol/chio-tool-call-fabric/src/types.rs::validate::from_wire",
+    "crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json::new",
+    "crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload::new",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire",
     "crates/security/chio-flow/src/classification.rs::validate_field_path::from_wire",
@@ -2350,10 +2362,7 @@
     "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_str",
     "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar::from_str",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
-    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value",
-    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value",
-    "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_progress_token::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_approval_artifacts::from_value",
@@ -2392,7 +2401,7 @@
     "crates/security/chio-keyring/src/checkpoint.rs::from_canonical_bytes::custom_deserialize",
     "crates/security/chio-keyring/src/event.rs::as_str::custom_deserialize",
     "crates/security/chio-keyring/src/event.rs::fmt::custom_deserialize",
-    "crates/security/chio-keyring/src/event.rs::is_recovery_only::custom_deserialize",
+    "crates/security/chio-keyring/src/event.rs::is_recovery_authorized::custom_deserialize",
     "crates/security/chio-quarantine/src/correlation.rs::load_capacity_state::from_slice",
     "crates/security/chio-quarantine/src/correlation.rs::load_durable_outcome::from_slice",
     "crates/security/chio-quarantine/src/correlation.rs::load_partition_state::from_slice",
@@ -2761,39 +2770,6 @@
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
     {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
-      "owner": "observed_time",
-      "sha256": "40eeddce06ccf369dc92a2d9c1c2f22cde26e85d46ccd5e1779854f0c3c2adb6",
-      "tables": [
-        "security_participant_egress_events"
-      ],
-      "sql": "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_egress_events",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
-      "owner": "observed_time",
-      "sha256": "54a723f0838efaed670f9ee6059b8bb29fda2c720574213ef353c809e65b6846",
-      "tables": [
-        "security_participant_output_events"
-      ],
-      "sql": "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_output_events",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs",
-      "owner": "observed_time",
-      "sha256": "cc99c4322e1455808ff82109d5040b0258141a3f6986a9c1a172d2bb9a133dcd",
-      "tables": [
-        "security_participant_state_mutations"
-      ],
-      "sql": "SELECT MAX(value) FROM ( SELECT COALESCE(MAX(initialized_at), 0) AS value FROM security_participant_state_initializations UNION ALL SELECT COALESCE(MAX(observed_at_unix_ms), 0) FROM security_participant_migration_events UNION ALL SELECT COALESCE(MAX(observed_at), 0) FROM security_participant_state_mutations)",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/integrity.rs",
       "owner": "verify_coverage",
       "sha256": "cbe36578ccb5173bc7e6997bcfde935fbb526d1dc1e57e643afb0f7ec1fda7e4",
@@ -2812,17 +2788,6 @@
         "security_participant_egress_events"
       ],
       "sql": "SELECT COUNT(*) FROM security_participant_egress_events",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs",
-      "owner": "head",
-      "sha256": "ffd3fa26856d0a9c50eaa7c28dfb57852acba3ef4de08994016e79e6a87b4d3c",
-      "tables": [
-        "security_participant_egress_events"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_egress_events WHERE security_authority_id = ?1",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
@@ -2873,17 +2838,6 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
-      "owner": "head",
-      "sha256": "c7c38885d498f26f8511eeab1f4226da56df0d3aff5ce230144f916677f22fbf",
-      "tables": [
-        "security_participant_state_mutations"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(MAX(sequence), 1), COALESCE(SUM(length(canonical_record)), 0) FROM security_participant_state_mutations WHERE security_authority_id = ?1",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
       "owner": "load",
       "sha256": "3616a18da83b9264111488912746a61533a3536fb65f7196a983e79d73de0c19",
       "tables": [
@@ -2906,51 +2860,51 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
-      "owner": "validate_history_bounds",
-      "sha256": "19058470cbf661e94acd76df0cea8f0cf41fd705d26f5baeb39d670186818969",
-      "tables": [
-        "security_participant_egress_events"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_egress_events WHERE security_authority_id = ?1",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
-      "owner": "validate_history_bounds",
-      "sha256": "42cbd083cba1785e78ff867d5ee1ea95af2b2365f0268a0d6edbe60a5c366fd2",
-      "tables": [
-        "security_participant_output_events"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_output_events WHERE security_authority_id = ?1",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
-      "owner": "validate_history_bounds",
-      "sha256": "b61e10e91728d506f6cceb8dde52229ae2fff5b32116af944e485c1d5d1fea1b",
-      "tables": [
-        "security_participant_nonce_preflight_events"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
-      "owner": "validate_history_bounds",
-      "sha256": "e7e721545ee413751ad99321d37ede67ea0c9d13ffc23a0848b8043aeefc58d6",
+      "owner": "segment_totals",
+      "sha256": "2ce9118fb66c0a8a82dbc75c53ad2f4aa1cf9c4124169fb2483ea2646f256a15",
       "tables": [
         "security_participant_state_mutations"
       ],
-      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_state_mutations WHERE security_authority_id = ?1",
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_state_mutations WHERE security_authority_id = ?1 AND sequence > ?2",
       "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
+      "contract": "Internal fenced native-history suffix accounting. The authority key and checkpoint floors bound per-family count/byte totals; this is not a tenant-facing lookup or authority release."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "segment_totals",
+      "sha256": "566fc10987afd8663a4b5fa50fc3a139d436c77ef53fa5b5378248dc1b08905a",
+      "tables": [
+        "security_participant_nonce_preflight_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1 AND sequence > ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced native-history suffix accounting. The authority key and checkpoint floors bound per-family count/byte totals; this is not a tenant-facing lookup or authority release."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "segment_totals",
+      "sha256": "5bb670bc4b99baa21888e585c05c9a554ecaf1cac0188d537596ed3dc5142350",
+      "tables": [
+        "security_participant_output_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_output_events WHERE security_authority_id = ?1 AND sequence > ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced native-history suffix accounting. The authority key and checkpoint floors bound per-family count/byte totals; this is not a tenant-facing lookup or authority release."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs",
+      "owner": "segment_totals",
+      "sha256": "ea953a42ad389b11a9574536f8315e9622e77d99115c186449e2c2aff8bca7f5",
+      "tables": [
+        "security_participant_egress_events"
+      ],
+      "sql": "SELECT COUNT(*), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_egress_events WHERE security_authority_id = ?1 AND sequence > ?2",
+      "principal": "kernel-admission",
+      "contract": "Internal fenced native-history suffix accounting. The authority key and checkpoint floors bound per-family count/byte totals; this is not a tenant-facing lookup or authority release."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs",
-      "owner": "verify_coverage",
+      "owner": "verify_archive_coverage",
       "sha256": "b468da5dc30cb7be0926c40a9139ec71aad922672ca4af494f3c449162e4109e",
       "tables": [
         "security_participant_state_mutations"
@@ -2961,7 +2915,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs",
-      "owner": "verify_coverage",
+      "owner": "verify_archive_coverage",
       "sha256": "e629d39e9043526464610b99eb9d2df4b443865aeeaf4b37bd4fd2de91266bca",
       "tables": [
         "security_participant_state_mutations"
@@ -2989,17 +2943,6 @@
         "security_participant_nonce_preflight_events"
       ],
       "sql": "SELECT EXISTS(SELECT 1 FROM security_participant_nonce_preflight_events AS event WHERE NOT EXISTS(SELECT 1 FROM security_participant_state_initializations AS initialization WHERE initialization.security_authority_id = event.security_authority_id))",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs",
-      "owner": "head",
-      "sha256": "d7fbe8592394bf2e302f781153650811573e75a7a4baadcd5b643264599f316c",
-      "tables": [
-        "security_participant_nonce_preflight_events"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
@@ -3058,17 +3001,6 @@
         "security_participant_output_events"
       ],
       "sql": "SELECT COUNT(*) FROM security_participant_output_events",
-      "principal": "kernel-admission",
-      "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs",
-      "owner": "head",
-      "sha256": "abe9abc3d9eb907cf2a6e60f42970568c37c15174682dc841ad5d8c329a5275e",
-      "tables": [
-        "security_participant_output_events"
-      ],
-      "sql": "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0) FROM security_participant_output_events WHERE security_authority_id = ?1",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
@@ -4564,6 +4496,50 @@
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
     {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/records.rs",
+      "owner": "schema",
+      "sha256": "052fb9889a825a891981912aa71ad64e4c82a8241bad641e3704b2258196f62f",
+      "tables": [
+        "security_participant_state_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state, transition_binding, evidence_type, evidence_id, canonical_body, body_hash, transition_id, occurred_at, predecessor_evidence_id, acknowledged, acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at, last_error_code FROM security_participant_state_declassification_receipt_outbox WHERE security_authority_id = ?1 AND acknowledged = 0 AND attempts > 0 ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC LIMIT ?2",
+      "principal": "security-runtime",
+      "contract": "Internal native declassification startup revalidation within the selected security_authority_id. Reads the first unacknowledged failed-attempt keyset page, including retry-backoff rows. Read-only page limit is checked at 1..1024; ScopedReader verifies dense numbered parameters and readonly status. Tenant cursor comparison is ordering, not tenant-facing authorization. No append, acknowledgment, new grant or externally authenticated completeness is asserted."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/records.rs",
+      "owner": "schema",
+      "sha256": "11fd888eaf752fe88490eeb0de204b26b290707c5e5eef26087088de436a97ea",
+      "tables": [
+        "security_participant_state_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state, transition_binding, evidence_type, evidence_id, canonical_body, body_hash, transition_id, occurred_at, predecessor_evidence_id, acknowledged, acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at, last_error_code FROM security_participant_state_declassification_receipt_outbox WHERE security_authority_id = ?1 AND acknowledged = 0 AND attempts > 0 AND (tenant_id > ?2 OR (tenant_id = ?2 AND (grant_id > ?3 OR (grant_id = ?3 AND phase_ordinal > ?4)))) ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC LIMIT ?5",
+      "principal": "security-runtime",
+      "contract": "Internal native declassification startup revalidation within the selected security_authority_id. Reads an unacknowledged failed-attempt suffix strictly after the complete tenant/grant/phase cursor. Read-only page limit is checked at 1..1024; ScopedReader verifies dense numbered parameters and readonly status. Tenant cursor comparison is ordering, not tenant-facing authorization. No append, acknowledgment, new grant or externally authenticated completeness is asserted."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/records.rs",
+      "owner": "schema",
+      "sha256": "a73036bf0ea8cdfade8c558e346a598bdc130ff057505c2ccbb3ae9d05b8e39d",
+      "tables": [
+        "security_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state, transition_binding, evidence_type, evidence_id, canonical_body, body_hash, transition_id, occurred_at, predecessor_evidence_id, acknowledged, acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at, last_error_code FROM security_declassification_receipt_outbox WHERE acknowledged = 0 AND attempts > 0 ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC LIMIT ?1",
+      "principal": "security-runtime",
+      "contract": "Composition-installed legacy declassification worker startup revalidation across tenant rows after the legacy-retirement check. Reads the first unacknowledged failed-attempt keyset page, including retry-backoff rows. Read-only page limit is checked at 1..1024; ScopedReader verifies dense numbered parameters and readonly status. Tenant cursor comparison is ordering, not tenant-facing authorization. No append, acknowledgment, new grant or externally authenticated completeness is asserted."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/declassification/records.rs",
+      "owner": "schema",
+      "sha256": "bff98e48b8175330393775f181ebc16bcc7ac973aa1fa0278c7f4cc588be86c0",
+      "tables": [
+        "security_declassification_receipt_outbox"
+      ],
+      "sql": "SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state, transition_binding, evidence_type, evidence_id, canonical_body, body_hash, transition_id, occurred_at, predecessor_evidence_id, acknowledged, acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at, last_error_code FROM security_declassification_receipt_outbox WHERE acknowledged = 0 AND attempts > 0 AND (tenant_id > ?1 OR (tenant_id = ?1 AND (grant_id > ?2 OR (grant_id = ?2 AND phase_ordinal > ?3)))) ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC LIMIT ?4",
+      "principal": "security-runtime",
+      "contract": "Composition-installed legacy declassification worker startup revalidation across tenant rows after the legacy-retirement check. Reads an unacknowledged failed-attempt suffix strictly after the complete tenant/grant/phase cursor. Read-only page limit is checked at 1..1024; ScopedReader verifies dense numbered parameters and readonly status. Tenant cursor comparison is ordering, not tenant-facing authorization. No append, acknowledgment, new grant or externally authenticated completeness is asserted."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/security_state/scoped_sql/flow/egress.rs",
       "owner": "schema",
       "sha256": "37f8b8f465029e74c6cecbf9f1ea47d45d64362ab60fb278a2fff59c2f3e27c9",
@@ -4776,6 +4752,9 @@
     "crates/protocol/chio-mcp-edge/src/authorization.rs::negotiate_authorization_capabilities::from_value": "Initialize-only feature negotiation from an already decoded object. Features cannot mint authority; the kernel validates signed artifacts against installed authorities and forbids per-call negotiation upgrades.",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_slice": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader.",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_str": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader.",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_slice": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_str": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar::from_str": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::list_roots::from_value": "Already decoded peer replies become roots, sampling or elicitation values. These are untrusted nested-flow data; request correlation and kernel flow policy remain mandatory before use.",
@@ -4786,6 +4765,7 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message_with_client_inbox::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
@@ -4813,7 +4793,7 @@
     "crates/security/chio-keyring/src/checkpoint.rs::from_canonical_bytes::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
     "crates/security/chio-keyring/src/event.rs::as_str::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
     "crates/security/chio-keyring/src/event.rs::fmt::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
-    "crates/security/chio-keyring/src/event.rs::is_recovery_only::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
+    "crates/security/chio-keyring/src/event.rs::is_recovery_authorized::custom_deserialize": "Reviewed existing shared from_bounded_json contract: bounded canonical original bytes reject alternate/ambiguous encodings before typed value use. Identifier/reason constraints and capped recovery/witness sequence visitors remain. Event/checkpoint signatures, quorum, epoch and replay checks are separate authority gates.",
     "crates/security/chio-quarantine/src/correlation.rs::load_capacity_state::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/correlation.rs::load_durable_outcome::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
     "crates/security/chio-quarantine/src/correlation.rs::load_partition_state::from_slice": "Reviewed existing CanonicalBody-bounded native readers: exact typed or Value canonical re-encoding equality precedes record use; state/effect/correlation records additionally bind hashes and replay identities. Contribution decoding retains plan/effect semantics. Simulation produces no live effect authority. Existing opaque PortError cause conversion remains in the broader mechanism C queue.",
@@ -4853,11 +4833,7 @@
     "crates/trust/chio-pheromone-runtime/src/lib.rs::peer_weights_from_json::from_value": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
     "crates/trust/chio-pheromone-runtime/src/lib.rs::runtime_policy_from_json::from_value": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
     "crates/trust/chio-pheromone-runtime/src/lib.rs::validate_json_schema::from_str": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
-    "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding.",
-    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message_with_client_inbox::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
-    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_slice": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
-    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_str": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
-    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar::from_str": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority."
+    "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding."
   },
   "proofs": [
     {
@@ -5614,6 +5590,11 @@
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs": [
       "native_release_custody::from_value"
     ],
+    "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs": [
+      "from_ledger::from_value",
+      "from_ledger::from_value",
+      "from_ledger::from_value"
+    ],
     "crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs": [
       "fmt::custom_deserialize"
     ],
@@ -5641,8 +5622,17 @@
       "validate_active_response_terminal_executor_receipt::from_value",
       "verify_active_response_completion_receipt::from_value"
     ],
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs": [
+      "completed_compacted_value_response::from_value",
+      "completed_compacted_value_response::from_value"
+    ],
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs": [
+      "validate_retained_financial_receipt::from_value"
+    ],
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot.rs": [
+      "from_evaluation::from_value"
+    ],
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs": [
-      "validate_completed_durable_receipt::from_value",
       "validate_completed_durable_receipt::from_value"
     ],
     "crates/kernel/chio-kernel/src/kernel/governed_validation.rs": [
@@ -5682,8 +5672,7 @@
       "parse_artifact_value::from_value"
     ],
     "crates/kernel/chio-kernel-browser/src/pure.rs": [
-      "parse_authority_input::from_str",
-      "verify_receipt_pure::from_slice"
+      "parse_authority_input::from_str"
     ],
     "crates/kernel/chio-kernel-browser/src/wasm.rs": [
       "parse_json::from_str"
@@ -5853,11 +5842,17 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_retraction_resolver.rs": [
       "verified_finding_parent::from_value"
     ],
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/admission_authority/recovery.rs": [
+      "decode_payload::from_value"
+    ],
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/admission_authority.rs": [
       "decode::from_value"
     ],
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/budget/recovery.rs": [
       "load_retained_budget_hold::from_value"
+    ],
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_admission/recovery/transport.rs": [
+      "decode_recovery_response::from_value"
     ],
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_admission.rs": [
       "decode_response::from_value"
@@ -5962,6 +5957,9 @@
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store.rs": [
       "verify_head_against_latest_checkpoint::from_str"
+    ],
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs": [
+      "qualified_replay_owners::from_value"
     ],
     "crates/platform/chio-transaction-passport/src/evidence_graph.rs": [
       "schema::custom_deserialize"
@@ -6092,9 +6090,6 @@
       "cmd_mercury_verify::from_value",
       "cmd_mercury_verify::from_value"
     ],
-    "crates/products/chio-mercury/src/commands/shared/utils.rs": [
-      "read_json_file::from_slice"
-    ],
     "crates/products/chio-mercury-core/src/receipt_metadata.rs": [
       "from_metadata_value::from_value"
     ],
@@ -6126,6 +6121,11 @@
     ],
     "crates/protocol/chio-acp-edge/src/bridge.rs": [
       "extract_capability_ref::from_value"
+    ],
+    "crates/protocol/chio-acp-proxy/src/input.rs": [
+      "validate_original_authority::from_slice",
+      "validate_original_authority::from_str",
+      "validate_original_authority::from_str"
     ],
     "crates/protocol/chio-acp-proxy/src/interceptor.rs": [
       "decode_jsonrpc_params::from_value",
@@ -6184,10 +6184,7 @@
     ],
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs": [
       "create_elicitation::from_value",
-      "create_elicitation::from_value",
       "create_message::from_value",
-      "create_message::from_value",
-      "list_roots::from_value",
       "list_roots::from_value"
     ],
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs": [
@@ -6222,7 +6219,7 @@
       "extract_tool_calls::from_value"
     ],
     "crates/protocol/chio-openapi/src/extensions.rs": [
-      "from_operation::from_value"
+      "decode_extension::from_value"
     ],
     "crates/protocol/chio-openapi/src/input.rs": [
       "decode::Deserializer::from_slice",
@@ -6239,9 +6236,6 @@
     ],
     "crates/sdk/chio-binding-helpers/src/manifest.rs": [
       "parse_signed_manifest_json::from_str"
-    ],
-    "crates/sdk/chio-binding-helpers/src/receipt.rs": [
-      "parse_receipt_json::from_str"
     ],
     "crates/sdk/chio-binding-helpers/src/signing.rs": [
       "sign_json_str_ed25519::from_str",
@@ -6263,8 +6257,7 @@
     ],
     "crates/sdk/chio-eval-receipt/src/verify.rs": [
       "test_signature_for_bundle_json::from_str",
-      "verify_bundle_with_mode::from_str",
-      "verify_chio_receipt_payload::from_str"
+      "verify_bundle_with_mode::from_str"
     ],
     "crates/sdk/chio-guard-sdk/src/glue.rs": [
       "read_request::from_slice",
@@ -6305,7 +6298,7 @@
     "crates/security/chio-keyring/src/event.rs": [
       "as_str::custom_deserialize",
       "fmt::custom_deserialize",
-      "is_recovery_only::custom_deserialize"
+      "is_recovery_authorized::custom_deserialize"
     ],
     "crates/security/chio-quarantine/src/correlation.rs": [
       "load_capacity_state::from_slice",
@@ -7373,7 +7366,6 @@
         {
           "reader": "validate_completed_durable_receipt",
           "decoders": [
-            "from_value",
             "from_value"
           ],
           "apis": [
@@ -9828,8 +9820,7 @@
           "apis": [
             "serde_json::from_value"
           ],
-          "checked": true,
-          "instances": 2
+          "checked": true
         },
         {
           "reader": "create_message",
@@ -9839,8 +9830,7 @@
           "apis": [
             "serde_json::from_value"
           ],
-          "checked": true,
-          "instances": 2
+          "checked": true
         },
         {
           "reader": "list_roots",
@@ -9850,8 +9840,7 @@
           "apis": [
             "serde_json::from_value"
           ],
-          "checked": true,
-          "instances": 2
+          "checked": true
         }
       ]
     },
@@ -10069,7 +10058,7 @@
       "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
       "readers": [
         {
-          "reader": "from_operation",
+          "reader": "decode_extension",
           "decoders": [
             "from_value"
           ],
@@ -11212,6 +11201,140 @@
           ],
           "apis": [
             "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects fields from a ledger JSON value already decoded with a 1 MiB signed-reader bound. Canonical byte equality, record digest, operation ID and exact context are checked. This is data binding only: no capture, release or independently authenticated completeness is granted; native parse causes currently become legacy invariant strings.",
+      "readers": [
+        {
+          "reader": "from_ledger",
+          "decoders": [
+            "from_value",
+            "from_value",
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects retained context and receipt metadata from existing values. Compacted replay is restricted to a completed local unsupported-profile-free value outcome and checks immutable request/frozen-plan binding, original selected Ed25519 signer/signature floors, receipt/admission/financial facts and bounded canonical retained output. It creates no fresh authority or recovered raw bytes; original bytes and operator causes remain separate owning contracts.",
+      "readers": [
+        {
+          "reader": "completed_compacted_value_response",
+          "decoders": [
+            "from_value",
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/financial_receipt.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects an existing signed receipt financial metadata value and compares it with the retained settlement journal, frozen pricing and original grant. It performs no new payment operation and cannot validate original receipt bytes; the native metadata parse cause is currently replaced by a fixed legacy durable-admission error.",
+      "readers": [
+        {
+          "reader": "validate_retained_financial_receipt",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/resolved_snapshot.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects a closed typed terminal snapshot from retained evaluation JSON. Schema and finding-status consistency are checked, and the parse error retains UntrustedJsonError::Decode. This restores previously retained decisions and does not establish original-byte validation or mint authorization.",
+      "readers": [
+        {
+          "reader": "from_evaluation",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/admission_authority/recovery.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects an already decoded authority request payload. The enclosing serving service authenticates and bounds original input; this recovery handler checks exact store fence, backend clock, operation/status/claim qualification and closed action semantics. Native serde/store causes remain in RecoveryAuthorityError and no payload string supplies authority time.",
+      "readers": [
+        {
+          "reader": "decode_payload",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_admission/recovery/transport.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects result.value only after the shared original response reader enforces a response cap and signed-input contract. Closed schema, exclusive result/error outcome and unsupported compaction metadata checks precede conversion. Native JSON/IO/transport causes and closed remote error kinds survive; this adapter alone does not qualify the serving endpoint or network deployment.",
+      "readers": [
+        {
+          "reader": "decode_recovery_response",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Projects receipt metadata after a 1 MiB canonical receipt decode. Complete erase eligibility also checks bounded latest-commit operation envelope, retained request begin commitment, no unsupported sidecars/profile and qualified outcome/evaluation/receipt ownership. Unsupported owners retain bytes. This is a typed projection and internal custody check, not externally authenticated completeness; legacy invariant mappings still stringify parse causes.",
+      "readers": [
+        {
+          "reader": "qualified_replay_owners",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-acp-proxy/src/input.rs": {
+      "kind": "bounded-original-and-typed-projection",
+      "contract": "AcpMessage is constructible only through an 8 MiB original-byte bound and duplicate-aware unsigned-document decoding. Private borrowed RawValue projections check the exact capabilityToken/capability_token and executionNonce/execution_nonce fields at params and params.chio; object capabilities and nonce slices pass original signed decoding before envelope projection, while string capabilities use the later strict token checker. Framing poisons rejected/truncated tails. Typed projection and parser validation do not verify a signature or grant authority; native errors are retained in AcpProxyError.",
+      "readers": [
+        {
+          "reader": "validate_original_authority",
+          "decoders": [
+            "from_slice",
+            "from_str",
+            "from_str"
+          ],
+          "apis": [
+            "call::validate_original_authority_fields::UntrustedJsonText::from_wire#1::decode_signed",
+            "call::validate_original_authority_fields::UntrustedJsonText::from_wire#2::decode_signed"
           ],
           "checked": true
         }
@@ -14766,8 +14889,8 @@
     }
   },
   "reviewed_acp_boundaries": {
-    "edge": "Public handle_jsonrpc accepts original bytes bounded at 8 MiB; duplicate keys reject before projection; local_error preserves typed rejection for notifications without a wire reply. Registry ownership is mandatory and every invocation uses kernel admission.",
-    "proxy": "AcpMessage is constructible only through bounded original-byte decoding. AcpFrameReader poisons after malformed, oversized or truncated frames and never parses a rejected tail. Typed input sources survive interceptor and kernel-checker rejection.",
+    "edge": "Public handle_jsonrpc accepts original bytes bounded at 8 MiB and duplicate-aware unsigned-document decoding, preserving ordinary document decimals. Peer input supplies capabilityId and arguments only; authority comes from the installed capability registry and independent AcpKernelExecutionContext, then kernel admission. local_error retains typed notification rejection without a wire reply.",
+    "proxy": "AcpMessage is constructible only through an 8 MiB original-byte bound and duplicate-aware unsigned-document decoding. Private borrowed RawValue projections check the exact capabilityToken/capability_token and executionNonce/execution_nonce fields at params and params.chio; object capabilities and nonce slices pass original signed decoding before envelope projection, while string capabilities use the later strict token checker. Framing poisons rejected/truncated tails. Typed projection and parser validation do not verify a signature or grant authority; native errors are retained in AcpProxyError.",
     "tests": [
       "crates/protocol/chio-acp-edge/src/tests/original_input.rs",
       "crates/protocol/chio-acp-proxy/src/input.rs",
@@ -16083,6 +16206,7 @@
     "crates/guards/chio-guards/src/embedding_anomaly.rs::from_json_file::from_wire#1::decode_document",
     "crates/guards/chio-wasm-guards/src/blocklist.rs::store::from_wire#1::bounds_only",
     "crates/guards/chio-wasm-guards/src/input.rs::decode::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel-browser/src/pure.rs::verify_receipt_pure::new#1::decode_signed",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc::validate_cleanup_payload::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs::from_canonical_bytes::from_wire#1::decode_signed",
@@ -16091,6 +16215,7 @@
     "crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::native_release_custody::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs::validate::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs::from_ledger::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs::verify_projection_body::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/admission_operation/projection/authorization.rs::from_canonical_record_verified::from_wire#1::decode_signed",
@@ -16127,6 +16252,7 @@
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/native_output.rs::validate_original::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::committed_caller_authorization::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs::decode_caller_return_payload::from_wire#1::decode_signed",
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs::completed_compacted_value_response::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::recover_terminal_receipt_outboxes_with_store::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_staged_compensation_receipt::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs::validate_terminal_compensation_receipt::from_wire#1::decode_signed",
@@ -16297,7 +16423,9 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_observer_projection::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_terminal_projection::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_terminal_projection::from_wire#2::decode_signed",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs::load::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::decode::from_wire#1::decode_canonical",
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::decode::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::decode::from_wire#2::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs::validate_owned_declassification::from_wire#1::decode_signed",
@@ -16392,6 +16520,8 @@
     "crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs::load_verified_projection::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_evaluation_connection::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_connection::from_wire#1::decode_canonical",
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::authenticated_owner_envelope::from_wire#1::decode_canonical",
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::qualified_replay_owners::from_wire#1::decode_canonical",
     "crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json::from_wire#1::decode_signed",
     "crates/platform/chio-transaction-passport/src/minimal.rs::transparency_anchor_state::from_wire#1::decode_external",
     "crates/products/chio-api-protect/src/proxy/approval_authority.rs::load::from_wire#1::decode_signed",
@@ -16416,14 +16546,17 @@
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire#1::canonicalize",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire#1::decode_canonical",
+    "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file::new#1::decode_signed",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire#1::canonicalize",
     "crates/protocol/chio-a2a-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire#1::decode_document",
-    "crates/protocol/chio-acp-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire#1::decode_signed",
-    "crates/protocol/chio-acp-proxy/src/input.rs::decode::from_wire#1::decode_signed",
+    "crates/protocol/chio-acp-edge/src/jsonrpc.rs::handle_jsonrpc::from_wire#1::decode_document",
+    "crates/protocol/chio-acp-proxy/src/input.rs::decode::from_wire#1::decode_document",
+    "crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields::from_wire#1::decode_signed",
+    "crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields::from_wire#2::decode_signed",
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs::parse_token::from_wire#1::decode_signed",
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire#1::decode_document",
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire#1::decode_document",
@@ -16445,6 +16578,8 @@
     "crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames::from_wire#1::bounds_only",
     "crates/protocol/chio-provider-conformance/src/bin/record/bedrock.rs::bedrock_converse::from_wire#1::bounds_only",
     "crates/protocol/chio-tool-call-fabric/src/types.rs::validate::from_wire#1::decode_document",
+    "crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json::new#1::decode_signed",
+    "crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload::new#1::decode_signed",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire#1::decode_canonical",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire#1::decode_canonical",
     "crates/security/chio-flow/src/classification.rs::validate_field_path::from_wire#1::decode_signed",
@@ -16926,6 +17061,9 @@
       "load_wasm_guards::shared-reader::crates/guards/chio-wasm-guards/src/manifest.rs::load_manifest",
       "load_wasm_guards::shared-reader::crates/guards/chio-wasm-guards/src/manifest.rs::verify_guard_signature"
     ],
+    "crates/kernel/chio-kernel-browser/src/pure.rs": [
+      "verify_receipt_pure::original-json-reader::UntrustedJsonText"
+    ],
     "crates/kernel/chio-kernel-browser/src/wasm.rs": [
       "evaluate::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
       "sign_receipt::shared-reader::crates/kernel/chio-kernel-browser/src/wasm.rs::parse_json",
@@ -16965,6 +17103,9 @@
     "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs": [
       "native_release_custody::original-json-reader::UntrustedJsonText",
       "validate::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs": [
+      "from_ledger::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/projection.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText",
@@ -17080,6 +17221,9 @@
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal.rs": [
       "completed_durable_tool_response::shared-reader::crates/kernel/chio-kernel/src/kernel/delivery_contract.rs::evaluate_delivery",
       "finalize_durable_tool_return_with_security_release::shared-reader::crates/kernel/chio-kernel/src/kernel/delivery_contract.rs::evaluate_delivery"
+    ],
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs": [
+      "completed_compacted_value_response::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/kernel/admission_terminal_receipt.rs": [
       "recover_terminal_receipt_outboxes_with_store::original-json-reader::UntrustedJsonText",
@@ -17930,6 +18074,9 @@
       "search_public_certifications::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/public_registry.rs::public_certification_get_json_with_query",
       "search_public_generic_listings::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/public_registry.rs::public_registry_get_json_with_query"
     ],
+    "crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_admission/recovery/transport.rs": [
+      "call_recovery::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
+    ],
     "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs": [
       "from_policy_file::original-json-reader::UntrustedJsonText"
     ],
@@ -18357,8 +18504,28 @@
       "verify_stored_terminal_projection::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_observer_projection",
       "verify_stored_terminal_projection::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/projection.rs::verify_stored_participant_projection"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs": [
+      "persist_recovery_deferral::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs::verify_snapshot",
+      "persist_recovery_deferral::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs::load",
+      "persist_recovery_deferral_clear::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs::verify_snapshot",
+      "persist_recovery_deferral_clear::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs::load",
+      "read_recovery_page::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs::read",
+      "read_recovery_status::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "read_recovery_status::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs::load",
+      "verify_all::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_row",
+      "verify_all::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs::load",
+      "verify_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/page.rs": [
+      "read::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_row"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs": [
+      "load::original-json-reader::UntrustedJsonText"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/retained_request.rs": [
       "begin_retaining_tool_request::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::begin_prepared_operation_tx",
+      "load_original_request_by_nonce::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_original_request_by_nonce::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/execution_nonce/issuance/record.rs::verify",
       "load_unambiguous_original_request::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs": [
@@ -18405,6 +18572,8 @@
       "migrate_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v32.rs::verify_pre_migration_schema",
       "migrate_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v33.rs::verify_pre_migration_schema",
       "migrate_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v34.rs::verify_pre_migration_schema",
+      "migrate_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v35.rs::verify_pre_migration_schema",
+      "migrate_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v36.rs::verify_pre_migration_schema",
       "migrate_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs::sql",
       "verify_admission_operation_data_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_row",
       "verify_admission_operation_data_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs::verify_credit_exposure_account_invariants",
@@ -18412,10 +18581,13 @@
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_claim/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_replay/records.rs::verify_all_records",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/governed_approval_claim/records.rs::verify_all",
+      "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_data_invariants",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_schema",
+      "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs::verify_all",
+      "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs::verify_archive_coverage",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::verify_all",
       "verify_admission_operation_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::expected_admission_operation_schema"
     ],
@@ -18534,6 +18706,16 @@
       "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_schema",
       "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::verify_all"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v35.rs": [
+      "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_data_invariants",
+      "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_schema"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v36.rs": [
+      "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs::verify_all",
+      "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_data_invariants",
+      "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_schema",
+      "verify_pre_migration_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::verify_all"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_dispatch.rs": [
       "verify_dispatch_capture_owner_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_dispatch.rs::verify_native_dispatch_capture_owner_tx",
       "verify_native_dispatch_capture_owner_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
@@ -18541,25 +18723,61 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_migration.rs": [
       "import_security_participant_source::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_migration/storage.rs::insert_rows"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_migration/integrity.rs": [
+      "verify_security_participant_migration_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs::verify_archive_coverage"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_migration/storage.rs": [
       "insert_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs": [
+      "hydrate_security_participant_state::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "hydrate_security_participant_state::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::load",
       "hydrate_security_participant_state::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::verify_all",
       "hydrate_security_participant_state::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/storage.rs::hydrate",
+      "load_security_participant_state::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "load_security_participant_state::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::load",
+      "observed_time::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
       "verify_predecessor::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::verify_all_version"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs": [
+      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::copy",
+      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit",
+      "checkpoint_security_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs::load",
+      "floors::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "latest::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::latest",
+      "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local",
+      "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit",
+      "verify_all::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local",
+      "verify_all::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "visit_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::visit"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs": [
+      "latest::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local",
+      "load_local::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs": [
+      "copy::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "copy::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger.rs": [
       "load_native_dispatch_ledger::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_native_dispatch_ledger::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "load_native_dispatch_ledger::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs::load",
       "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs::load"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/capture.rs": [
       "verify::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/execution_nonce.rs::verify_reservation",
-      "verify::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification.rs::verify_native_pending_declassification"
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::nonce_verification_time_unix_ms",
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::verify_nonce_capture_approval",
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification.rs::verify_native_pending_declassification",
+      "verify_deadline::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "verify_deadline::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval/nonce_capture.rs::verify_nonce_capture_approval"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/policy.rs": [
       "decode::original-json-reader::UntrustedJsonText",
@@ -18574,58 +18792,117 @@
       "verify_all::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs::load"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/write.rs": [
+      "retain_native_dispatch_ledger::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "retain_native_dispatch_ledger::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "retain_native_dispatch_ledger::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load_for_operation"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/contract.rs": [
       "require_original::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load_for_operation"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/readback.rs": [
+      "load_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "load_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs::verify_coverage"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/readback/portable.rs": [
-      "load_native_egress_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
+      "load_native_egress_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_native_egress_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "load_native_egress_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs::verify_coverage"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs": [
+      "head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::family_head",
       "load::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load_inner",
       "load_initialized::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load_inner",
       "load_inner::original-json-reader::UntrustedJsonText",
       "load_operation_inner::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load_inner"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/write.rs": [
-      "mutate_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::latest_totals"
+      "mutate_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "mutate_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "mutate_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "mutate_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::latest_totals",
+      "mutate_security_participant_egress::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::validate_history_bounds"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs": [
+      "head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::family_head",
       "load::original-json-reader::UntrustedJsonText",
       "load_for_operation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs": [
+      "family_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::floors",
+      "join_precedes::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load_for_operation",
+      "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::head",
       "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load",
+      "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::head",
       "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load",
+      "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::head",
       "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::load",
+      "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::head",
       "latest_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::load",
+      "segment_totals::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::floors",
+      "validate_history_bounds::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::segment_totals",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::head",
       "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load_initialized",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::head",
       "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::join_precedes",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::join_precedes",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::join_precedes",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::validate_history_bounds",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::head",
       "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::load_initialized",
+      "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::head",
       "visit::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::load_initialized"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs": [
       "apply_image::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::visit_rows",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::head",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::head",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::visit",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs::apply_image",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs::apply_image",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs::apply_image",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs::apply_image",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::head",
+      "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::head",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/storage.rs::verify_rows",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs": [
-      "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load"
+      "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::load",
+      "verify_archive_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::verify_coverage",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::verify_coverage",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::head",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs::head",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::head",
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::head"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/mutations.rs": [
+      "join_native_command::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "join_native_command::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs": [
+      "head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::family_head",
       "load::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::load_inner",
       "load_initialized::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/record.rs::load_inner",
       "load_inner::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/write.rs": [
+      "join_security_participant_nonce_preflight::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "join_security_participant_nonce_preflight::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "join_security_participant_nonce_preflight::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::latest_totals",
-      "load_native_nonce_preflight_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
+      "join_security_participant_nonce_preflight::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::validate_history_bounds",
+      "load_native_nonce_preflight_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_native_nonce_preflight_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "load_native_nonce_preflight_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs::verify_coverage"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/observation.rs": [
+      "observe_security_participant_flow::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/contract.rs": [
       "require_original::original-json-reader::UntrustedJsonText",
@@ -18637,17 +18914,25 @@
       "expected_initialized::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs::load_operation_inner"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs": [
+      "head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::family_head",
       "load::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::load_inner",
       "load_initialized::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/record.rs::load_inner",
       "load_inner::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/write.rs": [
+      "join_security_participant_output::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "join_security_participant_output::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
       "join_security_participant_output::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::latest_totals",
+      "join_security_participant_output::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/ordered.rs::validate_history_bounds",
       "join_security_participant_output::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification.rs::verify_native_pending_declassification",
-      "load_native_output_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
+      "load_native_output_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_native_output_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "load_native_output_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/integrity.rs::verify_coverage"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/readback.rs": [
-      "load_native_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
+      "load_native_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
+      "load_native_join_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time",
+      "load_security_participant_flow_join::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state.rs::observed_time"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/records.rs": [
       "load::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/rows.rs::verify_rows",
@@ -18702,8 +18987,6 @@
       "claim_and_compare_and_swap::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "claim_lease_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "claim_recovery_untrusted::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
-      "list_recoverable::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs::recoverable_page",
-      "list_recoverable::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs::recoverable_page",
       "load_by_operation_id::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "load_by_replay_key::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_replay_key_tx",
       "load_caller_dispatch_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
@@ -18712,7 +18995,6 @@
       "load_execution_nonce_reservation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "load_retained_tool_request::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "load_terminal_replay::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_replay_key_tx",
-      "recoverable_page::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_row",
       "revalidate_recovery_claim::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/threshold_approval.rs": [
@@ -19648,6 +19930,11 @@
       "stage_post_return_evaluation_tx::shared-reader::crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_evaluation_tx",
       "stage_post_return_evaluation_tx::shared-reader::crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_outcome_tx"
     ],
+    "crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs": [
+      "authenticated_owner_envelope::original-json-reader::UntrustedJsonText",
+      "qualified_replay_owners::original-json-reader::UntrustedJsonText",
+      "qualified_replay_owners::shared-reader::crates/platform/chio-store-sqlite/src/tool_outcome_store/payload_compaction/eligibility.rs::authenticated_owner_envelope"
+    ],
     "crates/platform/chio-transaction-passport/src/cognition_market.rs": [
       "parse_cognition_claim_set::shared-reader::crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json",
       "parse_recipe::shared-reader::crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json",
@@ -20244,7 +20531,8 @@
       "build_proof_package::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::load_bundle_manifests"
     ],
     "crates/products/chio-mercury/src/commands/shared/utils.rs": [
-      "load_bundle_manifests::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file"
+      "load_bundle_manifests::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file",
+      "read_json_file::original-json-reader::UntrustedJsonText"
     ],
     "crates/products/chio-mercury/src/main.rs": [
       "main::shared-reader::crates/products/chio-mercury/src/main.rs::run",
@@ -20455,7 +20743,11 @@
       "handle_jsonrpc::original-json-reader::UntrustedJsonText"
     ],
     "crates/protocol/chio-acp-proxy/src/input.rs": [
-      "decode::original-json-reader::UntrustedJsonText"
+      "decode::original-json-reader::UntrustedJsonText",
+      "decode::shared-reader::crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority",
+      "validate_original_authority::shared-reader::crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields",
+      "validate_original_authority::shared-reader::crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields",
+      "validate_original_authority_fields::original-json-reader::UntrustedJsonText"
     ],
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs": [
       "parse_token::original-json-reader::UntrustedJsonText"
@@ -20503,6 +20795,7 @@
       "poll_frame::original-json-reader::UntrustedJsonText"
     ],
     "crates/protocol/chio-cohere-tools-adapter/src/lib.rs": [
+      "chat_stream::shared-reader::crates/protocol/chio-provider-adapter-core/src/input.rs::json",
       "invocation_from_tool_call::shared-reader::crates/protocol/chio-provider-adapter-core/src/input.rs::arguments",
       "lift_batch::shared-reader::crates/protocol/chio-cohere-tools-adapter/src/lib.rs::tool_calls",
       "lower_allow_tool_message::shared-reader::crates/protocol/chio-cohere-tools-adapter/src/lib.rs::parse_value",
@@ -20654,6 +20947,7 @@
       "argument_done::shared-reader::crates/protocol/chio-openai-adapter/src/streaming.rs::argument_done_text",
       "argument_done_text::shared-reader::crates/protocol/chio-openai-adapter/src/streaming.rs::arguments_string",
       "arguments_string::shared-reader::crates/protocol/chio-openai-adapter/src/input.rs::arguments",
+      "complete_response::shared-reader::crates/protocol/chio-openai-adapter/src/streaming.rs::response_tool_call_from_item",
       "finish_output_item::shared-reader::crates/protocol/chio-openai-adapter/src/streaming.rs::response_tool_call_from_item",
       "gate_response_stream::shared-reader::crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames",
       "response_tool_call_from_item::shared-reader::crates/protocol/chio-openai-adapter/src/streaming.rs::arguments_string",
@@ -20758,6 +21052,7 @@
       "verify_signed_manifest_json::shared-reader::crates/sdk/chio-binding-helpers/src/manifest.rs::parse_signed_manifest_json"
     ],
     "crates/sdk/chio-binding-helpers/src/receipt.rs": [
+      "parse_receipt_json::original-json-reader::UntrustedJsonText",
       "verify_receipt_json::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json",
       "verify_receipt_json_with_trusted_signer_hex::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json"
     ],
@@ -20785,6 +21080,7 @@
     "crates/sdk/chio-eval-receipt/src/verify.rs": [
       "verify_bundle::shared-reader::crates/sdk/chio-eval-receipt/src/verify.rs::verify_bundle_with_mode",
       "verify_bundle_with_mode::shared-reader::crates/sdk/chio-eval-receipt/src/verify.rs::verify_receipts",
+      "verify_chio_receipt_payload::original-json-reader::UntrustedJsonText",
       "verify_fixture_bundle::shared-reader::crates/sdk/chio-eval-receipt/src/verify.rs::verify_bundle_with_mode",
       "verify_receipt_payload::shared-reader::crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload",
       "verify_receipts::shared-reader::crates/sdk/chio-eval-receipt/src/verify.rs::verify_receipt_payload"
@@ -20891,29 +21187,19 @@
     "crates/security/chio-keyring/src/time.rs": [
       "from_canonical_bytes::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json"
     ],
-    "crates/security/chio-keyring/src/verifier.rs": [
-      "apply_sync::shared-reader::crates/security/chio-keyring/src/verifier.rs::find_response_conflict",
-      "find_checkpoint_conflict::shared-reader::crates/security/chio-keyring/src/verifier.rs::gossip_checkpoint_query",
-      "find_checkpoint_conflict::shared-reader::crates/security/chio-keyring/src/verifier.rs::gossip_checkpoint_query",
-      "find_response_conflict::shared-reader::crates/security/chio-keyring/src/verifier.rs::find_checkpoint_conflict",
-      "gossip_checkpoint_query::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json",
-      "import_gossip#1::shared-reader::crates/security/chio-keyring/src/verifier.rs::find_checkpoint_conflict"
-    ],
     "crates/security/chio-keyring/src/witness.rs": [
       "conflicts::shared-reader::crates/security/chio-keyring/src/witness.rs::load_conflicts",
       "decision_for_sequence::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json",
-      "gossip_checkpoint_for_sequence::shared-reader::crates/security/chio-keyring/src/witness.rs::gossip_checkpoint_query",
-      "gossip_checkpoint_for_tree_size::shared-reader::crates/security/chio-keyring/src/witness.rs::gossip_checkpoint_query",
-      "gossip_checkpoint_query::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json",
       "gossip_for_sequence::shared-reader::crates/security/chio-keyring/src/witness.rs::decision_for_sequence",
       "gossip_observations::shared-reader::crates/security/chio-keyring/src/witness.rs::load_gossip",
-      "import_gossip::shared-reader::crates/security/chio-keyring/src/witness.rs::gossip_checkpoint_for_sequence",
-      "import_gossip::shared-reader::crates/security/chio-keyring/src/witness.rs::gossip_checkpoint_for_tree_size",
+      "import_gossip::shared-reader::crates/security/chio-keyring/src/witness.rs::validate_retained_gossip",
       "load_conflicts::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json",
       "load_gossip::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json",
       "service_gossip_observations::shared-reader::crates/security/chio-keyring/src/witness.rs::decision_for_sequence",
       "service_gossip_observations::shared-reader::crates/security/chio-keyring/src/witness.rs::load_gossip",
       "sign_candidate::shared-reader::crates/security/chio-keyring/src/witness.rs::decision_for_sequence",
+      "sign_candidate::shared-reader::crates/security/chio-keyring/src/witness.rs::validate_retained_gossip",
+      "validate_retained_gossip::shared-reader::crates/security/chio-keyring/src/witness.rs::load_conflicts",
       "validate_retained_gossip::shared-reader::crates/security/chio-keyring/src/witness.rs::load_gossip",
       "validate_startup::shared-reader::crates/security/chio-keyring/src/witness.rs::decision_for_sequence",
       "validate_startup::shared-reader::crates/security/chio-keyring/src/witness.rs::validate_retained_gossip"
@@ -21580,5 +21866,92 @@
     "crates/trust/chio-weights/src/card.rs": [
       "from_canonical_json::original-json-reader::UntrustedJsonText"
     ]
+  },
+  "retired_direct_readers": {
+    "crates/products/chio-mercury/src/commands/shared/utils.rs": {
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "helper": "read_json_file",
+      "helper_source_sha256": "5690e2647dcdd9ca0674cde032b83d607d272dc5690529a6e2b7af91ffba1c6d",
+      "constructor_contract": "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file::new#1::decode_signed",
+      "ingress": [
+        "load_bundle_manifests::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file",
+        "read_json_file::original-json-reader::UntrustedJsonText"
+      ],
+      "consumers": [
+        {
+          "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
+          "owner": "cmd_mercury_inquiry_export",
+          "source_sha256": "742ba76edaf7fcaef00e83a8681960bd662cad062d6e921ae55f3394bbcee4da"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
+          "owner": "cmd_mercury_verify",
+          "source_sha256": "60d3c6adc65b78d912e726d7acca3037dc764509971c8dcd0a4a8e3232e36178"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
+          "owner": "cmd_mercury_supervised_live_export",
+          "source_sha256": "9273a3969dd66524ee6b8cfb118a44d3dad50a59bffb1f88536adfbf9a9081f9"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/core_cli/exports.rs",
+          "owner": "export_downstream_review",
+          "source_sha256": "3fd4bb30127eed37bde7e77d860d59631868703d93f4dce149ed6fe8395c80f2"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/core_cli/exports.rs",
+          "owner": "export_governance_workbench",
+          "source_sha256": "14fb4b563c45b84353d3f2adf6dc69d1652a9e6633d3c37a6069ea61cc939434"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/shared/utils.rs",
+          "owner": "load_bundle_manifests",
+          "source_sha256": "b81785e7fe9af361eb8aea1486a0386546782dab28e2cd53c232ffbc8c01498f"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/assurance_release/trust_network.rs",
+          "owner": "export_trust_network",
+          "source_sha256": "83c1cfc3dda49a079b1451c7e9d2d07590fd0b909116cc5a8a4c584fc028a301"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/assurance_release/assurance_suite.rs",
+          "owner": "export_assurance_suite",
+          "source_sha256": "3fe54c5a3c9496a51483c665d7c10916c9407c0781454edd5cf2766407a5b640"
+        }
+      ],
+      "scope": "Original duplicate/lossless-number validation through decode_signed only. Parsing does not establish signature validity, trusted signer, capability authorization or file-wide input safety. UntrustedJsonText::new adds no byte cap.",
+      "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Bound file/caller memory, qualify native error/operator behavior and full owning native/trusted/hosted scope separately; scoped CR002 source changes do not close this cohort.",
+      "source_head": "787d303819c7da628dd4762cdb924624ef82a0a8"
+    },
+    "crates/sdk/chio-binding-helpers/src/receipt.rs": {
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "helper": "parse_receipt_json",
+      "helper_source_sha256": "4f15f6f5785e22831a8c29cd1a2f2548408b6bf0b9d2d45e613fa48b03051573",
+      "constructor_contract": "crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json::new#1::decode_signed",
+      "ingress": [
+        "parse_receipt_json::original-json-reader::UntrustedJsonText",
+        "verify_receipt_json::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json",
+        "verify_receipt_json_with_trusted_signer_hex::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json"
+      ],
+      "consumers": [
+        {
+          "path": "crates/sdk/chio-binding-helpers/src/receipt.rs",
+          "owner": "verify_receipt_json",
+          "source_sha256": "2dba97836568e245046c63076fa93c41228b6321c64f5d21e8a240ab12bff3cc"
+        },
+        {
+          "path": "crates/sdk/chio-binding-helpers/src/receipt.rs",
+          "owner": "verify_receipt_json_with_trusted_signer_hex",
+          "source_sha256": "b5466262e6d0079ea4c339fcd929d8b58db5040e66d287499f918521a826e2b7"
+        }
+      ],
+      "scope": "Original duplicate/lossless-number validation through decode_signed only. Parsing does not establish signature validity, trusted signer, capability authorization or file-wide input safety. UntrustedJsonText::new adds no byte cap.",
+      "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Bound file/caller memory, qualify native error/operator behavior and full owning native/trusted/hosted scope separately; scoped CR002 source changes do not close this cohort.",
+      "source_head": "787d303819c7da628dd4762cdb924624ef82a0a8"
+    }
   }
 }

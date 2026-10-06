@@ -113,7 +113,7 @@ def special_apis(path, reader, body, supports):
         if borrowed and all(re.search(pattern, body) for pattern in scalar) and all(
             re.search(pattern, source) for pattern in (
                 r"const\s+IDENTITY_BYTES\s*:\s*usize\s*=\s*512;",
-                r"fn\s+raw_member<'de,\s*D:\s*serde::Deserializer<'de>>\(decoder:\s*D\)\s*"
+                r"fn\s+raw_member<'de,\s*D:\s*serde::Deserializer<'de>>\(\s*decoder:\s*D\s*,?\s*\)\s*"
                 r"->\s*Result<Option<&'de\s+RawValue>,\s*D::Error>\s*\{\s*"
                 r"<&'de\s+RawValue>::deserialize\(decoder\)\.map\(Some\)\s*\}",
                 r"fn\s+control_identity\(bytes:\s*&\[u8\]\)\s*->\s*Value\s*\{\s*"

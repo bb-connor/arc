@@ -38,6 +38,101 @@ DECODER_KINDS = {
     "durable-internal-state", "strict-preflight-reparse", "validated-worker-input",
 }
 
+# The reviewed debt cohort survives scoped caller repairs and direct-site
+# migrations. Removing or promoting it requires an explicit source-gate review.
+RAW_INPUT_BASELINE_IDENTITIES_SHA256 = "049948d58a6c6c1ee334f7dd0886724dc786227068ee1df88b5be862318b2922"
+RETIRED_DIRECT_HELPERS = {
+    "crates/products/chio-mercury/src/commands/shared/utils.rs": "read_json_file",
+    "crates/sdk/chio-binding-helpers/src/receipt.rs": "parse_receipt_json",
+}
+
+
+def function_body(text, owner):
+    """Pin actual source, including literals, in one uniquely resolved owner."""
+    code = _lexer.blank_rust_noise(text)
+    rows = [row for row in _contracts.functions(code) if row[0] == owner]
+    if len(rows) != 1:
+        return None, None
+    row = rows[0]
+    actual = text[row[1]:row[3]]
+    calls = _contracts.owner_code(code, row)[row[2] - row[1] + 1:-1]
+    return hashlib.sha256(actual.encode()).hexdigest(), calls
+
+
+def local_helper_consumers(files, path, helper):
+    """Require all named local-package callers, not a metadata-chosen subset."""
+    prefix = path.split("/src/", 1)[0] + "/src/"
+    found = set()
+    for source_path, text in files.items():
+        if not source_path.startswith(prefix) or not source_path.endswith(".rs"):
+            continue
+        code = _lexer.blank_rust_noise(text)
+        for row in _contracts.functions(code):
+            key = (source_path, row[0])
+            body = _contracts.owner_code(code, row)[row[2] - row[1] + 1:-1]
+            if key != (path, helper) and _contracts.calls(body, helper):
+                found.add(key)
+    return found
+
+
+def retired_direct_contracts(catalog, found, files):
+    """Retain debt for two reviewed wrappers, without declaring input closure."""
+    errors = []
+    contracts = catalog.get("decoder_file_contracts", {})
+    baseline = sorted(path for path, row in contracts.items()
+                      if row.get("kind") == "raw-input-baseline")
+    digest = hashlib.sha256(json.dumps(baseline, separators=(",", ":")).encode()).hexdigest()
+    if digest != RAW_INPUT_BASELINE_IDENTITIES_SHA256:
+        errors.append("raw-input baseline debt identities changed")
+    retired = catalog.get("retired_direct_readers", {})
+    for path, review in retired.items():
+        helper = RETIRED_DIRECT_HELPERS.get(path)
+        if helper is None:
+            errors.append(f"unreviewed retired direct reader: {path}")
+            continue
+        baseline_contract = contracts.get(path, {})
+        contract_hash = hashlib.sha256(json.dumps(
+            baseline_contract, sort_keys=True, separators=(",", ":")
+        ).encode()).hexdigest()
+        if (baseline_contract.get("kind") != "raw-input-baseline"
+                or review.get("baseline_kind") != "raw-input-baseline"
+                or review.get("baseline_contract_sha256") != contract_hash):
+            errors.append(f"retired direct-reader baseline is missing or changed: {path}")
+        if path in found["decoder_census"]:
+            errors.append(f"retired direct reader gained direct decoder: {path}")
+        source = files.get(path)
+        signature = f"{path}::{helper}::new#1::decode_signed"
+        actual = [site for site in found["decoding_contracts"]
+                  if site.startswith(f"{path}::{helper}::")]
+        source_hash, _ = function_body(source or "", helper)
+        if (review.get("helper") != helper or actual != [signature]
+                or review.get("constructor_contract") != signature
+                or source_hash is None or review.get("helper_source_sha256") != source_hash
+                or review.get("ingress") != found["ingress_census"].get(path)):
+            errors.append(f"retired direct-reader signed helper changed: {path}")
+        consumers = review.get("consumers", [])
+        custody_valid = bool(consumers)
+        seen = set()
+        for consumer in consumers:
+            key = (consumer.get("path"), consumer.get("owner"))
+            if key in seen or key == (path, helper):
+                custody_valid = False
+            seen.add(key)
+            consumer_hash, body = function_body(files.get(key[0], ""), key[1])
+            if (consumer_hash is None or consumer.get("source_sha256") != consumer_hash
+                    or not _contracts.calls(body or "", helper)):
+                custody_valid = False
+        if not custody_valid:
+            errors.append(f"retired direct-reader consumer custody changed: {path}")
+        elif seen != local_helper_consumers(files, path, helper):
+            errors.append(f"retired direct-reader consumer custody changed: {path}")
+        if (review.get("status") != "direct-serde-site-migrated-original-debt-open"
+                or not review.get("scope") or not review.get("remaining_acceptance")):
+            errors.append(f"retired direct-reader remaining debt is missing: {path}")
+    if set(contracts) != set(found["decoder_census"]) | set(retired):
+        errors.append("workspace decoder file contracts are incomplete")
+    return errors
+
 
 def json_decoders(code):
     """Locate direct and imported serde JSON entry points, retaining multiplicity.
@@ -200,6 +295,7 @@ def check(root, catalog):
     if found["decoder_census"] != catalog.get("decoder_census"):
         errors.append("workspace decoder census changed; classify new files and entry points")
     contracts = catalog.get("decoder_file_contracts", {})
+    errors.extend(retired_direct_contracts(catalog, found, files))
     for path, contract in contracts.items():
         kind = contract.get("kind")
         if kind not in DECODER_KINDS:
@@ -227,7 +323,7 @@ def check(root, catalog):
                 errors.append(f"reviewed {label} owner is unregistered: {path}")
             if contracts.get(path, {}).get("kind") == "raw-input-baseline":
                 errors.append(f"reviewed {label} owner regressed to baseline: {path}")
-    if set(contracts) != set(found["decoder_census"]) or any(
+    if any(
         not contract.get("kind") or not contract.get("contract") for contract in contracts.values()
     ):
         errors.append("workspace decoder file contracts are incomplete")
