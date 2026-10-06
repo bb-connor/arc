@@ -75,6 +75,13 @@ impl DeclassificationEvidenceCommitStore for DelayedEvidence {
             .load_pending_declassification_evidence_batch(now_unix_ms, max_records)
     }
 
+    fn load_retried_declassification_evidence(
+        &self,
+        query: &DeclassificationRetriedEvidenceQuery,
+    ) -> PortResult<Vec<DeclassificationEvidenceRecord>> {
+        self.store.load_retried_declassification_evidence(query)
+    }
+
     fn load_stranded_declassification_consumptions_batch(
         &self,
         max_records: u32,

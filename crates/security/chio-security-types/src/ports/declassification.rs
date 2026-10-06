@@ -488,6 +488,18 @@ pub struct DeclassificationEvidencePendingQuery {
     pub max_records: u32,
 }
 
+/// One keyset page of unacknowledged evidence with at least one failed
+/// delivery attempt, due or not, in `(tenant_id, grant_id, phase)` order
+/// strictly after the cursor. The cursor fields are all set or all absent.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeclassificationRetriedEvidenceQuery {
+    pub after_tenant_id: Option<TenantId>,
+    pub after_grant_id: Option<GrantId>,
+    pub after_phase: Option<DeclassificationEvidencePhase>,
+    pub max_records: u32,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeclassificationEvidenceRecord {
@@ -659,6 +671,12 @@ pub trait DeclassificationEvidenceCommitStore: Send + Sync {
         &self,
         now_unix_ms: u64,
         max_records: u32,
+    ) -> PortResult<Vec<DeclassificationEvidenceRecord>>;
+    /// Unacknowledged evidence whose `attempts` is nonzero, including rows
+    /// still in retry backoff, ordered by `(tenant_id, grant_id, phase)`.
+    fn load_retried_declassification_evidence(
+        &self,
+        query: &DeclassificationRetriedEvidenceQuery,
     ) -> PortResult<Vec<DeclassificationEvidenceRecord>>;
     fn load_stranded_declassification_consumptions_batch(
         &self,

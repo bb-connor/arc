@@ -13,6 +13,7 @@ mod compaction;
 mod equivalence;
 mod isolation;
 mod recovery;
+mod retried;
 mod snapshot;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

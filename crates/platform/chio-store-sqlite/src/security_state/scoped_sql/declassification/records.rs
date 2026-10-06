@@ -112,6 +112,57 @@ pub(in crate::security_state) const PENDING_BATCH: ReadQuery = ReadQuery {
     LIMIT ?3"#,
 };
 
+/// Unacknowledged rows with a failed attempt, due or not, in keyset order.
+pub(in crate::security_state) const RETRIED_FIRST: ReadQuery = ReadQuery {
+    parameters: 1,
+    legacy: r#"SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state,
+    transition_binding, evidence_type, evidence_id, canonical_body, body_hash,
+    transition_id, occurred_at, predecessor_evidence_id, acknowledged,
+    acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at,
+    last_error_code
+    FROM security_declassification_receipt_outbox
+    WHERE acknowledged = 0 AND attempts > 0
+    ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC
+    LIMIT ?1"#,
+    native: r#"SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state,
+    transition_binding, evidence_type, evidence_id, canonical_body, body_hash,
+    transition_id, occurred_at, predecessor_evidence_id, acknowledged,
+    acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at,
+    last_error_code
+    FROM security_participant_state_declassification_receipt_outbox
+    WHERE security_authority_id = ?1 AND acknowledged = 0 AND attempts > 0
+    ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC
+    LIMIT ?2"#,
+};
+
+/// `RETRIED_FIRST` strictly after the `(tenant_id, grant_id, phase_ordinal)`
+/// cursor.
+pub(in crate::security_state) const RETRIED_AFTER: ReadQuery = ReadQuery {
+    parameters: 4,
+    legacy: r#"SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state,
+    transition_binding, evidence_type, evidence_id, canonical_body, body_hash,
+    transition_id, occurred_at, predecessor_evidence_id, acknowledged,
+    acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at,
+    last_error_code
+    FROM security_declassification_receipt_outbox
+    WHERE acknowledged = 0 AND attempts > 0
+      AND (tenant_id > ?1 OR (tenant_id = ?1 AND (grant_id > ?2
+          OR (grant_id = ?2 AND phase_ordinal > ?3))))
+    ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC
+    LIMIT ?4"#,
+    native: r#"SELECT tenant_id, grant_id, phase, phase_ordinal, request_hash, state,
+    transition_binding, evidence_type, evidence_id, canonical_body, body_hash,
+    transition_id, occurred_at, predecessor_evidence_id, acknowledged,
+    acknowledged_at, durable_sink_record_hash, attempts, next_attempt_at,
+    last_error_code
+    FROM security_participant_state_declassification_receipt_outbox
+    WHERE security_authority_id = ?1 AND acknowledged = 0 AND attempts > 0
+      AND (tenant_id > ?2 OR (tenant_id = ?2 AND (grant_id > ?3
+          OR (grant_id = ?3 AND phase_ordinal > ?4))))
+    ORDER BY tenant_id ASC, grant_id ASC, phase_ordinal ASC
+    LIMIT ?5"#,
+};
+
 pub(in crate::security_state) const INSERT_IDENTITY: WriteQuery = WriteQuery {
     parameters: 6,
     legacy: r#"INSERT INTO security_declassification_evidence_identity (

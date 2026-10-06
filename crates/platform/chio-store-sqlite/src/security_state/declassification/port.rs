@@ -129,6 +129,13 @@ impl DeclassificationEvidenceCommitStore for SqliteSecurityStateStore {
         })
     }
 
+    fn load_retried_declassification_evidence(
+        &self,
+        query: &DeclassificationRetriedEvidenceQuery,
+    ) -> PortResult<Vec<DeclassificationEvidenceRecord>> {
+        self.declassification_read(|tx| records::retried(ScopedReader::legacy(tx), query))
+    }
+
     fn load_stranded_declassification_consumptions_batch(
         &self,
         max_records: u32,
