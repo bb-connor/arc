@@ -3,6 +3,7 @@ mod error;
 use super::adapters::{
     DeclassificationCompactionReport, DeclassificationReceiptDrainReport,
     DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport,
+    DeclassificationRevalidationReport,
 };
 use chio_core::{canonical_json_bytes, sha256};
 use chio_quarantine::{
@@ -11,10 +12,10 @@ use chio_quarantine::{
 };
 use chio_security_kernel::Clock;
 use chio_security_types::ports::{
-    ActionId, DeclassificationEvidenceCommitStore, EffectPort, ErrorCode, GrantId, LeaseOwnerId,
-    PortError, PortErrorKind, RecordId, ResponseDispatchStore, ResponseSchedulerStore,
-    ScheduledWork, SchedulerHealthPort, SecurityAlertPort, SecurityReceiptSink, TenantId,
-    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    ActionId, DeclassificationEvidenceCommitStore, DeclassificationRetriedEvidenceQuery,
+    EffectPort, ErrorCode, GrantId, LeaseOwnerId, PortError, PortErrorKind, RecordId,
+    ResponseDispatchStore, ResponseSchedulerStore, ScheduledWork, SchedulerHealthPort,
+    SecurityAlertPort, SecurityReceiptSink, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 pub use error::ResponseWorkerTickError;
@@ -58,6 +59,9 @@ pub trait ResponseWorkerPort: Send + Sync {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResponseWorkerLifecycle {
     Created,
+    /// The first tick is in flight and no tick outcome exists yet. Later
+    /// ticks keep the previous outcome; `ResponseWorkerHealth::tick_in_flight`
+    /// reports them.
     Running,
     Ready,
     Degraded,
@@ -65,8 +69,17 @@ pub enum ResponseWorkerLifecycle {
     Stopped,
 }
 
+impl ResponseWorkerLifecycle {
+    /// The single readiness predicate for the worker, the host and runtime
+    /// admission: the last completed tick left the worker ready.
+    #[must_use]
+    pub const fn is_ready(self) -> bool {
+        matches!(self, Self::Ready)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum DeclassificationOutboxHealth {
+pub(in crate::security) enum DeclassificationOutboxHealth {
     Ready,
     Pending {
         receipts: u64,

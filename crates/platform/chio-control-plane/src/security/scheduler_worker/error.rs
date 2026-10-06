@@ -4,6 +4,8 @@ use chio_quarantine::SchedulerError;
 use chio_security_types::ports::{ErrorCode, PortError};
 use thiserror::Error;
 
+use super::ResponseWorkerLifecycle;
+
 #[derive(Debug, Error)]
 pub enum ResponseWorkerTickError {
     #[error("response worker lost an acknowledgement")]
@@ -14,8 +16,6 @@ pub enum ResponseWorkerTickError {
     TerminalSchedulerCleanupPending,
     #[error("declassification receipt outbox failed: {0}")]
     DeclassificationOutbox(PortError),
-    #[error("declassification receipt outbox has {0} pending receipts")]
-    DeclassificationOutboxPending(u64),
     #[error("declassification receipt outbox made no progress with {0} receipts pending")]
     DeclassificationOutboxNoProgress(u64),
     #[error(
@@ -30,6 +30,10 @@ pub enum ResponseWorkerTickError {
         "declassification receipt startup reconciliation exceeded its bound with {0} consumptions stranded"
     )]
     DeclassificationReconciliationLimit(u64),
+    #[error(
+        "declassification receipt startup revalidation exceeded its bound after {0} retried receipts"
+    )]
+    DeclassificationRevalidationLimit(u64),
     #[error("production security runtime has {0} live publication leases")]
     RuntimeLeasesActive(u64),
     #[error("production security runtime has {0} live dispatch outcome recorder leases")]
@@ -50,6 +54,8 @@ pub enum ResponseWorkerTickError {
     WorkerPublicationGate,
     #[error("response worker publication has not been observed")]
     WorkerPublicationPending,
+    #[error("response worker's last completed tick left it {0:?}")]
+    WorkerNotReady(ResponseWorkerLifecycle),
     #[error("response worker initial tick failed: {0}")]
     WorkerInitialTick(String),
     #[error("response worker runtime failed: {0}")]

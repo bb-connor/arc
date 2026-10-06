@@ -873,10 +873,7 @@ impl ProductionActiveDefenseHost {
             return Err(ProductionActiveDefenseHostError::WorkerTaskUnavailable);
         }
         let health = self.worker_health();
-        if matches!(
-            health.lifecycle,
-            ResponseWorkerLifecycle::Running | ResponseWorkerLifecycle::Ready
-        ) {
+        if health.lifecycle.is_ready() {
             Ok(())
         } else {
             Err(ProductionActiveDefenseHostError::UnhealthyWorker { health })

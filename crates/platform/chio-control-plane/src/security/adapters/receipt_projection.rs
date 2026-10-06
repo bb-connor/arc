@@ -80,22 +80,32 @@ pub(super) fn active_defense_receipt_request(
     })
 }
 
+/// A durable sink record already held under the request's evidence id must be
+/// the identical logical append with a nonzero record hash.
+pub(super) fn verify_exact_receipt(
+    exact: &ExactReceiptRecord,
+    request: &ReceiptAppendRequest,
+) -> PortResult<()> {
+    if exact.receipt != *request {
+        return Err(PortError::conflict());
+    }
+    if exact
+        .durable_record_hash
+        .as_bytes()
+        .iter()
+        .all(|byte| *byte == 0)
+    {
+        return Err(PortError::integrity_failure());
+    }
+    Ok(())
+}
+
 pub(super) fn append_exact_receipt(
     sink: &dyn ExactSecurityReceiptSink,
     request: &ReceiptAppendRequest,
 ) -> PortResult<ExactReceiptRecord> {
     if let Some(exact) = sink.load_exact(&request.evidence_id)? {
-        if exact.receipt != *request {
-            return Err(PortError::conflict());
-        }
-        if exact
-            .durable_record_hash
-            .as_bytes()
-            .iter()
-            .all(|byte| *byte == 0)
-        {
-            return Err(PortError::integrity_failure());
-        }
+        verify_exact_receipt(&exact, request)?;
         return Ok(exact);
     }
     let appended = sink.sign_and_append(request)?;

@@ -33,12 +33,13 @@ use chio_security_types::ports::{
     DeclassificationEvidenceCommitStore, DeclassificationEvidencePhase,
     DeclassificationEvidenceQuery, DeclassificationEvidenceRecord,
     DeclassificationEvidenceRetryRequest, DeclassificationOutcomeEvidenceCommit,
-    DeclassificationOutcomeRequest, DeclassificationTransitionBinding, DeclassificationUseQuery,
-    DeclassificationUseState, DeclassificationUseStore, DestinationId, Digest32, EgressFenceCommit,
-    ErrorCode, EventId, ExactReceiptRecord, ExactSecurityReceiptSink, FlowJoinRequest,
-    FlowStateKey, FlowStateSnapshot, FlowStateStore, GrantId, OpaqueReceiptRef, PortError,
-    PortErrorKind, PortResult, ReceiptAppendRequest, RecordId, RequestId, SecurityReceiptSink,
-    TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    DeclassificationOutcomeRequest, DeclassificationRetriedEvidenceQuery,
+    DeclassificationTransitionBinding, DeclassificationUseQuery, DeclassificationUseState,
+    DeclassificationUseStore, DestinationId, Digest32, EgressFenceCommit, ErrorCode, EventId,
+    ExactReceiptRecord, ExactSecurityReceiptSink, FlowJoinRequest, FlowStateKey, FlowStateSnapshot,
+    FlowStateStore, GrantId, OpaqueReceiptRef, PortError, PortErrorKind, PortResult,
+    ReceiptAppendRequest, RecordId, RequestId, SecurityReceiptSink, TenantId,
+    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 use chio_security_types::InformationLabel;
 pub use flow_dispatch::PreparedFlowDispatch;
@@ -72,6 +73,7 @@ use declassification_outbox::append_and_ack_exact_evidence;
 pub use declassification_outbox::{
     DeclassificationCompactionReport, DeclassificationReceiptDrainReport,
     DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport,
+    DeclassificationRevalidationReport,
 };
 
 mod declassification_outcome;
@@ -88,6 +90,7 @@ use receipt_projection::{
     active_defense_header, active_defense_receipt_request, append_active_defense_body,
     append_exact_receipt, canonical_body, declassification_consumption_body,
     declassification_grant_hash, declassification_outcome_body, digest, event_id, transition_id,
+    verify_exact_receipt,
 };
 
 #[cfg(test)]

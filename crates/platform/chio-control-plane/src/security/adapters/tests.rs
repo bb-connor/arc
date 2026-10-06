@@ -661,6 +661,8 @@ mod outcome_sink_failure_leaves_a_durable_terminal_outcome;
 
 mod outcome_store_failure_leaves_reconciliation_required;
 
+mod restart_revalidates_retried_declassification_evidence;
+
 mod persistent_flow_resolver_binds_verified_manifest_state_and_final_bytes;
 
 mod persistent_flow_resolver_accepts_exact_server_tool_in_pre_and_post_stages;

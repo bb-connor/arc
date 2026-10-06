@@ -94,13 +94,15 @@ impl ProductionResponseWorker {
     }
 
     pub fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
-        self.live_lifecycle()?;
-        if self.loop_started.load(Ordering::Acquire)
-            && !self.publication_ready.load(Ordering::Acquire)
-        {
+        let lifecycle = self.live_lifecycle()?;
+        let loop_started = self.loop_started.load(Ordering::Acquire);
+        if loop_started && !self.publication_ready.load(Ordering::Acquire) {
             return Err(ResponseWorkerTickError::WorkerPublicationPending);
         }
         self.ensure_progress()?;
+        if loop_started && !lifecycle.is_ready() {
+            return Err(ResponseWorkerTickError::WorkerNotReady(lifecycle));
+        }
         self.port.ensure_ready()
     }
 
@@ -129,33 +131,27 @@ impl ProductionResponseWorker {
         let sequence = self.next_tick_sequence.fetch_add(1, Ordering::AcqRel);
         self.mark_tick_started(sequence);
         self.with_health(|health| {
-            health.lifecycle = ResponseWorkerLifecycle::Running;
+            if health.lifecycle == ResponseWorkerLifecycle::Created {
+                health.lifecycle = ResponseWorkerLifecycle::Running;
+            }
             health.ticks_attempted = health.ticks_attempted.saturating_add(1);
         });
         let result = self.port.tick(sequence, false);
         self.mark_tick_completed(sequence);
         match result {
             Ok(report) => {
+                // Receipts left pending are reported through
+                // `declassification_receipts_pending`, not as degradation.
                 let lease_lost = !report.lease_lost_action_ids.is_empty();
-                let declassification_pending = report.declassification_receipts_pending > 0;
-                let degraded = lease_lost || declassification_pending;
                 self.with_health(|health| {
-                    health.lifecycle = if degraded {
+                    health.lifecycle = if lease_lost {
                         ResponseWorkerLifecycle::Degraded
                     } else {
                         ResponseWorkerLifecycle::Ready
                     };
                     health.ticks_completed = health.ticks_completed.saturating_add(1);
-                    health.last_error = if lease_lost {
-                        Some("one or more scheduler leases were lost".to_string())
-                    } else if declassification_pending {
-                        Some(format!(
-                            "{} declassification receipts remain pending",
-                            report.declassification_receipts_pending
-                        ))
-                    } else {
-                        None
-                    };
+                    health.last_error =
+                        lease_lost.then(|| "one or more scheduler leases were lost".to_string());
                 });
                 Ok(report)
             }

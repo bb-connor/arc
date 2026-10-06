@@ -48,10 +48,10 @@ pub use active_response_authority::{
 pub use adapters::{
     AlertDispatchReport, AlertOutboxConfig, DeclassificationCompactionReport,
     DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxDrainer,
-    DeclassificationReconciliationReport, FlowResolverConfig, FlowResolverConfigError,
-    NativeActiveResponseFindingAuthority, NativeFindingAuthorityConfigError,
-    NativeSchedulerHealthPort, NativeSecurityReceiptSink, PersistentFlowResolver, SqliteSiemOutbox,
-    StructuredClassificationAdapter,
+    DeclassificationReconciliationReport, DeclassificationRevalidationReport, FlowResolverConfig,
+    FlowResolverConfigError, NativeActiveResponseFindingAuthority,
+    NativeFindingAuthorityConfigError, NativeSchedulerHealthPort, NativeSecurityReceiptSink,
+    PersistentFlowResolver, SqliteSiemOutbox, StructuredClassificationAdapter,
 };
 pub use chio_kernel::{
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,

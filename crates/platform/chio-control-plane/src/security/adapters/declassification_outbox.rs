@@ -1,14 +1,15 @@
 use super::{
     active_defense_receipt_request, append_exact_receipt, declassification_outcome_body,
-    derive_declassification_transition_id, ActiveDefenseReceiptBody, Arc, Clock,
-    DeclassificationCompactionQuery, DeclassificationCompactionRequest,
+    derive_declassification_transition_id, verify_exact_receipt, ActiveDefenseReceiptBody, Arc,
+    Clock, DeclassificationCompactionQuery, DeclassificationCompactionRequest,
     DeclassificationEvidenceAckRequest, DeclassificationEvidenceCommitStore,
     DeclassificationEvidencePhase, DeclassificationEvidenceQuery, DeclassificationEvidenceRecord,
     DeclassificationEvidenceRetryRequest, DeclassificationOutcomeBodyInput,
     DeclassificationOutcomeEvidenceCommit, DeclassificationOutcomeRequest,
-    DeclassificationTransitionBinding, DeclassificationUseState, Digest32,
-    ExactSecurityReceiptSink, FlowDenial, GrantId, PortError, PortErrorKind, PortResult,
-    ReceiptAppendRequest, SystemClock, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    DeclassificationRetriedEvidenceQuery, DeclassificationTransitionBinding,
+    DeclassificationUseState, Digest32, ExactSecurityReceiptSink, FlowDenial, GrantId, PortError,
+    PortErrorKind, PortResult, ReceiptAppendRequest, SystemClock, TenantId,
+    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -34,6 +35,25 @@ pub struct DeclassificationCompactionReport {
     pub compacted: u32,
     pub last_tenant_id: Option<TenantId>,
     pub last_grant_id: Option<GrantId>,
+}
+
+/// One page of retried evidence that passed its delivery checks again. The
+/// `last_*` key is the cursor for the next page and is set exactly when
+/// `revalidated` is nonzero.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct DeclassificationRevalidationReport {
+    pub revalidated: u32,
+    pub last_tenant_id: Option<TenantId>,
+    pub last_grant_id: Option<GrantId>,
+    pub last_phase: Option<DeclassificationEvidencePhase>,
+}
+
+type EvidenceKey = (TenantId, GrantId, DeclassificationEvidencePhase);
+
+/// Store keyset order: tenant, grant, then phase ordinal, comparing bytes.
+fn evidence_key_precedes(before: &EvidenceKey, after: &EvidenceKey) -> bool {
+    (before.0.as_str(), before.1.as_str(), before.2.ordinal())
+        < (after.0.as_str(), after.1.as_str(), after.2.ordinal())
 }
 
 #[derive(Clone)]
@@ -275,10 +295,95 @@ impl DeclassificationReceiptOutboxDrainer {
         })
     }
 
+    /// Re-run the delivery checks for one page of evidence a previous attempt
+    /// left in retry, due or not, without appending or acknowledging
+    /// anything. An outcome must follow its acknowledged consumption, whose
+    /// exact sink record must exist and carry the acknowledged hash; a receipt
+    /// the sink already holds must be the identical append.
+    pub fn revalidate_retried_once(
+        &self,
+        query: &DeclassificationRetriedEvidenceQuery,
+    ) -> PortResult<DeclassificationRevalidationReport> {
+        if query.max_records == 0 || query.max_records > MAX_DECLASSIFICATION_EVIDENCE_BATCH {
+            return Err(PortError::invalid_data());
+        }
+        let mut previous = match (
+            &query.after_tenant_id,
+            &query.after_grant_id,
+            query.after_phase,
+        ) {
+            (None, None, None) => None,
+            (Some(tenant_id), Some(grant_id), Some(phase)) => {
+                Some((tenant_id.clone(), grant_id.clone(), phase))
+            }
+            _ => return Err(PortError::invalid_data()),
+        };
+        let retried = self.store.load_retried_declassification_evidence(query)?;
+        if !u32::try_from(retried.len()).is_ok_and(|records| records <= query.max_records) {
+            return Err(PortError::integrity_failure());
+        }
+        let mut report = DeclassificationRevalidationReport::default();
+        for evidence in retried {
+            let key = (
+                evidence.tenant_id.clone(),
+                evidence.grant_id.clone(),
+                evidence.phase,
+            );
+            if evidence.acknowledged
+                || evidence.attempts == 0
+                || previous
+                    .as_ref()
+                    .is_some_and(|before| !evidence_key_precedes(before, &key))
+            {
+                return Err(PortError::integrity_failure());
+            }
+            if evidence.phase == DeclassificationEvidencePhase::Outcome {
+                let predecessor = self.acknowledged_predecessor(&evidence)?;
+                let exact = self
+                    .sink
+                    .load_exact(&predecessor.receipt.evidence_id)?
+                    .ok_or_else(PortError::integrity_failure)?;
+                verify_exact_receipt(&exact, &predecessor.receipt)?;
+                if predecessor.durable_sink_record_hash != Some(exact.durable_record_hash) {
+                    return Err(PortError::integrity_failure());
+                }
+            }
+            if let Some(exact) = self.sink.load_exact(&evidence.receipt.evidence_id)? {
+                verify_exact_receipt(&exact, &evidence.receipt)?;
+            }
+            report.revalidated = report
+                .revalidated
+                .checked_add(1)
+                .ok_or_else(PortError::integrity_failure)?;
+            previous = Some(key);
+        }
+        if report.revalidated > 0 {
+            if let Some((tenant_id, grant_id, phase)) = previous {
+                report.last_tenant_id = Some(tenant_id);
+                report.last_grant_id = Some(grant_id);
+                report.last_phase = Some(phase);
+            }
+        }
+        Ok(report)
+    }
+
     fn verify_outcome_predecessor(
         &self,
         outcome: &DeclassificationEvidenceRecord,
     ) -> PortResult<()> {
+        let predecessor = self.acknowledged_predecessor(outcome)?;
+        let exact = append_exact_receipt(self.sink.as_ref(), &predecessor.receipt)?;
+        if predecessor.durable_sink_record_hash != Some(exact.durable_record_hash) {
+            return Err(PortError::integrity_failure());
+        }
+        Ok(())
+    }
+
+    /// The acknowledged consumption an outcome names as its predecessor.
+    fn acknowledged_predecessor(
+        &self,
+        outcome: &DeclassificationEvidenceRecord,
+    ) -> PortResult<DeclassificationEvidenceRecord> {
         let predecessor = self
             .store
             .load_declassification_evidence(&DeclassificationEvidenceQuery {
@@ -292,11 +397,7 @@ impl DeclassificationReceiptOutboxDrainer {
         {
             return Err(PortError::integrity_failure());
         }
-        let exact = append_exact_receipt(self.sink.as_ref(), &predecessor.receipt)?;
-        if predecessor.durable_sink_record_hash != Some(exact.durable_record_hash) {
-            return Err(PortError::integrity_failure());
-        }
-        Ok(())
+        Ok(predecessor)
     }
 
     pub fn compact_once(
