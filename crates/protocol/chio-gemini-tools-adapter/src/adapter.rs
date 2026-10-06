@@ -1054,6 +1054,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_model_that_is_not_one_path_segment_never_reaches_the_transport() {
+        let mock = Arc::new(transport::MockTransport::new());
+        let adapter = GeminiAdapter::new(config(), mock.clone());
+        let request = b"{\"contents\":[],\"tools\":[]}";
+        for model in [
+            "x/../../v1beta/cachedContents",
+            "gemini-1.5-pro?alt=json",
+            "gemini-1.5-pro#fragment",
+            "Gemini-1.5-Pro",
+            "",
+        ] {
+            let error = adapter
+                .generate_content(model, request)
+                .await
+                .expect_err("an unsafe model must be refused");
+            assert!(
+                matches!(error, ProviderError::BadToolArgs(_)),
+                "{model}: {error}"
+            );
+            let error = adapter
+                .generate_content_stream(model, request, |_| Ok(allow_verdict()))
+                .await
+                .expect_err("an unsafe model must be refused");
+            assert!(
+                matches!(error, ProviderError::BadToolArgs(_)),
+                "{model}: {error}"
+            );
+        }
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
     async fn generate_content_proxies_request_and_lifts_tool_calls() {
         let cfg = config();
         let mock = Arc::new(transport::MockTransport::new());
