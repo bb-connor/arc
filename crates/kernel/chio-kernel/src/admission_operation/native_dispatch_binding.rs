@@ -3,7 +3,7 @@ use super::{
     AdmissionDigest, AdmissionOperationStoreError, AdmissionOperationV1,
     NativeSecurityDispatchLedgerRecordV1,
 };
-use chio_core::canonical::canonical_json_bytes;
+use chio_core::canonical::{canonical_json_bytes, UntrustedJsonError};
 use chio_core::crypto::sha256_hex;
 use chio_security_types::ports::RecordId;
 
@@ -55,15 +55,19 @@ impl NativeSecurityDispatchRequestBindingV1 {
         }
         let value: serde_json::Value =
             chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_LEDGER_BYTES)
-                .and_then(|input| input.decode_signed())
-                .map_err(invalid)?;
+                .and_then(|input| input.decode_signed())?;
         let operation = AdmissionOperationV1::from_persisted(
-            serde_json::from_value(value["operation"].clone()).map_err(invalid)?,
+            serde_json::from_value(value["operation"].clone())
+                .map_err(UntrustedJsonError::Decode)?,
         )?;
-        if canonical_json_bytes(&value).map_err(invalid)? != *bytes
+        if canonical_json_bytes(&value).map_err(UntrustedJsonError::Canonicalization)? != *bytes
             || sha256_hex(bytes) != record.record_digest.as_str()
             || operation.binding().operation_id() != &record.operation_id
-            || value.get("context") != Some(&serde_json::to_value(context).map_err(invalid)?)
+            || value.get("context")
+                != Some(
+                    &serde_json::to_value(context)
+                        .map_err(|error| UntrustedJsonError::Canonicalization(error.into()))?,
+                )
         {
             return Err(invalid("original native ledger changed its data binding"));
         }
@@ -76,7 +80,7 @@ impl NativeSecurityDispatchRequestBindingV1 {
             Some(NATIVE_DISPATCH_LEDGER_SCHEMA) => {
                 let dispatch_commitment_id: RecordId =
                     serde_json::from_value(value["original_dispatch_commitment_id"].clone())
-                        .map_err(invalid)?;
+                        .map_err(UntrustedJsonError::Decode)?;
                 if !valid_dispatch_commitment_id(&dispatch_commitment_id) {
                     return Err(invalid("original native dispatch commitment is invalid"));
                 }
@@ -85,7 +89,7 @@ impl NativeSecurityDispatchRequestBindingV1 {
                     live_request_digest: serde_json::from_value(
                         value["live_request_digest"].clone(),
                     )
-                    .map_err(invalid)?,
+                    .map_err(UntrustedJsonError::Decode)?,
                 }))
             }
             _ => Err(invalid("original native ledger schema is invalid")),

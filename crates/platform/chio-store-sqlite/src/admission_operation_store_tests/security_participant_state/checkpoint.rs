@@ -473,3 +473,83 @@ fn native_journal_checkpoint_abort_reopens_complete_old_or_new_state() -> Anchor
     }
     Ok(())
 }
+
+fn malformed_native_checkpoint_diagnostic_refusal(utf8: bool) -> AnchoredTestResult {
+    use chio_kernel::admission_operation::AdmissionOperationError;
+    use std::error::Error;
+    let fixture = fixture();
+    let initialized = hydrate(&fixture, &imported(&fixture, "diagnostic-source")?)?;
+    fixture.store.checkpoint_security_participant_history(
+        &initialized,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    let connection = fixture.store.connection()?;
+    assert_eq!(native::verify_all(&connection)?, vec![initialized.clone()]);
+    let before: (i64,i64) = connection.query_row("SELECT (SELECT COUNT(*) FROM security_participant_checkpoint_events), (SELECT head_sequence FROM authority_global_commit_meta WHERE singleton=1)", [], |row|Ok((row.get(0)?,row.get(1)?)))?;
+    let mut bytes: Vec<u8> = connection.query_row("SELECT canonical_record FROM security_participant_checkpoint_events WHERE security_authority_id=?1 AND sequence=1", [initialized.security_authority_id().as_str()], |row|row.get(0))?;
+    if utf8 {
+        bytes = vec![b'{', 0xff, b'}'];
+    } else {
+        let mut value: serde_json::Value = serde_json::from_slice(&bytes)?;
+        value["sequence"] = serde_json::json!("CHECKPOINT_SHAPE_CANARY");
+        bytes = canonical_json_bytes(&value)?;
+    }
+    // Isolated fixture corruption and exact catalog restoration; use the real
+    // native owner verifier, with no new authority or decoder test port.
+    connection.execute_batch("DROP TRIGGER security_participant_checkpoint_events_no_update")?;
+    connection.execute("UPDATE security_participant_checkpoint_events SET canonical_record=?1 WHERE security_authority_id=?2 AND sequence=1", params![&bytes,initialized.security_authority_id().as_str()])?;
+    connection.execute_batch(native::checkpoint::sql())?;
+    let error = native::verify_all(&connection)
+        .err()
+        .ok_or("malformed retained checkpoint must refuse")?;
+    let after: (i64,i64) = connection.query_row("SELECT (SELECT COUNT(*) FROM security_participant_checkpoint_events), (SELECT head_sequence FROM authority_global_commit_meta WHERE singleton=1)", [], |row|Ok((row.get(0)?,row.get(1)?)))?;
+    assert_eq!(
+        after, before,
+        "refusal must not create checkpoint or global authority"
+    );
+    assert_eq!(fixture.authority.mutation_fence(), fixture.fence);
+    assert!(
+        matches!(
+            &error,
+            AdmissionOperationStoreError::Operation(AdmissionOperationError::UntrustedInput(_))
+        ),
+        "native checkpoint failure must keep its existing typed owner"
+    );
+    let expected = if utf8 {
+        "urn:chio:error:attest:signed-json-not-utf8"
+    } else {
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    };
+    assert!(error.to_string().contains(expected));
+    assert!(!error.to_string().contains("CHECKPOINT_SHAPE_CANARY"));
+    assert!(!format!("{error:?}").contains("CHECKPOINT_SHAPE_CANARY"));
+    let mut source = error.source();
+    let mut found = false;
+    while let Some(cause) = source {
+        found |= if utf8 {
+            cause
+                .downcast_ref::<std::str::Utf8Error>()
+                .is_some_and(|error| error.valid_up_to() == 1 && error.error_len() == Some(1))
+        } else {
+            cause
+                .downcast_ref::<serde_json::Error>()
+                .is_some_and(serde_json::Error::is_data)
+        };
+        source = cause.source();
+    }
+    assert!(
+        found,
+        "native checkpoint refusal must keep its concrete native source kind"
+    );
+    Ok(())
+}
+#[test]
+fn native_journal_checkpoint_reader_preserves_utf8_source_without_mutation() -> AnchoredTestResult {
+    malformed_native_checkpoint_diagnostic_refusal(true)
+}
+#[test]
+fn native_journal_checkpoint_reader_preserves_serde_data_source_without_mutation(
+) -> AnchoredTestResult {
+    malformed_native_checkpoint_diagnostic_refusal(false)
+}

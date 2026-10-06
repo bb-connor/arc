@@ -156,8 +156,7 @@ pub(super) fn load_local(
     };
     let bytes = bytes.ok_or_else(|| invalid("native checkpoint bytes exceed bounds"))?;
     let record: Record = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 65_536)
-        .and_then(|input| input.decode_signed())
-        .map_err(|_| invalid("native checkpoint is not bounded typed history"))?;
+        .and_then(|input| input.decode_signed())?;
     if record.bytes()? != bytes
         || record.authority.as_str() != authority
         || record.sequence != sequence

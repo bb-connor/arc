@@ -192,3 +192,123 @@ fn snapshot(
     )?;
     Ok((quota(fixture)?, (rows.0, rows.1), rows.2))
 }
+
+// Cloned retained readback supplies structural data, never a capture permit.
+fn retained_native_ledger_diagnostic_refusal(kind: &str) -> TestResult {
+    use chio_kernel::admission_operation::{
+        AdmissionOperationError, AdmissionOperationStoreError,
+        NativeSecurityDispatchRequestBindingV1,
+    };
+    use std::error::Error;
+    let mut fixture = Fixture::new(std::array::from_fn(|_| InformationLabel::bottom()))?;
+    let captured = run_capture_through_with_clearance(
+        &mut fixture,
+        false,
+        InformationLabel::bottom(),
+        |fixture| {
+            Ok(fixture
+                .kernel
+                .evaluate_tool_call_blocking_with_security_context(
+                    &fixture.request,
+                    &fixture.context,
+                )?)
+        },
+    )?;
+    let store = fixture.authority.admission_operation_store();
+    let fence = fixture.authority.mutation_fence();
+    let ledger = store
+        .load_native_dispatch_ledger(&captured.operation_id, &fence, now_ms()?)?
+        .ok_or("actual retained native ledger")?;
+    let original: serde_json::Value = serde_json::from_slice(&ledger.canonical_record)?;
+    let context: SecurityInvocationContext = serde_json::from_value(original["context"].clone())?;
+    assert!(NativeSecurityDispatchRequestBindingV1::from_ledger(&ledger, &context)?.is_some());
+    let before = snapshot(&fixture, &captured.operation_id)?;
+    let before_operation = store.load_by_operation_id(&captured.operation_id)?;
+    let mut malformed = ledger.clone();
+    let expected_code = if kind == "utf8" {
+        malformed.canonical_record = vec![b'{', 0xff, b'}'];
+        "urn:chio:error:attest:signed-json-not-utf8"
+    } else if kind == "signed_input" {
+        malformed.canonical_record = b"{\"schema\":0,".to_vec();
+        malformed
+            .canonical_record
+            .extend_from_slice(&ledger.canonical_record[1..]);
+        "urn:chio:error:attest:signed-json-invalid-input"
+    } else {
+        let mut value = original;
+        value[kind] = serde_json::json!(7);
+        malformed.canonical_record = chio_core::canonical::canonical_json_bytes(&value)?;
+        malformed.record_digest = chio_kernel::admission_operation::AdmissionDigest::try_new(
+            "diagnostic_clone_digest",
+            chio_core::sha256_hex(&malformed.canonical_record),
+        )?;
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    };
+    let error = NativeSecurityDispatchRequestBindingV1::from_ledger(&malformed, &context)
+        .err()
+        .ok_or("malformed retained ledger must refuse")?;
+    // Check refusal and unchanged effects before the missing diagnostic owner.
+    assert_eq!(snapshot(&fixture, &captured.operation_id)?, before);
+    assert_eq!(
+        store.load_by_operation_id(&captured.operation_id)?,
+        before_operation
+    );
+    assert_eq!(
+        store.load_native_dispatch_ledger(&captured.operation_id, &fence, now_ms()?)?,
+        Some(ledger)
+    );
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    assert!(
+        matches!(
+            &error,
+            AdmissionOperationStoreError::Operation(AdmissionOperationError::UntrustedInput(_))
+        ),
+        "retained ledger failure must keep its existing typed owner"
+    );
+    assert!(error.to_string().contains(expected_code));
+    let mut source = error.source();
+    let mut native = false;
+    while let Some(cause) = source {
+        native |= match kind {
+            "utf8" => cause
+                .downcast_ref::<std::str::Utf8Error>()
+                .is_some_and(|error| error.valid_up_to() == 1 && error.error_len() == Some(1)),
+            "signed_input" => matches!(
+                cause.downcast_ref::<chio_core::Error>(),
+                Some(chio_core::Error::CanonicalJson(_))
+            ),
+            _ => cause
+                .downcast_ref::<serde_json::Error>()
+                .is_some_and(serde_json::Error::is_data),
+        };
+        source = cause.source();
+    }
+    assert!(
+        native,
+        "retained ledger refusal must keep its concrete native source kind"
+    );
+    Ok(())
+}
+
+#[test]
+fn native_original_ledger_reader_preserves_utf8_source_without_authority() -> TestResult {
+    retained_native_ledger_diagnostic_refusal("utf8")
+}
+#[test]
+fn native_original_ledger_reader_preserves_signed_input_source_without_authority() -> TestResult {
+    retained_native_ledger_diagnostic_refusal("signed_input")
+}
+#[test]
+fn native_original_ledger_reader_preserves_operation_serde_source_without_authority() -> TestResult
+{
+    retained_native_ledger_diagnostic_refusal("operation")
+}
+#[test]
+fn native_original_ledger_reader_preserves_commitment_serde_source_without_authority() -> TestResult
+{
+    retained_native_ledger_diagnostic_refusal("original_dispatch_commitment_id")
+}
+#[test]
+fn native_original_ledger_reader_preserves_digest_serde_source_without_authority() -> TestResult {
+    retained_native_ledger_diagnostic_refusal("live_request_digest")
+}
