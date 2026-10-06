@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "Framework request extraction, transport response decoding, non-JSON formats, and resolved shared-reader call sites. This supplements the direct serde census and never changes its raw-input baseline.",
-  "control_reader_sha256": "fb363e0eb20857097f53c054209ceebc0af33e849ab19f2a0810ace585b68836",
+  "control_reader_sha256": "29dc19a9cc41f197134039337862d3ec19f3dcb01aab7c9b493517f68a8295ea",
   "requests": [
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",
@@ -14,7 +14,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "AUTHORITY_KEY_LOG_SYNC_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Signed authority key-log records update the local authority trust state after log-chain and signer validation."
     },
     {
@@ -28,7 +28,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FEDERATION_POLICY_EVALUATE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Federation admission policy evaluation consumes identity and authorization inputs and returns the owning policy decision."
     },
     {
@@ -42,7 +42,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "ISSUE_CAPABILITY_PATH",
-      "authentication": "validate_authority_issue_auth, then leader forwarding and enforce_authority_mutation_fence before issuance.",
+      "authentication": "Before body reads, json_ingress::authenticate calls validate_authority_issue_auth for the service/workload bearer or authenticated forwarded cluster-peer contract. The handler repeats this check after typed extraction, then performs leader forwarding and enforce_authority_mutation_fence before issuance.",
       "semantics": "Capability issuance requests select subject, scope, grants and attestation inputs; the capability authority applies issuance policy before signing."
     },
     {
@@ -56,7 +56,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "REVOCATIONS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated revocation updates capability authority state and cluster propagation; identifiers and revision numbers are authoritative."
     },
     {
@@ -70,7 +70,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "SCIM_USERS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated SCIM identity provisioning writes the lifecycle registry after provider and identity validation; its fields are not an arbitrary numeric document."
     },
     {
@@ -84,7 +84,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "PUT",
       "route": "FEDERATION_PROVIDER_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated provider configuration replaces identity trust endpoints and subject mapping after provider validation."
     },
     {
@@ -98,7 +98,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "PUT",
       "route": "FEDERATION_POLICY_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The record embeds a signed federation admission policy; path identity and policy signature must validate before the registry write."
     },
     {
@@ -112,7 +112,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "BUDGET_CAPTURE_INVOCATION_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -126,7 +126,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "BUDGET_RECONCILE_SPEND_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -140,7 +140,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "BUDGET_RELEASE_EXPOSURE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -154,7 +154,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "BUDGET_AUTHORIZE_EXPOSURE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -168,7 +168,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "BUDGET_INCREMENT_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated budget mutation changes quota, exposure, capture or settlement state. The owning budget store and cluster protocol retain their fencing and accounting checks."
     },
     {
@@ -182,7 +182,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_AUTHORIZE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -196,7 +196,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_AUTHORIZE_CUMULATIVE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -210,7 +210,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CANCEL_CAPTURED_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -224,7 +224,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CAPTURE_INVOCATION_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -238,7 +238,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CAPTURE_SPEND_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -252,7 +252,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_CUMULATIVE_OPERATION_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -266,7 +266,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_RECONCILE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -280,7 +280,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_RELEASE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -294,7 +294,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "STRUCTURED_BUDGET_FENCED_REVERSE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Structured budget mutation carries authority and reservation bindings. The store retains its generation, fence, lease and amount checks before any budget effect."
     },
     {
@@ -308,7 +308,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CERTIFICATION_DISCOVERY_CONSUME_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Unsigned discovery selection lists constrain informational certification consumption; the request contains identifiers and profile names, not signed artifacts."
     },
     {
@@ -322,7 +322,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CERTIFICATION_DISPUTE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated dispute state and timestamps update a stored certification entry."
     },
     {
@@ -336,7 +336,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "GENERIC_GOVERNANCE_CASE_EVALUATE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -350,7 +350,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "GENERIC_TRUST_ACTIVATION_EVALUATE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -364,7 +364,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "OPEN_MARKET_PENALTY_EVALUATE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -378,7 +378,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "GENERIC_GOVERNANCE_CASE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -392,7 +392,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -406,7 +406,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "GENERIC_TRUST_ACTIVATION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -420,7 +420,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -434,7 +434,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "OPEN_MARKET_PENALTY_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The request issues or evaluates signed trust, governance or market artifacts; nested signed documents and authority numbers retain strict parsing before the existing signature and policy checks."
     },
     {
@@ -448,7 +448,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CERTIFICATIONS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Signed certification bodies are verified before registry insertion, supersession and durable save."
     },
     {
@@ -462,7 +462,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CERTIFICATION_DISCOVERY_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The unsigned request wrapper embeds a signed certification; the signature is verified before peer publish fan-out."
     },
     {
@@ -476,7 +476,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CERTIFICATION_REVOKE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated reason and revocation time update a stored certification entry."
     },
     {
@@ -490,7 +490,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "INTERNAL_CLUSTER_PARTITION_PATH",
-      "authentication": "validate_cluster_peer_auth for the partition route before mutation of cluster peer state.",
+      "authentication": "Before body reads, json_ingress::authenticate calls validate_cluster_peer_auth for the partition route. The handler repeats peer authentication after typed extraction before changing cluster peer state.",
       "semantics": "An authenticated administrative cluster-partition request changes peer reachability controls used by authority replication."
     },
     {
@@ -504,7 +504,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FINDING_ACTIVATE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Finding activation validates signed lease and activation evidence before committing activation state."
     },
     {
@@ -518,7 +518,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FINDING_PARTICIPATION_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Signed participation evidence and authority status constrain the retained finding participation decision."
     },
     {
@@ -532,7 +532,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FINDINGS_COLLATERAL_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated collateral registration validates the retained account, amounts and evidence bindings before changing market state."
     },
     {
@@ -560,7 +560,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_ACTIVATIONS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -574,7 +574,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_APPROVALS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -588,7 +588,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH",
-      "authentication": "resolve_control_read_principal and matching tenant identity before querying credit authority.",
+      "authentication": "Before body reads, json_ingress::authenticate resolves the configured admin-service or tenant-read bearer. After typed extraction, resolve_control_read_principal and matching request tenant identity constrain credit-authority queries.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -602,7 +602,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_MARKETPLACE_PRICE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -616,7 +616,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_PROPOSAL_ADMIT_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -630,7 +630,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_PROPOSALS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -644,7 +644,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_PROPOSAL_PREVIEW_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -658,7 +658,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FISCAL_RESOLVE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Fiscal proposal, approval, activation or resolution input controls signed fiscal authority. Existing proposal verification, quorum, active binding and commit checks remain authoritative."
     },
     {
@@ -672,7 +672,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_CANCEL_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -686,7 +686,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_CLAIM_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -700,7 +700,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_COMMITMENT_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -714,7 +714,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_COMPLETE_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -728,7 +728,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_PACKAGE_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -742,7 +742,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_RENEW_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -756,7 +756,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs",
       "method": "POST",
       "route": "FROST_COORDINATOR_SHARE_PATH",
-      "authentication": "FROST credential registry and coordinator/participant role checks in the handler",
+      "authentication": "On the separate FROST router, original-byte validation precedes typed extraction and handler credential authentication. The control/store operations then check the coordinator or participant role, body-bound roster/lease and mutation fence as applicable.",
       "semantics": "FROST coordinator input carries the authorization body, current lease or signer contribution. The coordinator retains credential-role, active-roster, slot, fence and cryptographic contribution checks before a store mutation."
     },
     {
@@ -770,7 +770,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_OID4VP_REQUESTS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "OID4VP request issuance signs and retains nonce, verifier policy and presentation constraints."
     },
     {
@@ -784,7 +784,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_CHALLENGES_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Challenge creation retains verifier policy, issuer restrictions and expiry that constrain later presentation admission."
     },
     {
@@ -798,7 +798,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_ISSUANCE_OFFERS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "A signed agent passport and issuance settings create a one-time credential offer after passport verification."
     },
     {
@@ -812,7 +812,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "FEDERATED_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Federated issuance combines identity evidence and requested grants; federation and authority validation remain mandatory before minting a capability."
     },
     {
@@ -850,7 +850,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_STATUSES_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "A signed passport and lifecycle metadata update the authenticated passport-status registry."
     },
     {
@@ -864,7 +864,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_ISSUANCE_CREDENTIAL_PATH",
-      "authentication": "Existing handler checks: bearer_token_from_headers. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Before body reads, json_ingress::authenticate_wallet_credential validates the opaque bearer against the verified issuance registry without mutation: issued state, current offer/token expiry and normalized configured issuer. After upload, the handler reloads the registry and repeats validate_credential_entitlement before issuer metadata or signing seed/DB resolution; redeem_credential retains its later entitlement and request configuration/subject/format checks before signing, consumption and save.",
       "semantics": "Credential exchange binds proof and access-token state to issuance of a signed portable credential."
     },
     {
@@ -892,7 +892,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_STATUS_REVOKE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated passport lifecycle revocation mutates a retained status record."
     },
     {
@@ -906,7 +906,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "PUT",
       "route": "PASSPORT_VERIFIER_POLICY_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Signed verifier policy, including numeric trust thresholds, is verified before upsert and durable save."
     },
     {
@@ -920,7 +920,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PASSPORT_CHALLENGE_VERIFY_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "A nested signed passport presentation is checked against the retained challenge and verifier policy before challenge consumption."
     },
     {
@@ -934,7 +934,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CHILD_RECEIPTS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "A signed child receipt is validated before retained lineage append and cluster propagation."
     },
     {
@@ -948,7 +948,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "TOOL_RECEIPTS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "A signed Chio receipt is verified before durable append; original JSON must preserve nested signed metadata and native integer widths."
     },
     {
@@ -962,7 +962,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "EVIDENCE_EXPORT_PATH",
-      "authentication": "resolve_control_read_principal and principal.authorize_evidence_export_query constrain exported tenant evidence.",
+      "authentication": "Before body reads, json_ingress::authenticate resolves the configured admin-service or tenant-read bearer. After typed extraction, resolve_control_read_principal and principal.authorize_evidence_export_query constrain exported tenant evidence.",
       "semantics": "Unsigned export selection and filters choose existing evidence; no incoming signed record is interpreted by this request."
     },
     {
@@ -976,7 +976,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "EVIDENCE_IMPORT_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Authenticated service administrators provide an explicit independent verification policy. The common verifier authenticates the envelope, manifest and complete decoded payload, pins every signer, binds receipt/checkpoint keys, and checks any externally supplied anchor before forwarding or store import. No trust is inferred from the package."
     },
     {
@@ -990,7 +990,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LINEAGE_RECORD_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Capability and lineage snapshots affect retained authority provenance and must preserve authoritative identifiers and numbers."
     },
     {
@@ -1004,7 +1004,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "METERED_BILLING_RECONCILE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Metered billing reconciliation writes authoritative observations and financial state after the existing billing checks."
     },
     {
@@ -1018,7 +1018,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "SETTLEMENT_RECONCILE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Settlement reconciliation writes authoritative observations and financial state after the existing settlement checks."
     },
     {
@@ -1032,7 +1032,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Runtime attestation appraisal input carries evidence, policy or a signed appraisal result; the existing appraisal verification and imported-signature checks remain required."
     },
     {
@@ -1046,7 +1046,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "RUNTIME_ATTESTATION_APPRAISAL_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Runtime attestation appraisal input carries evidence, policy or a signed appraisal result; the existing appraisal verification and imported-signature checks remain required."
     },
     {
@@ -1060,7 +1060,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Runtime attestation appraisal input carries evidence, policy or a signed appraisal result; the existing appraisal verification and imported-signature checks remain required."
     },
     {
@@ -1074,7 +1074,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CAPITAL_ALLOCATION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Capital allocation or execution instruction issuance consumes financial authority inputs and signs a result only after the existing book and policy validation."
     },
     {
@@ -1088,7 +1088,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CAPITAL_INSTRUCTION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Capital allocation or execution instruction issuance consumes financial authority inputs and signs a result only after the existing book and policy validation."
     },
     {
@@ -1102,7 +1102,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CREDIT_BONDED_EXECUTION_SIMULATION_PATH",
-      "authentication": "Existing handler checks: resolve_admin_report_read_context. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Before body reads, json_ingress::authenticate calls resolve_admin_report_read_context, requiring admin-service receipt-read authority. The handler repeats the same report authorization after typed extraction.",
       "semantics": "Unsigned hypothetical bonded-execution policy and query produce a report without changing the bond or issuing execution authority."
     },
     {
@@ -1116,7 +1116,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CREDIT_BOND_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Credit facility, bond or loss-lifecycle issuance consumes authoritative financial terms and nested references before the existing validation and signed issuance."
     },
     {
@@ -1130,7 +1130,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CREDIT_FACILITY_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Credit facility, bond or loss-lifecycle issuance consumes authoritative financial terms and nested references before the existing validation and signed issuance."
     },
     {
@@ -1144,7 +1144,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "CREDIT_LOSS_LIFECYCLE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Credit facility, bond or loss-lifecycle issuance consumes authoritative financial terms and nested references before the existing validation and signed issuance."
     },
     {
@@ -1158,7 +1158,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1172,7 +1172,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_BOUND_COVERAGE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1186,7 +1186,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1200,7 +1200,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_DISPUTE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1214,7 +1214,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_PACKAGE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1228,7 +1228,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1242,7 +1242,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1256,7 +1256,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_RESPONSE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1270,7 +1270,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1284,7 +1284,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1298,7 +1298,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_PLACEMENT_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1312,7 +1312,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_PRICING_AUTHORITY_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1326,7 +1326,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_PROVIDER_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1340,7 +1340,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_QUOTE_REQUEST_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1354,7 +1354,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "LIABILITY_QUOTE_RESPONSE_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Liability insurance issuance consumes linked signed quote, coverage, claim or settlement artifacts and authoritative amounts; the owning issuance chain still validates those signatures and relationships."
     },
     {
@@ -1368,7 +1368,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PORTABLE_REPUTATION_EVALUATE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The evaluation request embeds signed portable reputation evidence; owning validation determines its admissibility."
     },
     {
@@ -1382,7 +1382,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PORTABLE_NEGATIVE_EVENT_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Portable reputation issuance consumes signed passport or attestation evidence and signs an authoritative reputation artifact after its existing validation."
     },
     {
@@ -1396,7 +1396,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Portable reputation issuance consumes signed passport or attestation evidence and signs an authoritative reputation artifact after its existing validation."
     },
     {
@@ -1410,7 +1410,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "REPUTATION_COMPARE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "The comparison request embeds a signed passport and an optional verifier policy; passport verification still determines the interpretation."
     },
     {
@@ -1424,7 +1424,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "UNDERWRITING_APPEALS_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Underwriting decision or appeal input changes retained decision/appeal state or mints a signed underwriting decision after owning policy validation."
     },
     {
@@ -1438,7 +1438,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "UNDERWRITING_DECISION_ISSUE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Underwriting decision or appeal input changes retained decision/appeal state or mints a signed underwriting decision after owning policy validation."
     },
     {
@@ -1452,7 +1452,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "UNDERWRITING_APPEAL_RESOLVE_PATH",
-      "authentication": "Existing handler checks: validate_service_auth. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after typed extraction.",
       "semantics": "Underwriting decision or appeal input changes retained decision/appeal state or mints a signed underwriting decision after owning policy validation."
     },
     {
@@ -1466,7 +1466,7 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "method": "POST",
       "route": "UNDERWRITING_SIMULATION_PATH",
-      "authentication": "Existing handler checks: resolve_admin_report_read_context. Original-byte validation precedes the typed handler, as extraction did previously.",
+      "authentication": "Before body reads, json_ingress::authenticate calls resolve_admin_report_read_context, requiring admin-service receipt-read authority. The handler repeats the same report authorization after typed extraction.",
       "semantics": "Unsigned hypothetical underwriting policy and query produce a report; ordinary decimal spellings are allowed and no decision is signed or persisted."
     },
     {
@@ -1641,7 +1641,7 @@
   "router_compositions": {
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs": {
       "owner": "build_router",
-      "sha256": "e164ad9ef53b76c6bf533158ff5a721f8038d644d2fe19ee5098b719dc0fc064"
+      "sha256": "faec7fbcc704e1294c6a9b89cca4d3feb78331df6bea73090f4dacb1f80fbfc6"
     },
     "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs": {
       "owner": "frost_coordinator_router",
@@ -1655,7 +1655,7 @@
       "request_type": "CreateThresholdProposalRequest",
       "reader": "read_body(request, input::decode)",
       "max_bytes": 1048576,
-      "authentication": "require_control_auth before body decode",
+      "authentication": "Router-level require_sidecar_control_middleware calls require_sidecar_control_request before read_body(request, input::decode). A configured sidecar-control credential is required even for local callers.",
       "contract": "Original bounded signed JSON with duplicate and numeric-loss rejection before threshold collector mutation; local typed cause with redacted wire error.",
       "tests": "crates/products/chio-api-protect/src/proxy/tests/inbound_authority.rs"
     },
@@ -1665,7 +1665,7 @@
       "request_type": "SubmitThresholdApprovalRequest",
       "reader": "read_body(request, input::decode)",
       "max_bytes": 1048576,
-      "authentication": "require_control_auth before body decode",
+      "authentication": "Router-level require_sidecar_control_middleware calls require_sidecar_control_request before read_body(request, input::decode). A configured sidecar-control credential is required even for local callers.",
       "contract": "Original bounded signed JSON with duplicate and numeric-loss rejection before threshold collector mutation; local typed cause with redacted wire error.",
       "tests": "crates/products/chio-api-protect/src/proxy/tests/inbound_authority.rs"
     }
