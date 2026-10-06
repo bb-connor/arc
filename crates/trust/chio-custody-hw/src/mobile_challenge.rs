@@ -194,7 +194,9 @@ impl MobileChallengeSnapshot {
 /// return [`MobileChallengeError::StoreUnavailable`] and callers must deny.
 pub trait MobileChallengeStore: Send + Sync {
     /// Register a challenge if its cryptographic identifier is absent.
-    /// Returns `false` only for an identifier collision.
+    /// Returns `false` only for an identifier collision. Challenges expired
+    /// at the new challenge's issuance no longer count against capacity;
+    /// callers must still rate-limit issuance per client.
     fn register_if_absent(
         &self,
         challenge: &IssuedMobileChallenge,
@@ -459,6 +461,10 @@ impl MobileChallengeStore for InMemoryMobileChallengeStore {
         if state.challenges.contains_key(&challenge.challenge_id) {
             return Ok(false);
         }
+        let issued_at = challenge.issued_at_unix_seconds;
+        state
+            .challenges
+            .retain(|_, record| record.challenge.expires_at_unix_seconds > issued_at);
         if state.challenges.len() >= self.max_challenges {
             return Err(MobileChallengeError::StoreUnavailable(
                 "mobile challenge capacity was exhausted".to_string(),
