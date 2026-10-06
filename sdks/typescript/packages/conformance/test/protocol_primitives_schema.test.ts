@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
-import { createWireSchemaValidator } from "@chio-protocol/node-http";
+import { createWireSchemaValidator, parseWireJson } from "@chio-protocol/node-http";
 
 import type {
   Agent_ActiveResponseGovernedIntent,
@@ -58,11 +58,6 @@ const corpus = JSON.parse(
   ),
 ) as { cases: FixtureCase[]; raw_cases: RawFixtureCase[] };
 
-// Raw cases this consumer accepts. Wire bytes reach the validator through
-// JSON.parse, which keeps the last of each duplicate key, and the collapsed
-// value validates. it.fails turns red once these reject.
-const lastWinsRawCases = new Set(["receipt-duplicate-id", "receipt-duplicate-parameter"]);
-
 const schemaFiles = new Set(
   [...corpus.cases, ...corpus.raw_cases].map((fixture) => fixture.schema_file),
 );
@@ -90,15 +85,11 @@ describe("protocol primitive generated schemas", () => {
     const schema = JSON.parse(
       readFileSync(resolve(schemaRoot, fixture.schema_file), "utf8"),
     ) as { $id: string };
-    const title = `raw ${fixture.name} rejects duplicate keys`;
-    const check = () => {
+    it(`raw ${fixture.name} rejects duplicate keys`, () => {
       expect(fixture.valid).toBe(false);
-      expect(validateWire(schema.$id, JSON.parse(fixture.instance_text))).toBe(false);
-    };
-    if (lastWinsRawCases.has(fixture.name)) {
-      it.fails(`${title} (known gap: JSON.parse keeps the last duplicate)`, check);
-    } else {
-      it(title, check);
-    }
+      // Valid once JSON.parse collapses duplicates; the wire decoder rejects the text.
+      expect(validateWire(schema.$id, JSON.parse(fixture.instance_text))).toBe(true);
+      expect(() => parseWireJson(fixture.instance_text)).toThrow(SyntaxError);
+    });
   }
 });

@@ -111,14 +111,24 @@ class SdkInventoryCalibration(unittest.TestCase):
             with self.subTest(language="python", mutation="raw-status"):
                 altered = copy.deepcopy(python)
                 for raw_case in altered[0]:
-                    for child in list(raw_case):
-                        raw_case.remove(child)
+                    if not raw_case.get("name", "").startswith("test_protocol_primitives_raw_cases_"):
+                        continue
+                    if len(raw_case):
+                        for child in list(raw_case):
+                            raw_case.remove(child)
+                    else:
+                        ET.SubElement(raw_case, "skipped", type="pytest.xfail")
                 with self.assertRaises(ValueError):
                     check(py=altered)
             with self.subTest(language="typescript", mutation="raw-status"):
                 altered = copy.deepcopy(typescript)
                 for item in altered["testResults"][0]["assertionResults"]:
-                    item["title"] = item["title"].removesuffix(MODULE.TYPESCRIPT_GAP_SUFFIX)
+                    if not item["title"].startswith("raw "):
+                        continue
+                    if item["title"].endswith(MODULE.TYPESCRIPT_GAP_SUFFIX):
+                        item["title"] = item["title"].removesuffix(MODULE.TYPESCRIPT_GAP_SUFFIX)
+                    else:
+                        item["title"] += MODULE.TYPESCRIPT_GAP_SUFFIX
                 with self.assertRaises(ValueError):
                     check(ts=altered)
 
