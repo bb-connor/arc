@@ -5,9 +5,9 @@ use chio_binding_helpers::{
     canonicalize_json_str, capability_body_canonical_json, receipt_body_canonical_json,
     sha256_hex_utf8, sign_json_str_ed25519, sign_utf8_message_ed25519,
     signed_manifest_body_canonical_json, verify_capability, verify_json_str_signature_ed25519,
-    verify_receipt, verify_receipt_json_with_trusted_signer_hex,
+    verify_receipt, verify_receipt_json, verify_receipt_json_with_trusted_signer_hex,
     verify_receipt_with_trusted_signers, verify_signed_manifest, verify_utf8_message_ed25519,
-    CapabilityVerification, ManifestVerification, ReceiptVerification,
+    CapabilityVerification, ErrorCode, ManifestVerification, ReceiptVerification,
 };
 use chio_core::{
     capability::{
@@ -1378,6 +1378,156 @@ fn receipt_fixture_allow_case_passes_with_json_trusted_signer_hex() {
     assert!(actual.signer_trusted);
     assert!(actual.ok);
     assert!(actual.authorized);
+}
+
+fn protocol_primitives_fixture_path() -> PathBuf {
+    repo_root().join("tests/bindings/fixtures/protocol-primitives-v1.json")
+}
+
+fn read_json_fixture(path: &Path) -> Value {
+    let raw = fs::read_to_string(path).test_unwrap("read fixture");
+    serde_json::from_str(&raw).test_unwrap("parse fixture")
+}
+
+fn kernel_key_hex(receipt: &Value) -> Vec<String> {
+    vec![receipt["kernel_key"]
+        .as_str()
+        .test_unwrap("kernel_key")
+        .to_string()]
+}
+
+fn assert_receipt_json_rejected(input: &str, label: &str) {
+    let trusted = kernel_key_hex(&serde_json::from_str(input).test_unwrap("input is JSON"));
+    for result in [
+        verify_receipt_json(input),
+        verify_receipt_json_with_trusted_signer_hex(input, &trusted),
+    ] {
+        match result {
+            Err(error) => assert_eq!(error.code(), ErrorCode::UntrustedInput, "{label}"),
+            Ok(verification) => {
+                panic!("duplicate keys in {label} were decoded: {verification:?}")
+            }
+        }
+    }
+}
+
+#[test]
+fn receipt_json_rejects_raw_duplicate_key_corpus_cases_at_original_bytes() {
+    let corpus = read_json_fixture(&protocol_primitives_fixture_path());
+    let valid = corpus["cases"]
+        .as_array()
+        .test_unwrap("cases array")
+        .iter()
+        .find(|case| case["name"] == "receipt-internal-origin")
+        .test_unwrap("valid receipt case");
+    assert_eq!(valid["valid"], json!(true));
+    let mut rejected = Vec::new();
+    for case in corpus["raw_cases"]
+        .as_array()
+        .test_unwrap("raw_cases array")
+    {
+        if case["schema_file"] != "receipt/record.schema.json" {
+            continue;
+        }
+        let name = case["name"].as_str().test_unwrap("raw case name");
+        let text = case["instance_text"]
+            .as_str()
+            .test_unwrap("raw case instance_text");
+        let collapsed: Value = serde_json::from_str(text).test_unwrap("raw case is JSON");
+        assert_eq!(collapsed, valid["instance"], "raw case {name} collapses");
+        for input in [
+            serde_json::to_string(&collapsed).test_unwrap("compact"),
+            serde_json::to_string_pretty(&collapsed).test_unwrap("pretty"),
+        ] {
+            verify_receipt_json(&input).test_unwrap("valid corpus receipt decodes");
+        }
+        assert_receipt_json_rejected(text, name);
+        rejected.push(name.to_string());
+    }
+    assert_eq!(
+        rejected,
+        ["receipt-duplicate-id", "receipt-duplicate-parameter"]
+    );
+}
+
+#[test]
+fn receipt_json_rejects_duplicate_keys_in_a_validly_signed_receipt() {
+    let fixture = read_json_fixture(&receipt_fixture_path());
+    let case = fixture["cases"]
+        .as_array()
+        .test_unwrap("cases array")
+        .iter()
+        .find(|case| case["id"] == "allow_receipt")
+        .test_unwrap("allow case");
+    let compact = serde_json::to_string(&case["receipt"]).test_unwrap("compact receipt");
+    let verified =
+        verify_receipt_json_with_trusted_signer_hex(&compact, &kernel_key_hex(&case["receipt"]))
+            .test_unwrap("signed vector verifies");
+    assert!(verified.ok && verified.authorized);
+
+    for (label, anchor, inserted) in [
+        (
+            "nested action.parameters",
+            r#""parameters":{"#,
+            r#""path":"/etc/shadow","#,
+        ),
+        (
+            "nested metadata",
+            r#""metadata":{"#,
+            r#""surface":"forged","#,
+        ),
+        ("top-level tool_name", "{", r#""tool_name":"shell_exec","#),
+    ] {
+        let forged = compact.replacen(anchor, &format!("{anchor}{inserted}"), 1);
+        let collapsed: Value = serde_json::from_str(&forged).test_unwrap("forged is JSON");
+        assert_eq!(collapsed, case["receipt"], "{label} collapses last-wins");
+        assert_receipt_json_rejected(&forged, label);
+    }
+}
+
+#[test]
+fn receipt_json_fixture_cases_match_expected_verification() {
+    let fixture = read_json_fixture(&receipt_fixture_path());
+    for case in fixture["cases"].as_array().test_unwrap("cases array") {
+        let expected: ReceiptVerification =
+            serde_json::from_value(case["expected"].clone()).test_unwrap("parse expectation");
+        for input in [
+            serde_json::to_string(&case["receipt"]).test_unwrap("compact"),
+            serde_json::to_string_pretty(&case["receipt"]).test_unwrap("pretty"),
+        ] {
+            let actual = verify_receipt_json(&input).test_unwrap("verify receipt json");
+            assert_eq!(actual, expected, "receipt case {}", case["id"]);
+        }
+    }
+}
+
+#[test]
+fn receipt_json_accepts_full_width_integers_and_nested_parameters() {
+    let keypair = Keypair::from_seed(&[23u8; 32]);
+    let action = ToolCallAction::from_parameters(json!({
+        "limits": {"max": u64::MAX, "min": i64::MIN, "zero": 0},
+        "nested": [{"path": "/workspace/a", "flags": [true, false, null]}, [1, [2, [3]]]],
+        "ratio": 0.25,
+        "unicode": "caf\u{e9} \u{2028}",
+    }))
+    .test_unwrap("full-width parameters hash");
+    let mut body = base_receipt_body("rcpt-full-width", action, Decision::Allow, &keypair);
+    body.timestamp = u64::MAX;
+    body.metadata = Some(json!({"sequence": u64::MAX, "window": {"offset": i64::MIN}}));
+    let receipt = ChioReceipt::sign(body, &keypair).test_unwrap("sign full-width receipt");
+    let trusted = vec![receipt.kernel_key.to_hex()];
+    for input in [
+        serde_json::to_string(&receipt).test_unwrap("compact"),
+        serde_json::to_string_pretty(&receipt).test_unwrap("pretty"),
+    ] {
+        assert!(input.contains("18446744073709551615"));
+        let verification = verify_receipt_json_with_trusted_signer_hex(&input, &trusted)
+            .test_unwrap("full-width receipt verifies");
+        assert!(verification.ok);
+        assert!(verification.signature_valid);
+        assert!(verification.parameter_hash_valid);
+        assert!(verification.receipt_id_valid);
+    }
 }
 
 #[test]
