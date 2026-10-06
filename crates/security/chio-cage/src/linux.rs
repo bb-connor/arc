@@ -648,6 +648,12 @@ pub(crate) fn retain_runtime_artifact(
     {
         return Err(CageError::InvalidExecutable(path.to_path_buf()));
     }
+    // The loader maps shared objects by path after admission, and many are
+    // installed without an execute bit, so no runtime file may be writable by
+    // anyone but its owner.
+    if role == RuntimeArtifactRole::RuntimeFile && identity.mode() & 0o6022 != 0 {
+        return Err(CageError::UnsafeRuntimeFile(path.to_path_buf()));
+    }
     if required_executable || executable_runtime {
         reject_file_capabilities(&file, path)?;
     }

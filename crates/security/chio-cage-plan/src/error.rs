@@ -69,6 +69,8 @@ pub enum CageError {
     DescriptorIdentityChanged(PathBuf),
     #[error("runtime artifact is not an executable regular file: {0}")]
     InvalidExecutable(PathBuf),
+    #[error("runtime file is writable by group or others, or is setuid or setgid: {0}")]
+    UnsafeRuntimeFile(PathBuf),
     #[error("runtime artifact is too large: {0}")]
     ArtifactTooLarge(PathBuf),
     #[error("runtime artifact content changed while it was hashed: {0}")]
