@@ -1038,10 +1038,9 @@ pub fn compile(
     let environment = build_environment(&admitted.environment_variables, parent_environment)?;
     let seccomp = build_seccomp_plan(architecture, admitted.native_syscall_profile)?;
     // Missing write grants are created only after every admission, runtime
-    // and alias check has passed. A later failure removes them again.
+    // and alias check has passed.
     #[cfg(target_os = "linux")]
-    let created_write_grants =
-        linux::create_pending_write_grants(&mut admitted, &runtime.execution_identity)?;
+    linux::create_pending_write_grants(&mut admitted, &runtime.execution_identity)?;
     let fd_table = build_fd_table(&admitted, &runtime, broker_ipc.as_ref())?;
     let landlock = build_landlock_plan(&admitted, &fd_table)?;
     let resource_limits = ResourceLimitPlan {
@@ -1104,8 +1103,6 @@ pub fn compile(
         broker_authentication_digest,
     };
     let plan_digest = digest(&plan)?;
-    #[cfg(target_os = "linux")]
-    created_write_grants.keep();
     Ok(CompiledCage {
         profile,
         profile_digest,

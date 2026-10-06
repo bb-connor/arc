@@ -594,70 +594,19 @@ fn pending_write_grant(root: &File, path: &Path) -> Result<PendingWriteGrant, Ca
     })
 }
 
-/// Write grants created by one compile. Dropping the set removes each name
-/// that still resolves to the inode the compile created; `keep` retains them.
-pub(crate) struct CreatedWriteGrants {
-    created: Vec<CreatedWriteGrant>,
-}
-
-struct CreatedWriteGrant {
-    parent: File,
-    file_name: std::ffi::OsString,
-    identity: FileIdentity,
-}
-
-impl CreatedWriteGrants {
-    pub(crate) fn keep(mut self) {
-        self.created.clear();
-    }
-}
-
-impl Drop for CreatedWriteGrants {
-    fn drop(&mut self) {
-        for created in self.created.drain(..).rev() {
-            remove_created_write_grant(&created);
-        }
-    }
-}
-
-fn remove_created_write_grant(created: &CreatedWriteGrant) {
-    let name = created.file_name.as_bytes();
-    let Ok(current) = openat2(
-        created.parent.as_raw_fd(),
-        name,
-        O_PATH | O_CLOEXEC | O_NOFOLLOW,
-        0,
-        strict_resolution(),
-    ) else {
-        return;
-    };
-    let Ok(current_identity) = descriptor_identity(&current, None) else {
-        return;
-    };
-    if !current_identity.same_object(created.identity) {
-        return;
-    }
-    let Ok(name) = CString::new(name) else {
-        return;
-    };
-    // SAFETY: the parent descriptor is live and `name` is a NUL-terminated
-    // single path component; flag zero removes a non-directory entry.
-    let _ = unsafe { libc::unlinkat(created.parent.as_raw_fd(), name.as_ptr(), 0) };
-}
-
 /// Create every pending write grant through its retained parent, owned by the
 /// execution identity, and move it into the write resources. An unprivileged
-/// runner can create files only for its own identity.
+/// runner can create files only for its own identity. A grant created before a
+/// later failure is never removed: a pathname cannot be deleted conditionally
+/// on the inode it names, so the empty owned file stays and the next compile
+/// retains it as an existing write grant.
 pub(crate) fn create_pending_write_grants(
     admitted: &mut AdmittedManifest,
     identity: &ExecutionIdentity,
-) -> Result<CreatedWriteGrants, CageError> {
-    let mut created = CreatedWriteGrants {
-        created: Vec::new(),
-    };
+) -> Result<(), CageError> {
     let pending = std::mem::take(&mut admitted.pending_write_grants);
     let Some(first) = pending.first() else {
-        return Ok(created);
+        return Ok(());
     };
     // SAFETY: these process-identity queries take no pointers and mutate no
     // Rust-owned memory.
@@ -668,32 +617,24 @@ pub(crate) fn create_pending_write_grants(
         return Err(CageError::WriteGrantIdentityUnavailable(first.path.clone()));
     }
     for grant in pending {
-        let resource = create_write_grant(grant, identity, &mut created)?;
+        let resource = create_write_grant(grant, identity)?;
         admitted.write_resources.push(resource);
     }
     admitted
         .write_resources
         .sort_by(|left, right| left.path.cmp(&right.path));
-    Ok(created)
+    Ok(())
 }
 
 fn create_write_grant(
     grant: PendingWriteGrant,
     identity: &ExecutionIdentity,
-    created: &mut CreatedWriteGrants,
 ) -> Result<RetainedResource, CageError> {
     let PendingWriteGrant {
         path,
         file_name,
         parent,
     } = grant;
-    let rollback_parent = parent
-        .file
-        .try_clone()
-        .map_err(|source| CageError::RetainPath {
-            path: parent.path.clone(),
-            source,
-        })?;
     let file = openat2(
         parent.file.as_raw_fd(),
         file_name.as_bytes(),
@@ -703,11 +644,6 @@ fn create_write_grant(
     )
     .map_err(|source| map_open_error(&path, source))?;
     let created_identity = descriptor_identity(&file, Some(&path))?;
-    created.created.push(CreatedWriteGrant {
-        parent: rollback_parent,
-        file_name: file_name.clone(),
-        identity: created_identity,
-    });
     // SAFETY: `file` owns a live descriptor and both IDs come from the
     // validated execution identity.
     if unsafe { fchown(file.as_raw_fd(), identity.uid(), identity.gid()) } != 0 {
