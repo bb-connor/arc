@@ -53,7 +53,9 @@ The compiler always emits explicit filesystem deny-all and network-blocked
 intent. Brokered profiles require one already-connected Unix-domain descriptor
 and a SHA-256 authentication-artifact digest. The syscall plan has a fail-stop
 default and does not include `socket`, `socketpair`, `connect`, `bind`, `listen`,
-or `accept`. The one `execveat` rule is constrained to the retained target at FD
+or `accept`. `ioctl` is limited to TCGETS, TIOCGWINSZ, FIONREAD, FIONBIO and
+FIOCLEX, so a target can neither enumerate host interfaces through its stdio
+sockets nor clear close-on-exec. The one `execveat` rule is constrained to the retained target at FD
 255 with `AT_EMPTY_PATH`. Cage-init sets `RLIMIT_NOFILE` to 192 after installing
 that descriptor. Every grant slot remains below the limit, while the inherited
 close-on-exec target remains usable for the initial transition and cannot be

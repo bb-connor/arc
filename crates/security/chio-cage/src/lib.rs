@@ -1809,6 +1809,19 @@ mod tests {
                     profile == NativeSyscallProfile::NativeStandardV1,
                 );
             }
+            let requests = plan.argument_constraints()[&Syscall::Ioctl]
+                .iter()
+                .map(|alternative| {
+                    assert_eq!(alternative.len(), 1);
+                    assert_eq!(alternative[0].argument_index, 1);
+                    alternative[0].value
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(requests, seccomp::REVIEWED_IOCTL_REQUESTS);
+            for refused in [0x8912, 0x8927, 0x5450] {
+                // SIOCGIFCONF, SIOCGIFHWADDR and FIONCLEX.
+                assert!(!requests.contains(&refused));
+            }
             let commands = &plan.argument_constraints()[&Syscall::Fcntl];
             for command in [5, 6] {
                 assert_eq!(

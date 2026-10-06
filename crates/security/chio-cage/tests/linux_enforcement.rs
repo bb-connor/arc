@@ -1195,6 +1195,13 @@ fn racing_stops_continues_and_a_kill_end_with_an_observed_exit() {
 }
 
 #[test]
+fn seccomp_kills_unreviewed_ioctl_requests() {
+    assert_probe_sigsys("CHIO_CAGE_TEST_IOCTL_INTERFACES");
+    assert_probe_sigsys("CHIO_CAGE_TEST_IOCTL_CLEAR_CLOEXEC");
+    assert_probe_exit("CHIO_CAGE_TEST_IOCTL_REVIEWED", 0);
+}
+
+#[test]
 fn the_target_starts_with_every_signal_at_its_default_disposition() {
     assert_probe_exit("CHIO_CAGE_TEST_SIGNAL_DEFAULTS", 0);
 }
