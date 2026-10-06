@@ -189,12 +189,10 @@ jobs:
             .github/workflows/ci.yml|.github/workflows/enterprise-evidence-finalizer.yml) ;;
             *) exit 1 ;;
           esac
-          test "$(jq -r '.state' <<< "${workflow}")" = active
           workflow_file="${workflow_path##*/}"
           registered="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}")"
           test "$(jq -r '.id' <<< "${registered}")" = "${EVENT_WORKFLOW_ID}"
           test "$(jq -r '.path' <<< "${registered}")" = "${workflow_path}"
-          test "$(jq -r '.state' <<< "${registered}")" = active
           echo "workflow_path=${workflow_path}" >> "${GITHUB_OUTPUT}"
 
       - name: Bind later failed CI rerun to existing authority
@@ -273,7 +271,6 @@ jobs:
           })"
           test "$(jq -r '.id' <<< "${ci_workflow}")" = "${EVENT_WORKFLOW_ID}"
           test "$(jq -r '.path' <<< "${ci_workflow}")" = ".github/workflows/ci.yml"
-          test "$(jq -r '.state' <<< "${ci_workflow}")" = "active"
           upstream="$({
             gh api \
               -H "Accept: application/vnd.github+json" \
@@ -638,7 +635,6 @@ jobs:
           finalizer_workflow="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/workflows/enterprise-evidence-finalizer.yml")"
           test "$(jq -r '.id' <<< "${finalizer_workflow}")" = "${EVENT_WORKFLOW_ID}"
           test "$(jq -r '.path' <<< "${finalizer_workflow}")" = .github/workflows/enterprise-evidence-finalizer.yml
-          test "$(jq -r '.state' <<< "${finalizer_workflow}")" = active
           upstream="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}")"
           test "$(jq -r '.id' <<< "${upstream}")" = "${EVENT_RUN_ID}"
           test "$(jq -r '.workflow_id' <<< "${upstream}")" = "${EVENT_WORKFLOW_ID}"

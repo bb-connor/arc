@@ -149,6 +149,17 @@ curl() { catalog_request "$@"; }
 gh() { catalog_request "$@"; }
 """
 
+HISTORICAL_ROUTE_API = r"""
+gh() {
+  local path="${@: -1}"
+  case "$path" in
+    "repos/bb-connor/arc/actions/workflows/${EVENT_WORKFLOW_ID}") printf '%s\n' "$MOCK_WORKFLOW" ;;
+    repos/bb-connor/arc/actions/workflows/ci.yml|repos/bb-connor/arc/actions/workflows/enterprise-evidence-finalizer.yml) printf '%s\n' "$MOCK_REGISTERED" ;;
+    *) printf 'unexpected historical route API request\n' >&2; return 22 ;;
+  esac
+}
+"""
+
 
 class DefinitionTests(unittest.TestCase):
     @classmethod
@@ -191,6 +202,32 @@ class DefinitionTests(unittest.TestCase):
             files = {path.name for path in Path(raw).iterdir()}
         return result.returncode, result.stderr, files
 
+    def run_historical_route(self, state: str, workflow_path: str, mutation: str = '') -> tuple[int, str, set[str]]:
+        route = workflow_step(REVOKER, "bind-revocation", "Resolve exact completed workflow identity")
+        record = {"id": 101, "path": workflow_path, "state": state}
+        registered = record.copy()
+        if mutation == 'event_id': record['id'] = 999
+        elif mutation == 'event_path': record['path'] = '.github/workflows/untrusted.yml'
+        elif mutation == 'registered_id': registered['id'] = 999
+        elif mutation == 'registered_path': registered['path'] = '.github/workflows/untrusted.yml'
+        program = HISTORICAL_ROUTE_API + route + '\ntest "$(cat "${GITHUB_OUTPUT}")" = "workflow_path=${EXPECTED_PATH}"\n'
+        return self.run_shell(program, {"GITHUB_REPOSITORY": "bb-connor/arc", "EVENT_WORKFLOW_ID": "101",
+                                       "MOCK_WORKFLOW": json.dumps(record), "MOCK_REGISTERED": json.dumps(registered),
+                                       "EXPECTED_PATH": workflow_path})
+
+    def test_historical_failure_route_accepts_disabled_workflow_identity(self) -> None:
+        for path in ('.github/workflows/ci.yml', '.github/workflows/enterprise-evidence-finalizer.yml'):
+            for state in ('active', 'disabled_manually', 'disabled_inactivity', 'disabled_fork'):
+                with self.subTest(path=path, state=state):
+                    code, error, _ = self.run_historical_route(state, path)
+                    self.assertEqual(code, 0, error)
+
+    def test_disabled_historical_route_still_rejects_identity_substitution(self) -> None:
+        for mutation in ('event_id', 'event_path', 'registered_id', 'registered_path'):
+            with self.subTest(mutation=mutation):
+                code, _, _ = self.run_historical_route('disabled_manually', '.github/workflows/ci.yml', mutation)
+                self.assertNotEqual(code, 0)
+
     def publication_fixture(self, labels: list[str] | None = None) -> dict:
         names = labels or []
         return {
@@ -223,7 +260,7 @@ class DefinitionTests(unittest.TestCase):
                 "revalidate_live_publication_head\nauthority_created=false\n",
                 "check_run_id=",
             )
-            env.update({"existing_authority_match_count": "0", "installation_token": "fixture-token", "check_payload": "{}"})
+            env.update({"existing_authority_match_count": "0", "installation_token": "fixture-token", "check_payload": "{}", "FINALIZER_RUN_ATTEMPT": "1"})
             program += "require_publishable_ci() { return 0; }\n" + region
         else:
             program += "revalidate_live_publication_head\n"
