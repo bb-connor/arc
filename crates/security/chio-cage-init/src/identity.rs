@@ -165,9 +165,9 @@ pub(super) fn arm_parent_death(expected_parent: u32) -> Result<(), BootstrapFaul
     // Credential changes clear this setting, so install it after the final
     // execution identity. The admitted target cannot carry set-ID bits or
     // file capabilities, and its seccomp profile cannot clear the setting.
-    // Linux binds it to the creating thread: that thread must remain alive
-    // for the target's lifetime. Host loss must not leave an effect-capable
-    // orphan after the launch trace has detached.
+    // Linux binds it to the creating thread, which is the launch supervisor
+    // that traces the target until it exits, so the target cannot outlive
+    // that supervisor. Host loss must not leave an effect-capable orphan.
     // SAFETY: PR_SET_PDEATHSIG consumes a signal number and no pointers.
     if unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) } != 0 {
         return Err(BootstrapFault::new(

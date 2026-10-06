@@ -103,22 +103,43 @@ both report `FullyEnforced`; `PartiallyEnforced` and `NotEnforced` deny launch.
 The seccompiler-generated filter is independently installed with
 `KILL_PROCESS` as its mismatch action.
 
-The parent treats the close-on-exec status EOF only as corroboration. A matching
-prepared record, kernel `PTRACE_EVENT_EXEC`, and stopped post-exec target image
-are all mandatory before it detaches the tracee and returns `FullyEnforced`.
-Every unsupported, partial, malformed, timed-out, or identity-mismatched path
-terminates and reaps the child.
+Each launch runs on its own supervisor thread. That thread spawns the helper,
+repeats the pidfd identity check after the live-image check, and seizes the
+helper with `PTRACE_SEIZE` and `PTRACE_O_TRACEEXEC | PTRACE_O_EXITKILL` before
+it transfers any retained descriptor. The helper's handshake `SIGSTOP` is
+accepted only as a stop the helper sent itself, and is consumed. The parent
+treats the close-on-exec status EOF only as corroboration. A matching prepared
+record, kernel `PTRACE_EVENT_EXEC`, and stopped post-exec target image are all
+mandatory before the supervisor resumes the target and the launch returns
+`FullyEnforced`. Every unsupported, partial, malformed, timed-out, or
+identity-mismatched path terminates and reaps the child.
+
+The tracer stays attached after the first exec. For the target's lifetime the
+supervisor kills the target at any later exec event, before the new image
+runs. It resumes a signal-delivery stop with exactly that signal, holds a group
+stop with `PTRACE_LISTEN` so `SIGSTOP` and `SIGCONT` keep their ordinary
+meaning, and resumes a `PTRACE_EVENT_STOP` that reports `SIGTRAP`, the
+notification that follows `SIGCONT`, with no signal. Any other trace event, or
+a failed ptrace request, kills the target through its pidfd. Every supervisor
+wait uses `WNOWAIT`, so reaping stays with the `EnforcedChild` handle, whose
+pidfd waits treat a ptrace stop as still running and reap only an observed
+exit.
 
 After dropping privileges, the helper arms `SIGKILL` on parent death and checks
-that its authenticated parent still exists. This protection remains after the
-launch trace detaches. The admitted image cannot carry set-ID bits or file
-capabilities, and the target syscall profile cannot clear the setting. Linux
-ties this signal to the thread that created the helper, so callers must keep
-that thread alive for the target's lifetime. A host killed during an outstanding
-call cannot sign a terminal receipt; recovery retains the original dispatch
-and unknown outcome even though the kernel terminates the target. The process
-host-crash qualifier checks both target termination through pinned pidfds and
-the absence of a repeated protected effect.
+that its authenticated parent still exists. The admitted image cannot carry
+set-ID bits or file capabilities, and the target syscall profile cannot clear
+the setting. Linux ties the parent-death signal to the thread that created the
+helper and `PTRACE_O_EXITKILL` to the tracing thread. Both are the supervisor,
+not the thread that called launch, so the target's lifetime is its
+`EnforcedChild` handle plus its supervisor. `wait`, `try_wait`, and `terminate`
+join the supervisor once they observe the exit. Dropping the handle terminates
+the target and reaps it, directly or through the process-wide child reaper,
+and the supervisor returns once the exit is observed. If the supervisor ends
+while the target is still alive, the kernel kills the target. A host killed
+during an outstanding call cannot sign a terminal receipt; recovery retains the
+original dispatch and unknown outcome even though the kernel terminates the
+target. The process host-crash qualifier checks both target termination through
+pinned pidfds and the absence of a repeated protected effect.
 
 ## Signed cage receipts
 
