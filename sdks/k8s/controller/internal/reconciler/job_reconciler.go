@@ -231,10 +231,14 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	// Invalid public identities must not create a grant or mutate Job authority state.
+	// Invalid public identities must not create a grant or mutate Job authority
+	// state. They are permanent input errors: report them and wait for an
+	// annotation edit, which triggers a new reconcile, instead of requeueing.
 	if job.Annotations[AnnotationCapabilityID] == "" {
 		if _, err := subjectPublicKey(&job); err != nil {
-			return ctrl.Result{}, err
+			logger.Info("governed job has an invalid subject public key", "error", err.Error())
+			r.event(&job, corev1.EventTypeWarning, "ChioInvalidSubjectPublicKey", err.Error())
+			return ctrl.Result{}, nil
 		}
 	}
 
