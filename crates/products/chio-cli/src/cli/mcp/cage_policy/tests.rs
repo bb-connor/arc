@@ -375,6 +375,37 @@ fn migration_posture_changes_with_every_authority_component() {
     assert_ne!(first_posture, changed_posture);
 }
 
+const IDENTITY_POINT_HEX: &str =
+    "0100000000000000000000000000000000000000000000000000000000000000";
+
+#[test]
+fn an_identity_point_trust_root_cannot_authenticate_a_forged_policy() {
+    let directory = tempfile::tempdir().test_expect("forged policy directory");
+    let path = directory.path().join("cage-policy.json");
+    let identity =
+        chio_core::PublicKey::from_hex(IDENTITY_POINT_HEX).test_expect("identity point key");
+    // R = identity point, s = 0 verifies for every message under the identity key
+    // unless verification is strict.
+    let forged = SignedMcpCageLaunchPolicy {
+        body: policy(
+            chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+            chio_manifest::NativeSyscallProfile::NativeMinimalV1,
+        ),
+        signer_public_key: identity,
+        signature: chio_core::Signature::from_hex(&format!(
+            "{IDENTITY_POINT_HEX}{}",
+            "0".repeat(64)
+        ))
+        .test_expect("forged signature"),
+    };
+    std::fs::write(
+        &path,
+        chio_core::canonical_json_bytes(&forged).test_expect("canonical forged policy"),
+    )
+    .test_expect("write forged policy");
+    assert!(SignedCagePolicyLaunchFactory::new(path, IDENTITY_POINT_HEX.to_string()).is_err());
+}
+
 #[test]
 fn launch_factory_pins_verified_policy_bytes_at_construction() {
     let directory = tempfile::tempdir().test_expect("launch factory directory");

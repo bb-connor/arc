@@ -109,7 +109,9 @@ pub(crate) use cage_policy::{
     export_broker_native_launch_evidence, export_native_launch_evidence,
     export_native_launch_observations,
 };
-pub(crate) use cage_policy::{load_native_mcp_launch, SignedCagePolicyLaunchFactory};
+pub(crate) use cage_policy::{
+    load_native_mcp_launch, parse_cage_policy_trust_root, SignedCagePolicyLaunchFactory,
+};
 pub(crate) use cage_policy::{
     verify_broker_native_launch_evidence, verify_native_launch_evidence,
     verify_native_launch_observation, verify_native_start_file, NativeLaunchEvidence,
