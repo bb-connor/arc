@@ -214,6 +214,29 @@ impl RetainedResource {
     }
 }
 
+/// A declared write grant whose file does not exist. Admission retains the
+/// parent directory by descriptor and creates nothing; compile creates the
+/// file through that descriptor for the execution identity.
+#[derive(Debug)]
+pub struct PendingWriteGrant {
+    path: PathBuf,
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    file_name: std::ffi::OsString,
+    parent: RetainedResource,
+}
+
+impl PendingWriteGrant {
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    #[must_use]
+    pub fn parent(&self) -> &RetainedResource {
+        &self.parent
+    }
+}
+
 /// Verified manifest digest and descriptor-owned filesystem grants.
 #[derive(Debug)]
 pub struct AdmittedManifest {
@@ -224,6 +247,7 @@ pub struct AdmittedManifest {
     operator_ceiling_digest: String,
     read_resources: Vec<RetainedResource>,
     write_resources: Vec<RetainedResource>,
+    pending_write_grants: Vec<PendingWriteGrant>,
     read_write_paths: BTreeSet<PathBuf>,
     forbidden_resources: Vec<RetainedResource>,
     network_destinations: BTreeSet<NetworkDestination>,
@@ -265,6 +289,13 @@ impl AdmittedManifest {
     #[must_use]
     pub fn write_resources(&self) -> &[RetainedResource] {
         &self.write_resources
+    }
+
+    /// Declared write grants that compile has not created yet. Empty after a
+    /// successful compile.
+    #[must_use]
+    pub fn pending_write_grants(&self) -> &[PendingWriteGrant] {
+        &self.pending_write_grants
     }
 
     #[must_use]
@@ -813,8 +844,13 @@ fn admit_with_architecture(
         let read_write_paths = read_paths.intersection(&write_paths).cloned().collect();
         let read_only_paths = read_paths.difference(&write_paths).cloned().collect();
         let read_resources = linux::retain_read_grants(&read_only_paths)?;
-        let write_resources = linux::retain_write_grants(&write_paths)?;
-        reject_descriptor_aliases(&forbidden_resources, &read_resources, &write_resources)?;
+        let (write_resources, pending_write_grants) = linux::retain_write_grants(&write_paths)?;
+        reject_descriptor_aliases(
+            &forbidden_resources,
+            &read_resources,
+            &write_resources,
+            &pending_write_grants,
+        )?;
         linux::reject_forbidden_descendant_aliases(
             &forbidden_resources,
             &read_resources,
@@ -828,6 +864,7 @@ fn admit_with_architecture(
             operator_ceiling_digest,
             read_resources,
             write_resources,
+            pending_write_grants,
             read_write_paths,
             forbidden_resources,
             network_destinations,
@@ -959,7 +996,7 @@ pub fn retain_broker_ipc(
 
 /// Compile descriptor-owned admission into a deterministic deny-all plan.
 pub fn compile(
-    admitted: AdmittedManifest,
+    #[cfg_attr(not(target_os = "linux"), allow(unused_mut))] mut admitted: AdmittedManifest,
     runtime: RetainedRuntimeResources,
     parent_environment: &BTreeMap<String, String>,
     broker_ipc: Option<BrokerIpc>,
@@ -967,7 +1004,12 @@ pub fn compile(
     if admitted.read_resources.len() > MAX_READ_GRANTS {
         return Err(CageError::ResourceLimitExceeded("read grants"));
     }
-    if admitted.write_resources.len() > MAX_WRITE_GRANTS {
+    if admitted
+        .write_resources
+        .len()
+        .saturating_add(admitted.pending_write_grants.len())
+        > MAX_WRITE_GRANTS
+    {
         return Err(CageError::ResourceLimitExceeded("write grants"));
     }
     let brokered_profile =
@@ -994,9 +1036,14 @@ pub fn compile(
 
     let architecture = SandboxArchitecture::current()?;
     let environment = build_environment(&admitted.environment_variables, parent_environment)?;
+    let seccomp = build_seccomp_plan(architecture, admitted.native_syscall_profile)?;
+    // Missing write grants are created only after every admission, runtime
+    // and alias check has passed. A later failure removes them again.
+    #[cfg(target_os = "linux")]
+    let created_write_grants =
+        linux::create_pending_write_grants(&mut admitted, &runtime.execution_identity)?;
     let fd_table = build_fd_table(&admitted, &runtime, broker_ipc.as_ref())?;
     let landlock = build_landlock_plan(&admitted, &fd_table)?;
-    let seccomp = build_seccomp_plan(architecture, admitted.native_syscall_profile)?;
     let resource_limits = ResourceLimitPlan {
         nofile_soft: CHILD_NOFILE_LIMIT,
         nofile_hard: CHILD_NOFILE_LIMIT,
@@ -1057,6 +1104,8 @@ pub fn compile(
         broker_authentication_digest,
     };
     let plan_digest = digest(&plan)?;
+    #[cfg(target_os = "linux")]
+    created_write_grants.keep();
     Ok(CompiledCage {
         profile,
         profile_digest,
@@ -1138,12 +1187,23 @@ fn reject_descriptor_aliases(
     forbidden: &[RetainedResource],
     read: &[RetainedResource],
     write: &[RetainedResource],
+    pending_write: &[PendingWriteGrant],
 ) -> Result<(), CageError> {
     for allowed in read.iter().chain(write) {
         for denied in forbidden {
             if allowed.identity.same_object(denied.identity) {
                 return Err(CageError::ForbiddenDescriptorAlias {
                     allowed: allowed.path.clone(),
+                    forbidden: denied.path.clone(),
+                });
+            }
+        }
+    }
+    for pending in pending_write {
+        for denied in forbidden {
+            if pending.parent.identity.same_object(denied.identity) {
+                return Err(CageError::ForbiddenDescriptorAlias {
+                    allowed: pending.path.clone(),
                     forbidden: denied.path.clone(),
                 });
             }

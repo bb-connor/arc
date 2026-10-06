@@ -72,7 +72,7 @@ impl TestTree {
             self.target.clone(),
             self.workdir.clone(),
             BTreeSet::new(),
-            ExecutionIdentity::new(10001, 10001, Vec::new()).test_unwrap(),
+            creatable_identity(),
         )
     }
 
@@ -82,8 +82,22 @@ impl TestTree {
             self.target.clone(),
             self.workdir.clone(),
             runtime_files,
-            ExecutionIdentity::new(10001, 10001, Vec::new()).test_unwrap(),
+            creatable_identity(),
         )
+    }
+}
+
+/// An identity compile may create write grants for: a dropped identity under
+/// root, otherwise the runner itself.
+fn creatable_identity() -> ExecutionIdentity {
+    // SAFETY: this process-identity query takes no pointers.
+    let uid = unsafe { libc::geteuid() };
+    // SAFETY: this process-identity query takes no pointers.
+    let gid = unsafe { libc::getegid() };
+    if uid == 0 {
+        ExecutionIdentity::new(10001, 10001, Vec::new()).test_unwrap()
+    } else {
+        ExecutionIdentity::new(uid, gid, Vec::new()).test_unwrap()
     }
 }
 
@@ -668,8 +682,10 @@ fn compile_creates_a_pending_write_grant_owned_by_the_execution_identity() {
     );
     let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
     assert!(!tree.writable.exists());
-    // SAFETY: these process-identity queries take no pointers.
-    let (uid, gid) = unsafe { (libc::geteuid(), libc::getegid()) };
+    // SAFETY: this process-identity query takes no pointers.
+    let uid = unsafe { libc::geteuid() };
+    // SAFETY: this process-identity query takes no pointers.
+    let gid = unsafe { libc::getegid() };
     let runtime = retain_runtime_resources(&RuntimeResourcePaths::new(
         tree.helper.clone(),
         tree.target.clone(),
@@ -683,6 +699,69 @@ fn compile_creates_a_pending_write_grant_owned_by_the_execution_identity() {
     assert!(metadata.file_type().is_file());
     assert_eq!((metadata.uid(), metadata.gid()), (uid, gid));
     assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+}
+
+#[test]
+fn a_failed_compile_removes_only_the_grants_it_created() {
+    let tree = TestTree::new();
+    let first = tree.root.join("a-output.data");
+    let second = tree.root.join("b-output.data");
+    let keypair = Keypair::from_seed(&[53; 32]);
+    let (signed, ceilings) = write_grant_manifest(
+        &keypair,
+        Vec::new(),
+        vec![first.clone(), second.clone()],
+        BTreeSet::new(),
+    );
+    let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
+    assert_eq!(admitted.pending_write_grants().len(), 2);
+    std::fs::write(&second, b"created by someone else").test_unwrap();
+    assert!(compile(
+        admitted,
+        retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
+        &BTreeMap::new(),
+        None,
+    )
+    .is_err());
+    assert!(!first.exists());
+    assert_eq!(
+        std::fs::read(&second).test_unwrap(),
+        b"created by someone else"
+    );
+}
+
+#[test]
+fn an_unprivileged_compile_refuses_a_pending_grant_for_another_identity() {
+    // SAFETY: this process-identity query takes no pointers.
+    let uid = unsafe { libc::geteuid() };
+    // SAFETY: this process-identity query takes no pointers.
+    let gid = unsafe { libc::getegid() };
+    if uid == 0 {
+        return;
+    }
+    let other = if uid == 10001 { 10002 } else { 10001 };
+    let tree = TestTree::new();
+    let keypair = Keypair::from_seed(&[54; 32]);
+    let (signed, ceilings) = write_grant_manifest(
+        &keypair,
+        Vec::new(),
+        vec![tree.writable.clone()],
+        BTreeSet::new(),
+    );
+    let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
+    let runtime = retain_runtime_resources(&RuntimeResourcePaths::new(
+        tree.helper.clone(),
+        tree.target.clone(),
+        tree.workdir.clone(),
+        BTreeSet::new(),
+        ExecutionIdentity::new(other, gid, Vec::new()).test_unwrap(),
+    ))
+    .test_unwrap();
+    assert!(matches!(
+        compile(admitted, runtime, &BTreeMap::new(), None),
+        Err(CageError::WriteGrantIdentityUnavailable(path)) if path == tree.writable
+    ));
+    assert!(!tree.writable.exists());
 }
 
 #[test]
