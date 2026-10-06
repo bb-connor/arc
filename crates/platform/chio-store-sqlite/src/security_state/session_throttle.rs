@@ -11,7 +11,7 @@ use super::{
     SessionThrottleDecision, SessionThrottleKey, SessionThrottleLimits,
     SessionThrottleRemoveRequest, SessionThrottleSnapshot, SessionThrottleStore,
     SessionThrottleWindowUsage, SessionThrottleWindowUsages, SqliteSecurityStateStore,
-    StoredEffectCommandProjection, Transaction, TransactionBehavior,
+    StoredEffectCommandProjection, Transaction, TransactionBehavior, MAX_CLOCK_SKEW_MS,
 };
 
 fn validate_stored_session_throttle_command(command: &SessionThrottleCommand) -> PortResult<()> {
@@ -870,6 +870,12 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        // Windows come from the caller's observed time, which must agree with
+        // the store's trusted clock.
+        let trusted_now = self.trusted_now_in_transaction(&transaction)?;
+        if request.observed_at_unix_ms.abs_diff(trusted_now) > MAX_CLOCK_SKEW_MS {
+            return Err(PortError::invalid_data());
+        }
         let snapshot = load_session_throttle_snapshot(&transaction, &request.key)?;
         let current_version_hash = session_throttle_version_hash(&snapshot)?;
         let mut windows = Vec::with_capacity(snapshot.contributions.len());
