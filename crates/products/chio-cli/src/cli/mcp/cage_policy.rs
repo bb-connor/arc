@@ -95,10 +95,7 @@ impl SignedCagePolicyLaunchFactory {
 
     pub(crate) fn new(path: PathBuf, trusted_policy_signer: String) -> Result<Self, CliError> {
         let signed_policy_bytes = read_cage_policy(&path)?;
-        let trusted_policy_signer_key = chio_core::PublicKey::from_hex(&trusted_policy_signer)
-            .map_err(|error| {
-                CliError::cli_other_error(format!("invalid cage policy trust root: {error}"))
-            })?;
+        let trusted_policy_signer_key = parse_cage_policy_trust_root(&trusted_policy_signer)?;
         let _ = decode_cage_policy(&path, &signed_policy_bytes, &trusted_policy_signer_key)?;
         Ok(Self {
             path,
@@ -857,6 +854,20 @@ fn read_cage_policy(path: &Path) -> Result<Vec<u8>, CliError> {
     Ok(bytes)
 }
 
+/// Parse an operator-pinned cage policy trust root. Only a strong Ed25519 key
+/// can authenticate a launch policy.
+pub(crate) fn parse_cage_policy_trust_root(hex: &str) -> Result<chio_core::PublicKey, CliError> {
+    let key = chio_core::PublicKey::from_hex(hex).map_err(|error| {
+        CliError::cli_other_error(format!("invalid cage policy trust root: {error}"))
+    })?;
+    if key.algorithm() != chio_core::SigningAlgorithm::Ed25519 || key.is_weak_ed25519() {
+        return Err(CliError::cli_other_error(
+            "cage policy trust root must be strong Ed25519".to_string(),
+        ));
+    }
+    Ok(key)
+}
+
 fn decode_cage_policy(
     path: &Path,
     bytes: &[u8],
@@ -882,7 +893,7 @@ fn decode_cage_policy(
     }
     if &policy.signer_public_key != trusted_policy_signer
         || !trusted_policy_signer
-            .verify_canonical(&policy.body, &policy.signature)
+            .verify_canonical_strict(&policy.body, &policy.signature)
             .map_err(|error| {
                 CliError::cli_other_error(format!(
                     "cage launch policy signature verification failed: {error}"
