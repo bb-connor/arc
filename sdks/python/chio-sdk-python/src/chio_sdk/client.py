@@ -135,6 +135,17 @@ def _capability_id_from_token(raw_token: str | None) -> str | None:
         return None
 
 
+def _unique_key_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Successful sidecar responses carry signed receipts and verifier reports,
+    so a repeated object key at any depth rejects before projection."""
+    decoded: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in decoded:
+            raise ValueError("duplicate object key in sidecar response")
+        decoded[key] = value
+    return decoded
+
+
 def _is_advisory_evaluation_wrapper(data: Any) -> bool:
     return (
         isinstance(data, dict)
@@ -1032,7 +1043,7 @@ class ChioClient:
                 code=f"HTTP_{resp.status_code}",
             )
         try:
-            data = resp.json()
+            data = resp.json(object_pairs_hook=_unique_key_object)
         except Exception as exc:
             raise ChioError(
                 "Chio sidecar returned malformed JSON response",
