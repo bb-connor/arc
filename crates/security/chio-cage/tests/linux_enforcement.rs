@@ -1108,6 +1108,52 @@ fn target_exec_exception_cannot_be_recreated_after_exec() {
     );
 }
 
+fn assert_second_exec_is_killed(probe: &str, runtime_files: BTreeSet<PathBuf>) {
+    let record = launch(
+        compiled_with_runtime_files(&required_path(probe), runtime_files),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap()
+    .wait()
+    .test_unwrap();
+    let exit = record.exit.as_ref();
+    assert_ne!(
+        exit.and_then(|exit| exit.exit_code),
+        Some(171),
+        "{probe}: the second exec ran an image"
+    );
+    assert_eq!(
+        exit.and_then(|exit| exit.signal),
+        Some(libc::SIGKILL),
+        "{probe}: a second exec must kill the target before the new image runs"
+    );
+}
+
+#[test]
+fn a_second_exec_by_absolute_path_is_killed() {
+    let marker = required_path("CHIO_CAGE_TEST_EXEC_MARKER");
+    assert_second_exec_is_killed(
+        "CHIO_CAGE_TEST_EXEC_ABSOLUTE",
+        [marker].into_iter().collect(),
+    );
+}
+
+#[test]
+fn a_second_exec_through_proc_self_fd_is_killed() {
+    let marker = required_path("CHIO_CAGE_TEST_EXEC_MARKER");
+    assert_second_exec_is_killed(
+        "CHIO_CAGE_TEST_EXEC_PROC_FD",
+        [marker].into_iter().collect(),
+    );
+}
+
+#[test]
+fn a_second_exec_through_the_interpreter_is_killed() {
+    let mut runtime_files = required_runtime_paths("CHIO_CAGE_TEST_DYNAMIC_RUNTIME");
+    runtime_files.insert(required_path("CHIO_CAGE_TEST_EXEC_DYNAMIC_MARKER"));
+    assert_second_exec_is_killed("CHIO_CAGE_TEST_EXEC_INTERPRETER", runtime_files);
+}
+
 #[test]
 fn landlock_denies_write_to_existing_ungranted_file() {
     let forbidden = Path::new("/tmp/chio-cage-forbidden-write-existing");
