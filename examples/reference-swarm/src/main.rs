@@ -77,7 +77,7 @@ fn main() -> ExitCode {
 
 fn run(args: Args) -> Fallible<bool> {
     std::fs::create_dir_all(&args.output)?;
-    let trust = TrustClient::new(&args.control_url, &args.service_token);
+    let trust = TrustClient::new(&args.control_url, &args.service_token)?;
     if !trust.healthy() {
         return Err(format!(
             "trust-control at {} does not answer its health route",
@@ -153,18 +153,24 @@ fn run(args: Args) -> Fallible<bool> {
 
     let result_digest = scenarios::result_digest(&reports);
     plan.complete(&["task-writer".to_string()], &result_digest)?;
-    let closing = match plan.verify() {
-        Ok(verdict) => format!(
-            "bundle verifies after the run despite the revoked reader: {}",
-            verdict.verdict
+    // The reader's task stays revoked, so the completed bundle must still be
+    // refused.
+    let (closing_passed, closing) = match plan.verify() {
+        Ok(verdict) => (
+            false,
+            format!(
+                "bundle still verifies after the run despite the revoked reader: {}",
+                verdict.verdict
+            ),
         ),
-        Err(error) => {
-            format!("bundle refused after the run, as the reader's task is revoked: {error}")
-        }
+        Err(error) => (
+            true,
+            format!("bundle refused after the run, as the reader's task is revoked: {error}"),
+        ),
     };
     println!("{closing}");
 
-    let passed = reports.iter().all(|report| report.passed);
+    let passed = closing_passed && reports.iter().all(|report| report.passed);
     for report in &reports {
         println!(
             "{:<20} {}",

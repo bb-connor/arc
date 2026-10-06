@@ -73,7 +73,7 @@ pub struct EdgeSession {
 impl EdgeSession {
     /// Open a session: `initialize`, then the initialized notification.
     pub fn connect(target: &EdgeTarget, bearer: &str) -> Fallible<Self> {
-        let mut session = Self::detached(target, bearer, None);
+        let mut session = Self::detached(target, bearer, None)?;
         let (result, _) = session.rpc(
             "initialize",
             json!({
@@ -95,21 +95,20 @@ impl EdgeSession {
 
     /// Continue an existing session by its id, without a handshake: what a
     /// worker does after the edge restarted.
-    pub fn resume(target: &EdgeTarget, bearer: &str, session_id: &str) -> Self {
+    pub fn resume(target: &EdgeTarget, bearer: &str, session_id: &str) -> Fallible<Self> {
         Self::detached(target, bearer, Some(session_id.to_string()))
     }
 
-    fn detached(target: &EdgeTarget, bearer: &str, session_id: Option<String>) -> Self {
-        Self {
+    fn detached(target: &EdgeTarget, bearer: &str, session_id: Option<String>) -> Fallible<Self> {
+        Ok(Self {
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
-                .build()
-                .unwrap_or_default(),
+                .build()?,
             base_url: target.base_url.trim_end_matches('/').to_string(),
             bearer: bearer.to_string(),
             session_id,
             next_id: 1,
-        }
+        })
     }
 
     pub fn session_id(&self) -> Option<&str> {
@@ -279,15 +278,14 @@ pub struct EdgeAdmin {
 }
 
 impl EdgeAdmin {
-    pub fn new(target: &EdgeTarget, admin_bearer: &str) -> Self {
-        Self {
+    pub fn new(target: &EdgeTarget, admin_bearer: &str) -> Fallible<Self> {
+        Ok(Self {
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(15))
-                .build()
-                .unwrap_or_default(),
+                .build()?,
             base_url: target.base_url.trim_end_matches('/').to_string(),
             bearer: admin_bearer.to_string(),
-        }
+        })
     }
 
     pub fn healthy(&self) -> bool {

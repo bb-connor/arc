@@ -155,7 +155,7 @@ pub fn success(context: &Context, ledger: &BudgetLedger) -> ScenarioReport {
         "the reader lists and reads, the writer writes and reads back, the orchestrator digests the result, every call leaves a receipt",
     );
     let run = |report: &mut ScenarioReport| -> Fallible<()> {
-        let admin_reader = EdgeAdmin::new(&context.reader, &context.admin_bearer);
+        let admin_reader = EdgeAdmin::new(&context.reader, &context.admin_bearer)?;
         let mut reader = EdgeSession::connect(&context.reader, &context.session_bearer)?;
         let reader_capability = record_capability(report, &admin_reader, &reader);
         let surface = reader.list_tools()?;
@@ -196,7 +196,7 @@ pub fn success(context: &Context, ledger: &BudgetLedger) -> ScenarioReport {
         );
         reader.close();
 
-        let admin_writer = EdgeAdmin::new(&context.writer, &context.admin_bearer);
+        let admin_writer = EdgeAdmin::new(&context.writer, &context.admin_bearer)?;
         let mut writer = EdgeSession::connect(&context.writer, &context.session_bearer)?;
         let writer_capability = record_capability(report, &admin_writer, &writer);
         let artifact = context.artifact.to_string_lossy().into_owned();
@@ -221,7 +221,7 @@ pub fn success(context: &Context, ledger: &BudgetLedger) -> ScenarioReport {
         );
         writer.close();
 
-        let admin_digest = EdgeAdmin::new(&context.digest, &context.admin_bearer);
+        let admin_digest = EdgeAdmin::new(&context.digest, &context.admin_bearer)?;
         let mut digest = EdgeSession::connect(&context.digest, &context.session_bearer)?;
         let digest_capability = record_capability(report, &admin_digest, &digest);
         let hashed = digest.call("sha256", json!({ "text": body }))?;
@@ -255,7 +255,7 @@ pub fn file_denial(context: &Context, ledger: &BudgetLedger) -> ScenarioReport {
         "a path outside the reader's root is refused by the tool, and a forbidden system file is denied by the edge before the tool sees it",
     );
     let run = |report: &mut ScenarioReport| -> Fallible<()> {
-        let admin = EdgeAdmin::new(&context.reader, &context.admin_bearer);
+        let admin = EdgeAdmin::new(&context.reader, &context.admin_bearer)?;
         let mut reader = EdgeSession::connect(&context.reader, &context.session_bearer)?;
         record_capability(report, &admin, &reader);
         report.check(
@@ -291,7 +291,7 @@ pub fn scope_widening(context: &Context, plan: &SwarmPlan) -> ScenarioReport {
         "a tool outside the digest edge's grant is denied by the edge, and no delegation witness exists for a scope wider than the orchestrator's",
     );
     let run = |report: &mut ScenarioReport| -> Fallible<()> {
-        let admin = EdgeAdmin::new(&context.digest, &context.admin_bearer);
+        let admin = EdgeAdmin::new(&context.digest, &context.admin_bearer)?;
         let mut digest = EdgeSession::connect(&context.digest, &context.session_bearer)?;
         record_capability(report, &admin, &digest);
         let widened = digest.call("canonical_json", json!({ "value": { "a": 1 } }))?;
@@ -343,6 +343,7 @@ pub fn budget_exhaustion(context: &Context, plan: &SwarmPlan) -> ScenarioReport 
                         EdgeSession::connect(target, &bearer).map_err(|error| error.to_string())?;
                     let session_id = session.session_id().ok_or("missing worker session")?;
                     let capability = EdgeAdmin::new(target, &admin_bearer)
+                        .map_err(|error| error.to_string())?
                         .session_capability_id(session_id)
                         .map_err(|error| error.to_string())?;
                     let mut granted = 0;
@@ -417,7 +418,7 @@ pub fn revocation(context: &Context, plan: &mut SwarmPlan) -> ScenarioReport {
         "after the orchestrator revokes a worker's capability mid-run, the edge denies the next call and the swarm bundle no longer verifies for that task",
     );
     let mut run = |report: &mut ScenarioReport| -> Fallible<()> {
-        let admin = EdgeAdmin::new(&context.reader, &context.admin_bearer);
+        let admin = EdgeAdmin::new(&context.reader, &context.admin_bearer)?;
         let mut reader = EdgeSession::connect(&context.reader, &context.session_bearer)?;
         let Some(capability_id) = record_capability(report, &admin, &reader) else {
             return Ok(());
@@ -463,7 +464,7 @@ pub fn sensitive_output(context: &Context, ledger: &BudgetLedger) -> ScenarioRep
         "a write carrying a credential pattern is denied by the edge's secret-leak guard and the artifact is left untouched",
     );
     let run = |report: &mut ScenarioReport| -> Fallible<()> {
-        let admin = EdgeAdmin::new(&context.writer, &context.admin_bearer);
+        let admin = EdgeAdmin::new(&context.writer, &context.admin_bearer)?;
         let mut writer = EdgeSession::connect(&context.writer, &context.session_bearer)?;
         record_capability(report, &admin, &writer);
         let artifact = context.artifact.to_string_lossy().into_owned();
@@ -512,7 +513,7 @@ pub fn restart_recovery(context: &Context, ledger: &BudgetLedger) -> ScenarioRep
         return report;
     };
     let run = |report: &mut ScenarioReport| -> Fallible<()> {
-        let admin = EdgeAdmin::new(&context.reader, &context.admin_bearer);
+        let admin = EdgeAdmin::new(&context.reader, &context.admin_bearer)?;
         let mut reader = EdgeSession::connect(&context.reader, &context.session_bearer)?;
         record_capability(report, &admin, &reader);
         let Some(session_id) = reader.session_id().map(str::to_string) else {
@@ -537,7 +538,7 @@ pub fn restart_recovery(context: &Context, ledger: &BudgetLedger) -> ScenarioRep
             "the reader edge answers its health route again",
         );
         let mut resumed =
-            EdgeSession::resume(&context.reader, &context.session_bearer, &session_id);
+            EdgeSession::resume(&context.reader, &context.session_bearer, &session_id)?;
         report.check(
             ledger.charge("task-reader"),
             "reader charged one unit after the restart",
