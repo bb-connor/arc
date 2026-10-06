@@ -238,8 +238,25 @@ fn a_provisioning_record_reached_through_a_symlinked_directory_is_refused() {
     assert!(matches!(result, Err(KeyringError::Io(_))), "{result:?}");
 }
 
+/// Bind a service socket. A child process another test spawns holds a copy
+/// of every descriptor until it execs, so a lock this test just released can
+/// still be held for a moment; only that refusal is retried.
+fn bind_listener(socket: &Path) -> chio_keyring::Result<chio_keyring::PrivateUnixListener> {
+    let started = Instant::now();
+    loop {
+        match chio_keyring::bind_private_unix_listener(socket) {
+            Err(KeyringError::StateInvariant("another service instance holds this socket"))
+                if started.elapsed() < Duration::from_secs(5) =>
+            {
+                thread::sleep(Duration::from_millis(10));
+            }
+            result => return result,
+        }
+    }
+}
+
 fn bind(socket: &Path) -> chio_keyring::Result<()> {
-    chio_keyring::bind_private_unix_listener(socket).map(drop)
+    bind_listener(socket).map(drop)
 }
 
 #[test]
@@ -247,12 +264,12 @@ fn a_service_socket_in_a_private_trusted_directory_binds_privately_and_exclusive
     let directory = support::private_tempdir().test_unwrap();
     let run = private_directory(&directory, "run", 0o700);
     let socket = run.join("witness.sock");
-    let listener = chio_keyring::bind_private_unix_listener(&socket).test_unwrap();
+    let listener = bind_listener(&socket).test_unwrap();
     let metadata = std::fs::symlink_metadata(&socket).test_unwrap();
     assert!(metadata.file_type().is_socket());
     assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
     std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
-    assert_refused_by_policy(bind(&socket));
+    assert_refused_by_policy(chio_keyring::bind_private_unix_listener(&socket).map(drop));
     drop(listener);
     bind(&socket).test_unwrap();
 }
@@ -465,6 +482,37 @@ fn close_on_exec(descriptor: rustix::fd::OwnedFd) -> std::io::Result<rustix::fd:
     Ok(descriptor)
 }
 
+/// A socket file with no listener, as a crashed holder leaves it. The socket
+/// is bound but never listens, so a child process another test spawns cannot
+/// keep it listening by holding a copy of its descriptor.
+fn stale_socket(socket: &Path) {
+    let unbound = rustix::net::socket(
+        rustix::net::AddressFamily::UNIX,
+        rustix::net::SocketType::STREAM,
+        None,
+    )
+    .test_unwrap();
+    rustix::net::bind(
+        &unbound,
+        &rustix::net::SocketAddrUnix::new(socket).test_unwrap(),
+    )
+    .test_unwrap();
+}
+
+/// Wait until connecting to `socket` is refused. A child process another test
+/// spawns holds a copy of every descriptor until it execs, so a listener this
+/// test closed can accept for a moment longer.
+fn wait_until_refused(socket: &Path) {
+    let started = Instant::now();
+    while std::os::unix::net::UnixStream::connect(socket).is_ok() {
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the closed listener still accepts"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
 fn inode(path: &Path) -> u64 {
     use std::os::unix::fs::MetadataExt as _;
 
@@ -587,6 +635,7 @@ fn a_failed_live_probe_leaves_no_authority_to_remove_the_socket() {
     let listener = UnixListener::bind(&socket).test_unwrap();
     assert_refused_by_policy(bind(&socket));
     drop(listener);
+    wait_until_refused(&socket);
     let stale = inode(&socket);
     assert_refused_as_unproven(bind(&socket));
     assert_eq!(inode(&socket), stale);
@@ -596,7 +645,7 @@ fn a_failed_live_probe_leaves_no_authority_to_remove_the_socket() {
 fn a_socket_without_a_generation_record_waits_for_operator_recovery() {
     let directory = support::private_tempdir().test_unwrap();
     let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
-    drop(UnixListener::bind(&socket).test_unwrap());
+    stale_socket(&socket);
     let legacy = inode(&socket);
     assert_refused_as_unproven(bind(&socket));
     assert_eq!(inode(&socket), legacy);
@@ -610,7 +659,7 @@ fn a_socket_without_a_generation_record_waits_for_operator_recovery() {
 fn a_dropped_managed_listener_removes_its_socket_and_keeps_its_record() {
     let directory = support::private_tempdir().test_unwrap();
     let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
-    drop(chio_keyring::bind_private_unix_listener(&socket).test_unwrap());
+    drop(bind_listener(&socket).test_unwrap());
     assert!(!socket.exists());
     assert_eq!(std::fs::read(lock_path(&socket)).test_unwrap().len(), 65);
     bind(&socket).test_unwrap();
@@ -648,7 +697,7 @@ fn a_crashed_managed_listener_is_recovered_at_restart() {
     let record = std::fs::read(lock_path(&socket)).test_unwrap();
     assert_eq!(record.len(), 65);
 
-    let listener = chio_keyring::bind_private_unix_listener(&socket).test_unwrap();
+    let listener = bind_listener(&socket).test_unwrap();
     assert_ne!(inode(&socket), crashed);
     assert_ne!(std::fs::read(lock_path(&socket)).test_unwrap(), record);
     std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
