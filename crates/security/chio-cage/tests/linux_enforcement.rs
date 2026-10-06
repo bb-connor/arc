@@ -1130,6 +1130,38 @@ fn assert_second_exec_is_killed(probe: &str, runtime_files: BTreeSet<PathBuf>) {
 }
 
 #[test]
+fn a_fault_in_the_target_reaches_its_default_action() {
+    let record = launch(
+        compiled(&required_path("CHIO_CAGE_TEST_FAULT")),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap()
+    .wait()
+    .test_unwrap();
+    assert_eq!(
+        record.exit.as_ref().and_then(|exit| exit.signal),
+        Some(libc::SIGSEGV)
+    );
+}
+
+#[test]
+fn a_timer_signal_reaches_the_target() {
+    let target = required_path("CHIO_CAGE_TEST_TIMER_SIGNAL");
+    let argv = vec![target.to_str().test_unwrap().to_string()];
+    let record = launch(
+        compiled_with_profile_argv(&target, NativeSyscallProfile::NativeStandardV1, argv),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap()
+    .wait()
+    .test_unwrap();
+    assert_eq!(
+        record.exit.as_ref().and_then(|exit| exit.signal),
+        Some(libc::SIGALRM)
+    );
+}
+
+#[test]
 fn a_second_exec_by_absolute_path_is_killed() {
     let marker = required_path("CHIO_CAGE_TEST_EXEC_MARKER");
     assert_second_exec_is_killed(
