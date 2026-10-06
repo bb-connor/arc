@@ -9,7 +9,7 @@ fn canary_pre_dispatch_denial() {
     invocation.agent_id = capability.subject.to_hex();
     invocation.capability = capability;
 
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let decoy_store = Arc::new(
         SqliteSealedDecoyRegistryStore::open(directory.path().join("decoys.db"))
             .test_expect("open decoy store"),
@@ -88,7 +88,7 @@ fn honey_tool_pre_dispatch_denial() {
         br#"{"server_id":"server-active-defense","tool_name":"export_records"}"#
     );
 
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let decoy_store = Arc::new(
         SqliteSealedDecoyRegistryStore::open(directory.path().join("decoys.db"))
             .test_expect("open decoy store"),
