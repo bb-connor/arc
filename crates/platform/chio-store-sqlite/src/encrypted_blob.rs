@@ -685,9 +685,9 @@ impl SqliteEncryptedBlobStore {
         let blob_id = conn
             .query_row(
                 r#"
-                SELECT reference.blob_id
+                SELECT blob.blob_id
                 FROM chio_encrypted_blob_references AS reference
-                INNER JOIN chio_encrypted_blobs AS blob
+                LEFT JOIN chio_encrypted_blobs AS blob
                     ON blob.blob_id = reference.blob_id
                    AND blob.tenant_id = reference.tenant_id
                 WHERE reference.namespace = ?1
@@ -700,12 +700,14 @@ impl SqliteEncryptedBlobStore {
                     reference.tenant_id().as_str(),
                     reference.reference_key().as_slice(),
                 ],
-                |row| row.get::<_, String>(0),
+                |row| row.get::<_, Option<String>>(0),
             )
             .optional()?;
-        blob_id
-            .map(|blob_id| BlobHandle::new(blob_id, reference.tenant_id().clone()))
-            .ok_or(BlobStoreError::NotFound)
+        match blob_id {
+            None => Err(BlobStoreError::NotFound),
+            Some(None) => Err(BlobStoreError::InvalidReference),
+            Some(Some(blob_id)) => Ok(BlobHandle::new(blob_id, reference.tenant_id().clone())),
+        }
     }
 
     /// Disable an opaque reference without deleting its encrypted bytes.

@@ -6,6 +6,9 @@ use crate::receipt::{
 };
 use crate::store::AttemptState;
 
+#[path = "resolver_integrity_tests.rs"]
+mod resolver_integrity_tests;
+
 pub(super) struct CountedTransport {
     inner: ObservingTransport,
     calls: Arc<AtomicU64>,
