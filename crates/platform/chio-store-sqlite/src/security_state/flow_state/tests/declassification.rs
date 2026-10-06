@@ -25,7 +25,7 @@ impl chio_security_types::clock::Clock for FixedClock {
 
 #[test]
 fn flow_use_and_receipt_outbox_share_one_outer_commit() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(FixedClock))?;
     store.seal_declassification_live_dispatch()?;
@@ -72,7 +72,7 @@ fn flow_use_and_receipt_outbox_share_one_outer_commit() -> TestResult {
 #[test]
 fn outbox_failure_rolls_back_flow_use_and_any_earlier_evidence() -> TestResult {
     for failing_phase in ["consumption", "outcome"] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let store = SqliteSecurityStateStore::open_with_trusted_clock(
             directory.path().join("security.db"),
             Arc::new(FixedClock),
@@ -118,7 +118,7 @@ fn outbox_failure_rolls_back_flow_use_and_any_earlier_evidence() -> TestResult {
 
 #[test]
 fn cancellation_after_consumption_rolls_back_flow_and_does_not_spend_grant() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let store = SqliteSecurityStateStore::open_with_trusted_clock(
         directory.path().join("security.db"),
         Arc::new(FixedClock),
@@ -146,7 +146,7 @@ fn cancellation_after_consumption_rolls_back_flow_and_does_not_spend_grant() -> 
 
 #[test]
 fn cancelling_uncommitted_flow_does_not_reverse_committed_taint() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let store = SqliteSecurityStateStore::open(directory.path().join("security.db"))?;
     let mut retained_join = request("retained-join")?;
     retained_join.principal_join = InformationLabel::try_known(

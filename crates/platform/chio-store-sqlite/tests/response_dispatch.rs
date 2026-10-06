@@ -542,7 +542,7 @@ fn durable_dispatch_fence_counts(
 
 #[test]
 fn atomic_dispatch_is_idempotent_bound_and_recoverable_after_crash() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("response-dispatch.db");
     let created_at_unix_ms = now_unix_ms();
@@ -678,7 +678,7 @@ fn atomic_dispatch_is_idempotent_bound_and_recoverable_after_crash() {
 
 #[test]
 fn scheduled_response_cas_sequences_one_fence_and_rejects_forged_mutation_fences() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("scheduled-response-cas.db");
     let store = Arc::new(

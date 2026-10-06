@@ -1,4 +1,6 @@
 mod capability_set_suspension;
+#[cfg(all(test, unix))]
+mod database_file_tests;
 #[cfg(test)]
 mod deadline_tests;
 mod declassification;
@@ -117,11 +119,17 @@ pub use participant_source::{
     SqliteSecurityParticipantSource,
 };
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
+#[cfg(unix)]
+use rustix::fs::{AtFlags, FileType, Mode, OFlags};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+#[cfg(unix)]
+use std::ffi::OsStr;
 use std::fs;
 #[cfg(unix)]
 use std::fs::File;
+#[cfg(unix)]
+use std::os::fd::OwnedFd;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -231,9 +239,27 @@ impl SqliteSecurityStateStore {
         }
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::DirBuilderExt;
+                    fs::DirBuilder::new()
+                        .recursive(true)
+                        .mode(0o700)
+                        .create(parent)
+                        .map_err(|_| PortError::unavailable())?;
+                }
+                #[cfg(not(unix))]
                 fs::create_dir_all(parent).map_err(|_| PortError::unavailable())?;
             }
         }
+        #[cfg(unix)]
+        let (database_path, database_parent) = canonical_database_path(path)?;
+        // The identity is bound before the first statement so an aliased path
+        // is refused before migration writes through it.
+        #[cfg(unix)]
+        let (connection, database_identity) =
+            open_unaliased_database(&database_parent, &database_path)?;
+        #[cfg(not(unix))]
         let connection = Connection::open(path).map_err(sqlite_error)?;
         // Reuse suspension lookup bytecode, never the observed authority state.
         connection
@@ -244,10 +270,6 @@ impl SqliteSecurityStateStore {
             .map_err(sqlite_error)?;
         migrate(&connection)?;
         SqliteEncryptedBlobStore::open(path).map_err(|_| PortError::unavailable())?;
-        #[cfg(unix)]
-        let database_path = absolute_database_path(path)?;
-        #[cfg(unix)]
-        let database_identity = security_state_database_path_identity(&database_path)?;
         Ok(Self {
             connection: StoreConnection::transaction_only("security_state", connection),
             isolation_epoch_verifier,
@@ -457,6 +479,219 @@ fn absolute_database_path(path: &Path) -> PortResult<PathBuf> {
         .map_err(|_| PortError::unavailable())
 }
 
+/// The absolute path with its parent resolved, so the only component left
+/// for `SQLITE_OPEN_NOFOLLOW` to check is the database file itself, and a
+/// held descriptor for that parent. The parent must belong to the effective
+/// user and admit no other writer, which could otherwise unlink or replace
+/// the database. The database and its sidecars are examined through the
+/// descriptor, so no ancestor is resolved again after this check.
+#[cfg(unix)]
+fn canonical_database_path(path: &Path) -> PortResult<(PathBuf, OwnedFd)> {
+    let absolute = absolute_database_path(path)?;
+    let file_name = absolute.file_name().ok_or_else(PortError::invalid_data)?;
+    let parent = absolute.parent().ok_or_else(PortError::invalid_data)?;
+    let parent = fs::canonicalize(parent).map_err(unavailable_io)?;
+    let metadata = fs::symlink_metadata(&parent).map_err(unavailable_io)?;
+    if !metadata.is_dir()
+        || metadata.uid() != nix::unistd::geteuid().as_raw()
+        || metadata.mode() & 0o022 != 0
+    {
+        return Err(PortError::invalid_data());
+    }
+    let handle = rustix::fs::open(
+        &parent,
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(unavailable_errno)?;
+    let held = security_state_file_entry(&rustix::fs::fstat(&handle).map_err(unavailable_errno)?);
+    if held.file_type != FileType::Directory
+        || held.owner != metadata.uid()
+        || held.mode & 0o022 != 0
+        || held.identity.device != metadata.dev()
+        || held.identity.inode != metadata.ino()
+    {
+        return Err(PortError::invalid_data());
+    }
+    Ok((parent.join(file_name), handle))
+}
+
+/// Create a missing database owner-only through the held parent, or secure
+/// the existing one, then secure any existing sidecar before SQLite can
+/// reuse it. SQLite gives sidecars it creates the database's mode. The open
+/// does not follow a final-component symlink planted after these checks,
+/// and the path and SQLite's own main descriptor must both still name the
+/// checked file.
+#[cfg(unix)]
+fn open_unaliased_database(
+    parent: &OwnedFd,
+    path: &Path,
+) -> PortResult<(Connection, SecurityStateDatabaseFileIdentity)> {
+    let file_name = path.file_name().ok_or_else(PortError::invalid_data)?;
+    let identity = match rustix::fs::openat(
+        parent,
+        file_name,
+        OFlags::RDWR | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::RUSR | Mode::WUSR,
+    ) {
+        // No SQLite connection can hold a lock on a file this call created.
+        Ok(created) => {
+            let entry =
+                security_state_file_entry(&rustix::fs::fstat(&created).map_err(unavailable_errno)?);
+            require_owned_unaliased_file(&entry, nix::unistd::geteuid().as_raw())?;
+            entry.identity
+        }
+        Err(error) if error == rustix::io::Errno::EXIST => {
+            secure_existing_file(parent, file_name)?.ok_or_else(PortError::unavailable)?
+        }
+        Err(error) => return Err(unavailable_errno(error)),
+    };
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let mut sidecar = file_name.to_os_string();
+        sidecar.push(suffix);
+        secure_existing_file(parent, &sidecar)?;
+    }
+    let connection = Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(sqlite_error)?;
+    let opened = chio_sqlite_file_identity::inspect_main_database_file_identity(&connection)
+        .map_err(security_state_file_identity_error)?;
+    if security_state_database_path_identity(path)? != identity
+        || opened.device != identity.device
+        || opened.inode != identity.inode
+        || opened.link_count != 1
+    {
+        return Err(PortError::invalid_data());
+    }
+    Ok((connection, identity))
+}
+
+/// Examine an existing entry of the held parent without following a symlink,
+/// refuse it unless it is an owned, singly linked regular file, and remove
+/// group and other access through a descriptor bound to the same file. A
+/// descriptor is opened only for that repair, because closing any descriptor
+/// for a file drops this process's POSIX locks on it, including those of a
+/// live SQLite connection.
+#[cfg(unix)]
+fn secure_existing_file(
+    parent: &OwnedFd,
+    name: &OsStr,
+) -> PortResult<Option<SecurityStateDatabaseFileIdentity>> {
+    let effective_uid = nix::unistd::geteuid().as_raw();
+    let entry = match rustix::fs::statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(stat) => security_state_file_entry(&stat),
+        Err(error) if error == rustix::io::Errno::NOENT => return Ok(None),
+        Err(error) => return Err(unavailable_errno(error)),
+    };
+    require_owned_unaliased_file(&entry, effective_uid)?;
+    if entry.mode & 0o077 == 0 {
+        return Ok(Some(entry.identity));
+    }
+    let file = rustix::fs::openat(
+        parent,
+        name,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::NOCTTY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(|error| {
+        if error == rustix::io::Errno::LOOP {
+            PortError::invalid_data()
+        } else {
+            unavailable_errno(error)
+        }
+    })?;
+    let held = security_state_file_entry(&rustix::fs::fstat(&file).map_err(unavailable_errno)?);
+    require_owned_unaliased_file(&held, effective_uid)?;
+    if held.identity != entry.identity {
+        return Err(PortError::invalid_data());
+    }
+    rustix::fs::fchmod(&file, Mode::RUSR | Mode::WUSR).map_err(unavailable_errno)?;
+    let repaired = security_state_file_entry(&rustix::fs::fstat(&file).map_err(unavailable_errno)?);
+    if repaired.identity != entry.identity || repaired.mode != 0o600 {
+        return Err(PortError::invalid_data());
+    }
+    Ok(Some(entry.identity))
+}
+
+#[cfg(unix)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SecurityStateFileEntry {
+    file_type: FileType,
+    link_count: u64,
+    owner: u32,
+    /// Permission and special bits only.
+    mode: u32,
+    identity: SecurityStateDatabaseFileIdentity,
+}
+
+#[cfg(unix)]
+#[allow(
+    clippy::as_conversions,
+    clippy::unnecessary_cast,
+    reason = "The stat field widths and signedness differ between supported Unix targets; \
+              these are the conversions std's MetadataExt applies to the same fields."
+)]
+fn security_state_file_entry(stat: &rustix::fs::Stat) -> SecurityStateFileEntry {
+    SecurityStateFileEntry {
+        file_type: FileType::from_raw_mode(stat.st_mode),
+        link_count: stat.st_nlink as u64,
+        owner: stat.st_uid as u32,
+        mode: (stat.st_mode as u32) & 0o7777,
+        identity: SecurityStateDatabaseFileIdentity {
+            device: stat.st_dev as u64,
+            inode: stat.st_ino as u64,
+        },
+    }
+}
+
+/// A symlink or hard link aliases another file, and another file type or
+/// owner is not state this store controls.
+#[cfg(unix)]
+fn require_owned_unaliased_file(
+    entry: &SecurityStateFileEntry,
+    effective_uid: u32,
+) -> PortResult<()> {
+    if entry.file_type != FileType::RegularFile
+        || entry.link_count != 1
+        || entry.owner != effective_uid
+    {
+        return Err(PortError::invalid_data());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn security_state_file_identity_error(
+    error: chio_sqlite_file_identity::SqliteFileIdentityInspectionError,
+) -> PortError {
+    match error {
+        chio_sqlite_file_identity::SqliteFileIdentityInspectionError::Io(source) => {
+            unavailable_io(source)
+        }
+        chio_sqlite_file_identity::SqliteFileIdentityInspectionError::Validation(_) => {
+            PortError::invalid_data()
+        }
+    }
+}
+
+#[cfg(unix)]
+fn unavailable_io(error: std::io::Error) -> PortError {
+    PortError::with_source(
+        chio_security_types::ports::PortErrorKind::Unavailable,
+        "store.unavailable",
+        error,
+    )
+}
+
+#[cfg(unix)]
+fn unavailable_errno(error: rustix::io::Errno) -> PortError {
+    unavailable_io(error.into())
+}
+
 #[cfg(target_os = "macos")]
 fn security_state_lifecycle_lock_path(path: &Path) -> PortResult<PathBuf> {
     let file_name = path.file_name().ok_or_else(PortError::invalid_data)?;
@@ -469,7 +704,7 @@ fn security_state_lifecycle_lock_path(path: &Path) -> PortResult<PathBuf> {
 fn security_state_database_path_identity(
     path: &Path,
 ) -> PortResult<SecurityStateDatabaseFileIdentity> {
-    let metadata = fs::symlink_metadata(path).map_err(|_| PortError::unavailable())?;
+    let metadata = fs::symlink_metadata(path).map_err(unavailable_io)?;
     if metadata.file_type().is_symlink() || !metadata.file_type().is_file() || metadata.nlink() != 1
     {
         return Err(PortError::invalid_data());

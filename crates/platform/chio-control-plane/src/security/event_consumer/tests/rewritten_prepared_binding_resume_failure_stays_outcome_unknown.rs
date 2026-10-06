@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn rewritten_prepared_binding_resume_failure_stays_outcome_unknown() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("rewritten-binding.sqlite"))
             .unwrap_or_else(|error| panic!("rewritten binding store: {error}")),

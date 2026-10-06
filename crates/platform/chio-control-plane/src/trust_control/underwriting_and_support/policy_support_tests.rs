@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn capability_budget_report_reads_all_matching_rows_before_display_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let receipts = SqliteReceiptStore::open(directory.path().join("receipts.db"))?;
     let budgets = SqliteBudgetStore::open(directory.path().join("budgets.db"))?;
     for (capability, grant) in [("cap-a", 0), ("cap-a", 1), ("cap-b", 0)] {

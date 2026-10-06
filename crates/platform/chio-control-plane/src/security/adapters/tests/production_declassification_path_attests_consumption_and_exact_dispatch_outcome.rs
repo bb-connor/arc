@@ -5,7 +5,8 @@ fn production_declassification_path_attests_consumption_and_exact_dispatch_outco
     let authority = Keypair::from_seed(&[75; 32]);
     let purpose =
         DeclassificationPurpose::new("support").unwrap_or_else(|error| panic!("purpose: {error}"));
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let declassification_store = Arc::new(
         open_declassification_test_store(directory.path().join("declassification.sqlite"))
             .unwrap_or_else(|error| panic!("declassification store: {error:?}")),

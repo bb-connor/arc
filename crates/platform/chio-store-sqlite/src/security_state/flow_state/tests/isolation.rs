@@ -112,7 +112,7 @@ struct Fixture {
 
 impl Fixture {
     fn new(action: DuringVerification) -> TestResult<Self> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let verifier = Arc::new(WritingVerifier {
             path: path.clone(),

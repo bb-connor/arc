@@ -35,7 +35,7 @@ fn signed_report() -> TestResult<(ResponseSimulationReport, ChioReceipt, chio_co
 
 #[test]
 fn response_dry_run_signed_report_round_trips_real_receipt_store_and_restart() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("receipts.sqlite");
     let (report, receipt, signer) = signed_report()?;
     let evidence_id = report.evidence_id()?;
@@ -116,7 +116,7 @@ fn response_dry_run_verification_refuses_tampering_wrong_trust_and_configuration
 #[test]
 fn response_dry_run_sqlite_capture_reads_all_five_stateful_targets_without_creating_work(
 ) -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("state.sqlite");
     let store = SqliteSecurityStateStore::open(&path)?;
     let (plan, expected) = fixture(None)?;

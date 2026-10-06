@@ -5,7 +5,8 @@ fn consumption_sink_failure_durably_terminalizes_at_failure_time() {
     let authority = Keypair::from_seed(&[76; 32]);
     let purpose =
         DeclassificationPurpose::new("support").unwrap_or_else(|error| panic!("purpose: {error}"));
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         open_declassification_test_store(directory.path().join("sink-failure.sqlite"))
             .unwrap_or_else(|error| panic!("declassification store: {error:?}")),

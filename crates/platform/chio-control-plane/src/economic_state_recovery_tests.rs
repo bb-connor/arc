@@ -53,7 +53,7 @@ fn fixture() -> Fixture {
     // Freeze before opening the store so a later whole-second fixture reading
     // never backdates the authority's already persisted millisecond floor.
     let (_, clock) = recovery_clock();
-    let temp = tempfile::tempdir().expect("tempdir");
+    let temp = chio_test_support::private_tempdir().expect("tempdir");
     crate::create_private_directory(temp.path()).expect("secure database parent");
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");
@@ -943,7 +943,7 @@ fn bounded_stage_expired_without_operation_binding_quarantines() -> TestResult {
 
 #[test]
 fn old_same_epoch_snapshot_cannot_erase_an_economic_stage() -> TestResult {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     crate::create_private_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let snapshot = temp.path().join("before-economic-stage.db");

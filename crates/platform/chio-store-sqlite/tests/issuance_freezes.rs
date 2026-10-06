@@ -32,7 +32,6 @@ use chio_security_types::{
     ResponsePlan, ResponsePlanInput, ResponseState, ResponseTarget,
 };
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 fn now_unix_ms() -> u64 {
     let elapsed = SystemTime::now()
@@ -623,7 +622,8 @@ fn require_error<T>(result: Result<T, PortError>) -> PortError {
 
 #[test]
 fn overlapping_freezes_remain_active_until_each_release_completes() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-overlap.db");
     let first_action = action("issuance-freeze-action-first");
     let second_action = action("issuance-freeze-action-second");
@@ -722,7 +722,8 @@ fn overlapping_freezes_remain_active_until_each_release_completes() {
 
 #[test]
 fn pending_release_and_completed_journal_survive_restart() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-restart.db");
     let action_id = action("issuance-freeze-action-restart");
     let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
@@ -804,7 +805,8 @@ fn pending_release_and_completed_journal_survive_restart() {
 
 #[test]
 fn stale_scheduler_rebinding_and_journal_tamper_fail_closed() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-hostile.db");
     let action_id = action("issuance-freeze-action-hostile");
     let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
@@ -862,7 +864,8 @@ fn stale_scheduler_rebinding_and_journal_tamper_fail_closed() {
 
 #[test]
 fn apply_journal_reports_completed_not_generic_failure() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-apply-journal.db");
     let action_id = action("issuance-freeze-action-journal");
     let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
@@ -896,7 +899,8 @@ fn apply_journal_reports_completed_not_generic_failure() {
 
 #[test]
 fn fence_maintenance_is_scheduler_fenced_idempotent_and_lifts_after_takeover() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-maintenance.db");
     let action_id = action("issuance-freeze-action-maintenance");
     let effect_id = effect("issuance-freeze-effect-maintenance");
@@ -1012,7 +1016,8 @@ fn fence_maintenance_is_scheduler_fenced_idempotent_and_lifts_after_takeover() {
 
 #[test]
 fn active_freeze_is_claimed_only_in_renewal_horizon_and_maintained_before_active() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("freeze-renewal-horizon.db"))
             .unwrap_or_else(|error| panic!("open horizon store: {error}")),
@@ -1135,7 +1140,8 @@ fn active_freeze_is_claimed_only_in_renewal_horizon_and_maintained_before_active
 
 #[test]
 fn installed_freeze_is_maintained_while_applying_and_rolling_back_but_not_after_restore() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("freeze-installed-states.db"))
             .unwrap_or_else(|error| panic!("open installed-state store: {error}")),

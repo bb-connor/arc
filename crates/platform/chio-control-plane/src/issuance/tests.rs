@@ -1079,7 +1079,7 @@ fn injected_reputation_time_cannot_decay_denials_into_authority(
     use std::sync::Arc;
     let now = 31 * 86_400;
     let clock = Arc::new(FixedClock::from_millis(now * 1000));
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let database = directory.path().join("receipts.db");
     let subject = Keypair::generate();
     let issuer = Keypair::generate();

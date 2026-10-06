@@ -9,7 +9,7 @@ fn canary_pre_dispatch_denial() {
     invocation.agent_id = capability.subject.to_hex();
     invocation.capability = capability;
 
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let decoy_store = Arc::new(
         SqliteSealedDecoyRegistryStore::open(directory.path().join("decoys.db"))
             .test_expect("open decoy store"),
@@ -56,7 +56,11 @@ fn canary_pre_dispatch_denial() {
     assert!(response.output.is_none());
     assert_eq!(dispatches.load(Ordering::SeqCst), 0);
     assert_eq!(events.0.load(Ordering::SeqCst), 1);
-    let evidence = response.receipt.evidence.first().test_expect("tripwire evidence");
+    let evidence = response
+        .receipt
+        .evidence
+        .first()
+        .test_expect("tripwire evidence");
     let details = evidence.details.as_deref().test_expect("tripwire details");
     assert!(details.contains("\"event_persistence\":\"failed\""));
 }
@@ -88,7 +92,7 @@ fn honey_tool_pre_dispatch_denial() {
         br#"{"server_id":"server-active-defense","tool_name":"export_records"}"#
     );
 
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let decoy_store = Arc::new(
         SqliteSealedDecoyRegistryStore::open(directory.path().join("decoys.db"))
             .test_expect("open decoy store"),

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn exact_tenant_identifiers_remain_isolated_after_restart() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("issuance-freeze-overlap.db");
     let first_action = action("issuance-freeze-action-first");
     let (store, work) = open_claimed_store(&path, &[first_action.as_str()]);

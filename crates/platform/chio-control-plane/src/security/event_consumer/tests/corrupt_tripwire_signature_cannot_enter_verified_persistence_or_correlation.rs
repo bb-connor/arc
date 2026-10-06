@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn corrupt_tripwire_signature_cannot_enter_verified_persistence_or_correlation() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("create security event directory: {error}"));
     let database_path = directory.path().join("tripwire-events.sqlite3");
     let store = Arc::new(

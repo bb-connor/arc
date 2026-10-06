@@ -526,11 +526,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use chio_errors::ErrorCodeSpec;
     use chio_errors::_generated::error_codes::{
         CLI_IO, CLI_YAML, GUARD_DENIED, MANIFEST_SCHEMA_INVALID, MANIFEST_SIGNATURE_INVALID,
         PROVIDER_TOOL_SERVER_ERROR, REPLAY_DETERMINISTIC_MISMATCH,
     };
-    use chio_errors::ErrorCodeSpec;
     use chio_guards::PostInvocationPipeline;
 
     fn make_kernel(require_web3_evidence: bool) -> ChioKernel {
@@ -568,7 +568,8 @@ mod tests {
 
     #[test]
     fn existing_authority_loader_never_provisions_missing_custody() {
-        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let directory =
+            chio_test_support::private_tempdir().expect("create authority loader test directory");
         let seed_path = directory.path().join("missing.seed");
 
         let error = load_existing_authority_keypair(&seed_path)
@@ -581,7 +582,8 @@ mod tests {
 
     #[test]
     fn existing_authority_loader_accepts_exact_private_seed_file() {
-        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let directory =
+            chio_test_support::private_tempdir().expect("create authority loader test directory");
         let seed_path = directory.path().join("authority.seed");
         let expected = Keypair::generate();
         write_authority_seed_file(&seed_path, &expected).expect("persist authority seed");
@@ -596,7 +598,8 @@ mod tests {
     fn existing_authority_loader_rejects_permissive_or_linked_custody() {
         use std::os::unix::fs::{symlink, PermissionsExt as _};
 
-        let directory = tempfile::tempdir().expect("create authority loader test directory");
+        let directory =
+            chio_test_support::private_tempdir().expect("create authority loader test directory");
         let seed_path = directory.path().join("authority.seed");
         let alias_path = directory.path().join("authority-alias.seed");
         let keypair = Keypair::generate();
@@ -744,7 +747,8 @@ mod tests {
 
     #[test]
     fn durable_admission_runtime_shares_one_owner_on_a_distinct_sidecar() {
-        let directory = tempfile::tempdir().expect("create durable admission test directory");
+        let directory =
+            chio_test_support::private_tempdir().expect("create durable admission test directory");
         create_private_directory(directory.path()).expect("secure test directory");
         let session_database = directory.path().join("sessions.sqlite3");
         let admission_database =
@@ -775,7 +779,8 @@ mod tests {
 
     #[test]
     fn durable_admission_runtime_rejects_a_lost_signing_seed() {
-        let directory = tempfile::tempdir().expect("create durable admission test directory");
+        let directory =
+            chio_test_support::private_tempdir().expect("create durable admission test directory");
         create_private_directory(directory.path()).expect("secure test directory");
         let admission_database = directory.path().join("admission.sqlite3");
         let runtime = DurableAdmissionRuntime::open(&admission_database)

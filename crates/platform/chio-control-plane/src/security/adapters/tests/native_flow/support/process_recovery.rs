@@ -27,7 +27,7 @@ const ROOT: &str = "CHIO_NATIVE_M2_PROCESS_ROOT";
 pub(super) fn fixture_directory() -> std::io::Result<tempfile::TempDir> {
     match std::env::var_os(ROOT) {
         Some(root) if std::env::var_os(CHILD).is_some() => tempfile::tempdir_in(root),
-        _ => tempfile::tempdir(),
+        _ => chio_test_support::private_tempdir(),
     }
 }
 
@@ -429,7 +429,7 @@ fn matrix_with_recovery(
     if std::env::var_os(CHILD).is_some() {
         return run_child(profile, point);
     }
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let output_path = root.path().join("child.log");
     let output = std::fs::File::create(&output_path)?;
     let module = module_path!()

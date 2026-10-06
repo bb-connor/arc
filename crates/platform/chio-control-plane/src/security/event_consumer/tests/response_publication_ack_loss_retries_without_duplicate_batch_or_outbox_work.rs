@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn response_publication_ack_loss_retries_without_duplicate_batch_or_outbox_work() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory
         .path()
         .join("response-publication-ack-loss.sqlite");

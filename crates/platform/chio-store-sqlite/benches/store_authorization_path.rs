@@ -494,7 +494,9 @@ fn suspension_apply_request(
 }
 
 fn bench_security_state_denial_read(c: &mut Criterion) {
-    let path = unique_db_path("chio-bench-security-state-denial");
+    // The security-state store refuses a shared writable parent such as /tmp.
+    let directory = unique_db_path("chio-bench-security-state-denial");
+    let path = directory.join("security-state.sqlite3");
     let (store, suspended) = populate_suspensions(&path);
     let tenant_id = suspension_tenant();
 
@@ -539,7 +541,7 @@ fn bench_security_state_denial_read(c: &mut Criterion) {
     });
 
     drop(store);
-    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_dir_all(directory);
 }
 
 criterion_group!(

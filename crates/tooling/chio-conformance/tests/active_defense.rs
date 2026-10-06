@@ -91,7 +91,6 @@ use chio_security_types::{
 };
 use chio_store_sqlite::{SqliteSealedDecoyRegistryStore, SqliteSecurityStateStore};
 use chio_test_support::prelude::*;
-use tempfile::tempdir;
 
 fn tenant(value: &str) -> TenantId {
     TenantId::new(value).test_expect("tenant id")
@@ -265,7 +264,7 @@ fn security_context(request: &ToolCallRequest) -> SecurityInvocationContext {
 
 #[test]
 fn slow_cumulative_exfiltration() {
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let store = SqliteSecurityStateStore::open(directory.path().join("flow-state.db"))
         .test_expect("open flow store");
     let key = flow_key("session-cumulative", "epoch-active-defense");
@@ -746,7 +745,7 @@ fn correlation_policy() -> CorrelationPolicy {
 #[test]
 fn temporal_within_boundary() {
     let rule = temporal_rule("active-defense-temporal-boundary");
-    let inside_directory = tempdir().test_expect("inside directory");
+    let inside_directory = chio_test_support::private_tempdir().test_expect("inside directory");
     let inside_store = Arc::new(
         SqliteSecurityStateStore::open(inside_directory.path().join("events.db"))
             .test_expect("inside event store"),
@@ -781,7 +780,7 @@ fn temporal_within_boundary() {
         .collect();
     assert_eq!(ordered, vec!["inside-first", "inside-boundary"]);
 
-    let outside_directory = tempdir().test_expect("outside directory");
+    let outside_directory = chio_test_support::private_tempdir().test_expect("outside directory");
     let outside_store = Arc::new(
         SqliteSecurityStateStore::open(outside_directory.path().join("events.db"))
             .test_expect("outside event store"),
@@ -943,7 +942,7 @@ fn declassification_replay() {
         transition_binding: binding,
         receipt: declassification_receipt_request(&body),
     };
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let evaluated_store = SqliteSecurityStateStore::open_with_trusted_clock(
         directory.path().join("evaluated-declassification.db"),
         Arc::new(FixedClock(150_000)),
@@ -1028,7 +1027,7 @@ fn declassification_replay() {
 
 #[test]
 fn session_isolation_epoch() {
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let store = SqliteSecurityStateStore::open(directory.path().join("session-state.db"))
         .test_expect("open flow store");
     let original_key = flow_key("session-original", "epoch-active-defense");
@@ -1116,7 +1115,8 @@ fn event_producer_trust() {
         )
         .test_expect("native security event verifier"),
     );
-    let ingress_directory = tempdir().test_expect("verified ingress directory");
+    let ingress_directory =
+        chio_test_support::private_tempdir().test_expect("verified ingress directory");
     let ingress_store = Arc::new(
         SqliteSecurityStateStore::open(ingress_directory.path().join("producer-ingress.db"))
             .test_expect("verified ingress store"),
@@ -1124,7 +1124,8 @@ fn event_producer_trust() {
     let ingress =
         VerifiedSecurityEventIngress::new(Arc::clone(&verifier), Arc::clone(&ingress_store))
             .test_expect("verified security event ingress");
-    let correlation_directory = tempdir().test_expect("correlation directory");
+    let correlation_directory =
+        chio_test_support::private_tempdir().test_expect("correlation directory");
     let correlation_store = Arc::new(
         SqliteSecurityStateStore::open(correlation_directory.path().join("producer-events.db"))
             .test_expect("correlation event store"),
@@ -1531,7 +1532,7 @@ fn overlay_guard_verdict(store: Arc<SqliteSecurityStateStore>, session_id: &str)
 
 #[test]
 fn overlapping_ttl_lift() {
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let action_id = action("overlapping-ttl-action");
     let (store, token) = claimed_overlay_store(&directory.path().join("overlap.db"), &action_id);
     let session_id = "session-overlapping-ttl";

@@ -66,16 +66,14 @@ fn review_payment_compensation_retries_original_release_intent() -> TestResult {
     calls.release_failed.store(true, Ordering::SeqCst);
     let operation = store.operation();
     let policy = serde_json::json!({"authority": "review-regression"});
-    assert!(
-        kernel
-            .compensate_durable_admission_before_dispatch(
-                &operation,
-                policy.clone(),
-                current_unix_timestamp_ms(),
-                None
-            )
-            .is_err()
-    );
+    assert!(kernel
+        .compensate_durable_admission_before_dispatch(
+            &operation,
+            policy.clone(),
+            current_unix_timestamp_ms(),
+            None
+        )
+        .is_err());
     assert_eq!(
         store.payment_journal().ok_or("pending journal")?.state,
         PaymentJournalState::Settling

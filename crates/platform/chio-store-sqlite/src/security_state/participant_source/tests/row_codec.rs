@@ -5,7 +5,7 @@ use rusqlite::{params_from_iter, types::Value};
 #[test]
 fn all_retained_tables_decode_into_a_disposable_projection_without_changing_fingerprints(
 ) -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("source.db");
     let _store = seeded_security_history(&path)?;
     let source = Connection::open(&path)?;

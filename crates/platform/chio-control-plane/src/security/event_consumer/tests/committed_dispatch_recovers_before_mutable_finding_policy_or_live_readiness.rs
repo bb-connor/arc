@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn committed_dispatch_recovers_before_mutable_finding_policy_or_live_readiness() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("committed-recovery.sqlite"))
             .unwrap_or_else(|error| panic!("committed recovery store: {error}")),

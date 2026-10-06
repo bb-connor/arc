@@ -17,7 +17,6 @@ use chio_security_types::ports::{
 };
 use chio_security_types::PrincipalId;
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 struct CountingServer {
     invocations: Arc<AtomicUsize>,
@@ -131,7 +130,8 @@ fn security_context(request: &ToolCallRequest) -> SecurityInvocationContext {
 
 #[test]
 fn overlay_store_outage_while_contribution_may_be_active_denies_before_dispatch() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let database_path = directory.path().join("containment-outage.db");
     let store = Arc::new(
         SqliteSecurityStateStore::open(&database_path)
@@ -169,7 +169,8 @@ fn overlay_store_outage_while_contribution_may_be_active_denies_before_dispatch(
 
 #[test]
 fn planner_outage_with_no_active_overlay_leaves_preventive_guards_functional() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("planner-outage.db"))
             .unwrap_or_else(|error| panic!("open security state store: {error}")),

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn attestation_failure_leaves_ingress_pending_until_response_work_is_durable() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("attestation-retry.sqlite");
     let store = Arc::new(
         SqliteSecurityStateStore::open(&path)

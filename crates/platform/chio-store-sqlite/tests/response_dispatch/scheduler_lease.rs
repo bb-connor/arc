@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn terminal_response_work_rejects_scheduler_lease_renewal() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("terminal-work-renewal.db"))
@@ -133,7 +133,7 @@ fn terminal_response_work_rejects_scheduler_lease_renewal() {
 
 #[test]
 fn corrupt_scheduler_lease_expiry_blocks_validation_effect_renew_retry_and_release() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("corrupt-work-provenance.db");
     let store = Arc::new(
@@ -282,7 +282,7 @@ fn corrupt_scheduler_lease_expiry_blocks_validation_effect_renew_retry_and_relea
 
 #[test]
 fn scheduler_renewal_replay_rejects_corrupt_lease_provenance() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory
         .path()
@@ -364,7 +364,7 @@ fn scheduler_renewal_replay_rejects_corrupt_lease_provenance() {
 
 #[test]
 fn scheduler_claim_replay_rejects_corrupt_lease_provenance() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("corrupt-claim-replay-provenance.db");
     let store = Arc::new(
@@ -448,7 +448,7 @@ fn scheduler_claim_replay_rejects_corrupt_lease_provenance() {
 
 #[test]
 fn scheduler_claim_replay_rejects_a_missing_claim_row() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("missing-claim-replay.db");
     let store = Arc::new(

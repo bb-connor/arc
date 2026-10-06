@@ -25,7 +25,6 @@ use chio_security_types::{PrincipalId, ResponseEffectKind, ResponseTarget};
 use chio_siem::{Alert, AlertBackend, ExportError};
 use chio_store_sqlite::SqliteSecurityStateStore;
 use serde::Serialize;
-use tempfile::tempdir;
 
 use crate::security::adapters::{AlertOutboxConfig, SqliteSiemOutbox};
 

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn durable_production_planner_cannot_report_success_without_admission_artifacts() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("missing-admission.sqlite"))
             .unwrap_or_else(|error| panic!("admission store: {error}")),

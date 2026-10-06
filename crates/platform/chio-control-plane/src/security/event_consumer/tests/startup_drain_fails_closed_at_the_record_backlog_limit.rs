@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn startup_drain_fails_closed_at_the_record_backlog_limit() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("bounded-startup.sqlite"))
             .unwrap_or_else(|error| panic!("bounded store: {error}")),

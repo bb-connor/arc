@@ -18,7 +18,7 @@ fn package_rejects_receipt_checkpoint_signer_substitution() {
 
 #[test]
 fn package_rejects_unsigned_manifest() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = chio_test_support::private_tempdir().test_unwrap();
     let output = directory.path().join("package");
     let mut bundle = sample_bundle();
     bundle.query.read_boundary = Some(ReceiptReadBoundary::AdminAll);
@@ -30,7 +30,7 @@ fn package_rejects_unsigned_manifest() {
 }
 
 fn fixture() -> (tempfile::TempDir, EvidenceImportPackage) {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = chio_test_support::private_tempdir().test_unwrap();
     let mut bundle = sample_bundle();
     bundle.query.read_boundary = Some(ReceiptReadBoundary::AdminAll);
     bundle.child_receipt_scope = EvidenceChildReceiptScope::FullQueryWindow;
@@ -118,7 +118,7 @@ fn package_accepts_explicit_rotation_keys_and_preserves_uncheckpointed_observati
     use chio_core::receipt::kinds::{
         BoundaryClass, ObservationOutcome, ReceiptKind, ToolOrigin, TrustLevel,
     };
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = chio_test_support::private_tempdir().test_unwrap();
     let signer = Keypair::generate();
     let mut bundle = sample_bundle();
     bundle.query = EvidenceExportQuery::admin_all();
@@ -233,7 +233,7 @@ fn package_rejects_duplicate_manifest_fields() {
 
 #[test]
 fn package_reader_rejects_non_regular_and_oversized_inputs() {
-    let directory = tempfile::tempdir().test_unwrap();
+    let directory = chio_test_support::private_tempdir().test_unwrap();
     fs::create_dir(directory.path().join("directory.json")).test_unwrap();
     let error = package_io::read_bytes(directory.path(), "directory.json").test_unwrap_err();
     assert!(error.to_string().contains("regular file"), "{error}");
@@ -248,8 +248,8 @@ fn package_reader_rejects_non_regular_and_oversized_inputs() {
 #[test]
 fn package_reader_rejects_leaf_and_parent_symlinks_and_fifo() {
     use std::os::unix::fs::symlink;
-    let directory = tempfile::tempdir().test_unwrap();
-    let outside = tempfile::tempdir().test_unwrap();
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let outside = chio_test_support::private_tempdir().test_unwrap();
     fs::write(outside.path().join("file.json"), b"{}").test_unwrap();
     symlink(
         outside.path().join("file.json"),

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn historical_suspension_discovery_refuses_one_past_its_supported_bound() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("suspension-history-bound.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -63,7 +64,8 @@ fn historical_suspension_discovery_refuses_one_past_its_supported_bound() {
 
 #[test]
 fn oversized_suspension_body_refuses_before_decoding() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("suspension-body-bound.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));

@@ -50,7 +50,6 @@ use chio_security_types::{
 };
 use chio_store_sqlite::SqliteSecurityStateStore;
 use rusqlite::Connection;
-use tempfile::tempdir;
 
 fn require_error<T>(result: PortResult<T>) -> chio_security_types::ports::PortError {
     match result {

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn sqlite_overlay_executes_under_the_real_scheduler_fence() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("response-effects.db"))
             .unwrap_or_else(|error| panic!("open SQLite store: {error}")),

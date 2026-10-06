@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn native_tripwire_ingress_recovers_and_persists_response_work_for_every_event_class() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let keypair = Keypair::from_seed(&[93_u8; 32]);
     for (event_id, event_kind) in [
         ("native-canary-ingress", SecurityEventKind::CanaryInvocation),

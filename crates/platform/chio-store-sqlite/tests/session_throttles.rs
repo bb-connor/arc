@@ -17,7 +17,10 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
+
+#[path = "support/security_state_clock.rs"]
+mod clock;
+use clock::FixedSecurityStateClock;
 
 fn now_unix_ms() -> u64 {
     let elapsed = SystemTime::now()
@@ -57,13 +60,20 @@ fn record(value: impl Into<String>) -> RecordId {
     RecordId::new(value).unwrap_or_else(|error| panic!("record id: {error}"))
 }
 
+/// The store's trusted clock follows real time except while a consume
+/// presents its observed time.
 fn open_claimed_store(
     path: &Path,
     actions: &[&str],
-) -> (SqliteSecurityStateStore, Vec<ScheduledWork>) {
-    let store = SqliteSecurityStateStore::open(path)
-        .unwrap_or_else(|error| panic!("open SQLite store: {error}"));
+) -> (
+    SqliteSecurityStateStore,
+    Vec<ScheduledWork>,
+    Arc<FixedSecurityStateClock>,
+) {
     let now = now_unix_ms();
+    let clock = Arc::new(FixedSecurityStateClock::new(now));
+    let store = SqliteSecurityStateStore::open_with_trusted_clock(path, clock.clone())
+        .unwrap_or_else(|error| panic!("open SQLite store: {error}"));
     for action_name in actions {
         let canonical_body =
             CanonicalBody::new(b"{}".to_vec()).unwrap_or_else(|error| panic!("plan: {error}"));
@@ -92,7 +102,20 @@ fn open_claimed_store(
         })
         .unwrap_or_else(|error| panic!("claim response plans: {error}"));
     assert_eq!(work.len(), actions.len());
-    (store, work)
+    (store, work, clock)
+}
+
+/// Run `operation` with the store's trusted clock agreeing with the
+/// caller's observed time, then return the clock to real time.
+fn at_observed_time<T>(
+    clock: &FixedSecurityStateClock,
+    observed_at_unix_ms: u64,
+    operation: impl FnOnce() -> T,
+) -> T {
+    clock.set(observed_at_unix_ms);
+    let result = operation();
+    clock.set(now_unix_ms());
+    result
 }
 
 fn work_for<'a>(work: &'a [ScheduledWork], action_id: &ActionId) -> &'a ScheduledWork {
@@ -223,16 +246,18 @@ fn query(request: &EffectRequest) -> EffectResultQuery {
 
 fn consume(
     store: &dyn SessionThrottleStore,
+    clock: &FixedSecurityStateClock,
     invocation: &str,
     observed_at_unix_ms: u64,
 ) -> chio_security_types::ports::SessionThrottleDecision {
-    store
-        .consume_session_invocation(&SessionThrottleConsumeRequest {
+    at_observed_time(clock, observed_at_unix_ms, || {
+        store.consume_session_invocation(&SessionThrottleConsumeRequest {
             key: key(),
             invocation_id: record(invocation),
             observed_at_unix_ms,
         })
-        .unwrap_or_else(|error| panic!("consume session invocation: {error}"))
+    })
+    .unwrap_or_else(|error| panic!("consume session invocation: {error}"))
 }
 
 fn require_error<T>(result: Result<T, PortError>) -> PortError {
@@ -244,11 +269,13 @@ fn require_error<T>(result: Result<T, PortError>) -> PortError {
 
 #[test]
 fn overlapping_windows_are_a_conjunction_and_remove_out_of_order() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("session-throttle-overlap.db");
     let first_action = action("throttle-action-first");
     let second_action = action("throttle-action-second");
-    let (store, work) = open_claimed_store(&path, &[first_action.as_str(), second_action.as_str()]);
+    let (store, work, clock) =
+        open_claimed_store(&path, &[first_action.as_str(), second_action.as_str()]);
     let empty = empty_session_throttle_snapshot(key())
         .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
     let first = apply_request(
@@ -280,9 +307,9 @@ fn overlapping_windows_are_a_conjunction_and_remove_out_of_order() {
         .apply_session_throttle(&second)
         .unwrap_or_else(|error| panic!("apply second throttle: {error}"));
 
-    assert!(consume(&store, "invocation-overlap-1", 10_100).allowed);
-    assert!(consume(&store, "invocation-overlap-2", 10_200).allowed);
-    let denied = consume(&store, "invocation-overlap-3", 10_300);
+    assert!(consume(&store, &clock, "invocation-overlap-1", 10_100).allowed);
+    assert!(consume(&store, &clock, "invocation-overlap-2", 10_200).allowed);
+    let denied = consume(&store, &clock, "invocation-overlap-3", 10_300);
     assert!(!denied.allowed);
     assert_eq!(denied.windows.as_slice()[0].consumed_before, 2);
     assert_eq!(denied.windows.as_slice()[1].consumed_before, 2);
@@ -298,8 +325,8 @@ fn overlapping_windows_are_a_conjunction_and_remove_out_of_order() {
         .remove_session_throttle(&remove_first)
         .unwrap_or_else(|error| panic!("remove first throttle: {error}"));
     assert_eq!(after_remove_first.contributions.len(), 1);
-    assert!(consume(&store, "invocation-overlap-3", 10_300).allowed);
-    assert!(!consume(&store, "invocation-overlap-4", 10_400).allowed);
+    assert!(consume(&store, &clock, "invocation-overlap-3", 10_300).allowed);
+    assert!(!consume(&store, &clock, "invocation-overlap-4", 10_400).allowed);
 
     let remove_second = remove_request(
         &second,
@@ -311,17 +338,18 @@ fn overlapping_windows_are_a_conjunction_and_remove_out_of_order() {
         .remove_session_throttle(&remove_second)
         .unwrap_or_else(|error| panic!("remove second throttle: {error}"));
     assert!(empty_again.contributions.is_empty());
-    let unrestricted = consume(&store, "invocation-unrestricted", 10_500);
+    let unrestricted = consume(&store, &clock, "invocation-unrestricted", 10_500);
     assert!(unrestricted.allowed);
     assert!(unrestricted.windows.is_empty());
 }
 
 #[test]
 fn deterministic_boundary_rollover_and_invocation_replay_are_exact() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("session-throttle-boundary.db");
     let action_id = action("throttle-action-boundary");
-    let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
+    let (store, work, clock) = open_claimed_store(&path, &[action_id.as_str()]);
     let empty = empty_session_throttle_snapshot(key())
         .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
     let apply = apply_request(
@@ -339,20 +367,20 @@ fn deterministic_boundary_rollover_and_invocation_replay_are_exact() {
         .apply_session_throttle(&apply)
         .unwrap_or_else(|error| panic!("apply boundary throttle: {error}"));
 
-    let first = consume(&store, "invocation-boundary", 10_999);
+    let first = consume(&store, &clock, "invocation-boundary", 10_999);
     assert!(first.allowed);
     assert_eq!(first.windows.as_slice()[0].consumed_before, 0);
     assert_eq!(first.windows.as_slice()[0].consumed_after, 1);
-    let replay = consume(&store, "invocation-boundary", 10_999);
+    let replay = consume(&store, &clock, "invocation-boundary", 10_999);
     assert!(replay.allowed);
     assert!(replay.windows.as_slice()[0].replayed);
     assert_eq!(
         replay.windows.as_slice()[0].identity,
         first.windows.as_slice()[0].identity
     );
-    assert!(!consume(&store, "invocation-boundary-denied", 10_999).allowed);
+    assert!(!consume(&store, &clock, "invocation-boundary-denied", 10_999).allowed);
 
-    let rolled = consume(&store, "invocation-boundary-next", 11_000);
+    let rolled = consume(&store, &clock, "invocation-boundary-next", 11_000);
     assert!(rolled.allowed);
     assert_ne!(
         rolled.windows.as_slice()[0].identity.window_id,
@@ -363,11 +391,100 @@ fn deterministic_boundary_rollover_and_invocation_replay_are_exact() {
 }
 
 #[test]
+fn a_regressed_clock_cannot_reopen_a_deleted_window() {
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = directory.path().join("session-throttle-regression.db");
+    let action_id = action("throttle-action-regression");
+    let (store, work, clock) = open_claimed_store(&path, &[action_id.as_str()]);
+    let empty = empty_session_throttle_snapshot(key())
+        .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
+    let apply = apply_request(
+        action_id.clone(),
+        effect("throttle-effect-regression"),
+        &empty,
+        work_for(&work, &action_id).fencing_token,
+        SessionThrottleLimits {
+            window_ms: 1_000,
+            max_invocations: 1,
+        },
+        "throttle-apply-regression",
+    );
+    store
+        .apply_session_throttle(&apply)
+        .unwrap_or_else(|error| panic!("apply regression throttle: {error}"));
+
+    assert!(consume(&store, &clock, "invocation-regression-earlier", 10_100).allowed);
+    assert!(consume(&store, &clock, "invocation-regression-later", 11_100).allowed);
+    let regressed = require_error(at_observed_time(&clock, 10_200, || {
+        store.consume_session_invocation(&SessionThrottleConsumeRequest {
+            key: key(),
+            invocation_id: record("invocation-regression-reopened"),
+            observed_at_unix_ms: 10_200,
+        })
+    }));
+    assert_eq!(regressed.kind(), PortErrorKind::Conflict);
+    assert!(!consume(&store, &clock, "invocation-regression-current", 11_200).allowed);
+}
+
+#[test]
+fn an_observed_time_the_trusted_clock_disagrees_with_is_refused() {
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = directory.path().join("session-throttle-skew.db");
+    let action_id = action("throttle-action-skew");
+    let (store, work, clock) = open_claimed_store(&path, &[action_id.as_str()]);
+    let empty = empty_session_throttle_snapshot(key())
+        .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
+    let apply = apply_request(
+        action_id.clone(),
+        effect("throttle-effect-skew"),
+        &empty,
+        work_for(&work, &action_id).fencing_token,
+        SessionThrottleLimits {
+            window_ms: 1_000,
+            max_invocations: 1,
+        },
+        "throttle-apply-skew",
+    );
+    store
+        .apply_session_throttle(&apply)
+        .unwrap_or_else(|error| panic!("apply skew throttle: {error}"));
+
+    let trusted = now_unix_ms();
+    clock.set(trusted);
+    for observed in [
+        trusted.saturating_sub(60_000),
+        trusted.saturating_add(60_000),
+    ] {
+        let error = require_error(store.consume_session_invocation(
+            &SessionThrottleConsumeRequest {
+                key: key(),
+                invocation_id: record("invocation-skew-refused"),
+                observed_at_unix_ms: observed,
+            },
+        ));
+        assert_eq!(error.kind(), PortErrorKind::InvalidData);
+    }
+    assert!(
+        store
+            .consume_session_invocation(&SessionThrottleConsumeRequest {
+                key: key(),
+                invocation_id: record("invocation-skew-agreed"),
+                observed_at_unix_ms: trusted,
+            })
+            .unwrap_or_else(|error| panic!("agreeing consume: {error}"))
+            .allowed
+    );
+}
+
+#[test]
 fn last_unit_race_allows_exactly_one_invocation() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("session-throttle-race.db");
     let action_id = action("throttle-action-race");
-    let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
+    let (store, work, clock) = open_claimed_store(&path, &[action_id.as_str()]);
     let empty = empty_session_throttle_snapshot(key())
         .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
     let apply = apply_request(
@@ -389,37 +506,42 @@ fn last_unit_race_allows_exactly_one_invocation() {
     let participants = 8;
     let barrier = Arc::new(Barrier::new(participants));
     let mut handles = Vec::new();
-    for index in 0..participants {
-        let store = store.clone();
-        let barrier = barrier.clone();
-        handles.push(thread::spawn(move || {
-            barrier.wait();
-            consume(
-                store.as_ref(),
-                format!("invocation-race-{index}").as_str(),
-                120_001,
-            )
-            .allowed
-        }));
-    }
-    let allowed = handles
-        .into_iter()
-        .map(|handle| {
-            handle
-                .join()
-                .unwrap_or_else(|_| panic!("race thread panicked"))
-        })
-        .filter(|allowed| *allowed)
-        .count();
+    let allowed = at_observed_time(&clock, 120_001, || {
+        for index in 0..participants {
+            let store = store.clone();
+            let barrier = barrier.clone();
+            handles.push(thread::spawn(move || {
+                barrier.wait();
+                store
+                    .consume_session_invocation(&SessionThrottleConsumeRequest {
+                        key: key(),
+                        invocation_id: record(format!("invocation-race-{index}")),
+                        observed_at_unix_ms: 120_001,
+                    })
+                    .unwrap_or_else(|error| panic!("race consume: {error}"))
+                    .allowed
+            }));
+        }
+        handles
+            .into_iter()
+            .map(|handle| {
+                handle
+                    .join()
+                    .unwrap_or_else(|_| panic!("race thread panicked"))
+            })
+            .filter(|allowed| *allowed)
+            .count()
+    });
     assert_eq!(allowed, 1);
 }
 
 #[test]
 fn command_recovery_survives_restart_and_rejects_rebinding_and_stale_fence() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("session-throttle-recovery.db");
     let action_id = action("throttle-action-recovery");
-    let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
+    let (store, work, _clock) = open_claimed_store(&path, &[action_id.as_str()]);
     let empty = empty_session_throttle_snapshot(key())
         .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
     let apply = apply_request(

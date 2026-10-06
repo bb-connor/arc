@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn expired_prepared_dispatch_terminates_without_mutable_live_dependencies() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("expired-prepared.sqlite"))
             .unwrap_or_else(|error| panic!("expired prepared store: {error}")),

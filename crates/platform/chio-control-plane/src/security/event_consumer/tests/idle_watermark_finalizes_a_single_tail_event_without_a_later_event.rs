@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn idle_watermark_finalizes_a_single_tail_event_without_a_later_event() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("idle-tail-correlation.sqlite");
     let store = Arc::new(
         SqliteSecurityStateStore::open(&path)

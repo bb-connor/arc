@@ -217,7 +217,7 @@ impl Fixture {
         #[cfg(unix)]
         let directory = process_recovery::fixture_directory()?;
         #[cfg(not(unix))]
-        let directory = tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let locks = directory.path().join("locks");
         std::fs::create_dir(&locks)?;
         #[cfg(unix)]

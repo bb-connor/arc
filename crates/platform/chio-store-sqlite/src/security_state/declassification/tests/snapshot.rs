@@ -18,7 +18,7 @@ impl chio_security_types::clock::Clock for FixedClock {
 
 #[test]
 fn readiness_and_compaction_reads_keep_one_snapshot_across_concurrent_compaction() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let reader = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(FixedClock))?;
     let writer = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(FixedClock))?;
@@ -77,7 +77,7 @@ fn readiness_and_compaction_reads_keep_one_snapshot_across_concurrent_compaction
 
 #[test]
 fn late_compaction_failure_rolls_back_tombstone_deletes_and_lifecycle_flag() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(FixedClock))?;
     store.seal_declassification_live_dispatch()?;

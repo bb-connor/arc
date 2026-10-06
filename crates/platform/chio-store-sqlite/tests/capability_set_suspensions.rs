@@ -16,7 +16,6 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 fn now_unix_ms() -> u64 {
     let elapsed = SystemTime::now()
@@ -248,7 +247,8 @@ fn require_error<T>(result: Result<T, PortError>) -> PortError {
 
 #[test]
 fn overlapping_sets_compose_and_remove_only_the_exact_contribution() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("capability-suspension-overlap.db");
     let first_action = action("capability-suspension-action-first");
     let second_action = action("capability-suspension-action-second");
@@ -320,7 +320,8 @@ fn overlapping_sets_compose_and_remove_only_the_exact_contribution() {
 
 #[test]
 fn journal_survives_restart_and_rejects_set_action_and_fence_rebinding() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("capability-suspension-recovery.db");
     let action_id = action("capability-suspension-action-recovery");
     let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
@@ -385,7 +386,8 @@ fn journal_survives_restart_and_rejects_set_action_and_fence_rebinding() {
 
 #[test]
 fn member_and_command_integrity_corruption_fail_closed() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("capability-suspension-integrity.db");
     let action_id = action("capability-suspension-action-integrity");
     let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);

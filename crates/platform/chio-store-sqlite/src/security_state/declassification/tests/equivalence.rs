@@ -12,7 +12,7 @@ use rusqlite::types::Value;
 
 #[test]
 fn missing_native_schema_does_not_fall_back_to_legacy_evidence() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let store = SqliteSecurityStateStore::open(directory.path().join("legacy.db"))?;
     let connection = store.connection()?;
     let query = evidence_query(
@@ -66,7 +66,7 @@ pub(super) fn all_rows(
 #[test]
 fn native_and_legacy_declassification_mutations_preserve_identical_retained_cells() -> TestResult {
     with_flow_sql_fixture(false, |connection| {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let legacy = SqliteSecurityStateStore::open(directory.path().join("legacy.db"))?;
         let mut legacy_connection = legacy.connection()?;
         let owner = SecurityStateWriteTransaction::new(

@@ -18,7 +18,7 @@ fn scope() -> ChioScope {
 
 #[test]
 fn aggregate_issuance_retains_policy_refusals() -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let receipt_db = directory.path().join("receipts.db");
     let subject = Keypair::generate().public_key();
     for (reputation, assurance) in [
@@ -46,7 +46,7 @@ fn aggregate_issuance_retains_policy_refusals() -> Result<(), Box<dyn std::error
 #[test]
 fn aggregate_issuance_persists_the_actual_signed_family_root(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let receipt_db = directory.path().join("receipts.db");
     let key = Keypair::generate();
     let subject = Keypair::generate().public_key();

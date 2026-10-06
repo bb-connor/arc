@@ -1157,7 +1157,7 @@ mod tests {
 
     fn provision_authority(
     ) -> Result<(tempfile::TempDir, Arc<SqliteAuthorityStore>), Box<dyn std::error::Error>> {
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

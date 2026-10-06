@@ -135,7 +135,7 @@ impl SecurityAlertPort for RecordingResponseAlerts {
 
 #[test]
 fn partial_rollback_truth() {
-    let directory = tempdir().test_expect("temporary directory");
+    let directory = chio_test_support::private_tempdir().test_expect("temporary directory");
     let path = directory.path().join("partial-rollback.db");
     let store = Arc::new(SqliteSecurityStateStore::open(path).test_expect("open response store"));
     let failed_session_id = "session-partial-rollback-failed";

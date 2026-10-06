@@ -2,10 +2,11 @@ use super::*;
 
 #[test]
 fn exact_tenant_identifiers_remain_isolated_after_restart() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("session-throttle-overlap.db");
     let first_action = action("throttle-action-first");
-    let (store, work) = open_claimed_store(&path, &[first_action.as_str()]);
+    let (store, work, clock) = open_claimed_store(&path, &[first_action.as_str()]);
     let empty = empty_session_throttle_snapshot(key())
         .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
     let first = apply_request(
@@ -45,16 +46,17 @@ fn exact_tenant_identifiers_remain_isolated_after_restart() {
                 .unwrap_or_else(|error| panic!("foreign snapshot: {error}")),
             None
         );
-        let consumed = consume(store, "exact-invocation", 10_100);
+        let consumed = consume(store, &clock, "exact-invocation", 10_100);
         assert!(consumed.allowed);
         assert_eq!(consumed.windows.len(), 1);
-        let foreign_consumption = store
-            .consume_session_invocation(&SessionThrottleConsumeRequest {
+        let foreign_consumption = at_observed_time(&clock, 10_100, || {
+            store.consume_session_invocation(&SessionThrottleConsumeRequest {
                 key: key.clone(),
                 invocation_id: record("exact-invocation"),
                 observed_at_unix_ms: 10_100,
             })
-            .unwrap_or_else(|error| panic!("foreign invocation: {error}"));
+        })
+        .unwrap_or_else(|error| panic!("foreign invocation: {error}"));
         assert!(foreign_consumption.allowed);
         assert!(foreign_consumption.windows.is_empty());
         let mut probe = owned;
@@ -68,7 +70,7 @@ fn exact_tenant_identifiers_remain_isolated_after_restart() {
     };
     check(&store);
     drop(store);
-    let reopened =
-        SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("reopen: {error}"));
+    let reopened = SqliteSecurityStateStore::open_with_trusted_clock(&path, clock.clone())
+        .unwrap_or_else(|error| panic!("reopen: {error}"));
     check(&reopened);
 }

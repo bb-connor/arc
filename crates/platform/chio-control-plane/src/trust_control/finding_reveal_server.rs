@@ -167,7 +167,7 @@ mod tests {
 
     #[tokio::test]
     async fn durable_resolver_reveals_after_store_restart() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = chio_test_support::private_tempdir().unwrap();
         let path = dir.path().join("operator.db");
         let tenant_id = TenantId::new("operator-alpha");
         let key = TenantKey::from_bytes([9; 32]);

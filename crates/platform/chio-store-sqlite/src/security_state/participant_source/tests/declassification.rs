@@ -172,7 +172,7 @@ pub(super) fn seed_history(store: &SqliteSecurityStateStore) -> TestResult {
 #[test]
 fn retains_pending_terminal_outbox_and_compacted_tombstones_without_resuming_dispatch() -> TestResult
 {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     seed_history(&store)?;
@@ -212,7 +212,7 @@ fn retains_pending_terminal_outbox_and_compacted_tombstones_without_resuming_dis
 
 #[test]
 fn corrupt_declassification_history_cannot_be_blessed_by_a_new_source_fingerprint() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     seed_history(&store)?;

@@ -14,7 +14,6 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 const TEST_EXPIRY_UNIX_MS: u64 = 4_102_444_800_000;
 
@@ -238,7 +237,8 @@ fn require_error<T>(result: Result<T, PortError>) -> PortError {
 
 #[test]
 fn exact_commands_survive_ack_loss_restart_and_out_of_order_removal() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("containment-commands.db");
     let first_action = action("containment-action-first");
     let second_action = action("containment-action-second");
@@ -370,7 +370,8 @@ fn exact_commands_survive_ack_loss_restart_and_out_of_order_removal() {
 
 #[test]
 fn stale_fences_and_action_rebinding_fail_closed() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("containment-binding.db");
     let first_action = action("containment-binding-first");
     let second_action = action("containment-binding-second");
@@ -456,7 +457,8 @@ fn stale_fences_and_action_rebinding_fail_closed() {
 
 #[test]
 fn readiness_rejects_derived_state_and_semantically_tampered_results() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("containment-readiness.db");
     let action_id = action("containment-readiness-action");
     let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);

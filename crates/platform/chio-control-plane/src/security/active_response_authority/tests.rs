@@ -653,7 +653,8 @@ mod linux_uds {
 
     #[test]
     fn runtime_boundaries_reject_same_process_topologies_without_test_override() {
-        let directory = tempfile::tempdir().test_expect("same-process socket directory");
+        let directory =
+            chio_test_support::private_tempdir().test_expect("same-process socket directory");
         let authority = Keypair::from_seed(&[45_u8; 32]);
         let (socket_path, _listener) = bind_private_listener(&directory);
         let client_signer: Arc<dyn SigningBackend> =
@@ -696,7 +697,8 @@ mod linux_uds {
 
     #[test]
     fn signed_uds_health_round_trip_authenticates_both_peers_without_owning_socket() {
-        let directory = tempfile::tempdir().test_expect("authority socket directory");
+        let directory =
+            chio_test_support::private_tempdir().test_expect("authority socket directory");
         let authority = Keypair::from_seed(&[45_u8; 32]);
         let (socket_path, listener) = bind_private_listener(&directory);
         let server = serve_protocol_once(listener, authority.clone(), None);
@@ -711,7 +713,8 @@ mod linux_uds {
 
     #[test]
     fn signed_uds_policy_rejection_is_a_permanent_conflict() {
-        let directory = tempfile::tempdir().test_expect("authority socket directory");
+        let directory =
+            chio_test_support::private_tempdir().test_expect("authority socket directory");
         let authority = Keypair::from_seed(&[49_u8; 32]);
         let rejection_code =
             ErrorCode::new("active_response.policy_rejected").test_expect("bounded rejection code");
@@ -735,7 +738,8 @@ mod linux_uds {
 
     #[test]
     fn signed_uds_transient_rejection_is_retryable_unavailable() {
-        let directory = tempfile::tempdir().test_expect("authority socket directory");
+        let directory =
+            chio_test_support::private_tempdir().test_expect("authority socket directory");
         let authority = Keypair::from_seed(&[53_u8; 32]);
         let rejection_code = ErrorCode::new("active_response.authority_busy")
             .test_expect("bounded transient rejection code");
@@ -911,7 +915,8 @@ mod linux_uds {
 
     #[test]
     fn signed_uds_trickle_cannot_extend_the_absolute_read_deadline() {
-        let directory = tempfile::tempdir().test_expect("authority socket directory");
+        let directory =
+            chio_test_support::private_tempdir().test_expect("authority socket directory");
         let authority = Keypair::from_seed(&[50_u8; 32]);
         let (socket_path, listener) = bind_private_listener(&directory);
         let server_authority = authority.clone();
@@ -960,7 +965,8 @@ mod linux_uds {
             bind, listen, socket_with, AddressFamily, SocketAddrUnix, SocketFlags, SocketType,
         };
 
-        let directory = tempfile::tempdir().test_expect("backlog socket directory");
+        let directory =
+            chio_test_support::private_tempdir().test_expect("backlog socket directory");
         let socket_path = directory.path().join("backlog.sock");
         let socket = socket_with(
             AddressFamily::UNIX,

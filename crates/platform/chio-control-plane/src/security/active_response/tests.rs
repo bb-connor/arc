@@ -446,7 +446,7 @@ impl Harness {
 
     fn with_lease_duration(lease_duration_ms: u64) -> Self {
         let now_unix_ms = system_now_unix_ms();
-        let tempdir = tempfile::tempdir()
+        let tempdir = chio_test_support::private_tempdir()
             .unwrap_or_else(|error| panic!("create executor test directory: {error}"));
         let database_path = tempdir.path().join("active-response.sqlite3");
         let clock = Arc::new(FixedClock::new(now_unix_ms));

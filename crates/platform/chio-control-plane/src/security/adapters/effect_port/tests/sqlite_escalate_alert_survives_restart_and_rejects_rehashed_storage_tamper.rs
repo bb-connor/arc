@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("effect-alerts.sqlite");
     let config = AlertOutboxConfig {
         base_retry_ms: 10,

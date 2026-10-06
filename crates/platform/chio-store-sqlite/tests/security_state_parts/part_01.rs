@@ -44,7 +44,6 @@ use chio_store_sqlite::{
     security_state::Clock, SqliteEncryptedBlobStore, SqliteReceiptStore, SqliteSecurityStateStore,
     TenantId as BlobTenantId, TenantKey,
 };
-use tempfile::tempdir;
 
 fn tenant(value: &str) -> TenantId {
     TenantId::new(value).unwrap_or_else(|error| panic!("tenant id: {error}"))
@@ -371,68 +370,9 @@ fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
 }
 
 #[test]
-fn migration_is_idempotent_and_preserves_existing_tables() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-    let path = directory.path().join("state.db");
-    let receipt_store = SqliteReceiptStore::open(&path)
-        .unwrap_or_else(|error| panic!("open receipt store: {error}"));
-    let keypair = Keypair::generate();
-    let receipt = ChioReceipt::sign(
-        ChioReceiptBody {
-            id: "security-migration-receipt".to_owned(),
-            timestamp: 1,
-            capability_id: "security-migration-capability".to_owned(),
-            tool_server: "migration-server".to_owned(),
-            tool_name: "migration-tool".to_owned(),
-            action: ToolCallAction::from_parameters(serde_json::json!({}))
-                .unwrap_or_else(|error| panic!("tool action: {error}")),
-            decision: Some(Decision::Allow),
-            receipt_kind: ReceiptKind::MediatedDecision,
-            boundary_class: BoundaryClass::Prevent,
-            observation_outcome: None,
-            tool_origin: ToolOrigin::CallerExecuted,
-            redaction_mode: RedactionMode::None,
-            actor_chain: Vec::new(),
-            content_hash: "content".to_owned(),
-            policy_hash: "policy".to_owned(),
-            evidence: Vec::new(),
-            metadata: None,
-            trust_level: TrustLevel::default(),
-            tenant_id: Some("tenant-a".to_owned()),
-            kernel_key: keypair.public_key(),
-            bbs_projection_version: None,
-        },
-        &keypair,
-    )
-    .unwrap_or_else(|error| panic!("sign receipt: {error}"));
-    receipt_store
-        .append_chio_receipt_returning_seq(&receipt)
-        .unwrap_or_else(|error| panic!("append receipt: {error}"));
-    drop(receipt_store);
-
-    drop(
-        SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("first open: {error}")),
-    );
-    drop(
-        SqliteSecurityStateStore::open(&path)
-            .unwrap_or_else(|error| panic!("second open: {error}")),
-    );
-
-    let connection = rusqlite::Connection::open(&path)
-        .unwrap_or_else(|error| panic!("reopen database: {error}"));
-    let receipt_id: String = connection
-        .query_row(
-            "SELECT receipt_id FROM chio_tool_receipts WHERE receipt_id = ?1",
-            rusqlite::params![receipt.id.as_str()],
-            |row| row.get(0),
-        )
-        .unwrap_or_else(|error| panic!("load existing receipt: {error}"));
-    assert_eq!(receipt_id, receipt.id);
-}
-
-#[test]
 fn response_effect_generation_migration_preserves_existing_intent() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("legacy-response-effect.db");
     let connection = rusqlite::Connection::open(&path)
         .unwrap_or_else(|error| panic!("open legacy database: {error}"));
@@ -525,7 +465,8 @@ fn response_effect_generation_migration_preserves_existing_intent() {
 
 #[test]
 fn response_effect_owner_migration_rejects_unbound_existing_intent() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("unbound-response-effect.db");
     let connection = rusqlite::Connection::open(&path)
         .unwrap_or_else(|error| panic!("open legacy database: {error}"));
@@ -576,7 +517,8 @@ fn response_effect_owner_migration_rejects_unbound_existing_intent() {
 
 #[test]
 fn scheduler_retry_health_migration_preserves_age_conservatively() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("legacy-scheduler-retry.db");
     let connection = rusqlite::Connection::open(&path)
         .unwrap_or_else(|error| panic!("open legacy database: {error}"));
@@ -618,26 +560,9 @@ fn scheduler_retry_health_migration_preserves_age_conservatively() {
 }
 
 #[test]
-fn security_state_rejects_ephemeral_sqlite_paths() {
-    for path in [
-        "",
-        ":memory:",
-        "file:security-state?mode=memory&cache=shared",
-        "FILE:security-state?mode=memory",
-        "security-state?mode=memory",
-        "security-state#fragment",
-    ] {
-        assert_eq!(
-            require_error(SqliteSecurityStateStore::open(path)).kind(),
-            PortErrorKind::InvalidData,
-            "path must be rejected: {path:?}"
-        );
-    }
-}
-
-#[test]
 fn concurrent_joins_retain_every_restriction_and_new_sessions_inherit() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     drop(
         SqliteSecurityStateStore::open(&path)
@@ -691,7 +616,8 @@ fn concurrent_joins_retain_every_restriction_and_new_sessions_inherit() {
 
 #[test]
 fn generation_change_invalidates_an_egress_fence() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let snapshot = store
@@ -736,7 +662,8 @@ fn generation_change_invalidates_an_egress_fence() {
 
 #[test]
 fn egress_fence_binds_the_canonical_request_hash() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let snapshot = store
@@ -782,7 +709,8 @@ fn egress_fence_binds_the_canonical_request_hash() {
 
 #[test]
 fn lineage_change_invalidates_every_principal_context() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let first_key = key("session-a");
@@ -840,7 +768,8 @@ fn lineage_change_invalidates_every_principal_context() {
 
 #[test]
 fn no_op_shared_label_joins_preserve_sibling_context_integrity() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
 
@@ -919,7 +848,8 @@ fn no_op_shared_label_joins_preserve_sibling_context_integrity() {
 
 #[test]
 fn new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let original = key("lineage-a-session");
@@ -981,7 +911,8 @@ fn new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch() {
 
 #[test]
 fn session_taint_is_shared_across_lineages_within_an_epoch() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let first = key("shared-session");
@@ -1033,7 +964,8 @@ fn session_taint_is_shared_across_lineages_within_an_epoch() {
 
 #[test]
 fn session_change_invalidates_same_session_fences_across_lineages() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let first = key("shared-fenced-session");
@@ -1099,7 +1031,8 @@ fn session_change_invalidates_same_session_fences_across_lineages() {
 
 #[test]
 fn missing_flow_context_generation_fails_closed() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -1128,7 +1061,8 @@ fn missing_flow_context_generation_fails_closed() {
 #[test]
 fn missing_flow_epoch_or_session_row_fails_closed() {
     for missing_table in ["security_isolation_epochs", "security_session_flow_state"] {
-        let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let path = directory.path().join("state.db");
         let store = SqliteSecurityStateStore::open(&path)
             .unwrap_or_else(|error| panic!("open store: {error}"));
@@ -1155,7 +1089,8 @@ fn missing_flow_epoch_or_session_row_fails_closed() {
 
 #[test]
 fn egress_fence_rejects_corrupt_flow_state() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -1199,7 +1134,8 @@ fn egress_fence_rejects_corrupt_flow_state() {
 
 #[test]
 fn egress_dispatch_commitment_is_idempotent_and_immutable() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
         .unwrap_or_else(|error| panic!("open store: {error}"));
     let snapshot = store
@@ -1258,7 +1194,8 @@ fn egress_dispatch_commitment_is_idempotent_and_immutable() {
 
 #[test]
 fn lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -1364,7 +1301,8 @@ fn lineage_fences_are_durable_and_orphans_recover_with_higher_fencing_tokens() {
 
 #[test]
 fn isolation_epoch_must_be_verified_and_preserves_lineage_taint() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -1434,7 +1372,8 @@ fn isolation_epoch_must_be_verified_and_preserves_lineage_taint() {
 
 #[test]
 fn corrupt_canonical_hash_fails_closed_on_read() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -1494,7 +1433,8 @@ fn corrupt_canonical_hash_fails_closed_on_read() {
 
 #[test]
 fn scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("scheduler-health.db");
     let now = current_unix_ms();
     let store =
@@ -1597,7 +1537,8 @@ fn scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent() {
 
 #[test]
 fn scheduler_takeover_fences_stale_overlay_mutations() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let now = current_unix_ms();
     let clock = Arc::new(FixedSecurityStateClock::new(now));
@@ -1737,7 +1678,8 @@ fn scheduler_takeover_fences_stale_overlay_mutations() {
 
 #[test]
 fn injected_clock_controls_scheduler_lease_and_overlay_mutations() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let clock = Arc::new(FixedSecurityStateClock::new(50_000));
     let store_clock: Arc<dyn Clock> = clock.clone();
     let store = SqliteSecurityStateStore::open_with_trusted_clock(

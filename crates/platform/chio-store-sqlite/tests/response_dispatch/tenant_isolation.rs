@@ -3,7 +3,8 @@ use chio_security_types::ports::PortError;
 
 #[test]
 fn exact_dispatch_id_cannot_cross_tenants_after_restart() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("directory: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("directory: {error}"));
     let path = directory.path().join("tenant-dispatch.sqlite");
     let now = now_unix_ms();
     let request = dispatch_request("exact-action", "exact-dispatch", now, now, now + 10_000);

@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn matching_fingerprints_cannot_substitute_for_retained_row_validation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("source.db");
     drop(crate::security_state::seeded_security_history(&path)?);
     let source = SqliteSecurityParticipantSource::open(&path)?;

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn durable_production_planner_reloads_the_exact_batch_after_restart() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("durable-planner.sqlite");
     let findings = reverse_lexicographic_findings();
     let expected = build_attested_finding_batch_publication(&findings)

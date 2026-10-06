@@ -527,7 +527,7 @@ mod tests {
     #[test]
     fn private_directory_creates_missing_components_without_reparse_points(
     ) -> Result<(), std::io::Error> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let target = directory.path().join("nested").join("project");
 
         let prepared = prepare_private_directory(&target)?;
@@ -540,7 +540,7 @@ mod tests {
     #[test]
     fn prepared_directory_supports_root_relative_scaffold_operations() -> Result<(), std::io::Error>
     {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let target = directory.path().join("project");
         let prepared = prepare_private_directory(&target)?;
 
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn prepared_directory_write_new_never_overwrites_existing_file() -> Result<(), std::io::Error> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let target = directory.path().join("project");
         let prepared = prepare_private_directory(&target)?;
         prepared.write_new(Path::new("policy.yaml"), b"first\n")?;
@@ -573,7 +573,7 @@ mod tests {
 
     #[test]
     fn prepared_directory_relative_operations_reject_escape_paths() -> Result<(), std::io::Error> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let target = directory.path().join("project");
         let prepared = prepare_private_directory(&target)?;
 
@@ -594,7 +594,7 @@ mod tests {
     #[test]
     fn prepared_directory_rejects_inserted_junction_during_relative_walk(
     ) -> Result<(), std::io::Error> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let target = directory.path().join("project");
         let outside = directory.path().join("attacker-selected");
         let junction = target.join("src");
@@ -616,7 +616,7 @@ mod tests {
     #[test]
     fn private_directory_rejects_intermediate_junction_before_creating_leaf(
     ) -> Result<(), std::io::Error> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let outside = directory.path().join("attacker-selected");
         let junction = directory.path().join("alias");
         fs::create_dir(&outside)?;
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn private_directory_rejects_final_junction() -> Result<(), std::io::Error> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let outside = directory.path().join("attacker-selected");
         let junction = directory.path().join("authority.locks");
         fs::create_dir(&outside)?;

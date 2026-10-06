@@ -1,6 +1,7 @@
 #[test]
 fn scheduler_and_effect_reads_verify_canonical_hashes() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -84,7 +85,8 @@ fn scheduler_and_effect_reads_verify_canonical_hashes() {
 #[test]
 fn overlapping_overlay_contributions_are_removed_independently() {
     for reverse in [false, true] {
-        let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let now = current_unix_ms();
         let store = SqliteSecurityStateStore::open(directory.path().join("state.db"))
             .unwrap_or_else(|error| panic!("open store: {error}"));
@@ -193,7 +195,8 @@ fn overlapping_overlay_contributions_are_removed_independently() {
 
 #[test]
 fn overlay_effect_identity_cannot_cross_action_boundaries() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -328,7 +331,8 @@ fn overlay_effect_identity_cannot_cross_action_boundaries() {
 
 #[test]
 fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -669,7 +673,8 @@ fn verified_event_correlation_is_durable_and_advisory_events_remain_segregated()
 
 #[test]
 fn verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("atomic-correlation.db");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("open store: {error}"));
@@ -792,7 +797,8 @@ fn verified_event_capacity_and_rule_index_roll_back_as_one_sqlite_transaction() 
 
 #[test]
 fn correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("correlation-event-time-order.db");
     let store = SqliteSecurityStateStore::open(&path)
         .unwrap_or_else(|error| panic!("open correlation ingress store: {error}"));
@@ -814,7 +820,8 @@ fn correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix() {
 
 #[test]
 fn correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("correlation-concurrent-ack.db");
     let store = SqliteSecurityStateStore::open(&path)
         .unwrap_or_else(|error| panic!("open correlation ingress store: {error}"));
@@ -840,7 +847,8 @@ fn correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement() 
 
 #[test]
 fn correlation_ingress_upgrades_the_known_legacy_pending_index() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("correlation-legacy-index.db");
     drop(
         SqliteSecurityStateStore::open(&path)
@@ -946,7 +954,8 @@ fn correlation_schema_drift_fails_startup() {
     ];
 
     for (index, (case, mutation)) in mutations.into_iter().enumerate() {
-        let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let path = directory
             .path()
             .join(format!("correlation-schema-{index}.db"));
@@ -972,7 +981,8 @@ fn correlation_schema_drift_fails_startup() {
 #[test]
 fn acknowledged_correlation_tombstone_source_binding_corruption_fails_readiness() {
     for corrupt_source_evidence in [true, false] {
-        let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let path = directory.path().join(if corrupt_source_evidence {
             "corrupt-acknowledged-source.db"
         } else {

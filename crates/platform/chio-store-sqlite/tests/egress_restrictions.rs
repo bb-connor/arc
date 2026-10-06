@@ -14,7 +14,6 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
 use chio_store_sqlite::{security_state::Clock, SqliteSecurityStateStore};
-use tempfile::tempdir;
 
 fn now_unix_ms() -> u64 {
     let elapsed = SystemTime::now()
@@ -212,7 +211,8 @@ fn decision(
 
 #[test]
 fn restrictions_survive_restart_and_overlap_removes_out_of_order() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("egress.db");
     let now = now_unix_ms();
     let store =
@@ -346,7 +346,8 @@ fn restrictions_survive_restart_and_overlap_removes_out_of_order() {
 
 #[test]
 fn action_rebinding_and_stale_scheduler_fences_fail_closed() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("egress-fence.db");
     let now = now_unix_ms();
     let clock = Arc::new(MutableSecurityStateClock::new(now));
@@ -412,7 +413,8 @@ fn action_rebinding_and_stale_scheduler_fences_fail_closed() {
 
 #[test]
 fn readiness_detects_corrupt_derived_generation() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("egress-corrupt.db");
     let now = now_unix_ms();
     let store =

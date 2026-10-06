@@ -5,7 +5,8 @@ fn outcome_sink_failure_leaves_a_durable_terminal_outcome() {
     let authority = Keypair::from_seed(&[78; 32]);
     let purpose =
         DeclassificationPurpose::new("support").unwrap_or_else(|error| panic!("purpose: {error}"));
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         open_declassification_test_store(directory.path().join("outcome-sink-failure.sqlite"))
             .unwrap_or_else(|error| panic!("declassification store: {error:?}")),

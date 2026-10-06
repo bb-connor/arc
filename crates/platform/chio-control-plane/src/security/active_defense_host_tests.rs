@@ -287,7 +287,8 @@ struct HostFixture {
 
 impl HostFixture {
     fn new() -> Self {
-        let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let security_path = directory.path().join("security-state.sqlite");
         let clock = Arc::new(FixedClock::new(50_000));
         let store_clock: Arc<dyn chio_store_sqlite::security_state::Clock> = clock.clone();
