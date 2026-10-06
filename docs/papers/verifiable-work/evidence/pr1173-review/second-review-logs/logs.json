@@ -1200,6 +1200,1194 @@
       "observed_result": "package-manager lock regeneration; complete final graph separately verified",
       "bytes": 151,
       "sha256": "6a75de8258c6154227632116f0595288d06a9d0fe2105b45947d1c6920041f2c"
+    },
+    {
+      "log": "a2a-nonterminal-red.log.gz",
+      "observed_result": "two actual signed pending-approval tasks are lost on the original implementation",
+      "bytes": 22358,
+      "sha256": "e1acda75f64828d952cb09fbfab848cb1ce8fd69afaca728c0f42d5faa7613a6"
+    },
+    {
+      "log": "a2a-nonterminal-red.status.json.gz",
+      "observed_result": "terminal original two-failure regression, exit 101",
+      "bytes": 417,
+      "sha256": "27459b00c3440b2e9f9d286b130083faf848e86c51688de49536dd224efb0018"
+    },
+    {
+      "log": "a2a-nonterminal-consumer-boundary.log.gz",
+      "observed_result": "first broader run: two repaired regressions pass; four stale approval fixtures fail",
+      "bytes": 20113,
+      "sha256": "c46ecc5ae6c5701fbac2819f92487503b9bd076fe884da3f585e94e956c1b03a"
+    },
+    {
+      "log": "a2a-nonterminal-green.status.json.gz",
+      "observed_result": "failed first broader campaign; no aggregate pass",
+      "bytes": 374,
+      "sha256": "90d3b2f326e8914eb4978c6f48ee654a5d5bfc0f65e3304b76ded746caf9514c"
+    },
+    {
+      "log": "a2a-nonterminal-final.status.json.gz",
+      "observed_result": "all five actual tests and strict Clippy commands pass",
+      "bytes": 1475,
+      "sha256": "c7c17890d0c8b8678269139fcf68b4c283e81a14be142ea4759d480267e15816"
+    },
+    {
+      "log": "a2a-nonterminal-structural.status.json.gz",
+      "observed_result": "initial proof inventory check reports stale source digest",
+      "bytes": 168,
+      "sha256": "77450ac5bcd111448d5c3f775ef3c6a68b63cf59cadd163e0948dbf614b2d542"
+    },
+    {
+      "log": "a2a-nonterminal-proof-coverage.log.gz",
+      "observed_result": "initial stale inventory failure retained separately",
+      "bytes": 317,
+      "sha256": "27ace1b248a8435e330fe768b5be53804cd2f539bbba55c94b29e76c61ef5e93"
+    },
+    {
+      "log": "a2a-nonterminal-structural-final.status.json.gz",
+      "observed_result": "all six final structural and inventory checks pass",
+      "bytes": 869,
+      "sha256": "d6129fb1dc8fb565806e38867cbf59a3b15e642d8f20eb25b02d67ca8842b401"
+    },
+    {
+      "log": "3b6b2ba447-advisory-success.log.gz",
+      "observed_result": "preceding candidate passes all eight Rust scans, unfiltered OSV and six real regressions",
+      "bytes": 149118,
+      "sha256": "282055b711778e7b30ab8bbde51f696c8e186da9ba8be279b122441fc1846770"
+    },
+    {
+      "log": "3b6b2ba447-advisory.zip.gz",
+      "observed_result": "authenticated twelve-member public successful scanner archive for preceding candidate",
+      "bytes": 11616,
+      "sha256": "d1b6e3e3dcc78a87faeca33d8de5603225271a66e3ce2a34b91c511cdd83bad7"
+    },
+    {
+      "log": "3b6b2ba447-advisory-artifact.json.gz",
+      "observed_result": "archive authentication metadata for preceding candidate",
+      "bytes": 788,
+      "sha256": "0864afa6fda3c50ded345a7d2cdd4c6e130dcaa506332850d364221c8975679f"
+    },
+    {
+      "log": "3b6b2ba447-advisory-job.json.gz",
+      "observed_result": "terminal successful preceding-candidate advisory job metadata",
+      "bytes": 5281,
+      "sha256": "c1d6603cb48b278e995831f189beefcdc68e6c2cb4d2b2dcdc2af1d25ac91f78"
+    },
+    {
+      "log": "3b6b2ba447-advisory-verification.json.gz",
+      "observed_result": "independent archive checks; zero vulnerabilities, known warnings retained",
+      "bytes": 1893,
+      "sha256": "4ab547721d13e512874b257dcc5d8d325603d72c9eb0fdbccbf05c1fe3db6cfc"
+    },
+    {
+      "log": "3b6b2ba447-composite-audit-success.log.gz",
+      "observed_result": "preceding-candidate complete standalone locked audit and default/FIPS regressions pass",
+      "bytes": 94748,
+      "sha256": "f6f0c3f3c5881b7451e2e7ef1bf25f5792d0b64a05683b16e143d77ad929f436"
+    },
+    {
+      "log": "3b6b2ba447-vet-run-current.json.gz",
+      "observed_result": "preceding-candidate terminal standalone audit metadata",
+      "bytes": 12112,
+      "sha256": "db91b9fc3c75aa7131e4c53dcd0609c2312fddc002268408523c242e997a8663"
+    },
+    {
+      "log": "3b6b2ba447-vet-jobs-current.json.gz",
+      "observed_result": "preceding-candidate terminal standalone audit job metadata",
+      "bytes": 3091,
+      "sha256": "5edb14e25af316aca6711fdad8c3b507e467198a8b0cea38745646d38d2b055a"
+    },
+    {
+      "log": "3b6b2ba447-reviews-refresh.json.gz",
+      "observed_result": "review identifies the additional nonterminal task-custody P2",
+      "bytes": 88749,
+      "sha256": "7bf3a88f6846cacc298591952558754dcbfb0aaa5e4ffbb1bb7ba061e090581e"
+    },
+    {
+      "log": "qualification-9b40dc9128.status.json.gz",
+      "observed_result": "all 21 native commands pass on the repaired source",
+      "bytes": 268,
+      "sha256": "a97862481a0012d068af5cd0d9fd9da08f03a960b43e8e3232f65b9bc8c51258"
+    },
+    {
+      "log": "review-native-qualification-9b40dc9128.log.gz",
+      "observed_result": "terminal source-bound native qualification",
+      "bytes": 539,
+      "sha256": "d32a98cd8baf169ce0c833c175ce565b248f02fd026630d93e3508ce745723d0"
+    },
+    {
+      "log": "qualification-5276181468.status.json.gz",
+      "observed_result": "preceding source passes all 21 native commands; independently preserved snapshot",
+      "bytes": 268,
+      "sha256": "c281c0b5d83e81ada253c238a038b7a4241c30b082d9ce8fa59a97d23975882f"
+    },
+    {
+      "log": "review-native-qualification-5276181468.log.gz",
+      "observed_result": "terminal preceding-source native package, 21 commands and 48 outputs",
+      "bytes": 539,
+      "sha256": "b7aa75d3686c60f3d3c0cb4ccb918286a038cb9305e74d99acdf4928c3dfd123"
+    },
+    {
+      "log": "paper-nonterminal-5276181468.status.json.gz",
+      "observed_result": "dependent waiter interrupted before any commands after new owned CI failure",
+      "bytes": 405,
+      "sha256": "0b15b6e50a9ea122b4f112edd592d4599949c33082663d6fbd954cf3e5768965"
+    },
+    {
+      "log": "receipt-verifier-5276181468.status.json.gz",
+      "observed_result": "verifier waiter interrupted before build after new owned CI failure",
+      "bytes": 425,
+      "sha256": "8dc33bb53008e3637625535d9dfd3d15b9f9c3d714f8c792af5a874ac60a81ab"
+    },
+    {
+      "log": "flow-security-inventory-contract-red.log.gz",
+      "observed_result": "updated contract rejects stale twenty-name inventory",
+      "bytes": 5068,
+      "sha256": "17521e64a17b576008be419029574430c83d616ecea2a63e2473a86056272f30"
+    },
+    {
+      "log": "flow-security-inventory-contract-red.status.json.gz",
+      "observed_result": "terminal actual contract failure before gate repair",
+      "bytes": 307,
+      "sha256": "b29a9951e33dc02af4f834b7ac30153258c6d57b23090e2d69544abd954309af"
+    },
+    {
+      "log": "flow-security-inventory-compiled-red.log.gz",
+      "observed_result": "all 26 actual tests pass; old inventory rejects six additional cases",
+      "bytes": 9962,
+      "sha256": "e5793084fdaec2eb7ef209d700ecabced39ea0c40be02a4fb04eeeeab09e6787"
+    },
+    {
+      "log": "flow-security-inventory-compiled-red.status.json.gz",
+      "observed_result": "terminal actual compiled-inventory failure before repair",
+      "bytes": 1872,
+      "sha256": "d8dc6f96e24ac831b81cb405b8644fafe3e2fa8ceb7127573b6152e13bc529c1"
+    },
+    {
+      "log": "flow-security-inventory-controls-green.status.json.gz",
+      "observed_result": "earlier bounded clock inventory calibration passes; later full controls retained separately",
+      "bytes": 584,
+      "sha256": "f3ce8a1eaed894b58f776819003cfeb9e49c8e0493a382f40f3b0865af334ea3"
+    },
+    {
+      "log": "flow-security-composed-final.status.json.gz",
+      "observed_result": "complete actual composed flow gate is terminal passing",
+      "bytes": 1656,
+      "sha256": "cdac5479c1c7429e653ecb80b01d0b40c2caa297877371bab222f26e28514819"
+    },
+    {
+      "log": "flow-security-composed-final-gate.log.gz",
+      "observed_result": "positive and negative formal controls, WASM checks and all 71 actual inventories pass",
+      "bytes": 558117,
+      "sha256": "23267e5a65a0ce6ce03488b6a906fd6b198178f5508215a58b9c6ee4c238539c"
+    },
+    {
+      "log": "3b6b2ba447-postgres-failure.log.gz",
+      "observed_result": "both confined worker trajectories pass; actual runtime retirement fails its original receipt binding assertion",
+      "bytes": 400585,
+      "sha256": "0753d4702316a6db302f26fac651c3e688f5a54aedd461bbd6d7965714b395e6"
+    },
+    {
+      "log": "3b6b2ba447-postgres-failure-job.json.gz",
+      "observed_result": "authenticated terminal failed PostgreSQL job; failure scope is actual launch receipt binding",
+      "bytes": 6783,
+      "sha256": "01dcc73bd78f1141e2a81b826e0cf7b9e3ecf3c3c1576c5cb43891af2087294e"
+    },
+    {
+      "log": "3b6b2ba447-kani-success.log.gz",
+      "observed_result": "preceding head completes all 53 actual Kani harnesses with the repaired compiler",
+      "bytes": 108252448,
+      "sha256": "4b2d11183178468bebd72c53a71fd9b3d90eb7ee86cac809cafd3e09586d517b"
+    },
+    {
+      "log": "3b6b2ba447-kani-success-job.json.gz",
+      "observed_result": "authenticated preceding-head terminal Kani success",
+      "bytes": 4293,
+      "sha256": "d0ff73d971d46e2a7dab37401d7303ef99038dfce26445b62defc01e55ea280c"
+    },
+    {
+      "log": "3b6b2ba447-kani-success.verification.json.gz",
+      "observed_result": "independent proof block and harness identity verification",
+      "bytes": 5430,
+      "sha256": "d55ffc157cf18c7c3456cd71fec1126fe76193e75415485de6737594d1131796"
+    },
+    {
+      "log": "3b6b2ba447-security-authorities-refresh.json.gz",
+      "observed_result": "repository-owned source and definition; signed package and policy absent",
+      "bytes": 729,
+      "sha256": "6d93e2ccfed208d28531ad370f278d08788ca98abad81e7476485529e023efbc"
+    },
+    {
+      "log": "3b6b2ba447-security-authorities-final.json.gz",
+      "observed_result": "later repository authority refresh; committed package and policy still absent",
+      "bytes": 255,
+      "sha256": "9032270b7b5fab51026fcc047b5d1d27b6a661688641748e153ef08c4de7acf7"
+    },
+    {
+      "log": "3b6b2ba447-build-failure.log.gz",
+      "observed_result": "main CI fails the original stub scanner before workspace build and tests",
+      "bytes": 733276,
+      "sha256": "f8e8c2e72a5549e366d35e85b974ad541aa50a76079a200a8196a9cfbaa8e6ce"
+    },
+    {
+      "log": "3b6b2ba447-build-failure-job.json.gz",
+      "observed_result": "authenticated preceding-head main CI failure metadata",
+      "bytes": 13411,
+      "sha256": "52ee27c42fb07e7dc8545a88ae398bb354d7812677d6cf404b954a7d78388595"
+    },
+    {
+      "log": "3b6b2ba447-msrv-failure.log.gz",
+      "observed_result": "MSRV reaches nine passing certification tests, four authority-parent fixture failures and one existing ignore",
+      "bytes": 673406,
+      "sha256": "c5aae49140a7b663b41c9e3d8462b6d72b110e5f6246f55d7e9a2115751f1920"
+    },
+    {
+      "log": "3b6b2ba447-msrv-failure-job.json.gz",
+      "observed_result": "authenticated preceding-head MSRV failure metadata",
+      "bytes": 4503,
+      "sha256": "06a612ec9f929e8c483b5ba3ba652dc4974ad2b32063d1595bbf86c39abe0073"
+    },
+    {
+      "log": "certify-fixture-extraction.json.gz",
+      "observed_result": "original fixture hash, five private database pairs and unchanged assertions; normal modules replace obsolete size cap",
+      "bytes": 483,
+      "sha256": "2afe1688b286a5fdb7b6e261a06cb8900a03f1a4dda5c3f48f715340f53f711f"
+    },
+    {
+      "log": "certify-fixture-inline-review.json.gz",
+      "observed_result": "fresh byte-exact comparison proves all five moved test bodies, assertions, deadlines and the existing ignore are unchanged outside private database parents",
+      "bytes": 473,
+      "sha256": "a8b7ffae1fe78a47ff850dae84ca6f903a4f3a62627a7081606673f1e1178ac2"
+    },
+    {
+      "log": "security-authorities-20261006T060739.json.gz",
+      "observed_result": "later read-only check of actual authority variables; source/definition unchanged and signed Linux evidence commit and policy still absent",
+      "bytes": 538,
+      "sha256": "b02e901e5380b5048ecb9e3c5ee514efb379058d1a95e93f17784cca2f680ee1"
+    },
+    {
+      "log": "security-authorities-20261006T053218.json.gz",
+      "observed_result": "fresh read-only authority check; original security owner source/definition remain pinned and Linux evidence SHA and policy remain absent",
+      "bytes": 866,
+      "sha256": "a4f1415dfb26147ae2b4ab2556e5a2da9fa7c9202d9bc81616e65a5d3d72671c"
+    },
+    {
+      "log": "3b6b2ba447-installed-consumer-failure.log.gz",
+      "observed_result": "installed repository operator fails its original first native run with request timeout",
+      "bytes": 350272,
+      "sha256": "007d21f1f2c34c1cdc4f658e77d6952ae6ef3ce1430973d13a90f1ded08dcbb8"
+    },
+    {
+      "log": "3b6b2ba447-installed-consumer-failure-job.json.gz",
+      "observed_result": "authenticated preceding-head installed-consumer failure metadata",
+      "bytes": 9501,
+      "sha256": "4e6851930ab6c301f3d2fbbf83ac22f62e3eb0eaae1d20c9d75415e09c7e3598"
+    },
+    {
+      "log": "3b6b2ba447-mcp-process-failure.log.gz",
+      "observed_result": "native host aggregate refuses installed-consumer failure despite other successful participants",
+      "bytes": 2514,
+      "sha256": "74186559d11dec33d1bd9f8249eaeb5b32a94f8680c463822548f97ecee8ebdb"
+    },
+    {
+      "log": "3b6b2ba447-mcp-process-failure-job.json.gz",
+      "observed_result": "authenticated preceding-head native host aggregate failure",
+      "bytes": 1704,
+      "sha256": "b0706b409f4b29d20cbf7c66b500ca0fd2ea0b8175f135707a8aa0abcc095966"
+    },
+    {
+      "log": "3b6b2ba447-mini-swe-operator-failure.json.gz",
+      "observed_result": "only bounded public failure classes and original incomplete run report are retained",
+      "bytes": 1094,
+      "sha256": "ee04524244069ad4a69856631953a2d5c9390feca6e6c9b38c6cc814b4aa02c0"
+    },
+    {
+      "log": "3b6b2ba447-mini-swe-artifact.json.gz",
+      "observed_result": "authenticated archive metadata; private worker logs and credentials are not retained",
+      "bytes": 795,
+      "sha256": "05769565df17b329d6dcfd856b12471c7c9c52eae2af167a06678357668b8bf8"
+    },
+    {
+      "log": "3b6b2ba447-security-aggregate-failure.log.gz",
+      "observed_result": "security aggregate rejects unsuccessful prerequisites and absent protected committed evidence",
+      "bytes": 3235,
+      "sha256": "bf9f885dc6ab25d004efd94d3a63be42d7fec36cb221a32a749cb85a586f8643"
+    },
+    {
+      "log": "3b6b2ba447-security-aggregate-failure-job.json.gz",
+      "observed_result": "authenticated preceding-head security aggregate failure metadata",
+      "bytes": 1786,
+      "sha256": "8c62da1034a7c505f44f0b687608e6a109e058dcbf703afae1b55f80a0dc4703"
+    },
+    {
+      "log": "3b6b2ba447-fuzz-success.log.gz",
+      "observed_result": "preceding head completes every actual ASan target without crashes",
+      "bytes": 2674084,
+      "sha256": "5651705ef59940e0c6380a3f55b2c3126cb521ca5d887742dd457d7fea45a41d"
+    },
+    {
+      "log": "3b6b2ba447-fuzz-success-job.json.gz",
+      "observed_result": "authenticated terminal preceding-head 34-target fuzz success",
+      "bytes": 5581,
+      "sha256": "d52717b4e7ef0b1adcbaaa018a8c3e5bf66d3a8c76abe2a2884789a900605153"
+    },
+    {
+      "log": "3b6b2ba447-fuzz-success.verification.json.gz",
+      "observed_result": "independent exact 34 build/start/end identities verified",
+      "bytes": 2399,
+      "sha256": "cc12b1420ed3858459d16bb71c8d84a959e041ca49aeda700b301b7c956d8216"
+    },
+    {
+      "log": "flow-security-composed-initial.status.json.gz",
+      "observed_result": "first full flow run stops at the stale response inventory, not a passing aggregate",
+      "bytes": 590,
+      "sha256": "781d935153cb61c55e928db59e775f2d16896cf31308f7a2e386e5ca52f9be1d"
+    },
+    {
+      "log": "flow-security-composed-initial.log.gz",
+      "observed_result": "actual initial full-flow inventory failure retained",
+      "bytes": 150484,
+      "sha256": "8ca7541220f13b22d0f42703e3a8defcbf64c7dd17b6ee2ea46b07f7f56027c2"
+    },
+    {
+      "log": "flow-security-compiled-preflight.status.json.gz",
+      "observed_result": "all 69 original selections compile; eleven remaining exact inventories mismatch",
+      "bytes": 221155,
+      "sha256": "98af7248d3d7e214b7e106e79c3d4805436faa7f6ee5e66c6250dbdf38b49f46"
+    },
+    {
+      "log": "flow-security-compiled-preflight-logs.tar.gz.gz",
+      "observed_result": "all 69 authenticated original compile/list raw outputs; no behavioral gate pass",
+      "bytes": 24087,
+      "sha256": "01cc477e6e6f7cf20007411bca2d9ba21528819fd862b3eac037dd2ad93931e8"
+    },
+    {
+      "log": "flow-security-compiled-preflight-archive.json.gz",
+      "observed_result": "archive member hashes and explicit compiled-only scope",
+      "bytes": 14758,
+      "sha256": "1d78ad0ad2886c1c7b7f0ccf9d67491b336f11baf514f20eb16a4d20b0b6a9c4"
+    },
+    {
+      "log": "flow-security-inventory-repair.json.gz",
+      "observed_result": "reviewed compiled identity additions, provenance of two renames and removed converter cases",
+      "bytes": 6574,
+      "sha256": "03bb2423abc3e7984e3bece70f3506f7eecfd14de4fd093ab0aeffe841f39a1f"
+    },
+    {
+      "log": "flow-security-complete-contract-red.log.gz",
+      "observed_result": "updated complete contract rejects the original stale inventories",
+      "bytes": 5151,
+      "sha256": "e6e4b301cf262a65e6a54aea6e9512689c963adc1954cba18141c93f5c19b749"
+    },
+    {
+      "log": "flow-security-complete-contract-red.status.json.gz",
+      "observed_result": "terminal actual complete-inventory contract failure before repair",
+      "bytes": 302,
+      "sha256": "66b657cf4b04332bcec92b5189f56285a827b80ec7d99dc64f03686fee2192ea"
+    },
+    {
+      "log": "flow-manifest-migration.log.gz",
+      "observed_result": "all eight existing operator migration cases pass, including authentic-v1 refusal",
+      "bytes": 5563,
+      "sha256": "3ece7aefd5f5296c88ab841d50e76ff291af834ab574f318cb980dcf0c2db45b"
+    },
+    {
+      "log": "flow-manifest-migration.status.json.gz",
+      "observed_result": "terminal existing operator-owned migration qualification",
+      "bytes": 2029,
+      "sha256": "4a3928fef318c0d1f04cec92b071fb5b7d8e43ec5ee391fef4b31fe844ece2b9"
+    },
+    {
+      "log": "consumer-inventory-contract-red.log.gz",
+      "observed_result": "updated ten-name consumer contract rejects original eight-name inventory",
+      "bytes": 325,
+      "sha256": "3329c990aac81715da03bf6e48cdc9f187d870d3850f9d897ef00888cbcd132b"
+    },
+    {
+      "log": "consumer-inventory-contract-red.status.json.gz",
+      "observed_result": "terminal original consumer contract failure",
+      "bytes": 283,
+      "sha256": "d81dbc0c8c318c19529dbdcb995dacebfbb17ebb116dbffd3df0f495f5bbcfdd"
+    },
+    {
+      "log": "consumer-inventory-compiled-red.log.gz",
+      "observed_result": "ten actual consumer tests pass before the original wrapper rejects the two added identities",
+      "bytes": 6081,
+      "sha256": "5f99b39691594ff9f70cac8af1d49c54c0937cc1bf5da7bacfc761e51f6d52e8"
+    },
+    {
+      "log": "consumer-inventory-compiled-red.status.json.gz",
+      "observed_result": "terminal exact consumer-inventory failure, not a behavior pass for the gate",
+      "bytes": 1195,
+      "sha256": "782b6377271c73fef2e7f836fc59a853d0b0879b77c29ef03311f2be12f18203"
+    },
+    {
+      "log": "kernel-legacy-receipt-compile-failed.log.gz",
+      "observed_result": "first portable fixture fails compilation on a test enum typo; no behavioral reproduction follows",
+      "bytes": 2542,
+      "sha256": "79cf44b1bf29374a86dec1cd3eeed56a8b689ee9211b684e5c4d9f59f1178e5c"
+    },
+    {
+      "log": "kernel-legacy-receipt-compile-failed.status.json.gz",
+      "observed_result": "separately retained compile failure before correcting the fixture",
+      "bytes": 544,
+      "sha256": "7877bd9d0d0dc742d5f14d5987920b4f2b977f4376a0914846405f921007eff0"
+    },
+    {
+      "log": "kernel-legacy-receipt-red.log.gz",
+      "observed_result": "corrected real signed-receipt regression fails the original missing launch binding",
+      "bytes": 3221,
+      "sha256": "03d34209f98223272af9ce686d4089b2b919e04070c1e462e998527f9db060c4"
+    },
+    {
+      "log": "kernel-legacy-receipt-red.status.json.gz",
+      "observed_result": "terminal actual receipt-binding behavioral failure",
+      "bytes": 544,
+      "sha256": "3adab71ceb39a50208d6ced6156d009902b4c08dea9068bceaf069ad1f8e2651"
+    },
+    {
+      "log": "kernel-legacy-receipt-green.status.json.gz",
+      "observed_result": "all ten delivery cases, strict kernel Clippy and format pass with exact source hashes",
+      "bytes": 1370,
+      "sha256": "aada8936ce302327331b9cba685be126316e8f4a356ae6d7a1f58b3dab643d2c"
+    },
+    {
+      "log": "kernel-legacy-receipt-late-log-custody.json.gz",
+      "observed_result": "older successful campaign schema lacks capture-time digests; retained raw outputs and source hashes are checked with explicit later digest capture",
+      "bytes": 1571,
+      "sha256": "ded52ef95036bb22e79bd33ce21c1979138ac92d30bc5e64aa90c570a3e1ffe6"
+    },
+    {
+      "log": "paper-inventory-9b40dc9128.status.json.gz",
+      "observed_result": "initial collector stops at legacy digest-schema mismatch before any artifact commands or paper mutation; native qualification remains successful",
+      "bytes": 282,
+      "sha256": "b08d2a282739043794e1ec6e5bad383239eae71bf9c83d181c152abc83f93f89"
+    },
+    {
+      "log": "freeze-inventory-followup-paper-first-preflight.py.gz",
+      "observed_result": "exact initial collector implementation retained with its preflight failure",
+      "bytes": 44430,
+      "sha256": "054a5faf5fdb3038fbba469ebd891eb522780a3d145559cad62ac0f1b220a124"
+    },
+    {
+      "log": "stub-surfaces-red.status.json.gz",
+      "observed_result": "original scanner rejects the real repository and updated checker controls",
+      "bytes": 581,
+      "sha256": "874ee5ef7bbb54b2a6398abc487b440f3a9feadb332f0f66e9592aeb697ded20"
+    },
+    {
+      "log": "stub-surfaces-green.status.json.gz",
+      "observed_result": "initial scanner repair passes before further macro calibration is added",
+      "bytes": 896,
+      "sha256": "0fc4d12134d64295df97d31ac2c449dd289c9018e8458d4d4c858ff94bf004de"
+    },
+    {
+      "log": "stub-surfaces-macro-whitespace-red.log.gz",
+      "observed_result": "first scanner repair falsely admits a whitespace-separated qualified executable TODO",
+      "bytes": 290,
+      "sha256": "1c819c3da340dc93ca501c13577faf79e97089ec6ed856498d4691f168e3bf21"
+    },
+    {
+      "log": "stub-surfaces-macro-whitespace-red.status.json.gz",
+      "observed_result": "terminal actual whitespace-macro control failure",
+      "bytes": 125,
+      "sha256": "fcf00521e54754616855de77466b6a477db4329371fe8d442e95b082af483d76"
+    },
+    {
+      "log": "stub-surfaces-final.status.json.gz",
+      "observed_result": "earlier whole scanner and controls pass; later qualified-comment calibration finds another gap",
+      "bytes": 896,
+      "sha256": "7f8152821e47195b754758f41e2aaf24e451701bf7b2bcb757dc1e485969b10b"
+    },
+    {
+      "log": "stub-surfaces-qualified-comments-red.log.gz",
+      "observed_result": "first added control rejects the macro on its unqualified import but falsely admits the qualified unfinished comment",
+      "bytes": 455,
+      "sha256": "3c511f0cabb90fcfe5616212fc1417b56a9c69eb68ab781236930d49f23f8e9b"
+    },
+    {
+      "log": "stub-surfaces-qualified-comments-red.status.json.gz",
+      "observed_result": "initial calibration failure retained with its original scope; corrected isolated macro control follows",
+      "bytes": 528,
+      "sha256": "e2b34b5bebfb325d28e63d841da10d93b8a1d413ff5b31a773c51b087cbbc318"
+    },
+    {
+      "log": "stub-surfaces-qualified-macro-red.log.gz",
+      "observed_result": "valid standard-library alias macro with intervening Rust comments is falsely admitted by the old exception",
+      "bytes": 375,
+      "sha256": "dc329a66aeee381bb1057a248a89b8acec12b4acd715aa68c935a167e224ae89"
+    },
+    {
+      "log": "stub-surfaces-qualified-macro-red.status.json.gz",
+      "observed_result": "actual isolated macro control fails after its source compiles as real Rust",
+      "bytes": 744,
+      "sha256": "30ed17f7996547c81138ce8cc7d88b5fbf43a23d649bdf588bc5770549f6a1ae"
+    },
+    {
+      "log": "stub-surfaces-qualified-final.status.json.gz",
+      "observed_result": "complete current scanner and every checker control pass with unchanged source hashes",
+      "bytes": 1070,
+      "sha256": "1b10b6c381dcf2cb4a109fcac535293e6b43177b66bc77d394c3c9a662c18d35"
+    },
+    {
+      "log": "mini-swe-diagnostics-launch-error.log.gz",
+      "observed_result": "missing virtual-environment launch; behavioral test was not executed",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "mini-swe-diagnostics-launch-error.status.json.gz",
+      "observed_result": "explicit not-executed diagnostic launch record",
+      "bytes": 185,
+      "sha256": "ac4d556a9fe1d0dae36bb4a4326d19f028e2d43b4722209db5bc8f019cd1237e"
+    },
+    {
+      "log": "mini-swe-diagnostics-red.log.gz",
+      "observed_result": "actual secret-seeded public method/deadline diagnostic is absent before the repair",
+      "bytes": 2139,
+      "sha256": "721af1b517526d97b13d2878861991130984bd728424b4ac4841c098ed898245"
+    },
+    {
+      "log": "mini-swe-diagnostics-red.status.json.gz",
+      "observed_result": "terminal actual diagnostic regression failure",
+      "bytes": 309,
+      "sha256": "76464f602924cb470f9e438c760f56e6cee8e8c6e0cf841f1dc5f0fc20d95303"
+    },
+    {
+      "log": "mini-swe-diagnostics-initial.status.json.gz",
+      "observed_result": "diagnostic and lint pass; first formatting check fails on test call wrapping",
+      "bytes": 1502,
+      "sha256": "ab283b2ce844d6de36e6023144cf18fdad1afef9aa32ace157c9050b9fde939c"
+    },
+    {
+      "log": "mini-swe-diagnostics-final.status.json.gz",
+      "observed_result": "diagnostic/lint/format pass; full SDK has seven missing-pidfd API failures in the selected interpreter",
+      "bytes": 2093,
+      "sha256": "b2658c61a83485a5d43f1d715a5d7d2345d3853b4b4285c7e4d0682046989daf"
+    },
+    {
+      "log": "mini-swe-native-python-final.status.json.gz",
+      "observed_result": "same locked dependencies under pidfd-capable system CPython: all 414 SDK/recovery tests and lint/format pass",
+      "bytes": 4290,
+      "sha256": "de26ab3ffda1cadcfd0c1567c7e4de4ddb299b5f90a0e67c1a2875cfff4436cb"
+    },
+    {
+      "log": "installed-native-diagnostic-checkpoint.json.gz",
+      "observed_result": "tested diagnostic-only source checkpoint; final source and hosted acceptance remain required",
+      "bytes": 426,
+      "sha256": "50fcdfa7035caf0f17a28dabffcec8eb3d58b011b5ca5a132752b9a236c2629e"
+    },
+    {
+      "log": "diagnostic-4b7480c686-ci-selection.json.gz",
+      "observed_result": "unrelated investigative checks are cancelled; native diagnosis remains selected; no aggregate qualification",
+      "bytes": 20160,
+      "sha256": "c886b80561bacb4580ac418a4bf243a9fc4d5ed209c3fbdfefa52e666c3fdde4"
+    },
+    {
+      "log": "inventory-controls-final.status.json.gz",
+      "observed_result": "whole 71-inventory and consumer contracts plus whitespace check pass",
+      "bytes": 2526,
+      "sha256": "188b8120f07880019c1673a4632183d9e4a74d544b547bbe63d3789c44d56a0e"
+    },
+    {
+      "log": "consumer-boundaries-composed-final.status.json.gz",
+      "observed_result": "six inventories and fifteen tests pass; first native MCP case then exits 101 on the unavailable Linux x86 host; no gate acceptance",
+      "bytes": 1672,
+      "sha256": "3128d67973090c7a150384ec21d9bb7dfa932a9637907963d41aea4387870f6c"
+    },
+    {
+      "log": "consumer-boundaries-composed-final-gate.log.gz",
+      "observed_result": "actual ARM consumer failure retained; enforcing-host assertion stays mandatory for final x86 qualification",
+      "bytes": 38419,
+      "sha256": "c749bc6fa4ff3d7a4d5f22aca091cb11ad7aa8bc5640fbe8adcf9435cfac35fd"
+    },
+    {
+      "log": "workspace-readiness-initial.status.json.gz",
+      "observed_result": "pending workspace waiter interrupted before any commands after two additional review findings",
+      "bytes": 533,
+      "sha256": "8f439dc2a1760c83f8fe71c789352b9e80ef9a4917cc837f4f834b640f5c2c3b"
+    },
+    {
+      "log": "workspace-readiness-portable-final.status.json.gz",
+      "observed_result": "certification target, selected strict Clippy, complete workspace test compilation and workspace library/binary/example Clippy pass; full execution requires x86",
+      "bytes": 824303,
+      "sha256": "5d63d6a69dd2772d9c0bf76754859f62eacd905a3af904b68dd48dda7826f763"
+    },
+    {
+      "log": "4b7480c686-reviews-current.json.gz",
+      "observed_result": "authenticated live review adds delegated cost ceiling and same-epoch revocation conflict findings",
+      "bytes": 93210,
+      "sha256": "f397ea13f8b7b8b85d0f7851b993afb860c47114032bdeb26feb253934bb16f3"
+    },
+    {
+      "log": "v1-custody-thread-resolution-4b7480c686.json.gz",
+      "observed_result": "qualified and pushed v1 custody finding resolved; native and new findings remain separate",
+      "bytes": 519,
+      "sha256": "bc1ecf91bd17c915754578c086315dea0defe776fdb14408b5a217238bd21af3"
+    },
+    {
+      "log": "review-epoch-ceilings-behavior-red.status.json.gz",
+      "observed_result": "two real targeted regressions reproduce the larger-cap refusal and same-epoch conflict acknowledgement, actual exits 101",
+      "bytes": 823540,
+      "sha256": "8a9ced612e91d4809132fef04dd5a08c156d261ae47249ed41da00de73d2ed0b"
+    },
+    {
+      "log": "review-epoch-ceilings-behavior-red-delegated.log.gz",
+      "observed_result": "actual signed SQLite 20/100 admission is incorrectly denied before the minimum-cap repair",
+      "bytes": 2695,
+      "sha256": "0737b85fd3a3be643d8a50854519859d0438754c2f1622d4bd1a3b7393d3e322"
+    },
+    {
+      "log": "review-epoch-ceilings-behavior-red-revocation.log.gz",
+      "observed_result": "five authentic conflict and handler regressions fail while identical/stale delivery remains a passing positive control",
+      "bytes": 10238,
+      "sha256": "95e0cf49d392eb0f52c070d500ae79c56a3f73d417a4e506f9bcbe5fc3b529f5"
+    },
+    {
+      "log": "review-epoch-ceilings-red.status.json.gz",
+      "observed_result": "first launch: fixture compilation and incorrectly scoped feature fail; no behavioral reproduction",
+      "bytes": 823484,
+      "sha256": "3d9372e7780fe6f9b69799098a031624614376fdaa82b051eeb9d5271a52033b"
+    },
+    {
+      "log": "review-epoch-ceilings-red-delegated.log.gz",
+      "observed_result": "first fixture compilation rejects missing MonetaryAmount import and unsupported unsigned SQLite decoding",
+      "bytes": 6183,
+      "sha256": "58f52e601d5a73fb89a68119a74b5becdc5d330ab3c9ed4eddf5d25d55678c75"
+    },
+    {
+      "log": "review-epoch-ceilings-red-revocation.log.gz",
+      "observed_result": "first transport command fails before compilation because typestate belongs to federation, not its adapter",
+      "bytes": 149,
+      "sha256": "d09696f2b013adaa386b67b972d29592af5e10ebc8eebbcc09588c906d92511e"
+    },
+    {
+      "log": "review-epoch-ceilings-green.status.json.gz",
+      "observed_result": "initial repaired campaign: fourteen delegation tests and kernel Clippy pass; transport fails compilation on missing collection import; actual subsequent results retained",
+      "bytes": 827453,
+      "sha256": "9a22d84e9ba1d74f96f7595396d6172c9c6ea6ef7fddc98c9c1431cc2f00364b"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green.status.json.gz",
+      "observed_result": "both complete repaired suites, strict affected Clippy and renewed structural checks pass against captured Rust source",
+      "bytes": 827515,
+      "sha256": "64d7ee55d074bcb7ca8fc50199bdfbaafda547ea7613b56e3ba448108734b0dc"
+    },
+    {
+      "log": "graph-native-environment.status.json.gz",
+      "observed_result": "separate locked system-CPython environment supplies both required Linux pidfd APIs; source lock unchanged",
+      "bytes": 1761,
+      "sha256": "75c16c6021eb34ebfff6e08121840b06fe56d8fa8e2238f249ce5783dfeb5f03"
+    },
+    {
+      "log": "security-authorities-20261006T0430.json.gz",
+      "observed_result": "read-only later authority refresh; signed package and policy still absent",
+      "bytes": 711,
+      "sha256": "9e9f38820d02ccffe52ef65ffdb4d68f071632ebc3f359357e2832025b49f03b"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686.status.json.gz",
+      "observed_result": "investigative native run completes five successful jobs and one legitimate conditional skip; not final repaired-head qualification",
+      "bytes": 16526,
+      "sha256": "6ce34f1f3d73d1ed5991752aff73928643d88c7106d390751622614e26f61c15"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686.latest.json.gz",
+      "observed_result": "authenticated terminal diagnostic-only source and complete hosted job/step metadata",
+      "bytes": 19845,
+      "sha256": "4152cbb578761161f4f8b9c5c90f70995fcdf2197f2ba42c790af47def4cec96"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686-artifact.json.gz",
+      "observed_result": "successful mini-SWE archive authenticated in memory; archive/private worker files not retained and no operator-failure diagnostic exists",
+      "bytes": 940,
+      "sha256": "839106d2a50077efdbdde7585a2e89144865737a093f34d71f1a6997a6736cda"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686-112106078015.log.gz",
+      "observed_result": "actual successful installed native consumer or native aggregate job on the investigative source; final source must be renewed",
+      "bytes": 846388,
+      "sha256": "2016a3f00ecdb4dd13a8df4a0d7ed991987ddd53e88f179d0ae6380eff6b4a57"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686-112106078015.job.json.gz",
+      "observed_result": "authenticated successful investigative native job metadata",
+      "bytes": 8718,
+      "sha256": "660aaf369ffa67625faae9a8781b4c1168995f760179b8f4177d636f764662e8"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686-112117517529.log.gz",
+      "observed_result": "actual successful installed native consumer or native aggregate job on the investigative source; final source must be renewed",
+      "bytes": 5233,
+      "sha256": "6e141e6ab32c1139ff5de1cbf8088cf49b0c0fb160895034a5eb9ce07c1600f4"
+    },
+    {
+      "log": "diagnostic-native-4b7480c686-112117517529.job.json.gz",
+      "observed_result": "authenticated successful investigative native job metadata",
+      "bytes": 983,
+      "sha256": "fd52cd864bb0ee85e54fa5d5af8ea27c50892e8f706b3d15c9d554f35d0307c6"
+    },
+    {
+      "log": "inventory-controls-final-flow.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 58,
+      "sha256": "cda8f0469c1da93aacf8ba6820897499f4cf2234b26b87b3b766fc48258ec0ae"
+    },
+    {
+      "log": "inventory-controls-final-consumer.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 129,
+      "sha256": "c54dfa944752e58527857b1f533188afafc40d92224171039ccc9225efdbae54"
+    },
+    {
+      "log": "inventory-controls-final-diff.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "workspace-readiness-portable-final-certify.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 8413,
+      "sha256": "c893cdbe7a5fe65208d1d064368976b65dcf81fa50bf36b97823ee67f17972ec"
+    },
+    {
+      "log": "workspace-readiness-portable-final-certify-clippy.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 6858,
+      "sha256": "1cd0ac817216768e5db93f0f1f98ff72ef681a02634f7e2146aacb2a84dc0e3b"
+    },
+    {
+      "log": "workspace-readiness-portable-final-workspace-compile.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 149281,
+      "sha256": "5e943c445f699c0c2215a4c1d525fe200a9f262b534bf3dc6c910904448993fb"
+    },
+    {
+      "log": "workspace-readiness-portable-final-workspace-clippy.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 29593,
+      "sha256": "26d1930eb1ae87da5cedd9e4118739881a69f1bfaad1a1eabc8e1d91202f71b8"
+    },
+    {
+      "log": "stub-surfaces-qualified-final-contract.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 2109,
+      "sha256": "27e33a55dd76532e2d7164bd7856fa6034cba0e1ad24f3656f67aef3637a8ac8"
+    },
+    {
+      "log": "stub-surfaces-qualified-final-repository.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 18038,
+      "sha256": "755d9f9cf87da716ec007966bf4cadb9cd728747254bce96eb2940cbfbb36ee1"
+    },
+    {
+      "log": "mini-swe-native-python-final-environment.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 2457,
+      "sha256": "7bd059b3a77c7b5b4e388dc47bab1ee352be1f10221a17d74cbab942f2e34a8a"
+    },
+    {
+      "log": "mini-swe-native-python-final-capabilities.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 133,
+      "sha256": "99fac9653cf445e78b7dda8e42ace96ebf1d6f9075603a038a2f3803b3b7b207"
+    },
+    {
+      "log": "mini-swe-native-python-final-sdk.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 511,
+      "sha256": "9121e3d0d15428cf2a5273019fcf5f99a1fbe5cf8bf3c18f44ae7f7c34f8b652"
+    },
+    {
+      "log": "mini-swe-native-python-final-lint.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "log": "mini-swe-native-python-final-format.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 26,
+      "sha256": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-delegated.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 2916,
+      "sha256": "f645ac240f1f089f2a951adb49bc55ad04eed97d8b858369419107aca558b098"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-revocation.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 39679,
+      "sha256": "cc2ac3cf680b393822dbe06b7d22a0d2e52bc9afa46e2ec99fe4e7f247a05a25"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-delegated-clippy.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 1660,
+      "sha256": "87c4cb956bb33c9da7f8e25aca367dd9dbb07732a9ac71afc691f299aff13b23"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-revocation-clippy.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 2771,
+      "sha256": "7c8cf1e353dc4434b37d77d4c9fb2245ea813d00a42a6c992e9ba841871f3cf9"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-proof-refresh.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-proof-check.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-hygiene.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 52024,
+      "sha256": "2cdae280f4f0a9e77d3b666acc8402445e048abc8c89e4014872c5b61e393b73"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-negative.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 163,
+      "sha256": "61da4b00542c2ccd635c3b403398e9d47cfbcc59676875b2e016d15283724d29"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-clock.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 115,
+      "sha256": "42e503725a2e92e18ec0c9f02b76e0b3ea414f33b127725b07b7ae997a5c90d9"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-format.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "review-epoch-ceilings-final-green-diff.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "graph-native-environment-sync.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 1863,
+      "sha256": "fbc917f3c037118348103cc9a6354608359536a0a8701afc5ba2f317fa8a6ccf"
+    },
+    {
+      "log": "graph-native-environment-capabilities.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 86,
+      "sha256": "131a31cd873414708cf6b7d24cfd0d072b71fe4674de25ed9e7b4e69ebd5ada8"
+    },
+    {
+      "log": "graph-native-environment-packages.log.gz",
+      "observed_result": "terminal actual current-source verification; scope bound by companion status and hashes",
+      "bytes": 2318,
+      "sha256": "463012b8eb98c6bd53a82d51e9be55f894a646d1b638c45be80ce613a70046ae"
+    },
+    {
+      "log": "review-epoch-ceilings-green-delegated.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 3765,
+      "sha256": "e5065e332622377d5dcca8d47be76d52d32cb171f8be2881186c76493f61d35e"
+    },
+    {
+      "log": "review-epoch-ceilings-green-revocation.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 2418,
+      "sha256": "1062aded1ab938d47ff6d845c3e30b500d897c22557c2b6d37db223055d6fff3"
+    },
+    {
+      "log": "review-epoch-ceilings-green-delegated-clippy.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 2509,
+      "sha256": "db8aa177b14d331deaa3cac24fbb6f29e8c4c87cdcb52445df1d108719e53698"
+    },
+    {
+      "log": "review-epoch-ceilings-green-revocation-clippy.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 6925,
+      "sha256": "b42bd4d7094ba185e5647a09bf44871140f1254fd59ed6994c97e466ca5acf0f"
+    },
+    {
+      "log": "review-epoch-ceilings-green-proof-refresh.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "review-epoch-ceilings-green-proof-check.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "review-epoch-ceilings-green-hygiene.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 52024,
+      "sha256": "9746120f70e0b3fa90b0c78cadad13e616d8f8f208be22a5756ca2d88ebcd1d8"
+    },
+    {
+      "log": "review-epoch-ceilings-green-negative.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 163,
+      "sha256": "61da4b00542c2ccd635c3b403398e9d47cfbcc59676875b2e016d15283724d29"
+    },
+    {
+      "log": "review-epoch-ceilings-green-clock.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 115,
+      "sha256": "42e503725a2e92e18ec0c9f02b76e0b3ea414f33b127725b07b7ae997a5c90d9"
+    },
+    {
+      "log": "review-epoch-ceilings-green-format.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "review-epoch-ceilings-green-diff.log.gz",
+      "observed_result": "initial repaired campaign; actual command result retained, including missing-import transport failures",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "kernel-legacy-receipt-format-green.log.gz",
+      "observed_result": "terminal actual legacy preparation signed-binding regression or strict lint",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "kernel-legacy-receipt-delivery-green.log.gz",
+      "observed_result": "terminal actual legacy preparation signed-binding regression or strict lint",
+      "bytes": 4045,
+      "sha256": "339769eb25deabdf0e627b320ec8eba5e4deb833d641d5bcddd8d01850992631"
+    },
+    {
+      "log": "kernel-legacy-receipt-clippy-green.log.gz",
+      "observed_result": "terminal actual legacy preparation signed-binding regression or strict lint",
+      "bytes": 5658,
+      "sha256": "2c7436851755197d0c5e88631cc96ffb69a374a81d0c7a6cb4391f913cfd683c"
+    },
+    {
+      "log": "stub-surfaces-contract-red.log.gz",
+      "observed_result": "historical scanner campaign; actual result and source retained in companion status",
+      "bytes": 74,
+      "sha256": "b7a5bedfdf5fbec8f0566c0c849daecc265040c8ad1d3564fa80bd08ca4f7864"
+    },
+    {
+      "log": "stub-surfaces-repository-red.log.gz",
+      "observed_result": "historical scanner campaign; actual result and source retained in companion status",
+      "bytes": 19320,
+      "sha256": "673e5d648c30a4160b51c0ac0447d4bdc3e85568772a12be8b96cac100035a4a"
+    },
+    {
+      "log": "stub-surfaces-contract-green.log.gz",
+      "observed_result": "historical scanner campaign; actual result and source retained in companion status",
+      "bytes": 1863,
+      "sha256": "3f21f3104f151c5c7ee275ce6b933dd662f98f181080cbd2bc9789e7213ec056"
+    },
+    {
+      "log": "stub-surfaces-repository-green.log.gz",
+      "observed_result": "historical scanner campaign; actual result and source retained in companion status",
+      "bytes": 18038,
+      "sha256": "b0e14db047ff4e170e2fe313bcec8d452df0ee5c2f3bee81948b47eeff4c9d5e"
+    },
+    {
+      "log": "stub-surfaces-contract-final.log.gz",
+      "observed_result": "historical scanner campaign; actual result and source retained in companion status",
+      "bytes": 1944,
+      "sha256": "9b470d936463e27ca7957509592ae2ed81d57b723a6c97742371bba1d0a8e14c"
+    },
+    {
+      "log": "stub-surfaces-repository-final.log.gz",
+      "observed_result": "historical scanner campaign; actual result and source retained in companion status",
+      "bytes": 18038,
+      "sha256": "13b8562fafc698943e8d097366bee5edfbfb7a5372d4acfc3eecb86c1fdfb907"
+    },
+    {
+      "log": "mini-swe-diagnostics-diagnostics-green.log.gz",
+      "observed_result": "actual preceding public diagnostics/style command; failed first formatting check remains failed",
+      "bytes": 98,
+      "sha256": "4a6070b078e8713685bb7d423b62e85d6415f822c5c557fbcd20f48e88981629"
+    },
+    {
+      "log": "mini-swe-diagnostics-lint-green.log.gz",
+      "observed_result": "actual preceding public diagnostics/style command; failed first formatting check remains failed",
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "log": "mini-swe-diagnostics-format-green.log.gz",
+      "observed_result": "actual preceding public diagnostics/style command; failed first formatting check remains failed",
+      "bytes": 477,
+      "sha256": "132450b67b8d5857b16e9057576a2e0c70aab13cb7ac2b688344275dc64cb774"
+    },
+    {
+      "log": "mini-swe-diagnostics-diagnostics-final.log.gz",
+      "observed_result": "actual preceding public diagnostics/style command; failed first formatting check remains failed",
+      "bytes": 98,
+      "sha256": "c67e541fd068f1dc781192f208ee5378278d4121a29b58ff089a2b0504263f5c"
+    },
+    {
+      "log": "mini-swe-diagnostics-lint-final.log.gz",
+      "observed_result": "actual preceding public diagnostics/style command; failed first formatting check remains failed",
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "log": "mini-swe-diagnostics-format-final.log.gz",
+      "observed_result": "actual preceding public diagnostics/style command; failed first formatting check remains failed",
+      "bytes": 26,
+      "sha256": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938"
+    },
+    {
+      "log": "mini-swe-diagnostics-sdk-final.log.gz",
+      "observed_result": "first full SDK run: 407 pass and seven missing Linux pidfd API failures; no SDK aggregate pass",
+      "bytes": 20179,
+      "sha256": "2e89d713ede4e0a9ab6699f64b2c5523d8da9e71889f6abb3a0ff8f07eac0305"
+    },
+    {
+      "log": "flow-security-inventory-contract-green.log.gz",
+      "observed_result": "terminal flow calibration check passes",
+      "bytes": 58,
+      "sha256": "d62f4d6d68a811fed3faff073bdc31efddd6c46fa9b20384df30541284957659"
+    },
+    {
+      "log": "flow-security-inventory-exact-runner-controls-green.log.gz",
+      "observed_result": "terminal flow calibration check passes",
+      "bytes": 43,
+      "sha256": "11c13e8051a0886d386a0631e7aefeeb2c271e05a0a1c5d3eb2a8e750428840c"
+    },
+    {
+      "log": "flow-security-inventory-diff-green.log.gz",
+      "observed_result": "terminal flow calibration check passes",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-portable-failure.log.gz",
+      "observed_result": "preceding hosted failure retained; supporting source/package handoff or owned stale inventory",
+      "bytes": 163721,
+      "sha256": "3c08bdd83e22cd3b64b423e1b3e7e7e345889f388dc8d76c10620ef5badc5e38"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-portable-failure-job.json.gz",
+      "observed_result": "authenticated terminal preceding-head failed job metadata",
+      "bytes": 7709,
+      "sha256": "9a1559f889354fbadc9a166cd843098fc02d3a18b4852f11bf602095ee4455fa"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-native-failure.log.gz",
+      "observed_result": "preceding hosted failure retained; supporting source/package handoff or owned stale inventory",
+      "bytes": 262662,
+      "sha256": "837b8efc3b1a9a88b1c05ed4abae66739535f536bd8a4cb38f9581cb85cdc0c4"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-native-failure-job.json.gz",
+      "observed_result": "authenticated terminal preceding-head failed job metadata",
+      "bytes": 3380,
+      "sha256": "748056820d714e5d386dba1c274ecb62711d37312faee6ed66853c0aed8dd4e0"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-adversarial-failure.log.gz",
+      "observed_result": "preceding hosted failure retained; supporting source/package handoff or owned stale inventory",
+      "bytes": 264155,
+      "sha256": "ac8035cfbd78887a4b394ab039804e72da6693189fddbcb1d6b30cbc258ccef0"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-adversarial-failure-job.json.gz",
+      "observed_result": "authenticated terminal preceding-head failed job metadata",
+      "bytes": 3619,
+      "sha256": "41d49187215bd93dd54e9f17ce51e2ea8ff9dfb98d545367358f17f6ad40cee3"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-active-failure.log.gz",
+      "observed_result": "preceding hosted failure retained; supporting source/package handoff or owned stale inventory",
+      "bytes": 326962,
+      "sha256": "8f95fb9f526eb18c9a681159267325bbc295f4e157ed86fe2670ae3db017fb3e"
+    },
+    {
+      "log": "3b6b2ba447-enterprise-active-failure-job.json.gz",
+      "observed_result": "authenticated terminal preceding-head failed job metadata",
+      "bytes": 6326,
+      "sha256": "43f312502db394969c56a74e69238775a9c7fe1650edd91a31883196b0621e47"
+    },
+    {
+      "log": "a2a-nonterminal-final-consumer-boundary.log.gz",
+      "observed_result": "terminal repaired-source tests or Clippy pass",
+      "bytes": 2766,
+      "sha256": "fc681b2e12fc99ab320a79a1e9aa5f667e232519197c74549e79cf64f6bcb367"
+    },
+    {
+      "log": "a2a-nonterminal-final-edge.log.gz",
+      "observed_result": "terminal repaired-source tests or Clippy pass",
+      "bytes": 10389,
+      "sha256": "36c9259a2ce75a0cd93facbe9f15ab6f102908daba5989ee9fdbeeb432a17de3"
+    },
+    {
+      "log": "a2a-nonterminal-final-http-interop.log.gz",
+      "observed_result": "terminal repaired-source tests or Clippy pass",
+      "bytes": 2260,
+      "sha256": "830ade10ea695b52dae1ead8b0a29558cb3d81bc94f627a3cc12b4233a67d058"
+    },
+    {
+      "log": "a2a-nonterminal-final-edge-clippy.log.gz",
+      "observed_result": "terminal repaired-source tests or Clippy pass",
+      "bytes": 1769,
+      "sha256": "e29ef1c812b6d0681254f3917c319b1ecf5f99dc9f8df634b8b3700a10282437"
+    },
+    {
+      "log": "a2a-nonterminal-final-consumer-clippy.log.gz",
+      "observed_result": "terminal repaired-source tests or Clippy pass",
+      "bytes": 1883,
+      "sha256": "2a243c59b6ae439cfacb274c42834408b4738e911ae38dd04eabeff09be72afd"
+    },
+    {
+      "log": "a2a-nonterminal-proof-refresh.log.gz",
+      "observed_result": "terminal repaired-source structural check passes",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "a2a-nonterminal-proof-final.log.gz",
+      "observed_result": "terminal repaired-source structural check passes",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "a2a-nonterminal-format-final.log.gz",
+      "observed_result": "terminal repaired-source structural check passes",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-nonterminal-hygiene-final.log.gz",
+      "observed_result": "terminal repaired-source structural check passes",
+      "bytes": 52158,
+      "sha256": "c64492a787ba9fd1368ee6bd2ceae0f3419a76d3563f6f64ce3c90880beef973"
+    },
+    {
+      "log": "a2a-nonterminal-negative-final.log.gz",
+      "observed_result": "terminal repaired-source structural check passes",
+      "bytes": 163,
+      "sha256": "61da4b00542c2ccd635c3b403398e9d47cfbcc59676875b2e016d15283724d29"
+    },
+    {
+      "log": "a2a-nonterminal-diff-final.log.gz",
+      "observed_result": "terminal repaired-source structural check passes",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ]
 }

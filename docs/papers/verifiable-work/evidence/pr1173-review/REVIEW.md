@@ -682,3 +682,91 @@ installation graphs, real behavioral controls, 502 SDK/conformance tests and
 unfiltered zero-finding scan. Rust sources are unchanged from the preceding
 qualified checkpoint. The failed hosted campaign retains its original scope;
 final-head hosted and signed security-package acceptance remain separate.
+
+
+## Nonterminal v1 task custody
+
+Source `9b40dc9128b1c62849558af387c1bf918d9c40f0` retains successful nonterminal v1 tasks after blocking
+SendMessage while releasing terminal results and execution/projection failures.
+Existing caller quotas, authority deadlines and output modes govern retained
+custody. V1 GetTask remains observational. Two real SQLite-backed cumulative
+approval regressions fail against the original removal, then pass with signed
+proposal and receipt authority, stable JSON/text task projections, caller
+isolation, cancellation and no dispatch or additional receipts.
+
+The full consumer run also finds four stale threshold fixtures. Bind their exact
+tool invocation using the public approval context and install their explicit
+approver roster. All successful capture and restart assertions are retained;
+production approval validation is unchanged. All ten consumer tests, 116 edge
+tests, three live HTTP tests, both strict Clippy commands and structural checks
+pass. Formal selection remains 66 rows and 182 artifacts, with its input digest
+renewed. Original failures and the preceding candidate's authenticated successful
+advisory archive remain historical. Final-head hosted acceptance and the
+security owner's coherent source and signed Linux package remain separate.
+
+The preceding hosted flow job passes all 26 default security-type library tests,
+then fails its stale twenty-name inventory. The repaired gate includes every
+compiled clock and bounded-reader case, preserves the exact default library
+target, and rejects each identity substitution through its actual validator.
+Positive and negative information-flow models, both portable WASM checks and
+all 71 composed test inventories pass in the preceding local campaign.
+Its source scope precedes the final delegated-ceiling and revocation repairs;
+fresh final-head hosted flow acceptance remains mandatory. Earlier failed checks retain
+their actual outcomes. The security owner must still supply the coherent
+closed-shard source closure and a fresh caught-only signed Linux package.
+
+## Delegated cost and revocation epoch boundaries
+
+An exact one-invocation dispatch binds the smaller of its signed per-call
+and total ceilings. Both ceilings and their currency remain mandatory.
+Actual SQLite execution admits the 20/100 and 20/20 grants for the same
+20-unit offer, signs the result, captures exactly one 20-unit hold and
+replays observationally. A 100/20 grant retains the ordinary worst-case
+budget refusal before payment or dispatch. The original maximum rejects
+the admissible 20/100 case; all 14 repaired delegation tests pass.
+
+The pinned-origin revocation sink retains the kernel-core strict epoch
+compare-and-swap. Identical projected snapshots and older roots remain
+idempotent; conflicting installed-epoch hashes, issue times or locally
+materialized subjects receive typed rejection without changing the view.
+Conflicting signed root bodies inside a batch are rejected before its
+single install, including conflicts below a valid highest epoch. Six
+authentic-signature controls cover these cases, actual handler rejection
+and concurrent duplicate/conflicting writers. Five controls fail against
+the original acknowledgement while the replay/stale positive control
+passes. The complete typestate-enabled transport campaign records 407
+passes and 0 ignored tests. Both affected strict Clippy commands and
+the renewed structural controls pass. No second authority registry or
+same-epoch update protocol is introduced.
+
+Legacy in-place preparation now retains its effective connection for
+signed launch attribution. All ten delivery-revalidation cases and
+strict kernel Clippy pass; actual x86 confinement and runtime retirement
+remain a separate final-head hosted requirement. The certification
+fixtures create private authority parents and live in normal modules
+below 2,000 lines. All thirteen certification cases pass with the one
+existing timing-sensitive ignore preserved. Complete workspace test compilation
+and strict library/binary/example Clippy pass with unchanged captured
+Rust/build inputs. The local consumer gate passes six inventories and
+fifteen tests, then correctly refuses its first native MCP case on ARM.
+That exit-101 campaign remains failed. Complete consumer and workspace
+execution require the qualified final-head Linux x86 enforcing host.
+
+The stub scanner distinguishes lint tokens from executable unfinished
+macros and comments, admits only the three reviewed exact domain lines,
+and removes stale exceptions. The whole repository and every contract
+control pass. All 414 SDK/recovery tests pass under system CPython with
+both Linux pidfd APIs. The original failed interpreter run is retained;
+subsequent workspace/native qualification uses a separately prepared
+locked system-CPython environment without changing the dependency lock.
+
+The investigative x86 run at 4b7480c686 completes all five selected native
+jobs successfully, including both installed operators, the original
+65-second repository command, coding sessions, installed packages,
+adaptive review, AI SDK 6/7 and the swarm benchmark. The conditionally
+disabled optimized comparison is skipped. Its successful archive is
+authenticated in memory; private worker files are not retained. The
+earlier request timeout does not reproduce, and retains its failed
+source scope. This investigative source precedes the final Rust repairs;
+fresh final-head native, PostgreSQL retirement, complete consumer and
+workspace qualification remain mandatory.
