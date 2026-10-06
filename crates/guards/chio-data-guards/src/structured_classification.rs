@@ -172,6 +172,9 @@ impl StructuredClassificationResult {
         }
         // All field findings bind this one payload. Decode it once instead of
         // repeating a potentially 4 MiB JSON allocation for each of 256 findings.
+        // The payload is unsigned tool data and only needs JSON Pointer
+        // resolution: duplicate keys are rejected so a pointer names one value,
+        // and ordinary numeric spellings such as `0.50` are accepted.
         let document = findings
             .iter()
             .any(|finding| matches!(finding.location, FindingLocation::FieldPath(_)))
@@ -180,7 +183,7 @@ impl StructuredClassificationResult {
                     payload,
                     MAX_CLASSIFICATION_PAYLOAD_BYTES,
                 )
-                .and_then(|input| input.decode_signed::<serde_json::Value>())
+                .and_then(|input| input.decode_document::<serde_json::Value>())
             })
             .transpose()
             .map_err(|error| StructuredClassificationError::Input(error.into()))?;
@@ -717,6 +720,40 @@ mod reader_boundary_tests {
             vec![finding],
         )?;
         assert_eq!(native.findings().len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn field_locations_resolve_in_payloads_with_ordinary_decimal_spellings(
+    ) -> Result<(), StructuredClassificationError> {
+        let identity = ClassifierIdentity::new("classifier.local", "1")?;
+        let payload = br#"{"price":0.50,"ratio":1e-05,"patient":{"diagnosis":"x"}}"#;
+        for path in ["/patient/diagnosis", "/price", "/ratio"] {
+            let finding = StructuredClassificationFinding::at_field_path(
+                "classifier.local",
+                "1",
+                "sensitive",
+                9000,
+                path,
+            )?;
+            let result = StructuredClassificationResult::from_payload(
+                identity.clone(),
+                payload,
+                vec![finding],
+            )?;
+            assert_eq!(result.findings().len(), 1, "{path}");
+        }
+        let missing = StructuredClassificationFinding::at_field_path(
+            "classifier.local",
+            "1",
+            "sensitive",
+            9000,
+            "/patient/missing",
+        )?;
+        assert_eq!(
+            StructuredClassificationResult::from_payload(identity, payload, vec![missing]),
+            Err(StructuredClassificationError::InvalidLocation)
+        );
         Ok(())
     }
 }
