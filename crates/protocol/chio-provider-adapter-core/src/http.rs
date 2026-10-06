@@ -298,6 +298,7 @@ impl HttpTransport {
     /// auth) are resolved up front so per-request work is minimal.
     pub fn new(config: HttpTransportConfig) -> Result<Self, HttpTransportError> {
         validate_base_url(&config.base_url)?;
+        validate_credential_transport(&config)?;
         if config.timeout.is_zero()
             || config.max_response_bytes == 0
             || config.max_response_bytes > crate::input::MAX_DOCUMENT_BYTES
@@ -465,6 +466,40 @@ fn validate_base_url(base_url: &str) -> Result<(), HttpTransportError> {
         ));
     }
     Ok(())
+}
+
+/// A credential crosses plaintext HTTP only to a loopback host.
+fn validate_credential_transport(config: &HttpTransportConfig) -> Result<(), HttpTransportError> {
+    if matches!(config.auth, AuthScheme::None) {
+        return Ok(());
+    }
+    let parsed =
+        reqwest::Url::parse(&config.base_url).map_err(|error| HttpTransportError::InvalidUrl {
+            url: config.base_url.clone(),
+            detail: "base URL parse failed".into(),
+            source: Some(Box::new(error)),
+        })?;
+    if parsed.scheme() == "https" || parsed.host_str().is_some_and(is_loopback_host) {
+        return Ok(());
+    }
+    Err(invalid_base_url(
+        &config.base_url,
+        "a base URL that carries credentials must use https unless its host is loopback"
+            .to_string(),
+    ))
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    let address = host
+        .strip_prefix('[')
+        .and_then(|inner| inner.strip_suffix(']'))
+        .unwrap_or(host);
+    address
+        .parse::<std::net::IpAddr>()
+        .is_ok_and(|address| address.is_loopback())
 }
 
 fn invalid_base_url(base_url: &str, detail: String) -> HttpTransportError {
@@ -1387,3 +1422,7 @@ mod boundary_tests;
 #[cfg(test)]
 #[path = "http/sse_mime_tests.rs"]
 mod sse_mime_tests;
+
+#[cfg(test)]
+#[path = "http/plaintext_credential_tests.rs"]
+mod plaintext_credential_tests;
