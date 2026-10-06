@@ -1,37 +1,25 @@
-//! Authenticate projected amounts against the signed receipts inside the
-//! report's pinned snapshot. Schema guards alone cannot prove stored values.
-
+//! Check every selected projection before aggregation, without claiming corpus trust.
+use super::super::read_boundary::ReportReadBudget;
 use super::*;
 
 pub(super) fn verify_report_costs(
     snapshot: &Connection,
     scope: &AnalyticsScope,
+    budget: &mut ReportReadBudget,
 ) -> Result<(), ReceiptStoreError> {
-    let scan = scope.scan(SubjectDimension::Absent);
-    let sql = format!(
-        "SELECT r.seq, r.raw_json, r.cost_currency, r.cost_charged_be, \
-         r.attempted_cost_be {}",
-        scan.from_where,
-    );
+    let row_bytes = sqlite_i64(budget.metadata_byte_limit()?, "report encoded row limit")?;
+    let ceiling =
+        sqlite_i64(
+            budget.limits.rows.checked_add(1).ok_or_else(|| {
+                ReceiptStoreError::ReadBoundary("invalid report row limit".into())
+            })?,
+            "report row limit",
+        )?;
+    let (sql, scan) = selected_query(scope, &row_bytes, &ceiling, false);
     let mut statement = snapshot.prepare(&sql)?;
     let mut rows = statement.query(scan.params())?;
     while let Some(row) = rows.next()? {
-        let seq = sqlite_positive_u64(row.get(0)?, "analytics receipt sequence")?;
-        let raw: String = row.get(1)?;
-        let receipt = decode_verified_chio_receipt(&raw, "receipt analytics", Some(seq))?;
-        let expected = receipt_cost_projection(&receipt)?;
-        let currency: Option<String> = row.get(2)?;
-        let charged: Option<Vec<u8>> = row.get(3)?;
-        let attempted: Option<Vec<u8>> = row.get(4)?;
-        if currency != expected.currency
-            || charged != expected.charged
-            || attempted != expected.attempted
-        {
-            return Err(ReceiptStoreError::Conflict(format!(
-                "receipt analytics cost projection differs from signed receipt {}",
-                receipt.id,
-            )));
-        }
+        budget.receipt(snapshot, row)?;
     }
     Ok(())
 }

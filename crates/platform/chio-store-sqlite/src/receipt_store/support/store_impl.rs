@@ -43,6 +43,15 @@ fn trusted_retention_archive(
 pub(crate) fn trusted_retention_archive_for_connection(
     connection: &Connection,
 ) -> Result<Option<Connection>, ReceiptStoreError> {
+    trusted_retention_archive_for_connection_with_preflight(connection, |_, _| Ok(()))
+}
+
+/// Inspect original archive bytes in the very transaction subsequently
+/// authenticated and served. A preflight never establishes archive trust.
+pub(crate) fn trusted_retention_archive_for_connection_with_preflight(
+    connection: &Connection,
+    mut preflight: impl FnMut(&Connection, u64) -> Result<(), ReceiptStoreError>,
+) -> Result<Option<Connection>, ReceiptStoreError> {
     let recorded = retention_watermark(connection)?.unwrap_or(0);
     if recorded == 0 {
         return Ok(None);
@@ -56,6 +65,7 @@ pub(crate) fn trusted_retention_archive_for_connection(
     // Keep validation and subsequent point reads in one snapshot, including
     // when another connection can modify the same archive inode.
     archive.execute_batch("BEGIN DEFERRED TRANSACTION")?;
+    preflight(&archive, recorded)?;
     if !retention_archive_connection_is_trusted(connection, &mut archive, recorded)? {
         return Err(ReceiptStoreError::ReadBoundary(
             "configured retention archive does not authenticate the recorded prefix".to_owned(),

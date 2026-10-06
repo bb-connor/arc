@@ -266,13 +266,14 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Remove the policy authority and immediately disable negotiation.
+    /// Disable active response and remove an independently installed policy.
+    /// Atomically published authority identities remain pinned.
     pub fn clear_active_response_requirement_resolver(&mut self) {
+        self.governed_active_response_plans_enabled = false;
         if self.has_atomic_security_runtime_publication() {
             return;
         }
         self.active_response_requirement_resolver = None;
-        self.governed_active_response_plans_enabled = false;
     }
 
     /// Install the durable, callable control-plane authority that executes plans.
@@ -326,21 +327,28 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Remove the executor authority and immediately disable negotiation.
+    /// Disable active response and remove an independently installed executor.
+    /// Atomically published authority identities remain pinned.
     pub fn clear_active_response_executor_authority(&mut self) {
+        self.governed_active_response_plans_enabled = false;
         if self.has_atomic_security_runtime_publication() {
             return;
         }
         self.active_response_executor = None;
+    }
+
+    /// Disable active-response admission and execution.
+    pub fn deactivate_governed_active_response_plans(&mut self) {
         self.governed_active_response_plans_enabled = false;
     }
 
-    /// Disable active-response negotiation before replacing policy authority.
-    pub fn deactivate_governed_active_response_plans(&mut self) {
-        if self.has_atomic_security_runtime_publication() {
-            return;
+    pub(super) fn require_governed_active_response_plans_enabled(&self) -> Result<(), KernelError> {
+        if !self.governed_active_response_plans_enabled {
+            return Err(active_response_policy_denied(
+                "active-response plan support is disabled",
+            ));
         }
-        self.governed_active_response_plans_enabled = false;
+        Ok(())
     }
 
     /// Negotiate active-response plan support only with an installed resolver.
@@ -404,6 +412,7 @@ impl ChioKernel {
         &self,
         bindings: &VerifiedActiveResponseBindings,
     ) -> Result<VerifiedActiveResponseRequirement, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         let negotiated = self
             .capability_negotiation_for_remote(None, self.read_authority_time()?.as_secs())
             .map_err(active_response_policy_denied)?;

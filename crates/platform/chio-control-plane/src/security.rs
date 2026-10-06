@@ -4,7 +4,8 @@ mod active_defense_host_tests;
 mod active_response;
 mod response_simulation;
 pub use response_simulation::{
-    ActiveResponseExecutionProfile, ProductionResponseSimulator, SqliteResponseSimulationSource,
+    ActiveResponseExecutionProfile, ProductionResponseSimulator,
+    ResponseSimulationReconciliationError, SqliteResponseSimulationSource,
 };
 #[cfg(unix)]
 mod active_response_authority;

@@ -43,6 +43,7 @@ impl RemoteSession {
             event_tx: init.event_tx,
             retained_notification_events: init.retained_notification_events,
             active_request_stream: Arc::new(Mutex::new(())),
+            worker_serving_closed: tokio::sync::watch::channel(false).0,
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
             session_db_path: init.session_db_path,
@@ -57,10 +58,56 @@ impl RemoteSession {
     }
 
     pub(super) fn send(&self, message: Value) -> Result<(), CliError> {
+        {
+            let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+            self.check_enqueue_lifecycle(&message, &mut lifecycle)?;
+        }
+        let message = self.input_tx.account(message)?;
+        self.send_accounted(message)
+    }
+
+    pub(super) fn send_accounted(&self, message: AccountedMessage) -> Result<(), CliError> {
         remote_mcp_approvals::validate_redemption(self, &message)?;
         // Redemption can inspect lifecycle itself. Take the lock afterward and
         // retain it through enqueue, serializing with drain/terminal transitions.
         let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        self.check_enqueue_lifecycle(&message, &mut lifecycle)?;
+        self.input_tx.send(message).map_err(Into::into)
+    }
+
+    pub(super) fn record_protocol_refusal(
+        &self,
+        message: AccountedMessage,
+        summary: chio_kernel::ProtocolRefusalSummary,
+    ) -> Result<chio_mcp_adapter::edge::ingress::ProtocolRefusalAcknowledgement, CliError> {
+        let mut lifecycle = self.lifecycle.lock().map_err(|_| ClockError::Unavailable)?;
+        if lifecycle.state != RemoteSessionState::Ready {
+            return Err(chio_kernel::KernelError::GovernedTransactionDenied(
+                "remote MCP session cannot record scoped refusal in its current state".into(),
+            )
+            .into());
+        }
+        lifecycle
+            .deadline
+            .as_mut()
+            .ok_or(ClockError::InvalidWindow)?
+            .remaining(self.clock.read()?)?;
+        self.input_tx
+            .record_protocol_refusal(message, summary)
+            .map_err(Into::into)
+    }
+
+    fn check_enqueue_lifecycle(
+        &self,
+        message: &Value,
+        lifecycle: &mut RemoteSessionLifecycleSnapshot,
+    ) -> Result<(), CliError> {
+        if *self.worker_serving_closed.borrow() {
+            return Err(chio_kernel::KernelError::GovernedTransactionDenied(
+                "remote MCP session worker is unavailable".into(),
+            )
+            .into());
+        }
         match lifecycle.state {
             RemoteSessionState::Ready => {
                 lifecycle
@@ -79,9 +126,7 @@ impl RemoteSession {
                 .into())
             }
         }
-        self.input_tx.send(message).map_err(|_| {
-            CliError::cli_other_error("remote MCP session worker is unavailable".to_string())
-        })
+        Ok(())
     }
 
     pub(super) fn subscribe(&self) -> broadcast::Receiver<RemoteSessionEvent> {
@@ -117,7 +162,24 @@ impl RemoteSession {
         last_event_id: Option<&str>,
     ) -> Result<(u64, Vec<RemoteSessionEvent>), Response> {
         let Some(last_event_id) = last_event_id else {
-            return Ok((0, Vec::new()));
+            let retained = self.retained_notification_events.lock().map_err(|_| {
+                plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to inspect retained session notifications",
+                )
+            })?;
+            return Ok((
+                0,
+                retained
+                    .iter()
+                    .map(|event| RemoteSessionEvent {
+                        seq: event.seq,
+                        event_id: event.event_id.clone(),
+                        kind: classify_remote_session_event(&event.message, false),
+                        message: event.message.clone(),
+                    })
+                    .collect(),
+            ));
         };
 
         let replay_after = parse_session_event_id(last_event_id, &self.session_id)
@@ -151,7 +213,9 @@ impl RemoteSession {
             .map(|event| RemoteSessionEvent {
                 seq: event.seq,
                 event_id: event.event_id.clone(),
-                kind: RemoteSessionEventKind::Notification,
+                // The retained schema is unchanged. Only session-owned messages
+                // enter this window; restore their kind from preserved shape.
+                kind: classify_remote_session_event(&event.message, false),
                 message: event.message.clone(),
             })
             .collect();

@@ -32,10 +32,10 @@ fn dispatch_deadline_cannot_outlive_a_shorter_signed_approval() -> TestResult {
         current_unix_timestamp(),
         false,
     )?;
-    assert_eq!(prepared.valid_until_unix_ms()?, expires * 1000);
+    assert_eq!(prepared.valid_until_unix_ms(None)?, expires * 1000);
     fixture.assert_no_writes()?;
     // Legacy proof verification cannot manufacture a durable proof horizon.
-    assert!(fixture.prepare()?.valid_until_unix_ms().is_err());
+    assert!(fixture.prepare()?.valid_until_unix_ms(None).is_err());
     Ok(())
 }
 

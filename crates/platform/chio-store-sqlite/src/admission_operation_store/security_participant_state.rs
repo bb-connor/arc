@@ -3,6 +3,7 @@
 
 use super::*;
 
+pub(in crate::admission_operation_store) mod checkpoint;
 pub(super) mod dispatch_ledger;
 pub(super) mod egress;
 pub(super) mod nonce_preflight;
@@ -12,6 +13,8 @@ pub(crate) use output::NativeOutputJoinAuthority;
 mod history;
 pub(crate) use egress::NativeEgressAuthority;
 pub use egress::SecurityParticipantEgressHistory;
+#[cfg(test)]
+pub(in crate::admission_operation_store) use history::ordered::with_test_bounds as with_test_journal_bounds;
 mod integrity;
 mod mutations;
 mod observation;
@@ -23,7 +26,7 @@ pub(super) mod schema;
 mod storage;
 
 pub(crate) use integrity::projection_reference;
-pub(super) use integrity::{verify_coverage, verify_pristine};
+pub(super) use integrity::{verify_archive_coverage, verify_coverage, verify_pristine};
 pub(super) use records::verify_all;
 
 pub(super) fn verify_predecessor(
@@ -186,34 +189,51 @@ fn observed_time(
     let high_water: i64 = tx.query_row(
         "SELECT MAX(value) FROM (
          SELECT COALESCE(MAX(initialized_at), 0) AS value FROM security_participant_state_initializations
-         UNION ALL SELECT COALESCE(MAX(observed_at_unix_ms), 0) FROM security_participant_migration_events
-         UNION ALL SELECT COALESCE(MAX(observed_at), 0) FROM security_participant_state_mutations)",
+         UNION ALL SELECT COALESCE(MAX(observed_at_unix_ms), 0) FROM security_participant_migration_events)",
         [], |row| row.get(0),
     ).map_err(sqlite_error)?;
-    let high_water = if egress::exists(tx)? {
-        let egress: i64 = tx
-            .query_row(
-                "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_egress_events",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        high_water.max(egress)
-    } else {
-        high_water
-    };
-    let high_water = if output::exists(tx)? {
-        let output: i64 = tx
-            .query_row(
-                "SELECT COALESCE(MAX(observed_at),0) FROM security_participant_output_events",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        high_water.max(output)
-    } else {
-        high_water
-    };
+    let mut high_water = high_water;
+    let mut statement = tx.prepare("SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512
+        THEN security_authority_id END FROM security_participant_state_initializations ORDER BY security_authority_id LIMIT 17")
+        .map_err(sqlite_error)?;
+    let mut roots = statement.query([]).map_err(sqlite_error)?;
+    let mut count = 0;
+    while let Some(root) = roots.next().map_err(sqlite_error)? {
+        count += 1;
+        if count > 16 {
+            return Err(invalid("native clock roots exceed bounds"));
+        }
+        let authority = root
+            .get::<_, Option<String>>(0)
+            .map_err(sqlite_error)?
+            .ok_or_else(|| invalid("native clock authority exceeds bounds"))?;
+        for table in [
+            "security_participant_state_mutations",
+            "security_participant_egress_events",
+            "security_participant_output_events",
+            "security_participant_nonce_preflight_events",
+        ] {
+            let exists: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1)",
+                    [table],
+                    |row| row.get(0),
+                )
+                .map_err(sqlite_error)?;
+            if !exists {
+                continue;
+            }
+            let time: Option<i64> = tx.query_row(&format!(
+                "SELECT observed_at FROM {table} WHERE security_authority_id = ?1 ORDER BY sequence DESC LIMIT 1"
+            ),[&authority],|row|row.get(0)).optional().map_err(sqlite_error)?;
+            if let Some(time) = time {
+                high_water = high_water.max(time);
+            }
+        }
+        if let Some(checkpoint) = checkpoint::latest(tx, &authority)? {
+            high_water = high_water.max(i64::try_from(checkpoint.observed_at).map_err(invalid)?);
+        }
+    }
     if observed < u64::try_from(high_water).map_err(invalid)? {
         return Err(invalid("native initialization clock regressed"));
     }

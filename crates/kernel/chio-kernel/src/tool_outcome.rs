@@ -36,6 +36,11 @@ pub const RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA: &str =
     "chio.raw-invocation-outcome-with-caller-delivery.v1";
 
 mod caller_delivery;
+mod original_security_dispatch;
+pub use original_security_dispatch::{
+    OriginalSecurityDispatchBindingV1,
+    RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA,
+};
 mod receipt_signing;
 mod record_binding;
 pub use receipt_signing::FrozenReceiptSigningIdentityV1;
@@ -396,6 +401,8 @@ pub struct RawInvocationOutcomeV1 {
     receipt_signing_identity: Option<FrozenReceiptSigningIdentityV1>,
     #[serde(skip_serializing_if = "Option::is_none")]
     caller_delivery_evidence: Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    original_security_dispatch_binding: Option<Box<OriginalSecurityDispatchBindingV1>>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -435,6 +442,9 @@ pub struct PersistedRawInvocationOutcomeV1 {
     /// qualifying durable native caller release. This is not public metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub caller_delivery_evidence: Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
+    /// Original nonsecret full-request facts, not capture or release authority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_security_dispatch_binding: Option<Box<OriginalSecurityDispatchBindingV1>>,
 }
 
 // Raw returns can contain credentials, tool output and private treaty evidence.
@@ -523,7 +533,8 @@ impl RawInvocationOutcomeV1 {
         request: &ToolCallRequest,
         security_invocation_context: Option<crate::kernel::SecurityInvocationContext>,
     ) -> Result<Self, ToolOutcomeError> {
-        let request_canonical_json = String::from_utf8(canonical(request)?)
+        let retained_request = crate::admission_operation::RetainedToolAdmissionRequestV1::request_without_transient_credentials(request);
+        let request_canonical_json = String::from_utf8(canonical(&retained_request)?)
             .map_err(|_| ToolOutcomeError::Invalid("raw.request_canonical_json"))?;
         Self::from_committed_dispatch_parts(
             if security_invocation_context.is_some() {
@@ -596,6 +607,7 @@ impl RawInvocationOutcomeV1 {
             security_release_required: None,
             receipt_signing_identity: None,
             caller_delivery_evidence: None,
+            original_security_dispatch_binding: None,
         };
         raw.canonical_blob()?;
         Ok(raw)
@@ -629,6 +641,7 @@ impl RawInvocationOutcomeV1 {
             security_release_required: self.security_release_required,
             receipt_signing_identity: self.receipt_signing_identity.clone(),
             caller_delivery_evidence: self.caller_delivery_evidence.clone(),
+            original_security_dispatch_binding: self.original_security_dispatch_binding.clone(),
         }
     }
 
@@ -637,96 +650,6 @@ impl RawInvocationOutcomeV1 {
     ) -> Result<Self, ToolOutcomeError> {
         let raw = Self::from_persisted_fields(value)?;
         raw.canonical_blob()?;
-        Ok(raw)
-    }
-
-    // Both callers must validate the complete canonical blob before returning.
-    // Keep field reconstruction separate to avoid serializing large output twice.
-    fn from_persisted_fields(
-        value: PersistedRawInvocationOutcomeV1,
-    ) -> Result<Self, ToolOutcomeError> {
-        let caller_schema = value.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA;
-        if caller_schema != value.caller_delivery_evidence.is_some() {
-            return Err(ToolOutcomeError::Invalid("raw.caller_delivery_schema"));
-        }
-        let schema = match (
-            if caller_schema {
-                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
-            } else {
-                value.schema.as_str()
-            },
-            value.request_canonical_json.is_some(),
-            value.security_invocation_context.is_some(),
-            value.federation_context_json.is_some(),
-            value.security_release_required.is_some(),
-            value.receipt_signing_identity.is_some(),
-        ) {
-            (RAW_INVOCATION_OUTCOME_SCHEMA, false, false, false, false, false) => {
-                RAW_INVOCATION_OUTCOME_SCHEMA
-            }
-            (RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA, true, false, false, false, false) => {
-                RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
-            }
-            (
-                RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA,
-                true,
-                true,
-                false,
-                false,
-                false,
-            ) => RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA,
-            (
-                RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA,
-                true,
-                _,
-                true,
-                false,
-                false,
-            ) => RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA,
-            (RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA, true, true, _, true, false) => {
-                RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
-            }
-            (
-                RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
-                true,
-                security,
-                _,
-                release,
-                true,
-            ) if security == release => RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
-            _ => return Err(ToolOutcomeError::Invalid("raw.schema")),
-        };
-        if value.request_canonical_json.as_deref() == Some("") {
-            return Err(ToolOutcomeError::Invalid("raw.schema"));
-        }
-        let raw = Self {
-            schema: if caller_schema {
-                RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
-            } else {
-                schema
-            },
-            operation_id: value.operation_id,
-            request_id: value.request_id,
-            dispatch_operation_version: value.dispatch_operation_version,
-            dispatch_fence: value.dispatch_fence,
-            tool_server: value.tool_server,
-            tool_name: value.tool_name,
-            provider_attempt: value.provider_attempt,
-            transport_terminal_evidence_digest: value.transport_terminal_evidence_digest,
-            matched_grant_index: value.matched_grant_index,
-            elapsed_millis: value.elapsed_millis,
-            stream_limits: value.stream_limits,
-            output: value.output,
-            reported_cost: value.reported_cost,
-            receipt_metadata_snapshot: value.receipt_metadata_snapshot,
-            pre_invocation_guard_evidence: value.pre_invocation_guard_evidence,
-            request_canonical_json: value.request_canonical_json,
-            security_invocation_context: value.security_invocation_context,
-            federation_context_json: value.federation_context_json,
-            security_release_required: value.security_release_required,
-            receipt_signing_identity: value.receipt_signing_identity,
-            caller_delivery_evidence: value.caller_delivery_evidence,
-        };
         Ok(raw)
     }
 
@@ -760,7 +683,8 @@ impl RawInvocationOutcomeV1 {
             (
                 Some(identity),
                 RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
-                | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA,
+                | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+                | RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA,
             ) if self.request_canonical_json.is_some() => {
                 identity.validate()?;
                 self.requires_security_release()?;
@@ -770,10 +694,12 @@ impl RawInvocationOutcomeV1 {
                     schema,
                     RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
                         | RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+                        | RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA
                 ) => {}
             _ => return Err(ToolOutcomeError::Invalid("raw.receipt_signing_schema")),
         }
         self.validate_caller_delivery_evidence()?;
+        self.validate_original_security_dispatch_schema()?;
         positive(
             "raw.dispatch_operation_version",
             self.dispatch_operation_version,
@@ -1603,6 +1529,13 @@ pub enum ToolOutcomeStoreError {
     CasConflict,
     #[error("tool outcome invariant failed: {0}")]
     Invariant(String),
+    /// Known retention state. The immutable digest and size remain committed;
+    /// this marker grants neither payload reconstruction nor fresh dispatch.
+    #[error("tool outcome raw invocation blob {raw_output_digest:?} ({raw_output_size_bytes} bytes) was compacted under retention and is no longer available")]
+    Compacted {
+        raw_output_digest: AdmissionDigest,
+        raw_output_size_bytes: u64,
+    },
 }
 
 /// Storage boundary for insert-once return recording and atomic finalization.

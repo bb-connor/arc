@@ -85,37 +85,8 @@ pub(crate) use chio_test_support::loopback::{reserve_listen_addr, skip_when_loop
 pub(crate) use reqwest::blocking::Client;
 pub(crate) use rusqlite::Connection;
 
-pub(crate) fn unique_dir(prefix: &str) -> PathBuf {
-    let mut builder = tempfile::Builder::new();
-    builder.prefix(prefix);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        builder.permissions(std::fs::Permissions::from_mode(0o700));
-    }
-    // These fixtures retain paths across child processes. Keep the directory
-    // with its existing caller-owned lifetime, but establish custody at creation.
-    builder
-        .tempdir()
-        .expect("private receipt-query fixture")
-        .keep()
-}
-
-pub(crate) fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(3)
-        .expect("workspace root")
-        .to_path_buf()
-}
-
-pub(crate) fn build_test_client() -> Client {
-    Client::builder()
-        .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(120))
-        .build()
-        .expect("build reqwest client")
-}
+mod environment;
+pub(crate) use environment::{build_test_client, unique_dir, workspace_root};
 
 pub(crate) const TEST_REPUTATION_RECEIPT_TARGET: u64 = 100;
 pub(crate) const LARGE_RECEIPT_HISTORY_LEN: u64 = 128;

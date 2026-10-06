@@ -1,7 +1,10 @@
+#[cfg(test)]
 use std::io::BufRead;
 
+#[cfg(test)]
 use serde_json::Value;
 
+#[cfg(test)]
 use crate::AdapterError;
 
 pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
@@ -11,6 +14,7 @@ pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
 /// Empty frames are skipped. Clean EOF before any bytes returns `Ok(None)` so
 /// the caller can close the session. EOF after partial bytes is a parse error
 /// because MCP stdio frames are newline-delimited.
+#[cfg(test)]
 pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Value>, AdapterError> {
     loop {
         let Some(line) = read_bounded_line(reader, MAX_STDIO_MCP_FRAME_BYTES)? else {
@@ -28,6 +32,7 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
     }
 }
 
+#[cfg(test)]
 fn read_bounded_line(
     reader: &mut impl BufRead,
     max_bytes: usize,

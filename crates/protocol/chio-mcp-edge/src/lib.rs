@@ -10,7 +10,7 @@ use chio_kernel::{NestedFlowBridge, ToolDispatchContext};
 use serde::{Deserialize, Serialize};
 
 pub mod authorization;
-mod ingress;
+pub mod ingress;
 pub use ingress::decode_mcp_request;
 pub mod metrics;
 mod runtime;
@@ -155,6 +155,8 @@ impl McpServerCapabilities {
 /// Errors that can occur during MCP adaptation.
 #[derive(Debug, thiserror::Error)]
 pub enum AdapterError {
+    #[error("urn:chio:error:transport:stream-capacity-exceeded")]
+    IngressCapacity,
     #[error("urn:chio:error:transport:task-capacity-exceeded")]
     TaskCapacity,
     #[error("{code}", code = .0.code())]

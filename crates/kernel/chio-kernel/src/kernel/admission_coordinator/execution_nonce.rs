@@ -53,6 +53,66 @@ impl DurableToolAdmission {
 }
 
 impl ChioKernel {
+    /// Check the original physically reserved nonce at its exact retained
+    /// proposal binding time. This neither reacquires nor renews authority.
+    pub(crate) fn verify_bound_execution_nonce_reservation(
+        &self,
+        admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
+        bound_at_unix_ms: u64,
+        now_unix_ms: u64,
+    ) -> Result<(), KernelError> {
+        let operation = admission.operation();
+        let original = admission.original_retained_request().ok_or_else(|| {
+            KernelError::DurableAdmission("bound nonce lost its original request".into())
+        })?;
+        let issued = admission.issued_execution_nonce().ok_or_else(|| {
+            KernelError::DurableAdmission("bound nonce lost its original issuance".into())
+        })?;
+        if operation.state() != AdmissionOperationState::CapturePending
+            || !operation.binding().participant_requirements().approval
+            || operation
+                .threshold_proposal()
+                .and_then(|proposal| proposal.body.proposal_created_at.checked_mul(1000))
+                != Some(bound_at_unix_ms)
+            || request.execution_nonce.as_ref() != Some(issued.signed_nonce())
+            || operation.execution_nonce_id() != Some(issued.nonce_id())
+        {
+            return Err(KernelError::DurableAdmission(
+                "bound nonce time differs from its original operation".into(),
+            ));
+        }
+        let runtime = self.durable_runtime()?;
+        let physical = runtime
+            .store
+            .load_execution_nonce_reservation(
+                operation.binding().operation_id(),
+                &runtime.fence,
+                now_unix_ms,
+            )
+            .map_err(durable_store_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("bound nonce physical reservation is absent".into())
+            })?;
+        if physical.canonical_bytes() != issued.canonical_bytes() {
+            return Err(KernelError::DurableAdmission(
+                "bound nonce changed its exact physical reservation".into(),
+            ));
+        }
+        issued
+            .require_operation_bound_profile()
+            .map_err(durable_store_error)?;
+        AdmissionExecutionNonceReservationV1::from_canonical_bytes(
+            issued.canonical_bytes(),
+            operation,
+            original,
+            &self.config.keypair.public_key(),
+            bound_at_unix_ms,
+        )
+        .map_err(durable_store_error)?;
+        Ok(())
+    }
+
     /// Decide whether this admission routes execution nonces through the durable
     /// participant. Strict issuance is required: an opt-in nonce profile has no
     /// preflight identity to own, and a store without the participant cannot
@@ -499,40 +559,83 @@ impl ChioKernel {
         Ok(require_live_nonce(reservation.signed_nonce(), trusted_now_unix_ms).is_ok())
     }
 
-    /// The retained request of the operation a caller reserved under
-    /// `request_id`, for a reconcile to resume. Refuses an operation that was
-    /// not reserved for caller execution; the evaluation decides everything
-    /// else from the operation's state.
-    pub(crate) fn caller_reserved_request(
+    /// The physical nonce ID selects the original caller operation. Equality
+    /// with its exact signed issuance is required before using retained data.
+    pub(crate) fn caller_reserved_original(
         &self,
-        request_id: &str,
+        nonce: &SignedExecutionNonce,
         trusted_now_unix_ms: u64,
-    ) -> Result<ToolCallRequest, KernelError> {
+    ) -> Result<
+        (
+            AdmissionOperationV1,
+            crate::admission_operation::RetainedToolAdmissionRequestV1,
+        ),
+        KernelError,
+    > {
         let runtime = self.durable_runtime()?;
-        // Select trusted time after recovery's mutations, not before waiting
-        // for their SQLite transaction. The retained lookup checks row time.
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        let selector = AdmissionIdentifier::try_new("request_id", request_id.to_owned())
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let _guard = runtime.lock_mutations()?;
+        let now = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
+        let selector = AdmissionIdentifier::try_new("execution_nonce_id", nonce.nonce_id())?;
         let (operation, retained) = runtime
             .store
-            .load_unambiguous_retained_tool_request(&selector, &runtime.fence, trusted_now_unix_ms)
+            .load_retained_tool_request_by_execution_nonce(&selector, &runtime.fence, now)
             .map_err(durable_store_error)?
             .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "no reserved operation retains this request".to_owned(),
-                )
+                KernelError::DurableAdmission("no original caller operation owns this nonce".into())
             })?;
-        if !operation
-            .provider_attempt()
-            .is_some_and(super::is_caller_report_attempt)
+        let original_nonce = runtime
+            .store
+            .load_execution_nonce_reservation(
+                operation.binding().operation_id(),
+                &runtime.fence,
+                now,
+            )
+            .map_err(durable_store_error)?
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("original caller nonce reservation is absent".into())
+            })?;
+        original_nonce
+            .require_operation_bound_profile()
+            .map_err(durable_store_error)?;
+        if original_nonce.signed_nonce() != nonce
+            || original_nonce.issuer() != &self.config.keypair.public_key()
+            || operation.execution_nonce_id() != Some(original_nonce.nonce_id())
+            || !operation
+                .provider_attempt()
+                .is_some_and(super::is_caller_report_attempt)
         {
             return Err(KernelError::DurableAdmission(
-                "operation was not reserved for caller execution".to_owned(),
+                "caller nonce differs from its original operation-owned reservation".into(),
             ));
         }
-        Ok(retained.request_for_revalidation().clone())
+        self.validate_original_authority_profile(&retained)?;
+        retained
+            .validate_binding(operation.binding())
+            .map_err(durable_store_error)?;
+        Ok((operation, retained))
+    }
+
+    pub(crate) fn caller_reserved_request(
+        &self,
+        nonce: &SignedExecutionNonce,
+        trusted_now_unix_ms: u64,
+    ) -> Result<ToolCallRequest, KernelError> {
+        let (_, original) = self.caller_reserved_original(nonce, trusted_now_unix_ms)?;
+        Ok(original.request_for_revalidation().clone())
+    }
+
+    pub(crate) fn caller_reserved_tenant_id(
+        &self,
+        nonce: &SignedExecutionNonce,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Option<String>, KernelError> {
+        let (operation, _) = self.caller_reserved_original(nonce, trusted_now_unix_ms)?;
+        let binding = operation.binding().to_persisted();
+        let tenant = binding.authenticated_tenant_id.as_str();
+        Ok(
+            (tenant != crate::admission_operation::LOCAL_SYSTEM_TENANT_ID)
+                .then(|| tenant.to_owned()),
+        )
     }
 
     pub(super) fn mark_durable_nonce_capture_pending(

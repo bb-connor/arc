@@ -56,13 +56,14 @@ impl ChioKernel {
         client: &mut C,
         proofs: NestedToolCallProofs,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
         self.validate_web3_evidence_prerequisites()?;
         if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
             return Ok(response);
         }
         let proofs = merge_operation_proof(operation, proofs)?;
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        let retained =
+        let mut claim =
             self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
 
         let mut request = nested_tool_request(context, operation, execution_nonce, proofs);
@@ -70,7 +71,7 @@ impl ChioKernel {
         // Once begun, resolution failures must use the same terminal cleanup
         // as evaluation failures. Returning early would leak in-flight state.
         let result = self
-            .prepare_session_threshold_intent(context, &mut request, retained)
+            .prepare_session_threshold_intent(context, &mut request, claim.retained())
             .and_then(|()| self.resolve_security_invocation_context(context, operation))
             .and_then(|security_context| {
                 self.evaluate_tool_call_with_nested_flow_client_and_security_context(
@@ -103,6 +104,7 @@ impl ChioKernel {
             request.governed_intent.as_ref(),
             terminal_state,
         )?;
+        claim.disarm();
         result
     }
 
@@ -138,19 +140,20 @@ impl ChioKernel {
         client: &mut C,
         proofs: NestedToolCallProofs,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(operation.extra_metadata.as_ref())?;
         self.validate_web3_evidence_prerequisites()?;
         if let Some(response) = self.reject_conflicting_session_authorization(context, operation)? {
             return Ok(response);
         }
         let proofs = merge_operation_proof(operation, proofs)?;
         let execution_nonce = parse_tool_call_operation_execution_nonce(operation)?;
-        let retained =
+        let mut claim =
             self.begin_or_resume_tool_request(context, operation, execution_nonce.as_ref())?;
 
         let mut request = nested_tool_request(context, operation, execution_nonce, proofs);
 
         let prepared = self
-            .prepare_session_threshold_intent(context, &mut request, retained)
+            .prepare_session_threshold_intent(context, &mut request, claim.retained())
             .and_then(|()| self.resolve_security_invocation_context(context, operation));
         let result = match prepared {
             Ok(security_context) => {
@@ -187,6 +190,7 @@ impl ChioKernel {
             request.governed_intent.as_ref(),
             terminal_state,
         )?;
+        claim.disarm();
         result
     }
 }

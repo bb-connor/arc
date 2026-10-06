@@ -276,6 +276,197 @@ fn two_kernels_commit_wins_before_the_automatic_fence() {
     assert_eq!(fixture.authority.state(), DurableDispatchState::Committed);
 }
 
+struct PreparingExecutorAuthority {
+    identity: ActiveResponseExecutorAuthorityIdentity,
+    lease: chio_security_types::ports::ResponseDispatchLease,
+    lookup_request: ActiveResponseExecutionRequest,
+    store: Arc<chio_store_sqlite::SqliteSecurityStateStore>,
+    effects: std::sync::atomic::AtomicUsize,
+}
+
+impl ActiveResponseExecutorAuthority for PreparingExecutorAuthority {
+    fn identity(&self) -> ActiveResponseExecutorAuthorityIdentity {
+        self.identity.clone()
+    }
+
+    fn ensure_ready(&self) -> Result<(), ActiveResponseExecutorError> {
+        Ok(())
+    }
+
+    fn load_committed_active_response_dispatch(
+        &self,
+        _: &TenantId,
+        _: &RecordId,
+    ) -> Result<Option<crate::ActiveResponseCommittedDispatch>, ActiveResponseExecutorError> {
+        self.lookup_request
+            .prepare_dispatch(
+                self.lease.clone(),
+                self.lookup_request.authorized_at_unix_ms(),
+            )
+            .map(|_| None)
+    }
+
+    fn fence_uncommitted_automatic_dispatch(
+        &self,
+        _: &ResponsePlan,
+        _: &PreparedActiveResponseDispatchBinding,
+    ) -> Result<AutomaticActiveResponseDispatchFenceOutcome, ActiveResponseExecutorError> {
+        self.lookup_request
+            .prepare_dispatch(
+                self.lease.clone(),
+                self.lookup_request.authorized_at_unix_ms(),
+            )
+            .map(|_| AutomaticActiveResponseDispatchFenceOutcome::Fenced)
+    }
+
+    fn execute_active_response(
+        &self,
+        request: &ActiveResponseExecutionRequest,
+    ) -> Result<ActiveResponseExecutionEvidence, ActiveResponseExecutorError> {
+        use chio_security_types::ports::ResponseDispatchStore;
+        let dispatch =
+            request.prepare_dispatch(self.lease.clone(), request.authorized_at_unix_ms())?;
+        self.store.commit_dispatch(&dispatch).map_err(|error| {
+            ActiveResponseExecutorError::OutcomeUnknown(format!("dispatch commit: {error}"))
+        })?;
+        self.effects
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Err(ActiveResponseExecutorError::OutcomeUnknown(
+            "test executor committed dispatch".to_owned(),
+        ))
+    }
+}
+
+#[test]
+fn response_dispatch_refusals_preserve_registered_codes_without_durable_commit() {
+    use chio_security_types::ports::{
+        LeaseOwnerId, ResponseDispatchKey, ResponseDispatchLease, ResponseDispatchLoadOutcome,
+        ResponseDispatchStore,
+    };
+    use chio_security_types::DispatchRejection;
+    use std::error::Error;
+
+    for capability_mismatch in [true, false] {
+        let fixture = two_kernel_fixture(None, None);
+        let plan = fixture.response_plan.clone();
+        let authorized_at = fixture.execution.authorized_at_unix_ms();
+        let capability_hash = if capability_mismatch {
+            Digest32::new([0x99; 32])
+        } else {
+            plan.operator_capability.capability_digest
+        };
+        let request = ActiveResponseExecutionRequest::from_fresh(
+            &chio_security_types::FreshLiveAdmission::new(plan.clone())
+                .expect("fresh response plan"),
+            ActiveResponseExecutionRequestParts {
+                response_plan: plan.clone(),
+                dispatch_id: fixture.execution.dispatch_id().clone(),
+                executor_authority: fixture.authority.identity.clone(),
+                request_id: plan.action_id.as_str().to_owned(),
+                plan_body_hash: digest_hex(&plan.plan_hash),
+                authorization_capability_hash: digest_hex(&capability_hash),
+                governed_intent_hash: fixture.execution.governed_intent_hash().to_owned(),
+                policy_decision_hash: fixture.execution.policy_decision_hash().to_owned(),
+                approval: ActiveResponseExecutionApproval::Automatic,
+                authorized_at_unix_ms: authorized_at,
+                expires_at_unix_ms: plan.expires_at_unix_ms,
+            },
+        )
+        .expect("sealed execution request");
+        let lease = ResponseDispatchLease {
+            lease_owner_id: LeaseOwnerId::new("refusal-test-executor").expect("lease owner"),
+            lease_expires_at_unix_ms: if capability_mismatch {
+                plan.expires_at_unix_ms
+            } else {
+                plan.expires_at_unix_ms + 1
+            },
+        };
+        let (expected, code) = if capability_mismatch {
+            (
+                DispatchRejection::CapabilityDigestMismatch,
+                "urn:chio:error:kernel:response-dispatch-capability-digest-mismatch",
+            )
+        } else {
+            (
+                DispatchRejection::LeaseOutsideWindow {
+                    lease_expires_at_unix_ms: plan.expires_at_unix_ms + 1,
+                    authorized_at_unix_ms: authorized_at,
+                    plan_expires_at_unix_ms: plan.expires_at_unix_ms,
+                },
+                "urn:chio:error:kernel:response-dispatch-lease-outside-window",
+            )
+        };
+        let directory = tempfile::tempdir().expect("dispatch refusal directory");
+        let store = Arc::new(
+            chio_store_sqlite::SqliteSecurityStateStore::open(directory.path().join("state.db"))
+                .expect("dispatch refusal store"),
+        );
+        let authority = Arc::new(PreparingExecutorAuthority {
+            identity: fixture.authority.identity.clone(),
+            lease: lease.clone(),
+            lookup_request: request.clone(),
+            store: Arc::clone(&store),
+            effects: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let mut kernel = make_kernel(make_config());
+        kernel
+            .set_active_response_executor_authority(authority.clone())
+            .expect("install preparing executor");
+        let error = kernel
+            .execute_active_response_with_authority(&request)
+            .expect_err("invalid dispatch must fail");
+        assert_eq!(error.report().code, code);
+        assert_eq!(
+            error
+                .source()
+                .and_then(|source| source.downcast_ref::<DispatchRejection>()),
+            Some(&expected),
+        );
+        let preparation_error = request
+            .prepare_dispatch(lease, authorized_at)
+            .expect_err("invalid preparation must fail");
+        assert_eq!(
+            preparation_error
+                .source()
+                .and_then(|source| source.downcast_ref::<DispatchRejection>()),
+            Some(&expected),
+        );
+        let readback_error = kernel
+            .recover_committed_active_response(&plan, request.dispatch_id())
+            .expect_err("invalid dispatch readback must fail");
+        assert_eq!(readback_error.report().code, code);
+        assert_eq!(
+            readback_error
+                .source()
+                .and_then(|source| source.downcast_ref::<DispatchRejection>()),
+            Some(&expected),
+        );
+        let fence_error = kernel
+            .terminate_never_committed_active_response(&plan, &fixture.binding, None)
+            .expect_err("invalid automatic fence must fail");
+        assert_eq!(fence_error.report().code, code);
+        assert_eq!(
+            fence_error
+                .source()
+                .and_then(|source| source.downcast_ref::<DispatchRejection>()),
+            Some(&expected),
+        );
+        assert!(matches!(
+            store
+                .load_dispatch(&ResponseDispatchKey {
+                    tenant_id: plan.tenant_id,
+                    dispatch_id: request.dispatch_id().clone(),
+                })
+                .expect("refused dispatch readback"),
+            ResponseDispatchLoadOutcome::Missing
+        ));
+        assert_eq!(
+            authority.effects.load(std::sync::atomic::Ordering::SeqCst),
+            0
+        );
+    }
+}
+
 fn automatic_response_plan(identity: &ActiveResponseExecutorAuthorityIdentity) -> ResponsePlan {
     let tenant_id = TenantId::new("tenant-two-kernel-fence").expect("tenant id");
     let action_id = ActionId::new("action-two-kernel-fence").expect("action id");

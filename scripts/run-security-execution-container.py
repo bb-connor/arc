@@ -51,6 +51,9 @@ SECCOMP_DENIED_SYSCALLS = (
     "fsopen",
     "fspick",
     "init_module",
+    "io_uring_enter",
+    "io_uring_register",
+    "io_uring_setup",
     "ioperm",
     "iopl",
     "kcmp",
@@ -80,6 +83,11 @@ SECCOMP_DENIED_SYSCALLS = (
     "unshare",
     "userfaultfd",
 )
+SECCOMP_UPSTREAM_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "deploy/docker/security-evidence-seccomp-upstream.json"
+)
+SECCOMP_UPSTREAM_SHA256 = "6416b47770785a41ac59073cdc77d9fe98517df2799dc83ef207e622de3053f6"
 SECCOMP_CLONE_DENIED_MASKS = (
     128,
     131072,
@@ -214,37 +222,57 @@ class DirectoryChainIdentity:
 
 
 def expected_seccomp_profile() -> dict[str, object]:
-    errno_rule = {
-        "names": list(SECCOMP_DENIED_SYSCALLS),
-        "action": "SCMP_ACT_ERRNO",
-        "errnoRet": 1,
-    }
-    clone_rules = [
-        {
-            "names": ["clone"],
-            "action": "SCMP_ACT_ERRNO",
-            "errnoRet": 1,
-            "args": [
-                {
-                    "index": 0,
-                    "value": mask,
-                    "valueTwo": mask,
-                    "op": "SCMP_CMP_MASKED_EQ",
-                }
-            ],
-        }
-        for mask in SECCOMP_CLONE_DENIED_MASKS
-    ]
+    # The container drops all capabilities, then grants only CHOWN, SETGID
+    # and SETUID for supervisor setup. None enables an upstream conditional
+    # syscall allowance. Remove every capability-dependent grant and narrow
+    # architecture, syscall and namespace access.
+    try:
+        if SECCOMP_UPSTREAM_PATH.is_symlink() or not SECCOMP_UPSTREAM_PATH.is_file():
+            raise BoundaryError("trusted upstream seccomp profile is not regular")
+        raw = SECCOMP_UPSTREAM_PATH.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != SECCOMP_UPSTREAM_SHA256:
+            raise BoundaryError("trusted upstream seccomp source commitment changed")
+        upstream = json.loads(raw)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise BoundaryError("trusted upstream seccomp profile is unavailable") from error
+    if upstream.get("defaultAction") != "SCMP_ACT_ERRNO":
+        raise BoundaryError("upstream seccomp policy is not default-deny")
+    denied = set(SECCOMP_DENIED_SYSCALLS)
+    rules = []
+    for original in upstream["syscalls"]:
+        rule = json.loads(json.dumps(original))
+        includes = rule.get("includes", {})
+        excludes = rule.get("excludes", {})
+        if includes.get("caps") or (
+            includes.get("arches")
+            and not set(includes["arches"]) & {"amd64", "x86_64"}
+        ):
+            continue
+        if set(excludes.get("arches", [])) & {"amd64", "x86_64"}:
+            continue
+        if rule["action"] == "SCMP_ACT_ALLOW":
+            rule["names"] = [
+                name for name in rule["names"] if name not in denied and name != "clone"
+            ]
+        if rule["names"]:
+            rules.append(rule)
+    rules.append({
+        "names": ["clone"],
+        "action": "SCMP_ACT_ALLOW",
+        "args": [{
+            "index": 0,
+            "value": sum(SECCOMP_CLONE_DENIED_MASKS),
+            "valueTwo": 0,
+            "op": "SCMP_CMP_MASKED_EQ",
+        }],
+    })
+    if not any("clone3" in rule["names"] and rule["action"] == "SCMP_ACT_ERRNO" for rule in rules):
+        rules.append({"names": ["clone3"], "action": "SCMP_ACT_ERRNO", "errnoRet": 38})
     return {
-        "defaultAction": "SCMP_ACT_ALLOW",
+        "defaultAction": "SCMP_ACT_ERRNO",
         "defaultErrnoRet": 1,
-        "archMap": [
-            {
-                "architecture": "SCMP_ARCH_X86_64",
-                "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"],
-            }
-        ],
-        "syscalls": [errno_rule, *clone_rules],
+        "architectures": ["SCMP_ARCH_X86_64"],
+        "syscalls": rules,
     }
 
 

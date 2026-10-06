@@ -96,7 +96,7 @@ pub use economic_continuity::{
     CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 pub use error::{Error, Result};
-pub use hashing::{sha256, Hash};
+pub use hashing::{sha256, Hash, Sha256State};
 pub use loaded_weights::{
     loaded_weights_hash_of, loaded_weights_hash_of_chunks, LoadedWeights, LoadedWeightsUnavailable,
 };

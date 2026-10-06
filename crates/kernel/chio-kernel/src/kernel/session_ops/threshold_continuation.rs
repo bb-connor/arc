@@ -67,6 +67,7 @@ impl ChioKernel {
             let Some(retained) = pending.pending_threshold_approval.as_ref() else {
                 return Ok(None);
             };
+            let retained = retained.clone();
             let proposal = operation
                 .threshold_approval_proposal
                 .as_ref()
@@ -75,7 +76,7 @@ impl ChioKernel {
                 })?;
             let binding = continuation_binding(operation, proposal, retained.bound_intent())?;
             session.claim_threshold_approval_retry(context, &binding)?;
-            Ok(Some(binding))
+            Ok(Some(retained))
         })
     }
 

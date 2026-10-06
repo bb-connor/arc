@@ -2,6 +2,8 @@
 
 use super::*;
 
+mod terminal_snapshot;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EvaluationPhaseV1 {
@@ -35,6 +37,11 @@ pub struct PostReturnNormalizedRequestContextV1 {
 }
 
 impl PostReturnNormalizedRequestContextV1 {
+    /// Decoded historical data only. Qualified store provenance and the
+    /// enclosing evaluation's immutable commitments remain mandatory.
+    pub(crate) fn normalized_value(&self) -> &Value {
+        &self.normalized
+    }
     #[allow(dead_code)]
     pub(crate) fn from_verified_normalization(normalized: Value) -> Result<Self, ToolOutcomeError> {
         let bytes = bounded(
@@ -396,6 +403,8 @@ pub struct PostReturnResolutionV1 {
     pub(super) post_guard_decision_digest: AdmissionDigest,
     pub(super) pricing_verdict_digest: AdmissionDigest,
     pub(super) settlement_disposition: SettlementDispositionV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) terminal_snapshot: Option<Value>,
 }
 
 impl PostReturnResolutionV1 {
@@ -462,6 +471,7 @@ impl PostReturnResolutionV1 {
             post_guard_decision_digest,
             pricing_verdict_digest,
             settlement_disposition,
+            terminal_snapshot: None,
         };
         record.validate()?;
         Ok((record, blob))
@@ -476,6 +486,7 @@ impl PostReturnResolutionV1 {
                 "resolution.resolved_output_size_bytes",
             ));
         }
+        terminal_snapshot::validate(self.terminal_snapshot.as_ref())?;
         self.settlement_disposition.validate()
     }
 }
@@ -575,6 +586,23 @@ fn evaluation_lifecycle_digest(
 }
 
 impl PostReturnEvaluationRecordV1 {
+    pub(crate) fn retained_terminal_snapshot(&self) -> Option<&Value> {
+        match &self.state {
+            PostReturnEvaluationStateV1::Resolved { resolution } => {
+                resolution.terminal_snapshot.as_ref()
+            }
+            _ => None,
+        }
+    }
+    pub(crate) fn retained_normalized_request_context(
+        &self,
+    ) -> &PostReturnNormalizedRequestContextV1 {
+        &self.exact_inputs.normalized_request_context
+    }
+
+    pub(crate) fn retained_frozen_steps(&self) -> &[FrozenEvaluationStepV1] {
+        &self.frozen_steps
+    }
     pub fn to_persisted(&self) -> PersistedPostReturnEvaluationRecordV1 {
         PersistedPostReturnEvaluationRecordV1 {
             schema: self.schema.to_owned(),
@@ -788,20 +816,23 @@ impl PostReturnEvaluationRecordV1 {
         )
     }
 
-    pub(crate) fn resolve_with_signing_preimage(
+    pub(crate) fn resolve_with_signing_preimage_and_snapshot(
         &self,
         signing_preimage: Vec<u8>,
         post_guard_decision_digest: AdmissionDigest,
         pricing_verdict_digest: AdmissionDigest,
         settlement_disposition: SettlementDispositionV1,
+        snapshot: Option<Value>,
     ) -> Result<(Self, CanonicalResolvedOutputBlobV1), ToolOutcomeError> {
-        let (resolution, blob) = PostReturnResolutionV1::from_signing_preimage(
+        terminal_snapshot::validate(snapshot.as_ref())?;
+        let (mut resolution, blob) = PostReturnResolutionV1::from_signing_preimage(
             self,
             signing_preimage,
             post_guard_decision_digest,
             pricing_verdict_digest,
             settlement_disposition,
         )?;
+        resolution.terminal_snapshot = snapshot;
         self.transition(
             self.version,
             PostReturnEvaluationTransitionV1::Resolve(resolution),

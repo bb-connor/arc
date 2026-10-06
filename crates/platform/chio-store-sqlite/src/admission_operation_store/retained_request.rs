@@ -28,6 +28,57 @@ pub(super) fn verify_retained_request_ownership(
 }
 
 impl SqliteAdmissionOperationStore {
+    pub(super) fn load_original_request_by_nonce(
+        &self,
+        nonce_id: &AdmissionIdentifier,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        let mut connection = self.connection()?;
+        let transaction = self.begin_read(&mut connection)?;
+        verify_active_owner(&transaction, &self.serving_owner, Some(fence))?;
+        verify_trusted_time(&transaction, trusted_now_unix_ms, &self.serving_owner)?;
+        let ids = {
+            let mut statement = transaction.prepare(
+                "SELECT operation_id FROM admission_execution_nonce_issuances WHERE nonce_id = ?1 ORDER BY operation_id LIMIT 2",
+            ).map_err(sqlite_error)?;
+            let ids = statement
+                .query_map([nonce_id.as_str()], |row| row.get::<_, String>(0))
+                .map_err(sqlite_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(sqlite_error)?;
+            ids
+        };
+        let id = match ids.as_slice() {
+            [] => {
+                transaction.commit().map_err(sqlite_error)?;
+                return Ok(None);
+            }
+            [id] => AdmissionOperationId::from_persisted(id.clone())?,
+            _ => {
+                return Err(invariant(
+                    "physical nonce issuance has multiple owning operations",
+                ))
+            }
+        };
+        let stored = load_by_operation_id_tx(&transaction, &id)?
+            .ok_or_else(|| invariant("physical nonce original operation disappeared"))?;
+        stored.verify_decision_time(trusted_now_unix_ms)?;
+        let issuance = super::execution_nonce::issuance::verify(&transaction, &stored.operation)?
+            .ok_or_else(|| invariant("physical nonce original issuance disappeared"))?;
+        if issuance.nonce_id() != nonce_id {
+            return Err(invariant(
+                "physical nonce selector changed its original identity",
+            ));
+        }
+        let original = load_retained_request_tx(&transaction, &stored.operation)?;
+        transaction.commit().map_err(sqlite_error)?;
+        Ok(original.map(|original| (stored.operation, original)))
+    }
+
     pub(super) fn load_unambiguous_original_request(
         &self,
         request_id: &AdmissionIdentifier,

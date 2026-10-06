@@ -124,6 +124,7 @@ fn certificate_time_and_sequence_fail_closed() {
     let entries = [ComplianceReceiptEntry {
         receipt: receipt.clone(),
         seq: 1,
+        entry_seq: None,
     }];
     let config = ComplianceConfig {
         trusted_kernel_keys: std::collections::BTreeSet::from([key.public_key().to_hex()]),
@@ -156,8 +157,13 @@ fn certificate_time_and_sequence_fail_closed() {
         ComplianceReceiptEntry {
             receipt: receipt.clone(),
             seq: u64::MAX,
+            entry_seq: None,
         },
-        ComplianceReceiptEntry { receipt, seq: 0 },
+        ComplianceReceiptEntry {
+            receipt,
+            seq: 0,
+            entry_seq: None,
+        },
     ];
     assert!(matches!(
         generate_compliance_certificate("session", &overflow, &config, &key, &clock),

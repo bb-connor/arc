@@ -339,7 +339,10 @@ impl ChioKernel {
                             PreDispatchCleanupDeny {
                                 request,
                                 reason: &reason,
-                                timestamp: self.read_authority_time()?.as_secs(),
+                                timestamp: self
+                                    .read_authority_time()
+                                    .map(|time| time.as_secs())
+                                    .unwrap_or(now),
                                 matched_grant_index,
                                 cap,
                                 budget_mutation,

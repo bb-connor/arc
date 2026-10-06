@@ -8,6 +8,10 @@ use std::time::Duration;
 
 use crate::mcp_cli::payment_config::PaymentAdapterConfig;
 
+#[cfg(test)]
+#[path = "runtime/payload_maintenance_tests.rs"]
+mod payload_maintenance_tests;
+
 pub(crate) fn resolve_sidecar_payment_adapter(
 ) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
     let config = PaymentAdapterConfig::from_env().map_err(|error| {
@@ -34,6 +38,18 @@ fn open_cli_durable_admission_runtime(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<Option<DurableAdmissionRuntime>, CliError> {
+    let maintenance = chio_control_plane::TerminalPayloadMaintenanceConfig::from_env()?;
+    if maintenance.is_some() {
+        if mode == chio_kernel::admission_operation::DurableAdmissionMode::Off {
+            return Err(CliError::cli_other_error(
+                "terminal raw payload maintenance requires enabled durable admission",
+            ));
+        }
+        if control_url.is_some() {
+            return Err(CliError::cli_other_error(
+                "terminal raw payload maintenance for a remote authority belongs to its server owner"));
+        }
+    }
     validate_durable_admission_participant_paths(
         mode,
         control_url,
@@ -56,14 +72,37 @@ fn open_cli_durable_admission_runtime(
             validate_distinct_database_paths(&paths)?;
         }
     }
-    match (mode, admission_db_path, control_url) {
+    let runtime = match (mode, admission_db_path, control_url) {
         (chio_kernel::admission_operation::DurableAdmissionMode::Off, _, _) => Ok(None),
         (_, Some(identity_path), Some(url)) => {
             let token = require_control_token(control_token)?;
             DurableAdmissionRuntime::open_remote(identity_path, url, token).map(Some)
         }
         _ => open_durable_admission_runtime(mode, admission_db_path),
+    }?;
+    if let Some(runtime) = runtime.as_ref() {
+        if let Some(config) = maintenance {
+            runtime
+                .start_terminal_payload_maintenance(config)
+                .map_err(|source| {
+                    CliError::with_public_source(
+                        &chio_errors::_generated::error_codes::CLI_OTHER,
+                        "terminal raw payload maintenance could not start",
+                        source,
+                    )
+                })?;
+            tracing::info!(
+                ttl_seconds = config.terminal_raw_payload_ttl.as_secs(),
+                interval_seconds = config.interval.as_secs(),
+                "terminal raw payload maintenance configured for supported local value calls"
+            );
+        } else if runtime.local_authority_store().is_some() {
+            tracing::warn!("terminal raw payload maintenance is disabled because operator TTL and interval are missing");
+        } else {
+            tracing::info!("terminal raw payload maintenance belongs to the remote server owner; this client has no local worker");
+        }
     }
+    Ok(runtime)
 }
 
 pub(crate) fn cmd_run(
@@ -271,7 +310,8 @@ fn require_durable_or_ephemeral_optin(
     }
     if !ephemeral_receipts && authority_seed_path.is_none() {
         return Err(CliError::cli_other_error(
-            "durable receipts require existing private signing custody: pass --authority-seed-file"));
+            "durable receipts require existing private signing custody: pass --authority-seed-file",
+        ));
     }
     if let Some(path) = authority_seed_path {
         chio_control_plane::load_existing_authority_keypair(path)?;
@@ -430,7 +470,9 @@ pub(crate) fn cmd_api_protect(
     // Validate identity before CLI-side key creation or policy/store work.
     chio_control_plane::server_transport::prepare(
         &transport,
-        listen_addr.parse::<SocketAddr>().map_err(std::io::Error::other)?,
+        listen_addr
+            .parse::<SocketAddr>()
+            .map_err(std::io::Error::other)?,
     )?;
     require_durable_or_ephemeral_optin(
         receipt_store,
@@ -527,7 +569,9 @@ pub(crate) fn cmd_start(
 ) -> Result<(), CliError> {
     chio_control_plane::server_transport::prepare(
         &transport,
-        listen_addr.parse::<SocketAddr>().map_err(std::io::Error::other)?,
+        listen_addr
+            .parse::<SocketAddr>()
+            .map_err(std::io::Error::other)?,
     )?;
     let scheme = if transport.tls_cert.is_some() {
         "https"

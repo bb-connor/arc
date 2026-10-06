@@ -30,7 +30,8 @@ impl ChioKernel {
             )?
             .refresh()?;
         prepared.validate_origin(self, original)?;
-        let mut deadline = prepared.valid_until_unix_ms()?;
+        let nonce_binding = self.verified_bound_execution_nonce_time(admission, request, now)?;
+        let mut deadline = prepared.valid_until_unix_ms(nonce_binding.as_ref())?;
         if let Some((_, validity)) = self.verify_owned_runtime_for_native_capture(
             admission,
             request,

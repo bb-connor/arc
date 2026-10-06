@@ -7,7 +7,7 @@ use super::types::{
     PolicyFormat, ReputationIssuancePolicy, RuntimeAssuranceIssuancePolicy,
 };
 
-const RUNTIME_POLICY_IDENTITY_SCHEMA: &str = "chio.runtime-policy.v2";
+const RUNTIME_POLICY_IDENTITY_SCHEMA: &str = "chio.runtime-policy.v3";
 
 pub(super) fn parse_operations(operations: &[String]) -> Result<Vec<Operation>, PolicyError> {
     operations
@@ -36,6 +36,7 @@ pub(super) fn runtime_hash_for_chio_yaml(
         "format": PolicyFormat::ChioYaml.as_str(),
         "kernel": policy.kernel,
         "guards": policy.guards,
+        "default_guard_profile": default_guard_profile_identity()?,
         "default_capabilities": default_capabilities,
     });
     hash_json_value(&fingerprint)
@@ -79,12 +80,21 @@ pub(super) fn runtime_hash_for_hushspec(
         "kernel": kernel,
         "default_capabilities": default_capabilities,
         "resolved_policy": spec,
+        "default_guard_profile": default_guard_profile_identity()?,
         "issuance_policy": issuance_policy,
         "runtime_assurance_policy": runtime_assurance_policy,
         "threshold_approval": approval_material,
         "auxiliary_assets": auxiliary_assets,
     });
     hash_json_value(&fingerprint)
+}
+
+fn default_guard_profile_identity() -> Result<String, PolicyError> {
+    chio_guards::default_runtime_guard_profile_identity().map_err(|error| {
+        PolicyError::Invalid(format!(
+            "default guard profile identity is invalid: {error}"
+        ))
+    })
 }
 
 fn ensure_finite_policy_numbers(policy: &impl serde::Serialize) -> Result<(), PolicyError> {

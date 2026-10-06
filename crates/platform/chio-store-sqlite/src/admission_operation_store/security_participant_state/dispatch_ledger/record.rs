@@ -15,6 +15,8 @@ pub(super) struct Record {
     pub grant_index: u32,
     pub grant_digest: AdmissionDigest,
     pub live_request_digest: AdmissionDigest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_dispatch_commitment_id: Option<chio_security_types::ports::RecordId>,
     pub policy: serde_json::Value,
     pub join_digest: AdmissionDigest,
     pub egress_acquisition: Option<AdmissionDigest>,
@@ -62,8 +64,25 @@ impl Record {
     ) -> Result<(), AdmissionOperationStoreError> {
         let operation = AdmissionOperationV1::from_persisted(self.operation.clone())?;
         require_operation(&operation)?;
-        if self.schema != SCHEMA {
+        if !matches!(
+            (
+                self.schema.as_str(),
+                self.original_dispatch_commitment_id.as_ref()
+            ),
+            (LEGACY_SCHEMA, None) | (SCHEMA, Some(_))
+        ) {
             return Err(invalid("native dispatch ledger schema differs"));
+        }
+        if self.schema == SCHEMA
+            && NativeSecurityDispatchRequestBindingV1::from_ledger(
+                &self.evidence()?,
+                &self.context,
+            )?
+            .is_none()
+        {
+            return Err(invalid(
+                "native dispatch ledger lacks its original commitment",
+            ));
         }
         self.lease
             .validate_operation(tx, &operation, self.observed_at, self.decision_at)?;
@@ -127,6 +146,10 @@ impl Record {
                     .ok_or_else(|| invalid("native dispatch ledger requires committed egress"))?;
                 if history.binding != policy.inputs.native_authority
                     || history.live_request_hash != self.live_request_digest
+                    || self
+                        .original_dispatch_commitment_id
+                        .as_ref()
+                        .is_some_and(|id| id != &committed.commitment.dispatch_commitment_id)
                     || Some(&history.acquisition.event_digest) != self.egress_acquisition.as_ref()
                     || Some(&committed.event_digest) != self.egress_commitment.as_ref()
                     || history.acquisition.fence.key != policy.inputs.observation.key

@@ -130,7 +130,8 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
             'channel_reservation_finalized',
             'runtime_participant_claim', 'runtime_participant_release',
             'governed_approval_claim', 'governed_approval_release',
-            'dpop_replay_claim', 'dpop_replay_release'
+            'dpop_replay_claim', 'dpop_replay_release',
+            'recovery_deferred', 'recovery_deferral_cleared'
         )
     ),
     operation_digest TEXT NOT NULL
@@ -187,6 +188,11 @@ CREATE TABLE IF NOT EXISTS admission_operation_commits (
             AND participant_digest IS NOT NULL)
         OR (mutation_kind IN ('runtime_participant_claim', 'runtime_participant_release')
             AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+        OR (mutation_kind = 'recovery_deferred'
+            AND recovery_claim_digest IS NOT NULL
+            AND participant_digest IS NOT NULL)
+        OR (mutation_kind = 'recovery_deferral_cleared'
             AND participant_digest IS NOT NULL)
     )
 );

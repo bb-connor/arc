@@ -9,7 +9,8 @@ from functools import lru_cache
 CORE = "crates/core/chio-core-types/src/"
 CHECKPOINT = "crates/kernel/chio-kernel/src/checkpoint.rs"
 EFFECT = "crates/security/chio-security-types/src/response.rs"
-SUPPORT_PATHS = (CHECKPOINT, EFFECT)
+MCP_INBOX = "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs"
+SUPPORT_PATHS = (CHECKPOINT, EFFECT, MCP_INBOX)
 
 # (owner path, reader symbol): (constrained API, required source expressions).
 # Every expression is confined to this named function with nested items masked.
@@ -81,6 +82,52 @@ def special_apis(path, reader, body, supports):
     rule = RULES.get((path, reader.split("#")[0]))
     if rule and all(re.search(pattern, body) for pattern in rule[1]):
         apis.append(rule[0])
+    if path == MCP_INBOX and reader == "scalar":
+        source = supports.get(MCP_INBOX, "")
+        envelope = re.search(r"struct\s+Envelope<'a>\s*\{([^}]+)\}", source)
+        params = re.search(r"struct\s+Params<'a>\s*\{([^}]+)\}", source)
+        borrowed = envelope and params and all(
+            re.search(r"\b" + field + r"\s*:\s*Option<&'a\s+RawValue>", declaration)
+            for declaration, fields in (
+                (envelope.group(1), ("jsonrpc", "id", "method", "params")),
+                (params.group(1), ("request", "task")),
+            ) for field in fields
+        )
+        scalar = (
+            r"let\s+raw\s*=\s*raw\.filter\(\|raw\|\s*raw\.get\(\)\.len\(\)\s*<=\s*IDENTITY_BYTES\)\?;",
+            r"let\s+value\s*:\s*Value\s*=\s*serde_json::from_str\(raw\.get\(\)\)\.ok\(\)\?;",
+            r"bounded_id\(&value\)\.then_some\(value\)",
+        )
+        route = (
+            r"fn\s+decode\(\s*&self,\s*bytes\s*:\s*&\[u8\],\s*bound\s*:\s*usize\s*\)"
+            r"\s*->\s*Result<AccountedMessage,\s*AdapterError>\s*\{\s*"
+            r"(?:let\s+text\s*=\s*)?chio_core::canonical::UntrustedJsonText::from_wire\(bytes,\s*bound\)\?;\s*"
+            r"(?:let\s+_\s*=\s*text;\s*)?"
+            r"let\s+identity\s*=\s*control_identity\(bytes\);\s*"
+            r"let\s+budget\s*=\s*self\.budget\(&identity\)\?;\s*"
+            r"let\s+wire\s*=\s*std::str::from_utf8\(bytes\)\s*"
+            r"\.map_err\(chio_core::canonical::UntrustedJsonError::NotUtf8\)\?;\s*"
+            r"let\s+reservation\s*=\s*budget\.admit\(wire\)\?;\s*"
+            r"let\s+value\s*=\s*super::decode_mcp_request\(bytes,\s*bound\)\?;"
+        )
+        if borrowed and all(re.search(pattern, body) for pattern in scalar) and all(
+            re.search(pattern, source) for pattern in (
+                r"const\s+IDENTITY_BYTES\s*:\s*usize\s*=\s*512;",
+                r"fn\s+raw_member<'de,\s*D:\s*serde::Deserializer<'de>>\(decoder:\s*D\)\s*"
+                r"->\s*Result<Option<&'de\s+RawValue>,\s*D::Error>\s*\{\s*"
+                r"<&'de\s+RawValue>::deserialize\(decoder\)\.map\(Some\)\s*\}",
+                r"fn\s+control_identity\(bytes:\s*&\[u8\]\)\s*->\s*Value\s*\{\s*"
+                r"let\s+Ok\(envelope\)\s*=\s*serde_json::from_slice::<Envelope<'_>>\(bytes\)\s*else\s*\{\s*"
+                r"return\s+Value::Null;\s*\};\s*let\s+params\s*=\s*envelope\s*\.params\s*"
+                r"\.and_then\(\|params\|\s*serde_json::from_str::<Params<'_>>\(params\.get\(\)\)\.ok\(\)\);",
+                r"scalar\(raw\)\.unwrap_or\(Value::Bool\(false\)\)",
+                r"fn\s+bounded_id\(value:\s*&Value\)\s*->\s*bool\s*\{\s*match\s+value\s*\{\s*"
+                r"Value::String\(text\)\s*=>\s*text\.len\(\)\s*<=\s*IDENTITY_BYTES,\s*"
+                r"Value::Number\(_\)\s*\|\s*Value::Null\s*=>\s*true,\s*_\s*=>\s*false,?\s*\}\s*\}",
+                route,
+            )
+        ):
+            apis.append("borrowed-control::bounded_scalar+same_wire_aggregate_admission")
     if path == "crates/protocol/chio-mcp-remote/src/remote_mcp/session_resume.rs" and reader.startswith("read_resume_hmac_keyring_file#") and re.search(
         r"\{\s*Err\(CliError::cli_other_error\(", body
     ) and not re.search(r"\bOk\s*\(", body):
@@ -99,7 +146,7 @@ def special_apis(path, reader, body, supports):
 
 def private_producer_apis(path, reader, body, owners, calls, canonical_equality):
     """Pin the finite private producer/readback relationships reviewed in code."""
-    if path == "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs" and reader == "measure":
+    if path == "crates/protocol/chio-mcp-edge/src/ingress/budget/admission.rs" and reader == "measure":
         witnesses = {
             "measure": (
                 r"wire_bytes\s*:\s*text\.len\(\)",

@@ -724,6 +724,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh
@@ -834,6 +837,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh
@@ -1001,6 +1007,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh
@@ -1273,6 +1282,8 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/enterprise-evidence-finalizer.yml"
           })"
+          finalizer_workflow_id="$(jq -r '.id' <<< "${finalizer_workflow}")"
+          [[ "${finalizer_workflow_id}" =~ ^[1-9][0-9]*$ ]]
           test "$(jq -r '.path' <<< "${finalizer_workflow}")" = ".github/workflows/enterprise-evidence-finalizer.yml"
           test "$(jq -r '.state' <<< "${finalizer_workflow}")" = "active"
 
@@ -1327,9 +1338,10 @@ jobs:
                 --arg head_branch "${default_branch}" \
                 --arg head_sha "${default_commit_sha}" \
                 --arg started_at "${dispatch_started_at}" \
+                --arg workflow_id "${finalizer_workflow_id}" \
                 '[.[] | select(
-                  .name == "Enterprise evidence finalizer" and
                   .path == ".github/workflows/enterprise-evidence-finalizer.yml" and
+                  (.workflow_id | tostring) == $workflow_id and
                   .event == "workflow_dispatch" and
                   .display_title == $display_title and
                   .head_branch == $head_branch and
@@ -1373,8 +1385,8 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               "repos/${GITHUB_REPOSITORY}/actions/runs/${dispatched_run_id}"
           })"
-          test "$(jq -r '.name' <<< "${dispatched_run}")" = "Enterprise evidence finalizer"
           test "$(jq -r '.path' <<< "${dispatched_run}")" = ".github/workflows/enterprise-evidence-finalizer.yml"
+          test "$(jq -r '.workflow_id' <<< "${dispatched_run}")" = "${finalizer_workflow_id}"
           test "$(jq -r '.event' <<< "${dispatched_run}")" = "workflow_dispatch"
           test "$(jq -r '.display_title' <<< "${dispatched_run}")" = "${display_title}"
           test "$(jq -r '.head_branch' <<< "${dispatched_run}")" = "${default_branch}"

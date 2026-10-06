@@ -86,6 +86,8 @@ mod schema;
 pub(super) mod security_participant_migration;
 #[path = "admission_operation_store_tests/security_participant_state.rs"]
 pub(super) mod security_participant_state;
+#[path = "admission_operation_store_tests/terminal_reader_bounds.rs"]
+mod terminal_reader_bounds;
 #[path = "admission_operation_store_tests/threshold_approval.rs"]
 mod threshold_approval;
 use crate::{

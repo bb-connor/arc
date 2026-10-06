@@ -276,7 +276,7 @@ async fn restored_transport_obeys_original_deadline_and_stops_even_if_fencing_fa
             ));
             // Construction sees a fresh local instant after upstream setup.
             // Startup recovery must restore the earlier deadline before use.
-            let (input_tx, _input_rx) = mpsc::channel();
+            let (input_tx, _input_rx) = mcp_inbox();
             let (event_tx, _) = broadcast::channel(8);
             let session = RemoteSession::new(RemoteSessionInit {
                 clock: clock.clone(),

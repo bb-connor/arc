@@ -377,11 +377,16 @@ impl KernelMediatedMcpTransport {
             .list_tools()
             .map_err(|e| CliError::cli_other_error(format!("failed to list tools: {e}")))?;
         let kernel_keypair = chio_core::Keypair::generate();
+        let policy_material = chio_core::canonical::canonical_json_bytes(&(
+            "chio.mcp-wrap-policy.v1",
+            "strict-execution-nonce",
+            chio_guards::default_runtime_guard_profile_identity()?,
+        ))?;
         let mut kernel = chio_kernel::ChioKernel::new(chio_kernel::KernelConfig {
             keypair: kernel_keypair.clone(),
             ca_public_keys: vec![],
             max_delegation_depth: 5,
-            policy_hash: "mcp-wrap-strict-execution-nonce".to_string(),
+            policy_hash: chio_core::sha256_hex(&policy_material),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -395,6 +400,11 @@ impl KernelMediatedMcpTransport {
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             deadlines: chio_kernel::HotPathDeadlineConfig::default(),
         });
+        let default_guard_profile = chio_guards::default_runtime_guard_profile();
+        for guard in default_guard_profile.pre_invocation_guards {
+            kernel.add_guard(guard);
+        }
+        kernel.set_post_invocation_pipeline(default_guard_profile.post_invocation_pipeline);
         let payment_adapter_config = PaymentAdapterConfig::from_env()
             .map_err(CliError::cli_other_error)?
             .unwrap_or_else(PaymentAdapterConfig::default_safe);
@@ -1090,3 +1100,7 @@ mod wrap_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "wrap/product_guard_tests.rs"]
+mod product_guard_tests;

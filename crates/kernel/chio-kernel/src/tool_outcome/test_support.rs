@@ -64,16 +64,65 @@ pub fn returned_value(
     Ok((blob, outcome))
 }
 
+/// Construct record data for a canonical adversarial candidate. Physical
+/// mutation still requires its original captured operation and real lease.
+pub fn record_returned_blob(
+    operation: &AdmissionOperationV1,
+    blob: &CanonicalInvocationBlobV1,
+    recording_fence: StoreMutationFence,
+    recorded_at_unix_ms: u64,
+) -> Result<ToolOutcomeRecordV1, ToolOutcomeError> {
+    let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
+    ToolOutcomeRecordV1::record_tool_returned(
+        operation,
+        &raw,
+        blob,
+        recording_fence,
+        recorded_at_unix_ms,
+    )
+}
+
+/// Exact fixture inputs, not native capture or release authority.
+pub struct NativeReturnedValueContext<'a> {
+    pub request: &'a ToolCallRequest,
+    pub security_context: &'a crate::SecurityInvocationContext,
+    pub ledger: &'a crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
+    pub receipt_signing_public_key: chio_core::PublicKey,
+    pub receipt_crypto_floor: chio_core::receipt::crypto_floor::ReceiptCryptoFloor,
+}
+
 /// Build native return data for physical journal tests. This bypasses connector
 /// execution, not native capture, and is compiled only as test support.
 pub fn native_returned_value(
     operation: &AdmissionOperationV1,
     recording_fence: StoreMutationFence,
     recorded_at_unix_ms: u64,
-    request: &ToolCallRequest,
-    context: &crate::SecurityInvocationContext,
+    input: NativeReturnedValueContext<'_>,
     value: Value,
 ) -> Result<(CanonicalInvocationBlobV1, ToolOutcomeRecordV1), ToolOutcomeError> {
+    let NativeReturnedValueContext {
+        request,
+        security_context: context,
+        ledger,
+        receipt_signing_public_key,
+        receipt_crypto_floor,
+    } = input;
+    let live =
+        crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(
+            request, context,
+        )
+        .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+    let original = crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_ledger(
+        ledger, context,
+    )
+    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?
+    .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
+    if live != original || operation.native_dispatch_ledger_digest() != Some(&ledger.record_digest)
+    {
+        return Err(ToolOutcomeError::Binding("test_support.original_dispatch"));
+    }
+    let original = OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?
+        .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
     let (blob, _) = returned_value(
         operation,
         recording_fence.clone(),
@@ -85,16 +134,22 @@ pub fn native_returned_value(
     raw.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA.into();
     raw.tool_server = identifier(&request.server_id);
     raw.tool_name = identifier(&request.tool_name);
+    let retained = crate::admission_operation::RetainedToolAdmissionRequestV1::request_without_transient_credentials(request);
     raw.request_canonical_json = Some(
         String::from_utf8(
-            canonical_json_bytes(request)
+            canonical_json_bytes(&retained)
                 .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
         )
         .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
     );
     raw.security_invocation_context = Some(context.clone());
     raw.security_release_required = Some(true);
-    let raw = RawInvocationOutcomeV1::from_persisted(raw)?;
+    let raw = RawInvocationOutcomeV1::from_persisted(raw)?
+        .with_receipt_signing_identity(FrozenReceiptSigningIdentityV1::new(
+            receipt_signing_public_key,
+            receipt_crypto_floor,
+        )?)?
+        .with_original_security_dispatch_binding(Some(Box::new(original)))?;
     let blob = raw.canonical_blob()?;
     let outcome = ToolOutcomeRecordV1::record_tool_returned(
         operation,

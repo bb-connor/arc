@@ -18,6 +18,7 @@ pub struct NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
     credentials: &'a mut DispatchCredentialReservation<'kernel>,
     metadata: Option<&'a serde_json::Value>,
     attempted: bool,
+    store_entered: bool,
     failed: bool,
     return_input: Option<DurableToolReturnContextInput<'a>>,
     captured_lifecycle: Option<lifecycle::CapturedLifecycle>,
@@ -61,12 +62,15 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
         ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
         policy_json: &[u8],
     ) -> Result<crate::receipt_store::AdmissionBudgetCapture, KernelError> {
-        let grant_index = self.grant_index()?;
-        if self.attempted {
+        if self.attempted || self.failed {
             return Err(invalid(
                 "native capture authority already attempted capture",
             ));
         }
+        // Every entry consumes this authority, including rejection while
+        // freezing the return context. Store uncertainty starts separately.
+        self.attempted = true;
+        let grant_index = self.grant_index()?;
         if !std::ptr::eq(prepared.kernel, self.kernel)
             || !std::ptr::eq(prepared.request, self.request)
             || prepared.operation != *self.admission.operation()
@@ -98,11 +102,10 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
             })
             .transpose()?;
         if let Some(context) = frozen.as_mut() {
-            context.bind_native_dispatch(&ledger.record_digest)?;
+            context.bind_native_dispatch(ledger)?;
         }
-        // From this point, a callback failure or lost acknowledgement cannot
-        // justify refunding quota or releasing one-shot credential custody.
-        self.attempted = true;
+        // Preserve original credentials while preparing the physical commit.
+        // Retention alone does not assert that the store callback was entered.
         self.credentials.retain_if_dropped()?;
         let proof = self.credentials.verify_native_dispatch(
             self.admission,
@@ -170,6 +173,7 @@ impl<'a, 'kernel: 'a> NativeSecurityDispatchCaptureAuthority<'a, 'kernel> {
                 ledger,
                 policy_json,
             };
+            self.store_entered = true;
             if let Some(frame) = caller_frame.as_ref() {
                 runtime
                     .store
@@ -313,6 +317,7 @@ impl ChioKernel {
             credentials,
             metadata,
             attempted: false,
+            store_entered: false,
             failed: false,
             return_input: None,
             captured_lifecycle: None,
@@ -323,7 +328,7 @@ impl ChioKernel {
         let error = result.err().unwrap_or_else(|| {
             invalid("native capture checkpoint complete; execution remains unsupported")
         });
-        Some(if authority.attempted {
+        Some(if authority.store_entered {
             DurableDispatchCommitError::CommitUnconfirmed(error)
         } else {
             DurableDispatchCommitError::RejectedBeforeCommit(error)

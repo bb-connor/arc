@@ -47,6 +47,18 @@ pub(crate) struct ConnectionFenced {
     pub(crate) reason: FenceReason,
 }
 
+/// Housekeeping cannot run unbudgeted recovery before installing its SQL guard.
+/// The existing qualified port or reopen still owns connection recovery.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum MaintenanceLockError {
+    #[error(transparent)]
+    Fenced(#[from] ConnectionFenced),
+    #[error(
+        "{store} connection is poisoned; bounded maintenance requires qualified recovery or reopen"
+    )]
+    RecoveryRequired { store: &'static str },
+}
+
 #[derive(Clone, Debug, thiserror::Error)]
 pub(crate) enum FenceReason {
     #[error("rollback of the transaction the panic interrupted failed: {0}")]
@@ -107,6 +119,25 @@ impl StoreConnection {
             Some(fenced) => Err(fenced.clone()),
             None => Ok(guard),
         }
+    }
+
+    /// Acquire a healthy connection without executing panic-recovery SQL.
+    /// This check is inside the lock acquisition, so poison cannot race an
+    /// earlier `is_poisoned` observation. No fence or anchor proof is bypassed.
+    pub(crate) fn lock_for_maintenance(
+        &self,
+    ) -> Result<MutexGuard<'_, Connection>, MaintenanceLockError> {
+        if let Some(fenced) = self.fence.get() {
+            return Err(fenced.clone().into());
+        }
+        let guard = self
+            .connection
+            .lock()
+            .map_err(|_| MaintenanceLockError::RecoveryRequired { store: self.store })?;
+        if let Some(fenced) = self.fence.get() {
+            return Err(fenced.clone().into());
+        }
+        Ok(guard)
     }
 
     /// The reason this connection refuses to serve, once it does.

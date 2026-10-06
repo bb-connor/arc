@@ -136,6 +136,7 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseSimulationRequest,
     ) -> Result<VerifiedResponseSimulationAuthorization, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         let now = self.read_authority_time()?.get();
         let bindings = self.verify_active_response_authorization_at(&request.authorization, now)?;
         self.verify_active_response_artifact_authority_attestation(request, &bindings, now)?;

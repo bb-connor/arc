@@ -148,11 +148,14 @@ fn loom_real_session_admission_never_outlives_terminal() {
 
     loom::model(|| {
         let session = {
-            let session = Session::new(
+            let session = match Session::new(
                 SessionId::new("sess-loom"),
                 "agent-loom".to_string(),
                 Vec::new(),
-            )?;
+            ) {
+                Ok(session) => session,
+                Err(error) => panic!("real Session fixture failed to initialize: {error}"),
+            };
             assert!(
                 session.activate().is_ok(),
                 "session should activate to ready"

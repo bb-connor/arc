@@ -12,6 +12,8 @@ use chio_test_support::prelude::*;
 mod attempted_cost;
 #[path = "analytics_tests/integrity.rs"]
 mod integrity;
+#[path = "analytics_tests/read_bounds.rs"]
+mod read_bounds;
 
 /// Charged-cost aggregate the analytics queries carried before the typed
 /// projection replaced it. Kept here as the oracle the replacement is measured

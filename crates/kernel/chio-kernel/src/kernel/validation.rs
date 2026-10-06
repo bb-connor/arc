@@ -34,6 +34,8 @@ mod issuance;
 mod issuer_trust;
 #[path = "validation/lineage.rs"]
 mod lineage;
+#[path = "validation/payment_amount.rs"]
+mod payment_amount;
 #[path = "validation/portable.rs"]
 mod portable;
 #[path = "validation/revocation_trace.rs"]
@@ -1281,6 +1283,9 @@ impl ChioKernel {
                                         .to_owned(),
                                 )
                             })?;
+                            let authorized_amount_units = Self::durable_payment_authorized_amount(
+                                request, cost_units, &currency,
+                            )?;
                             let journal = crate::payment::PaymentJournalRecord {
                                 operation_id: admission.operation_id().to_owned(),
                                 journal_version: 1,
@@ -1309,6 +1314,10 @@ impl ChioKernel {
                                 authorization_id: None,
                                 transaction_id: None,
                                 amount_units: cost_units,
+                                authorized_amount_units: Some(authorized_amount_units),
+                                authorization_attempt: Some(
+                                    crate::payment::PaymentAuthorizationAttempt::NotStarted,
+                                ),
                                 settle_action: None,
                                 settle_amount_units: None,
                                 release_authority: None,
@@ -2215,7 +2224,7 @@ impl ChioKernel {
             }
             return Ok(None);
         };
-        let durable_journal = durable_admission
+        let mut durable_journal = durable_admission
             .filter(|_| charge_result.is_some())
             .map(|admission| {
                 self.load_durable_payment_journal(admission)
@@ -2223,14 +2232,12 @@ impl ChioKernel {
             })
             .transpose()?;
         if let Some(journal) = durable_journal.as_ref() {
-            let rail_mode = adapter.rail_mode().ok_or_else(|| {
-                PaymentError::RailError("durable payment adapter omitted its rail mode".to_owned())
-            })?;
-            if adapter.rail_id() != journal.rail || rail_mode != journal.rail_mode {
-                return Err(PaymentError::RailError(
-                    "durable payment adapter does not match the persisted rail profile".to_owned(),
-                ));
-            }
+            Self::validate_durable_payment_authorization_intent(
+                adapter.as_ref(),
+                journal,
+                amount_units,
+                &currency,
+            )?;
             match (journal.state, journal.rail_mode) {
                 (
                     crate::payment::PaymentJournalState::Authorized,
@@ -2369,6 +2376,13 @@ impl ChioKernel {
             governed,
             commerce,
         };
+        if let (Some(admission), Some(journal)) = (durable_admission, durable_journal.as_ref()) {
+            durable_journal = Some(self.begin_durable_payment_authorization_attempt(
+                admission,
+                journal,
+                trusted_now_unix_ms,
+            )?);
+        }
         let authorization = run_payment_adapter_operation("authorize", || {
             adapter.authorize(&authorization_request)
         })?;

@@ -660,6 +660,11 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
         .route_layer(axum::middleware::from_fn(
             super::super::json_ingress::validate,
         ))
+        // The later layer runs first, before original-byte buffering and Json.
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            super::super::json_ingress::authenticate,
+        ))
         .with_state(state);
 
     // Dashboard SPA is served from the same origin via ServeDir -- no CORS

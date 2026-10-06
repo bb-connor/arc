@@ -9,6 +9,11 @@ use chio_tool_call_fabric::{
 };
 use serde_json::json;
 
+#[path = "streaming/final_callset.rs"]
+mod final_callset;
+#[path = "streaming/known_events.rs"]
+mod known_events;
+
 fn allow_verdict() -> VerdictResult {
     VerdictResult::Allow {
         redactions: vec![],
@@ -644,3 +649,9 @@ fn provider_executed_message_and_reasoning_items_are_forwarded() {
         .unwrap()
         .contains("response.output_text.delta"));
 }
+
+#[path = "streaming/lifecycle_payload.rs"]
+mod lifecycle_payload;
+
+#[path = "streaming/raw_identity.rs"]
+mod raw_identity;

@@ -74,11 +74,17 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         storage::verify_coverage(tx)?;
         let record = storage::load(tx, operation.binding().operation_id().as_str())?
             .ok_or_else(|| invalid("native capture requires its exact preparation ledger"))?;
-        if record.evidence()? != *input.ledger
+        let original_dispatch = NativeSecurityDispatchRequestBindingV1::from_live_request(
+            custody.request,
+            custody.security_context,
+        )?;
+        if record.schema != SCHEMA
+            || record.original_dispatch_commitment_id.as_ref()
+                != Some(original_dispatch.dispatch_commitment_id())
+            || record.evidence()? != *input.ledger
             || record.operation != operation.to_persisted()
             || usize::try_from(record.grant_index).ok() != Some(grant_index)
-            || record.live_request_digest
-                != super::super::egress::live_request_hash(custody.request)?
+            || &record.live_request_digest != original_dispatch.live_request_digest()
             || record.context != *custody.security_context
         {
             return Err(invalid("native capture changed its prepared command"));
@@ -155,6 +161,23 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             .as_ref()
             .map(|value| {
                 value.require_operation_bound_profile()?;
+                if let Some(bound_at) = input.credentials.execution_nonce_binding_time_unix_ms() {
+                    if !operation.binding().participant_requirements().approval
+                        || operation.threshold_proposal_hash().is_none()
+                        || crate::admission_operation_store::threshold_approval::nonce_verification_time_unix_ms(
+                            tx, operation, now,
+                        )? != bound_at
+                    {
+                        return Err(invalid("native capture nonce changed its original approval binding time"));
+                    }
+                    crate::admission_operation_store::threshold_approval::verify_nonce_capture_approval(
+                        tx, operation, now, owner,
+                    )?;
+                    chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1::from_canonical_bytes(
+                        value.canonical_bytes(), operation, &original, value.issuer(), bound_at,
+                    )?;
+                    return Ok(None);
+                }
                 u64::try_from(value.signed_nonce().expires_at())
                     .ok()
                     .and_then(|seconds| seconds.checked_mul(1000))
@@ -162,8 +185,9 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                     .ok_or_else(|| {
                         invalid("native capture execution nonce expired or exceeds bounds")
                     })
+                    .map(Some)
             })
-            .transpose()?;
+            .transpose()?.flatten();
         let runtime_valid_until_unix_ms = input
             .credentials
             .runtime_validity()
@@ -291,6 +315,14 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         if commit_now < now {
             return Err(invalid("native capture clock regressed before commit"));
         }
+        if self.operation.threshold_proposal_hash().is_some() {
+            crate::admission_operation_store::threshold_approval::verify_nonce_capture_approval(
+                tx,
+                &self.operation,
+                commit_now,
+                owner,
+            )?;
+        }
         #[cfg(feature = "admission-test-support")]
         {
             expiry_test_support::annotate_rejection(delayed, self.validate_time(commit_now))
@@ -352,11 +384,23 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_c
     operation: &AdmissionOperationV1,
     initialized: Option<&SecurityParticipantStateInitialization>,
 ) -> Result<(), AdmissionOperationStoreError> {
-    let Some(digest) = operation.native_dispatch_ledger_digest() else {
+    if operation.native_dispatch_ledger_digest().is_none() {
         return Ok(());
-    };
+    }
     let record = storage::load(connection, operation.binding().operation_id().as_str())?
         .ok_or_else(|| invalid("native capture attachment lost its preparation ledger"))?;
+    verify_capture_record(connection, operation, &record, initialized)
+}
+
+pub(super) fn verify_capture_record(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+    record: &Record,
+    initialized: Option<&SecurityParticipantStateInitialization>,
+) -> Result<(), AdmissionOperationStoreError> {
+    let digest = operation
+        .native_dispatch_ledger_digest()
+        .ok_or_else(|| invalid("native capture lost its original ledger attachment"))?;
     let original = AdmissionOperationV1::from_persisted(record.operation.clone())?;
     let committed = operation
         .dispatch_commit()

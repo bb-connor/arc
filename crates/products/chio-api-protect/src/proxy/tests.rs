@@ -248,7 +248,6 @@ fn test_state_with_receipt_db(
         minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
-        reaper_handle: Mutex::new(None),
         allow_advisory: true,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",

@@ -1,7 +1,8 @@
 use super::*;
 
 #[test]
-fn dry_run_executor_request_is_rejected_before_dispatch_or_effects() {
+fn response_dispatch_refusal_dry_run_executor_preserves_source_before_dispatch_or_effects() {
+    use std::error::Error;
     let harness = Harness::new();
     let mut response_plan = harness.automatic_request().response_plan;
     response_plan.execution = chio_security_types::ResponseExecutionBinding::new(
@@ -27,13 +28,19 @@ fn dry_run_executor_request_is_rejected_before_dispatch_or_effects() {
     );
 
     let error = require_error(harness.executor.execute_source(&request));
-    assert!(
-        matches!(
-            error,
-            ActiveResponseExecutorError::RejectedBeforeCommit(ref reason)
-                if reason == "response plan is bound to dry_run execution; live execution requires live"
-        ),
-        "unexpected rejection: {error:?}"
+    let rejection = error
+        .source()
+        .and_then(|source| source.downcast_ref::<chio_security_types::DispatchRejection>())
+        .unwrap_or_else(|| panic!("dispatch rejection source lost: {error:?}"));
+    assert_eq!(
+        rejection,
+        &chio_security_types::DispatchRejection::ExecutionMode {
+            observed: chio_security_types::ResponseExecutionMode::DryRun,
+        },
+    );
+    assert_eq!(
+        rejection.code(),
+        "urn:chio:error:kernel:response-dispatch-execution-mode",
     );
     assert!(matches!(
         require_success(

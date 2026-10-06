@@ -34,14 +34,9 @@ mod swarm_required;
 #[path = "runtime_tests/execution_evidence.rs"]
 mod execution_evidence;
 
-static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-fn metrics_test_guard() -> std::sync::MutexGuard<'static, ()> {
-    match METRICS_TEST_LOCK.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    }
-}
+#[path = "runtime_tests/metrics.rs"]
+mod metrics;
+use metrics::metrics_test_guard;
 
 struct EchoServer;
 struct StreamingEchoServer;
@@ -933,64 +928,9 @@ fn run_channel_session(edge: &mut ChioMcpEdge, messages: &[Value]) -> Vec<Value>
         .collect()
 }
 
-fn normalize_transport_output(messages: &mut [Value]) {
-    for message in messages {
-        normalize_dynamic_transport_fields(message);
-    }
-}
-
-fn normalize_dynamic_transport_fields(value: &mut Value) {
-    match value {
-        Value::Object(map) => {
-            if let Some(value) = map.get_mut("receipt") {
-                let receipt: chio_core::receipt::body::ChioReceipt =
-                    serde_json::from_value(value.clone()).unwrap();
-                assert!(receipt.verify_signature().unwrap());
-                // These transcripts use separately constructed kernels and
-                // sessions. Verify each signature, then compare decision and
-                // tool semantics without comparing fresh signing identities.
-                *value = json!({
-                    "tool_server":receipt.tool_server, "tool_name":receipt.tool_name,
-                    "action":receipt.action, "decision":receipt.decision,
-                    "receipt_kind":receipt.receipt_kind, "boundary_class":receipt.boundary_class,
-                    "observation_outcome":receipt.observation_outcome, "tool_origin":receipt.tool_origin,
-                    "redaction_mode":receipt.redaction_mode, "trust_level":receipt.trust_level,
-                    "policy_hash":receipt.policy_hash, "tenant_id":receipt.tenant_id,
-                });
-            }
-            if let Some(receipt_id) = map.get_mut("receiptId") {
-                *receipt_id = json!("$receipt");
-            }
-            // Each transport run has a fresh signing identity. Dedicated
-            // execution-evidence tests verify these receipts and their bindings.
-            map.remove("chioEvidence");
-            if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
-                *owner_session_id = json!("$session");
-            }
-            if let Some(owner_request_id) = map.get_mut("ownerRequestId") {
-                *owner_request_id = json!("$request");
-            }
-            // The two transports capture wall-clock timestamps independently;
-            // a tick across a second boundary between the stdio and channel
-            // runs causes assert_eq! to flake. The shape comparison is what
-            // matters, so collapse the captured instants to a sentinel.
-            for field in ["createdAt", "lastUpdatedAt"] {
-                if let Some(ts) = map.get_mut(field) {
-                    *ts = json!("$timestamp");
-                }
-            }
-            for child in map.values_mut() {
-                normalize_dynamic_transport_fields(child);
-            }
-        }
-        Value::Array(values) => {
-            for child in values {
-                normalize_dynamic_transport_fields(child);
-            }
-        }
-        _ => {}
-    }
-}
+#[path = "runtime_tests/normalize.rs"]
+mod normalize;
+use normalize::normalize_transport_output;
 
 fn make_edge_with_config(page_size: usize, logging_enabled: bool) -> ChioMcpEdge {
     let (kernel, _) = make_kernel();
@@ -3389,6 +3329,12 @@ fn channel_pump_does_not_signal_notification_shaped_tasks_cancel() {
         .recv_timeout(Duration::from_secs(1))
         .unwrap_or_else(|error| panic!("pump did not forward inbound message: {error}"));
     match inbound {
+        ClientInbound::HostProtocolRefusal(_) => {
+            panic!("unexpected host control in cancellation fixture")
+        }
+        ClientInbound::Accounted(message) => {
+            panic!("unexpected accounted test-helper message: {message:?}")
+        }
         ClientInbound::Message(message) => {
             assert_eq!(message["method"], "tasks/cancel");
             assert!(message.get("id").is_none());
@@ -3425,8 +3371,14 @@ fn stdio_pump_rejects_delimiterless_jsonrpc_frame() {
                 matches!(message, AdapterError::ParseError(reason) if reason.contains("newline delimiter"))
             );
         }
-        ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
+        ClientInbound::Accounted(_)
+        | ClientInbound::Message(_)
+        | ClientInbound::ReadError(_)
+        | ClientInbound::Closed => {
             panic!("expected parse error for delimiterless frame")
+        }
+        ClientInbound::HostProtocolRefusal(_) => {
+            panic!("unexpected host control in delimiter fixture")
         }
     }
     assert!(
@@ -3459,8 +3411,14 @@ fn stdio_pump_rejects_oversized_jsonrpc_frame() {
                 )
             ));
         }
-        ClientInbound::Message(_) | ClientInbound::ReadError(_) | ClientInbound::Closed => {
+        ClientInbound::Accounted(_)
+        | ClientInbound::Message(_)
+        | ClientInbound::ReadError(_)
+        | ClientInbound::Closed => {
             panic!("expected parse error for oversized frame")
+        }
+        ClientInbound::HostProtocolRefusal(_) => {
+            panic!("unexpected host control in frame-size fixture")
         }
     }
     assert!(
@@ -4233,13 +4191,13 @@ fn create_message_roundtrips_through_client_with_child_lineage() {
             "{\"role\":\"assistant\",\"content\":{\"type\":\"text\",\"text\":\"Summary ready.\"},\"model\":\"gpt-5.4\",\"stopReason\":\"endTurn\"}}\n"
         );
     let mut output = Vec::new();
+    let (sender, mut inbox) = mcp_inbox();
+    sender
+        .send(sender.decode(input.as_bytes(), 1024 * 1024).unwrap())
+        .unwrap();
+    drop(sender);
     let result = edge
-        .create_message(
-            &parent_context,
-            operation,
-            &mut Cursor::new(input.as_bytes()),
-            &mut output,
-        )
+        .create_message_with_client_inbox(&parent_context, operation, &mut inbox, &mut output)
         .unwrap();
 
     assert_eq!(result.model, "gpt-5.4");
@@ -4330,13 +4288,9 @@ fn create_message_denies_tool_use_when_not_negotiated() {
     };
 
     let mut output = Vec::new();
+    let (_sender, mut inbox) = mcp_inbox();
     let error = edge
-        .create_message(
-            &parent_context,
-            operation,
-            &mut Cursor::new(b""),
-            &mut output,
-        )
+        .create_message_with_client_inbox(&parent_context, operation, &mut inbox, &mut output)
         .unwrap_err();
     match error {
         AdapterError::NestedFlowDenied(message) => {

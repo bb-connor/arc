@@ -170,6 +170,7 @@ impl ChioKernel {
         request: &super::ActiveResponseAdmissionRequest,
         binding: &PreparedActiveResponseDispatchBinding,
     ) -> Result<PreDispatchActiveResponseReconstruction, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         let response_plan = request.response_plan();
         validate_executable_response_plan_value(response_plan)?;
         let (expected_executor, _) = validate_prepared_binding(response_plan, binding)?;
@@ -326,6 +327,7 @@ impl ChioKernel {
         response_plan: &ResponsePlan,
         dispatch_id: &RecordId,
     ) -> Result<Option<ActiveResponseExecutionEvidence>, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         validate_executable_response_plan_value(response_plan)?;
         let installed = self.active_response_executor.as_ref().ok_or_else(|| {
             committed_recovery_internal("active-response executor authority is not installed")
@@ -369,10 +371,11 @@ impl ChioKernel {
         response_plan: &ResponsePlan,
         binding: &PreparedActiveResponseDispatchBinding,
     ) -> Result<DispatchCommittedActiveResponseResume, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         validate_executable_response_plan_value(response_plan)?;
         response_plan
             .require_live_execution()
-            .map_err(|error| committed_resume_denied(error.to_string()))?;
+            .map_err(KernelError::ResponseDispatchRejected)?;
         let (expected_executor, execution_approval) =
             validate_prepared_binding(response_plan, binding)?;
         let installed = self.active_response_executor.as_ref().ok_or_else(|| {
@@ -833,7 +836,7 @@ impl ChioKernel {
         committed: &ActiveResponseCommittedDispatch,
     ) -> Result<CommittedDispatchAuthority, KernelError> {
         plan.require_live_execution()
-            .map_err(|error| committed_recovery_denied(error.to_string()))?;
+            .map_err(KernelError::ResponseDispatchRejected)?;
         let execution = validate_committed_dispatch(plan, dispatch_id, executor, committed)?;
         let approval = self.validate_committed_governed_operation(&execution)?;
         Ok(CommittedDispatchAuthority::new(execution, approval))
@@ -1447,6 +1450,9 @@ fn digest_from_hex(value: &str, label: &str) -> Result<Digest32, KernelError> {
 
 fn map_executor_lookup_error(error: ActiveResponseExecutorError) -> KernelError {
     match error {
+        ActiveResponseExecutorError::DispatchRejectedBeforeCommit(rejection) => {
+            KernelError::ResponseDispatchRejected(rejection)
+        }
         ActiveResponseExecutorError::RejectedBeforeCommit(reason) => committed_recovery_denied(
             format!("committed active-response dispatch readback was rejected: {reason}"),
         ),
@@ -1459,6 +1465,9 @@ fn map_executor_lookup_error(error: ActiveResponseExecutorError) -> KernelError 
 
 fn map_automatic_dispatch_fence_error(error: ActiveResponseExecutorError) -> KernelError {
     match error {
+        ActiveResponseExecutorError::DispatchRejectedBeforeCommit(rejection) => {
+            KernelError::ResponseDispatchRejected(rejection)
+        }
         ActiveResponseExecutorError::RejectedBeforeCommit(reason) => never_committed_denied(
             format!("automatic active-response dispatch fence was rejected: {reason}"),
         ),

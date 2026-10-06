@@ -9,6 +9,140 @@ use chio_security_types::{ResponseEffectKind, ResponseExecutionMode, ResponsePla
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 use std::sync::Arc;
 
+const RECEIPT_STORE_UNAVAILABLE: &str = "urn:chio:error:attest:receipt-store-unavailable";
+const RECEIPT_VERIFICATION_FAILED: &str = "urn:chio:error:attest:receipt-verification-failed";
+
+/// Both native failures from an append whose committed result cannot be read back.
+/// Neither public formatting path discloses retained source text.
+#[derive(Debug)]
+pub struct ResponseSimulationReconciliationError {
+    append_error: PortError,
+    readback_error: PortError,
+}
+impl ResponseSimulationReconciliationError {
+    #[must_use]
+    pub const fn append_error(&self) -> &PortError {
+        &self.append_error
+    }
+    #[must_use]
+    pub const fn readback_error(&self) -> &PortError {
+        &self.readback_error
+    }
+}
+impl std::fmt::Display for ResponseSimulationReconciliationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("response simulation receipt reconciliation failed")
+    }
+}
+impl std::error::Error for ResponseSimulationReconciliationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.readback_error)
+    }
+}
+
+fn port_rule(kind: PortErrorKind) -> &'static str {
+    match kind {
+        PortErrorKind::Unavailable => RECEIPT_STORE_UNAVAILABLE,
+        PortErrorKind::Conflict | PortErrorKind::IntegrityFailure => RECEIPT_VERIFICATION_FAILED,
+        PortErrorKind::InvalidData => "urn:chio:error:transport:invalid-request-shape",
+    }
+}
+fn registered_port_error(error: PortError) -> PortError {
+    if chio_errors::_generated::error_codes::lookup_error_code(error.code().as_str()).is_some() {
+        return error;
+    }
+    PortError::with_source(error.kind(), port_rule(error.kind()), error)
+}
+fn signing_error(error: chio_core::Error) -> PortError {
+    PortError::with_source(
+        PortErrorKind::Unavailable,
+        "urn:chio:error:attest:receipt-signing-failed",
+        error,
+    )
+}
+
+fn receipt_store_error(error: chio_kernel::ReceiptStoreError) -> PortError {
+    use chio_kernel::ReceiptStoreError;
+    let (kind, code) = match &error {
+        ReceiptStoreError::Clock(error) => (PortErrorKind::Unavailable, error.code()),
+        ReceiptStoreError::UntrustedInput(error) => (PortErrorKind::IntegrityFailure, error.code()),
+        ReceiptStoreError::Conflict(_)
+        | ReceiptStoreError::Canonical(_)
+        | ReceiptStoreError::CryptoDecode(_)
+        | ReceiptStoreError::Json(_)
+        | ReceiptStoreError::RetentionArchiveIncomplete { .. }
+        | ReceiptStoreError::ArchivedRangeProjection { .. } => {
+            (PortErrorKind::IntegrityFailure, RECEIPT_VERIFICATION_FAILED)
+        }
+        ReceiptStoreError::ReadBoundary(_) | ReceiptStoreError::Fenced => {
+            (PortErrorKind::Unavailable, RECEIPT_STORE_UNAVAILABLE)
+        }
+        ReceiptStoreError::InvalidOutcome(_)
+        | ReceiptStoreError::ReadAuthorization(_)
+        | ReceiptStoreError::RetentionTenantScopeUnsupported => (
+            PortErrorKind::InvalidData,
+            "urn:chio:error:transport:invalid-request-shape",
+        ),
+        ReceiptStoreError::Sqlite(rusqlite::Error::SqliteFailure(native, _))
+            if matches!(
+                native.code,
+                rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase
+            ) =>
+        {
+            (PortErrorKind::IntegrityFailure, RECEIPT_VERIFICATION_FAILED)
+        }
+        _ => (PortErrorKind::Unavailable, RECEIPT_STORE_UNAVAILABLE),
+    };
+    PortError::with_source(kind, code, error)
+}
+
+// Emit closed cause classes, not arbitrary parser/provider messages. The complete
+// native errors remain inspectable through Error::source and reconciliation accessors.
+fn record_simulation_failure(operation: &'static str, error: &PortError) {
+    let mut causes = Vec::new();
+    let mut source = std::error::Error::source(error);
+    for _ in 0..4 {
+        let Some(cause) = source else {
+            break;
+        };
+        let entry = if let Some(error) = cause.downcast_ref::<PortError>() {
+            let code =
+                chio_errors::_generated::error_codes::lookup_error_code(error.code().as_str())
+                    .map_or_else(|| port_rule(error.kind()), |spec| spec.urn);
+            serde_json::json!({ "class": "port", "kind": error.kind(), "code": code })
+        } else if let Some(error) = cause.downcast_ref::<chio_kernel::ReceiptStoreError>() {
+            use chio_kernel::ReceiptStoreError;
+            let class = match error {
+                ReceiptStoreError::Clock(_) => "authority_clock",
+                ReceiptStoreError::Sqlite(_) => "sqlite",
+                ReceiptStoreError::Io(_) => "io",
+                ReceiptStoreError::Conflict(_) => "conflict",
+                ReceiptStoreError::Fenced => "fenced",
+                ReceiptStoreError::OutcomeUnknown(_) => "outcome_unknown",
+                ReceiptStoreError::Unsupported(_) => "unsupported",
+                ReceiptStoreError::Json(_) => "json",
+                ReceiptStoreError::ReadBoundary(_) => "read_boundary",
+                ReceiptStoreError::UntrustedInput(_) => "original_json",
+                _ => "receipt_store",
+            };
+            serde_json::json!({ "class": class })
+        } else if let Some(error) = cause.downcast_ref::<std::io::Error>() {
+            serde_json::json!({ "class": "io", "kind": format!("{:?}", error.kind()) })
+        } else if let Some(error) = cause.downcast_ref::<serde_json::Error>() {
+            serde_json::json!({ "class": "json_parser", "category": format!("{:?}", error.classify()), "line": error.line(), "column": error.column() })
+        } else if let Some(error) = cause.downcast_ref::<chio_security_types::clock::ClockError>() {
+            serde_json::json!({ "class": "authority_clock", "code": error.code() })
+        } else if cause.is::<chio_core::Error>() {
+            serde_json::json!({ "class": "core_validation" })
+        } else {
+            serde_json::json!({ "class": "native_error" })
+        };
+        causes.push(entry);
+        source = cause.source();
+    }
+    tracing::warn!(operation, code = %error.code().as_str(), kind = ?error.kind(), causes = %serde_json::json!({ "chain": causes, "truncated": source.is_some() }), "response simulation boundary refused");
+}
+
 pub struct SqliteResponseSimulationSource {
     state: Arc<SqliteSecurityStateStore>,
     scope: Arc<dyn BlastRadiusPort>,
@@ -77,7 +211,7 @@ impl ProductionResponseSimulator {
         configuration_digest: Digest32,
     ) -> PortResult<Self> {
         if configuration_digest.is_zero() {
-            return Err(PortError::invalid_data());
+            return Err(registered_port_error(PortError::invalid_data()));
         }
         let service = Self {
             snapshots,
@@ -92,10 +226,18 @@ impl ProductionResponseSimulator {
     pub fn ensure_ready(&self) -> PortResult<()> {
         self.receipts
             .ensure_indexed_security_evidence_ready()
-            .map_err(|_| PortError::unavailable())?;
+            .map_err(|error| {
+                let error = receipt_store_error(error);
+                record_simulation_failure("store_readiness", &error);
+                error
+            })?;
         self.signer
             .sign_bytes(b"chio.response-simulation.readiness.v1\0")
-            .map_err(|_| PortError::unavailable())?;
+            .map_err(|error| {
+                let error = signing_error(error);
+                record_simulation_failure("signer_readiness", &error);
+                error
+            })?;
         Ok(())
     }
 
@@ -106,13 +248,18 @@ impl ProductionResponseSimulator {
         plan: &ResponsePlan,
     ) -> PortResult<Option<(ResponseSimulationReport, ChioReceipt)>> {
         if plan.execution.mode() != ResponseExecutionMode::DryRun {
-            return Err(PortError::invalid_data());
+            return Err(registered_port_error(PortError::invalid_data()));
         }
-        let id = response_simulation_evidence_id(plan, self.configuration_digest)?;
+        let id = response_simulation_evidence_id(plan, self.configuration_digest)
+            .map_err(registered_port_error)?;
         let Some(receipt) = self
             .receipts
             .load_indexed_security_evidence(&id)
-            .map_err(|_| PortError::unavailable())?
+            .map_err(|error| {
+                let error = receipt_store_error(error);
+                record_simulation_failure("load", &error);
+                error
+            })?
         else {
             return Ok(None);
         };
@@ -121,9 +268,10 @@ impl ProductionResponseSimulator {
             &id,
             &self.signer.public_key(),
             self.configuration_digest,
-        )?;
+        )
+        .map_err(registered_port_error)?;
         if report.plan != *plan {
-            return Err(PortError::integrity_failure());
+            return Err(registered_port_error(PortError::integrity_failure()));
         }
         Ok(Some((report, receipt)))
     }
@@ -140,9 +288,12 @@ impl ProductionResponseSimulator {
         let authorization = kernel
             .verify_active_response_simulation(request)
             .map_err(super::event_consumer::map_active_response_kernel_error)?;
-        let snapshot = self.snapshots.capture(plan)?;
-        let evaluation =
-            chio_quarantine::simulation::evaluate_response_simulation(plan, &snapshot)?;
+        let snapshot = self
+            .snapshots
+            .capture(plan)
+            .map_err(registered_port_error)?;
+        let evaluation = chio_quarantine::simulation::evaluate_response_simulation(plan, &snapshot)
+            .map_err(registered_port_error)?;
         let report = ResponseSimulationReport {
             schema: RESPONSE_SIMULATION_SCHEMA.to_owned(),
             configuration_digest: self.configuration_digest,
@@ -159,31 +310,59 @@ impl ProductionResponseSimulator {
             evaluation,
         };
         let receipt = ChioReceipt::sign_with_backend(
-            report.receipt_body(self.signer.public_key())?,
+            report
+                .receipt_body(self.signer.public_key())
+                .map_err(registered_port_error)?,
             self.signer.as_ref(),
         )
-        .map_err(|_| PortError::unavailable())?;
+        .map_err(|error| {
+            let error = signing_error(error);
+            record_simulation_failure("sign", &error);
+            error
+        })?;
         // Recheck real authority after capture and signing, before recording a
         // fresh successful evaluation. This cannot reserve or consume tokens.
         kernel
             .verify_active_response_simulation(request)
             .map_err(super::event_consumer::map_active_response_kernel_error)?;
-        let id = report.evidence_id()?;
+        let id = report.evidence_id().map_err(registered_port_error)?;
         let persisted = match self
             .receipts
             .append_indexed_security_evidence(&id, &receipt)
         {
             Ok(persisted) => persisted,
-            Err(_) => return self.load(plan)?.ok_or_else(PortError::unavailable),
+            Err(append_error) => {
+                let append_error = receipt_store_error(append_error);
+                record_simulation_failure("append", &append_error);
+                return match self.load(plan) {
+                    Ok(Some(retained)) => Ok(retained),
+                    Ok(None) => Err(append_error),
+                    Err(readback_error) => {
+                        let code = chio_errors::_generated::error_codes::lookup_error_code(
+                            readback_error.code().as_str(),
+                        )
+                        .map_or_else(|| port_rule(readback_error.kind()), |spec| spec.urn);
+                        Err(PortError::with_source(
+                            readback_error.kind(),
+                            code,
+                            ResponseSimulationReconciliationError {
+                                append_error,
+                                readback_error,
+                            },
+                        ))
+                    }
+                };
+            }
         };
         let verified = verify_response_simulation_receipt(
             &persisted,
             &id,
             &self.signer.public_key(),
             self.configuration_digest,
-        )?;
+        )
+        .map_err(registered_port_error)?;
         if verified != report {
-            return Err(PortError::integrity_failure());
+            return Err(registered_port_error(PortError::integrity_failure()));
         }
         Ok((verified, persisted))
     }
@@ -227,5 +406,43 @@ pub(super) fn production_response_effects(
             )?,
         )),
         ResponseExecutionMode::DryRun => Ok(Arc::new(SimulationOnlyEffects)),
+    }
+}
+
+#[cfg(test)]
+mod diagnostic_classification_tests {
+    use super::*;
+
+    #[test]
+    fn simulation_diagnostic_fenced_store_retains_refusal_without_claiming_corruption() {
+        let error = receipt_store_error(chio_kernel::ReceiptStoreError::Fenced);
+        assert_eq!(error.kind(), PortErrorKind::Unavailable);
+        assert_eq!(
+            error.code().as_str(),
+            "urn:chio:error:attest:receipt-store-unavailable"
+        );
+        assert!(matches!(
+            std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>()),
+            Some(chio_kernel::ReceiptStoreError::Fenced)
+        ));
+    }
+
+    #[test]
+    fn simulation_diagnostic_read_capacity_retains_refusal_without_claiming_corruption() {
+        let error = receipt_store_error(chio_kernel::ReceiptStoreError::ReadBoundary(
+            "private-capacity-detail".into(),
+        ));
+        assert_eq!(error.kind(), PortErrorKind::Unavailable);
+        assert_eq!(
+            error.code().as_str(),
+            "urn:chio:error:attest:receipt-store-unavailable"
+        );
+        assert!(matches!(
+            std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>()),
+            Some(chio_kernel::ReceiptStoreError::ReadBoundary(_))
+        ));
+        assert!(!format!("{error} {error:?}").contains("private"));
     }
 }

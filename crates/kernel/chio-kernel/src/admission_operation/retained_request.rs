@@ -156,7 +156,9 @@ pub(crate) fn immutable_tool_request_hash_with_profile(
 }
 
 impl RetainedToolAdmissionRequestV1 {
-    fn request_without_transient_credentials(request: &ToolCallRequest) -> ToolCallRequest {
+    pub(crate) fn request_without_transient_credentials(
+        request: &ToolCallRequest,
+    ) -> ToolCallRequest {
         // Explicit construction makes additions to ToolCallRequest require a
         // retention decision. Do not clone credentials and then redact them.
         ToolCallRequest {

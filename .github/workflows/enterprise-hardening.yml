@@ -29,8 +29,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: enterprise-security-source-${{ github.repository }}-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: true
+  group: enterprise-security-source-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 env:
   CARGO_INCREMENTAL: "0"
@@ -525,6 +525,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh
@@ -624,6 +627,9 @@ jobs:
           644 deploy/docker/Dockerfile.security-evidence-runner
           644 deploy/docker/security-evidence-apk.lock
           644 deploy/docker/security-evidence-seccomp.json
+          644 deploy/docker/security-evidence-seccomp-upstream.json
+          644 deploy/docker/security-evidence-seccomp-provenance.json
+          644 deploy/docker/security-evidence-seccomp-upstream.LICENSE
           755 crates/security/chio-cage/scripts/check-linux-enforcement.sh
           644 scripts/check-cage-all-target-inventory.py
           755 scripts/check-cage-enforcement.sh

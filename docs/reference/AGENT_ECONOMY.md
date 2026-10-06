@@ -601,21 +601,53 @@ migration completes. Migration verifies each signed receipt and refuses any
 preexisting projection that disagrees with it. It never changes signed receipt
 bytes. Keep a database backup before upgrading; older binaries reject version 6.
 
-Analytics sums charged and attempted projections with exact unsigned arithmetic
-in one read snapshot. It first verifies each selected receipt's signature and
-compares both projections and currency with that signed receipt. A schema-valid
-projection alone cannot authorize a reported amount, including after an external
-database mutation or reopen. Every dimension returns the exact total or a named
-refusal when the total exceeds the report's `u64` range. No JSON-to-SQL integer
-cast is used for either total.
+Analytics and cost attribution are admin diagnostics over live rows selected by
+stored projections. Within one pinned read snapshot they verify each selected
+receipt's embedded signature and compare its identity, timestamp, capability,
+tool, decision, tenant, signed attribution, policy/content hashes, currency and
+cost projections with the canonical receipt body before aggregating. Legacy
+subject/issuer fallback is checked against the same snapshot's validated local
+capability lineage; an unsigned legacy lineage projection remains a diagnostic
+source, not independently authenticated attribution. Charged and attempted totals
+use exact unsigned arithmetic and refuse totals outside `u64`. No JSON-to-SQL
+integer cast is used for either total.
 
-A report refuses more than 250,000 matching receipts and also limits total SQL
-work to approximately 100 million VM instructions, checked every 1,000
-instructions. The latter also bounds sparse filters that examine many rows but
-match none. Exhaustion returns a read-boundary error and releases the read
-snapshot. Callers must narrow capability, tool, subject, or time filters for
-larger history. Signature verification adds CPU cost proportional to the selected
-receipts; the instruction limit is not a wall-clock latency guarantee.
+This is selected-row consistency, not authorization of the reported history.
+Stored selectors can exclude a row before it is examined, and an embedded signer
+does not independently establish kernel trust. Empty results, complete exclusion
+of matching evidence and independently trusted history remain unaccepted. A
+consumer requiring those properties needs a separately trusted bounded range
+commitment or authenticated selection proof; these report APIs supply neither.
+
+Both reports refuse more than 250,000 selected receipts, 8 MiB of raw source per
+receipt or lineage record, 64 MiB of aggregate raw source, 32 MiB of decoded JSON
+string keys/values, 10,000 distinct groups per dimension, or 250,000 lineage
+lookups. A delegation chain has at most 32 hops. Total SQL work is limited to
+approximately 100 million VM instructions, checked every 1,000 instructions,
+including sparse filters and lineage reads. Byte accounting uses the actual
+borrowed UTF-8 TEXT and BLOB tuple before owned text and typed JSON allocation.
+Metadata checks allow at most twice the logical record bound in SQLite's stored
+encoding, preserving existing UTF-16 databases. UTF-16 conversion can transiently
+expose up to 24 MiB of borrowed UTF-8 for a record before the 8 MiB logical check;
+this is a representation bound, not an exact SQLite heap bound.
+Exhaustion returns an explicit read-boundary error and
+releases the snapshot; it never truncates input and publishes partial totals.
+Each textual query filter also has an 8 MiB limit checked before cloning.
+The existing response limits still trim displayed groups/receipts, independently
+of these work limits. Previously accepted large reports can now refuse. Callers
+must narrow their filters. These are logical work and source-text bounds, not an
+exact heap-size or wall-clock latency guarantee.
+
+Capability-suspension admission retains complete tenant state-key discovery,
+including lifted history, until an authenticated candidate index is available.
+One lookup supports at most 1,024 historical set keys, 4,096 contributions,
+65,536 member rows, 16 MiB each of aggregate canonical body and member-identifier
+bytes, and 8 MiB of decoded
+JSON string keys/values. The existing 1 MiB per-contribution body bound remains.
+The lookup also has a shared 10 million SQLite-instruction budget. Missing or
+corrupt membership cannot become an indexed negative Allow; capacity exhaustion
+fails the lookup and the installed guard denies. A tenant exceeding the supported
+history must receive an explicit refusal, not an unbounded scan or silent prune.
 
 ### 3.6 Payment Rail Integration
 

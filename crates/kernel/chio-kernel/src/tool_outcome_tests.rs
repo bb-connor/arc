@@ -1,5 +1,11 @@
 use super::*;
 
+#[path = "tool_outcome_tests/terminal_snapshot.rs"]
+mod terminal_snapshot;
+
+#[path = "tool_outcome_tests/original_security_dispatch.rs"]
+mod original_security_dispatch;
+
 use std::sync::Mutex;
 
 use chio_core::capability::scope::ChioScope;
@@ -406,6 +412,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
     reverse.insert("a".to_owned(), json!(1));
     let operation_id = AdmissionOperationId::from_persisted(sha("op")).unwrap();
     let raw = RawInvocationOutcomeV1 {
+        original_security_dispatch_binding: None,
         caller_delivery_evidence: None,
         schema: RAW_INVOCATION_OUTCOME_SCHEMA,
         operation_id: operation_id.clone(),
@@ -479,6 +486,122 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         reason: " ambiguous ".to_owned(),
     };
     assert!(incomplete.canonical_blob().is_err());
+}
+
+#[test]
+fn raw_outcome_omits_transient_credentials_without_changing_request_material() {
+    use crate::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+    use chio_core::capability::governance::{
+        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    };
+
+    let operation = committed_operation("request-credential-retention");
+    let issuer = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "capability-1".into(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 1,
+            expires_at: 2,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .unwrap();
+    let request = ToolCallRequest {
+        request_id: "request-credential-retention".into(),
+        agent_id: capability.subject.to_hex(),
+        capability,
+        tool_name: "tool-1".into(),
+        server_id: "server-1".into(),
+        arguments: json!({"retained_argument": "original"}),
+        dpop_proof: Some(
+            DpopProof::sign(
+                DpopProofBody {
+                    schema: DPOP_SCHEMA.into(),
+                    replay_authority: None,
+                    capability_id: "capability-1".into(),
+                    tool_server: "server-1".into(),
+                    tool_name: "tool-1".into(),
+                    action_hash: sha("arguments"),
+                    nonce: "TRANSIENT_PROOF_CANARY".into(),
+                    issued_at: 1,
+                    agent_key: issuer.public_key(),
+                },
+                &issuer,
+            )
+            .unwrap(),
+        ),
+        approval_token: Some(
+            GovernedApprovalToken::sign(
+                GovernedApprovalTokenBody {
+                    id: "TRANSIENT_APPROVAL_CANARY".into(),
+                    approver: issuer.public_key(),
+                    subject: issuer.public_key(),
+                    governed_intent_hash: sha("intent"),
+                    request_id: "request-credential-retention".into(),
+                    threshold_proposal_hash: None,
+                    issued_at: 1,
+                    expires_at: 2,
+                    decision: GovernedApprovalDecision::Approved,
+                },
+                &issuer,
+            )
+            .unwrap(),
+        ),
+        execution_nonce: None,
+        governed_intent: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let material_before =
+        crate::admission_operation::RetainedToolAdmissionRequestV1::request_material_digest(
+            &request,
+        )
+        .unwrap();
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
+        &operation,
+        operation.dispatch_commit().unwrap(),
+        id("server-1"),
+        id("tool-1"),
+        provider_attempt(&operation, "attempt-1"),
+        admission_digest("transport-terminal"),
+        0,
+        7,
+        stream_limits(),
+        InvocationOutputV1::Value { value: json!(1) },
+        None,
+        None,
+        Vec::new(),
+        &request,
+        None,
+    )
+    .unwrap();
+    let persisted_request = raw.to_persisted().request_canonical_json.unwrap();
+    assert!(!persisted_request.contains("TRANSIENT_PROOF_CANARY"));
+    assert!(!persisted_request.contains("TRANSIENT_APPROVAL_CANARY"));
+    let retained: ToolCallRequest = serde_json::from_str(&persisted_request).unwrap();
+    assert!(retained.dpop_proof.is_none());
+    assert!(retained.approval_token.is_none());
+    assert_eq!(
+        canonical_json_bytes(&retained.capability).unwrap(),
+        canonical_json_bytes(&request.capability).unwrap()
+    );
+    assert_eq!(retained.arguments, json!({"retained_argument": "original"}));
+    assert_eq!(
+        crate::admission_operation::RetainedToolAdmissionRequestV1::request_material_digest(
+            &retained
+        )
+        .unwrap(),
+        material_before
+    );
 }
 
 #[test]

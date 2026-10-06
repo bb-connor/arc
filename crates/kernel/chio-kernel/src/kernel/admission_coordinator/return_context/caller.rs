@@ -87,12 +87,13 @@ impl ChioKernel {
         let runtime = self.durable_runtime()?;
         let guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(0)?;
-        let selector =
-            AdmissionIdentifier::try_new("request_id", nonce.nonce.bound_to.request_id.clone())?;
+        let selector = AdmissionIdentifier::try_new("execution_nonce_id", nonce.nonce_id())?;
         let (operation, original) = custody::custody_call(|| {
-            runtime
-                .store
-                .load_unambiguous_retained_tool_request(&selector, &runtime.fence, now)
+            runtime.store.load_retained_tool_request_by_execution_nonce(
+                &selector,
+                &runtime.fence,
+                now,
+            )
         })?
         .ok_or_else(|| invalid("caller start original request is absent"))?;
         let reservation = custody::custody_call(|| {
@@ -103,7 +104,10 @@ impl ChioKernel {
             )
         })?
         .ok_or_else(|| invalid("caller start original nonce is absent"))?;
-        if reservation.signed_nonce() != nonce {
+        if reservation.signed_nonce() != nonce
+            || reservation.issuer() != &self.config.keypair.public_key()
+            || operation.execution_nonce_id() != Some(reservation.nonce_id())
+        {
             return Err(invalid(
                 "caller start nonce differs from the original issuance",
             ));
@@ -174,10 +178,12 @@ impl ChioKernel {
             dispatch_commit: commit,
             frozen_context_digest: frame.digest().clone(),
         };
-        let expires_at_unix_ms = u64::try_from(nonce.expires_at())
-            .ok()
-            .map(|seconds| seconds.min(request.capability.expires_at))
-            .and_then(|seconds| seconds.checked_mul(1_000))
+        // The physical frozen frame already carries the original nonce or
+        // approval deadline. Historical reconstruction never resamples it.
+        let expires_at_unix_ms = request
+            .capability
+            .expires_at
+            .checked_mul(1_000)
             .ok_or_else(|| invalid("caller start expiry is invalid"))?;
         let admission = DurableToolAdmission {
             operation,
@@ -465,6 +471,24 @@ impl ChioKernel {
                 )
             })
             .transpose()?;
+        let original_security_dispatch_binding = wire
+            .native_custody
+            .as_ref()
+            .map(|custody| {
+                let ledger = crate::admission_operation::NativeSecurityDispatchLedgerRecordV1 {
+                    operation_id: admission.operation.binding().operation_id().clone(),
+                    record_digest: custody.ledger_digest().clone(),
+                    canonical_record: custody.ledger_bytes().to_vec(),
+                };
+                crate::tool_outcome::OriginalSecurityDispatchBindingV1::from_ledger(
+                    &ledger,
+                    custody.security_context(),
+                )
+                .map(|binding| binding.map(Box::new))
+                .map_err(tool_outcome_error)
+            })
+            .transpose()?
+            .flatten();
         let context = DurableToolReturnContext {
             operation_id: wire.operation_id,
             request_binding_hash: wire.request_binding_hash,
@@ -478,6 +502,7 @@ impl ChioKernel {
             pre_invocation_guard_evidence: wire.pre_invocation_guard_evidence,
             security_invocation_context: wire.security_invocation_context,
             security_release_required: wire.native_custody.is_some(),
+            original_security_dispatch_binding,
             caller_delivery_evidence: None,
             federation_context,
             receipt_signing_identity: wire.receipt_signing_identity,

@@ -556,18 +556,49 @@ fn startup_recovery_rejects_a_changed_post_return_plan() {
     recovered_config.policy_hash = sha256_hex(b"durable-admission-test-policy");
     let mut recovered_kernel = make_kernel(recovered_config);
     recovered_kernel
-        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence)
+        .set_durable_admission_store(store.clone(), store.clone(), rotated_fence.clone())
         .expect("qualified admission store");
     recovered_kernel.add_post_invocation_hook(Box::new(StableRedactingPostInvocationHook {
         replacement: "second",
     }));
 
-    let error = recovered_kernel
-        .reconcile_recoverable_admissions()
-        .expect_err("changed recovery plan must fail closed");
-    assert!(error
-        .to_string()
-        .contains("recovered post-return plan does not match durable admission"));
+    assert_eq!(
+        recovered_kernel
+            .reconcile_recoverable_admissions()
+            .expect("changed plan is item-local"),
+        0,
+    );
+    let original = store.operation();
+    let status = store
+        .load_recovery_status(
+            original.binding().operation_id(),
+            &rotated_fence,
+            current_unix_timestamp_ms(),
+        )
+        .expect("fenced recovery status")
+        .expect("retained original deferral");
+    assert!(status.quarantined);
+    assert_eq!(
+        status.deferral.failure_kind,
+        crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged
+    );
+    assert_eq!(
+        status.deferral.phase,
+        crate::admission_operation::AdmissionRecoveryPhase::Returned
+    );
+    assert_eq!(status.deferral.attempt_count, 1);
+    assert_eq!(
+        status.deferral.operation_id,
+        *original.binding().operation_id()
+    );
+    assert_eq!(
+        status.deferral.retry_not_before_unix_ms,
+        status
+            .deferral
+            .last_failure_unix_ms
+            .checked_add(60_000)
+            .expect("bounded retry time")
+    );
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Finalizing

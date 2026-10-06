@@ -139,20 +139,12 @@ pub(in crate::admission_operation_store::security_participant_state) fn head(
     connection: &Connection,
     authority: &str,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let (count,first,last,bytes): (i64,i64,i64,i64) = connection.query_row(
-        "SELECT COUNT(*), COALESCE(MIN(sequence),0), COALESCE(MAX(sequence),0), COALESCE(SUM(length(canonical_record)),0)
-         FROM security_participant_nonce_preflight_events WHERE security_authority_id = ?1", [authority],
-        |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).map_err(sqlite_error)?;
-    if !(0..=65_536).contains(&count)
-        || count != last
-        || (count > 0 && first != 1)
-        || !(0..=67_108_864).contains(&bytes)
-    {
-        return Err(invalid(
-            "native nonce preflight chain exceeds bounds or has gaps",
-        ));
-    }
-    u64::try_from(last).map_err(invalid)
+    super::super::history::ordered::family_head(
+        connection,
+        authority,
+        "security_participant_nonce_preflight_events",
+        3,
+    )
 }
 
 pub(in crate::admission_operation_store::security_participant_state) fn load(
@@ -253,5 +245,14 @@ pub(in crate::admission_operation_store::security_participant_state) fn load_ope
     if record.intent.operation_id() != operation {
         return Err(invalid("native nonce preflight operation index differs"));
     }
+    super::super::integrity::verify_event_reference(
+        connection,
+        super::PROJECTION,
+        authority.as_str(),
+        record.sequence,
+        super::MUTATION,
+        &record.digest()?,
+        &record.lease.fence,
+    )?;
     Ok(Some(record))
 }

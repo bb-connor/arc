@@ -8,8 +8,7 @@ use rusqlite::ToSql;
 
 #[path = "analytics/integrity.rs"]
 mod integrity;
-#[path = "analytics/work_budget.rs"]
-mod work_budget;
+use super::read_boundary::{ReportReadLimits, ReportSnapshot};
 
 const TOTAL_COST_CHARGED: &str = "chio_total_cost_charged";
 const TOTAL_ATTEMPTED_COST: &str = "chio_total_attempted_cost";
@@ -165,6 +164,7 @@ fn metrics_from_row(
 /// return totals that disagree with each other. A deferred transaction pins the
 /// snapshot at the first read and rolls back when it drops. It holds back WAL
 /// checkpoint truncation while it is open, which the report's own bounds limit.
+#[cfg(test)]
 fn report_snapshot(
     connection: &Connection,
 ) -> Result<rusqlite::Transaction<'_>, ReceiptStoreError> {
@@ -176,7 +176,7 @@ fn report_snapshot(
 
 /// The filters a report was asked for, owned so the bound parameters can borrow
 /// from one place for every dimension.
-struct AnalyticsScope {
+pub(super) struct AnalyticsScope {
     capability_id: Option<String>,
     tool_server: Option<String>,
     tool_name: Option<String>,
@@ -188,7 +188,7 @@ struct AnalyticsScope {
 /// Whether a dimension resolves each receipt's subject through capability
 /// lineage.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum SubjectDimension {
+pub(super) enum SubjectDimension {
     /// The dimension neither filters nor groups by subject.
     Absent,
     /// The dimension groups by the resolved subject and drops receipts whose
@@ -198,38 +198,71 @@ enum SubjectDimension {
 
 /// The `FROM` and `WHERE` text for one dimension with the values its positional
 /// parameters bind to. Values are bound, never interpolated.
-struct AnalyticsScan<'bind> {
-    from_where: String,
+pub(super) struct AnalyticsScan<'bind> {
+    pub(super) from_where: String,
     bound: Vec<&'bind dyn ToSql>,
 }
 
 impl<'bind> AnalyticsScan<'bind> {
     /// Bind one more value and return the positional index that names it.
-    fn bind(&mut self, value: &'bind dyn ToSql) -> usize {
+    pub(super) fn bind(&mut self, value: &'bind dyn ToSql) -> usize {
         self.bound.push(value);
         self.bound.len()
     }
 
-    fn params(&self) -> &[&'bind dyn ToSql] {
+    pub(super) fn params(&self) -> &[&'bind dyn ToSql] {
         &self.bound
     }
 }
 
 impl AnalyticsScope {
-    fn from_query(query: &ReceiptAnalyticsQuery) -> Result<Self, ReceiptStoreError> {
+    pub(super) fn from_query(query: &ReceiptAnalyticsQuery) -> Result<Self, ReceiptStoreError> {
+        Self::from_filters(
+            &query.capability_id,
+            &query.tool_server,
+            &query.tool_name,
+            query.since,
+            query.until,
+            &query.agent_subject,
+        )
+    }
+
+    pub(super) fn from_cost_query(query: &CostAttributionQuery) -> Result<Self, ReceiptStoreError> {
+        Self::from_filters(
+            &query.capability_id,
+            &query.tool_server,
+            &query.tool_name,
+            query.since,
+            query.until,
+            &query.agent_subject,
+        )
+    }
+
+    fn from_filters(
+        capability_id: &Option<String>,
+        tool_server: &Option<String>,
+        tool_name: &Option<String>,
+        since: Option<u64>,
+        until: Option<u64>,
+        agent_subject: &Option<String>,
+    ) -> Result<Self, ReceiptStoreError> {
+        for value in [capability_id, tool_server, tool_name, agent_subject]
+            .into_iter()
+            .flatten()
+        {
+            if crate::integer::count(value.len()) > ReportReadLimits::default().row_bytes {
+                return Err(ReceiptStoreError::ReadBoundary(
+                    "report filter exceeds its raw byte limit".into(),
+                ));
+            }
+        }
         Ok(Self {
-            capability_id: query.capability_id.clone(),
-            tool_server: query.tool_server.clone(),
-            tool_name: query.tool_name.clone(),
-            since: query
-                .since
-                .map(crate::integer::checked::<_, i64>)
-                .transpose()?,
-            until: query
-                .until
-                .map(crate::integer::checked::<_, i64>)
-                .transpose()?,
-            agent_subject: query.agent_subject.clone(),
+            capability_id: capability_id.clone(),
+            tool_server: tool_server.clone(),
+            tool_name: tool_name.clone(),
+            since: since.map(crate::integer::checked::<_, i64>).transpose()?,
+            until: until.map(crate::integer::checked::<_, i64>).transpose()?,
+            agent_subject: agent_subject.clone(),
         })
     }
 
@@ -239,7 +272,7 @@ impl AnalyticsScope {
     /// `(?N IS NULL OR col = ?N)` form the planner has no usable index on any of
     /// the six indexed columns, so a report was a full table scan whatever it
     /// filtered on.
-    fn scan(&self, subject: SubjectDimension) -> AnalyticsScan<'_> {
+    pub(super) fn scan(&self, subject: SubjectDimension) -> AnalyticsScan<'_> {
         let mut bound: Vec<&dyn ToSql> = Vec::new();
         let mut predicates: Vec<String> = Vec::new();
 
@@ -287,7 +320,7 @@ impl AnalyticsScope {
         if resolves_subject {
             from_where.push_str(
                 "\n            LEFT JOIN capability_lineage cl \
-                 ON r.capability_id = cl.capability_id",
+                 ON r.subject_key IS NULL AND r.capability_id = cl.capability_id",
             );
         }
         if !predicates.is_empty() {
@@ -297,6 +330,33 @@ impl AnalyticsScope {
 
         AnalyticsScan { from_where, bound }
     }
+}
+
+pub(super) fn selected_query<'bind>(
+    scope: &'bind AnalyticsScope,
+    row_bytes: &'bind i64,
+    row_ceiling: &'bind i64,
+    financial_only: bool,
+) -> (String, AnalyticsScan<'bind>) {
+    let mut scan = scope.scan(SubjectDimension::Absent);
+    if financial_only {
+        let conjunction = if scan.from_where.contains("WHERE") {
+            "AND"
+        } else {
+            "WHERE"
+        };
+        // Financial selection is a stored projection, not authenticated exclusion.
+        // Avoid parsing unbounded raw JSON inside the SQL predicate.
+        scan.from_where.push_str(&format!("\n {conjunction} (r.cost_currency IS NOT NULL OR r.cost_charged_be IS NOT NULL OR r.attempted_cost_be IS NOT NULL)"));
+    }
+    let byte_index = scan.bind(row_bytes);
+    let ceiling_index = scan.bind(row_ceiling);
+    let sql = format!(
+        "SELECT {} {} ORDER BY r.seq ASC LIMIT ?{ceiling_index}",
+        super::read_boundary::receipt_columns(byte_index),
+        scan.from_where
+    );
+    (sql, scan)
 }
 
 fn receipt_ceiling_query<'bind>(
@@ -392,8 +452,13 @@ impl SqliteReceiptStore {
     /// where one currency is in use.
     ///
     /// Charged and attempted costs use exact unsigned projections. Before
-    /// aggregation, their values must match the verified signed receipts in
+    /// aggregation, every selected identity/filter/group projection must match
+    /// the verified signed receipt and its validated local lineage fallback in
     /// the same read snapshot. A reportable total must fit in `u64`.
+    ///
+    /// This proves selected-row consistency with embedded signers. Stored
+    /// selectors can exclude rows before verification; no exclusion completeness
+    /// or independently trusted kernel/history guarantee is supplied.
     ///
     /// A report matching more receipts than `MAX_ANALYTICS_RECEIPT_SCAN` is
     /// refused. `since` and `until` bound it.
@@ -418,6 +483,22 @@ impl SqliteReceiptStore {
         receipt_ceiling: i64,
         sql_steps: u64,
     ) -> Result<ReceiptAnalyticsResponse, ReceiptStoreError> {
+        let limits = ReportReadLimits {
+            rows: u64::try_from(receipt_ceiling).map_err(|_| {
+                ReceiptStoreError::ReadBoundary("invalid analytics row limit".into())
+            })?,
+            sql_steps,
+            ..ReportReadLimits::default()
+        };
+        self.receipt_analytics_with_read_limits(query, limits, || Ok(()))
+    }
+
+    fn receipt_analytics_with_read_limits(
+        &self,
+        query: &ReceiptAnalyticsQuery,
+        limits: ReportReadLimits,
+        after_snapshot: impl FnOnce() -> Result<(), ReceiptStoreError>,
+    ) -> Result<ReceiptAnalyticsResponse, ReceiptStoreError> {
         require_admin_receipt_read_context(
             query.read_context.as_ref(),
             "receipt analytics report",
@@ -434,8 +515,10 @@ impl SqliteReceiptStore {
 
         let connection = self.connection()?;
         register_cost_aggregates(&connection)?;
-        let snapshot = report_snapshot(&connection)?;
-        let budget = work_budget::SqlWorkBudget::new(&snapshot, sql_steps)?;
+        let receipt_ceiling = sqlite_i64(limits.rows, "analytics receipt ceiling")?;
+        let mut owner = ReportSnapshot::new(&connection, "receipt analytics report", limits)?;
+        after_snapshot()?;
+        let (snapshot, budget) = owner.split();
         let result = (|| {
             let ceiling = receipt_ceiling.saturating_add(1);
             let (ceiling_sql, ceiling_scan) = receipt_ceiling_query(&scope, &ceiling);
@@ -448,12 +531,33 @@ impl SqliteReceiptStore {
                 )));
             }
 
-            integrity::verify_report_costs(&snapshot, &scope)?;
+            integrity::verify_report_costs(snapshot, &scope, budget)?;
 
             let (summary_sql, summary_scan) = summary_query(&scope);
             let summary = snapshot.query_row(&summary_sql, summary_scan.params(), |row| {
                 metrics_from_row(row, 0)
             })?;
+
+            let group_ceiling = sqlite_i64(
+                budget.limits.groups.checked_add(1).ok_or_else(|| {
+                    ReceiptStoreError::ReadBoundary("invalid report group limit".into())
+                })?,
+                "report group limit",
+            )?;
+            for (group_sql, group_scan) in [
+                agent_query(&scope, &group_ceiling),
+                tool_query(&scope, &group_ceiling),
+                time_query(&scope, &bucket_width, &group_ceiling),
+            ] {
+                let count: i64 = snapshot.query_row(
+                    &format!("SELECT COUNT(*) FROM ({group_sql})"),
+                    group_scan.params(),
+                    |row| row.get(0),
+                )?;
+                budget.groups(usize::try_from(count).map_err(|_| {
+                    ReceiptStoreError::Conflict("invalid report group count".into())
+                })?)?;
+            }
 
             let (agent_sql, agent_scan) = agent_query(&scope, &group_limit);
             let by_agent = snapshot
@@ -501,7 +605,7 @@ impl SqliteReceiptStore {
                 by_time,
             })
         })();
-        budget.finish(result)
+        owner.finish(result)
     }
 }
 

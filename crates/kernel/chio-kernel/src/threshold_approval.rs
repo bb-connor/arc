@@ -40,6 +40,17 @@ pub trait ThresholdApprovalContextResolver: Send + Sync {
         request_id: &str,
         now: u64,
     ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError>;
+
+    /// Preserve signed proposal identity for resolvers whose physical request
+    /// namespace cannot be selected by a bare request ID. Existing resolvers
+    /// remain responsible for their independently authenticated request source.
+    fn resolve_proposal_context(
+        &self,
+        proposal: &ThresholdApprovalProposal,
+        now: u64,
+    ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError> {
+        self.resolve_context(&proposal.body.request_id, now)
+    }
 }
 
 impl<F> ThresholdApprovalContextResolver for F
@@ -233,7 +244,7 @@ impl ThresholdApprovalCollector {
         proposal
             .validate_at(now)
             .map_err(|error| ThresholdApprovalCollectorStoreError::Conflict(error.to_string()))?;
-        let context = self.resolve_context(&proposal.body.request_id, now)?;
+        let context = self.resolve_context(&proposal, now)?;
         ThresholdApprovalProposalRegistration::new(
             proposal.clone(),
             &context,
@@ -289,7 +300,7 @@ impl ThresholdApprovalCollector {
                 &self.trusted_policy_authorities,
             )?;
             record.validate_update_time(now)?;
-            let context = self.resolve_context(&record.proposal.body.request_id, now)?;
+            let context = self.resolve_context(&record.proposal, now)?;
             record.validate_current_context(&context, &self.trusted_policy_authorities)?;
         }
         Ok(record)
@@ -297,15 +308,15 @@ impl ThresholdApprovalCollector {
 
     fn resolve_context(
         &self,
-        request_id: &str,
+        proposal: &ThresholdApprovalProposal,
         now: u64,
     ) -> Result<ThresholdApprovalProposalCreationContext, ThresholdApprovalCollectorStoreError>
     {
         let context = self
             .context_resolver
-            .resolve_context(request_id, now)
+            .resolve_proposal_context(proposal, now)
             .map_err(collector_validation::context_error)?;
-        if context.matched_request().request_id() != request_id {
+        if context.matched_request().request_id() != proposal.body.request_id {
             return Err(ThresholdApprovalCollectorStoreError::Conflict(
                 "threshold approval context resolved a different request".to_string(),
             ));
@@ -331,7 +342,7 @@ impl ThresholdApprovalCollector {
             &self.trusted_policy_authorities,
         )?;
         record.validate_update_time(now)?;
-        let context = self.resolve_context(&record.proposal.body.request_id, now)?;
+        let context = self.resolve_context(&record.proposal, now)?;
         if record.request_route.is_some() {
             record.validate_current_context(&context, &self.trusted_policy_authorities)?;
             return Ok(record);

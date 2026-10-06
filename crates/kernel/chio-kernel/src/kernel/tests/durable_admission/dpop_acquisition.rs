@@ -70,13 +70,16 @@ fn dispatch_deadline_keeps_the_original_dpop_window() {
             false,
         )
         .expect("verified original credentials");
-    assert_eq!(prepared.valid_until_unix_ms().expect("deadline"), deadline);
+    assert_eq!(
+        prepared.valid_until_unix_ms(None).expect("deadline"),
+        deadline
+    );
     let _clock = chio_test_support::clock::scope_unix_secs(proof.body.issued_at + 5);
     assert_eq!(
         prepared
             .refresh()
             .expect("still valid")
-            .valid_until_unix_ms()
+            .valid_until_unix_ms(None)
             .expect("deadline"),
         deadline
     );

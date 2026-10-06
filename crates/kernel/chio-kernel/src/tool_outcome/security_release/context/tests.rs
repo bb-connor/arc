@@ -64,7 +64,21 @@ impl Fixture {
             ),
         ));
         raw.security_release_required = Some(true);
-        let raw = RawInvocationOutcomeV1::from_persisted(raw)?;
+        let original =
+            crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(
+                &request,
+                raw.security_invocation_context
+                    .as_ref()
+                    .ok_or("security context")?,
+            )?;
+        let raw = RawInvocationOutcomeV1::from_persisted(raw)?
+            .with_receipt_signing_identity(FrozenReceiptSigningIdentityV1::new(
+                signer.public_key(),
+                chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
+            )?)?
+            .with_original_security_dispatch_binding(Some(Box::new(
+                OriginalSecurityDispatchBindingV1::new(&original)?,
+            )))?;
         let outcome = ToolOutcomeRecordV1::record_tool_returned(
             &operation,
             &raw,

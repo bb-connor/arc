@@ -46,14 +46,13 @@ pq = ["chio-core-types/pq", "chio-core/pq"]
 # data plane.
 delegation = ["chio-core-types/delegation"]
 
-# These three are the only dependencies the `session` module needs and the only
-# ones that build under `--cfg loom`: none reaches hyper-util, reqwest, or
-# tokio, so tokio dropping `tokio::net` never touches them (chio-core is a pure
-# types/crypto graph; serde and thiserror are proc-macro/serialization crates).
-# They stay unconditional so the loom lane can compile the real `Session`
-# terminal-admission state machine while normal builds are byte-identical.
+# The dependencies needed by `session` stay unconditional for `--cfg loom`.
+# This types, crypto, clock and serialization graph reaches no async transport.
+# The real Session retains its trusted native clock and terminal-admission
+# state machine under loom; runtime-bearing dependencies remain gated below.
 [dependencies]
 chio-core = { workspace = true }
+chio-security-types = { workspace = true, features = ["std"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
 
@@ -75,7 +74,6 @@ chio-appraisal = { workspace = true }
 chio-bounded = { workspace = true }
 chio-supervisor = { workspace = true }
 chio-core-types = { workspace = true }
-chio-security-types = { workspace = true }
 chio-response-model = { workspace = true }
 # The kernel verifies signed custody envelopes; it does not run the WebAuthn
 # issuer or its stores. Inherit the workspace's disabled defaults. Issuer

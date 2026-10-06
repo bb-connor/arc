@@ -24,6 +24,8 @@ mod compliance;
 mod cost_attribution;
 #[path = "reports/economic.rs"]
 mod economic;
+#[path = "reports/read_boundary.rs"]
+pub(crate) mod read_boundary;
 #[path = "reports/reconciliation.rs"]
 mod reconciliation;
 #[path = "reports/settlement.rs"]

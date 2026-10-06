@@ -18,7 +18,11 @@ impl RawInvocationOutcomeV1 {
                 return Err(invalid());
             }
             self.caller_delivery_evidence = Some(evidence);
-            self.schema = RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA;
+            self.schema = if self.original_security_dispatch_binding.is_some() {
+                RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA
+            } else {
+                RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
+            };
             self.canonical_blob()?;
         }
         Ok(self)
@@ -29,8 +33,9 @@ impl RawInvocationOutcomeV1 {
     }
 
     pub(super) fn validate_caller_delivery_evidence(&self) -> Result<(), ToolOutcomeError> {
-        if (self.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA)
-            != self.caller_delivery_evidence.is_some()
+        if self.schema != RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA
+            && (self.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA)
+                != self.caller_delivery_evidence.is_some()
         {
             return Err(invalid());
         }

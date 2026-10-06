@@ -4,6 +4,12 @@ use axum::body::Body;
 use axum::http::Request;
 use tower::ServiceExt;
 
+#[path = "ingress_tests/authentication.rs"]
+mod authentication;
+
+#[path = "ingress_tests/wallet_credentials.rs"]
+mod wallet_credentials;
+
 fn certification() -> Result<SignedCertificationCheck, Box<dyn std::error::Error>> {
     let body: crate::certify::CertificationCheckBody = serde_json::from_value(serde_json::json!({
         "schema": "chio.certify.check.v1",
@@ -423,6 +429,7 @@ async fn ingress_body_limits_preserve_route_exceptions_and_stop_streams(
         .method("POST")
         .uri(CERTIFICATIONS_PATH)
         .header(CONTENT_TYPE, "application/json")
+        .header(AUTHORIZATION, "Bearer service-secret")
         .body(Body::from_stream(failed_stream))?;
     let response = router.oneshot(request).await?;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);

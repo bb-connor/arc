@@ -174,6 +174,155 @@ fn review_regression_channel_preserves_original_decoder_cause() {
     assert!(!format!("{error:?}").contains("secret"));
 }
 
+#[test]
+fn client_reply_deadline_expires_before_a_late_reply_is_accepted() {
+    use chio_security_types::clock::{ClockError, ClockReading, MonotonicInstant, UnixMillis};
+    struct AdvancingWriter(Arc<ProtocolClock>, bool);
+    impl std::io::Write for AdvancingWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if bytes.contains(&b'\n') {
+                *self.0 .0.lock().unwrap() = Ok(ClockReading::new(
+                    UnixMillis::new(1_700_000_000_000 + if self.1 { 60_000 } else { 0 }),
+                    MonotonicInstant::from_nanos(60_000_000_000),
+                ));
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    for advance_wall in [false, true] {
+        let clock = Arc::new(ProtocolClock::new());
+        let mut edge = edge_with_clock(clock.clone());
+        let (tx, mut rx) = mpsc::channel();
+        tx.send(ClientInbound::Message(json!({"jsonrpc":"2.0",
+            "method":"notifications/message","params":{"data":"unrelated"}})))
+            .unwrap();
+        tx.send(ClientInbound::Message(
+            json!({"jsonrpc":"2.0","id":"edge-client-1",
+            "result":{"roots":[]}}),
+        ))
+        .unwrap();
+        drop(tx);
+        let result = edge.send_client_request_with_channel(
+            &mut rx,
+            &mut AdvancingWriter(clock, advance_wall),
+            "roots/list",
+            json!({}),
+        );
+        assert!(
+            matches!(result, Err(AdapterError::Clock(ClockError::Expired))),
+            "late reply bypassed the absolute authority deadline: {result:?}"
+        );
+    }
+}
+
+#[test]
+fn client_reply_clock_failure_does_not_disable_a_healthy_followup() {
+    struct FailingWriter(Arc<ProtocolClock>);
+    impl std::io::Write for FailingWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if bytes.contains(&b'\n') {
+                self.0.fail();
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let clock = Arc::new(ProtocolClock::new());
+    let mut edge = edge_with_clock(clock.clone());
+    let (_tx, mut rx) = mpsc::channel();
+    let error = edge
+        .send_client_request_with_channel(
+            &mut rx,
+            &mut FailingWriter(clock.clone()),
+            "roots/list",
+            json!({}),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        AdapterError::Clock(chio_security_types::clock::ClockError::Unavailable)
+    ));
+    clock.advance(0);
+    let (tx, mut rx) = mpsc::channel();
+    tx.send(ClientInbound::Message(
+        json!({"jsonrpc":"2.0","id":"edge-client-2",
+        "result":{"roots":[]}}),
+    ))
+    .unwrap();
+    drop(tx);
+    let reply = edge
+        .send_client_request_with_channel(&mut rx, &mut Vec::new(), "roots/list", json!({}))
+        .unwrap();
+    assert_eq!(reply.value(), &json!({"roots":[]}));
+}
+
+#[test]
+fn unrelated_client_messages_do_not_renew_the_reply_deadline() {
+    use chio_security_types::clock::{
+        Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis,
+    };
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    struct SteppingClock {
+        active: AtomicBool,
+        elapsed: AtomicU64,
+    }
+    impl Clock for SteppingClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            let elapsed = if self.active.load(Ordering::SeqCst) {
+                self.elapsed.fetch_add(10_000, Ordering::SeqCst) + 10_000
+            } else {
+                0
+            };
+            Ok(ClockReading::new(
+                UnixMillis::new(1_700_000_000_000 + elapsed),
+                MonotonicInstant::from_nanos(elapsed * 1_000_000),
+            ))
+        }
+    }
+    struct Trigger(Arc<SteppingClock>);
+    impl std::io::Write for Trigger {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if bytes.contains(&b'\n') {
+                self.0.active.store(true, Ordering::SeqCst);
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let clock = Arc::new(SteppingClock {
+        active: AtomicBool::new(false),
+        elapsed: AtomicU64::new(0),
+    });
+    let mut edge = edge_with_clock(clock.clone());
+    let (tx, mut rx) = mpsc::channel();
+    tx.send(ClientInbound::Message(
+        json!({"jsonrpc":"2.0","method":"notifications/message","params":{}}),
+    ))
+    .unwrap();
+    tx.send(ClientInbound::Message(
+        json!({"jsonrpc":"2.0","id":"edge-client-1","result":{"roots":[]}}),
+    ))
+    .unwrap();
+    drop(tx);
+    let result = edge.send_client_request_with_channel(
+        &mut rx,
+        &mut Trigger(clock),
+        "roots/list",
+        json!({}),
+    );
+    assert!(matches!(
+        result,
+        Err(AdapterError::Clock(ClockError::Expired))
+    ));
+}
+
 pub(super) fn make_kernel_with_clock(
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> (ChioKernel, Keypair) {

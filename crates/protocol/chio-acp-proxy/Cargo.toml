@@ -23,7 +23,7 @@ chio-kernel = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
 chio-manifest = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

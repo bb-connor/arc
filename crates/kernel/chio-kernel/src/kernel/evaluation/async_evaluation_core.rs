@@ -24,13 +24,13 @@ impl ChioKernel {
         // Resolve tenant_id from the session's enterprise identity context
         // (if any) and install it for the remainder of this evaluation so
         // every receipt `build_and_sign_receipt` signs picks up the tag.
-        let tenant_id = self.resolve_tenant_id_for_session(session_id);
+        let now_unix_ms = self.read_authority_time()?.get();
+        let now = now_unix_ms / 1000;
+        let tenant_id =
+            self.resolve_evaluation_tenant(&dispatch_mode, request, session_id, now_unix_ms)?;
         let _tenant_request_scope =
             self.scope_receipt_tenant_id_for_request(&request.request_id, tenant_id.clone());
         let _tenant_scope = scope_receipt_tenant_id(tenant_id);
-
-        let now_unix_ms = self.read_authority_time()?.get();
-        let now = now_unix_ms / 1000;
 
         // Emergency kill switch: every evaluate path checks the flag
         // before receipt negotiation, capability validation, guard evaluation,
@@ -1075,13 +1075,18 @@ impl ChioKernel {
         let durable_execution_nonce = durable_admission
             .as_ref()
             .is_some_and(DurableToolAdmission::requires_execution_nonce);
-        let mut credential_reservation = match self.reserve_admitted_dispatch_credentials(
-            request,
-            dpop_required,
-            self.read_authority_time()?.as_secs(),
-            durable_admission.as_ref(),
-            matched_grant_index,
-        ) {
+        let mut credential_reservation = match self
+            .read_authority_time()
+            .map_err(KernelError::from)
+            .and_then(|time| {
+                self.reserve_admitted_dispatch_credentials(
+                    request,
+                    dpop_required,
+                    time.as_secs(),
+                    durable_admission.as_ref(),
+                    matched_grant_index,
+                )
+            }) {
             Ok(reservation) => reservation,
             Err(error) => {
                 let reason = error.to_string();
@@ -1092,7 +1097,10 @@ impl ChioKernel {
                         self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                             request,
                             reason: &reason,
-                            timestamp: self.read_authority_time()?.as_secs(),
+                            timestamp: self
+                                .read_authority_time()
+                                .map(|time| time.as_secs())
+                                .unwrap_or(now),
                             matched_grant_index,
                             cap,
                             budget_mutation: &budget_mutation,
@@ -1151,26 +1159,32 @@ impl ChioKernel {
             .as_ref()
             .and_then(|prepared| prepared.connection.clone())
             .or(server);
-        let revalidation_now_unix_ms = self.read_authority_time()?.get();
+        let revalidation_time = self.read_authority_time();
+        let revalidation_now_unix_ms = revalidation_time
+            .as_ref()
+            .map(|time| time.get())
+            .unwrap_or(now_unix_ms);
         let final_dispatch_admission = match readiness_result {
-            Ok(readiness_waited) => self.revalidate_immediately_before_dispatch(
-                request,
-                durable_admission.as_ref(),
-                dpop_required,
-                matched_grant,
-                matched_grant_index,
-                None,
-                session_id,
-                session_filesystem_roots,
-                security_context,
-                &receipt_admission,
-                extra_metadata.as_ref(),
-                dispatch_mode.caller_executed(),
-                durable_execution_nonce,
-                readiness_waited || force_dispatch_revalidation,
-                revalidation_now_unix_ms / 1000,
-                revalidation_now_unix_ms,
-            ),
+            Ok(readiness_waited) => revalidation_time.map_err(KernelError::from).and_then(|_| {
+                self.revalidate_immediately_before_dispatch(
+                    request,
+                    durable_admission.as_ref(),
+                    dpop_required,
+                    matched_grant,
+                    matched_grant_index,
+                    None,
+                    session_id,
+                    session_filesystem_roots,
+                    security_context,
+                    &receipt_admission,
+                    extra_metadata.as_ref(),
+                    dispatch_mode.caller_executed(),
+                    durable_execution_nonce,
+                    readiness_waited || force_dispatch_revalidation,
+                    revalidation_now_unix_ms / 1000,
+                    revalidation_now_unix_ms,
+                )
+            }),
             Err(error) => Err(error),
         };
         let mut verified_finding_admission = final_dispatch_admission
@@ -1271,7 +1285,10 @@ impl ChioKernel {
                                     PreDispatchCleanupDeny {
                                         request,
                                         reason: &reason,
-                                        timestamp: self.read_authority_time()?.as_secs(),
+                                        timestamp: self
+                                            .read_authority_time()
+                                            .map(|time| time.as_secs())
+                                            .unwrap_or(now),
                                         matched_grant_index,
                                         cap,
                                         budget_mutation: &budget_mutation,
@@ -1412,27 +1429,34 @@ impl ChioKernel {
         };
 
         if payment_authorization.is_some() {
-            let post_payment_now_unix_ms = self.read_authority_time()?.get();
-            let post_payment_admission = self.revalidate_immediately_before_dispatch(
-                request,
-                durable_admission.as_ref(),
-                dpop_required,
-                matched_grant,
-                matched_grant_index,
-                None,
-                session_id,
-                session_filesystem_roots,
-                security_context,
-                &receipt_admission,
-                extra_metadata.as_ref(),
-                false,
-                durable_execution_nonce,
-                // External payment authorization may change mutable authority
-                // even when no single-use dispatch credential was presented.
-                true,
-                post_payment_now_unix_ms / 1000,
-                post_payment_now_unix_ms,
-            );
+            let post_payment_time = self.read_authority_time();
+            let post_payment_now_unix_ms = post_payment_time
+                .as_ref()
+                .map(|time| time.get())
+                .unwrap_or(revalidation_now_unix_ms);
+            let post_payment_admission =
+                post_payment_time.map_err(KernelError::from).and_then(|_| {
+                    self.revalidate_immediately_before_dispatch(
+                        request,
+                        durable_admission.as_ref(),
+                        dpop_required,
+                        matched_grant,
+                        matched_grant_index,
+                        None,
+                        session_id,
+                        session_filesystem_roots,
+                        security_context,
+                        &receipt_admission,
+                        extra_metadata.as_ref(),
+                        false,
+                        durable_execution_nonce,
+                        // External payment authorization may change mutable authority
+                        // even when no single-use dispatch credential was presented.
+                        true,
+                        post_payment_now_unix_ms / 1000,
+                        post_payment_now_unix_ms,
+                    )
+                });
             if let Ok(admission) = &post_payment_admission {
                 verified_finding_admission.clone_from(admission);
             }
@@ -1475,7 +1499,10 @@ impl ChioKernel {
                     PreDispatchCleanupDeny {
                         request,
                         reason: &reason,
-                        timestamp: self.read_authority_time()?.as_secs(),
+                        timestamp: self
+                            .read_authority_time()
+                            .map(|time| time.as_secs())
+                            .unwrap_or(now),
                         matched_grant_index,
                         cap,
                         budget_mutation: &budget_mutation,
@@ -1501,14 +1528,19 @@ impl ChioKernel {
         // become DispatchCommitted, keeping rejection compensatable. A crash after this
         // claim, the admission operation is still pre-dispatch and exact replay
         // resumes against the same payment operation and pool claim.
-        let pool_claim = self.claim_finding_pool_immediately_before_dispatch(
-            matched_grant,
-            request,
-            self.read_authority_time()?.get(),
-            durable_admission
-                .as_ref()
-                .map(|admission| admission.operation().binding().operation_id().as_str()),
-        );
+        let pool_claim = self
+            .read_authority_time()
+            .map_err(KernelError::from)
+            .and_then(|time| {
+                self.claim_finding_pool_immediately_before_dispatch(
+                    matched_grant,
+                    request,
+                    time.get(),
+                    durable_admission
+                        .as_ref()
+                        .map(|admission| admission.operation().binding().operation_id().as_str()),
+                )
+            });
         if let Ok(purchase) = &pool_claim {
             verified_finding_admission.purchase.clone_from(purchase);
         }
@@ -1520,7 +1552,10 @@ impl ChioKernel {
                     PreDispatchCleanupDeny {
                         request,
                         reason: &reason,
-                        timestamp: self.read_authority_time()?.as_secs(),
+                        timestamp: self
+                            .read_authority_time()
+                            .map(|time| time.as_secs())
+                            .unwrap_or(now),
                         matched_grant_index,
                         cap,
                         budget_mutation: &budget_mutation,
@@ -1603,7 +1638,10 @@ impl ChioKernel {
                         PreDispatchCleanupDeny {
                             request,
                             reason: &reason,
-                            timestamp: self.read_authority_time()?.as_secs(),
+                            timestamp: self
+                                .read_authority_time()
+                                .map(|time| time.as_secs())
+                                .unwrap_or(now),
                             matched_grant_index,
                             cap,
                             budget_mutation: &budget_mutation,
@@ -1689,6 +1727,11 @@ impl ChioKernel {
         };
         let tool_started_at = Instant::now();
         let has_monetary = budget_mutation.charge_result().is_some();
+        // The guard owns the original dispatch snapshot while the live
+        // admission advances to its separately recorded return.
+        let guarded_dispatch_operation = durable_admission
+            .as_ref()
+            .map(|admission| admission.operation().clone());
         let mut post_admission_drop_guard = PostAdmissionDropGuard::new(
             self,
             request,
@@ -1703,11 +1746,7 @@ impl ChioKernel {
             },
             budget_lease_acquired,
         )
-        .with_durable_operation(
-            durable_admission
-                .as_ref()
-                .map(DurableToolAdmission::operation),
-        );
+        .with_durable_operation(guarded_dispatch_operation.as_ref());
         post_admission_drop_guard.mark_dispatch_started();
         if let Some(outcome) = security_dispatch_outcome.as_mut() {
             outcome.mark_dispatch_started();
@@ -1728,17 +1767,14 @@ impl ChioKernel {
                 Err(_) => outcome.record_outcome_unknown_after_dispatch()?,
             }
         }
-        // Keep the terminal-receipt guard armed until credentials commit. The
-        // tool may already have executed, so a failed replay-marker commit must
-        // produce a signed ambiguous receipt instead of returning silently.
+        // Keep the guard armed through credential commitment and return recording.
+        // A failure after tool execution preserves outcome uncertainty.
         let (tool_output, reported_cost) = match dispatch_result {
             Ok(result) => {
                 if let Err(error) = credential_reservation.commit() {
                     post_admission_drop_guard.mark_dispatch_credential_commit_failed();
                     return Err(error);
                 }
-                post_admission_drop_guard.disarm();
-                drop(post_admission_drop_guard);
                 result
             }
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
@@ -1888,53 +1924,29 @@ impl ChioKernel {
             }
         };
         let tool_elapsed = tool_started_at.elapsed();
-        let durable_outcome = if let Some(admission) = durable_admission.as_mut() {
-            let context = durable_return_context.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission("tool return lost its frozen dispatch context".into())
-            })?;
-            let recorded_at_unix_ms = self.read_authority_time()?.get().max(now_unix_ms);
-            match self.record_durable_tool_return(
-                admission,
-                DurableToolReturnInput {
-                    request,
-                    output: &tool_output,
-                    reported_cost: reported_cost.clone(),
-                    context,
-                    elapsed: tool_elapsed,
-                    trusted_now_unix_ms: recorded_at_unix_ms,
-                },
-            ) {
-                Ok(outcome) => Some(outcome),
-                Err(error) => {
-                    warn!(
-                        request_id = %request.request_id,
-                        reason = %redacted!(&error),
-                        "tool return could not be durably recorded"
-                    );
-                    let deny_metadata = self.ambiguous_dispatch_receipt_metadata(
-                        &budget_mutation,
-                        payment_authorization.as_ref(),
-                        extra_metadata.clone(),
-                    );
-                    let _ = self.with_pre_invocation_guard_evidence(
-                        &pre_invocation_guard_evidence,
-                        || {
-                            self.build_deny_response_with_metadata_and_payee_binding(
-                                request,
-                                &error.to_string(),
-                                now,
-                                Some(matched_grant_index),
-                                deny_metadata,
-                                verified_governed_payee_binding.as_ref(),
-                            )
-                        },
-                    );
-                    return Err(error);
-                }
-            }
-        } else {
-            None
+        let durable_outcome = match self.record_evaluation_return(
+            durable_admission.as_mut(),
+            &mut post_admission_drop_guard,
+            super::return_recording::EvaluationReturnRecording {
+                request,
+                output: &tool_output,
+                reported_cost: reported_cost.clone(),
+                context: durable_return_context.as_ref(),
+                elapsed: tool_elapsed,
+                trusted_now_unix_ms: now_unix_ms,
+                timestamp: now,
+                matched_grant_index,
+                budget: &budget_mutation,
+                payment: payment_authorization.as_ref(),
+                metadata: extra_metadata.clone(),
+                evidence: &pre_invocation_guard_evidence,
+                payee: verified_governed_payee_binding.as_ref(),
+            },
+        )? {
+            std::ops::ControlFlow::Continue(outcome) => outcome,
+            std::ops::ControlFlow::Break(response) => return Ok(response),
         };
+        drop(post_admission_drop_guard);
         if let (Some(admission), Some(outcome)) =
             (durable_admission.as_mut(), durable_outcome.as_ref())
         {

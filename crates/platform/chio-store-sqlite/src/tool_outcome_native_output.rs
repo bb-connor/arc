@@ -24,6 +24,13 @@ pub(crate) fn verify_native_output_artifacts(
         }
         match projection.raw {
             Some(raw) => {
+                crate::SqliteAdmissionOperationStore::verify_original_native_return_tx(
+                    connection,
+                    operation,
+                    &raw,
+                    require_payload,
+                )
+                .map_err(admission_error)?;
                 if raw.requires_security_release() != Ok(true) {
                     return Err(invariant(
                         "native output lacks its frozen release requirement",

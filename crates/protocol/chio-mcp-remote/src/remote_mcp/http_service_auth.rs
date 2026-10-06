@@ -5,6 +5,7 @@ fn should_emit_post_stream_event(
 ) -> bool {
     match event.kind {
         RemoteSessionEventKind::Notification => !notification_stream_attached,
+        RemoteSessionEventKind::StandaloneRequest => false,
         RemoteSessionEventKind::RequestCorrelated => {
             request_id.is_none_or(|request_id| {
                 is_terminal_response_for_request(&event.message, request_id)

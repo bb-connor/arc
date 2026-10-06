@@ -190,3 +190,6 @@ fn inbound_authority_introspection_confirmation_is_closed() -> TestResult {
     assert!(decode_json::<OAuthIntrospectionResponse>(valid, MAX_AUTH_JSON_BYTES).is_ok());
     Ok(())
 }
+
+#[path = "transport_identity_tests/error_registry.rs"]
+mod error_registry;

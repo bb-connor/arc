@@ -16,6 +16,10 @@ const CALL_TABLE: &str = "remote_session_credential_calls";
 const LATCH_TABLE: &str = "remote_session_credential_latches";
 const DELIVERY_SCHEMA: &str = "chio.mcp.delivery-ack.v1";
 
+#[cfg(test)]
+#[path = "session_credentials_tests/durable_bounds.rs"]
+mod durable_bounds_tests;
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DeliveryAcknowledgement {
@@ -495,10 +499,17 @@ impl SessionCredential {
         if allowed {
             Ok(())
         } else {
-            Err(plain_http_error(
+            let reason = if method == Some("tools/call") {
+                chio_kernel::ProtocolRefusalReason::SessionCredentialToolRestricted
+            } else {
+                chio_kernel::ProtocolRefusalReason::SessionCredentialMethodRestricted
+            };
+            let mut response = plain_http_error(
                 StatusCode::FORBIDDEN,
                 "method or tool outside session credential authority",
-            ))
+            );
+            response.extensions_mut().insert(reason);
+            Err(response)
         }
     }
 
@@ -582,8 +593,8 @@ fn write_call(
     keypair: &Keypair,
     call: &CredentialCall,
 ) -> Result<(), Response> {
+    let encoded = input::encode_session(call).map_err(storage_error)?;
     let (signature, _) = keypair.sign_canonical(call).map_err(storage_error)?;
-    let encoded = serde_json::to_string(call).map_err(storage_error)?;
     conn.execute(
         &format!(
             "INSERT INTO {CALL_TABLE} (session_id,request_id,record_json,signature)
@@ -923,7 +934,70 @@ async fn status(
 mod tests {
     use super::*;
 
-    fn record() -> SessionCredential {
+    #[test]
+    fn protocol_refusal_restricted_credentials_carry_host_only_typed_reasons(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let credential = record();
+        for (method, name, expected) in [
+            (
+                "tools/call",
+                "disallowed-tool",
+                chio_kernel::ProtocolRefusalReason::SessionCredentialToolRestricted,
+            ),
+            (
+                "resources/read",
+                "ignored-target",
+                chio_kernel::ProtocolRefusalReason::SessionCredentialMethodRestricted,
+            ),
+            (
+                "chio/host-protocol-refusal",
+                "write_file",
+                chio_kernel::ProtocolRefusalReason::SessionCredentialMethodRestricted,
+            ),
+        ] {
+            let message = json!({"jsonrpc":"2.0", "id":1, "method":method, "params": {
+                "name":name, "_meta":{"protocol_refusal":{"reason":"capability_not_matched"}}
+            }});
+            let refusal = credential
+                .validate_message(&message)
+                .err()
+                .ok_or("restricted request allowed")?;
+            assert_eq!(refusal.status(), StatusCode::FORBIDDEN);
+            assert_eq!(
+                refusal
+                    .extensions()
+                    .get::<chio_kernel::ProtocolRefusalReason>(),
+                Some(&expected)
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn protocol_refusal_malformed_or_allowed_credentials_cannot_create_a_marker(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let credential = record();
+        let malformed =
+            json!({"jsonrpc":"2.0", "method":"tools/call", "params":{"name":"disallowed-tool"}});
+        let refusal = credential
+            .validate_message(&malformed)
+            .err()
+            .ok_or("missing request id allowed")?;
+        assert_eq!(refusal.status(), StatusCode::BAD_REQUEST);
+        assert!(refusal
+            .extensions()
+            .get::<chio_kernel::ProtocolRefusalReason>()
+            .is_none());
+        for message in [
+            json!({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{"name":"write_file"}}),
+            json!({"jsonrpc":"2.0", "id":1, "method":"ping", "params":{"_meta":{"protocol_refusal":{"reason":"forged"}}}}),
+        ] {
+            assert!(credential.validate_message(&message).is_ok());
+        }
+        Ok(())
+    }
+
+    pub(super) fn record() -> SessionCredential {
         SessionCredential {
             schema: SCHEMA.to_owned(),
             token_hash: sha256_hex(b"test bearer"),
@@ -941,7 +1015,7 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn completed_response(
+    pub(super) fn completed_response(
         keypair: &Keypair,
         call: &CredentialCall,
         arguments: Value,

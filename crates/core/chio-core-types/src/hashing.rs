@@ -109,6 +109,35 @@ pub fn sha256(data: &[u8]) -> Hash {
     Hash::from_bytes(bytes)
 }
 
+/// Opaque incremental SHA-256 state for callers that cannot stage the complete
+/// plaintext preimage. The state has no serialization or raw Debug surface.
+pub struct Sha256State(Sha256);
+
+impl Sha256State {
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Sha256::new())
+    }
+
+    pub fn update(&mut self, bytes: &[u8]) {
+        self.0.update(bytes);
+    }
+
+    #[must_use]
+    pub fn finalize(mut self) -> Hash {
+        let result = self.0.finalize_reset();
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&result);
+        Hash::from_bytes(bytes)
+    }
+}
+
+impl Default for Sha256State {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Compute SHA-256 hash and return as hex string (no prefix).
 ///
 /// This matches the convention of `crypto::sha256_hex` within chio-core.
@@ -126,6 +155,18 @@ pub fn sha256_hex(data: &[u8]) -> String {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incremental_sha256_matches_known_digest() {
+        let mut state = Sha256State::new();
+        state.update(b"he");
+        state.update(b"ll");
+        state.update(b"o");
+        assert_eq!(
+            state.finalize().to_hex(),
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
+    }
 
     #[test]
     fn test_sha256() {

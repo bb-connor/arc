@@ -84,6 +84,52 @@ protected `enterprise-evidence-signing` environment. The introducing pull
 request cannot establish these default-branch and environment trust roots by
 itself.
 
+## Execution seccomp source policy
+
+The trusted execution profile is derived from the byte-pinned
+[Moby default profile](https://github.com/moby/profiles/blob/6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef/seccomp/default.json).
+Its original JSON and Apache-2.0 license are committed beside the derived profile;
+`security-evidence-seccomp-provenance.json` records their Git blobs, SHA-256
+commitments and exact derivation. The runner independently reconstructs the
+profile from the pinned upstream bytes, and the source checker commits the exact
+derived bytes and provenance.
+
+The policy defaults to ERRNO and grants only the Linux/X64 ABI. It removes every
+prior explicit denial and every io_uring syscall from allow rules, preserves
+upstream personality and socket argument restrictions, and permits clone only
+when namespace mask `2114060416` equals zero. clone3 returns ENOSYS 38 so standard
+thread creation can use its ordinary clone fallback. The container still drops
+ALL capabilities and adds only CHOWN, SETGID and SETUID for supervisor setup.
+Those capabilities activate no upstream conditional syscall allowance, and every
+capability-dependent allowance is removed. Candidate identity drops and all
+existing container mount, network, cgroup and output boundaries remain required.
+
+The 367 named baseline-compatible allowances are a source policy, not a claim of
+an operationally minimal or working syscall set. Acceptance requires genuine
+native qualification on the designated Linux/X64 runner for supervisor startup,
+helper handshake, Cargo/compiler/linker execution, exact tests, kernel probes,
+mutation campaigns, artifact collection and cleanup. Preserve denied calls and
+failed runs. Any extra permission requires explicit review of demonstrated
+native need. ARM Docker, schema checks and simulated Docker tests do not satisfy
+that gate.
+
+## Authority queue syntax qualification
+
+GitHub's [concurrency documentation](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+and [2026-05-07 release note](https://github.blog/changelog/2026-05-07-github-actions-concurrency-groups-now-allow-larger-queues/)
+define queue max with up to 100 pending jobs and cancel-in-progress false. Runs
+beyond the limit can still be cancelled. Preserve the shared exact-M authority
+lock and every authentic critical bad completion.
+
+Some actionlint releases predate this field. `check-actions-workflow-syntax.py`
+first verifies the exact publisher and revoker queue/group/non-cancellation
+contracts, then omits only those two recognized queue lines from a temporary
+lint input. Every remaining byte and generic lint failure is retained. Unknown
+locations, duplicate members, weakened groups and different queue values fail.
+The original unsupported-linter failure is separate evidence. Passing this
+source syntax check does not establish acceptance of the candidate workflow by
+the hosted GitHub runtime.
+
 ## Protected signing environment
 
 Create `enterprise-evidence-signing` with a zero-minute wait, no reviewers,
@@ -246,6 +292,25 @@ erase the authenticated historical failure. The listener can normalize only
 preexisting exact authority created by that failed attempt and cannot create a
 namespace.
 
+A failed retry of an already authorizing finalizer run retains the binding from
+that run's immutable successful first attempt. The listener proves the original
+four successful jobs and capture-owned intent, then authenticates the existing
+dedicated App check's exact external ID, first-attempt details URL, v2 metadata,
+source CI attempt, and identical `ci.yml` blobs at `S`, `E`, and `M`. A later
+attempt cannot create authority or restore a failure. The publisher scans every
+attempt of this recorded authorizing run before each success boundary and uses
+only failure PATCH operations on the existing five namespaces when it finds an
+authenticated bad completion. A failed sibling without that App binding is
+ineligible; its title alone grants no withdrawal authority. The current initial
+publisher may finish while its own first attempt is in progress, after proving
+all three protected predecessor jobs succeeded and no rerun has started.
+
+The protected-merge auditor reads every attempt of the recorded authorizing run,
+reports the successful history, and rechecks its stable current projection. At
+the final audit boundary it rechecks that the protected merge remains reachable
+from `main`. Legitimate descendants preserve the result; withdrawal of that
+merge rejects qualification.
+
 Withdrawal is a three-step fail-closed operation. First, freeze every future
 publication by setting `CHIO_COMMITTED_LINUX_EVIDENCE_SHA` to the reserved
 all-zero SHA. Keep the App, installation, publisher environment, and private
@@ -318,6 +383,50 @@ completion for the current `E` and `M` can permanently tombstone
 that tuple even when a later rerun succeeds. Recovery requires a new reviewed
 source, evidence, or test merge tuple.
 
+Required CI does not subscribe to label-removal events. Its caller and reusable
+enterprise and nonce/FIPS lanes isolate concurrency by run ID and attempt and do
+not cancel another critical run. The process-isolated nextest lane is reported by
+`Security nextest advisory`, outside the CI workflow. Its failures remain visible
+with their original conclusion and JUnit artifact; they do not publish or revoke
+security authority. Every critical CI dependency and exact-success assertion
+remains mandatory. A cancelled critical run for the current tuple remains
+failure-authoritative. Cancellation of an obsolete tuple can affect only its
+historical `M`, subject to the existing no-create rule, and never a new tuple.
+
+The post-merge audit reads the recorded qualification on test merge `M`, authenticates
+all five App-and-name namespaces and their `arc:<PR>:<E>:<M>:<S>` source identity,
+and binds the exact CI and finalizer attempts. It then proves the actual main
+merge has ordered parents `<base>, E` and the same tree as `M`. It does not expect
+mirror checks on the new main merge commit, and an ordinary Actions aggregate
+named `Security contract` cannot substitute for dedicated-App authority. The
+auditor runs from the authorized trusted definition. A failed audit is an
+unverified landing diagnosis; administrator bypass attribution requires separate
+external evidence. Manual audit dispatch requires an explicit merged PR number.
+
+GitHub documents required-check evaluation on a test merge when that commit has
+status checks. This supports the `M` placement; it does not establish that this
+repository has activated or accepted the proposed five-App-context ruleset.
+See [GitHub required-check troubleshooting](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
+
+The last observed production ruleset (`main-required-checks`, ID `22033486`,
+2026-10-06) required the four ordinary CI contexts, used non-strict status checks,
+and had no linear-history requirement or bypass actors. The repository permitted
+merge, squash and rebase. Refresh this external state before acting. The payload
+below is the proposed strict authority ruleset, not a claim of current activation.
+It allows only a merge commit and omits linear history so exact `E` and both
+histories remain reachable. Independent exact-source review is still a separate
+landing requirement; the payload does not assert that CODEOWNERS approval is
+currently enforced.
+
+Before adoption, land and review the complete trusted-definition prerequisite on
+main, rotate its immutable definition and caller pins together, and run the real
+five-App-context required-check acceptance experiment. Candidate-only changes do
+not replace a default-branch `workflow_run` listener. Require all five exact
+App-bound contexts on current `M`, verify the ruleset reports their integration
+IDs and strict policy with no bypass actors, and retain the protected merge's
+parents and tree as acceptance evidence. Keep missing, pending, failed and
+unavailable observations explicit. Do not disable a required context to land.
+
 Apply a branch ruleset with no bypass actors. Replace only the numeric
 `CHIO_SECURITY_APP_ID` shell value below with the live App ID; do not use
 `15368` for it. The payload pins the four trusted merge-check mirrors to GitHub
@@ -344,11 +453,10 @@ jq -n --argjson security_app_id "${CHIO_SECURITY_APP_ID}" '{
   rules: [
     {type: "deletion"},
     {type: "non_fast_forward"},
-    {type: "required_linear_history"},
     {
       type: "pull_request",
       parameters: {
-        allowed_merge_methods: ["squash", "rebase"],
+        allowed_merge_methods: ["merge"],
         dismiss_stale_reviews_on_push: false,
         require_code_owner_review: false,
         require_last_push_approval: false,

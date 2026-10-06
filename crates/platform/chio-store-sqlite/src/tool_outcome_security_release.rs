@@ -241,6 +241,13 @@ impl SqliteToolOutcomeStore {
             .ok_or(ToolOutcomeStoreError::NotFound)?;
         let raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())
             .map_err(|error| invariant(error.to_string()))?;
+        crate::SqliteAdmissionOperationStore::verify_original_native_return_tx(
+            &transaction,
+            &operation,
+            &raw,
+            true,
+        )
+        .map_err(admission_error)?;
         record
             .validate_against(&operation, &raw, &outcome, &evaluation)
             .map_err(|error| invariant(error.to_string()))?;

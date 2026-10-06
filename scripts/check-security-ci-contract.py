@@ -95,7 +95,7 @@ EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
 )
 EXPECTED_SECURITY_RUNNER_SHA256 = (
-    "793375d3fa1d3b3750591beb2c1030f2f6e050d51c1e3fbb397a7e7662736211"
+    "4eb7b7d4f2ed72ad74fa4b0ace2ce7deb73ad6528dfe8594c5af0c31f60b0832"
 )
 EXPECTED_SECURITY_AGGREGATOR_SHA256 = "7d752cd35b704dd2212fb317a8ec1a70df929df8e374bb9305b5e17313f1cc93"
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
@@ -276,10 +276,9 @@ EXPECTED_ENTERPRISE_PERMISSIONS = {
     "contents": "read",
     "id-token": "write",
 }
-EXPECTED_ENTERPRISE_CONCURRENCY = {
-    "group": "enterprise-security-source-${{ github.repository }}-${{ github.event.pull_request.head.sha || github.sha }}",
-    "cancel-in-progress": "true",
-}
+EXPECTED_ENTERPRISE_CONCURRENCY = {'group': 'enterprise-security-source-${{ github.workflow }}-${{ github.run_id }}-${{ '
+          'github.run_attempt }}',
+ 'cancel-in-progress': 'false'}
 EXPECTED_CONTROLLER_PERMISSIONS = {
     "actions": "write",
     "contents": "read",
@@ -304,6 +303,18 @@ EXPECTED_ACTIONS_WRITE_JOBS = {
     ("enterprise-evidence-controller.yml", "dispatch-isolated-capture"),
     ("enterprise-linux-capture.yml", "dispatch-trusted-finalizer"),
 }
+EXPECTED_CI_CONCURRENCY = {'group': 'ci-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}',
+ 'cancel-in-progress': 'false'}
+EXPECTED_NONCE_FIPS_CONCURRENCY = {'group': 'chio-tee-fips-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}',
+ 'cancel-in-progress': 'false'}
+EXPECTED_ADVISORY_ENV = {'CARGO_INCREMENTAL': '0',
+ 'CARGO_BUILD_JOBS': '1',
+ 'CARGO_TERM_COLOR': 'always',
+ 'PROPTEST_CASES': '256',
+ 'CHIO_CI_RUSTFLAGS': '-D warnings -C link-arg=-Wl,--threads=1'}
+EXPECTED_ADVISORY_JOB_SHA256 = "a518a495aecb5d9eca47d6a5aaa3c3d978f524a5a020f312dbc8a0e24e399ff5"
+EXPECTED_LANDING_AUDITOR_SHA256 = "57c30d47cb64bd811d3e072d83f28a7fb9ddc00e85ffc4f3c5d819213b9844d1"
+EXPECTED_WORKFLOW_SYNTAX_CHECKER_SHA256 = "1777d2df48bff8f3269a1da5451572576cadfbbf3b0784dfc16e28137bd13ada"
 EXPECTED_CI_PERMISSIONS = {"contents": "read"}
 EXPECTED_CONTROLLER_EVENTS = {
     "pull_request_target": {
@@ -897,7 +908,7 @@ EXPECTED_ENTERPRISE_BOUNDARY_STEP_INVENTORIES = {
     ),
 }
 EXPECTED_TRUST_JOB_DIGESTS = {
-    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "407f050bd8140ef2f271ce12eae990917990648bc99d89fcc7f4e637e1bdc37f",
+    ("enterprise Linux capture", "aggregate-refreshed-evidence"): "bac3f1f1f1d8c285488775a73acd1e7f152f13c68b575c52a7e86d8276e7babc",
     (
         "enterprise-hardening",
         "bind-source",
@@ -913,15 +924,15 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise Linux capture",
         "refresh-linux-evidence",
-    ): "39dd1339a0df4c859e838974e39a7d76ddc494dcc7c651bd501f35b61d1647ab",
+    ): "4e8aa0c1a096aa4ccd3b7d2c3071c93814c3f5843bc106dbf9a35a16183a52f1",
     (
         "enterprise Linux capture",
         "capture-linux-enforcement",
-    ): "21279f441c48df1082cda19f19e722231da5484016727ff2cc00593de6bcfe6c",
+    ): "3cfd02c24c052bfa32ce8056f07232ef59982b882549f1866aa2691f9e8bda58",
     (
         "enterprise Linux capture",
         "dispatch-trusted-finalizer",
-    ): "08c86b8224cce5268679f8c6152a95848c03a707ed387ea2c6252d739927f382",
+    ): "c5f94e2a91b174fd70f6a7db0e4325c348c2f25133612ec72e08122df296ca4d",
     (
         "enterprise evidence finalizer",
         "validate-capture",
@@ -933,15 +944,15 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "authorize-security-check-publication",
-    ): "ba12570c0bfc4982d977643e12522dc90b64d941224a18861556405c08140186",
+    ): "438a461c2b60eca09603933e8e809e5245f637be0ab01fe47910488edb91aa06",
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "96b283337273721fffd49fbd1787d0f6d85791da36e1ac042cf72ecf911e5947",
+    ): "56ee2c359d5a8c0918894431baaf5b8aaf2101201101da6e2768c4aab45bca5e",
     (
         "security contract revocation",
         "bind-revocation",
-    ): "cf3fe01f8fa43d0d51102ce6c82de9271966462207e6b4985d4882f30b76fb63",
+    ): "7636ab4a3aca488a74d0e03eb7e33d323ba7d2df982248f5435ae773c052a312",
     (
         "security contract revocation",
         "revoke-security-contract",
@@ -1086,92 +1097,40 @@ python3 scripts/check-kani-public-harnesses.py
 python3 scripts/tests/check-kani-public-harnesses.test.py
 """.strip()
 EXPECTED_KANI_MANIFEST_RUN = "./scripts/run-kani-manifest.sh --lane pr"
-EXPECTED_ADMIN_AUDIT_ENV = {
-    "GH_TOKEN": "${{ github.token }}",
-    "CHECK_SHA": "${{ github.event.pull_request.merge_commit_sha || github.sha }}",
-    "PR_NUMBER": "${{ github.event.pull_request.number || '' }}",
-}
-EXPECTED_ADMIN_EVENTS = {
-    "pull_request": {"types": ["closed"]},
-    "workflow_dispatch": "",
-}
-EXPECTED_ADMIN_PERMISSIONS = {
-    "checks": "read",
-    "contents": "read",
-    "pull-requests": "write",
-}
+EXPECTED_ADMIN_AUDIT_ENV = {'GH_TOKEN': '${{ github.token }}',
+ 'PR_NUMBER': '${{ github.event.pull_request.number || inputs.pr_number }}',
+ 'SECURITY_APP_ID': '${{ vars.CHIO_SECURITY_APP_ID }}',
+ 'SECURITY_DEFINITION_SHA': '${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}',
+ 'AUDIT_WORKFLOW_SHA': '${{ github.workflow_sha }}'}
+EXPECTED_ADMIN_EVENTS = {'pull_request': {'types': ['closed']},
+ 'workflow_dispatch': {'inputs': {'pr_number': {'description': 'Exact merged pull request whose '
+                                                               'qualification is audited',
+                                                'required': 'true',
+                                                'type': 'string'}}}}
+EXPECTED_ADMIN_PERMISSIONS = {'actions': 'read', 'checks': 'read', 'contents': 'read', 'pull-requests': 'read'}
 EXPECTED_ADMIN_JOB_IF = (
     "github.event_name == 'workflow_dispatch' || "
     "github.event.pull_request.merged == true"
 )
-EXPECTED_ADMIN_CHECKOUT = {
-    "uses": "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
-    "with": {"fetch-depth": "1"},
-}
+EXPECTED_ADMIN_CHECKOUT = {'name': 'Checkout authorized auditor without credentials',
+ 'uses': 'actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
+ 'with': {'ref': '${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}',
+          'path': 'authorized-auditor',
+          'fetch-depth': '1',
+          'persist-credentials': 'false'}}
 EXPECTED_ADMIN_AUDIT_RUN = r"""
 set -euo pipefail
-
-required_checks=(
-  "Security mirror / Build, lint, test"
-  "Security mirror / MSRV build and test"
-  "Security mirror / cargo-vet (locked supply-chain audit)"
-  "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)"
-  "Security contract"
-)
-
-gh api \
-  -H "Accept: application/vnd.github+json" \
-  "repos/${GITHUB_REPOSITORY}/commits/${CHECK_SHA}/check-runs" \
-  --paginate \
-  --jq '.check_runs[] | [.name, .status, (.conclusion // "pending"), .html_url] | @tsv' \
-  > check-runs.tsv
-
-{
-  echo "## Admin override audit"
-  echo
-  echo "Protected merge commit: \`${CHECK_SHA}\`"
-  echo
-  echo "| Required check | Status | Conclusion | Run |"
-  echo "|----------------|--------|------------|-----|"
-} > audit.md
-
-red=0
-for check in "${required_checks[@]}"; do
-  line="$(awk -F '\t' -v want="${check}" '$1 == want {print; found=1; exit} END {if (!found) exit 1}' check-runs.tsv || true)"
-  if [[ -z "${line}" ]]; then
-    status="missing"
-    conclusion="missing"
-    url=""
-    red=1
-  else
-    IFS=$'\t' read -r _name status conclusion url <<< "${line}"
-    case "${status}:${conclusion}" in
-      completed:success|completed:neutral|completed:skipped)
-        ;;
-      *)
-        red=1
-        ;;
-    esac
-  fi
-
-  if [[ -n "${url}" ]]; then
-    run_cell="[run](${url})"
-  else
-    run_cell="n/a"
-  fi
-  printf '| %s | %s | %s | %s |\n' "${check}" "${status}" "${conclusion}" "${run_cell}" >> audit.md
-done
-
+audit_rc=0
+python3 -I authorized-auditor/scripts/audit-security-merge-qualification.py \
+  --repository "${GITHUB_REPOSITORY}" \
+  --pr-number "${PR_NUMBER}" \
+  --security-app-id "${SECURITY_APP_ID}" \
+  --definition-sha "${SECURITY_DEFINITION_SHA}" \
+  --audit-workflow-sha "${AUDIT_WORKFLOW_SHA}" \
+  --output audit.json \
+  --markdown audit.md || audit_rc=$?
 cat audit.md >> "${GITHUB_STEP_SUMMARY}"
-
-if [[ "${red}" == "1" && -n "${PR_NUMBER}" ]]; then
-  {
-    echo "Admin override audit detected a missing or non-success required check on protected merge commit \`${CHECK_SHA}\`."
-    echo
-    cat audit.md
-  } > comment.md
-  gh pr comment "${PR_NUMBER}" --body-file comment.md
-fi
+exit "${audit_rc}"
 """.strip()
 EXPECTED_PROMOTED_MARKET_RUN = r"""
 umask 022
@@ -1321,8 +1280,8 @@ toolchain="$(tr -d '\r\n' < formal/lean4/Chio/lean-toolchain)"
 EXPECTED_UV_ACTION = "astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39"
 EXPECTED_UV_INPUTS = {"version": "0.5.11"}
 EXPECTED_APALACHE_CONCURRENCY = {
-    "group": "apalache-safety-${{ github.workflow }}-${{ github.ref }}",
-    "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+    "group": "apalache-safety-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}",
+    "cancel-in-progress": "false",
 }
 EXPECTED_APALACHE_CALL_PERMISSIONS = {
     "actions": "read",
@@ -1330,8 +1289,8 @@ EXPECTED_APALACHE_CALL_PERMISSIONS = {
     "issues": "write",
 }
 EXPECTED_THREAT_CONCURRENCY = {
-    "group": "threat-model-coverage-${{ github.workflow }}-${{ github.ref }}",
-    "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+    "group": "threat-model-coverage-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}",
+    "cancel-in-progress": "false",
 }
 EXPECTED_CI_PYTHON_VALIDATORS_RUN = (
     "python -m pip install --disable-pip-version-check "
@@ -1512,6 +1471,16 @@ def workflow_jobs(workflow: dict[str, object]) -> dict[str, object]:
     if not isinstance(jobs, dict):
         raise ContractError("workflow jobs are not a mapping")
     return jobs
+
+
+def validate_authority_queue(workflow_name: str, job_id: str, concurrency: dict) -> None:
+    contracts = {
+        ("enterprise-evidence-finalizer.yml", "publish-security-contract"): EXPECTED_PUBLISHER_CONCURRENCY,
+        ("security-contract-revocation.yml", "revoke-security-contract"): EXPECTED_REVOCATION_CONCURRENCY,
+    }
+    expected = contracts.get((workflow_name, job_id))
+    if expected is None or concurrency != expected:
+        raise ContractError("unrecognized or weakened security authority queue contract")
 
 
 def job(workflow: dict[str, object], identifier: str) -> dict[str, object]:
@@ -1905,6 +1874,11 @@ def validate_environment_provisioning_document(root: Path) -> None:
         '{context: "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)", integration_id: 15368}',
         '{context: "Security contract", integration_id: $security_app_id}',
     )
+    if (
+        re.search(r'\{type:\s*"required_linear_history"\}', publisher)
+        or re.findall(r'allowed_merge_methods:\s*\[([^\]]*)\]', publisher) != ['"merge"']
+    ):
+        raise ContractError("documented protected landing cannot retain exact E and both histories")
     if any(marker not in publisher for marker in publisher_markers):
         raise ContractError("publisher environment provisioning contract changed")
 
@@ -4401,6 +4375,9 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "deploy/docker/Dockerfile.security-evidence-runner": 0o644,
         "deploy/docker/security-evidence-apk.lock": 0o644,
         "deploy/docker/security-evidence-seccomp.json": 0o644,
+        "deploy/docker/security-evidence-seccomp-upstream.json": 0o644,
+        "deploy/docker/security-evidence-seccomp-provenance.json": 0o644,
+        "deploy/docker/security-evidence-seccomp-upstream.LICENSE": 0o644,
         "crates/security/chio-cage/scripts/check-linux-enforcement.sh": 0o755,
         "scripts/check-cage-all-target-inventory.py": 0o644,
         "scripts/check-cage-enforcement.sh": 0o755,
@@ -4429,97 +4406,34 @@ def validate_security_execution_boundary_files(root: Path) -> None:
     )
     validate_security_dockerfile(root, dockerfile)
 
-    profile = json.loads(
-        (root / "deploy/docker/security-evidence-seccomp.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    expected_denied = (
-        "_sysctl",
-        "acct",
-        "add_key",
-        "bpf",
-        "clone3",
-        "delete_module",
-        "finit_module",
-        "fsconfig",
-        "fsmount",
-        "fsopen",
-        "fspick",
-        "init_module",
-        "ioperm",
-        "iopl",
-        "kcmp",
-        "kexec_file_load",
-        "kexec_load",
-        "keyctl",
-        "lookup_dcookie",
-        "mount",
-        "move_mount",
-        "open_by_handle_at",
-        "open_tree",
-        "perf_event_open",
-        "pivot_root",
-        "process_vm_readv",
-        "process_vm_writev",
-        "quotactl",
-        "reboot",
-        "request_key",
-        "setns",
-        "settimeofday",
-        "stime",
-        "swapoff",
-        "swapon",
-        "syslog",
-        "umount",
-        "umount2",
-        "unshare",
-        "userfaultfd",
-    )
-    clone_masks = (
-        128,
-        131072,
-        33554432,
-        67108864,
-        134217728,
-        268435456,
-        536870912,
-        1073741824,
-    )
-    expected_profile = {
-        "defaultAction": "SCMP_ACT_ALLOW",
-        "defaultErrnoRet": 1,
-        "archMap": [
-            {
-                "architecture": "SCMP_ARCH_X86_64",
-                "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"],
-            }
-        ],
-        "syscalls": [
-            {
-                "names": list(expected_denied),
-                "action": "SCMP_ACT_ERRNO",
-                "errnoRet": 1,
-            },
-            *[
-                {
-                    "names": ["clone"],
-                    "action": "SCMP_ACT_ERRNO",
-                    "errnoRet": 1,
-                    "args": [
-                        {
-                            "index": 0,
-                            "value": mask,
-                            "valueTwo": mask,
-                            "op": "SCMP_CMP_MASKED_EQ",
-                        }
-                    ],
-                }
-                for mask in clone_masks
-            ],
-        ],
-    }
-    if profile != expected_profile:
+    profile_path = root / "deploy/docker/security-evidence-seccomp.json"
+    require_exact_file_digest(profile_path,
+        "60eb492e39caacf8686d52f2ca6447045e85989b5aaa3739dbcd24b47f64ddfa",
+        "trusted security seccomp syscall contract changed")
+    require_exact_file_digest(root / "deploy/docker/security-evidence-seccomp-upstream.json",
+        "6416b47770785a41ac59073cdc77d9fe98517df2799dc83ef207e622de3053f6",
+        "trusted upstream seccomp source")
+    require_exact_file_digest(root / "deploy/docker/security-evidence-seccomp-provenance.json",
+        "77fda65b521f6e0cb95c65654d720f5f120d41b1b44ae75f0ef12b6885d4ba6f",
+        "trusted seccomp derivation provenance")
+    require_exact_file_digest(root / "deploy/docker/security-evidence-seccomp-upstream.LICENSE",
+        "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "upstream seccomp license")
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    clone = [rule for rule in profile["syscalls"]
+             if rule["names"] == ["clone"] and rule["action"] == "SCMP_ACT_ALLOW"]
+    if (
+        profile.get("defaultAction") != "SCMP_ACT_ERRNO"
+        or profile.get("defaultErrnoRet") != 1
+        or profile.get("architectures") != ["SCMP_ARCH_X86_64"]
+        or len(clone) != 1
+        or clone[0].get("args") != [{"index": 0, "value": 2114060416,
+                                    "valueTwo": 0, "op": "SCMP_CMP_MASKED_EQ"}]
+        or any(rule["action"] == "SCMP_ACT_ALLOW" and any(name.startswith("io_uring_") for name in rule["names"])
+               for rule in profile["syscalls"])
+        or any(rule["action"] == "SCMP_ACT_ALLOW" and rule.get("includes", {}).get("caps")
+               for rule in profile["syscalls"])
+    ):
         raise ContractError("trusted security seccomp syscall contract changed")
 
     runner = (root / "scripts/run-security-execution-container.py").read_text(
@@ -4803,6 +4717,9 @@ def validate_isolated_execution_job(
         "644 deploy/docker/Dockerfile.security-evidence-runner",
         "644 deploy/docker/security-evidence-apk.lock",
         "644 deploy/docker/security-evidence-seccomp.json",
+        "644 deploy/docker/security-evidence-seccomp-upstream.json",
+        "644 deploy/docker/security-evidence-seccomp-provenance.json",
+        "644 deploy/docker/security-evidence-seccomp-upstream.LICENSE",
         "755 crates/security/chio-cage/scripts/check-linux-enforcement.sh",
         "644 scripts/check-cage-all-target-inventory.py",
         "755 scripts/check-cage-enforcement.sh",
@@ -4990,10 +4907,7 @@ def validate_nonce_fips_contract(root: Path) -> None:
         set(workflow) != {"name", "on", "concurrency", "permissions", "env", "jobs"}
         or workflow.get("permissions") != {"contents": "read"}
         or workflow.get("env") != {"CARGO_TERM_COLOR": "always", "CARGO_INCREMENTAL": "0"}
-        or workflow.get("concurrency") != {
-            "group": "chio-tee-fips-${{ github.workflow }}-${{ github.ref }}",
-            "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
-        }
+        or workflow.get("concurrency") != EXPECTED_NONCE_FIPS_CONCURRENCY
     ):
         raise ContractError("nonce/FIPS workflow privilege or execution boundary changed")
     jobs = workflow_jobs(workflow)
@@ -5089,11 +5003,32 @@ def validate(root: Path) -> None:
         "opened",
         "synchronize",
         "reopened",
-        "unlabeled",
     ]:
-        raise ContractError(
-            "required CI does not rerun after Linux refresh label removal"
-        )
+        raise ContractError("required CI must not rerun on capture-label edits")
+
+    if ci.get("concurrency") != EXPECTED_CI_CONCURRENCY:
+        raise ContractError("critical CI concurrency can replace or cancel another run")
+    if "nextest-security" in workflow_jobs(ci):
+        raise ContractError("advisory nextest must have a separate reported workflow")
+    advisory = load_workflow(root / ".github/workflows/security-nextest-advisory.yml")
+    if (
+        set(advisory) != {"name", "run-name", "on", "permissions", "env", "jobs"}
+        or advisory.get("name") != "Security nextest advisory"
+        or advisory.get("run-name") != "Security nextest advisory E=${{ github.event.pull_request.head.sha || github.sha }}"
+        or advisory.get("on") != {"push": {"branches": ["main"]}, "pull_request": {"branches": ["main"], "types": ["opened", "synchronize", "reopened"]}}
+        or advisory.get("permissions") != {"contents": "read"}
+        or advisory.get("env") != EXPECTED_ADVISORY_ENV
+        or set(workflow_jobs(advisory)) != {"nextest-security"}
+        or hashlib.sha256(json.dumps(job(advisory, "nextest-security"), sort_keys=True, separators=(",", ":")).encode()).hexdigest() != EXPECTED_ADVISORY_JOB_SHA256
+    ):
+        raise ContractError("advisory nextest reporting or read-only boundary changed")
+    auditor = root / "scripts/audit-security-merge-qualification.py"
+    if auditor.is_symlink() or not auditor.is_file() or hashlib.sha256(auditor.read_bytes()).hexdigest() != EXPECTED_LANDING_AUDITOR_SHA256:
+        raise ContractError("trusted landing auditor source commitment changed")
+
+    syntax_checker = root / "scripts/check-actions-workflow-syntax.py"
+    if syntax_checker.is_symlink() or not syntax_checker.is_file() or hashlib.sha256(syntax_checker.read_bytes()).hexdigest() != EXPECTED_WORKFLOW_SYNTAX_CHECKER_SHA256:
+        raise ContractError("trusted workflow syntax compatibility source commitment changed")
 
     ci_env = ci.get("env")
     if not isinstance(ci_env, dict) or any(
@@ -6237,6 +6172,8 @@ def validate(root: Path) -> None:
             "enterprise-evidence-finalizer.yml/runs?event=workflow_dispatch&branch=${default_branch}&per_page=100",
             "--paginate",
             '--arg display_title "${display_title}"',
+            '--arg workflow_id "${finalizer_workflow_id}"',
+            "(.workflow_id | tostring) == $workflow_id",
             ".display_title == $display_title",
             ".created_at >= $started_at",
             'test "${match_count}" -le 1',
@@ -6263,7 +6200,7 @@ def validate(root: Path) -> None:
     )
     final_output_assertion = '} >> "${GITHUB_OUTPUT}"'
     if (
-        finalizer_dispatch_run.count("--arg ") != 26
+        finalizer_dispatch_run.count("--arg ") != 27
         or "queued|in_progress)" in finalizer_dispatch_run
         or "queued|in_progress|completed)" in finalizer_dispatch_run
         or not finalizer_dispatch_run.strip().endswith(final_output_assertion)
@@ -6848,7 +6785,6 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'length\' <<< "${page_runs}")" = 100',
             'test "$(jq -r \'[.[].id] | unique | length\' <<< "${runs}")" = "${total_count}"',
             'if ! matching_runs="$(list_matching_ci_runs)"; then',
-            '.name == "CI"',
             '.path == ".github/workflows/ci.yml"',
             '.event == "pull_request"',
             "(.workflow_id | tostring) == $workflow_id",
@@ -7245,16 +7181,20 @@ def validate(root: Path) -> None:
     )
     failure_start = publisher_run.index("normalize_bad_ci_namespace()")
     reconciliation_start = publisher_run.index("reconcile_bad_ci()")
+    retry_start = publisher_run.index("reconcile_bad_authorizing_finalizer()")
+    guard_start = publisher_run.index("require_publishable_ci()")
     success_start = publisher_run.index("publish_success_authority()")
     branch_start = publisher_run.index(
         'reconcile_bad_ci\nif test "${bad_ci_observed}" = false; then'
     )
-    if not failure_start < reconciliation_start < success_start < branch_start:
+    if not failure_start < reconciliation_start < retry_start < guard_start < success_start < branch_start:
         raise ContractError(
             "dedicated Security contract reconciler branch ordering changed"
         )
     failure_routine = publisher_run[failure_start:reconciliation_start]
-    bad_ci_routine = publisher_run[reconciliation_start:success_start]
+    bad_ci_routine = publisher_run[reconciliation_start:retry_start]
+    retry_routine = publisher_run[retry_start:guard_start]
+    publication_guard = publisher_run[guard_start:success_start]
     success_routine = publisher_run[success_start:branch_start]
     branch_routine = publisher_run[branch_start:]
     history_helpers = re.findall(
@@ -7290,8 +7230,6 @@ def validate(root: Path) -> None:
         or "bad_ci_observed=true" not in bad_ci_routine
         or "bad_ci_create_missing=false" not in bad_ci_routine
         or "bad_ci_create_missing=true" not in bad_ci_routine
-        or 'require_publishable_ci() {\n  reconcile_bad_ci\n  test "${bad_ci_observed}" = false\n}'
-        not in bad_ci_routine
         or 'if test "$(jq -r \'length\' <<< "${bad_ci_runs}")" = "0"; then'
         not in bad_ci_routine
         or bad_ci_routine.count('matching_ci_runs="$(list_matching_ci_runs)"') != 2
@@ -7321,11 +7259,41 @@ def validate(root: Path) -> None:
             "dedicated Security contract bad-CI evidence does not dominate failure reconciliation"
         )
     if (
+        publication_guard.strip() != (
+            'require_publishable_ci() {\n  reconcile_bad_ci\n  test "${bad_ci_observed}" = false\n'
+            '  reconcile_bad_authorizing_finalizer\n  test "${bad_authorizing_finalizer_observed}" = false\n}'
+        )
+        or "--request POST" in retry_routine
+        or retry_routine.count("--request PATCH") != 1
+        or retry_routine.count('conclusion: "failure"') != 1
+        or 'conclusion: "success"' in retry_routine
+        or retry_routine.count("fail_existing_retry_namespace ") != 5
+        or "actions/workflows/enterprise-evidence-finalizer.yml/runs" in retry_routine
+        or "actions/runs/${authorizing_finalizer_id}/attempts/1" not in retry_routine
+        or 'test "${retry_original_blob}" = "${retry_authorized_blob}"' not in retry_routine
+        or 'for ((retry_attempt = 1; retry_attempt <= retry_maximum; retry_attempt++)); do' not in retry_routine
+        or 'test "${retry_complete}" = true' not in retry_routine
+        or '.schema == "chio.security-check-authority.v2" and .identity == $identity and .source_ci == $source_ci' not in retry_routine
+        or 'test "${authorizing_finalizer_id}" = "${FINALIZER_RUN_ID}"' not in retry_routine
+        or 'require_authorizing_attempt "${retry_own_current}" 1' not in retry_routine
+        or 'retry_own_in_progress=false' not in retry_routine
+        or 'test "${retry_attempt}" = "${FINALIZER_RUN_ATTEMPT}"' not in retry_routine
+        or 'test "${retry_attempt}" = "${retry_maximum}"' not in retry_routine
+        or 'test "${retry_attempt}" -gt 1' not in retry_routine
+        or '.workflow_name == $title' not in retry_routine
+        or '.output.text == $text' not in retry_routine
+    ):
+        raise ContractError("authorizing-finalizer retry reconciliation loses recorded authority or failure-only binding")
+    if (
         "--request PATCH" in success_routine
         or success_routine.count("--request POST") != 2
         or success_routine.count('conclusion: "success"') != 2
         or 'conclusion: "failure"' in success_routine
         or success_routine.count("require_publishable_ci\n") != 8
+        or sorted(re.findall(
+            r'(?m)^\s*test "\$\{FINALIZER_RUN_ATTEMPT\}" = 1\n\s*(mirror_check|check_run)=',
+            success_routine,
+        )) != ["check_run", "mirror_check"]
     ):
         raise ContractError(
             "dedicated Security contract publisher weakens App, main-ref, binding, or check payload authentication"
@@ -7343,7 +7311,7 @@ def validate(root: Path) -> None:
         )
     for marker, expected_count in (
         ('conclusion: "success"', 2),
-        ('conclusion: "failure"', 2),
+        ('conclusion: "failure"', 3),
         ("external_id: $external_id", 4),
         ("head_sha: $head_sha", 3),
         ('--arg details_url "${publication_details_url}"', 2),
@@ -7353,10 +7321,10 @@ def validate(root: Path) -> None:
             "actions/runs/${FINALIZER_RUN_ID}/attempts/${FINALIZER_RUN_ATTEMPT}",
             1,
         ),
-        (".details_url", 5),
-        ("revalidate_live_publication_head\n", 10),
-        ('status: "completed"', 4),
-        ("--request PATCH", 1),
+        (".details_url", 6),
+        ("revalidate_live_publication_head\n", 12),
+        ('status: "completed"', 5),
+        ("--request PATCH", 2),
     ):
         if publisher_run.count(marker) != expected_count:
             raise ContractError(
@@ -7445,6 +7413,7 @@ def validate(root: Path) -> None:
         bind_revocation,
         (
             ("Bind frozen manual revocation", "manual", None),
+            ("Resolve exact completed workflow identity", "route", None),
             ("Bind later failed CI rerun to existing authority", "failure", None),
             ("Bind failed finalizer to existing authority", "finalizer", None),
         ),
@@ -7460,9 +7429,9 @@ def validate(root: Path) -> None:
     if (
         manual_bind.get("if") != "${{ github.event_name == 'workflow_dispatch' }}"
         or failure_bind.get("if")
-        != "${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'CI' }}"
+        != "${{ github.event_name == 'workflow_run' && steps.route.outputs.workflow_path == '.github/workflows/ci.yml' }}"
         or finalizer_bind.get("if")
-        != "${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Enterprise evidence finalizer' }}"
+        != "${{ github.event_name == 'workflow_run' && steps.route.outputs.workflow_path == '.github/workflows/enterprise-evidence-finalizer.yml' }}"
     ):
         raise ContractError("security check revocation event routing changed")
     if manual_bind.get("env") != {
@@ -7662,9 +7631,13 @@ def validate(root: Path) -> None:
             'test "$(jq -r \'.conclusion // ""\' <<< "${upstream}")" = "${EVENT_CONCLUSION}"',
             'test "$(jq -r \'.actor.login\' <<< "${upstream}")" = "github-actions[bot]"',
             'test "$(jq -r \'.triggering_actor.login\' <<< "${upstream}")" = "github-actions[bot]"',
-            'run_attempt="${EVENT_RUN_ATTEMPT}"',
-            'test "$(jq -r \'.run_attempt\' <<< "${upstream}")" = "${run_attempt}"',
+            'failed_finalizer_attempt="${EVENT_RUN_ATTEMPT}"',
+            'test "$(jq -r \'.run_attempt\' <<< "${upstream}")" = "${failed_finalizer_attempt}"',
+            'run_attempt="$(jq -r \'.run_attempt\' <<< "${upstream}")"',
             'test "${run_attempt}" = "1"',
+            "actions/runs/${EVENT_RUN_ID}/attempts/1",
+            'test "$(jq -r \'.head_sha\' <<< "${upstream}")" = "${upstream_sha}"',
+            'test "$(jq -r \'.display_title\' <<< "${upstream}")" = "${failed_finalizer_title}"',
             'test "$(jq -r \'length\' <<< "${finalizer_jobs}")" = 4',
             'require_successful_finalizer_job "validate unsigned enterprise Linux capture"',
             'require_successful_finalizer_job "sign committed enterprise Linux migration evidence"',
@@ -7708,11 +7681,17 @@ def validate(root: Path) -> None:
             "commits/${merge_commit_sha}/check-runs?filter=all&per_page=100",
             'finalizer_details_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${run_attempt}"',
             '.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract" and .external_id == $external_id',
+            'relevant_count="$(jq -r --arg app_id "${SECURITY_APP_ID}" --arg details_url "${finalizer_details_url}" --arg external_id "${external_id}" \'[.[] | select(.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract" and .external_id == $external_id)] | length\' <<< "${existing_checks}")"',
             'test "${relevant_count}" -le 1',
             'echo "eligible=false" >> "${GITHUB_OUTPUT}"',
             'echo "create_missing=false"',
             'echo "eligible=true"',
             'echo "reason=finalizer-failure"',
+            'test "$(jq -r \'.app.slug\' <<< "${recorded_authority}")" = chio-security-authority',
+            'test "$(jq -r \'.head_sha\' <<< "${recorded_authority}")" = "${merge_commit_sha}"',
+            "actions/runs/${recorded_ci_id}/attempts/${recorded_ci_attempt}",
+            '(.id | tostring) == $source_ci.run_id and (.run_attempt | tostring) == $source_ci.run_attempt and (.workflow_id | tostring) == $source_ci.workflow_id',
+            'test "${recorded_blob}" = "${recorded_source_blob}"',
         ),
         "failed-finalizer revocation loses workflow, definition, N/E/M/S, or existing-authority binding",
     )
@@ -7723,10 +7702,9 @@ def validate(root: Path) -> None:
         in finalizer_bind_run
         or finalizer_bind_run.count("require_successful_finalizer_job ") != 3
         or finalizer_bind_run.count("create_missing=false") != 1
-        or finalizer_bind_run.count("(.app.id | tostring) == $app_id") != 1
+        or finalizer_bind_run.count("(.app.id | tostring) == $app_id") != 2
         or '"repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}"'
         in finalizer_bind_run
-        or 'run_attempt="$(jq' in finalizer_bind_run
     ):
         raise ContractError(
             "failed-finalizer revocation accepts mutable authority or non-dedicated evidence"
@@ -8249,21 +8227,22 @@ def validate(root: Path) -> None:
         raise ContractError("admin override audit changes its closed-PR trigger")
     if admin_override.get("permissions") != EXPECTED_ADMIN_PERMISSIONS:
         raise ContractError(
-            "admin override audit lacks its exact read/comment permissions"
+            "admin override audit lacks its exact read-only permissions"
         )
     if (
-        set(audit) != {"name", "if", "runs-on", "env", "steps"}
+        set(audit) != {"name", "if", "runs-on", "timeout-minutes", "env", "steps"}
         or audit.get("name") != "admin-override-audit"
         or audit.get("if") != EXPECTED_ADMIN_JOB_IF
         or audit.get("runs-on") != "ubuntu-latest"
+        or audit.get("timeout-minutes") != "10"
     ):
         raise ContractError("admin override audit changes its execution contract")
     audit_env = audit.get("env")
     if audit_env != EXPECTED_ADMIN_AUDIT_ENV:
         raise ContractError(
-            "admin override audit is not bound to the protected test merge"
+            "admin override audit is not bound to the authorized qualification"
         )
-    audit_step = named_step(audit, "Audit required checks at protected merge commit")
+    audit_step = named_step(audit, "Audit recorded qualification and protected merge")
     audit_steps = audit.get("steps")
     if (
         not isinstance(audit_steps, list)
@@ -8272,26 +8251,13 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("admin override audit changes its unconditional checkout")
     audit_run = audit_step.get("run")
-    if not isinstance(audit_run, str) or not all(
-        required in audit_run
-        for required in (
-            '"Security mirror / Build, lint, test"',
-            '"Security mirror / MSRV build and test"',
-            '"Security mirror / cargo-vet (locked supply-chain audit)"',
-            '"Security mirror / cargo-deny (supply-chain bans/advisories/licenses)"',
-            '"Security contract"',
-            "commits/${CHECK_SHA}/check-runs",
-        )
-    ):
-        raise ContractError(
-            "admin override audit omits a planned context or merge-commit query"
-        )
     if (
         set(audit_step) != {"name", "shell", "run"}
         or audit_step.get("shell") != "bash"
+        or not isinstance(audit_run, str)
         or audit_run.strip() != EXPECTED_ADMIN_AUDIT_RUN
     ):
-        raise ContractError("admin override audit changes its exact merge-commit audit body")
+        raise ContractError("admin override audit changes its exact recorded-qualification body")
 
 
 def main() -> int:

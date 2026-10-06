@@ -298,28 +298,38 @@ impl ChioKernel {
         operation_store: &dyn AdmissionOperationStore,
         approval_store: Option<&dyn ApprovalStore>,
     ) -> Result<usize, KernelError> {
-        let mut operation_ids = operation_store.list_compensated_with_pending_cleanup(
-            Some(AdmissionOperationKind::GovernedActiveResponse),
-            MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION + 1,
-        )?;
-        if operation_ids.len() > MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION {
-            return Err(KernelError::Internal(format!(
-                "more governed active-response cleanup operations remain after the bounded {MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation recovery batch"
-            )));
-        }
-        let mut recovered = 0usize;
-        for operation_id in operation_ids.drain(..) {
-            if self.recover_compensated_active_response_operation_with_store(
-                operation_store,
-                approval_store,
-                &operation_id,
-            )? {
-                recovered = recovered.checked_add(1).ok_or_else(|| {
-                    KernelError::Internal(
-                        "active-response cleanup recovery count overflowed usize".to_string(),
-                    )
-                })?;
+        let mut cursor: Option<String> = None;
+        let mut recovered = 0_usize;
+        let mut pending = None;
+        loop {
+            let mut ids = operation_store.list_compensated_with_pending_cleanup_page(
+                Some(AdmissionOperationKind::GovernedActiveResponse),
+                cursor.as_deref(),
+                MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION + 1,
+            )?;
+            validate_recovery_page(ids.iter().map(String::as_str), cursor.as_deref(), ids.len())?;
+            let more_remaining = ids.len() > MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION;
+            ids.truncate(MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION);
+            for id in ids {
+                cursor = Some(id.clone());
+                if self.recover_compensated_active_response_operation_with_store(
+                    operation_store,
+                    approval_store,
+                    &id,
+                )? {
+                    recovered = increment_recovery_count(recovered)?;
+                } else if pending.is_none() {
+                    pending = Some(KernelError::Internal(format!(
+                        "active-response cleanup remains pending for {id}"
+                    )));
+                }
             }
+            if !more_remaining {
+                break;
+            }
+        }
+        if let Some(error) = pending {
+            return Err(error);
         }
         Ok(recovered)
     }
@@ -636,75 +646,172 @@ impl ChioKernel {
         approval_store: Option<&dyn ApprovalStore>,
         expected_coordinator_authority_id: &str,
     ) -> Result<usize, KernelError> {
-        let mut operations = operation_store.list_admission_recovery_candidates(
-            AdmissionOperationKind::GovernedActiveResponse,
-            MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION + 1,
-        )?;
-        if operations.len() > MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION {
-            return Err(KernelError::Internal(format!(
-                "more governed active-response operations remain after the bounded {MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION}-operation recovery batch"
-            )));
-        }
         let mut recovered = self.recover_terminal_receipt_outboxes_with_store(
             operation_store,
             AdmissionOperationKind::GovernedActiveResponse,
             Some(expected_coordinator_authority_id),
         )?;
-        for operation in operations.drain(..) {
-            if operation.coordinator_authority_id() != expected_coordinator_authority_id {
-                return Err(KernelError::Internal(format!(
-                    "governed active-response operation {} belongs to a different executor authority",
-                    operation.operation_id()
-                )));
-            }
-            match operation.state() {
-                AdmissionOperationState::Prepared
-                | AdmissionOperationState::ApprovalReserved
-                | AdmissionOperationState::CompensationPending
-                | AdmissionOperationState::CompensatedBeforeDispatch => {
-                    if matches!(
-                        operation.state(),
-                        AdmissionOperationState::Prepared
-                            | AdmissionOperationState::ApprovalReserved
-                    ) {
-                        self.stage_compensation_pending_with_terminal_receipt(
-                            operation_store,
-                            &operation,
-                            "governed security runtime recovered an uncommitted active response",
-                        )?;
+        let mut cursor: Option<String> = None;
+        let mut deferred = None;
+        loop {
+            let mut page = operation_store.list_admission_recovery_candidates_page(
+                AdmissionOperationKind::GovernedActiveResponse,
+                cursor.as_deref(),
+                MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION + 1,
+            )?;
+            validate_recovery_page(
+                page.iter().map(AdmissionOperation::operation_id),
+                cursor.as_deref(),
+                page.len(),
+            )?;
+            let more_remaining =
+                page.len() > MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION;
+            page.truncate(MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION);
+            for operation in page {
+                cursor = Some(operation.operation_id().into());
+                match self.recover_active_response_item(
+                    operation_store,
+                    approval_store,
+                    expected_coordinator_authority_id,
+                    operation,
+                ) {
+                    Ok(true) => recovered = increment_recovery_count(recovered)?,
+                    Ok(false) => {}
+                    Err(ActiveResponseRecoveryFailure::ItemRefusal(error)) => {
+                        if deferred.is_none() {
+                            deferred = Some(error);
+                        }
                     }
-                    if self.recover_compensated_active_response_operation_with_store(
-                        operation_store,
-                        approval_store,
-                        operation.operation_id(),
-                    )? {
-                        recovered = recovered.checked_add(1).ok_or_else(|| {
-                            KernelError::Internal(
-                                "active-response recovery count overflowed usize".to_string(),
-                            )
-                        })?;
-                    }
-                }
-                AdmissionOperationState::DispatchCommitted => {
-                    self.reconcile_governed_active_response_commit(
-                        operation_store,
-                        approval_store,
-                        &operation,
-                    )?;
-                }
-                AdmissionOperationState::Completed => {
-                    self.validate_terminal_receipt_binding_with_store(operation_store, &operation)?;
-                }
-                AdmissionOperationState::OutcomeUnknownAfterDispatch => {}
-                _ => {
-                    return Err(KernelError::Internal(
-                        "governed active response entered a tool-dispatch-only state".to_string(),
-                    ))
+                    Err(ActiveResponseRecoveryFailure::Fatal(error)) => return Err(error),
                 }
             }
+            if !more_remaining {
+                break;
+            }
+        }
+        if let Some(error) = deferred {
+            tracing::warn!(
+                recovered,
+                "active-response recovery made progress before an item refusal"
+            );
+            return Err(error);
         }
         Ok(recovered)
     }
+
+    fn recover_active_response_item(
+        &self,
+        operation_store: &dyn AdmissionOperationStore,
+        approval_store: Option<&dyn ApprovalStore>,
+        expected_coordinator_authority_id: &str,
+        mut operation: AdmissionOperation,
+    ) -> Result<bool, ActiveResponseRecoveryFailure> {
+        if operation.coordinator_authority_id() != expected_coordinator_authority_id {
+            return Err(ActiveResponseRecoveryFailure::ItemRefusal(KernelError::Internal(format!(
+                "governed active-response operation {} belongs to a different executor authority", operation.operation_id()
+            ))));
+        }
+        // Approval commitment is the same commit point in startup and live
+        // recovery. It must be reconciled before compensation is considered.
+        if operation.state() == AdmissionOperationState::ApprovalReserved {
+            if let Some(committed) = self.reconcile_governed_active_response_commit(
+                operation_store,
+                approval_store,
+                &operation,
+            )? {
+                operation = committed;
+            }
+        }
+        match operation.state() {
+            AdmissionOperationState::Prepared
+            | AdmissionOperationState::ApprovalReserved
+            | AdmissionOperationState::CompensationPending
+            | AdmissionOperationState::CompensatedBeforeDispatch => {
+                if matches!(
+                    operation.state(),
+                    AdmissionOperationState::Prepared | AdmissionOperationState::ApprovalReserved
+                ) {
+                    self.stage_compensation_pending_with_terminal_receipt(
+                        operation_store,
+                        &operation,
+                        "governed security runtime recovered an uncommitted active response",
+                    )?;
+                }
+                let completed = self.recover_compensated_active_response_operation_with_store(
+                    operation_store,
+                    approval_store,
+                    operation.operation_id(),
+                )?;
+                if !completed {
+                    return Err(ActiveResponseRecoveryFailure::ItemRefusal(
+                        KernelError::Internal(format!(
+                            "active-response cleanup remains pending for {}",
+                            operation.operation_id()
+                        )),
+                    ));
+                }
+                Ok(true)
+            }
+            AdmissionOperationState::DispatchCommitted => {
+                self.reconcile_governed_active_response_commit(
+                    operation_store,
+                    approval_store,
+                    &operation,
+                )?;
+                Ok(false)
+            }
+            AdmissionOperationState::Completed => {
+                self.validate_terminal_receipt_binding_with_store(operation_store, &operation)?;
+                Ok(false)
+            }
+            AdmissionOperationState::OutcomeUnknownAfterDispatch => Ok(false),
+            _ => Err(ActiveResponseRecoveryFailure::ItemRefusal(
+                KernelError::Internal(
+                    "governed active response entered a tool-dispatch-only state".into(),
+                ),
+            )),
+        }
+    }
+}
+
+// Only explicit semantic item refusals are deferred. Unknown kernel errors,
+// store faults, clock failures, and receipt/integrity failures remain fatal.
+enum ActiveResponseRecoveryFailure {
+    ItemRefusal(KernelError),
+    Fatal(KernelError),
+}
+impl From<KernelError> for ActiveResponseRecoveryFailure {
+    fn from(error: KernelError) -> Self {
+        Self::Fatal(error)
+    }
+}
+
+fn increment_recovery_count(count: usize) -> Result<usize, KernelError> {
+    count.checked_add(1).ok_or_else(|| {
+        KernelError::Internal("active-response recovery count overflowed usize".into())
+    })
+}
+
+fn validate_recovery_page<'a>(
+    ids: impl IntoIterator<Item = &'a str>,
+    cursor: Option<&str>,
+    len: usize,
+) -> Result<(), KernelError> {
+    if len > MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION + 1 {
+        return Err(KernelError::Internal(
+            "active-response recovery store exceeded its page bound".into(),
+        ));
+    }
+    let mut previous = cursor;
+    for id in ids {
+        if previous.is_some_and(|last| id <= last) {
+            return Err(KernelError::Internal(
+                "active-response recovery page did not advance its exact cursor".into(),
+            ));
+        }
+        previous = Some(id);
+    }
+    Ok(())
 }
 
 fn parse_cleanup_payload<T: for<'de> Deserialize<'de>>(

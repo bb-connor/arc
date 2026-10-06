@@ -2058,7 +2058,6 @@ dependencies = [
  "chio-finding-market-migrations",
  "chio-finding-market-port",
  "chio-open-market",
- "chio-secret-broker",
  "serde",
  "serde_json",
  "sqlx",
@@ -2467,6 +2466,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-http-core",
+ "chio-log-redact",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -10254,35 +10254,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "cmpv2"
-version = "0.2.0"
-
-[[patch.unused]]
-name = "crmf"
-version = "0.2.0"
-
-[[patch.unused]]
-name = "ignore"
-version = "0.4.32"
-
-[[patch.unused]]
-name = "nono"
-version = "0.53.0"
-
-[[patch.unused]]
-name = "regress"
-version = "0.11.1"
-
-[[patch.unused]]
-name = "sigstore-crypto"
-version = "0.6.6"
-
-[[patch.unused]]
-name = "sigstore-merkle"
-version = "0.6.6"
-
-[[patch.unused]]
-name = "sigstore-trust-root"
-version = "0.6.3"

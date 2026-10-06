@@ -1,9 +1,8 @@
 # chio-api-protect
 
-Zero-code reverse proxy that fronts an existing HTTP API and requires every
-mediated request to clear the Chio kernel guard pipeline before it reaches
-the upstream. It derives a route table and default policy from an OpenAPI
-spec, evaluates and forwards requests, and signs an `HttpReceipt` for every
+Zero-code reverse proxy that fronts an existing HTTP API. It derives a route
+table and default policy from an OpenAPI spec, evaluates and forwards requests
+under the route policy and upstream egress contract, and signs an `HttpReceipt` for every
 outcome, allowed or denied. It is the library behind `chio api protect` and
 `chio start` in `chio-cli`.
 
@@ -169,6 +168,23 @@ capability and ancestor revocations, signer roster, tenant, policy, and token
 expiry are rechecked before fresh admission and dispatch. Decisions are immutable;
 there is no independent per-token revoke endpoint. Revoke the capability or retire
 the signer to withdraw authority before dispatch.
+
+`POST /v1/evaluate` reserves a caller-executed invocation. A reservation is
+not dispatch authority, and this endpoint does not observe the caller's later
+external HTTP response. A post-invocation hook installed on its mediation
+kernel therefore does not establish sanitization of that external response.
+The reverse proxy's ordinary upstream forwarding path has its own route-policy
+and egress contract; caller reservation evidence does not qualify that path.
+
+The caller-reservation kernel installs the shared defaults:
+`InternalNetworkGuard`, `AgentVelocityGuard`, `AdvisoryPipeline`, and
+`SanitizerHook`. Applicable network-action inputs targeting private or reserved
+addresses are denied before a nonce is minted. Default velocity thresholds are
+unlimited, and the advisory detector roster and promotion rules are empty.
+These defaults do not establish rate limiting, advisory detection, or any
+optional guard's protection. The production policy identity binds the default
+profile configuration alongside the spec, operator pin, and anonymous-read
+setting; HTTP evaluation and durable admission use that same identity.
 
 ## Testing
 

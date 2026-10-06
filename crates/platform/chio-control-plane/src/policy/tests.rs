@@ -12,6 +12,9 @@ use chio_test_support::prelude::*;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
+#[path = "tests/guard_api_key.rs"]
+mod guard_api_key;
+
 const EXAMPLE_POLICY: &str = r#"
 kernel:
   max_capability_ttl: 3600

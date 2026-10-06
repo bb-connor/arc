@@ -901,6 +901,11 @@ selected grant and preflight or dispatch phase under the current operation lease
 New budget authorization, nonce preflight and dispatch MUST require a fresh live
 claim. Expiry alone MUST NOT release ownership or erase spent replay identity.
 An exact pre-dispatch release may end an episode; that episode cannot be reused.
+
+Releasing a pre-dispatch DPoP claim frees live reservation capacity but does not
+erase spent replay identity. Only the original admission operation may acquire a
+successor episode for that same (authority, capability, nonce); every other
+operation must reject it, including after release or expiry.
 A dispatch commitment permanently retains its claim. Recovery of a committed
 result checks authority at the recorded commit, not freshness at recovery time.
 Imported legacy-domain markers remain evidence and do not occupy the distinct

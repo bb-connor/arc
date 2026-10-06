@@ -8,6 +8,34 @@ use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
+/// Encode trusted typed rows within the unchanged native reader's byte ceiling.
+pub(crate) fn encode_session<T: serde::Serialize>(value: &T) -> Result<String, serde_json::Error> {
+    struct BoundedOutput(Vec<u8>);
+    impl std::io::Write for BoundedOutput {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if bytes.len() > MAX_SESSION_JSON_BYTES.saturating_sub(self.0.len()) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "MCP durable JSON exceeds its native reader byte limit",
+                ));
+            }
+            self.0.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut output = BoundedOutput(Vec::new());
+    serde_json::to_writer(&mut output, value)?;
+    String::from_utf8(output.0).map_err(|error| {
+        serde_json::Error::io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            error.utf8_error(),
+        ))
+    })
+}
+
 pub(crate) const MAX_CONTROL_JSON_BYTES: usize = 64 * 1024;
 pub(crate) const MAX_SESSION_JSON_BYTES: usize = 8 * 1024 * 1024;
 pub(crate) const MAX_AUTH_JSON_BYTES: usize = 64 * 1024;

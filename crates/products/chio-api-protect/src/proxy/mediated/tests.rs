@@ -307,11 +307,10 @@ fn mediated_test_state_with_durable_admission(
         sidecar_control_token,
         budget_store: Some(budget),
         mediation_hold_capable: hold_capable,
-        mediation_kernel: Some(mediation_kernel),
+        mediation_kernel: Some(Arc::new(mediation_kernel)),
         minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
-        reaper_handle: Mutex::new(None),
         allow_advisory: false,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",
@@ -1474,30 +1473,16 @@ async fn reserved_hold_reaper_handle_is_retained_not_detached() {
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
     let state = mediated_test_state(signer, budget, Vec::new());
 
-    // No reaper before spawn.
-    assert!(state.reaper_handle.lock().await.is_none());
-
-    // The reaper's JoinHandle is retained on the shared state,
-    // not dropped/detached, so it can be aborted on shutdown.
-    spawn_reserved_hold_reaper(&state).await;
-    {
-        let guard = state.reaper_handle.lock().await;
-        let handle = guard
-            .as_ref()
-            .expect("the reaper handle must be retained on the state");
-        assert!(
-            !handle.is_finished(),
-            "the retained reaper handle must reference a live, abortable task"
-        );
-    }
-
-    // The retained handle is abortable; aborting cancels the reaper task.
-    let handle = state.reaper_handle.lock().await.take().unwrap();
-    handle.abort();
-    assert!(
-        handle.await.is_err(),
-        "aborting the retained handle must cancel the reaper task"
-    );
+    let controller = Arc::new(chio_http_serve::ShutdownController::manual());
+    let mut owner = spawn_reserved_hold_reaper(&state, controller)
+        .test_unwrap()
+        .expect("configured original kernel requires an owned reaper");
+    let control = owner.control();
+    assert!(control.health().worker_running);
+    assert!(!control.health().worker_joined);
+    owner.stop_and_join(std::time::Duration::from_secs(1)).await;
+    assert!(control.health().worker_joined);
+    assert!(!control.health().worker_running);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1686,3 +1671,6 @@ async fn mediated_durable_hold_rejects_request_id_reuse_after_settle() {
     assert_eq!(fresh["status"], "reserved");
     assert!(fresh["execution_nonce"].is_object());
 }
+
+#[path = "tests/product_guards.rs"]
+mod product_guard_tests;

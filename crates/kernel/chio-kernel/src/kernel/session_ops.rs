@@ -14,11 +14,22 @@ use super::*;
 #[path = "session_ops/threshold_continuation.rs"]
 mod threshold_continuation;
 
+#[path = "session_ops/request_claim.rs"]
+mod request_claim;
+use request_claim::ToolRequestClaim;
+
 #[path = "session_ops/threshold_binding.rs"]
 mod threshold_binding;
 
 #[path = "session_ops/reports.rs"]
 mod reports;
+
+#[path = "session_ops/protocol_refusal.rs"]
+mod protocol_refusal;
+pub use protocol_refusal::{
+    ProtocolRefusalReason, ProtocolRefusalSummary, ProtocolRequestDigest,
+    ProtocolRequestDigestSource,
+};
 
 #[path = "session_ops/nested_tool_call.rs"]
 mod nested_tool_call;
@@ -436,9 +447,9 @@ impl ChioKernel {
         context: &OperationContext,
         operation: &ToolCallOperation,
         execution_nonce: Option<&crate::execution_nonce::SignedExecutionNonce>,
-    ) -> Result<Option<PendingThresholdApproval>, KernelError> {
+    ) -> Result<ToolRequestClaim<'_>, KernelError> {
         if let Some(retained) = self.resume_pending_threshold_request(context, operation)? {
-            return Ok(Some(retained));
+            return Ok(ToolRequestClaim::new(self, context, Some(retained)));
         }
         if let Some(nonce) = execution_nonce
             .filter(|nonce| nonce.nonce.bound_to.request_id == context.request_id.as_str())
@@ -462,11 +473,11 @@ impl ChioKernel {
                 Ok(false)
             })?;
             if resumed {
-                return Ok(None);
+                return Ok(ToolRequestClaim::existing_nonce_retry(self, context));
             }
         }
         self.begin_session_request(context, OperationKind::ToolCall, true)?;
-        Ok(None)
+        Ok(ToolRequestClaim::new(self, context, None))
     }
 
     fn finish_session_tool_request(
@@ -723,6 +734,9 @@ impl ChioKernel {
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
+        if let SessionOperation::ToolCall(tool_call) = operation {
+            reject_reserved_receipt_metadata(tool_call.extra_metadata.as_ref())?;
+        }
         // Install tenant_id scope for the duration of this session-scoped
         // evaluation so every receipt signed here (tool call, resource read
         // deny, etc.) is tagged with the session's tenant. The ToolCall
@@ -763,14 +777,17 @@ impl ChioKernel {
         };
 
         let mut retained_threshold = None;
+        let mut request_claim = None;
         let mut bound_threshold_intent = None;
         if should_track_inflight {
             if let SessionOperation::ToolCall(tool_call) = operation {
-                retained_threshold = self.begin_or_resume_tool_request(
+                let claim = self.begin_or_resume_tool_request(
                     context,
                     tool_call,
                     parsed_tool_call_execution_nonce.as_ref(),
                 )?;
+                retained_threshold = claim.retained();
+                request_claim = Some(claim);
             } else {
                 self.begin_session_request(context, operation_kind, true)?;
             }
@@ -894,6 +911,9 @@ impl ChioKernel {
                 bound_threshold_intent.as_ref(),
                 terminal_state,
             )?;
+            if let Some(claim) = request_claim.as_mut() {
+                claim.disarm();
+            }
         }
 
         evaluation

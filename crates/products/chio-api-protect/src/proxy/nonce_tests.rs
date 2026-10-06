@@ -57,7 +57,6 @@ fn strict_nonce_state_with_upstream(routes: Vec<RouteEntry>, upstream: String) -
         minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
             chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
         )),
-        reaper_handle: Mutex::new(None),
         allow_advisory: false,
         receipt_backend: "ephemeral",
         revocation_backend: "ephemeral",

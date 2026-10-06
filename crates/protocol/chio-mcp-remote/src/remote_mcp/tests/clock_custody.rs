@@ -4,6 +4,9 @@ use chio_security_types::clock::{ClockReading, MonotonicInstant};
 #[path = "clock_custody/dispatch.rs"]
 mod dispatch;
 
+#[path = "clock_custody/pinned_authority.rs"]
+mod pinned_authority;
+
 struct TestClock(StdMutex<Result<ClockReading, ClockError>>);
 impl Clock for TestClock {
     fn read(&self) -> Result<ClockReading, ClockError> {
@@ -100,7 +103,7 @@ fn exhausted_counters_fail_without_wrapping() {
 }
 
 fn session_init(clock: RemoteClock) -> RemoteSessionInit {
-    let (input_tx, _) = mpsc::channel();
+    let (input_tx, _input_rx) = mcp_inbox();
     let (event_tx, _) = broadcast::channel(8);
     RemoteSessionInit {
         clock,

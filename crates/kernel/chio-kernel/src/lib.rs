@@ -127,6 +127,7 @@ pub mod provider_verdict;
 pub mod receipt_analytics;
 #[cfg(not(loom))]
 pub mod receipt_query;
+#[cfg(not(loom))]
 pub mod receipt_store;
 #[cfg(not(loom))]
 mod receipt_support;
@@ -685,7 +686,8 @@ pub use kernel::{
     MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
     NativeSecurityNoncePreflightJoinAuthority, NestedToolCallProofs, OverloadResource,
     PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission,
-    PreparedNativeSecurityEgress, PromptProvider, ReceiptLog, ReplayClockDirection,
+    PreparedNativeSecurityEgress, PromptProvider, ProtocolRefusalReason, ProtocolRefusalSummary,
+    ProtocolRequestDigest, ProtocolRequestDigestSource, ReceiptLog, ReplayClockDirection,
     ResourceProvider, ResponseDispatchPreparationRequest, RuntimeAdmissionContext,
     RuntimeAdmissionDecision, RuntimeAdmissionHook, RuntimeAdmissionReadinessToken,
     RuntimeAdmissionRevalidationContext, RuntimeParticipantClaimAuthority, SecurityDispatchOutcome,
@@ -704,19 +706,23 @@ pub use kernel::{
 
 #[cfg(not(loom))]
 pub use kernel::evaluator::ToolEvaluator;
+#[cfg(not(loom))]
 pub use kernel::DurableFinalizationCutpoint;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::DurableFinalizationCutpointHook;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::NativeSecurityCaptureCheckpointHook;
+#[cfg(not(loom))]
 pub use kernel::NativeSecurityDispatchCaptureAuthority;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::NativeSecurityEgressCheckpointHook;
 #[cfg(not(loom))]
 pub use kernel::NativeSecurityOutputJoinAuthority;
+#[cfg(not(loom))]
 pub use kernel::VerifiedNativeDispatchCredentials;
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::{CallerExecutionCheckpoint, CallerExecutionCheckpointHook};
+#[cfg(not(loom))]
 pub use kernel::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 
 #[cfg(not(loom))]
@@ -742,5 +748,5 @@ pub const SIGNING_CHANNEL_DEFAULT_CAPACITY: usize =
 /// blocks under backpressure.
 pub use kernel::signing_task::METRIC_CHIO_SIGNING_QUEUE_BLOCK_TOTAL;
 
-#[cfg(feature = "admission-test-support")]
+#[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::active_response_test_support;

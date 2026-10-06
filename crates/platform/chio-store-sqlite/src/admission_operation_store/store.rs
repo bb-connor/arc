@@ -567,6 +567,21 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         Ok(reservation)
     }
 
+    fn load_retained_tool_request_by_execution_nonce(
+        &self,
+        nonce_id: &AdmissionIdentifier,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(
+            AdmissionOperationV1,
+            chio_kernel::admission_operation::RetainedToolAdmissionRequestV1,
+        )>,
+        AdmissionOperationStoreError,
+    > {
+        self.load_original_request_by_nonce(nonce_id, fence, trusted_now_unix_ms)
+    }
+
     fn load_unambiguous_retained_tool_request(
         &self,
         request_id: &AdmissionIdentifier,
@@ -773,33 +788,59 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         not_after_unix_ms: u64,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-        if limit > MAX_RECOVERY_BATCH {
-            return Err(invariant("recovery batch limit exceeds 256"));
+        if limit == 0 {
+            return Ok(Vec::new());
         }
-        let mut connection = self.connection()?;
-        let transaction = self.begin_read(&mut connection)?;
-        let mut operations = recoverable_page(
-            &transaction,
-            &self.serving_owner.fence,
-            RecoverableRows::Active,
-            not_after_unix_ms,
-            limit,
-        )?;
-        // A parked operation joins the page only once its proposal deadline has
-        // elapsed, and only after every active operation had its turn, so live
-        // parked operations can neither occupy nor starve a page.
-        let remaining = limit.saturating_sub(operations.len());
-        if remaining != 0 {
-            operations.extend(recoverable_page(
-                &transaction,
-                &self.serving_owner.fence,
-                RecoverableRows::ExpiredParked,
+        self.read_recovery_page(
+            chio_kernel::admission_operation::AdmissionRecoveryPageQuery {
                 not_after_unix_ms,
-                remaining,
-            )?);
-        }
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(operations)
+                candidate_limit: limit,
+                after_operation_id: None,
+                fence: &self.serving_owner.fence,
+            },
+        )
+        .map(|page| page.operations)
+    }
+
+    fn recovery_page(
+        &self,
+        query: chio_kernel::admission_operation::AdmissionRecoveryPageQuery<'_>,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionRecoveryPageV1,
+        chio_kernel::admission_operation::AdmissionRecoveryPortError,
+    > {
+        self.read_recovery_page(query).map_err(Into::into)
+    }
+
+    fn load_recovery_status(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        now: u64,
+    ) -> Result<
+        Option<chio_kernel::admission_operation::AdmissionRecoveryStatusV1>,
+        chio_kernel::admission_operation::AdmissionRecoveryPortError,
+    > {
+        self.read_recovery_status(operation_id, fence, now)
+            .map_err(Into::into)
+    }
+
+    fn defer_recovery(
+        &self,
+        request: chio_kernel::admission_operation::AdmissionRecoveryDeferralWrite<'_>,
+    ) -> Result<
+        chio_kernel::admission_operation::AdmissionRecoveryStatusV1,
+        chio_kernel::admission_operation::AdmissionRecoveryPortError,
+    > {
+        self.persist_recovery_deferral(request).map_err(Into::into)
+    }
+
+    fn clear_recovery_deferral(
+        &self,
+        request: chio_kernel::admission_operation::AdmissionRecoveryDeferralClear<'_>,
+    ) -> Result<(), chio_kernel::admission_operation::AdmissionRecoveryPortError> {
+        self.persist_recovery_deferral_clear(request)
+            .map_err(Into::into)
     }
 
     fn load_terminal_replay(
@@ -1132,87 +1173,10 @@ impl SqliteAdmissionOperationStore {
 }
 
 /// Which non-terminal rows a recovery page draws from.
-#[derive(Clone, Copy)]
-enum RecoverableRows {
-    /// Every state except a parked approval.
-    Active,
-    /// Parked approvals whose proposal deadline has elapsed.
-    ExpiredParked,
-}
-
-fn recoverable_page(
-    transaction: &rusqlite::Transaction<'_>,
-    fence: &StoreMutationFence,
-    rows: RecoverableRows,
-    not_after_unix_ms: u64,
-    limit: usize,
-) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError> {
-    let state_predicate = match rows {
-        // A committed caller waits for authenticated external evidence. It has
-        // no timer-driven recovery action and must not occupy an active page.
-        RecoverableRows::Active => "state NOT IN ('approval_required', 'awaiting_caller_report')",
-        RecoverableRows::ExpiredParked => "state = 'approval_required'",
-    };
-    let sql = format!(
-        r#"
-        SELECT operation_id, request_namespace_digest, request_id,
-               operation_json, state, terminal, coordinator_lease_epoch,
-               version, created_at_unix_ms, updated_at_unix_ms,
-               recovery_claimant_id, recovery_coordinator_lease_id,
-               recovery_coordinator_lease_epoch, recovery_claimed_version,
-               recovery_expires_at_unix_ms, recovery_store_uuid,
-               recovery_store_lease_id, recovery_store_owner_epoch
-        FROM admission_operations
-        WHERE terminal = 0
-          AND {state_predicate}
-          AND (recovery_expires_at_unix_ms IS NULL
-               OR recovery_expires_at_unix_ms <= ?1
-               OR recovery_store_uuid <> ?2
-               OR recovery_store_lease_id <> ?3
-               OR recovery_store_owner_epoch <> ?4)
-        ORDER BY updated_at_unix_ms, operation_id
-        "#
-    );
-    let mut statement = transaction.prepare(&sql).map_err(sqlite_error)?;
-    let mut rows_iter = statement
-        .query(params![
-            sqlite_i64(not_after_unix_ms, "not_after_unix_ms")?,
-            &fence.store_uuid,
-            &fence.lease_id,
-            sqlite_i64(fence.owner_epoch, "store_owner_epoch")?,
-        ])
-        .map_err(sqlite_error)?;
-    let mut operations = Vec::with_capacity(limit);
-    while operations.len() < limit {
-        let Some(row) = rows_iter.next().map_err(sqlite_error)? else {
-            break;
-        };
-        let stored = decode_row(read_raw_row(row).map_err(sqlite_error)?)?;
-        if matches!(rows, RecoverableRows::ExpiredParked)
-            && stored
-                .operation
-                .parked_approval_deadline_unix_ms()?
-                .is_none_or(|deadline| deadline > not_after_unix_ms)
-        {
-            continue;
-        }
-        verify_latest_commit(transaction, &stored)?;
-        caller_dispatch_context::load(transaction, &stored.operation)?;
-        runtime_participant::verify_operation(transaction, &stored.operation)?;
-        governed_approval_claim::verify_stored_operation(transaction, &stored.operation)?;
-        dpop_claim::verify_stored_operation(transaction, &stored.operation)?;
-        if waits_for_live_nonce(transaction, &stored.operation, not_after_unix_ms)? {
-            continue;
-        }
-        operations.push(stored.operation);
-    }
-    Ok(operations)
-}
-
 /// Quiescent work must not occupy the bounded recovery page. Inspect the
 /// authenticated participant, not untrusted SQL expiry hints, before skipping
 /// it. Missing or corrupt ownership remains recoverable or fails closed.
-fn waits_for_live_nonce(
+pub(super) fn waits_for_live_nonce(
     transaction: &rusqlite::Transaction<'_>,
     operation: &AdmissionOperationV1,
     now_unix_ms: u64,

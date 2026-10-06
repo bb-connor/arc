@@ -567,6 +567,35 @@ mod settlement_routing_tests {
     }
 
     #[test]
+    fn protocol_refusal_never_seeds_claim_route_or_invokes_settlement(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let harness = recording_harness(
+            ClaimMode::Claim,
+            RouteMode::Contract,
+            HookBehavior::Accepted,
+        );
+        let (context, _) = super::session_reports::report_operation(&harness.kernel)?;
+        let summary = crate::ProtocolRefusalSummary::new(
+            crate::ProtocolRefusalReason::CapabilityNotMatched,
+            "tools/call",
+            Some("denied-target"),
+            crate::ProtocolRequestDigest::from_wire_bytes(b"denied-request"),
+        );
+        let receipt = harness
+            .kernel
+            .record_session_protocol_refusal(&context, &summary)?;
+        let state = harness.store.state();
+        assert_eq!(state.legacy_appends, 1);
+        assert_eq!(state.atomic_appends, 0);
+        assert_eq!(state.claim_calls, 0);
+        assert_eq!(state.route_calls, 0);
+        assert!(state.attempts.is_empty());
+        assert!(state.receipts.contains_key(&receipt.id));
+        assert_eq!(harness.hook.calls(), 0);
+        Ok(())
+    }
+
+    #[test]
     fn installed_runtime_seeds_before_claim_and_routes_after_the_receipt_is_queryable() {
         let harness = recording_harness(
             ClaimMode::Claim,

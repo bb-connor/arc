@@ -38,8 +38,9 @@ impl ChioKernel {
                 .map(|original| original.authority_profile()),
         )?;
         if &recovered_request_hash != admission.operation.binding().immutable_request_hash() {
-            return Err(KernelError::DurableAdmission(
-                "recovered post-return plan does not match durable admission".to_owned(),
+            return Err(super::super::recovery::failure::item_failure(
+                crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+                "recovered post-return plan does not match durable admission",
             ));
         }
         if let Some(reason) =

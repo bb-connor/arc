@@ -19,6 +19,9 @@ use chio_security_types::ports::{
 use chio_security_types::{ResponseEffectKind, ResponseTarget};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
+#[path = "capability_set_suspension/admission_lookup.rs"]
+mod admission_lookup;
+
 fn suspension_key(request: &EffectRequest) -> PortResult<CapabilitySetSuspensionKey> {
     let ResponseTarget::CapabilitySet { affected_set_hash } = &request.target else {
         return Err(PortError::invalid_data());
@@ -839,71 +842,7 @@ impl CapabilitySetSuspensionStore for SqliteSecurityStateStore {
         &self,
         query: &CapabilitySuspensionQuery,
     ) -> PortResult<CapabilitySuspensionDecision> {
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Deferred)
-            .map_err(sqlite_error)?;
-        let mut statement = transaction
-            .prepare_cached(
-                r#"
-                SELECT affected_set_hash
-                FROM security_capability_set_suspension_state
-                WHERE tenant_id = ?1
-                ORDER BY affected_set_hash
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        let rows = statement
-            .query_map(params![query.tenant_id.as_str()], |row| {
-                row.get::<_, Vec<u8>>(0)
-            })
-            .map_err(sqlite_error)?;
-        let mut keys = Vec::new();
-        for row in rows {
-            keys.push(CapabilitySetSuspensionKey {
-                tenant_id: query.tenant_id.clone(),
-                affected_set_hash: decode_digest(row.map_err(sqlite_error)?)?,
-            });
-        }
-        drop(statement);
-        let mut matches = Vec::new();
-        for key in keys {
-            let snapshot = load_snapshot(&transaction, &key)?;
-            for contribution in snapshot.contributions.as_slice() {
-                if contribution
-                    .affected_ids
-                    .as_slice()
-                    .binary_search(&query.capability_id)
-                    .is_ok()
-                {
-                    matches.push(CapabilitySetSuspensionMatch {
-                        affected_set_hash: key.affected_set_hash,
-                        action_id: contribution.action_id.clone(),
-                        effect_id: contribution.effect_id.clone(),
-                        contribution_hash: contribution.contribution_hash,
-                        expires_at_unix_ms: contribution.expires_at_unix_ms,
-                    });
-                }
-            }
-        }
-        matches.sort_by(|left, right| {
-            (&left.action_id, &left.effect_id, left.affected_set_hash).cmp(&(
-                &right.action_id,
-                &right.effect_id,
-                right.affected_set_hash,
-            ))
-        });
-        let active_matches = CapabilitySetSuspensionMatches::new(matches)
-            .map_err(|_| PortError::integrity_failure())?;
-        let decision = CapabilitySuspensionDecision {
-            tenant_id: query.tenant_id.clone(),
-            capability_id: query.capability_id.clone(),
-            denied: !active_matches.is_empty(),
-            active_matches,
-        };
-        validate_capability_suspension_decision(query, &decision)?;
-        transaction.commit().map_err(sqlite_error)?;
-        Ok(decision)
+        admission_lookup::evaluate(self, query)
     }
 
     fn load_capability_set_suspension_result(

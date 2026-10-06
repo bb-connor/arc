@@ -1,14 +1,21 @@
 // Session compliance certificate generation and verification.
 //
-// Walks the receipt log for a session, verifies signatures, chain
-// continuity, scope, budget, guard evidence, and delegation. Produces
-// a signed compliance certificate or aborts with a typed error.
+// Commits an ordered signed receipt set and explicitly configured tool-target,
+// guard and allowed-receipt-count checks. Authenticated corpus collection is an
+// independent reader boundary; snapshot references do not prove closed lifetimes.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::Signature;
 use chio_core::receipt::body::chio_receipt_id;
+
+#[path = "compliance/bundle.rs"]
+mod compliance_bundle;
+pub use compliance_bundle::{
+    ComplianceBundleError, ComplianceCheckStatus, ComplianceChecks, ComplianceCoverage,
+    ComplianceProfile, ComplianceToolTarget,
+};
 
 /// One-shot guard for the empty-`trusted_kernel_keys` warning.
 ///
@@ -42,35 +49,35 @@ fn warn_empty_compliance_trusted_keys_once() {
 #[derive(thiserror::Error)]
 pub enum ComplianceCertificateError {
     /// Trusted audit time or canonical serialization failed.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("{0}")]
     Audit(#[from] AcpAuditError),
     /// No receipts found for the given session.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:provenance-missing")]
     EmptySession(String),
 
     /// A receipt's Ed25519 signature is invalid.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     InvalidReceiptSignature {
         /// The receipt ID whose signature failed.
         receipt_id: String,
     },
 
     /// A receipt ID does not match the content-addressed receipt body.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     InvalidReceiptId {
         /// The receipt ID whose content-addressed identity failed.
         receipt_id: String,
     },
 
     /// A receipt action hash does not match the canonical action parameters.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     InvalidActionHash {
         /// The receipt ID whose action hash failed.
         receipt_id: String,
     },
 
     /// A receipt does not belong to the certificate's named session.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     SessionMismatch {
         /// The receipt ID whose session binding failed.
         receipt_id: String,
@@ -79,7 +86,7 @@ pub enum ComplianceCertificateError {
     },
 
     /// A receipt does not belong to the configured tenant.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     TenantMismatch {
         /// The receipt ID whose tenant binding failed.
         receipt_id: String,
@@ -88,14 +95,14 @@ pub enum ComplianceCertificateError {
     },
 
     /// A receipt carries an allow decision without authorization semantics.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     NonAuthorizingReceipt {
         /// The receipt ID whose semantics failed.
         receipt_id: String,
     },
 
     /// A receipt was signed by a kernel key outside the verifier trust set.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     UntrustedKernelKey {
         /// The receipt ID whose signer was not trusted.
         receipt_id: String,
@@ -103,8 +110,8 @@ pub enum ComplianceCertificateError {
         kernel_key: String,
     },
 
-    /// A gap or reordering was detected in the receipt chain.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    /// The selected receipt order went backwards or repeated an identity.
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     ChainDiscontinuity {
         /// The expected sequence number.
         expected: u64,
@@ -112,26 +119,26 @@ pub enum ComplianceCertificateError {
         found: u64,
     },
 
-    /// A receipt's scope exceeds the session's authorized scope.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    /// An allowed receipt falls outside configured tool targets or tool-name prefixes.
+    #[error("urn:chio:error:policy:decision-denied")]
     ScopeViolation {
         /// The receipt that violated scope.
         receipt_id: String,
-        /// The resource that was out of scope.
+        /// The tool name that failed the configured target/prefix check.
         resource: String,
     },
 
-    /// The session's invocation budget was exceeded.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    /// The configured allowed-mediated-receipt count ceiling was exceeded.
+    #[error("urn:chio:error:kernel:budget-exhausted")]
     BudgetExceeded {
-        /// Actual number of invocations observed.
+        /// Number of allowed mediated receipts, not actual dispatch or spend.
         used: u64,
         /// The configured budget limit.
         limit: u64,
     },
 
-    /// A guard was bypassed (no evidence recorded for a required guard).
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    /// A configured applicable guard lacks passing evidence or records a denial.
+    #[error("urn:chio:error:guard:denied")]
     GuardBypass {
         /// The guard that was expected to run.
         guard_name: String,
@@ -145,19 +152,52 @@ pub enum ComplianceCertificateError {
     /// mixes receipts from different kernels would produce a certificate
     /// whose `kernel_key` field misrepresents the signer for some receipts;
     /// fail closed.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     KernelKeyMismatch {
         /// The receipt whose kernel_key did not match the session's first receipt.
         receipt_id: String,
     },
 
+    /// Invalid or incomplete signed receipt-set data.
+    #[error("{0}")]
+    Bundle(#[from] ComplianceBundleError),
+
     /// Serialization error during certificate construction.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:signed-json-canonicalization")]
     Canonical(#[from] chio_core::error::Error),
 
     /// Signing error during certificate construction.
-    #[error("urn:chio:error:attest:receipt-signing-failed")]
+    #[error("urn:chio:error:attest:receipt-verification-failed")]
     SelfVerification,
+}
+
+impl ComplianceCertificateError {
+    /// Input-independent registered classification; the typed cause stays local.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Audit(AcpAuditError::Clock(error)) => error.code(),
+            Self::Canonical(_) => "urn:chio:error:attest:signed-json-canonicalization",
+            Self::Audit(AcpAuditError::Canonical(_) | AcpAuditError::Timestamp(_)) => {
+                "urn:chio:error:transport:invalid-request-shape"
+            }
+            Self::EmptySession(_) => "urn:chio:error:attest:provenance-missing",
+            Self::ScopeViolation { .. } => "urn:chio:error:policy:decision-denied",
+            Self::BudgetExceeded { .. } => "urn:chio:error:kernel:budget-exhausted",
+            Self::GuardBypass { .. } => "urn:chio:error:guard:denied",
+            Self::InvalidReceiptSignature { .. }
+            | Self::InvalidReceiptId { .. }
+            | Self::InvalidActionHash { .. }
+            | Self::SessionMismatch { .. }
+            | Self::TenantMismatch { .. }
+            | Self::NonAuthorizingReceipt { .. }
+            | Self::UntrustedKernelKey { .. }
+            | Self::ChainDiscontinuity { .. }
+            | Self::KernelKeyMismatch { .. }
+            | Self::SelfVerification
+            | Self::Bundle(_) => "urn:chio:error:attest:receipt-verification-failed",
+        }
+    }
 }
 
 impl std::fmt::Debug for ComplianceCertificateError {
@@ -171,20 +211,25 @@ impl std::fmt::Debug for ComplianceCertificateError {
 pub struct ComplianceReceiptEntry {
     /// The full signed receipt.
     pub receipt: ChioReceipt,
-    /// Sequence number in the receipt log.
+    /// Original global tool-receipt source identity. It is never renumbered.
     pub seq: u64,
+    /// Authenticated claim-log ordering, when collecting retained history.
+    pub entry_seq: Option<u64>,
 }
 
 /// Configuration for compliance certificate generation.
 #[derive(Debug, Default, Clone)]
 pub struct ComplianceConfig {
-    /// Maximum number of invocations allowed (0 = unlimited).
+    /// Allowed mediated receipt count ceiling (0 = not evaluated), not financial spend.
     pub budget_limit: u64,
-    /// Guard names that must appear in every receipt's evidence.
+    /// Guard names that must pass on every applicable allowed mediated receipt.
     pub required_guards: Vec<String>,
-    /// Authorized resource scopes (path prefixes).
+    /// Explicit legacy tool-name prefixes. These do not certify resource scopes.
     pub authorized_scopes: Vec<String>,
-    /// Expected tenant for all receipts. None disables tenant checking.
+    /// Exact server/tool identities. Combined with any configured legacy prefixes.
+    pub authorized_tool_targets: Vec<ComplianceToolTarget>,
+    /// Expected tenant for all receipts. None leaves that profile check unevaluated.
+    /// Every committed set must still contain one consistent tenant identity.
     pub expected_tenant_id: Option<String>,
     /// Trusted kernel keys allowed to sign receipts and certificates.
     ///
@@ -200,6 +245,7 @@ pub struct ComplianceConfig {
 
 /// The body of a compliance certificate (unsigned).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ComplianceCertificateBody {
     /// Schema identifier.
     pub schema: String,
@@ -215,22 +261,38 @@ pub struct ComplianceCertificateBody {
     pub last_receipt_at: u64,
     /// Whether all receipts passed signature verification.
     pub all_signatures_valid: bool,
-    /// Whether the receipt chain is continuous (no gaps).
+    /// Whether selected claim/source ordering is increasing; global gaps are legitimate.
     pub chain_continuous: bool,
-    /// Whether all receipts are within authorized scope.
+    /// Whether configured tool-target/prefix checks passed on applicable allowed receipts.
     pub scope_compliant: bool,
-    /// Whether the invocation budget was respected.
+    /// Whether the configured allowed-mediated-receipt ceiling passed, not financial spend.
     pub budget_compliant: bool,
-    /// Whether all required guards have evidence in every receipt.
+    /// Whether every configured guard passed on applicable allowed mediated receipts.
     pub guards_compliant: bool,
-    /// Summary of any anomalies detected (empty if fully compliant).
+    /// Integrity anomalies. Unconfigured check applicability is reported separately.
     pub anomalies: Vec<String>,
     /// The kernel public key that signed the session receipts.
     pub kernel_key: PublicKey,
+    /// Ordered, domain-separated commitment to every supplied signed receipt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_set_digest: Option<String>,
+    /// Commitment to the exact configured checks, independent of signing pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compliance_profile_digest: Option<String>,
+    /// Count of allowed mediated receipts, not actual dispatch or financial spend.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocation_count: Option<u64>,
+    /// Explicit check applicability; unconfigured checks are not claimed passed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checks: Option<ComplianceChecks>,
+    /// A supplied set or descriptive signed snapshot reference, not independent history proof.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<ComplianceCoverage>,
 }
 
 /// A signed compliance certificate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ComplianceCertificate {
     /// The unsigned body.
     pub body: ComplianceCertificateBody,
@@ -245,13 +307,26 @@ pub struct ComplianceCertificate {
 pub enum VerificationMode {
     /// Lightweight: verify certificate signature and body consistency only.
     Lightweight,
-    /// Full bundle: verify certificate + re-verify all receipt signatures.
+    /// Verify the exact positive committed v2 receipt set and configured profile.
     FullBundle,
+}
+
+/// The established verification boundary, independently of signed coverage assertions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CertificateVerificationScope {
+    Unverified,
+    SignatureAndBodyOnly,
+    CommittedReceiptSet,
+    /// Set only by private CLI orchestration after authenticated exact recollection.
+    AuthenticatedRetainedToolSnapshot,
 }
 
 /// Result of certificate verification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CertificateVerificationResult {
+    /// No corpus-authentication claim is inferred from deserialized coverage.
+    pub verification_scope: CertificateVerificationScope,
     /// Whether the certificate signature is valid.
     #[serde(alias = "certificateSignatureValid")]
     pub certificate_signature_valid: bool,
@@ -270,20 +345,44 @@ pub struct CertificateVerificationResult {
     pub summary: String,
 }
 
-pub const COMPLIANCE_CERTIFICATE_SCHEMA: &str = "chio.compliance.certificate.v1";
+pub const COMPLIANCE_CERTIFICATE_SCHEMA_V1: &str = "chio.compliance.certificate.v1";
+pub const COMPLIANCE_CERTIFICATE_SCHEMA: &str = "chio.compliance.certificate.v2";
+
+#[cfg(test)]
+#[path = "compliance/bundle_tests.rs"]
+mod compliance_bundle_tests;
 
 fn receipt_session_id(receipt: &ChioReceipt) -> Option<&str> {
-    let metadata = receipt.metadata.as_ref()?;
-    metadata
-        .get("acp")
-        .and_then(|acp| acp.get("sessionId"))
-        .and_then(serde_json::Value::as_str)
-        .or_else(|| {
-            metadata
-                .get("receipt_context")
-                .and_then(|context| context.get("session_id"))
-                .and_then(serde_json::Value::as_str)
-        })
+    let metadata = receipt.metadata.as_ref()?.as_object()?;
+    let mut selected = None;
+    for (namespace, key) in [
+        ("acp", "sessionId"),
+        ("receipt_context", "session_id"),
+        ("protocol_refusal", "session_id"),
+    ] {
+        let Some(value) = metadata.get(namespace) else {
+            continue;
+        };
+        let object = value.as_object()?;
+        if namespace == "protocol_refusal"
+            && object.get("schema").and_then(Value::as_str)
+                != Some("chio.session.protocol-refusal.v1")
+        {
+            return None;
+        }
+        let Some(value) = object.get(key) else {
+            continue;
+        };
+        let session = value.as_str()?;
+        if session.is_empty()
+            || session.trim() != session
+            || selected.is_some_and(|prior| prior != session)
+        {
+            return None;
+        }
+        selected = Some(session);
+    }
+    selected
 }
 
 fn validate_compliance_receipt(
@@ -353,11 +452,8 @@ fn validate_compliance_receipt(
     Ok(())
 }
 
-/// Generate a compliance certificate for the given session.
-///
-/// Walks all receipts, verifies signatures, checks chain continuity,
-/// scope, budget, and guard evidence. Any anomaly aborts with a typed
-/// error.
+/// Generate a certificate committing the complete supplied set and exact profile.
+/// The caller supplies the set; this API does not claim retained-history coverage.
 pub fn generate_compliance_certificate(
     session_id: &str,
     receipts: &[ComplianceReceiptEntry],
@@ -365,217 +461,176 @@ pub fn generate_compliance_certificate(
     keypair: &Keypair,
     clock: &AcpClock,
 ) -> Result<ComplianceCertificate, ComplianceCertificateError> {
-    // 1. Empty session check.
+    generate_compliance_certificate_with_coverage(
+        session_id,
+        receipts,
+        config,
+        keypair,
+        clock,
+        ComplianceCoverage::SuppliedReceiptSet,
+    )
+}
+
+/// Bind a descriptive signed snapshot reference alongside the supplied set.
+/// This portable API does not authenticate whole-corpus completeness from metadata.
+/// The CLI obtains that guarantee by collecting and comparing the sealed reader result.
+pub fn generate_compliance_certificate_with_coverage(
+    session_id: &str,
+    receipts: &[ComplianceReceiptEntry],
+    config: &ComplianceConfig,
+    keypair: &Keypair,
+    clock: &AcpClock,
+    coverage: ComplianceCoverage,
+) -> Result<ComplianceCertificate, ComplianceCertificateError> {
+    if session_id.len() > 1024 {
+        return Err(ComplianceBundleError::CapacityExceeded.into());
+    }
+    // Preserve the empty-session diagnostic before reading time.
     if receipts.is_empty() {
         return Err(ComplianceCertificateError::EmptySession(
-            session_id.to_string(),
+            session_id.to_owned(),
         ));
     }
-
-    // 2. Verify all receipt authority signals.
-    for entry in receipts {
-        validate_compliance_receipt(session_id, entry, config)?;
-    }
-
-    // 3. Check chain continuity.
-    for i in 1..receipts.len() {
-        let expected = receipts[i - 1]
-            .seq
-            .checked_add(1)
-            .ok_or(AcpAuditError::Clock(
-                chio_security_types::clock::ClockError::Overflow,
-            ))?;
-        let found = receipts[i].seq;
-        if found != expected {
-            return Err(ComplianceCertificateError::ChainDiscontinuity { expected, found });
-        }
-    }
-
-    // 4. Check scope compliance.
-    if !config.authorized_scopes.is_empty() {
-        for entry in receipts {
-            let resource = &entry.receipt.tool_name;
-            let in_scope = config
-                .authorized_scopes
-                .iter()
-                .any(|scope| resource.starts_with(scope.as_str()));
-            if !in_scope {
-                return Err(ComplianceCertificateError::ScopeViolation {
-                    receipt_id: entry.receipt.id.clone(),
-                    resource: resource.clone(),
-                });
-            }
-        }
-    }
-
-    // 5. Check budget.
-    let invocation_count = receipts.len() as u64;
-    if config.budget_limit > 0 && invocation_count > config.budget_limit {
-        return Err(ComplianceCertificateError::BudgetExceeded {
-            used: invocation_count,
-            limit: config.budget_limit,
-        });
-    }
-
-    // 6. Check guard evidence.
-    for guard_name in &config.required_guards {
-        for entry in receipts {
-            let has_evidence = entry
-                .receipt
-                .evidence
-                .iter()
-                .any(|ev| &ev.guard_name == guard_name);
-            if !has_evidence {
-                return Err(ComplianceCertificateError::GuardBypass {
-                    guard_name: guard_name.clone(),
-                    receipt_id: entry.receipt.id.clone(),
-                });
-            }
-        }
-    }
-
-    // 7. Cross-check that all receipts share the same kernel key.
-    //
-    // The certificate body records a single `kernel_key`. Without this check,
-    // a session that mixed receipts from different kernels would still be
-    // certified, masking the mismatch under the first receipt's key.
-    if let Some(first_entry) = receipts.first() {
-        let session_kernel_key = &first_entry.receipt.kernel_key;
-        for entry in receipts.iter().skip(1) {
-            if &entry.receipt.kernel_key != session_kernel_key {
-                return Err(ComplianceCertificateError::KernelKeyMismatch {
-                    receipt_id: entry.receipt.id.clone(),
-                });
-            }
-        }
-    }
-
-    // All checks passed -- build the certificate.
-    let first_ts = receipts.first().map(|e| e.receipt.timestamp).unwrap_or(0);
-    let last_ts = receipts.last().map(|e| e.receipt.timestamp).unwrap_or(0);
-
-    let kernel_key = receipts
-        .first()
-        .map(|e| e.receipt.kernel_key.clone())
-        .unwrap_or_else(|| keypair.public_key());
-
     let now = clock.seconds()?;
-    if receipts.iter().any(|entry| entry.receipt.timestamp > now) {
-        return Err(
-            AcpAuditError::Clock(chio_security_types::clock::ClockError::NotYetValid).into(),
-        );
+    let summary = compliance_bundle::validate_set(session_id, receipts, config, now, &coverage)?;
+    if keypair.public_key() != summary.kernel_key {
+        return Err(ComplianceCertificateError::SelfVerification);
     }
-
     let body = ComplianceCertificateBody {
-        schema: COMPLIANCE_CERTIFICATE_SCHEMA.to_string(),
-        session_id: session_id.to_string(),
+        schema: COMPLIANCE_CERTIFICATE_SCHEMA.to_owned(),
+        session_id: session_id.to_owned(),
         issued_at: now,
-        receipt_count: invocation_count,
-        first_receipt_at: first_ts,
-        last_receipt_at: last_ts,
+        receipt_count: summary.receipt_count,
+        first_receipt_at: summary.first_receipt_at,
+        last_receipt_at: summary.last_receipt_at,
         all_signatures_valid: true,
+        // v2 continuity means the committed selected order, not global adjacency.
         chain_continuous: true,
-        scope_compliant: true,
-        budget_compliant: true,
-        guards_compliant: true,
+        scope_compliant: summary.checks.tool_targets == ComplianceCheckStatus::Passed,
+        budget_compliant: summary.checks.allowed_mediated_receipt_limit
+            == ComplianceCheckStatus::Passed,
+        guards_compliant: summary.checks.required_guards == ComplianceCheckStatus::Passed,
         anomalies: Vec::new(),
-        kernel_key,
+        kernel_key: summary.kernel_key,
+        receipt_set_digest: Some(summary.receipt_set_digest),
+        compliance_profile_digest: Some(summary.profile_digest),
+        invocation_count: Some(summary.invocation_count),
+        checks: Some(summary.checks),
+        coverage: Some(coverage),
     };
-
-    let body_bytes = canonical_json_bytes(&body).map_err(ComplianceCertificateError::Canonical)?;
+    compliance_bundle::preflight_body(&body)?;
+    let body_bytes = canonical_json_bytes(&body)?;
     let signature = keypair.sign(&body_bytes);
-
     let certificate = ComplianceCertificate {
         body,
         signer_key: keypair.public_key(),
         signature,
     };
-
-    // Self-verify before returning. If the caller's keypair does not
-    // match the kernel key recorded on the receipts (or the trust set
-    // does not include this signer), the certificate would silently be
-    // unverifiable. Fail closed here so generation never hands back a
-    // certificate that the matching verifier would reject.
-    //
-    // Trust-set independence: if the operator's `trusted_kernel_keys`
-    // set is empty (a misconfiguration covered by the empty-set warning
-    // elsewhere in this module), the signer-trust check below would
-    // reject every otherwise-valid certificate. To keep self-verify
-    // robust against that operator misconfiguration, augment the trust
-    // set with the certificate's own signer and the receipts' kernel
-    // key for the purpose of this check only.
-    let mut self_verify_config = config.clone();
-    self_verify_config
-        .trusted_kernel_keys
-        .insert(certificate.signer_key.to_hex());
-    self_verify_config
-        .trusted_kernel_keys
-        .insert(certificate.body.kernel_key.to_hex());
-    let self_verification = verify_compliance_certificate(
+    if !verify_compliance_certificate_at_time(
         &certificate,
         VerificationMode::Lightweight,
         None,
-        &self_verify_config,
-    );
-    if !self_verification.passed {
+        config,
+        now,
+    )
+    .passed
+    {
         return Err(ComplianceCertificateError::SelfVerification);
     }
-
     Ok(certificate)
 }
 
-/// Verify a compliance certificate.
+/// Verify signature/body only or the exact committed v2 receipt set.
 pub fn verify_compliance_certificate(
     cert: &ComplianceCertificate,
     mode: VerificationMode,
     receipts: Option<&[ComplianceReceiptEntry]>,
     config: &ComplianceConfig,
 ) -> CertificateVerificationResult {
-    // 1. Verify certificate signature.
+    verify_compliance_certificate_with_clock(cert, mode, receipts, config, &AcpClock::default())
+}
+
+/// Verify issuance bounds against an explicit trusted authority clock.
+pub fn verify_compliance_certificate_with_clock(
+    cert: &ComplianceCertificate,
+    mode: VerificationMode,
+    receipts: Option<&[ComplianceReceiptEntry]>,
+    config: &ComplianceConfig,
+    clock: &AcpClock,
+) -> CertificateVerificationResult {
+    match clock.seconds() {
+        Ok(now) => verify_compliance_certificate_at_time(cert, mode, receipts, config, now),
+        Err(error) => CertificateVerificationResult {
+            verification_scope: CertificateVerificationScope::Unverified,
+            certificate_signature_valid: false,
+            body_consistent: false,
+            receipts_reverified: 0,
+            receipt_failures: 0,
+            passed: false,
+            summary: format!("certificate trusted-time verification unavailable: {error}"),
+        },
+    }
+}
+
+fn verify_compliance_certificate_at_time(
+    cert: &ComplianceCertificate,
+    mode: VerificationMode,
+    receipts: Option<&[ComplianceReceiptEntry]>,
+    config: &ComplianceConfig,
+    now: u64,
+) -> CertificateVerificationResult {
+    if compliance_bundle::preflight_certificate(cert).is_err() {
+        return CertificateVerificationResult {
+            verification_scope: CertificateVerificationScope::Unverified,
+            certificate_signature_valid: false,
+            body_consistent: false,
+            receipts_reverified: 0,
+            receipt_failures: 0,
+            passed: false,
+            summary: ComplianceBundleError::CapacityExceeded.reason().into(),
+        };
+    }
     let body_bytes = match canonical_json_bytes(&cert.body) {
-        Ok(b) => b,
+        Ok(bytes) => bytes,
         Err(_) => {
             return CertificateVerificationResult {
+                verification_scope: CertificateVerificationScope::Unverified,
                 certificate_signature_valid: false,
                 body_consistent: false,
                 receipts_reverified: 0,
                 receipt_failures: 0,
                 passed: false,
-                summary: "failed to serialize certificate body for verification".to_string(),
-            };
+                summary: "failed to serialize certificate body for verification".into(),
+            }
         }
     };
-
-    let sig_valid = cert.signer_key.verify(&body_bytes, &cert.signature);
+    let sig_valid = cert.signer_key.verify_strict(&body_bytes, &cert.signature);
     let signer_trusted = config
         .trusted_kernel_keys
         .contains(&cert.signer_key.to_hex());
     let signer_matches_body = cert.signer_key == cert.body.kernel_key;
-
-    // 2. Body consistency checks. `body_ok_excluding_signer_match` lets the
-    // failure summary distinguish a body that is broken in some way OTHER
-    // than signer-vs-body mismatch from one whose only fault is the mismatch.
-    // Without that split, every signer-mismatch failure also tripped the
-    // generic "body consistency check failed" reason, producing a redundant
-    // entry that obscured the underlying cause.
-    let body_ok_excluding_signer_match = cert.body.all_signatures_valid
-        && cert.body.schema == COMPLIANCE_CERTIFICATE_SCHEMA
-        && cert.body.chain_continuous
-        && cert.body.scope_compliant
-        && cert.body.budget_compliant
-        && cert.body.guards_compliant
-        && cert.body.anomalies.is_empty();
+    let legacy = cert.body.schema == COMPLIANCE_CERTIFICATE_SCHEMA_V1;
+    let body_ok_excluding_signer_match = certificate_body_consistent(cert, now);
     let body_ok = body_ok_excluding_signer_match && signer_matches_body;
-
-    if mode == VerificationMode::Lightweight || receipts.is_none() {
+    if mode == VerificationMode::Lightweight {
+        let passed = sig_valid && signer_trusted && body_ok;
         return CertificateVerificationResult {
+            verification_scope: if passed {
+                CertificateVerificationScope::SignatureAndBodyOnly
+            } else {
+                CertificateVerificationScope::Unverified
+            },
             certificate_signature_valid: sig_valid,
             body_consistent: body_ok,
             receipts_reverified: 0,
             receipt_failures: 0,
-            passed: sig_valid && signer_trusted && body_ok,
-            summary: if sig_valid && signer_trusted && body_ok {
-                "lightweight verification passed".to_string()
+            passed,
+            summary: if passed {
+                if legacy {
+                    "legacy lightweight signature/body assertions verified; receipt set, history and compliance checks not reverified".into()
+                } else {
+                    "lightweight signature/body verification passed; receipt set, history and compliance checks not reverified".into()
+                }
             } else {
                 verification_failure_summary(
                     sig_valid,
@@ -587,38 +642,141 @@ pub fn verify_compliance_certificate(
             },
         };
     }
-
-    // 3. Full-bundle mode: re-verify all receipt authority signals.
-    let receipt_entries = receipts.unwrap_or(&[]);
-    let mut reverified: u64 = 0;
-    let mut failures: u64 = 0;
-
-    for entry in receipt_entries {
-        reverified += 1;
-        if validate_compliance_receipt(&cert.body.session_id, entry, config).is_err() {
-            failures += 1;
-        }
+    let Some(entries) = receipts.filter(|entries| !entries.is_empty()) else {
+        return CertificateVerificationResult {
+            verification_scope: CertificateVerificationScope::Unverified,
+            certificate_signature_valid: sig_valid,
+            body_consistent: false,
+            receipts_reverified: 0,
+            receipt_failures: 0,
+            passed: false,
+            summary: "full-bundle verification requires a nonempty receipt set".into(),
+        };
+    };
+    if legacy || cert.body.coverage.is_none() || entries.len() > 100_000 {
+        return CertificateVerificationResult {
+            verification_scope: CertificateVerificationScope::Unverified,
+            certificate_signature_valid: sig_valid,
+            body_consistent: false,
+            receipts_reverified: 0,
+            receipt_failures: 0,
+            passed: false,
+            summary: ComplianceBundleError::MissingCommitment.reason().into(),
+        };
     }
-
-    let passed = sig_valid && signer_trusted && body_ok && failures == 0;
+    let mut report = compliance_bundle::ReceiptVerificationReport::default();
+    let validation = cert
+        .body
+        .coverage
+        .as_ref()
+        .ok_or(ComplianceBundleError::MissingCommitment)
+        .map_err(ComplianceCertificateError::from)
+        .and_then(|coverage| {
+            compliance_bundle::validate_set_with_report(
+                &cert.body.session_id,
+                entries,
+                config,
+                cert.body.issued_at,
+                coverage,
+                &mut report,
+            )
+        })
+        .and_then(|summary| {
+            if cert.body.receipt_count != summary.receipt_count
+                || cert.body.invocation_count != Some(summary.invocation_count)
+            {
+                return Err(ComplianceBundleError::CountMismatch.into());
+            }
+            if cert.body.receipt_set_digest.as_deref() != Some(summary.receipt_set_digest.as_str())
+            {
+                return Err(ComplianceBundleError::MissingCommitment.into());
+            }
+            if cert.body.compliance_profile_digest.as_deref()
+                != Some(summary.profile_digest.as_str())
+                || cert.body.checks.as_ref() != Some(&summary.checks)
+            {
+                return Err(ComplianceBundleError::ProfileMismatch.into());
+            }
+            if cert.body.kernel_key != summary.kernel_key
+                || cert.body.first_receipt_at != summary.first_receipt_at
+                || cert.body.last_receipt_at != summary.last_receipt_at
+            {
+                return Err(ComplianceBundleError::TimeMismatch.into());
+            }
+            Ok(())
+        });
+    let reverified = report.reverified;
+    let failures = report.failures;
+    let passed = sig_valid && signer_trusted && body_ok && failures == 0 && validation.is_ok();
+    let summary = if passed {
+        format!("full committed receipt-set integrity verified ({reverified} receipts); signed snapshot references do not independently verify retained corpus completeness or session closure")
+    } else {
+        let mut reason = verification_failure_summary(
+            sig_valid,
+            signer_trusted,
+            body_ok_excluding_signer_match,
+            signer_matches_body,
+            failures,
+        );
+        if let Err(error) = &validation {
+            if let ComplianceCertificateError::Bundle(error) = error {
+                reason.push_str("; ");
+                reason.push_str(error.reason());
+            } else {
+                reason.push_str("; configured receipt-set checks failed");
+            }
+        }
+        reason
+    };
     CertificateVerificationResult {
+        verification_scope: if passed {
+            CertificateVerificationScope::CommittedReceiptSet
+        } else {
+            CertificateVerificationScope::Unverified
+        },
         certificate_signature_valid: sig_valid,
-        body_consistent: body_ok,
+        body_consistent: body_ok && validation.is_ok(),
         receipts_reverified: reverified,
         receipt_failures: failures,
         passed,
-        summary: if passed {
-            format!("full-bundle verification passed ({reverified} receipts re-verified)")
-        } else {
-            verification_failure_summary(
-                sig_valid,
-                signer_trusted,
-                body_ok_excluding_signer_match,
-                signer_matches_body,
-                failures,
-            )
-        },
+        summary,
     }
+}
+
+fn certificate_body_consistent(cert: &ComplianceCertificate, now: u64) -> bool {
+    let body = &cert.body;
+    if !body.all_signatures_valid
+        || !body.chain_continuous
+        || !body.anomalies.is_empty()
+        || body.receipt_count == 0
+        || body.first_receipt_at > body.last_receipt_at
+        || body.last_receipt_at > body.issued_at
+        || body.issued_at > now
+    {
+        return false;
+    }
+    if body.schema == COMPLIANCE_CERTIFICATE_SCHEMA_V1 {
+        return body.scope_compliant && body.budget_compliant && body.guards_compliant;
+    }
+    if body.schema != COMPLIANCE_CERTIFICATE_SCHEMA
+        || !compliance_bundle::valid_digest(body.receipt_set_digest.as_deref())
+        || !compliance_bundle::valid_digest(body.compliance_profile_digest.as_deref())
+        || body
+            .invocation_count
+            .is_none_or(|count| count > body.receipt_count)
+    {
+        return false;
+    }
+    let (Some(checks), Some(coverage)) = (&body.checks, &body.coverage) else {
+        return false;
+    };
+    body.scope_compliant == (checks.tool_targets == ComplianceCheckStatus::Passed)
+        && body.guards_compliant == (checks.required_guards == ComplianceCheckStatus::Passed)
+        && body.budget_compliant
+            == (checks.allowed_mediated_receipt_limit == ComplianceCheckStatus::Passed)
+        && coverage
+            .validate(&body.session_id, &[], &body.kernel_key, body.issued_at)
+            .is_ok()
 }
 
 /// Build a human-readable reason list for a failed certificate verification.
@@ -654,5 +812,9 @@ fn verification_failure_summary(
             "{receipt_failures} receipt authority check(s) failed"
         ));
     }
-    format!("verification failed: {}", reasons.join(", "))
+    if reasons.is_empty() {
+        "verification failed".into()
+    } else {
+        format!("verification failed: {}", reasons.join(", "))
+    }
 }

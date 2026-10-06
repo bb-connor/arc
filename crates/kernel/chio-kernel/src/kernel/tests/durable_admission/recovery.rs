@@ -173,24 +173,41 @@ fn admission_receipt_reconciliation_heals_a_crash_gap_before_serving() {
 }
 
 #[test]
-fn failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch() {
+fn failed_tool_return_persistence_terminalizes_unknown_and_blocks_redispatch() {
     let (kernel, request, store, invocations) =
         durable_admission_fixture("durable-return-write-failure");
     store.fail_next_outcome_write();
 
-    let error = kernel
+    let denied = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect_err("tool return journal failure must fail closed");
-    assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason)
-            if reason.contains("injected tool outcome write failure")
-    ));
+        .expect("unrecordable committed return yields a signed denial");
+    assert_eq!(denied.verdict, Verdict::Deny);
+    assert!(denied.output.is_none());
+    assert!(denied
+        .reason
+        .as_deref()
+        .is_some_and(|reason| { reason.contains("injected tool outcome write failure") }));
+    assert!(denied.receipt.verify_signature().expect("signed response"));
     assert_eq!(
         store.operation().state(),
-        AdmissionOperationState::DispatchCommitted
+        AdmissionOperationState::OutcomeUnknownAfterDispatch
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    let usage = store
+        .budget
+        .get_usage(&request.capability.id, 0)
+        .expect("committed quota remains readable")
+        .expect("committed quota remains retained");
+    assert_eq!(
+        usage.invocation_count, 1,
+        "unknown return cannot refund an effect"
+    );
+    assert!(store
+        .state
+        .lock()
+        .expect("outcome state")
+        .raw_outcome
+        .is_none());
     let receipt_log = kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
     let failure_receipt = receipt_log.get(0).expect("tool return failure receipt");
@@ -204,7 +221,7 @@ fn failed_tool_return_persistence_retains_dispatch_and_blocks_redispatch() {
     assert!(replay
         .reason
         .as_deref()
-        .is_some_and(|reason| reason.contains("DispatchCommitted")));
+        .is_some_and(|reason| reason.contains("OutcomeUnknownAfterDispatch")));
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
 }
 

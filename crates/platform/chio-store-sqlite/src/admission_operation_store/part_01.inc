@@ -434,56 +434,16 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
         kind: AdmissionOperationKind,
         limit: usize,
     ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let limit = i64::try_from(limit).map_err(|_| {
-            AdmissionOperationError::Overflow(
-                "prioritized admission recovery limit exceeds i64".to_string(),
-            )
-        })?;
-        let connection = self.connection()?;
-        let mut statement = connection
-            .prepare(
-                r#"
-                SELECT operation.operation_id
-                FROM admission_operations AS operation
-                LEFT JOIN admission_cleanup_actions AS handoff
-                  ON handoff.operation_id = operation.operation_id
-                 AND handoff.kind = 'caller_reservation_handoff'
-                WHERE operation.kind = ?1
-                  AND operation.state NOT IN (
-                    'completed',
-                    'compensated_before_dispatch',
-                    'outcome_unknown_after_dispatch'
-                  )
-                ORDER BY CASE
-                    WHEN operation.state != 'caller_reserved' THEN 0
-                    WHEN handoff.state IS NULL OR handoff.state != 'completed' THEN 1
-                    ELSE 2
-                  END ASC,
-                  operation.updated_at ASC,
-                  operation.operation_id ASC
-                LIMIT ?2
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        let operation_ids = statement
-            .query_map(params![kind.as_str(), limit], |row| row.get::<_, String>(0))
-            .map_err(sqlite_error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(sqlite_error)?;
-        operation_ids
-            .into_iter()
-            .map(|operation_id| {
-                load_operation(&connection, &operation_id)?.ok_or_else(|| {
-                    AdmissionOperationError::Unavailable(
-                        "admission operation disappeared during prioritized recovery inventory"
-                            .to_string(),
-                    )
-                })
-            })
-            .collect()
+        self.recovery_candidates_legacy(kind, limit)
+    }
+
+    fn list_admission_recovery_candidates_page(
+        &self,
+        kind: AdmissionOperationKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
+        self.recovery_candidates_page(kind, after_operation_id, limit)
     }
 
     fn list_caller_reservation_reap_candidates(
@@ -1003,6 +963,15 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
             operation_ids.push(row.map_err(sqlite_error)?);
         }
         Ok(operation_ids)
+    }
+
+    fn list_compensated_with_pending_cleanup_page(
+        &self,
+        kind: Option<AdmissionOperationKind>,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        self.compensation_cleanup_page(kind, after_operation_id, limit)
     }
 
     fn list_operations_with_pending_cleanup_action(

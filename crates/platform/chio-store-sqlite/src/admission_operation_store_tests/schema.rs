@@ -2,7 +2,7 @@ use super::*;
 
 #[path = "schema/caller_wait.rs"]
 mod caller_wait;
-pub(super) use caller_wait::remove_caller_wait_state;
+pub(super) use caller_wait::{remove_caller_wait_state, remove_empty_checkpoint_catalog};
 
 struct SqlObligationHead {
     obligation_id: String,

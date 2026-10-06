@@ -1,3 +1,4 @@
+#[cfg(test)]
 use super::framing::read_jsonrpc_frame;
 use super::*;
 
@@ -31,8 +32,7 @@ pub(super) use self::envelope::{
 };
 pub(super) use self::messaging::{
     cancellation_matches_client_request, cancellation_matches_request, cancellation_reason,
-    explicit_task_cancel_reason, next_client_message, pump_channel_messages, pump_client_messages,
-    task_cancel_matches_related_task,
+    explicit_task_cancel_reason, task_cancel_matches_related_task,
 };
 pub(super) use self::metadata::{
     attach_execution_nonce_meta_to_result, attach_related_task_meta_to_message,
@@ -46,9 +46,11 @@ pub(super) use self::parsing::{
     parse_request_extra_metadata, parse_request_governed_intent, parse_request_model_metadata,
     parse_request_stable_request_id, parse_request_supplemental_authorization, parse_task_id,
 };
+#[cfg(test)]
+pub(super) use self::response::read_jsonrpc_line;
 pub(super) use self::response::{
     adapter_jsonrpc_error, jsonrpc_error, jsonrpc_error_with_data, jsonrpc_result,
-    queue_progress_notification, read_jsonrpc_line, write_jsonrpc_line,
+    queue_progress_notification, write_jsonrpc_line,
 };
 pub(super) use self::serialization::{
     paginate_named_response, paginate_response, serialize_prompts, serialize_resource_contents,
@@ -63,7 +65,10 @@ pub(super) use self::tool_results::{
 };
 
 #[cfg(test)]
-pub(super) use self::messaging::is_cancellation_side_channel_signal;
+pub(super) use self::messaging::{
+    is_cancellation_side_channel_signal, next_client_message, pump_channel_messages,
+    pump_client_messages,
+};
 
 #[cfg(test)]
 #[path = "protocol/tests.rs"]

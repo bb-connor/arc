@@ -396,11 +396,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         max_lines=7_501,
         max_fragments=3,
     ),
-    "crates/platform/chio-store-sqlite/src/budget_store/composite_schema.rs": allow(
-        "2026-11-30",
-        "durable composite budget schema and migration surface; capped to current size until split",
-        max_lines=2_058,
-    ),
     "crates/platform/chio-store-sqlite/src/finding_market_store.rs": allow(
         "2026-11-30",
         "cognition finding market authority store with atomic status and sales-blocked participation fences; capped to current size until split",

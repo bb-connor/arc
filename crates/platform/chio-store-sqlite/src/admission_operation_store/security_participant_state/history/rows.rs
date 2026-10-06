@@ -37,6 +37,7 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
     initialization: &SecurityParticipantStateInitialization,
 ) -> Result<(), AdmissionOperationStoreError> {
     let authority = initialization.authority.as_str();
+    let checkpoint = super::super::checkpoint::latest(connection, authority)?;
     let head = super::head(connection, authority)?;
     let egress = super::super::egress::exists(connection)?
         && super::super::egress::head(connection, authority)? != 0;
@@ -44,30 +45,41 @@ pub(in crate::admission_operation_store::security_participant_state) fn verify_r
         && super::super::output::head(connection, authority)? != 0;
     let nonce_preflight = super::super::nonce_preflight::exists(connection)?
         && super::super::nonce_preflight::head(connection, authority)? != 0;
-    if head == 1 && !egress && !output && !nonce_preflight {
+    if checkpoint.is_none() && head == 1 && !egress && !output && !nonce_preflight {
         return super::super::storage::verify_rows(connection, source);
     }
     let mut inventory = Inventory::new();
-    let mut statement = connection
-        .prepare(
-            "SELECT table_name, canonical_row FROM security_participant_migration_rows
+    if let Some(checkpoint) = &checkpoint {
+        super::super::checkpoint::visit_rows(connection, checkpoint, |table, bytes| {
+            apply_image(
+                &mut inventory,
+                table,
+                std::str::from_utf8(bytes).map_err(invalid)?,
+                true,
+            )
+        })?;
+    } else {
+        let mut statement = connection
+            .prepare(
+                "SELECT table_name, canonical_row FROM security_participant_migration_rows
          WHERE security_authority_id = ?1 ORDER BY table_name, row_index",
-        )
-        .map_err(sqlite_error)?;
-    let mut rows = statement.query([authority]).map_err(sqlite_error)?;
-    while let Some(row) = rows.next().map_err(sqlite_error)? {
-        let table: String = row.get(0).map_err(sqlite_error)?;
-        let bytes = row
-            .get_ref(1)
-            .map_err(sqlite_error)?
-            .as_blob()
-            .map_err(invalid)?;
-        apply_image(
-            &mut inventory,
-            &table,
-            std::str::from_utf8(bytes).map_err(invalid)?,
-            true,
-        )?;
+            )
+            .map_err(sqlite_error)?;
+        let mut rows = statement.query([authority]).map_err(sqlite_error)?;
+        while let Some(row) = rows.next().map_err(sqlite_error)? {
+            let table: String = row.get(0).map_err(sqlite_error)?;
+            let bytes = row
+                .get_ref(1)
+                .map_err(sqlite_error)?
+                .as_blob()
+                .map_err(invalid)?;
+            apply_image(
+                &mut inventory,
+                &table,
+                std::str::from_utf8(bytes).map_err(invalid)?,
+                true,
+            )?;
+        }
     }
     super::ordered::visit(connection, initialization, |event| {
         for change in event.changes() {

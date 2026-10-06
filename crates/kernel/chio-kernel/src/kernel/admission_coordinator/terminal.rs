@@ -3,17 +3,50 @@ use serde::Serialize;
 use super::*;
 use crate::finding_denial::{record_finding_denial, FindingDenial};
 use crate::kernel::delivery_contract;
+#[path = "terminal/publication_release.rs"]
+mod publication_release;
+use publication_release::TerminalPublicationInput;
+#[path = "terminal/record_return.rs"]
+mod record_return;
 
 #[path = "terminal_payment.rs"]
 mod payment;
 use payment::DurablePaymentSettlementInput;
 
+#[path = "terminal/payment_pricing.rs"]
+mod payment_pricing;
+use payment_pricing::{DurablePaymentDispositionInput, DurablePaymentPricing};
+#[path = "terminal/resolved_snapshot.rs"]
+mod resolved_snapshot;
+use resolved_snapshot::DurableTerminalSnapshot;
+
 #[path = "terminal/evaluation_contract.rs"]
 mod evaluation_contract;
 
+#[path = "terminal/compacted_replay.rs"]
+mod compacted_replay;
+#[path = "terminal/financial_receipt.rs"]
+mod financial_receipt;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DurableReturnOrigin {
+    Observed,
+    Retained,
+}
+
 pub(crate) struct DurableToolReturn {
+    origin: DurableReturnOrigin,
     raw: RawInvocationOutcomeV1,
     outcome: ToolOutcomeRecordV1,
+}
+
+enum RetainedDurableToolReturn {
+    Present(Box<DurableToolReturn>),
+    Compacted {
+        outcome: Box<ToolOutcomeRecordV1>,
+        digest: AdmissionDigest,
+        size_bytes: u64,
+    },
 }
 
 impl DurableToolReturn {
@@ -139,208 +172,29 @@ impl ChioKernel {
         Ok(())
     }
 
-    pub(crate) fn record_durable_tool_return(
-        &self,
-        admission: &mut DurableToolAdmission,
-        input: DurableToolReturnInput<'_>,
-    ) -> Result<DurableToolReturn, KernelError> {
-        let DurableToolReturnInput {
-            request,
-            output,
-            reported_cost,
-            context,
-            elapsed,
-            trusted_now_unix_ms,
-        } = input;
-        context.validate_binding(admission, request)?;
-        let matched_grant_index = context.matched_grant_index;
-        let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
-        self.validate_guarded_output(request, matched_grant_index, output, false)?;
-        let runtime = self.durable_runtime()?;
-        let _mutation_guard = runtime.lock_mutations()?;
-        let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
-        if !matches!(
-            admission.operation.state(),
-            AdmissionOperationState::DispatchCommitted
-                | AdmissionOperationState::AwaitingCallerReport
-        ) {
-            return Err(KernelError::DurableAdmission(format!(
-                "tool return cannot be recorded from state {:?}",
-                admission.operation.state()
-            )));
-        }
-        let provider_attempt =
-            admission
-                .operation
-                .provider_attempt()
-                .cloned()
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "durable tool return has no registered provider attempt".to_owned(),
-                    )
-                })?;
-        let invocation_output = match output {
-            ToolServerOutput::Value(value) => InvocationOutputV1::Value {
-                value: value.clone(),
-            },
-            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
-                InvocationOutputV1::CompleteStream {
-                    chunks: stream
-                        .chunks
-                        .iter()
-                        .map(|chunk| chunk.data.clone())
-                        .collect(),
-                }
-            }
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
-                InvocationOutputV1::IncompleteStream {
-                    chunks: stream
-                        .chunks
-                        .iter()
-                        .map(|chunk| chunk.data.clone())
-                        .collect(),
-                    reason: reason.clone(),
-                }
-            }
-        };
-        let elapsed_millis = u64::try_from(elapsed.as_millis())
-            .unwrap_or(I_JSON_MAX_SAFE_INTEGER)
-            .min(I_JSON_MAX_SAFE_INTEGER);
-        let matched_grant_index_usize = matched_grant_index;
-        let matched_grant_index = u64::try_from(matched_grant_index_usize)
-            .ok()
-            .filter(|index| *index <= I_JSON_MAX_SAFE_INTEGER)
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("matched grant index is not I-JSON safe".to_owned())
-            })?;
-        let stream_limits = context.stream_limits;
-        // This is an observation of the completed read, not an admission fact.
-        let memory_read_metadata = match crate::memory_provenance::classify_memory_action(
-            &request.tool_name,
-            &request.arguments,
-        ) {
-            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => {
-                self.resolve_memory_read_provenance_metadata(&store, &key)
-            }
-            _ => None,
-        };
-        let receipt_metadata_snapshot =
-            context.metadata_with_return_observation(memory_read_metadata);
-        let transport_terminal_evidence_digest = admission_digest(
-            "transport_terminal_evidence_digest",
-            &LocalToolReturnEvidence {
-                schema: "chio.local-tool-return-evidence.v1",
-                operation_id: admission.operation_id(),
-                provider_attempt: &provider_attempt,
-                matched_grant_index,
-                elapsed_millis,
-                stream_limits,
-                output: &invocation_output,
-                reported_cost: &reported_cost,
-                receipt_metadata_snapshot: &receipt_metadata_snapshot,
-                pre_invocation_guard_evidence,
-            },
-        )?;
-        let monetary_cost =
-            reported_cost
-                .as_ref()
-                .map(|cost| chio_core::capability::scope::MonetaryAmount {
-                    units: cost.units,
-                    currency: cost.currency.clone(),
-                });
-        let commit = admission
-            .operation
-            .dispatch_commit()
-            .cloned()
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable tool return lost its dispatch commit".to_owned(),
-                )
-            })?;
-        let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
-            &admission.operation,
-            &commit,
-            AdmissionIdentifier::try_new("tool_server", request.server_id.clone())?,
-            AdmissionIdentifier::try_new("tool_name", request.tool_name.clone())?,
-            provider_attempt,
-            transport_terminal_evidence_digest,
-            matched_grant_index,
-            elapsed_millis,
-            stream_limits,
-            invocation_output,
-            monetary_cost,
-            receipt_metadata_snapshot,
-            pre_invocation_guard_evidence.to_vec(),
-            request,
-            context.security_invocation_context.clone(),
-        )
-        .map_err(tool_outcome_error)?;
-        let raw = raw
-            .with_security_release_requirement(context.security_release_required)
-            .map_err(tool_outcome_error)?;
-        let raw = raw
-            .with_federation_context_json(
-                context
-                    .federation_context
-                    .as_ref()
-                    .map(|federation| federation.canonical_json().to_owned()),
-            )
-            .map_err(tool_outcome_error)?;
-        let raw = match context.receipt_signing_identity.as_ref() {
-            Some(identity) => raw
-                .with_receipt_signing_identity(identity.clone())
-                .map_err(tool_outcome_error)?,
-            None => raw,
-        };
-        let raw = raw
-            .with_caller_delivery_evidence(context.caller_delivery_evidence.clone())
-            .map_err(tool_outcome_error)?;
-        let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
-        let record = ToolOutcomeRecordV1::record_tool_returned(
-            &admission.operation,
-            &raw,
-            &blob,
-            runtime.fence.clone(),
-            trusted_now_unix_ms,
-        )
-        .map_err(tool_outcome_error)?;
-        let claim =
-            Self::recovery_claim_request(runtime, &admission.operation, trusted_now_unix_ms)?;
-        let admission_store: &dyn QualifiedAdmissionOperationStore = runtime.store.as_ref();
-        let (stored, finalizing) = runtime
-            .outcome_store
-            .claim_and_record_tool_returned(
-                admission_store,
-                claim,
-                &mut qualified_lease(claim, trusted_now_unix_ms),
-                &admission.operation,
-                &blob,
-                &record,
-                &runtime.fence,
-                trusted_now_unix_ms,
-            )
-            .map_err(durable_outcome_store_error)?
-            .into_parts();
-        admission.operation = finalizing;
-        Ok(DurableToolReturn {
-            raw,
-            outcome: stored,
-        })
-    }
-
     pub(super) fn load_durable_tool_return(
         &self,
         admission: &DurableToolAdmission,
     ) -> Result<DurableToolReturn, KernelError> {
+        match self.load_retained_durable_tool_return(admission)? {
+            RetainedDurableToolReturn::Present(tool_return) => Ok(*tool_return),
+            RetainedDurableToolReturn::Compacted {
+                digest, size_bytes, ..
+            } => Err(durable_outcome_store_error(
+                ToolOutcomeStoreError::Compacted {
+                    raw_output_digest: digest,
+                    raw_output_size_bytes: size_bytes,
+                },
+            )),
+        }
+    }
+
+    fn load_retained_durable_tool_return(
+        &self,
+        admission: &DurableToolAdmission,
+    ) -> Result<RetainedDurableToolReturn, KernelError> {
         let runtime = self.durable_runtime()?;
         let operation_id = admission.operation.binding().operation_id();
-        let raw = runtime
-            .outcome_store
-            .load_raw_invocation_by_operation(operation_id)
-            .map_err(durable_outcome_store_error)?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("raw tool return disappeared".to_owned())
-            })?;
         let outcome = runtime
             .outcome_store
             .lookup_by_operation(operation_id)
@@ -348,11 +202,49 @@ impl ChioKernel {
             .ok_or_else(|| {
                 KernelError::DurableAdmission("recorded tool outcome disappeared".to_owned())
             })?;
+        let raw = match runtime
+            .outcome_store
+            .load_raw_invocation_by_operation(operation_id)
+        {
+            Ok(Some(raw)) => raw,
+            Ok(None) => {
+                return Err(KernelError::DurableAdmission(
+                    "raw tool return disappeared".into(),
+                ))
+            }
+            Err(ToolOutcomeStoreError::Compacted {
+                raw_output_digest,
+                raw_output_size_bytes,
+            }) => {
+                outcome
+                    .validate_against(&admission.operation)
+                    .map_err(tool_outcome_error)?;
+                if &raw_output_digest != outcome.raw_output_digest()
+                    || raw_output_size_bytes != outcome.to_persisted().raw_output_size_bytes
+                {
+                    return Err(KernelError::DurableAdmission(
+                        "compacted raw metadata conflicts with its immutable outcome".into(),
+                    ));
+                }
+                return Ok(RetainedDurableToolReturn::Compacted {
+                    outcome: Box::new(outcome),
+                    digest: raw_output_digest,
+                    size_bytes: raw_output_size_bytes,
+                });
+            }
+            Err(error) => return Err(durable_outcome_store_error(error)),
+        };
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
         outcome
             .validate_canonical_blob(&admission.operation, &blob)
             .map_err(tool_outcome_error)?;
-        Ok(DurableToolReturn { raw, outcome })
+        Ok(RetainedDurableToolReturn::Present(Box::new(
+            DurableToolReturn {
+                raw,
+                outcome,
+                origin: DurableReturnOrigin::Retained,
+            },
+        )))
     }
 
     fn terminal_tool_call_output(output: ToolServerOutput) -> (ToolCallOutput, Option<String>) {
@@ -406,9 +298,9 @@ impl ChioKernel {
             raw.stream_limits(),
         )?;
         if handling.blocked_reason.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "durable post-invocation pipeline returned an unsupported blocking verdict"
-                    .to_owned(),
+            return Err(super::recovery::failure::item_failure(
+                crate::admission_operation::AdmissionRecoveryFailureKind::OutputDenied,
+                "durable post-invocation pipeline returned an unsupported blocking verdict",
             ));
         }
         self.validate_guarded_output(request, matched_grant_index, &handling.output, true)?;
@@ -455,7 +347,18 @@ impl ChioKernel {
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
         let runtime = self.durable_runtime()?;
-        let tool_return = self.load_durable_tool_return(admission)?;
+        let tool_return = match self.load_retained_durable_tool_return(admission)? {
+            RetainedDurableToolReturn::Present(tool_return) => *tool_return,
+            RetainedDurableToolReturn::Compacted {
+                outcome,
+                digest,
+                size_bytes,
+            } => {
+                return self.completed_compacted_value_response(
+                    admission, request, &outcome, digest, size_bytes,
+                );
+            }
+        };
         self.require_caller_output_release(&tool_return, request)?;
         self.require_durable_security_release(admission, &tool_return.raw, &tool_return.outcome)?;
         let federation_scope = self.scope_retained_federation_return(
@@ -836,95 +739,7 @@ impl ChioKernel {
                 )
             })?;
         let expected_outcome_id = Some(tool_return.outcome.outcome_id());
-        let financial = receipt
-            .metadata
-            .as_ref()
-            .and_then(serde_json::Value::as_object)
-            .and_then(|metadata| metadata.get("financial"))
-            .cloned()
-            .map(serde_json::from_value::<FinancialReceiptMetadata>)
-            .transpose()
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "projected receipt financial metadata is invalid".to_owned(),
-                )
-            })?;
-        if operation.binding().participant_requirements().payment {
-            let journal = runtime
-                .store
-                .load_payment_journal(operation.binding().operation_id().as_str(), &runtime.fence)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed payment journal disappeared".to_owned(),
-                    )
-                })?;
-            let expected_cost = match (journal.rail_mode, journal.settle_action) {
-                (crate::payment::PaymentRailMode::PrepaidFinal, _) => journal.amount_units,
-                (
-                    crate::payment::PaymentRailMode::ReversibleHold,
-                    Some(crate::payment::PaymentSettleAction::Capture),
-                ) => journal.settle_amount_units.ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "completed capture journal omitted its amount".to_owned(),
-                    )
-                })?,
-                (
-                    crate::payment::PaymentRailMode::ReversibleHold,
-                    Some(crate::payment::PaymentSettleAction::Release),
-                ) => 0,
-                _ => {
-                    return Err(KernelError::DurableAdmission(
-                        "completed payment journal omitted its settlement action".to_owned(),
-                    ));
-                }
-            };
-            let financial = financial.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "completed payment receipt omitted financial metadata".to_owned(),
-                )
-            })?;
-            let payment_reference = journal
-                .transaction_id
-                .as_ref()
-                .or(journal.authorization_id.as_ref());
-            let grant = request
-                .capability
-                .scope
-                .grants
-                .get(usize::try_from(journal.grant_index).map_err(|_| {
-                    KernelError::DurableAdmission(
-                        "payment grant index exceeds address space".into(),
-                    )
-                })?)
-                .ok_or_else(|| {
-                    KernelError::DurableAdmission("payment journal names a missing grant".into())
-                })?;
-            let expected_ceiling = grant.max_total_cost.as_ref().map(|amount| amount.units);
-            if journal.state != crate::payment::PaymentJournalState::Settled
-                || financial.grant_index != journal.grant_index
-                || financial.cost_charged != expected_cost
-                || financial.currency != journal.currency
-                || financial.payment_reference.as_ref() != payment_reference
-                || financial.settlement_status != SettlementStatus::Settled
-                || financial.delegation_depth
-                    != u32::try_from(request.capability.delegation_chain.len()).unwrap_or(u32::MAX)
-                || financial.root_budget_holder != request.capability.issuer.to_hex()
-                || financial.budget_total != expected_ceiling
-                || financial.budget_remaining.is_some() != financial.budget_total.is_some()
-                || financial.budget_remaining > financial.budget_total
-                || financial.attempted_cost.is_some()
-            {
-                return Err(KernelError::DurableAdmission(
-                    "projected receipt financial metadata conflicts with the payment journal"
-                        .to_owned(),
-                ));
-            }
-        } else if financial.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "nonpayment admission projected financial metadata".to_owned(),
-            ));
-        }
+        self.validate_retained_financial_receipt(operation, request, receipt)?;
         let signing_nonce = receipt
             .metadata
             .as_ref()
@@ -1056,6 +871,27 @@ impl ChioKernel {
         // again in the core identity-bound signing primitive.
         let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
         self.require_original_receipt_signer(&signing_identity)?;
+        let existing_evaluation = runtime
+            .outcome_store
+            .lookup_post_return_evaluation(admission.operation.binding().operation_id())
+            .map_err(durable_outcome_store_error)?;
+        if let Some(existing) = existing_evaluation.as_ref() {
+            existing
+                .validate_against(&admission.operation, &tool_return.outcome)
+                .map_err(tool_outcome_error)?;
+        }
+        let finalization_resolved = existing_evaluation.as_ref().is_some_and(|evaluation| {
+            matches!(
+                evaluation.state(),
+                PostReturnEvaluationStateV1::Resolved { .. }
+            )
+        });
+        let retained_snapshot = existing_evaluation
+            .as_ref()
+            .map(DurableTerminalSnapshot::from_evaluation)
+            .transpose()?
+            .flatten();
+
         let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
             tool_return.raw.pre_invocation_guard_evidence().to_vec(),
         );
@@ -1105,7 +941,10 @@ impl ChioKernel {
             &receipt_content.canonical_content,
             purchase.as_ref(),
         );
-        if delivery_evaluation.denial.is_none() {
+        if let Some(snapshot) = retained_snapshot.as_ref() {
+            terminal_finding_denial = snapshot.restore_delivery(&mut delivery_evaluation);
+        }
+        if !finalization_resolved && delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
                 self.read_authority_time()?.get() / 1_000,
@@ -1134,10 +973,6 @@ impl ChioKernel {
         stored_outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
-        let existing_evaluation = runtime
-            .outcome_store
-            .lookup_post_return_evaluation(admission.operation.binding().operation_id())
-            .map_err(durable_outcome_store_error)?;
         let mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = self
             .read_authority_time()?
@@ -1201,7 +1036,7 @@ impl ChioKernel {
                 evaluation.validate_replay_contract(&plan.frozen_steps, &normalized_context)
             })
             .map_err(tool_outcome_error)?;
-        if delivery_evaluation.denial.is_none() {
+        if !finalization_resolved && delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_purchase_status(
                 purchase.as_ref(),
                 self.read_authority_time()?.get() / 1_000,
@@ -1215,7 +1050,7 @@ impl ChioKernel {
                     Some(delivery_contract::finding_status_delivery_denial());
             }
         }
-        if delivery_evaluation.denial.is_none() {
+        if !finalization_resolved && delivery_evaluation.denial.is_none() {
             if let Err(denial) = self.revalidate_completed_recovery_status(
                 matched_grant_index,
                 request,
@@ -1263,17 +1098,40 @@ impl ChioKernel {
                 decision: &terminal_decision,
             },
         )?;
-        let payment_plan = self.durable_payment_disposition(
+        let retained_disposition = if finalization_resolved {
+            match stored_outcome.disposition() {
+                ResolvedToolOutcomeV1::Resolved {
+                    settlement_disposition,
+                    ..
+                } => Some((
+                    settlement_disposition,
+                    retained_snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.pricing.as_ref()),
+                )),
+                _ => {
+                    return Err(KernelError::DurableAdmission(
+                        "resolved evaluation lost its financial disposition".into(),
+                    ))
+                }
+            }
+        } else {
+            None
+        };
+        let payment_plan = self.durable_payment_disposition(DurablePaymentDispositionInput {
             admission,
             runtime,
-            &tool_return.raw,
+            raw: &tool_return.raw,
             trusted_now_unix_ms,
             delivery_denied,
-        )?;
-        let settlement_disposition = payment_plan.as_ref().map_or(
-            SettlementDispositionV1::NotApplicable,
-            |(_, disposition)| disposition.clone(),
-        );
+            retained: retained_disposition,
+        })?;
+        let payment_pricing = payment_plan.as_ref().and_then(|plan| plan.pricing.clone());
+        let settlement_disposition = payment_plan
+            .as_ref()
+            .map_or(SettlementDispositionV1::NotApplicable, |plan| {
+                plan.disposition.clone()
+            });
         if let Some(binding) = purchase.as_ref() {
             self.require_finding_pool_delivery_terminal(binding, &settlement_disposition)?;
         }
@@ -1321,11 +1179,19 @@ impl ChioKernel {
                     ));
                 }
                 let (terminal_evaluation, resolved_output) = evaluation
-                    .resolve_with_signing_preimage(
+                    .resolve_with_signing_preimage_and_snapshot(
                         receipt_content.canonical_content.clone(),
                         post_guard_decision_digest.clone(),
                         pricing_verdict_digest.clone(),
                         settlement_disposition.clone(),
+                        Some(
+                            DurableTerminalSnapshot::prepare(
+                                &delivery_evaluation,
+                                terminal_finding_denial.as_ref(),
+                                payment_pricing.clone(),
+                            )
+                            .canonical_value()?,
+                        ),
                     )
                     .map_err(tool_outcome_error)?;
                 let terminal_outcome = stored_outcome
@@ -1396,15 +1262,17 @@ impl ChioKernel {
                     || recorded_pricing != &pricing_verdict_digest
                     || recorded_settlement != &settlement_disposition
                 {
-                    return Err(KernelError::DurableAdmission(
-                        "resolved finalization artifacts conflict with replay".to_owned(),
+                    return Err(super::recovery::failure::item_failure(
+                        crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+                        "resolved finalization artifacts conflict with replay",
                     ));
                 }
                 (evaluation, stored_outcome)
             }
             PostReturnEvaluationStateV1::Frozen { .. } => {
-                return Err(KernelError::DurableAdmission(
-                    "post-return evaluation is frozen".to_owned(),
+                return Err(super::recovery::failure::item_failure(
+                    crate::admission_operation::AdmissionRecoveryFailureKind::UnsupportedState,
+                    "post-return evaluation is frozen",
                 ));
             }
         };
@@ -1418,12 +1286,12 @@ impl ChioKernel {
             store_fence: runtime.fence.clone(),
         };
         let payment_terminal = payment_plan
-            .map(|(journal, _)| {
+            .map(|plan| {
                 self.settle_durable_payment(DurablePaymentSettlementInput {
                     admission,
                     runtime,
                     lease: &lease,
-                    journal,
+                    journal: plan.journal,
                     disposition: &settlement_disposition,
                     context: &context,
                     purchase: purchase.as_ref(),
@@ -1536,18 +1404,9 @@ impl ChioKernel {
                     delegation_depth: crate::receipt_support::checked_receipt_count(request.capability.delegation_chain.len(), "delegation depth")?,
                     root_budget_holder: request.capability.issuer.to_hex(),
                     payment_reference,
-                    settlement_status: SettlementStatus::Settled,
-                    cost_breakdown: Some(serde_json::json!({
-                        "payment": {
-                            "rail": payment.journal.rail,
-                            "rail_mode": payment.journal.rail_mode,
-                            "authorization_id": payment.journal.authorization_id,
-                            "transaction_id": payment.journal.transaction_id,
-                            "preauthorized_units": payment.journal.amount_units,
-                            "recorded_units": payment.amount_units
-                        }
-                    })),
-                    oracle_evidence: None,
+                    settlement_status: payment_pricing.as_ref().map_or(SettlementStatus::Settled, DurablePaymentPricing::settlement_status),
+                    cost_breakdown: Some(payment_pricing::payment_cost_breakdown(&payment.journal, payment.amount_units, payment_pricing.as_ref())),
+                    oracle_evidence: payment_pricing.as_ref().and_then(|pricing| pricing.oracle_evidence.clone()),
                     attempted_cost: None,
                 }
             }))
@@ -1907,6 +1766,18 @@ impl ChioKernel {
                     ))
                 })?;
         }
+        if let Some(denial) = self.revalidate_terminal_publication(
+            TerminalPublicationInput {
+                request,
+                matched_grant_index,
+                purchase: purchase.as_ref(),
+                recovery: recovery.as_ref(),
+                recovery_status: recovery_status.as_ref(),
+            },
+            &mut delivery_evaluation,
+        )? {
+            warn!(request_id = %request.request_id, reason = %redacted!(&denial), "current finding authority withheld terminal output");
+        }
         self.apply_federation_cosign_for_admitted_request(request, &projected_receipt)?;
         if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
             memory_action_kind.as_ref()
@@ -1933,7 +1804,9 @@ impl ChioKernel {
                         Verdict::Allow,
                         None,
                         OperationTerminalState::Completed,
-                        if tool_return.caller_report_digest().is_some() {
+                        if tool_return.origin == DurableReturnOrigin::Retained
+                            || tool_return.caller_report_digest().is_some()
+                        {
                             None
                         } else {
                             self.mint_execution_nonce_for_allow(

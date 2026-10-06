@@ -17,16 +17,35 @@ fn simulated_copy(plan: &ResponsePlan) -> ResponsePlan {
 }
 
 fn assert_mode_denied(error: chio_kernel::KernelError, boundary: &str) {
-    let expected = format!(
-        "active-response {boundary} denied: response plan is bound to dry_run execution; live execution requires live"
+    use std::error::Error;
+    assert_eq!(
+        error.report().code,
+        "urn:chio:error:kernel:response-dispatch-execution-mode",
+        "{boundary}",
     );
-    assert!(
-        matches!(
-            error,
-            chio_kernel::KernelError::GovernedTransactionDenied(ref reason) if reason == &expected
-        ),
-        "unexpected rejection: {error:?}"
+    assert_eq!(
+        error
+            .source()
+            .and_then(|source| source.downcast_ref::<chio_security_types::DispatchRejection>()),
+        Some(&chio_security_types::DispatchRejection::ExecutionMode {
+            observed: ResponseExecutionMode::DryRun,
+        }),
+        "{boundary}",
     );
+}
+
+#[test]
+fn response_dispatch_refusal_fresh_admission_preserves_execution_mode_code_and_source() {
+    let fixture = real_adapter_fixture_for_mode(ResponseExecutionMode::DryRun, true);
+    let error = rejected(
+        fixture
+            .artifacts
+            .clone()
+            .into_admission_request(fixture.plan.response_plan().clone()),
+        "fresh admission must refuse dry-run execution",
+    );
+    assert_mode_denied(error, "fresh admission");
+    super::response_dry_run::assert_dry_run_untouched(&fixture);
 }
 
 #[test]

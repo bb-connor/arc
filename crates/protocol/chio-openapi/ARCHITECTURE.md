@@ -52,14 +52,18 @@ tools over MCP, and dispatching HTTP calls are out of scope and live in
   (URLs, other files) are rejected as `UnresolvedRef`.
 - Path parameters default to required when the document omits `required`;
   other locations default to not required.
-- `sensitivity` and `budget_limit` are parsed onto `ChioExtensions` and are
-  publicly readable, but `ManifestGenerator` does not consume them; only
-  `publish`, `side_effects`, and `approval_required` affect the generated
-  `ToolDefinition`.
+- Present Chio security extensions require their declared types and recognized
+  enum values. Sensitive and Restricted operations require the generated approval
+  annotation and a deny-by-default policy; an explicit false approval hint cannot
+  weaken that default. Admission still requires the owning capability and policy
+  checks.
+- `publish`, `side_effects`, and approval annotations affect generated tools.
+  `budget_limit` is rejected until budget semantics are implemented; it never
+  supplies currency enforcement or a price.
 - `GeneratorConfig.server_id` is stored but not read by `generate_tools`; it
   has no effect on this crate's output.
 - `ToolDefinition.pricing` is always `None`; this crate does not compute
-  pricing from `budget_limit` or elsewhere.
+  pricing from security extensions or elsewhere.
 
 ## Dependencies
 

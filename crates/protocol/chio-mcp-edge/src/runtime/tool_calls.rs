@@ -368,8 +368,19 @@ impl ChioMcpEdge {
             &arguments,
             model_metadata.as_ref(),
         ) {
-            Some(capability) => capability,
-            None => {
+            Ok(Some(capability)) => capability,
+            rejected => {
+                let reason = if rejected.is_err() {
+                    chio_kernel::ProtocolRefusalReason::CapabilityMatcherInvalid
+                } else {
+                    chio_kernel::ProtocolRefusalReason::CapabilityNotMatched
+                };
+                let evidence = self.protocol_refusal_evidence(
+                    &session_id,
+                    "tools/call",
+                    &binding.tool_name,
+                    reason,
+                );
                 self.emit_log(
                     LogLevel::Warning,
                     "chio.mcp.tools",
@@ -379,9 +390,12 @@ impl ChioMcpEdge {
                         "server": binding.server_id,
                     }),
                 );
-                return Err(jsonrpc_result(
-                    id.clone(),
-                    tool_error_result("tool is not authorized by the active capability set"),
+                return Err(attach_refusal_evidence(
+                    jsonrpc_result(
+                        id.clone(),
+                        tool_error_result("tool is not authorized by the active capability set"),
+                    ),
+                    evidence,
                 ));
             }
         };
@@ -503,74 +517,6 @@ impl ChioMcpEdge {
         }
     }
 
-    pub(super) fn evaluate_tool_call_operation_with_transport<
-        R: BufRead + Send,
-        W: Write + Send,
-    >(
-        &mut self,
-        request: ToolCallRequestContext<'_>,
-        reader: &mut R,
-        writer: &mut W,
-    ) -> ToolCallEdgeOutcome {
-        let ToolCallRequestContext {
-            id,
-            session_id,
-            context,
-            operation,
-            related_task_id,
-        } = request;
-        let mut parent_progress_step = 0;
-        let mut accepted_url_elicitations = Vec::new();
-        let mut nested_flow_client = EdgeNestedFlowClient {
-            request_counter: &mut self.client_request_counter,
-            parent_progress_step: &mut parent_progress_step,
-            parent_client_request_id: id,
-            parent_kernel_request_id: &context.request_id,
-            pending_notifications: &mut self.pending_notifications,
-            deferred_client_messages: &mut self.deferred_client_messages,
-            accepted_url_elicitations: &mut accepted_url_elicitations,
-            logging_enabled: self.config.logging_enabled,
-            minimum_log_level: self.minimum_log_level,
-            related_task_id,
-            reader,
-            writer,
-        };
-
-        let outcome = match self
-            .kernel
-            .evaluate_tool_call_operation_with_nested_flow_client(
-                context,
-                operation,
-                &mut nested_flow_client,
-            ) {
-            Ok(response) => self.tool_result_for_kernel_response(KernelToolResultArgs {
-                client_request_id: id,
-                session_id,
-                output: response.output,
-                reason: response.reason,
-                verdict: response.verdict,
-                receipt: &response.receipt,
-                terminal_state: &response.terminal_state,
-                execution_nonce: response.execution_nonce,
-                related_task_id,
-            }),
-            Err(error) => {
-                self.emit_log_with_related_task(
-                    LogLevel::Error,
-                    "chio.mcp.tools",
-                    json!({
-                        "event": "tool_failed",
-                        "error": error.to_string(),
-                    }),
-                    related_task_id,
-                );
-                self.tool_call_error_outcome(session_id, error, related_task_id)
-            }
-        };
-        self.persist_accepted_url_elicitations(session_id, accepted_url_elicitations);
-        outcome
-    }
-
     pub(super) fn evaluate_tool_call_operation_with_transport_channel<W: Write + Send>(
         &mut self,
         request: ToolCallRequestContext<'_>,
@@ -587,7 +533,40 @@ impl ChioMcpEdge {
         } = request;
         let mut parent_progress_step = 0;
         let mut accepted_url_elicitations = Vec::new();
+        let _parent_control = match self.inbox_admission.begin_operation(id, related_task_id) {
+            Ok(control) => control,
+            Err(error) => {
+                return self.tool_call_error_outcome(
+                    session_id,
+                    chio_kernel::KernelError::Internal(error.to_string()),
+                    related_task_id,
+                )
+            }
+        };
+        let expires_at = match operation.capability.expires_at.checked_mul(1000) {
+            Some(expiry) => chio_security_types::clock::UnixMillis::new(expiry),
+            None => {
+                return self.tool_call_error_outcome(
+                    session_id,
+                    chio_security_types::clock::ClockError::Overflow.into(),
+                    related_task_id,
+                )
+            }
+        };
+        let clock = self.kernel.authority_clock();
+        // Preserve normal kernel admission for an initially invalid capability.
+        // Only the cancellation poll consumes this fixed deadline or its error.
+        let capability_deadline = clock.read().and_then(|reading| {
+            chio_security_types::clock::AuthorityDeadline::new(
+                chio_security_types::clock::UnixMillis::from_secs(operation.capability.issued_at)?,
+                expires_at,
+                reading,
+            )
+        });
         let mut nested_flow_client = QueuedEdgeNestedFlowClient {
+            refusal_kernel: &self.kernel,
+            refusal_context: context,
+            held_reply_reservations: Vec::new(),
             request_counter: &mut self.client_request_counter,
             parent_progress_step: &mut parent_progress_step,
             parent_client_request_id: id,
@@ -598,6 +577,12 @@ impl ChioMcpEdge {
             logging_enabled: self.config.logging_enabled,
             minimum_log_level: self.minimum_log_level,
             related_task_id,
+            admission: self.inbox_admission.clone(),
+            clock,
+            expires_at,
+            capability_deadline,
+            task_deadline: related_task_id
+                .and_then(|id| self.tasks.get(id).map(|task| task.deadline)),
             client_rx,
             cancel_rx,
             writer,
@@ -660,49 +645,6 @@ impl ChioMcpEdge {
         tool_call_outcome_to_jsonrpc(
             id.clone(),
             self.evaluate_tool_call_operation(&id, &session_id, &context, &operation, None),
-        )
-    }
-
-    // Reader/writer transport variant dispatched from `handle_request_with_transport`.
-    pub(super) fn handle_tools_call_with_transport<R: BufRead + Send, W: Write + Send>(
-        &mut self,
-        id: Value,
-        params: Value,
-        reader: &mut R,
-        writer: &mut W,
-    ) -> Value {
-        let (session_id, context, operation) = match self.prepare_tool_call_request(&id, &params) {
-            Ok(parts) => parts,
-            Err(response) => return response,
-        };
-        let requested_task = match parse_requested_task(&id, &params) {
-            Ok(requested_task) => requested_task,
-            Err(response) => return response,
-        };
-        if let Some(requested_task) = requested_task {
-            return self.create_tool_call_task(
-                id,
-                session_id,
-                context,
-                operation,
-                requested_task,
-                false,
-            );
-        }
-
-        tool_call_outcome_to_jsonrpc(
-            id.clone(),
-            self.evaluate_tool_call_operation_with_transport(
-                ToolCallRequestContext {
-                    id: &id,
-                    session_id: &session_id,
-                    context: &context,
-                    operation: &operation,
-                    related_task_id: None,
-                },
-                reader,
-                writer,
-            ),
         )
     }
 

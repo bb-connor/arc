@@ -101,9 +101,9 @@ pub enum PaymentError {
 /// Thin prepaid HTTP payment bridge for x402-style per-request settlement.
 ///
 /// The adapter intentionally stays narrow: it only performs one remote
-/// authorization request and treats later capture/release/refund actions as
-/// prepaid bookkeeping. This keeps the bridge small while still giving the
-/// kernel a real external authorization hop before execution.
+/// authorization request. A final prepayment has no unused hold to release,
+/// and this bridge has no remote refund protocol. Unsupported unwind actions
+/// retain the original payment for recovery rather than fabricating results.
 #[derive(Clone)]
 pub struct X402PaymentAdapter {
     base_url: String,
@@ -315,40 +315,24 @@ impl PaymentAdapter for X402PaymentAdapter {
 
     fn release(
         &self,
-        authorization_id: &str,
-        reference: &str,
+        _authorization_id: &str,
+        _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
-        Ok(PaymentResult {
-            transaction_id: authorization_id.to_string(),
-            settlement_status: RailSettlementStatus::Released,
-            metadata: serde_json::json!({
-                "adapter": "x402",
-                "mode": "prepaid",
-                "action": "release",
-                "reference": reference
-            }),
-        })
+        Err(PaymentError::Unavailable(
+            "x402 final prepayment has no releasable hold".into(),
+        ))
     }
 
     fn refund(
         &self,
-        transaction_id: &str,
-        amount_units: u64,
-        currency: &str,
-        reference: &str,
+        _transaction_id: &str,
+        _amount_units: u64,
+        _currency: &str,
+        _reference: &str,
     ) -> Result<PaymentResult, PaymentError> {
-        Ok(PaymentResult {
-            transaction_id: transaction_id.to_string(),
-            settlement_status: RailSettlementStatus::Refunded,
-            metadata: serde_json::json!({
-                "adapter": "x402",
-                "mode": "prepaid",
-                "action": "refund",
-                "amount_units": amount_units,
-                "currency": currency,
-                "reference": reference
-            }),
-        })
+        Err(PaymentError::Unavailable(
+            "x402 remote refund is unsupported".into(),
+        ))
     }
 }
 
@@ -1033,6 +1017,8 @@ mod tests {
             authorization_id: None,
             transaction_id: None,
             amount_units: 125,
+            authorized_amount_units: None,
+            authorization_attempt: None,
             settle_action: None,
             settle_amount_units: None,
             release_authority: None,

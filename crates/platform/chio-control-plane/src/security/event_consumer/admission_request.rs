@@ -24,13 +24,8 @@ impl AttestedFindingAdmissionArtifacts {
                     governed_intent,
                     submission_proof,
                 )?;
-                let fresh = chio_security_types::FreshLiveAdmission::new(response_plan).map_err(
-                    |error| {
-                        chio_kernel::KernelError::GovernedTransactionDenied(format!(
-                            "active-response admission denied: {error}"
-                        ))
-                    },
-                )?;
+                let fresh = chio_security_types::FreshLiveAdmission::new(response_plan)
+                    .map_err(chio_kernel::KernelError::ResponseDispatchRejected)?;
                 ActiveResponseAdmissionRequest::new(
                     fresh,
                     authorization,

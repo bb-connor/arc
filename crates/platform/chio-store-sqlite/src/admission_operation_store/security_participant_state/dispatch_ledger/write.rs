@@ -39,7 +39,11 @@ impl SqliteAdmissionOperationStore {
         {
             return Err(invalid("native dispatch ledger initialization differs"));
         }
-        let live_request_digest = egress::live_request_hash(custody.request)?;
+        let original_dispatch = NativeSecurityDispatchRequestBindingV1::from_live_request(
+            custody.request,
+            custody.security_context,
+        )?;
+        let live_request_digest = original_dispatch.live_request_digest().clone();
         policy.validate_binding(
             operation,
             &original,
@@ -53,7 +57,10 @@ impl SqliteAdmissionOperationStore {
             .retained_matching_grant(input.grant_index)
             .ok_or_else(|| invalid("native dispatch ledger selected an unmatched grant"))?;
         if let Some(existing) = storage::load(&tx, operation.binding().operation_id().as_str())? {
-            if existing.policy != policy_value
+            if existing.schema != SCHEMA
+                || existing.original_dispatch_commitment_id.as_ref()
+                    != Some(original_dispatch.dispatch_commitment_id())
+                || existing.policy != policy_value
                 || existing.grant_index != grant_index
                 || existing.live_request_digest != live_request_digest
                 || existing.context != *custody.security_context
@@ -104,6 +111,9 @@ impl SqliteAdmissionOperationStore {
                 sha256_hex(&canonical_json_bytes(grant).map_err(invalid)?),
             )?,
             live_request_digest,
+            original_dispatch_commitment_id: Some(
+                original_dispatch.dispatch_commitment_id().clone(),
+            ),
             policy: policy_value,
             join_digest: AdmissionDigest::try_new("native_dispatch_join", joined.digest()?)?,
             egress_acquisition: egress

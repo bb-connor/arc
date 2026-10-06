@@ -14,11 +14,23 @@ impl LoadedSpec {
     }
 
     pub(super) fn policy_hash(&self, allow_anonymous_reads: bool) -> Result<String, ProtectError> {
+        self.policy_hash_with_guard_profile(
+            allow_anonymous_reads,
+            &chio_guards::default_runtime_guard_profile_identity()?,
+        )
+    }
+
+    fn policy_hash_with_guard_profile(
+        &self,
+        allow_anonymous_reads: bool,
+        guard_profile_identity: &str,
+    ) -> Result<String, ProtectError> {
         let bytes = chio_core_types::canonical::canonical_json_bytes(&(
-            "chio-api-protect-local-policy-v1",
+            "chio-api-protect-local-policy-v2",
             chio_core_types::sha256_hex(self.content.as_bytes()),
             self.pinned,
             allow_anonymous_reads,
+            guard_profile_identity,
         ))?;
         Ok(chio_core_types::sha256_hex(&bytes))
     }
@@ -83,4 +95,37 @@ pub(super) async fn load(config: &ProtectConfig) -> Result<LoadedSpec, ProtectEr
         false
     };
     Ok(LoadedSpec { content, pinned })
+}
+
+#[cfg(test)]
+mod product_guard_tests {
+    use super::*;
+
+    #[test]
+    fn product_default_guards_authority_identity_binds_spec_and_profile() -> Result<(), ProtectError>
+    {
+        let spec = LoadedSpec {
+            content: "openapi: 3.0.3".into(),
+            pinned: true,
+        };
+        let baseline = spec.policy_hash(false)?;
+        assert_eq!(baseline.len(), 64);
+        let changed_profile = chio_core_types::sha256_hex(b"changed-default-profile");
+        assert_ne!(
+            baseline,
+            spec.policy_hash_with_guard_profile(false, &changed_profile)?
+        );
+        assert_ne!(spec.policy_hash(false)?, spec.policy_hash(true)?);
+        let unpinned = LoadedSpec {
+            content: spec.content.clone(),
+            pinned: false,
+        };
+        assert_ne!(spec.policy_hash(false)?, unpinned.policy_hash(false)?);
+        let other_spec = LoadedSpec {
+            content: "openapi: 3.1.0".into(),
+            pinned: true,
+        };
+        assert_ne!(spec.policy_hash(false)?, other_spec.policy_hash(false)?);
+        Ok(())
+    }
 }

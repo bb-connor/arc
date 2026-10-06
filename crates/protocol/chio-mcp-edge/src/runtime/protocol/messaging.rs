@@ -36,6 +36,7 @@ pub(in crate::runtime) fn task_cancel_matches_related_task(
             == Some(related_task_id)
 }
 
+#[cfg(test)]
 pub(in crate::runtime) fn is_cancellation_side_channel_signal(message: &Value) -> bool {
     match message.get("method").and_then(Value::as_str) {
         Some("notifications/cancelled") => message.get("params").is_some_and(Value::is_object),
@@ -68,11 +69,23 @@ pub(in crate::runtime) fn cancellation_reason(message: &Value) -> String {
     }
 }
 
+#[cfg(test)]
 pub(in crate::runtime) fn next_client_message(
     client_rx: &mut mpsc::Receiver<ClientInbound>,
 ) -> Result<Value, AdapterError> {
     match client_rx.recv() {
         Ok(ClientInbound::Message(message)) => Ok(message),
+        Ok(ClientInbound::Accounted(message)) => Ok(message.into_parts().0),
+        Ok(ClientInbound::HostProtocolRefusal(command)) => {
+            let _ = command
+                .acknowledgement
+                .send(Err(chio_kernel::KernelError::Internal(
+                    "test compatibility receiver cannot record host refusal".into(),
+                )));
+            Err(AdapterError::ConnectionFailed(
+                "host refusal requires the owning worker".into(),
+            ))
+        }
         Ok(ClientInbound::ParseError(error)) => Err(error),
         Ok(ClientInbound::ReadError(error)) => Err(AdapterError::ConnectionFailed(format!(
             "failed to read MCP edge request: {error}"
@@ -83,6 +96,7 @@ pub(in crate::runtime) fn next_client_message(
     }
 }
 
+#[cfg(test)]
 pub(in crate::runtime) fn pump_client_messages<R: BufRead>(
     mut reader: R,
     sender: mpsc::Sender<ClientInbound>,
@@ -128,6 +142,7 @@ pub(in crate::runtime) fn pump_client_messages<R: BufRead>(
     }
 }
 
+#[cfg(test)]
 pub(in crate::runtime) fn pump_channel_messages(
     receiver: mpsc::Receiver<Value>,
     sender: mpsc::Sender<ClientInbound>,

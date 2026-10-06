@@ -90,6 +90,8 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
         authorization_id: None,
         transaction_id: None,
         amount_units: 125,
+        authorized_amount_units: Some(125),
+        authorization_attempt: Some(chio_kernel::payment::PaymentAuthorizationAttempt::NotStarted),
         settle_action: None,
         settle_amount_units: None,
         release_authority: None,
@@ -222,12 +224,24 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
         )
         .expect("resume combined authorization from committed operation");
     assert_eq!(resumed.1, authorized);
-    let held = fixture
+    let attempted = fixture
         .store
         .advance_payment_journal(chio_kernel::AdmissionPaymentJournalAdvance {
             operation: &authorized,
             recovery_lease: &resumed_lease,
             expected: &journal,
+            transition: &PaymentJournalTransition::BeginAuthorizationAttempt,
+            release_evidence: None,
+            active_fence: &fixture.fence,
+            trusted_now_unix_ms: begun_at + 7,
+        })
+        .expect("persist authorization attempt before rail effect");
+    let held = fixture
+        .store
+        .advance_payment_journal(chio_kernel::AdmissionPaymentJournalAdvance {
+            operation: &authorized,
+            recovery_lease: &resumed_lease,
+            expected: &attempted,
             transition: &PaymentJournalTransition::AuthorizationHeld {
                 authorization_id: "authorization-combined".to_owned(),
             },
@@ -237,7 +251,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
         })
         .expect("advance payment authorization");
     assert_eq!(held.state, PaymentJournalState::Authorized);
-    assert_eq!(held.journal_version, 2);
+    assert_eq!(held.journal_version, 3);
     let post_transition_replay = fixture
         .store
         .authorize_budget_and_commit_admission(
@@ -257,7 +271,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             .advance_payment_journal(chio_kernel::AdmissionPaymentJournalAdvance {
                 operation: &authorized,
                 recovery_lease: &resumed_lease,
-                expected: &journal,
+                expected: &attempted,
                 transition: &PaymentJournalTransition::AuthorizationHeld {
                     authorization_id: "authorization-combined".to_owned(),
                 },
@@ -306,7 +320,7 @@ fn combined_budget_authorization_payment_journal_and_operation_commit_are_atomic
             participant_commits,
             payment_commits
         ),
-        (1, 1, 1, 1, 2)
+        (1, 1, 1, 1, 3)
     );
     drop(connection);
 
@@ -751,6 +765,8 @@ fn combined_authorization_request(
         authorization_id: None,
         transaction_id: None,
         amount_units: 125,
+        authorized_amount_units: Some(125),
+        authorization_attempt: Some(chio_kernel::payment::PaymentAuthorizationAttempt::NotStarted),
         settle_action: None,
         settle_amount_units: None,
         release_authority: None,

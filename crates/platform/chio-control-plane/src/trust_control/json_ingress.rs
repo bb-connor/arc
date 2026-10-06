@@ -1,10 +1,17 @@
 //! Validate original JSON bytes before Axum can discard keys or numeric spelling.
 //!
 //! The route table is checked against actual request extractors and router bindings
-//! by check-trust-boundaries.py. Signature, authentication and semantic validation
-//! remain the owning handler's responsibility. Binary and Form routes stay with
-//! their existing format-specific readers.
+//! by check-trust-boundaries.py. Service authorization runs before body reads;
+//! signature, protocol-specific authentication and semantic validation remain
+//! the owning handler's responsibility. Binary and Form routes stay with their
+//! existing format-specific readers.
+use super::config_and_public::load_passport_issuance_registry_for_admin;
 use super::frost::*;
+use super::receipt_handlers::resolve_admin_report_read_context;
+use super::report_validation::{
+    bearer_token_from_headers, resolve_control_read_principal, validate_authority_issue_auth,
+    validate_cluster_peer_auth, validate_service_auth,
+};
 use super::*;
 use axum::body::Body;
 use axum::extract::{MatchedPath, NestedPath, Request};
@@ -53,6 +60,37 @@ async fn read_body(body: Body, bound: usize) -> Result<Vec<u8>, InputError> {
 enum Mode {
     Signed,
     Document,
+}
+
+enum Authentication {
+    Service,
+    AuthorityIssue,
+    ControlRead,
+    ClusterPeer,
+    AdminReport(&'static str),
+    WalletCredential,
+    Handler,
+}
+
+fn authentication(path: &str) -> Authentication {
+    match path {
+        ISSUE_CAPABILITY_PATH => Authentication::AuthorityIssue,
+        EVIDENCE_EXPORT_PATH | FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH => Authentication::ControlRead,
+        INTERNAL_CLUSTER_PARTITION_PATH => Authentication::ClusterPeer,
+        UNDERWRITING_SIMULATION_PATH => {
+            Authentication::AdminReport("underwriting simulation report")
+        }
+        CREDIT_BONDED_EXECUTION_SIMULATION_PATH => {
+            Authentication::AdminReport("credit bonded execution simulation report")
+        }
+        PASSPORT_ISSUANCE_CREDENTIAL_PATH => Authentication::WalletCredential,
+        // Public and token-exchange contracts keep their own protocol-specific
+        // authentication. The separate FROST router installs only validate.
+        PASSPORT_ISSUANCE_TOKEN_PATH
+        | PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH
+        | FINDINGS_SEARCH_PATH => Authentication::Handler,
+        _ => Authentication::Service,
+    }
 }
 
 fn contract(method: &str, path: &str) -> Option<(Mode, usize)> {
@@ -181,9 +219,9 @@ fn validate_document(bytes: &[u8], bound: usize) -> Result<(), UntrustedJsonErro
     Ok(())
 }
 
-pub(super) async fn validate(request: Request, next: Next) -> Response {
+fn request_contract(request: &Request) -> Result<Option<(Mode, usize, &str)>, Response> {
     let Some(path) = request.extensions().get::<MatchedPath>() else {
-        return next.run(request).await;
+        return Ok(None);
     };
     // Axum includes every outer nest prefix in MatchedPath. NestedPath is
     // framework-owned route context, so parameterized mounts can be removed
@@ -194,12 +232,88 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
             .strip_prefix(prefix.as_str().trim_end_matches('/'))
         {
             Some(relative) => relative,
-            None => return plain_http_error(StatusCode::BAD_REQUEST, "invalid JSON route context"),
+            None => {
+                return Err(plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    "invalid JSON route context",
+                ));
+            }
         },
         None => path.as_str(),
     };
     let Some((mode, bound)) = contract(request.method().as_str(), path) else {
-        return next.run(request).await;
+        return Ok(None);
+    };
+    Ok(Some((mode, bound, path)))
+}
+
+pub(super) async fn authenticate(
+    State(state): State<TrustServiceState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let path = match request_contract(&request) {
+        Ok(Some((_, _, path))) => path,
+        Ok(None) => return next.run(request).await,
+        Err(response) => return response,
+    };
+    let authorized = match authentication(path) {
+        Authentication::Service => {
+            validate_service_auth(request.headers(), &state.config.service_token)
+        }
+        Authentication::AuthorityIssue => {
+            validate_authority_issue_auth(request.headers(), &state, path).map(|_| ())
+        }
+        Authentication::ControlRead => {
+            resolve_control_read_principal(request.headers(), &state.config).map(|_| ())
+        }
+        Authentication::ClusterPeer => {
+            validate_cluster_peer_auth(request.headers(), &state.config, path).map(|_| ())
+        }
+        Authentication::AdminReport(surface) => {
+            resolve_admin_report_read_context(request.headers(), &state.config, surface).map(|_| ())
+        }
+        Authentication::WalletCredential => {
+            authenticate_wallet_credential(request.headers(), &state)
+        }
+        Authentication::Handler => Ok(()),
+    };
+    if let Err(response) = authorized {
+        return response;
+    }
+    // Retain handler rechecks: a long upload cannot turn this allocation guard
+    // into stale authentication or a stale cluster authority lease.
+    next.run(request).await
+}
+
+fn authenticate_wallet_credential(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+) -> Result<(), Response> {
+    let access_token = bearer_token_from_headers(headers)?;
+    let now = unix_timestamp_now()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
+    let (_, registry) = load_passport_issuance_registry_for_admin(&state.config)
+        .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
+    let issuer = state.config.advertise_url.as_deref().ok_or_else(|| {
+        plain_http_error(
+            StatusCode::CONFLICT,
+            "passport issuance requires --advertise-url on the trust-control service",
+        )
+    })?;
+    // Full issuer metadata resolution can create signing material. Entitlement
+    // needs only the configured issuer and the existing verified registry.
+    registry
+        .validate_credential_entitlement(issuer, &access_token, now)
+        .map(|_| ())
+        .map_err(|error| plain_http_error(StatusCode::UNAUTHORIZED, &error.to_string()))
+}
+
+pub(super) async fn validate(request: Request, next: Next) -> Response {
+    let (mode, bound) = match request_contract(&request) {
+        Ok(Some((mode, bound, _))) => (mode, bound),
+        Ok(None) => return next.run(request).await,
+        Err(response) => return response,
     };
     // Let Axum retain its own media-type rejection and +json handling. Only
     // requests whose media type can select Json need original-token validation.

@@ -1148,7 +1148,15 @@ fn map_backend(error: HostedMarketBackendError) -> HostedEdgeError {
     }
 }
 
+#[path = "server/operator_diagnostics.rs"]
+mod operator_diagnostics;
+
+#[cfg(test)]
+#[path = "server/durable_classification_tests.rs"]
+mod durable_classification_tests;
+
 fn error_response(error: HostedEdgeError, request_id: &str) -> Response {
+    operator_diagnostics::record(&error);
     let status =
         StatusCode::from_u16(error.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     (status, Json(error.body(request_id))).into_response()
@@ -1307,7 +1315,7 @@ mod tests {
         );
     }
 
-    fn server_state() -> Result<HostedHttpServerState, HostedEdgeError> {
+    pub(super) fn server_state() -> Result<HostedHttpServerState, HostedEdgeError> {
         server_state_counting_readiness().map(|(state, _)| state)
     }
 
@@ -1573,7 +1581,10 @@ mod tests {
         })
     }
 
-    fn proxied_request(mut builder: axum::http::request::Builder, body: Body) -> Request<Body> {
+    pub(super) fn proxied_request(
+        mut builder: axum::http::request::Builder,
+        body: Body,
+    ) -> Request<Body> {
         builder = builder
             .header(
                 "Forwarded",

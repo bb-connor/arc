@@ -272,9 +272,9 @@ def static_contract_tests() -> None:
         ):
             mutation = json.loads(json.dumps(profile))
             if label == "default-action":
-                mutation["defaultAction"] = "SCMP_ACT_ERRNO"
+                mutation["defaultAction"] = "SCMP_ACT_ALLOW"
             elif label == "architecture":
-                mutation["archMap"][0]["architecture"] = "SCMP_ARCH_AARCH64"
+                mutation["architectures"] = ["SCMP_ARCH_AARCH64"]
             elif label == "syscall-inventory":
                 mutation["syscalls"][0]["names"].pop()
             elif label == "syscall-action":
@@ -282,7 +282,7 @@ def static_contract_tests() -> None:
             elif label == "syscall-errno":
                 mutation["syscalls"][0]["errnoRet"] = 13
             else:
-                mutation["syscalls"][1]["args"][0]["valueTwo"] = 0
+                next(rule for rule in mutation["syscalls"] if rule["names"] == ["clone"] and rule["action"] == "SCMP_ACT_ALLOW")["args"][0]["valueTwo"] = 128
             seccomp_mutations.append((label, mutation))
         for label, mutation in seccomp_mutations:
             mutant = temporary / f"seccomp-{label}.json"

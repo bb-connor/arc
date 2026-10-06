@@ -17,6 +17,13 @@ use serde_json::Value;
 #[path = "evaluator/route_matching.rs"]
 mod route_matching;
 
+#[path = "evaluator/diagnostics.rs"]
+mod diagnostics;
+
+#[cfg(test)]
+#[path = "evaluator/capability_diagnostics_tests.rs"]
+mod capability_diagnostics_tests;
+
 /// Backend label reported through the sidecar health endpoint. A durable store
 /// survives restart; an ephemeral one does not.
 const BACKEND_DURABLE: &str = "durable";
@@ -484,6 +491,9 @@ impl RequestEvaluator {
 
 impl From<HttpAuthorityEvaluation> for EvaluationResult {
     fn from(value: HttpAuthorityEvaluation) -> Self {
+        if let Some(source) = &value.capability_input_error {
+            diagnostics::record_capability_input_error(source);
+        }
         Self {
             verdict: value.verdict,
             receipt: value.receipt,

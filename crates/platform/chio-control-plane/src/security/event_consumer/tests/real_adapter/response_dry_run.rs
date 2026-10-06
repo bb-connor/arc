@@ -143,13 +143,21 @@ fn response_dry_run_receipt_failures_do_not_create_authority_or_effects() {
         if after_commit {
             assert!(result.is_ok(), "committed report readback: {result:?}");
         } else {
-            assert_eq!(
-                result
-                    .err()
-                    .unwrap_or_else(|| panic!("missing receipt accepted"))
-                    .kind(),
-                PortErrorKind::Unavailable
+            let error = result
+                .err()
+                .unwrap_or_else(|| panic!("missing receipt accepted"));
+            assert_eq!(error.kind(), PortErrorKind::Unavailable);
+            let native = std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>());
+            assert!(
+                matches!(native, Some(chio_kernel::ReceiptStoreError::Unsupported(_))),
+                "append failure lost its machine-readable source: {error:?}"
             );
+            assert_eq!(
+                error.code().as_str(),
+                "urn:chio:error:attest:receipt-store-unavailable"
+            );
+            assert!(!format!("{error} {error:?}").contains("injected"));
         }
         assert_dry_run_untouched(&fixture);
     }
@@ -453,4 +461,237 @@ fn response_dry_run_host_effect_gate_refuses_execution_and_fence_maintenance() {
         PortErrorKind::Unavailable
     );
     assert_dry_run_untouched(&fixture);
+}
+
+struct DiagnosticReadbackFailure {
+    reads: std::sync::atomic::AtomicUsize,
+}
+impl chio_kernel::IndexedSecurityEvidenceStore for DiagnosticReadbackFailure {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), chio_kernel::ReceiptStoreError> {
+        Ok(())
+    }
+    fn load_indexed_security_evidence(
+        &self,
+        _: &OpaqueReceiptRef,
+    ) -> Result<Option<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
+        if self.reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+            return Ok(None);
+        }
+        Err(chio_kernel::ReceiptStoreError::Conflict(
+            "private-readback-detail".into(),
+        ))
+    }
+    fn append_indexed_security_evidence(
+        &self,
+        _: &OpaqueReceiptRef,
+        _: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<chio_core::receipt::body::ChioReceipt, chio_kernel::ReceiptStoreError> {
+        Err(chio_kernel::ReceiptStoreError::OutcomeUnknown(
+            "private-append-detail".into(),
+        ))
+    }
+}
+
+#[test]
+fn response_dry_run_diagnostic_preserves_integrity_class_after_uncertain_append() {
+    let fixture =
+        real_adapter_fixture_for_mode(chio_security_types::ResponseExecutionMode::DryRun, true);
+    let request = fixture
+        .artifacts
+        .clone()
+        .into_simulation_request(fixture.plan.response_plan().clone())
+        .unwrap_or_else(|error| panic!("request: {error}"));
+    let source = Arc::new(
+        SqliteSecurityStateStore::open(&fixture.paths.responses)
+            .unwrap_or_else(|error| panic!("state: {error}")),
+    );
+    let service = crate::security::ProductionResponseSimulator::new(
+        Arc::new(DryRunStateSource(source)),
+        Arc::new(DiagnosticReadbackFailure {
+            reads: std::sync::atomic::AtomicUsize::new(0),
+        }),
+        Arc::new(Ed25519Backend::new(fixture.executor_signer.clone())),
+        Digest32::new([0x91; 32]),
+    )
+    .unwrap_or_else(|error| panic!("service: {error}"));
+    let error = service
+        .run(fixture.runtime.kernel.as_ref(), &request)
+        .err()
+        .unwrap_or_else(|| panic!("uncertain append accepted"));
+    assert_eq!(
+        error.kind(),
+        PortErrorKind::IntegrityFailure,
+        "readback corruption became transient: {error:?}"
+    );
+    assert_eq!(
+        error.code().as_str(),
+        "urn:chio:error:attest:receipt-verification-failed"
+    );
+    let reconciliation = std::error::Error::source(&error)
+        .and_then(|source| {
+            source.downcast_ref::<crate::security::ResponseSimulationReconciliationError>()
+        })
+        .unwrap_or_else(|| panic!("append/readback custody lost"));
+    let append = std::error::Error::source(reconciliation.append_error())
+        .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>());
+    assert!(matches!(
+        append,
+        Some(chio_kernel::ReceiptStoreError::OutcomeUnknown(_))
+    ));
+    let readback = std::error::Error::source(reconciliation.readback_error())
+        .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>());
+    assert!(matches!(
+        readback,
+        Some(chio_kernel::ReceiptStoreError::Conflict(_))
+    ));
+    assert!(!format!("{error} {error:?} {reconciliation} {reconciliation:?}").contains("private"));
+    assert_dry_run_untouched(&fixture);
+}
+
+struct DiagnosticReadinessFailure {
+    clock: bool,
+}
+impl chio_kernel::IndexedSecurityEvidenceStore for DiagnosticReadinessFailure {
+    fn ensure_indexed_security_evidence_ready(&self) -> Result<(), chio_kernel::ReceiptStoreError> {
+        if self.clock {
+            return Err(chio_security_types::clock::ClockError::WallClockRegression.into());
+        }
+        Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "private-store-path").into())
+    }
+    fn load_indexed_security_evidence(
+        &self,
+        _: &OpaqueReceiptRef,
+    ) -> Result<Option<chio_core::receipt::body::ChioReceipt>, chio_kernel::ReceiptStoreError> {
+        Ok(None)
+    }
+    fn append_indexed_security_evidence(
+        &self,
+        _: &OpaqueReceiptRef,
+        _: &chio_core::receipt::body::ChioReceipt,
+    ) -> Result<chio_core::receipt::body::ChioReceipt, chio_kernel::ReceiptStoreError> {
+        Err(chio_kernel::ReceiptStoreError::Fenced)
+    }
+}
+
+#[test]
+fn response_dry_run_diagnostic_retains_readiness_native_and_clock_failures() {
+    let fixture =
+        real_adapter_fixture_for_mode(chio_security_types::ResponseExecutionMode::DryRun, false);
+    for clock in [false, true] {
+        let source = Arc::new(
+            SqliteSecurityStateStore::open(&fixture.paths.responses)
+                .unwrap_or_else(|error| panic!("state: {error}")),
+        );
+        let error = crate::security::ProductionResponseSimulator::new(
+            Arc::new(DryRunStateSource(source)),
+            Arc::new(DiagnosticReadinessFailure { clock }),
+            Arc::new(Ed25519Backend::new(fixture.executor_signer.clone())),
+            Digest32::new([0x91; 32]),
+        )
+        .err()
+        .unwrap_or_else(|| panic!("unready store accepted"));
+        let native = std::error::Error::source(&error)
+            .and_then(|source| source.downcast_ref::<chio_kernel::ReceiptStoreError>());
+        assert!(native.is_some(), "native readiness cause lost: {error:?}");
+        if clock {
+            assert!(matches!(
+                native,
+                Some(chio_kernel::ReceiptStoreError::Clock(
+                    chio_security_types::clock::ClockError::WallClockRegression
+                ))
+            ));
+            assert_eq!(
+                error.code().as_str(),
+                "urn:chio:error:kernel:clock-wall-clock-regression"
+            );
+        } else {
+            assert!(
+                matches!(native, Some(chio_kernel::ReceiptStoreError::Io(error)) if error.kind() == std::io::ErrorKind::PermissionDenied)
+            );
+            assert_eq!(
+                error.code().as_str(),
+                "urn:chio:error:attest:receipt-store-unavailable"
+            );
+        }
+        assert!(!format!("{error} {error:?}").contains("private"));
+    }
+    assert_dry_run_untouched(&fixture);
+}
+
+struct DiagnosticSigningFailure {
+    inner: Ed25519Backend,
+    readiness: bool,
+}
+impl chio_core::SigningBackend for DiagnosticSigningFailure {
+    fn algorithm(&self) -> chio_core::SigningAlgorithm {
+        self.inner.algorithm()
+    }
+    fn public_key(&self) -> PublicKey {
+        self.inner.public_key()
+    }
+    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
+        if self.readiness || message != b"chio.response-simulation.readiness.v1\0" {
+            return Err(chio_core::Error::InvalidSignature(
+                "private-signer-detail".into(),
+            ));
+        }
+        self.inner.sign_bytes(message)
+    }
+}
+
+#[test]
+fn response_dry_run_diagnostic_retains_native_signer_failure_before_any_receipt() {
+    for readiness in [false, true] {
+        let fixture = real_adapter_fixture_for_mode(
+            chio_security_types::ResponseExecutionMode::DryRun,
+            false,
+        );
+        let request = fixture
+            .artifacts
+            .clone()
+            .into_simulation_request(fixture.plan.response_plan().clone())
+            .unwrap_or_else(|error| panic!("request: {error}"));
+        let source = Arc::new(
+            SqliteSecurityStateStore::open(&fixture.paths.responses)
+                .unwrap_or_else(|error| panic!("state: {error}")),
+        );
+        let receipts = Arc::new(
+            SqliteReceiptStore::open(&fixture.paths.receipts)
+                .unwrap_or_else(|error| panic!("receipts: {error}")),
+        );
+        let result = crate::security::ProductionResponseSimulator::new(
+            Arc::new(DryRunStateSource(source)),
+            receipts.clone(),
+            Arc::new(DiagnosticSigningFailure {
+                inner: Ed25519Backend::new(fixture.executor_signer.clone()),
+                readiness,
+            }),
+            Digest32::new([0x91; 32]),
+        )
+        .and_then(|service| service.run(fixture.runtime.kernel.as_ref(), &request));
+        let error = result
+            .err()
+            .unwrap_or_else(|| panic!("failed signer accepted"));
+        let native = std::error::Error::source(&error)
+            .and_then(|source| source.downcast_ref::<chio_core::Error>());
+        assert!(
+            matches!(native, Some(chio_core::Error::InvalidSignature(_))),
+            "native signing cause lost: {error:?}"
+        );
+        assert_eq!(
+            error.code().as_str(),
+            "urn:chio:error:attest:receipt-signing-failed"
+        );
+        assert!(!format!("{error} {error:?}").contains("private"));
+        let evidence_id = chio_kernel::response_simulation_report::response_simulation_evidence_id(
+            fixture.plan.response_plan(),
+            Digest32::new([0x91; 32]),
+        )
+        .unwrap_or_else(|error| panic!("id: {error}"));
+        assert!(receipts
+            .load_indexed_security_evidence(&evidence_id)
+            .unwrap_or_else(|error| panic!("load: {error}"))
+            .is_none());
+        assert_dry_run_untouched(&fixture);
+    }
 }

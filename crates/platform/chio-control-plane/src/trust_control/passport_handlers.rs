@@ -223,6 +223,17 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
+    let Some(issuer) = state.config.advertise_url.as_deref() else {
+        return plain_http_error(
+            StatusCode::CONFLICT,
+            "passport issuance requires --advertise-url on the trust-control service",
+        );
+    };
+    // An upload can outlive its entitlement. Recheck before issuer metadata
+    // resolution can create signing material, keeping this refusal read-only.
+    if let Err(error) = registry.validate_credential_entitlement(issuer, &access_token, clock_now) {
+        return plain_http_error(StatusCode::UNAUTHORIZED, &error.to_string());
+    }
     let metadata = match configured_passport_credential_issuer(&state.config) {
         Ok(metadata) => metadata,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),

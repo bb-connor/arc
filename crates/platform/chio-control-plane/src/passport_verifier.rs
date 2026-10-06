@@ -592,6 +592,55 @@ impl PassportIssuanceOfferRegistry {
         })
     }
 
+    /// Check current wallet redemption authority without refreshing or consuming it.
+    pub(crate) fn validate_credential_entitlement(
+        &self,
+        configured_credential_issuer: &str,
+        access_token: &str,
+        now: u64,
+    ) -> Result<&PassportIssuanceOfferRecord, CliError> {
+        let record = self
+            .offers
+            .values()
+            .find(|record| record.access_token.as_deref() == Some(access_token))
+            .ok_or_else(|| {
+                CliError::cli_other_error(
+                    "access token is not present in the issuance registry".to_string(),
+                )
+            })?;
+        match record.state {
+            PassportIssuanceOfferState::TokenIssued => {}
+            PassportIssuanceOfferState::Offered => {
+                return Err(CliError::cli_other_error(
+                    "access token has not been issued for this offer".to_string(),
+                ));
+            }
+            PassportIssuanceOfferState::CredentialIssued => {
+                return Err(CliError::cli_other_error(
+                    "credential has already been issued for this access token".to_string(),
+                ));
+            }
+            PassportIssuanceOfferState::Expired => {
+                return Err(CliError::cli_other_error(
+                    "access token entitlement has expired".to_string(),
+                ));
+            }
+        }
+        if passport_issuance_offer_expired(record, now) {
+            return Err(CliError::cli_other_error(
+                "access token entitlement has expired".to_string(),
+            ));
+        }
+        if normalize_credential_issuer(&record.offer.credential_issuer)?
+            != normalize_credential_issuer(configured_credential_issuer)?
+        {
+            return Err(CliError::policy_error(
+                "offer credential_issuer does not match the configured issuer metadata".to_string(),
+            ));
+        }
+        Ok(record)
+    }
+
     pub fn redeem_credential(
         &mut self,
         metadata: &Oid4vciCredentialIssuerMetadata,
@@ -603,47 +652,16 @@ impl PassportIssuanceOfferRegistry {
     ) -> Result<Oid4vciCredentialResponse, CliError> {
         request.validate()?;
         metadata.validate()?;
-        let Some(offer_id) = self
-            .offers
-            .iter()
-            .find(|(_, record)| record.access_token.as_deref() == Some(access_token))
-            .map(|(offer_id, _)| offer_id.clone())
-        else {
-            return Err(CliError::cli_other_error(
-                "access token is not present in the issuance registry".to_string(),
-            ));
-        };
+        let offer_id = self
+            .validate_credential_entitlement(&metadata.credential_issuer, access_token, now)?
+            .offer_id
+            .clone();
         let Some(record) = self.offers.get_mut(&offer_id) else {
             return Err(CliError::cli_other_error(
                 "access token resolved to a missing issuance offer".to_string(),
             ));
         };
         refresh_passport_issuance_offer_state(record, now);
-        if normalize_credential_issuer(&record.offer.credential_issuer)?
-            != normalize_credential_issuer(&metadata.credential_issuer)?
-        {
-            return Err(CliError::policy_error(
-                "offer credential_issuer does not match the configured issuer metadata".to_string(),
-            ));
-        }
-        match record.state {
-            PassportIssuanceOfferState::TokenIssued => {}
-            PassportIssuanceOfferState::Offered => {
-                return Err(CliError::cli_other_error(
-                    "access token has not been issued for this offer".to_string(),
-                ))
-            }
-            PassportIssuanceOfferState::CredentialIssued => {
-                return Err(CliError::cli_other_error(
-                    "credential has already been issued for this access token".to_string(),
-                ))
-            }
-            PassportIssuanceOfferState::Expired => {
-                return Err(CliError::cli_other_error(
-                    "issuance offer has expired".to_string(),
-                ))
-            }
-        }
 
         let credential_configuration_id = request
             .validate_against_metadata(metadata)
@@ -1528,13 +1546,16 @@ fn refresh_passport_issuance_offer_state(record: &mut PassportIssuanceOfferRecor
     if record.state == PassportIssuanceOfferState::CredentialIssued {
         return;
     }
-    if now > record.expires_at
+    if passport_issuance_offer_expired(record, now) {
+        record.state = PassportIssuanceOfferState::Expired;
+    }
+}
+
+fn passport_issuance_offer_expired(record: &PassportIssuanceOfferRecord, now: u64) -> bool {
+    now > record.expires_at
         || record
             .access_token_expires_at
             .is_some_and(|expires_at| now > expires_at)
-    {
-        record.state = PassportIssuanceOfferState::Expired;
-    }
 }
 
 fn normalize_credential_issuer(value: &str) -> Result<String, CliError> {

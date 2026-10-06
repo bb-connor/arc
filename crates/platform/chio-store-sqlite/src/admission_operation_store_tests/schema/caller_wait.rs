@@ -33,6 +33,8 @@ pub(in crate::admission_operation_store::tests) fn remove_caller_wait_state(
 }
 
 fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
+    remove_empty_checkpoint_catalog(connection)?;
+    remove_empty_recovery_schema(connection)?;
     assert_eq!(
         connection.query_row(
             "SELECT COUNT(*) FROM admission_operations WHERE state = 'awaiting_caller_report'",
@@ -70,6 +72,77 @@ fn rebuild_predecessor(connection: &Connection) -> rusqlite::Result<()> {
         "INSERT INTO admission_operations SELECT * FROM admission_operations_v34_fixture;
         DROP TABLE admission_operations_v34_fixture;",
     )
+}
+
+pub(in crate::admission_operation_store::tests) fn remove_empty_checkpoint_catalog(
+    connection: &Connection,
+) -> rusqlite::Result<()> {
+    for table in [
+        "security_participant_checkpoint_rows",
+        "security_participant_checkpoint_events",
+    ] {
+        let exists: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = ?1)",
+            [table],
+            |row| row.get(0),
+        )?;
+        if !exists {
+            continue;
+        }
+        let count: i64 =
+            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })?;
+        assert_eq!(
+            count, 0,
+            "predecessor fixture cannot discard checkpoint history"
+        );
+        connection.execute_batch(&format!("DROP TABLE {table}"))?;
+    }
+    assert_eq!(connection.query_row("SELECT COUNT(*) FROM authority_global_commits WHERE projection_kind = 'security_participant_checkpoint'",[],|row|row.get::<_,i64>(0))?,0,
+        "predecessor fixture cannot discard checkpoint references");
+    Ok(())
+}
+
+fn remove_empty_recovery_schema(connection: &Connection) -> rusqlite::Result<()> {
+    let exists: bool = connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'admission_operation_recovery_deferrals')",[],|row|row.get(0))?;
+    if exists {
+        assert_eq!(
+            connection.query_row(
+                "SELECT COUNT(*) FROM admission_operation_recovery_deferrals",
+                [],
+                |row| row.get::<_, i64>(0)
+            )?,
+            0,
+            "predecessor fixture cannot discard recovery deferrals"
+        );
+    }
+    assert_eq!(connection.query_row("SELECT COUNT(*) FROM admission_operation_commits WHERE mutation_kind IN ('recovery_deferred','recovery_deferral_cleared')",[],|row|row.get::<_,i64>(0))?,0,
+        "predecessor fixture cannot discard recovery commit evidence");
+    if exists {
+        connection.execute_batch("DROP TABLE admission_operation_recovery_deferrals")?;
+    }
+    let sql: String = connection.query_row(
+        "SELECT sql FROM sqlite_schema WHERE name = 'admission_operation_commits'",
+        [],
+        |row| row.get(0),
+    )?;
+    if !sql.contains("'recovery_deferred'") {
+        return Ok(());
+    }
+    connection.execute_batch(
+        "DROP TRIGGER admission_operation_commits_exact_lease;
+        DROP TRIGGER admission_operation_commits_immutable;
+        DROP TRIGGER admission_operation_commits_no_delete;
+        DROP INDEX admission_operation_commits_operation;
+        ALTER TABLE admission_operation_commits RENAME TO admission_operation_commits_v35_fixture;",
+    )?;
+    let model = crate::admission_operation_store::schema::pre_recovery_schema_fixture();
+    connection.execute_batch(&model)?;
+    connection.execute_batch("DROP TRIGGER admission_operation_commits_exact_lease;
+        INSERT INTO admission_operation_commits SELECT * FROM admission_operation_commits_v35_fixture;
+        DROP TABLE admission_operation_commits_v35_fixture;")?;
+    connection.execute_batch(&model)
 }
 
 fn rows(connection: &Connection, table: &str) -> AnchoredTestResult<Vec<Vec<Value>>> {

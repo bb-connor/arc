@@ -2,6 +2,12 @@
 //! the rail settlement and its continuation after an interrupted attempt.
 
 use super::*;
+#[path = "terminal_payment/continuation.rs"]
+mod continuation;
+use super::super::recovery::failure::{
+    item_failure, payment_error, payment_record_error, payment_store_error,
+};
+use crate::admission_operation::AdmissionRecoveryFailureKind as FailureKind;
 
 pub(super) struct DurablePaymentTerminal {
     pub(super) journal: crate::payment::PaymentJournalRecord,
@@ -25,6 +31,16 @@ fn payment_journal_matches_settlement(
     action: crate::payment::PaymentSettleAction,
     amount_units: u64,
 ) -> bool {
+    if journal.rail_mode == crate::payment::PaymentRailMode::PrepaidFinal {
+        return journal.state == crate::payment::PaymentJournalState::Settled
+            && journal.authorization_id.is_some()
+            && journal.transaction_id.is_none()
+            && journal.settle_action.is_none()
+            && journal.settle_amount_units.is_none()
+            && journal.release_authority.is_none()
+            && action == crate::payment::PaymentSettleAction::Capture
+            && journal.authorized_amount_units == Some(amount_units);
+    }
     journal.settle_action == Some(action)
         && match action {
             crate::payment::PaymentSettleAction::Capture => {
@@ -42,216 +58,6 @@ fn payment_journal_matches_settlement(
 }
 
 impl ChioKernel {
-    pub(super) fn durable_payment_disposition(
-        &self,
-        admission: &DurableToolAdmission,
-        runtime: &DurableAdmissionRuntime,
-        raw: &RawInvocationOutcomeV1,
-        trusted_now_unix_ms: u64,
-        delivery_denied: bool,
-    ) -> Result<
-        Option<(
-            crate::payment::PaymentJournalRecord,
-            SettlementDispositionV1,
-        )>,
-        KernelError,
-    > {
-        if !admission.requires_payment() {
-            return Ok(None);
-        }
-        let journal = runtime
-            .store
-            .load_payment_journal(admission.operation_id(), &runtime.fence)
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
-            .ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "durable payment participant disappeared during finalization".to_owned(),
-                )
-            })?;
-        journal
-            .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if journal.capability_id != admission.operation.binding().capability_id().as_str()
-            || usize::try_from(journal.grant_index).ok()
-                != Some(raw.matched_grant_index().map_err(tool_outcome_error)?)
-        {
-            return Err(KernelError::DurableAdmission(
-                "payment journal does not match the recorded tool outcome".to_owned(),
-            ));
-        }
-        let amount_units = match journal.rail_mode {
-            crate::payment::PaymentRailMode::PrepaidFinal => journal.amount_units,
-            crate::payment::PaymentRailMode::ReversibleHold => {
-                let reported = raw.reported_cost();
-                let units = match reported {
-                    Some(cost) if cost.currency != journal.currency => {
-                        let cost = ToolInvocationCost {
-                            units: cost.units,
-                            currency: cost.currency.clone(),
-                            breakdown: None,
-                        };
-                        self.resolve_cross_currency_cost(
-                            &cost,
-                            &journal.currency,
-                            trusted_now_unix_ms / 1_000,
-                        )?
-                        .0
-                    }
-                    Some(cost) => cost.units,
-                    None => journal.amount_units,
-                };
-                if units > journal.amount_units {
-                    return Err(KernelError::DurableAdmission(
-                        "reported cost exceeds the durable payment authorization".to_owned(),
-                    ));
-                }
-                units
-            }
-        };
-        // A delivery mismatch releases the open hold and captures zero. The
-        // pre-dispatch gate rejects every non-reversible rail for a
-        // digest-constrained request, so a denied delivery is always a
-        // reversible hold; assert that invariant rather than silently
-        // producing an unreleasable zero-charge.
-        if delivery_denied && journal.rail_mode != crate::payment::PaymentRailMode::ReversibleHold {
-            return Err(KernelError::DurableAdmission(
-                "delivery denial requires a reversible-hold rail".to_owned(),
-            ));
-        }
-        let disposition = if delivery_denied || amount_units == 0 {
-            SettlementDispositionV1::ContractualZeroCharge {
-                currency: journal.currency.clone(),
-            }
-        } else {
-            SettlementDispositionV1::Capture {
-                amount: chio_core::capability::scope::MonetaryAmount {
-                    units: amount_units,
-                    currency: journal.currency.clone(),
-                },
-            }
-        };
-        Ok(Some((journal, disposition)))
-    }
-
-    fn continue_durable_payment_settlement(
-        &self,
-        operation: &AdmissionOperationV1,
-        runtime: &DurableAdmissionRuntime,
-        lease: &crate::admission_operation::AdmissionRecoveryLease,
-        mut journal: crate::payment::PaymentJournalRecord,
-        trusted_now_unix_ms: u64,
-    ) -> Result<Option<crate::payment::PaymentJournalRecord>, KernelError> {
-        journal
-            .validate()
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        if journal.operation_id != operation.binding().operation_id().as_str() {
-            return Err(KernelError::DurableAdmission(
-                "payment settlement changed operation identity".to_owned(),
-            ));
-        }
-        if journal.state == crate::payment::PaymentJournalState::Settled {
-            return Ok(Some(journal));
-        }
-        // A journal sealed as reconcile_failed still carries its settle action and
-        // authorization, so the same intent is re-driven against the rail rather
-        // than leaving the operation non-terminal with its hold already reconciled.
-        if journal.rail_mode != crate::payment::PaymentRailMode::ReversibleHold
-            || !matches!(
-                journal.state,
-                crate::payment::PaymentJournalState::Settling
-                    | crate::payment::PaymentJournalState::ReconcileFailed
-            )
-        {
-            return Err(KernelError::DurableAdmission(
-                "payment journal has no replayable settlement intent".to_owned(),
-            ));
-        }
-        let settle_action = journal.settle_action.ok_or_else(|| {
-            KernelError::DurableAdmission("settling payment journal omitted its action".to_owned())
-        })?;
-        let authorization_id = journal.authorization_id.as_deref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "settling payment journal omitted authorization_id".to_owned(),
-            )
-        })?;
-        let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission(
-                "durable payment adapter disappeared during settlement".to_owned(),
-            )
-        })?;
-        if adapter.rail_id() != journal.rail || adapter.rail_mode() != Some(journal.rail_mode) {
-            return Err(KernelError::DurableAdmission(
-                "durable payment adapter changed before settlement".to_owned(),
-            ));
-        }
-        let result = match settle_action {
-            crate::payment::PaymentSettleAction::Capture => adapter.capture(
-                authorization_id,
-                journal.settle_amount_units.ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "capture journal omitted its settlement amount".to_owned(),
-                    )
-                })?,
-                &journal.currency,
-                &journal.operation_id,
-            ),
-            crate::payment::PaymentSettleAction::Release => {
-                adapter.release(authorization_id, &journal.operation_id)
-            }
-        }
-        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        let compatible = matches!(
-            (settle_action, result.settlement_status),
-            (
-                crate::payment::PaymentSettleAction::Capture,
-                crate::payment::RailSettlementStatus::Captured
-                    | crate::payment::RailSettlementStatus::Settled
-            ) | (
-                crate::payment::PaymentSettleAction::Release,
-                crate::payment::RailSettlementStatus::Released
-            )
-        );
-        if compatible {
-            let transition = crate::payment::PaymentJournalTransition::SettlementCompleted {
-                transaction_id: result.transaction_id,
-            };
-            journal = runtime
-                .store
-                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                    operation,
-                    recovery_lease: lease,
-                    expected: &journal,
-                    transition: &transition,
-                    release_evidence: None,
-                    active_fence: &runtime.fence,
-                    trusted_now_unix_ms,
-                })
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-            return Ok(Some(journal));
-        }
-        if result.settlement_status == crate::payment::RailSettlementStatus::Pending {
-            return Ok(None);
-        }
-        if journal.state != crate::payment::PaymentJournalState::ReconcileFailed {
-            let transition = crate::payment::PaymentJournalTransition::ReconcileFailed;
-            runtime
-                .store
-                .advance_payment_journal(crate::receipt_store::AdmissionPaymentJournalAdvance {
-                    operation,
-                    recovery_lease: lease,
-                    expected: &journal,
-                    transition: &transition,
-                    release_evidence: None,
-                    active_fence: &runtime.fence,
-                    trusted_now_unix_ms,
-                })
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
-        }
-        Err(KernelError::DurableAdmission(
-            "payment rail returned an incompatible settlement status".to_owned(),
-        ))
-    }
-
     pub(super) fn settle_durable_payment(
         &self,
         input: DurablePaymentSettlementInput<'_>,
@@ -266,11 +72,14 @@ impl ChioKernel {
             purchase,
             trusted_now_unix_ms,
         } = input;
+        let authorized_amount = journal.authorized_amount_units;
         let (amount_units, settle_action) = match disposition {
             SettlementDispositionV1::Capture { amount } => {
+                let authorized_amount = authorized_amount.ok_or_else(|| item_failure(
+                    FailureKind::LegacyPaymentAmountAbsent, "legacy payment has no exact debit; new capture cannot be inferred from exposure"))?;
                 if amount.currency != journal.currency
                     || amount.units == 0
-                    || amount.units > journal.amount_units
+                    || amount.units > authorized_amount
                 {
                     return Err(KernelError::DurableAdmission(
                         "durable capture disposition conflicts with the payment journal".to_owned(),
@@ -301,7 +110,7 @@ impl ChioKernel {
             (
                 crate::payment::PaymentRailMode::PrepaidFinal,
                 crate::payment::PaymentJournalState::Settled,
-            ) if journal.authorization_id.is_some() && amount_units == journal.amount_units => {
+            ) if journal.authorization_id.is_some() && Some(amount_units) == authorized_amount => {
                 (None, None)
             }
             (
@@ -339,6 +148,7 @@ impl ChioKernel {
             (
                 crate::payment::PaymentRailMode::ReversibleHold,
                 crate::payment::PaymentJournalState::Settling
+                | crate::payment::PaymentJournalState::ReconcileFailed
                 | crate::payment::PaymentJournalState::Settled,
             ) if payment_journal_matches_settlement(&journal, settle_action, amount_units) => {
                 (None, None)
@@ -378,7 +188,7 @@ impl ChioKernel {
                 active_fence: &runtime.fence,
                 trusted_now_unix_ms,
             })
-            .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+            .map_err(payment_store_error)?;
         journal = settlement.journal;
         let reconcile = settlement.budget;
         if !payment_journal_matches_settlement(&journal, settle_action, amount_units) {
@@ -411,7 +221,10 @@ impl ChioKernel {
                 trusted_now_unix_ms,
             )?
             .ok_or_else(|| {
-                KernelError::DurableAdmission("payment settlement remains pending".to_owned())
+                super::super::recovery::failure::item_failure(
+                    crate::admission_operation::AdmissionRecoveryFailureKind::PaymentPending,
+                    "payment settlement remains pending",
+                )
             })?;
         if journal.state != crate::payment::PaymentJournalState::Settled {
             return Err(KernelError::DurableAdmission(

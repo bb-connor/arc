@@ -35,6 +35,66 @@ pub(super) fn measure(text: &str) -> Result<Footprint, AdmissionError> {
     }
 }
 
+/// Already-decoded callers have no original wire slice. Count the tree and the
+/// exact serialized representation without allocating another tree or buffer.
+pub(super) fn measure_value(value: &serde_json::Value) -> Result<Footprint, AdmissionError> {
+    fn visit(
+        value: &serde_json::Value,
+        depth: usize,
+        counter: &mut Counter,
+    ) -> Result<(), serde_json::Error> {
+        if depth > 128 {
+            counter.limit = Some("JSON depth");
+            return Err(<serde_json::Error as de::Error>::custom(
+                "MCP ingress depth exceeded",
+            ));
+        }
+        counter.add(1, 0)?;
+        match value {
+            serde_json::Value::String(text) => counter.add(0, text.len())?,
+            serde_json::Value::Array(values) => {
+                for value in values {
+                    visit(value, depth + 1, counter)?;
+                }
+            }
+            serde_json::Value::Object(values) => {
+                for (key, value) in values {
+                    counter.add(0, key.len())?;
+                    visit(value, depth + 1, counter)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+    struct WireCount(usize);
+    impl std::io::Write for WireCount {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 = self
+                .0
+                .checked_add(bytes.len())
+                .filter(|count| *count <= super::MAX_RETAINED_WIRE_BYTES)
+                .ok_or_else(|| std::io::Error::other("MCP ingress wire capacity exceeded"))?;
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut counter = Counter {
+        footprint: Footprint::default(),
+        limit: None,
+    };
+    visit(value, 0, &mut counter).map_err(|error| match counter.limit {
+        Some(limit) => AdmissionError::Limit(limit),
+        None => AdmissionError::Input(error),
+    })?;
+    let mut wire = WireCount(0);
+    serde_json::to_writer(&mut wire, value).map_err(|_| AdmissionError::Limit("wire bytes"))?;
+    counter.footprint.wire_bytes = wire.0;
+    Ok(counter.footprint)
+}
+
 struct Counter {
     footprint: Footprint,
     limit: Option<&'static str>,

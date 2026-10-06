@@ -10,6 +10,9 @@ pub enum ProtectError {
     #[error("authority clock rejected the operation: {0}")]
     Clock(#[from] chio_security_types::clock::ClockError),
 
+    #[error("owned mediation maintenance failed")]
+    MediationMaintenance(#[source] std::sync::Arc<chio_kernel::KernelError>),
+
     #[error("{0}")]
     Input(#[from] chio_core_types::canonical::UntrustedJsonError),
 

@@ -982,6 +982,9 @@ pub(super) fn map_approval_coordinator_error(error: ApprovalCoordinatorError) ->
 }
 
 pub(in crate::security) fn map_active_response_kernel_error(error: KernelError) -> PortError {
+    if let KernelError::ResponseDispatchRejected(rejection) = &error {
+        return PortError::with_source(PortErrorKind::InvalidData, rejection.code(), error);
+    }
     let definitively_never_committed =
         matches!(&error, KernelError::ActiveResponseNeverCommitted(_));
     let retryable = matches!(

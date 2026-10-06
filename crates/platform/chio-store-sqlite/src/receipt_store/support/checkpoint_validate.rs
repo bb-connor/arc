@@ -432,9 +432,22 @@ pub(crate) fn verify_latest_checkpoint_integrity(
     if load_latest_persisted_checkpoint_row(connection)?.is_none() {
         return Ok(());
     }
+    let watermark = trusted_retention_watermark(connection)?;
+    verify_latest_checkpoint_integrity_with_trusted_watermark(connection, watermark)
+}
+
+/// Reuse an archive watermark authenticated on an already pinned connection.
+/// This does not resolve or reopen the archive's mutable filesystem path.
+pub(crate) fn verify_latest_checkpoint_integrity_with_trusted_watermark(
+    connection: &Connection,
+    watermark: u64,
+) -> Result<(), ReceiptStoreError> {
+    if load_latest_persisted_checkpoint_row(connection)?.is_none() {
+        return Ok(());
+    }
     #[cfg(test)]
     CHECKPOINT_CHAIN_READ_VERIFICATIONS.with(|count| count.set(count.get() + 1));
-    verify_checkpoint_chain_integrity(connection).map(|_| ())
+    verify_checkpoint_chain_integrity_with_frontier_at_watermark(connection, watermark).map(|_| ())
 }
 
 /// The archival watermark that may be TRUSTED to skip the live Merkle rebuild
@@ -641,6 +654,14 @@ pub(crate) fn verify_checkpoint_chain_integrity(
 pub(crate) fn verify_checkpoint_chain_integrity_with_frontier(
     connection: &Connection,
 ) -> Result<(Option<KernelCheckpoint>, CheckpointChainFrontier), ReceiptStoreError> {
+    let watermark = trusted_retention_watermark(connection)?;
+    verify_checkpoint_chain_integrity_with_frontier_at_watermark(connection, watermark)
+}
+
+fn verify_checkpoint_chain_integrity_with_frontier_at_watermark(
+    connection: &Connection,
+    watermark: u64,
+) -> Result<(Option<KernelCheckpoint>, CheckpointChainFrontier), ReceiptStoreError> {
     let rows = load_all_persisted_checkpoint_rows(connection)?;
     let mut latest = None;
     let mut expected_head_ids = BTreeSet::new();
@@ -648,7 +669,6 @@ pub(crate) fn verify_checkpoint_chain_integrity_with_frontier(
     let mut expected_publication_ids = BTreeSet::new();
     let mut chain_frontier = chio_kernel::checkpoint::CheckpointChainFrontier::empty();
 
-    let watermark = trusted_retention_watermark(connection)?;
     for row in rows {
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?; // signature + column consistency
                                                                        // Checkpoints fully covered by a persisted archival watermark have

@@ -14,6 +14,15 @@ use chio_test_support::prelude::*;
 use chio_tool_call_fabric::{ProviderRequest, ReceiptId, VerdictResult};
 use serde_json::json;
 
+#[path = "registry_security/delta_identity.rs"]
+mod delta_identity;
+#[path = "registry_security/lifecycle_payload.rs"]
+mod lifecycle_payload;
+#[path = "registry_security/provider_contract.rs"]
+mod provider_contract;
+#[path = "registry_security/terminal_payload.rs"]
+mod terminal_payload;
+
 const SERVER_ID: &str = "cohere-security";
 const TOOL_NAME: &str = "get_weather";
 

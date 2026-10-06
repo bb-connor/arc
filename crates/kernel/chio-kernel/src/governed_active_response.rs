@@ -242,6 +242,9 @@ impl ChioKernel {
         })
     }
 
+    /// The legacy admission lacks the attested finding and submission bindings
+    /// required for dispatch. This compatibility method always refuses. Use
+    /// `prepare_active_response_admission` and `execute_prepared_active_response`.
     pub fn commit_governed_active_response_dispatch(
         &self,
         admission: &mut GovernedActiveResponseAdmission,
@@ -254,14 +257,12 @@ impl ChioKernel {
 
     pub(crate) fn commit_governed_active_response_dispatch_at(
         &self,
-        admission: &mut GovernedActiveResponseAdmission,
-        trusted_now_unix_ms: u64,
+        _admission: &mut GovernedActiveResponseAdmission,
+        _trusted_now_unix_ms: u64,
     ) -> Result<GovernedActiveResponseDispatchCommit, KernelError> {
-        if admission.admission.state() == AdmissionOperationState::DispatchCommitted {
-            return Ok(GovernedActiveResponseDispatchCommit::AlreadyCommitted);
-        }
-        self.commit_durable_dispatch(&mut admission.admission, trusted_now_unix_ms)?;
-        Ok(GovernedActiveResponseDispatchCommit::Committed)
+        Err(KernelError::GovernedTransactionDenied(
+            "legacy governed active-response commitment is retired; use prepare_active_response_admission and execute_prepared_active_response".to_owned(),
+        ))
     }
 
     pub fn cancel_governed_active_response(

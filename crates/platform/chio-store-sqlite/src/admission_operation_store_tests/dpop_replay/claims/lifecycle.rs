@@ -1,6 +1,76 @@
 use super::*;
 
 #[test]
+fn released_dpop_identity_remains_spent_for_a_different_operation() -> AnchoredTestResult {
+    let fixture = fixture();
+    let source = Source::new(&fixture, true)?;
+    let authority = activate(&fixture, &source)?;
+    let (original, lease, credential) = setup(
+        &fixture,
+        &authority,
+        "released-original",
+        "released-replay",
+        DpopReplayClaimPhase::Dispatch,
+    )?;
+    let intent = candidate(
+        &original,
+        "original-episode",
+        credential.clone(),
+        DpopReplayClaimPhase::Dispatch,
+    )?;
+    let (original, reference) =
+        fixture
+            .store
+            .claim_dpop_replay(&original, &lease, &intent, now_ms())?;
+    let lease = renew(&fixture, &original, &lease, now_ms())?;
+    fixture
+        .store
+        .release_dpop_replay(&original, &lease, &reference, now_ms())?;
+    let (other, other_lease, other_credential) = setup(
+        &fixture,
+        &authority,
+        "released-other",
+        "released-replay",
+        DpopReplayClaimPhase::Dispatch,
+    )?;
+    assert_ne!(
+        original.binding().operation_id(),
+        other.binding().operation_id()
+    );
+    let other_intent = candidate(
+        &other,
+        "other-episode",
+        other_credential,
+        DpopReplayClaimPhase::Dispatch,
+    )?;
+    let count = global_count(&fixture);
+    let error = fixture
+        .store
+        .claim_dpop_replay(&other, &other_lease, &other_intent, now_ms())
+        .expect_err("released proof remains spent for every other operation");
+    assert!(error.to_string().contains("historically spent"), "{error}");
+    assert_eq!(global_count(&fixture), count);
+    assert_eq!(
+        fixture
+            .store
+            .load_by_operation_id(other.binding().operation_id())?,
+        Some(other),
+    );
+    // A new episode may reclaim the released credential only within its owner.
+    let successor = candidate(
+        &original,
+        "original-successor",
+        credential,
+        DpopReplayClaimPhase::Dispatch,
+    )?;
+    fixture
+        .store
+        .claim_dpop_replay(&original, &lease, &successor, now_ms())?;
+    verify_admission_operation_invariants(&*fixture.store.connection()?)?;
+    Ok(())
+}
+
+#[test]
 fn exact_claim_retry_release_and_successor_preserve_ownership() -> AnchoredTestResult {
     let fixture = fixture();
     let source = Source::new(&fixture, false)?;

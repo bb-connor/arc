@@ -4,6 +4,10 @@ use super::*;
 
 #[path = "scope_binding.rs"]
 mod scope_binding;
+#[path = "session_cancellation.rs"]
+mod session_cancellation;
+#[path = "session_claim_race.rs"]
+mod session_claim_race;
 #[path = "reports.rs"]
 mod session_reports;
 
@@ -466,8 +470,9 @@ fn threshold_session_rejects_unsupported_durable_nonce_profile() -> TestResult {
     );
     let response = evaluate(&fixture, &context, EntryPoint::Session)?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.reason.as_deref().is_some_and(|reason| reason
-        .contains("admission store lacks the operation-owned execution nonce participant")));
+    assert!(response.reason.as_deref().is_some_and(|reason| {
+        reason.contains("admission store lacks the operation-owned execution nonce participant")
+    }));
     assert!(response.execution_nonce.is_none());
     assert!(response.output.is_none());
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);

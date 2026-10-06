@@ -83,6 +83,7 @@ mod factor_assignment;
 mod obligation;
 mod participant;
 mod projection;
+mod recovery;
 mod retained_request;
 mod runtime_participant;
 mod runtime_replay;
@@ -92,6 +93,7 @@ pub(crate) use security_dispatch::verify_dispatch_capture_owner_tx;
 pub(crate) use security_dispatch::verify_native_dispatch_capture_owner_tx;
 mod security_participant_migration;
 mod security_participant_state;
+pub(crate) use security_participant_state::checkpoint::projection_reference as security_participant_checkpoint_projection_reference;
 pub(crate) use security_participant_state::dispatch_ledger::projection_reference as native_dispatch_ledger_projection_reference;
 pub(crate) use security_participant_state::dispatch_ledger::{
     NativeCaptureBinding, VerifiedNativeCapture,
@@ -216,10 +218,11 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
-pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 34;
+pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 36;
 const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
     "admission_operations",
     "admission_operation_commits",
+    "admission_operation_recovery_deferrals",
     "threshold_approval_proposals",
     "chio_serving_owner",
     "capability_grant_budgets",

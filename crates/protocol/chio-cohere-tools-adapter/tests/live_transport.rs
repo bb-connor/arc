@@ -135,11 +135,8 @@ async fn chat_stream_gates_sse_response() {
     Mock::given(method("POST"))
         .and(path("/v2/chat"))
         .and(header("authorization", "Bearer live-key"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .insert_header("content-type", "text/event-stream")
-                .set_body_string(sse),
-        )
+        .and(header("accept", "text/event-stream"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(sse.as_bytes(), "text/event-stream"))
         .mount(&server)
         .await;
 

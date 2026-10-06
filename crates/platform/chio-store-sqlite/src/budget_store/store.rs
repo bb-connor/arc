@@ -4,7 +4,7 @@ mod invocations;
 use chio_kernel_core::budget_increment_admits;
 
 /// Budget-store schema revision. Bump on every schema-affecting change.
-pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 11;
+pub(crate) const BUDGET_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 12;
 /// The revision from which a stamped database is expected to already
 /// carry the invocation-capture column. Pinned rather than tracking the
 /// supported revision, so a later migration cannot silently retire the

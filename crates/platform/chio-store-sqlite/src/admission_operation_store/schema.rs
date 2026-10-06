@@ -18,10 +18,17 @@ mod migration_v31;
 mod migration_v32;
 mod migration_v33;
 mod migration_v34;
+mod migration_v35;
+mod migration_v36;
 
 #[cfg(test)]
 pub(crate) fn pre_caller_wait_schema_fixture() -> String {
-    migration_v34::predecessor_schema()
+    migration_v35::predecessor_sql(migration_v34::predecessor_schema())
+}
+
+#[cfg(test)]
+pub(crate) fn pre_recovery_schema_fixture() -> String {
+    migration_v35::predecessor_sql(ADMISSION_OPERATION_SCHEMA.to_owned())
 }
 
 #[cfg(test)]
@@ -127,7 +134,13 @@ fn migrate_schema(
     if on_disk < 33 {
         migration_v33::verify_pre_migration_schema(&transaction, on_disk)?;
     }
-    migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    if on_disk < 34 {
+        migration_v34::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    if on_disk < 35 {
+        migration_v35::verify_pre_migration_schema(&transaction, on_disk)?;
+    }
+    migration_v36::verify_pre_migration_schema(&transaction, on_disk)?;
     if on_disk < 18 && table_exists(&transaction, "admission_operations")? {
         // The legacy report-after-effect contract could refund an executed
         // caller as pre-dispatch compensation. A refunded terminal is not
@@ -181,6 +194,10 @@ fn migrate_schema(
     transaction
         .execute_batch(ADMISSION_OPERATION_SCHEMA)
         .map_err(sqlite_error)?;
+    migration_v35::migrate(&transaction)?;
+    transaction
+        .execute_batch(super::recovery::SCHEMA)
+        .map_err(sqlite_error)?;
     transaction
         .execute_batch(include_str!("../admission_operation_nonce.sql"))
         .map_err(sqlite_error)?;
@@ -225,6 +242,9 @@ fn migrate_schema(
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(super::security_participant_state::nonce_preflight::sql())
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(super::security_participant_state::checkpoint::sql())
         .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
@@ -569,6 +589,13 @@ pub(crate) fn verify_admission_operation_invariants(
     super::security_participant_state::output::verify_catalog(connection)?;
     super::security_participant_state::nonce_preflight::verify_catalog(connection)?;
     super::security_participant_state::dispatch_ledger::verify_all(connection)?;
+    super::recovery::verify_all(connection)?;
+    super::security_participant_state::checkpoint::verify_catalog(connection)?;
+    super::security_participant_state::checkpoint::verify_all(connection)?;
+    if table_exists(connection, "authority_global_commits")? {
+        super::security_participant_state::verify_archive_coverage(connection)
+            .map_err(map_owner_error)?;
+    }
     super::security_participant_state::verify_all(connection).map(|_| ())
 }
 
@@ -591,19 +618,28 @@ fn expected_admission_operation_schema(
     version: i32,
 ) -> Result<Connection, AdmissionOperationStoreError> {
     let expected = Connection::open_in_memory().map_err(sqlite_error)?;
+    let mut admission_sql = if version < 20 {
+        migration_v20::predecessor_schema()
+    } else if version < 23 {
+        migration_v23::predecessor_admission_schema()
+    } else if version < 26 {
+        migration_v26::predecessor_admission_schema()
+    } else if version < 34 {
+        migration_v34::predecessor_schema()
+    } else {
+        ADMISSION_OPERATION_SCHEMA.to_owned()
+    };
+    if version < 35 {
+        admission_sql = migration_v35::predecessor_sql(admission_sql);
+    }
     expected
-        .execute_batch(&if version < 20 {
-            migration_v20::predecessor_schema()
-        } else if version < 23 {
-            migration_v23::predecessor_admission_schema()
-        } else if version < 26 {
-            migration_v26::predecessor_admission_schema()
-        } else if version < 34 {
-            migration_v34::predecessor_schema()
-        } else {
-            ADMISSION_OPERATION_SCHEMA.to_owned()
-        })
+        .execute_batch(&admission_sql)
         .map_err(sqlite_error)?;
+    if version >= 35 {
+        expected
+            .execute_batch(super::recovery::SCHEMA)
+            .map_err(sqlite_error)?;
+    }
     if version >= 19 {
         expected
             .execute_batch(&if version < 21 {
@@ -683,6 +719,11 @@ fn expected_admission_operation_schema(
     if version >= 33 {
         expected
             .execute_batch(super::security_participant_state::nonce_preflight::sql())
+            .map_err(sqlite_error)?;
+    }
+    if version >= 36 {
+        expected
+            .execute_batch(super::security_participant_state::checkpoint::sql())
             .map_err(sqlite_error)?;
     }
     Ok(expected)
@@ -785,6 +826,8 @@ fn verify_admission_operation_data_invariants(
                             OR (mutation_kind = 'recovery_claim'
                                 AND operation_version <> previous_version)
                             OR (mutation_kind = 'participant_update'
+                                AND operation_version <> previous_version)
+                            OR (mutation_kind IN ('recovery_deferred', 'recovery_deferral_cleared')
                                 AND operation_version <> previous_version)
                             OR (mutation_kind IN ('runtime_participant_release', 'governed_approval_release', 'dpop_replay_release')
                                 AND operation_version <> previous_version)
@@ -956,6 +999,8 @@ fn admission_operation_schema_catalog(
                OR lower(tbl_name) GLOB 'security_participant_nonce_preflight*'
                OR lower(name) GLOB 'security_participant_output*'
                OR lower(tbl_name) GLOB 'security_participant_output*'
+               OR lower(name) GLOB 'security_participant_checkpoint*'
+               OR lower(tbl_name) GLOB 'security_participant_checkpoint*'
                OR lower(name) GLOB 'admission_operation_native_dispatch*'
                OR lower(tbl_name) GLOB 'admission_operation_native_dispatch*'
             ORDER BY type, name, tbl_name

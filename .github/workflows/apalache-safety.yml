@@ -11,8 +11,8 @@ permissions:
   actions: read
 
 concurrency:
-  group: apalache-safety-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: apalache-safety-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 jobs:
   apalache_contracts:

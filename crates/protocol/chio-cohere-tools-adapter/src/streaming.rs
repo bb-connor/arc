@@ -76,6 +76,15 @@ impl CohereAdapter {
                 )));
             }
             let data = frame.data.as_ref();
+            if !matches!(
+                event,
+                "tool-call-start" | "tool-call-delta" | "tool-call-end"
+            ) && data.is_some_and(carries_tool_call_payload)
+            {
+                return Err(ProviderError::Malformed(format!(
+                    "Cohere {event} frame carried a tool call outside the tool-call frames"
+                )));
+            }
             match event {
                 "message-start" => message_open = true,
                 "message-end" => {
@@ -97,6 +106,7 @@ impl CohereAdapter {
                         malformed("Cohere tool-call-delta arrived without tool-call-start")
                     })?;
                     ensure_same_index(call, data)?;
+                    ensure_same_call_identity(call, data)?;
                     let fragment = streamed_tool_call(data)
                         .and_then(|call| call.get("function"))
                         .and_then(|function| function.get("arguments"))
@@ -112,6 +122,12 @@ impl CohereAdapter {
                     call.arguments.push_str(fragment);
                 }
                 "tool-call-end" => {
+                    let selected = data.and_then(embedded_tool_call);
+                    if data.is_some_and(|data| carries_other_tool_call_payload(data, selected)) {
+                        return Err(malformed(
+                            "Cohere tool-call-end carried an unrecognized additional tool payload",
+                        ));
+                    }
                     let embedded = data
                         .filter(|data| embedded_tool_call(data).is_some())
                         .map(tool_call_from_data)
@@ -154,13 +170,7 @@ impl CohereAdapter {
                     }
                     invocations.push(invocation);
                 }
-                _ => {
-                    if data.is_some_and(carries_tool_call_payload) {
-                        return Err(ProviderError::Malformed(format!(
-                            "Cohere {event} frame carried a tool call outside the tool-call frames"
-                        )));
-                    }
-                }
+                _ => {}
             }
             output.extend_from_slice(&frame.raw);
         }
@@ -203,14 +213,11 @@ fn streamed_tool_call(data: Option<&Value>) -> Option<&Value> {
 fn open_call(data: Option<&Value>) -> Result<OpenCall, ProviderError> {
     let call = streamed_tool_call(data)
         .ok_or_else(|| malformed("Cohere tool-call-start was missing its tool call"))?;
-    let kind = call
+    if call
         .get("type")
-        .and_then(Value::as_str)
-        .unwrap_or("function");
-    if kind != "function" {
-        return Err(ProviderError::Malformed(format!(
-            "Cohere tool call type {kind} is not supported by the gate"
-        )));
+        .is_some_and(|kind| kind.as_str() != Some("function"))
+    {
+        return Err(malformed("Cohere tool-call-start type must be function"));
     }
     let text = |value: Option<&Value>, what: &str| -> Result<String, ProviderError> {
         value
@@ -227,12 +234,35 @@ fn open_call(data: Option<&Value>) -> Result<OpenCall, ProviderError> {
             .and_then(Value::as_u64),
         id: text(call.get("id"), "id")?,
         name: text(function.and_then(|function| function.get("name")), "name")?,
-        arguments: function
-            .and_then(|function| function.get("arguments"))
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
+        arguments: match function.and_then(|function| function.get("arguments")) {
+            Some(arguments) => text(Some(arguments), "argument text")?,
+            None => String::new(),
+        },
     })
+}
+
+fn ensure_same_call_identity(call: &OpenCall, data: Option<&Value>) -> Result<(), ProviderError> {
+    let delta = streamed_tool_call(data)
+        .ok_or_else(|| malformed("Cohere tool-call-delta was missing its tool call"))?;
+    if delta
+        .get("id")
+        .filter(|id| !id.is_null())
+        .is_some_and(|id| id.as_str() != Some(call.id.as_str()))
+        || delta
+            .get("type")
+            .filter(|kind| !kind.is_null())
+            .is_some_and(|kind| kind.as_str() != Some("function"))
+        || delta
+            .get("function")
+            .and_then(|function| function.get("name"))
+            .filter(|name| !name.is_null())
+            .is_some_and(|name| name.as_str() != Some(call.name.as_str()))
+    {
+        return Err(malformed(
+            "Cohere tool-call-delta identity or type changed mid-call",
+        ));
+    }
+    Ok(())
 }
 
 fn ensure_same_index(call: &OpenCall, data: Option<&Value>) -> Result<(), ProviderError> {
@@ -252,13 +282,27 @@ fn embedded_tool_call(data: &Value) -> Option<&Value> {
         .or_else(|| data.get("delta").and_then(|delta| delta.get("tool_call")))
 }
 
-/// True when a non-tool frame carries any `tool_call` or `tool_calls` member.
+/// Empty/null lifecycle placeholders are not calls. Every other tool member
+/// must pass through a supported tool-call frame, including malformed shapes.
 fn carries_tool_call_payload(value: &Value) -> bool {
+    carries_other_tool_call_payload(value, None)
+}
+
+/// Only the exact selected singular payload is consumed by the terminal parser.
+/// Its contents are still checked for additional tool members.
+fn carries_other_tool_call_payload(value: &Value, selected: Option<&Value>) -> bool {
     match value {
         Value::Object(map) => map.iter().any(|(key, value)| {
-            key == "tool_call" || key == "tool_calls" || carries_tool_call_payload(value)
+            let tool_member = (key == "tool_call" && !value.is_null())
+                || (key == "tool_calls"
+                    && !value.is_null()
+                    && value.as_array().is_none_or(|calls| !calls.is_empty()));
+            (tool_member && !selected.is_some_and(|selected| std::ptr::eq(value, selected)))
+                || carries_other_tool_call_payload(value, selected)
         }),
-        Value::Array(items) => items.iter().any(carries_tool_call_payload),
+        Value::Array(items) => items
+            .iter()
+            .any(|value| carries_other_tool_call_payload(value, selected)),
         _ => false,
     }
 }

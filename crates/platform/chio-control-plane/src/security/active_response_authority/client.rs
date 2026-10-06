@@ -1,8 +1,9 @@
-#[cfg(target_os = "linux")]
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, SigningBackend};
 use chio_kernel::AuthoritativeCorrelatedFindingEvidence;
 use chio_secure_ipc::{read_bounded_frame, write_bounded_frame};
-use chio_security_types::clock::{Clock, MonotonicInstant, SystemClock};
+#[cfg(target_os = "linux")]
+use chio_security_types::clock::MonotonicInstant;
+use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{
     AdmissionArtifactRef, AttestedFindingBatchBinding, PortError, PortResult, RequestId,
 };

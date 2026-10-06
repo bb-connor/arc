@@ -175,7 +175,7 @@ impl<
             |reason: &str| ActiveResponseExecutorError::RejectedBeforeCommit(reason.to_string());
         raw.response_plan
             .require_live_execution()
-            .map_err(|error| reject(&error.to_string()))?;
+            .map_err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit)?;
         if raw.executor_authority != self.identity
             || raw.request_id != raw.response_plan.action_id.as_str()
             || raw.expires_at_unix_ms != raw.response_plan.expires_at_unix_ms

@@ -290,18 +290,12 @@ pub(super) fn head(
     connection: &Connection,
     authority: &str,
 ) -> Result<u64, AdmissionOperationStoreError> {
-    let (count, sequence, bytes): (i64, i64, i64) = connection.query_row(
-        "SELECT COUNT(*), COALESCE(MAX(sequence), 1), COALESCE(SUM(length(canonical_record)), 0)
-         FROM security_participant_state_mutations WHERE security_authority_id = ?1",
-        [authority], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-    ).map_err(sqlite_error)?;
-    if !(0..=65_536).contains(&count) || sequence != count + 1 || !(0..=67_108_864).contains(&bytes)
-    {
-        return Err(invalid(
-            "native mutation history is incomplete or exceeds bounds",
-        ));
-    }
-    u64::try_from(sequence).map_err(invalid)
+    ordered::family_head(
+        connection,
+        authority,
+        "security_participant_state_mutations",
+        0,
+    )
 }
 
 pub(super) fn load_for_operation(
@@ -323,5 +317,14 @@ pub(super) fn load_for_operation(
         u64::try_from(sequence).map_err(invalid)?,
     )?
     .ok_or_else(|| invalid("native mutation index has no record"))?;
+    super::integrity::verify_event_reference(
+        connection,
+        super::PROJECTION_KIND,
+        authority.as_str(),
+        record.sequence,
+        MUTATION,
+        &record.digest()?,
+        &record.lease.fence,
+    )?;
     Ok(Some(record))
 }

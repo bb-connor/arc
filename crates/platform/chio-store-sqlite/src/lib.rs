@@ -503,7 +503,11 @@ pub use governed_approval_replay_store::{
 };
 pub use iou_store::{SqliteIouEnvelopeStore, IOU_ENVELOPE_MIGRATION};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
-pub use receipt_store::{BackgroundCheckpointSigner, SqliteReceiptStore};
+pub use receipt_store::{
+    collect_retained_session_receipts_read_only, BackgroundCheckpointSigner,
+    RetainedSessionReceipt, RetainedSessionReceipts, RetainedSessionSnapshotCoverage,
+    SqliteReceiptStore,
+};
 pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
     check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
@@ -847,7 +851,10 @@ impl chio_kernel::receipt_store::AnchoredAdmissionProjectionStore
     }
 }
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
-pub use tool_outcome_store::SqliteToolOutcomeStore;
+pub use tool_outcome_store::{
+    SqliteToolOutcomeStore, ToolOutcomeCompactionLimits, ToolOutcomeCompactionPage,
+    ToolOutcomeCompactionSummary,
+};
 
 #[cfg(test)]
 mod tests {

@@ -6,14 +6,86 @@ use std::io::BufRead;
 pub const MAX_ACP_MESSAGE_BYTES: usize = 8 * 1024 * 1024;
 pub(crate) const MAX_CAPABILITY_BYTES: usize = 64 * 1024;
 
+#[derive(serde::Deserialize)]
+struct OriginalEnvelope<'a> {
+    #[serde(borrow)]
+    params: Option<&'a serde_json::value::RawValue>,
+}
+
+#[derive(serde::Deserialize)]
+struct OriginalAuthorityFields<'a> {
+    #[serde(rename = "capabilityToken", borrow)]
+    capability_token: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "capability_token", borrow)]
+    snake_capability_token: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "executionNonce", borrow)]
+    execution_nonce: Option<&'a serde_json::value::RawValue>,
+    #[serde(rename = "execution_nonce", borrow)]
+    snake_execution_nonce: Option<&'a serde_json::value::RawValue>,
+    #[serde(borrow)]
+    chio: Option<&'a serde_json::value::RawValue>,
+}
+
+fn validate_original_authority_fields(
+    fields: &OriginalAuthorityFields<'_>,
+) -> Result<(), AcpProxyError> {
+    for raw in [fields.capability_token, fields.snake_capability_token]
+        .into_iter()
+        .flatten()
+    {
+        // String tokens retain their own bytes and use the capability checker's
+        // strict reader. Object forms must pass it before envelope projection.
+        if !raw.get().starts_with('"') {
+            let _: serde_json::Value =
+                UntrustedJsonText::from_wire(raw.get().as_bytes(), MAX_ACP_MESSAGE_BYTES)?
+                    .decode_signed()?;
+        }
+    }
+    for raw in [fields.execution_nonce, fields.snake_execution_nonce]
+        .into_iter()
+        .flatten()
+    {
+        let _: serde_json::Value =
+            UntrustedJsonText::from_wire(raw.get().as_bytes(), MAX_ACP_MESSAGE_BYTES)?
+                .decode_signed()?;
+    }
+    Ok(())
+}
+
+fn validate_original_authority(bytes: &[u8]) -> Result<(), AcpProxyError> {
+    // Parameter shape failures belong to the dispatcher. Only walk the object
+    // paths consumed by the interceptor, retaining their original JSON slices.
+    if bytes
+        .iter()
+        .copied()
+        .find(|byte| !byte.is_ascii_whitespace())
+        != Some(b'{')
+    {
+        return Ok(());
+    }
+    let envelope: OriginalEnvelope<'_> =
+        serde_json::from_slice(bytes).map_err(UntrustedJsonError::Decode)?;
+    if let Some(params) = envelope.params.filter(|raw| raw.get().starts_with('{')) {
+        let fields: OriginalAuthorityFields<'_> =
+            serde_json::from_str(params.get()).map_err(UntrustedJsonError::Decode)?;
+        validate_original_authority_fields(&fields)?;
+        if let Some(chio) = fields.chio.filter(|raw| raw.get().starts_with('{')) {
+            let fields: OriginalAuthorityFields<'_> =
+                serde_json::from_str(chio.get()).map_err(UntrustedJsonError::Decode)?;
+            validate_original_authority_fields(&fields)?;
+        }
+    }
+    Ok(())
+}
+
 /// A message validated from original peer bytes. Fields cannot bypass decoding.
 #[derive(Debug)]
 pub struct AcpMessage(serde_json::Value);
 impl AcpMessage {
     pub fn decode(bytes: &[u8]) -> Result<Self, AcpProxyError> {
-        Ok(Self(
-            UntrustedJsonText::from_wire(bytes, MAX_ACP_MESSAGE_BYTES)?.decode_signed()?,
-        ))
+        let original = UntrustedJsonText::from_wire(bytes, MAX_ACP_MESSAGE_BYTES)?;
+        validate_original_authority(bytes)?;
+        Ok(Self(original.decode_document()?))
     }
     pub fn as_value(&self) -> &serde_json::Value {
         &self.0
@@ -156,3 +228,7 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "input_document_tests.rs"]
+mod document_tests;

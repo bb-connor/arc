@@ -529,10 +529,15 @@ pub(super) fn validate_payment_reconcile_binding(
                 chio_kernel::payment::PaymentRailMode::PrepaidFinal,
                 chio_kernel::payment::PaymentJournalState::Settled,
                 None,
-            ) => journal.amount_units,
+            ) => journal.authorized_amount_units.ok_or_else(|| {
+                AdmissionPaymentJournalError::Invariant(
+                    "prepayment reconciliation requires its exact original debit".into(),
+                )
+            })?,
             (
                 chio_kernel::payment::PaymentRailMode::ReversibleHold,
                 chio_kernel::payment::PaymentJournalState::Settling
+                | chio_kernel::payment::PaymentJournalState::ReconcileFailed
                 | chio_kernel::payment::PaymentJournalState::Settled,
                 Some(chio_kernel::payment::PaymentSettleAction::Capture),
             ) => journal.settle_amount_units.ok_or_else(|| {
@@ -543,6 +548,7 @@ pub(super) fn validate_payment_reconcile_binding(
             (
                 chio_kernel::payment::PaymentRailMode::ReversibleHold,
                 chio_kernel::payment::PaymentJournalState::Settling
+                | chio_kernel::payment::PaymentJournalState::ReconcileFailed
                 | chio_kernel::payment::PaymentJournalState::Settled,
                 Some(chio_kernel::payment::PaymentSettleAction::Release),
             ) => 0,
@@ -757,16 +763,10 @@ pub(super) fn verify_payment_terminal_source<'a>(
         journal
             .validate()
             .map_err(|error| AdmissionOperationStoreError::Invariant(error.to_string()))?;
-        let cancelled_before_authorization = journal.state
-            == chio_kernel::payment::PaymentJournalState::Closed
-            && journal.authorization_id.is_none()
-            && journal.settle_action.is_none();
-        let released_after_authorization = journal.state
-            == chio_kernel::payment::PaymentJournalState::Settled
-            && journal.settle_action == Some(chio_kernel::payment::PaymentSettleAction::Release);
-        if !cancelled_before_authorization && !released_after_authorization {
+        if !journal.is_compensated_before_dispatch() {
             return Err(AdmissionOperationStoreError::Invariant(
-                "pre-dispatch compensation must cancel or release its payment hold".to_owned(),
+                "pre-dispatch compensation requires a confirmed cancellation, release or refund"
+                    .to_owned(),
             ));
         }
         return Ok(());

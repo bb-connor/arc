@@ -164,16 +164,122 @@ pub struct RuntimeGuardProfile {
 /// Build the default Chio runtime guard profile without coupling the kernel to
 /// concrete guard implementations.
 pub fn default_runtime_guard_profile() -> RuntimeGuardProfile {
-    let mut post_invocation_pipeline = PostInvocationPipeline::new();
-    post_invocation_pipeline.add(Box::new(SanitizerHook::new()));
+    DefaultRuntimeGuardMaterial::new().into_profile()
+}
 
-    RuntimeGuardProfile {
-        pre_invocation_guards: vec![
-            Box::new(InternalNetworkGuard::new()),
-            Box::new(AgentVelocityGuard::new(AgentVelocityConfig::default())),
-            Box::new(AdvisoryPipeline::new(PromotionPolicy::new())),
-        ],
-        post_invocation_pipeline,
+/// Canonical identity of the exact defaults installed by
+/// [`default_runtime_guard_profile`]. Component versions name the enforcement
+/// algorithms; the material binds their actual parameters and sanitizer config.
+/// Velocity thresholds and the advisory detector roster are empty by default.
+pub fn default_runtime_guard_profile_identity() -> Result<String, chio_core::Error> {
+    DefaultRuntimeGuardMaterial::new().identity()
+}
+
+// Keep construction and identity on the same inputs. A change to an enforcement
+// algorithm also requires a component-version change in the identity material.
+struct DefaultRuntimeGuardMaterial {
+    extra_blocked_hosts: Vec<String>,
+    dns_rebinding_detection: bool,
+    velocity: AgentVelocityConfig,
+    velocity_bucket_cap: usize,
+    advisory_policy: PromotionPolicy,
+    sanitizer: SanitizerHook,
+}
+
+impl DefaultRuntimeGuardMaterial {
+    fn new() -> Self {
+        Self {
+            extra_blocked_hosts: Vec::new(),
+            dns_rebinding_detection: true,
+            velocity: AgentVelocityConfig::default(),
+            velocity_bucket_cap: chio_kernel::MemoryBudgetConfig::defaults()
+                .velocity_bucket_cap
+                .max(1),
+            advisory_policy: PromotionPolicy::new(),
+            sanitizer: SanitizerHook::new(),
+        }
+    }
+
+    fn identity(&self) -> Result<String, chio_core::Error> {
+        let AgentVelocityConfig {
+            max_requests_per_agent,
+            max_requests_per_session,
+            window_secs,
+            burst_factor,
+        } = &self.velocity;
+        if !burst_factor.is_finite() {
+            return Err(chio_core::Error::CanonicalJson(
+                "default guard identity requires finite velocity parameters".into(),
+            ));
+        }
+        let sanitizer = self
+            .sanitizer
+            .durable_identity()
+            .map_err(chio_core::Error::CanonicalJson)?
+            .ok_or_else(|| {
+                chio_core::Error::CanonicalJson(
+                    "default sanitizer requires a deterministic hook identity".into(),
+                )
+            })?;
+        let guards = self.pre_invocation_guards();
+        let guard_order: Vec<&str> = guards.iter().map(|guard| guard.name()).collect();
+        let material = serde_json::json!({
+            "schema": "chio.default-runtime-guard-profile.v1",
+            "pre_invocation_order": guard_order,
+            "guard_configurations": [
+                {
+                    "component": "chio-guards.internal-network.v1",
+                    "config": {
+                        "extra_blocked_hosts": self.extra_blocked_hosts,
+                        "dns_rebinding_detection": self.dns_rebinding_detection,
+                    },
+                },
+                {
+                    "component": "chio-guards.agent-velocity.v1",
+                    "config": {
+                        "max_requests_per_agent": max_requests_per_agent,
+                        "max_requests_per_session": max_requests_per_session,
+                        "window_secs": window_secs,
+                        "burst_factor": burst_factor,
+                        "bucket_cap": self.velocity_bucket_cap,
+                    },
+                },
+                {
+                    "component": "chio-guards.advisory-pipeline.v1",
+                    // AdvisoryPipeline::new installs no detectors. Registering
+                    // defaults here requires their configuration in this material.
+                    "config": { "detectors": [], "promotion_policy": self.advisory_policy },
+                },
+            ],
+            "post_invocation": [sanitizer],
+        });
+        let bytes = chio_core::canonical::canonical_json_bytes(&material)?;
+        Ok(chio_core::sha256_hex(&bytes))
+    }
+
+    fn pre_invocation_guards(&self) -> Vec<Box<dyn chio_kernel::Guard>> {
+        vec![
+            Box::new(InternalNetworkGuard::with_config(
+                self.extra_blocked_hosts.clone(),
+                self.dns_rebinding_detection,
+            )),
+            Box::new(AgentVelocityGuard::with_bucket_cap(
+                self.velocity.clone(),
+                self.velocity_bucket_cap,
+            )),
+            Box::new(AdvisoryPipeline::new(self.advisory_policy.clone())),
+        ]
+    }
+
+    fn into_profile(self) -> RuntimeGuardProfile {
+        let pre_invocation_guards = self.pre_invocation_guards();
+        let mut post_invocation_pipeline = PostInvocationPipeline::new();
+        post_invocation_pipeline.add(Box::new(self.sanitizer));
+
+        RuntimeGuardProfile {
+            pre_invocation_guards,
+            post_invocation_pipeline,
+        }
     }
 }
 
@@ -216,3 +322,44 @@ pub use memory_governance::{
     FindingRetractionGuardConfig, MemoryGovernanceConfig, MemoryGovernanceError,
     MemoryGovernanceGuard,
 };
+
+#[cfg(test)]
+mod runtime_guard_profile_tests {
+    use super::*;
+
+    #[test]
+    fn product_default_guards_identity_binds_actual_factory_parameters(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let baseline = default_runtime_guard_profile_identity()?;
+        assert_eq!(baseline.len(), 64);
+        assert_eq!(baseline, default_runtime_guard_profile_identity()?);
+        let changes: [fn(&mut DefaultRuntimeGuardMaterial); 8] = [
+            |material| material.extra_blocked_hosts.push("blocked.example".into()),
+            |material| material.dns_rebinding_detection = false,
+            |material| material.velocity.max_requests_per_agent = Some(1),
+            |material| material.velocity.max_requests_per_session = Some(1),
+            |material| material.velocity.window_secs += 1,
+            |material| material.velocity.burst_factor += 1.0,
+            |material| material.velocity_bucket_cap += 1,
+            |material| {
+                material.advisory_policy.add_rule(PromotionRule {
+                    guard_name: "configured-advisory".into(),
+                    min_severity: AdvisorySeverity::High,
+                })
+            },
+        ];
+        for (index, change) in changes.into_iter().enumerate() {
+            let mut material = DefaultRuntimeGuardMaterial::new();
+            change(&mut material);
+            assert_ne!(baseline, material.identity()?, "unbound parameter {index}");
+        }
+        let mut material = DefaultRuntimeGuardMaterial::new();
+        let mut sanitizer = material.sanitizer.sanitizer().config().clone();
+        sanitizer.max_input_bytes -= 1;
+        material.sanitizer = SanitizerHook::with_config(sanitizer)?;
+        assert_ne!(baseline, material.identity()?);
+        material.velocity.burst_factor = f64::NAN;
+        assert!(material.identity().is_err());
+        Ok(())
+    }
+}

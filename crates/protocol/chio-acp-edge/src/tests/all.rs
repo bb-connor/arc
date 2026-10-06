@@ -3404,5 +3404,7 @@ mod tests {
 
     #[path = "original_input.rs"]
     mod original_input;
+    #[path = "document_input.rs"]
+    mod document_input;
     include!("config_and_serde.rs");
 }

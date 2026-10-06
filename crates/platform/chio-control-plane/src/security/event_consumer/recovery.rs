@@ -26,6 +26,14 @@ pub struct DurableAttestedFindingBatchPlanner {
     clock: Arc<dyn Clock>,
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("active-response dispatch refusal requires reconciliation after termination failed: {termination_failure}")]
+pub(super) struct ResponseDispatchRefusalReconciliation {
+    #[source]
+    pub(super) dispatch_refusal: PortError,
+    pub(super) termination_failure: PortError,
+}
+
 pub(super) const MAX_ATTESTED_FINDING_STARTUP_RECOVERY_RECORDS: u64 = 1_000_000;
 pub(super) const MAX_ATTESTED_FINDING_STARTUP_RECOVERY_WALL_CLOCK_MS: u64 = 3_600_000;
 pub(super) const ATTESTED_FINDING_STARTUP_RECOVERY_POLL_MS: u64 = 10;
@@ -583,6 +591,7 @@ impl DurableAttestedFindingBatchPlanner {
                         &claimed,
                         &publication.body.response_plan,
                         None,
+                        None,
                         report,
                     );
                 }
@@ -727,6 +736,7 @@ impl DurableAttestedFindingBatchPlanner {
                     &artifact_bound,
                     plan.response_plan(),
                     Some(&termination_artifacts),
+                    Some(error),
                     report,
                 );
             }
@@ -805,6 +815,7 @@ impl DurableAttestedFindingBatchPlanner {
                     &admitted,
                     plan.response_plan(),
                     Some(&termination_artifacts),
+                    Some(error),
                     report,
                 );
             }
@@ -917,6 +928,7 @@ impl DurableAttestedFindingBatchPlanner {
         current: &AttestedFindingResponseOutboxRecord,
         response_plan: &ResponsePlan,
         current_artifacts: Option<&AttestedFindingAdmissionArtifacts>,
+        dispatch_refusal: Option<PortError>,
         report: &mut AttestedFindingResponseRecoveryReport,
     ) -> PortResult<()> {
         let binding = current
@@ -942,7 +954,28 @@ impl DurableAttestedFindingBatchPlanner {
                 report,
             ),
             Err(error) => {
-                let retryable = PortError::new(PortErrorKind::Unavailable, error.code().clone());
+                let original_refusal = dispatch_refusal.and_then(|refusal| {
+                    let code = std::error::Error::source(&refusal)
+                        .and_then(|source| source.downcast_ref::<chio_kernel::KernelError>())
+                        .and_then(|error| match error {
+                            chio_kernel::KernelError::ResponseDispatchRejected(rejection) => {
+                                Some(rejection.code())
+                            }
+                            _ => None,
+                        });
+                    code.map(|code| (code, refusal))
+                });
+                let retryable = match original_refusal {
+                    Some((code, dispatch_refusal)) => PortError::with_source(
+                        PortErrorKind::Unavailable,
+                        code,
+                        ResponseDispatchRefusalReconciliation {
+                            dispatch_refusal,
+                            termination_failure: error,
+                        },
+                    ),
+                    None => PortError::new(PortErrorKind::Unavailable, error.code().clone()),
+                };
                 self.mark_outcome_unknown_after_dispatch(current, retryable, report)
             }
         }

@@ -34,17 +34,36 @@ covers about one tenth of that history.
 These results are a performance regression. Verifying each selected signed
 receipt adds material work. The earlier 137.07 ms unfiltered result predates the
 integrity repair and is not qualification evidence for the accepted source.
-Removing signature verification or trusting the projections again would reopen
-the reproduced corruption defect. A future optimization needs an authenticated
-projection/cache design that still detects external modification while an open
-handle is reused. Statement caching alone is not justified as a remedy for this
-measured verification cost.
+The reproduced cost-column corruption is detected by comparing the projections
+with the signed body. Signature verification against an embedded key alone does
+not authenticate database selection, independently pin a kernel signer, or detect
+an externally replaced self-signed corpus. The October 5 repair extends selected
+projection checks to the identity, decision, filter and grouping fields used by
+the reports. It retains an explicit selected-row consistency guarantee and does
+not claim exclusion completeness or independent history authentication. Legacy
+unsigned lineage fallback remains diagnostic. Statement caching alone does not
+address the measured verification cost.
 
-The report refuses more than 250,000 matches and interrupts after a shared
-100,000,000 SQLite-instruction budget, checked every 1,000 instructions. The latter
-also covers scans that find no matches. Neither limit is a wall-clock deadline;
-signature verification and receipt size also affect latency. Callers should use
-selective filters for interactive reports.
+Analytics and cost attribution refuse more than 250,000 selected receipts and
+interrupt after a shared 100,000,000 SQLite-instruction budget, checked every
+1,000 instructions. The latter also covers scans that find no matches. They now
+also bound each raw receipt/lineage record at 8 MiB, aggregate raw source at
+64 MiB, decoded JSON string keys/values at 32 MiB, groups per dimension at
+10,000, and lineage lookups at 250,000 with at most 32 hops per chain. The limits
+can refuse reports older versions accepted; they never publish partial totals.
+The byte budgets count actual borrowed UTF-8 tuples before JSON/owned copies.
+The metadata gate permits at most 16 MiB of stored encoding per record so legacy
+UTF-16 input remains compatible; conversion can transiently produce at most
+24 MiB of borrowed UTF-8 before the 8 MiB logical record check. These logical work
+and representation bounds are not exact heap-size or wall-clock guarantees.
+Callers should use selective filters for interactive reports.
+
+The table above predates those additional bounds and full selected-projection
+checks. It is historical measurement evidence, not a fresh performance result or
+qualification of the October 5 source. The separate suspension lookup now caps
+complete historical key discovery at 1,024 sets and uses aggregate contribution,
+member, byte and SQL-work limits; it does not claim an authenticated active index
+or use an unauthenticated absent-membership result as permission.
 
 Evidence is retained locally under `/tmp/chio-resume-20260926/`:
 `c-baseline-custody.json`, `c-benchmark-before.log`,

@@ -103,6 +103,11 @@ impl RemoteSessionLedger {
         };
 
         for session in sessions {
+            let serving_closed = *session.worker_serving_closed.borrow();
+            if serving_closed {
+                self.mark_closed(&session).await?;
+                continue;
+            }
             let expired = session.deadline_expired()?;
             let snapshot = session.lifecycle_snapshot();
             match snapshot.state {

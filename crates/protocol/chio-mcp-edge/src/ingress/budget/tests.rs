@@ -1,5 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 use super::*;
-use chio_test_support::prelude::*;
 use std::sync::mpsc;
 
 fn budget() -> IngressBudget {
@@ -7,13 +7,13 @@ fn budget() -> IngressBudget {
 }
 
 fn retained(budget: &IngressBudget) -> Footprint {
-    budget.state.lock().test_expect("budget state").retained
+    budget.state.lock().expect("budget state").retained
 }
 
 fn message(budget: &IngressBudget) -> AccountedMessage {
     budget
         .read_message(&mut b"{\"id\":1,\"result\":{\"ok\":true}}\n".as_slice())
-        .test_expect("admit a real JSON frame")
+        .expect("admit a real JSON frame")
 }
 
 #[test]
@@ -28,10 +28,7 @@ fn reservations_survive_full_send_and_release_on_disconnect_and_drop() {
         Err(mpsc::TrySendError::Full(message)) => message,
         _ => panic!("full channel must return the owned reservation"),
     };
-    assert_eq!(
-        retained(&budget),
-        one.checked_add(one).test_expect("two frames")
-    );
+    assert_eq!(retained(&budget), one.checked_add(one).expect("two frames"));
     drop(returned);
     assert_eq!(retained(&budget), one);
     drop(receiver);
@@ -56,7 +53,7 @@ fn batch_and_result_handoff_release_once_without_cloning_trees() {
     assert_eq!(retained(&budget), Footprint::default());
     let result = message(&budget)
         .into_result()
-        .test_expect("move the response result");
+        .expect("move the response result");
     assert_eq!(result["ok"], true);
     assert_eq!(retained(&budget), Footprint::default());
 }
@@ -83,9 +80,7 @@ fn every_limit_is_atomic_and_failure_survives_capacity_release() {
             nodes: MAX_RETAINED_NODES,
             text_bytes: MAX_RETAINED_TEXT_BYTES,
         };
-        let reservation = budget
-            .reserve(exact)
-            .test_expect("inclusive aggregate limits");
+        let reservation = budget.reserve(exact).expect("inclusive aggregate limits");
         assert!(budget.reserve(excess).is_err());
         assert_eq!(retained(&budget), exact);
         assert!(budget.shutdown_requested.load(Ordering::Acquire));
@@ -98,7 +93,7 @@ fn every_limit_is_atomic_and_failure_survives_capacity_release() {
 #[test]
 fn admission_counts_decoded_keys_strings_containers_and_values() {
     let text = "{\"a\":[null,true,12.50],\"\\u0062\":\"\\u20ac\"}\n";
-    let measured = admission::measure(text).test_expect("stream structural accounting");
+    let measured = admission::measure(text).expect("stream structural accounting");
     assert_eq!(
         measured,
         Footprint {
@@ -110,7 +105,7 @@ fn admission_counts_decoded_keys_strings_containers_and_values() {
     let budget = budget();
     let frame = budget
         .read_message(&mut text.as_bytes())
-        .test_expect("canonical decode");
+        .expect("canonical decode");
     assert_eq!(frame.value()["b"], "\u{20ac}");
     assert_eq!(frame.value()["a"][2].as_f64(), Some(12.5));
     assert_eq!(retained(&budget), measured);
@@ -123,7 +118,7 @@ fn canonical_rejection_releases_pre_decode_reservation() {
     let budget = budget();
     let error = budget
         .read_message(&mut b"{\"x\":1,\"x\":2}\n".as_slice())
-        .test_expect_err("canonical decoder must still reject duplicate keys");
+        .expect_err("canonical decoder must still reject duplicate keys");
     assert_eq!(
         error.to_string(),
         "urn:chio:error:attest:signed-json-invalid-input"
@@ -137,7 +132,7 @@ fn admission_preserves_unsigned_numbers_and_original_depth_limit() {
     let text = b"{\"ordinary\":0.50,\"small\":1e-05,\"wide\":18446744073709551615}\n";
     let frame = budget
         .read_message(&mut text.as_slice())
-        .test_expect("unsigned number compatibility");
+        .expect("unsigned number compatibility");
     assert_eq!(frame.value()["ordinary"].as_f64(), Some(0.5));
     assert_eq!(frame.value()["small"].as_f64(), Some(0.00001));
     assert_eq!(frame.value()["wide"].as_u64(), Some(u64::MAX));
@@ -160,8 +155,8 @@ fn terminal_diagnostics_bound_primary_and_cleanup_independently() {
     budget.fail("must not replace the first failure");
     let error = budget
         .terminal_error()
-        .test_expect("read terminal state")
-        .test_expect("terminal failure");
+        .expect("read terminal state")
+        .expect("terminal failure");
     let diagnostic = error.to_string();
     assert!(diagnostic.len() < 2 * MAX_DIAGNOSTIC_COMPONENT_BYTES + 128);
     assert!(diagnostic.contains("primary"));

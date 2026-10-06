@@ -34,6 +34,10 @@ use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
 #[path = "durable_admission_sqlite/federation_context.rs"]
 mod federation_context;
+#[path = "durable_admission_sqlite/payment_recovery.rs"]
+mod payment_recovery;
+#[path = "durable_admission_sqlite/review_boundaries.rs"]
+mod review_boundaries;
 #[path = "durable_admission_sqlite/security_release.rs"]
 mod security_release;
 
@@ -749,21 +753,31 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
         let request = paid_request(&capability);
-        let error = kernel
-            .evaluate_tool_call_blocking(&request)
-            .err()
-            .ok_or_else(|| std::io::Error::other("the injected outcome write must fail"))?;
-        assert!(matches!(
-            error,
-            KernelError::DurableAdmission(ref reason)
-                if reason.contains("injected tool outcome write failure")
-        ));
-        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
-        assert_eq!(recoverable.len(), 1);
-        let operation = &recoverable[0];
+        let denied = kernel.evaluate_tool_call_blocking(&request)?;
+        assert_eq!(denied.verdict, Verdict::Deny);
+        assert!(denied.output.is_none());
+        assert!(denied.receipt.verify_signature()?);
+        assert!(denied
+            .reason
+            .as_deref()
+            .is_some_and(|reason| { reason.contains("injected tool outcome write failure") }));
+        assert!(operations
+            .list_recoverable(now_unix_ms()? + 120_000, 10)?
+            .is_empty());
+        let operation = operations
+            .load_unambiguous_retained_tool_request(
+                &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                    "request_id",
+                    &request.request_id,
+                )?,
+                &fence,
+                now_unix_ms()?,
+            )?
+            .ok_or_else(|| std::io::Error::other("original unknown operation is absent"))?
+            .0;
         assert_eq!(
             operation.state(),
-            AdmissionOperationState::DispatchCommitted
+            AdmissionOperationState::OutcomeUnknownAfterDispatch
         );
         let journal = operations
             .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
@@ -802,7 +816,7 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         invocations: invocations.clone(),
     }));
 
-    assert_eq!(recovered_kernel.reconcile_durable_admission_startup()?, 1);
+    assert_eq!(recovered_kernel.reconcile_durable_admission_startup()?, 0);
     assert_eq!(recovered_kernel.reconcile_recoverable_admissions()?, 0);
     let retained = operations
         .load_by_operation_id(&operation_id)?

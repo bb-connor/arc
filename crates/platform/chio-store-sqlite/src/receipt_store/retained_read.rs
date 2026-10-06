@@ -3,7 +3,8 @@
 mod projection;
 use super::support::{
     load_claim_tree_canonical_bytes_range, retention_watermark,
-    trusted_retention_archive_for_connection, verify_latest_checkpoint_integrity,
+    trusted_retention_archive_for_connection_with_preflight,
+    verify_latest_checkpoint_integrity_with_trusted_watermark,
 };
 use super::*;
 
@@ -40,23 +41,39 @@ impl SqliteReceiptStore {
         E: From<ReceiptStoreError> + From<rusqlite::Error>,
     {
         let mut connection = self.connection()?;
-        let transaction = connection.transaction()?;
-        verify_latest_checkpoint_integrity(&transaction)?;
-        let watermark = retention_watermark(&transaction)?.unwrap_or(0);
-        let archive = trusted_retention_archive_for_connection(&transaction)?;
-        if let Some(archive) = &archive {
-            projection::validate(&transaction, archive, watermark)?;
-        }
-        let result = read(&RetainedSnapshot {
-            live: &transaction,
-            archive: archive.as_ref(),
-            watermark,
-        })?;
-        transaction.commit()?;
-        // The archive connection owns its validated read transaction. Dropping
-        // it releases that exact snapshot, including on every error path.
-        Ok(result)
+        with_retained_connection_snapshot(&mut connection, |_, _| Ok(()), read)
     }
+}
+
+/// Authenticate and read one live/archive snapshot without constructing a
+/// serving store. A caller-supplied preflight may bound original bytes before
+/// authentication decoders allocate. Its predicates grant no inclusion or
+/// read authority.
+pub(crate) fn with_retained_connection_snapshot<T, E>(
+    connection: &mut Connection,
+    mut preflight: impl FnMut(&Connection, u64) -> Result<(), ReceiptStoreError>,
+    read: impl FnOnce(&RetainedSnapshot<'_>) -> Result<T, E>,
+) -> Result<T, E>
+where
+    E: From<ReceiptStoreError> + From<rusqlite::Error>,
+{
+    let transaction = connection.transaction()?;
+    preflight(&transaction, i64::MAX.unsigned_abs())?;
+    let watermark = retention_watermark(&transaction)?.unwrap_or(0);
+    let archive =
+        trusted_retention_archive_for_connection_with_preflight(&transaction, &mut preflight)?;
+    verify_latest_checkpoint_integrity_with_trusted_watermark(&transaction, watermark)?;
+    if let Some(archive) = &archive {
+        projection::validate(&transaction, archive, watermark)?;
+    }
+    let result = read(&RetainedSnapshot {
+        live: &transaction,
+        archive: archive.as_ref(),
+        watermark,
+    })?;
+    transaction.commit()?;
+    // Dropping the already authenticated archive releases its exact snapshot.
+    Ok(result)
 }
 
 impl RetainedSnapshot<'_> {
@@ -190,7 +207,7 @@ impl RetainedSnapshot<'_> {
     }
 
     pub(crate) fn reject_legacy_receipt_omission(&self) -> Result<(), ReceiptStoreError> {
-        for name in ["http_receipts", "tool_receipts"] {
+        for name in ["http_receipts", "tool_receipts", "chio_receipts"] {
             let present: bool = self.live.query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
                 [name],

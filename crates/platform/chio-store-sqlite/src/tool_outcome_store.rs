@@ -25,7 +25,7 @@ use crate::serving_owner::SqliteServingOwner;
 use crate::store_connection::StoreConnection;
 
 const TOOL_OUTCOME_SCHEMA_KEY: &str = "tool_outcome";
-pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 3;
+pub(crate) const TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION: i32 = 4;
 const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
     "tool_outcomes",
     "admission_operations",
@@ -33,6 +33,7 @@ const TOOL_OUTCOME_SCHEMA_ANCHORS: &[&str] = &[
 ];
 const TOOL_OUTCOME_SCHEMA: &str = include_str!("tool_outcome_store.sql");
 const SECURITY_RELEASE_SCHEMA: &str = include_str!("tool_outcome_security_release.sql");
+const PAYLOAD_COMPACTION_SCHEMA: &str = include_str!("tool_outcome_payload_compaction.sql");
 #[path = "tool_outcome_native_output.rs"]
 mod native_output;
 #[path = "tool_outcome_projection.rs"]
@@ -45,21 +46,34 @@ pub(crate) use security_release::require_terminal_release;
 const MAX_OUTCOME_RECORD_BYTES: usize = 1024 * 1024;
 const MAX_EVALUATION_RECORD_BYTES: usize = 64 * 1024 * 1024;
 
+#[path = "tool_outcome_store/payload_compaction.rs"]
+mod payload_compaction;
+pub use payload_compaction::{ToolOutcomeCompactionLimits, ToolOutcomeCompactionPage};
+
 /// Result of one raw-invocation retention pass.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolOutcomeCompactionSummary {
     /// Raw invocation payloads cleared to NULL during this pass.
     pub compacted: u64,
     /// Payloads past the retention cutoff left in place because at least one
     /// owning admission operation has not yet reached a terminal state.
     pub retained_live: u64,
+    pub retained_resolved: u64,
+    pub retained_non_completed: u64,
+    pub retained_unsupported: u64,
+    pub retained_owner_budget: u64,
+    pub inspected: u64,
+    /// A committed first page may leave work. Resume with the paged API and
+    /// this cursor; repeatedly calling this compatibility method restarts.
+    pub next_digest: Option<AdmissionDigest>,
+    pub byte_budget_exhausted: bool,
 }
 
 /// A stored raw invocation blob, or a marker that its payload was compacted away
 /// under retention while the digest and size were preserved.
 enum StoredInvocationBlob {
     Present(CanonicalInvocationBlobV1),
-    Compacted,
+    Compacted { size_bytes: u64 },
 }
 
 #[derive(Clone)]
@@ -134,69 +148,32 @@ impl SqliteToolOutcomeStore {
             .map_err(|error| ToolOutcomeStoreError::Unavailable(error.to_string()))
     }
 
-    /// Clears the raw invocation payload of every content-addressed blob whose
-    /// owning operations are all terminal and that was recorded at or before
-    /// `retention_cutoff_unix_ms`, preserving the digest and size that
-    /// verification depends on. The caller supplies the cutoff (for example from
-    /// a retention policy); this store never reads kernel configuration on its
-    /// own. Blobs whose owning operation is still live are left untouched, which
-    /// the schema triggers independently enforce.
+    /// Compatibility entrypoint for one default bounded page, not a whole
+    /// sweep. The same custody, replay-profile, poison, fence, clock and work
+    /// gates apply. Use `next_digest` with the paged API to continue a sweep.
     pub fn compact_retained_invocation_blobs(
         &self,
         retention_cutoff_unix_ms: u64,
         active_fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<ToolOutcomeCompactionSummary, ToolOutcomeStoreError> {
-        let cutoff = sqlite_u64(retention_cutoff_unix_ms, "retention_cutoff_unix_ms")?;
-        let mut connection = self.connection()?;
-        let transaction = self.begin_write(&mut connection, active_fence, trusted_now_unix_ms)?;
-        let compacted = transaction
-            .execute(
-                r#"
-                UPDATE tool_outcome_blobs
-                SET canonical_bytes = NULL
-                WHERE canonical_bytes IS NOT NULL
-                  AND recorded_at_unix_ms <= ?1
-                  AND EXISTS (
-                      SELECT 1 FROM tool_outcomes o
-                      WHERE o.raw_output_digest = tool_outcome_blobs.digest
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1 FROM tool_outcomes o
-                      JOIN admission_operations a ON a.operation_id = o.operation_id
-                      WHERE o.raw_output_digest = tool_outcome_blobs.digest
-                        AND a.terminal = 0
-                  )
-                "#,
-                params![cutoff],
-            )
-            .map_err(sqlite_error)?;
-        let retained_live: i64 = transaction
-            .query_row(
-                r#"
-                SELECT COUNT(*) FROM tool_outcome_blobs b
-                WHERE b.canonical_bytes IS NOT NULL
-                  AND b.recorded_at_unix_ms <= ?1
-                  AND EXISTS (
-                      SELECT 1 FROM tool_outcomes o
-                      WHERE o.raw_output_digest = b.digest
-                  )
-                  AND EXISTS (
-                      SELECT 1 FROM tool_outcomes o
-                      JOIN admission_operations a ON a.operation_id = o.operation_id
-                      WHERE o.raw_output_digest = b.digest
-                        AND a.terminal = 0
-                  )
-                "#,
-                params![cutoff],
-                |row| row.get(0),
-            )
-            .map_err(sqlite_error)?;
-        self.commit_write(transaction)?;
-        self.sync_after_write(&connection)?;
+        let page = self.compact_retained_invocation_blobs_page_with_limits(
+            retention_cutoff_unix_ms,
+            active_fence,
+            trusted_now_unix_ms,
+            None,
+            ToolOutcomeCompactionLimits::default(),
+        )?;
         Ok(ToolOutcomeCompactionSummary {
-            compacted: u64::try_from(compacted).unwrap_or(0),
-            retained_live: u64::try_from(retained_live).unwrap_or(0),
+            compacted: page.compacted,
+            retained_live: page.retained_live,
+            retained_resolved: page.retained_resolved,
+            retained_non_completed: page.retained_non_completed,
+            retained_unsupported: page.retained_unsupported,
+            retained_owner_budget: page.retained_owner_budget,
+            inspected: page.inspected,
+            next_digest: page.next_digest,
+            byte_budget_exhausted: page.byte_budget_exhausted,
         })
     }
 }
@@ -226,7 +203,7 @@ impl SqliteToolOutcomeStore {
                 }
                 // The payload was compacted under retention. Blobs are
                 // content-addressed, so an equal digest is an equal payload.
-                StoredInvocationBlob::Compacted => {
+                StoredInvocationBlob::Compacted { .. } => {
                     existing.raw_output_digest() == blob.blob_ref().digest()
                 }
             };
@@ -257,6 +234,16 @@ impl SqliteToolOutcomeStore {
         record
             .validate_for_store_insert(operation, blob, active_fence, trusted_now_unix_ms)
             .map_err(|error| invariant(error.to_string()))?;
+        let raw = record
+            .decode_canonical_bytes(operation, blob.bytes())
+            .map_err(|error| invariant(error.to_string()))?;
+        crate::SqliteAdmissionOperationStore::verify_original_native_return_tx(
+            &transaction,
+            operation,
+            &raw,
+            true,
+        )
+        .map_err(admission_error)?;
         let outcome_json = encode_outcome(record)?;
         let participant_digest = returned_participant_digest(
             record,
@@ -802,7 +789,23 @@ pub(crate) fn initialize_tool_outcome_schema(
         verify_tool_outcome_invariants(&transaction)?;
         return transaction.commit().map_err(sqlite_error);
     }
-    security_release::verify_pre_migration(&transaction, on_disk)?;
+    if on_disk == 3 {
+        let expected = Connection::open_in_memory().map_err(sqlite_error)?;
+        expected
+            .execute_batch(TOOL_OUTCOME_SCHEMA)
+            .map_err(sqlite_error)?;
+        expected
+            .execute_batch(SECURITY_RELEASE_SCHEMA)
+            .map_err(sqlite_error)?;
+        if tool_outcome_schema_catalog(&transaction)? != tool_outcome_schema_catalog(&expected)? {
+            return Err(invariant(
+                "pre-v4 outcome schema is not the exact qualified v3 predecessor",
+            ));
+        }
+        verify_tool_outcome_data_invariants(&transaction)?;
+    } else {
+        security_release::verify_pre_migration(&transaction, on_disk)?;
+    }
     // Version 2 permits a compacted payload to be restored when a later owner
     // supplies the same digest- and size-verified canonical bytes. Recreate the
     // trigger transactionally before applying the canonical schema definition.
@@ -814,6 +817,9 @@ pub(crate) fn initialize_tool_outcome_schema(
         .map_err(sqlite_error)?;
     transaction
         .execute_batch(SECURITY_RELEASE_SCHEMA)
+        .map_err(sqlite_error)?;
+    transaction
+        .execute_batch(PAYLOAD_COMPACTION_SCHEMA)
         .map_err(sqlite_error)?;
     crate::stamp_schema_version(
         &transaction,
@@ -835,11 +841,20 @@ pub(crate) fn verify_tool_outcome_invariants(
     expected
         .execute_batch(SECURITY_RELEASE_SCHEMA)
         .map_err(sqlite_error)?;
+    expected
+        .execute_batch(PAYLOAD_COMPACTION_SCHEMA)
+        .map_err(sqlite_error)?;
     if tool_outcome_schema_catalog(connection)? != tool_outcome_schema_catalog(&expected)? {
         return Err(invariant(
             "tool outcome schema differs from the canonical definition",
         ));
     }
+    verify_tool_outcome_data_invariants(connection)
+}
+
+fn verify_tool_outcome_data_invariants(
+    connection: &Connection,
+) -> Result<(), ToolOutcomeStoreError> {
     let mut blob_statement = connection
         .prepare(
             "SELECT digest, blob_size_bytes, canonical_bytes FROM tool_outcome_blobs ORDER BY digest",
@@ -1304,7 +1319,9 @@ fn load_blob_connection(
     match load_blob_state_connection(connection, digest)? {
         None => Ok(None),
         Some(StoredInvocationBlob::Present(blob)) => Ok(Some(blob)),
-        Some(StoredInvocationBlob::Compacted) => Err(compacted_blob_error(digest.as_str())),
+        Some(StoredInvocationBlob::Compacted { size_bytes }) => {
+            Err(compacted_blob_error(digest, size_bytes))
+        }
     }
 }
 
@@ -1321,7 +1338,21 @@ fn load_blob_state_connection(
 ) -> Result<Option<StoredInvocationBlob>, ToolOutcomeStoreError> {
     match load_blob_bytes_connection(connection, digest)? {
         None => Ok(None),
-        Some(None) => Ok(Some(StoredInvocationBlob::Compacted)),
+        Some(None) => {
+            let size: i64 = connection
+                .query_row(
+                    "SELECT blob_size_bytes FROM tool_outcome_blobs WHERE digest = ?1",
+                    [digest.as_str()],
+                    |row| row.get(0),
+                )
+                .map_err(sqlite_error)?;
+            let size_bytes =
+                u64::try_from(size).map_err(|_| invariant("compacted blob size is invalid"))?;
+            if size_bytes == 0 || size_bytes > 269_484_032 {
+                return Err(invariant("compacted blob size is outside its bound"));
+            }
+            Ok(Some(StoredInvocationBlob::Compacted { size_bytes }))
+        }
         Some(Some(bytes)) => {
             let blob = RawInvocationOutcomeV1::from_canonical_bytes(&bytes)
                 .and_then(|raw| raw.canonical_blob())
@@ -1345,10 +1376,11 @@ fn load_blob_bytes_connection(
         .map_err(sqlite_error)
 }
 
-fn compacted_blob_error(digest: &str) -> ToolOutcomeStoreError {
-    invariant(format!(
-        "tool outcome raw invocation blob `{digest}` was compacted under retention and is no longer available"
-    ))
+fn compacted_blob_error(digest: &AdmissionDigest, size_bytes: u64) -> ToolOutcomeStoreError {
+    ToolOutcomeStoreError::Compacted {
+        raw_output_digest: digest.clone(),
+        raw_output_size_bytes: size_bytes,
+    }
 }
 
 fn encode_outcome(record: &ToolOutcomeRecordV1) -> Result<Vec<u8>, ToolOutcomeStoreError> {

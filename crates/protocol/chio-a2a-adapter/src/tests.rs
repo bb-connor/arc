@@ -42,6 +42,8 @@ mod protocol;
 mod protocol_boundaries;
 #[path = "tests/streaming_lifecycle.rs"]
 mod streaming_lifecycle;
+#[path = "tests/unsigned_http.rs"]
+mod unsigned_http;
 
 #[test]
 fn durable_dispatch_message_id_is_the_operation_id() {

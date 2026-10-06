@@ -1165,6 +1165,11 @@ files = ["crates/protocol/chio-acp-proxy/src/compliance.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.compliance.certificate.v2"
+files = ["crates/protocol/chio-acp-proxy/src/compliance.rs"]
+first_seen = "d0496c14d8"
+
+[[schema]]
 value = "chio.comptroller.surface-report.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "d91c44dcc7"

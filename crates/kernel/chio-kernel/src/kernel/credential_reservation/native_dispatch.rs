@@ -4,8 +4,8 @@ use crate::admission_operation::{
     dpop_claim::DpopReplayClaimReferenceV1,
     governed_approval_claim::GovernedApprovalClaimReferenceV1,
     runtime_participant::{RuntimeDispatchValidity, RuntimeParticipantClaimHistoryV1},
-    AdmissionExecutionNonceReservationV1, AdmissionOperationState, AdmissionOperationStoreError,
-    AdmissionOperationV1, RetainedToolAdmissionRequestV1,
+    AdmissionDigest, AdmissionExecutionNonceReservationV1, AdmissionOperationState,
+    AdmissionOperationStoreError, AdmissionOperationV1, RetainedToolAdmissionRequestV1,
 };
 
 /// A non-serializable borrow of the original kernel reservation and immutable
@@ -20,6 +20,7 @@ pub struct VerifiedNativeDispatchCredentials<'a> {
     grant_index: usize,
     runtime: Option<(RuntimeParticipantClaimHistoryV1, RuntimeDispatchValidity)>,
     execution_nonce: Option<&'a AdmissionExecutionNonceReservationV1>,
+    nonce_binding: Option<VerifiedBoundExecutionNonceTime>,
     valid_until_unix_ms: u64,
 }
 
@@ -69,6 +70,99 @@ impl VerifiedNativeDispatchCredentials<'_> {
     pub fn execution_nonce(&self) -> Option<&AdmissionExecutionNonceReservationV1> {
         self.execution_nonce
     }
+
+    /// Historical approval binding of the exact physically reserved nonce.
+    /// The store must independently validate this time against its proposal.
+    pub fn execution_nonce_binding_time_unix_ms(&self) -> Option<u64> {
+        self.nonce_binding
+            .as_ref()
+            .map(|binding| binding.bound_at_unix_ms)
+    }
+}
+
+/// Created only from the original proposal and physical nonce reservation.
+/// This is read-only verification evidence, never renewed dispatch authority.
+pub(crate) struct VerifiedBoundExecutionNonceTime {
+    nonce: crate::execution_nonce::SignedExecutionNonce,
+    bound_at_unix_ms: u64,
+    approval_valid_until_unix_ms: u64,
+}
+
+impl VerifiedBoundExecutionNonceTime {
+    pub(super) fn matches_nonce(
+        &self,
+        nonce: &crate::execution_nonce::SignedExecutionNonce,
+    ) -> bool {
+        &self.nonce == nonce
+    }
+    pub(super) fn approval_valid_until_unix_ms(&self) -> u64 {
+        self.approval_valid_until_unix_ms
+    }
+}
+
+impl ChioKernel {
+    pub(crate) fn verified_bound_execution_nonce_time(
+        &self,
+        admission: &DurableToolAdmission,
+        request: &ToolCallRequest,
+        now: u64,
+    ) -> Result<Option<VerifiedBoundExecutionNonceTime>, KernelError> {
+        if !admission.requires_execution_nonce() {
+            return Ok(None);
+        }
+        let operation = admission.operation();
+        let Some(proposal) = operation.threshold_proposal() else {
+            return Ok(None);
+        };
+        let issued = admission
+            .issued_execution_nonce()
+            .ok_or_else(|| invalid("bound nonce lost original issuance"))?;
+        if operation.state() != AdmissionOperationState::CapturePending
+            || !operation.binding().participant_requirements().approval
+            || proposal.body.proposal_id != operation.binding().operation_id().as_str()
+            || request.threshold_approval_proposal.as_ref() != Some(proposal)
+            || request.execution_nonce.as_ref() != Some(issued.signed_nonce())
+            || operation.execution_nonce_id() != Some(issued.nonce_id())
+            || operation
+                .threshold_proposal_hash()
+                .map(AdmissionDigest::as_str)
+                != Some(
+                    proposal
+                        .artifact_digest()
+                        .map_err(|error| invalid(&error.to_string()))?
+                        .as_str(),
+                )
+        {
+            return Err(invalid(
+                "bound nonce differs from its original approval operation",
+            ));
+        }
+        self.validate_cumulative_threshold_proposal(
+            request,
+            proposal,
+            &self.threshold_approval_requirement(request, now / 1000)?,
+            now / 1000,
+        )?;
+        let bound_at = proposal
+            .body
+            .proposal_created_at
+            .checked_mul(1000)
+            .ok_or_else(|| invalid("nonce binding time overflows"))?;
+        self.verify_bound_execution_nonce_reservation(admission, request, bound_at, now)?;
+        let until = proposal
+            .body
+            .proposal_deadline
+            .checked_mul(1000)
+            .ok_or_else(|| invalid("approval deadline overflows"))?;
+        if bound_at > now || now >= until {
+            return Err(invalid("original nonce approval window is not live"));
+        }
+        Ok(Some(VerifiedBoundExecutionNonceTime {
+            nonce: issued.signed_nonce().clone(),
+            bound_at_unix_ms: bound_at,
+            approval_valid_until_unix_ms: until,
+        }))
+    }
 }
 
 impl DispatchCredentialReservation<'_> {
@@ -98,7 +192,17 @@ impl DispatchCredentialReservation<'_> {
                 "native capture requires complete operation-owned custody",
             ));
         }
-        let execution_nonce = self.verify_native_execution_nonce(admission, request, original)?;
+        let nonce_binding = self.kernel.verified_bound_execution_nonce_time(
+            admission,
+            request,
+            self.kernel.read_authority_time()?.get(),
+        )?;
+        let execution_nonce = self.verify_native_execution_nonce(
+            admission,
+            request,
+            original,
+            nonce_binding.as_ref(),
+        )?;
         let dpop_required = original.matching_grants_require_dpop();
         if self.kernel.is_emergency_stopped() {
             return Err(invalid("native capture denied by emergency stop"));
@@ -167,7 +271,7 @@ impl DispatchCredentialReservation<'_> {
         )?;
         // Carry the already verified artifacts' exclusive horizon across the
         // capture callback. Never refresh or extend them after commitment.
-        let mut valid_until = prepared.valid_until_unix_ms()?;
+        let mut valid_until = prepared.valid_until_unix_ms(nonce_binding.as_ref())?;
         if let Some((_, validity)) = &runtime {
             valid_until = valid_until.min(validity.valid_until_unix_ms());
         }
@@ -179,6 +283,7 @@ impl DispatchCredentialReservation<'_> {
             grant_index,
             runtime,
             execution_nonce,
+            nonce_binding,
             valid_until_unix_ms: valid_until,
         })
     }
@@ -188,6 +293,7 @@ impl DispatchCredentialReservation<'_> {
         admission: &'a DurableToolAdmission,
         request: &ToolCallRequest,
         original: &RetainedToolAdmissionRequestV1,
+        binding: Option<&VerifiedBoundExecutionNonceTime>,
     ) -> Result<Option<&'a AdmissionExecutionNonceReservationV1>, KernelError> {
         let required = admission.requires_execution_nonce();
         let issued = admission.issued_execution_nonce();
@@ -216,14 +322,17 @@ impl DispatchCredentialReservation<'_> {
         issued
             .require_operation_bound_profile()
             .map_err(|error| invalid(&error.to_string()))?;
-        // Recheck against the configured issuer and current time. A historical
-        // reservation check alone cannot extend the native dispatch horizon.
+        // Only a checked original approval binding supplies historical time.
+        // Unapproved nonces still require a currently live issuance window.
         AdmissionExecutionNonceReservationV1::from_canonical_bytes(
             issued.canonical_bytes(),
             admission.operation(),
             original,
             &self.kernel.config.keypair.public_key(),
-            self.kernel.read_authority_time()?.get(),
+            match binding {
+                Some(binding) => binding.bound_at_unix_ms,
+                None => self.kernel.read_authority_time()?.get(),
+            },
         )
         .map_err(|error| invalid(&error.to_string()))?;
         Ok(Some(issued))

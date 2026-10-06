@@ -676,6 +676,10 @@ impl<'de> Deserialize<'de> for Signature {
     }
 }
 
+fn encoded_hex_text_len(bytes: usize, prefix: usize) -> Option<usize> {
+    bytes.checked_mul(2)?.checked_add(prefix)
+}
+
 impl Signature {
     /// Create from raw 64-byte Ed25519 signature bytes.
     pub fn from_bytes(bytes: &[u8; 64]) -> Self {
@@ -726,6 +730,30 @@ impl Signature {
     /// DER structure and cryptographic validity remain the verifier's responsibility.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
         wire::signature_from_hex(hex_str)
+    }
+
+    /// Length of the existing textual encoding without serializing or cloning material.
+    ///
+    /// This does not validate DER or cryptographic authority. Overflow returns
+    /// `None`, so a caller can refuse before allocating the hexadecimal encoding.
+    #[must_use]
+    pub fn encoded_text_len(&self) -> Option<usize> {
+        match &self.material {
+            SignatureMaterial::Ed25519 { .. } => Some(128),
+            SignatureMaterial::P256 { der } => encoded_hex_text_len(der.len(), "p256:".len()),
+            SignatureMaterial::P384 { der } => encoded_hex_text_len(der.len(), "p384:".len()),
+            SignatureMaterial::Hybrid {
+                classical,
+                pq,
+                alg_set,
+            } => "hybrid:"
+                .len()
+                .checked_add(alg_set.len())?
+                .checked_add(1)?
+                .checked_add(classical.encoded_text_len()?)?
+                .checked_add(1)?
+                .checked_add(pq.len().checked_mul(2)?),
+        }
     }
 
     /// Hex encoding, with algorithm prefix for non-Ed25519 signatures.
@@ -1287,6 +1315,33 @@ pub fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn signature_encoded_text_len_matches_existing_encoding() -> Result<()> {
+        let ed25519 = Keypair::from_seed(&[31; 32]).sign(b"encoding-length");
+        let p256 = Signature::from_p256_der(&[0x30; 72]);
+        let p384 = Signature::from_p384_der(&[0x30; 104]);
+        let pq = alloc::vec![0; ML_DSA_65_SIGNATURE_LEN];
+        let signatures = [
+            ed25519.clone(),
+            p256.clone(),
+            p384.clone(),
+            Signature::from_hybrid_parts(ed25519, &pq, HYBRID_ED25519_MLDSA65)?,
+            Signature::from_hybrid_parts(p256, &pq, HYBRID_P256_MLDSA65)?,
+            Signature::from_hybrid_parts(p384, &pq, HYBRID_P384_MLDSA65)?,
+        ];
+        for signature in signatures {
+            assert_eq!(signature.encoded_text_len(), Some(signature.to_hex().len()));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn signature_encoded_text_len_overflow_refuses() {
+        assert_eq!(encoded_hex_text_len(usize::MAX, 5), None);
+        assert_eq!(encoded_hex_text_len(usize::MAX / 2, 5), None);
+        assert_eq!(encoded_hex_text_len(0, 5), Some(5));
+    }
 
     #[test]
     fn sign_and_verify() {

@@ -239,6 +239,21 @@ Accepted before or after the subcommand; every one is optional.
 when that receipt contract meets the caller's requirements. Other commands
 that support the configured receipt store retain their persistence behavior.
 
+Plain `mcp wrap` gates tool names against the manifest and passes calls to the
+child transport. `--strict-execution-nonce` uses the kernel mediation path.
+The strict path installs `InternalNetworkGuard`, `AgentVelocityGuard`, and
+`AdvisoryPipeline` before invocation, plus `SanitizerHook` for observed child
+tool results. Recognized network actions deny private and reserved targets
+before child dispatch; detected output secrets are redacted with signed hook
+evidence retained in the ephemeral kernel log. Its policy digest binds the
+strict mode and the default profile's actual configuration.
+
+Default velocity thresholds are unlimited. The default advisory pipeline has
+no detectors or promotion rules, so these installed components do not establish
+rate limiting or advisory detection.
+Optional configured guards are outside the wrap constructor's default profile;
+their absence does not establish protection for their respective inputs.
+
 Wrap no longer adds `_meta.chio_verified` to successful tool results. The former
 static `urn:chio:attest:tool-call/v1` block had no receipt identity or signature
 binding; consumers must stop using it as verification evidence. The public

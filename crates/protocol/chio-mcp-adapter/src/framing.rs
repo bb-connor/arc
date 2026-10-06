@@ -1,12 +1,16 @@
+#[cfg(any(test, feature = "fuzz"))]
 use std::io::BufRead;
 
+#[cfg(any(test, feature = "fuzz"))]
 use serde_json::Value;
 
+#[cfg(any(test, feature = "fuzz"))]
 use crate::edge::AdapterError;
 
 pub(crate) const MAX_STDIO_MCP_FRAME_BYTES: usize = 1024 * 1024;
 // Broker structured responses encode admitted upstream bytes as JSON arrays.
 // Keep the outgoing request bound independent of this response envelope budget.
+#[cfg(any(test, feature = "fuzz"))]
 pub(crate) const MAX_STDIO_MCP_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 
 /// Read one newline-delimited JSON-RPC frame.
@@ -24,6 +28,7 @@ pub(crate) fn read_jsonrpc_frame(reader: &mut impl BufRead) -> Result<Option<Val
 /// Admit the complete bounded wire frame before allocating its JSON tree.
 /// The returned admission follows the decoded value, and is dropped on a
 /// canonical decoding error. Syntax and duplicate-key authority stay here.
+#[cfg(any(test, feature = "fuzz"))]
 pub(crate) fn read_jsonrpc_frame_with_admission<T>(
     reader: &mut impl BufRead,
     mut admit: impl FnMut(&str) -> Result<T, AdapterError>,
@@ -48,6 +53,7 @@ pub(crate) fn read_jsonrpc_frame_with_admission<T>(
     }
 }
 
+#[cfg(any(test, feature = "fuzz"))]
 fn read_bounded_line(
     reader: &mut impl BufRead,
     max_bytes: usize,

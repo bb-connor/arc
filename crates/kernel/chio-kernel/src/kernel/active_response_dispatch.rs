@@ -97,10 +97,13 @@ pub(super) fn prepare_kernel_dispatch(
         initial_lease,
         commit_mode: mode,
     })
-    .map_err(|error| {
-        ActiveResponseExecutorError::RejectedBeforeCommit(format!(
+    .map_err(|error| match error {
+        StateMachineError::InvalidDispatch(rejection) => {
+            ActiveResponseExecutorError::DispatchRejectedBeforeCommit(rejection)
+        }
+        error => ActiveResponseExecutorError::RejectedBeforeCommit(format!(
             "active-response dispatch preparation failed: {error}"
-        ))
+        )),
     })
 }
 

@@ -688,6 +688,23 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Select the exact original operation by its globally unique physical
+    /// execution nonce issuance. This read grants no dispatch authority; the
+    /// kernel must compare and verify the original signed issuance separately.
+    fn load_retained_tool_request_by_execution_nonce(
+        &self,
+        _nonce_id: &AdmissionIdentifier,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<
+        Option<(AdmissionOperationV1, RetainedToolAdmissionRequestV1)>,
+        AdmissionOperationStoreError,
+    > {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "original request selection by physical nonce is unsupported".into(),
+        ))
+    }
+
     /// Resolve a request ID in one fenced, anchored snapshot. Count all retained
     /// operations before selecting: another tenant, terminal operation or legacy
     /// row without request material still makes the selector ambiguous.
@@ -811,6 +828,51 @@ pub trait AdmissionOperationStore: Send + Sync {
         not_after_unix_ms: u64,
         limit: usize,
     ) -> Result<Vec<AdmissionOperationV1>, AdmissionOperationStoreError>;
+
+    /// Read at most candidate_limit physical rows, including skipped rows.
+    /// An empty eligible page with a next cursor is progress. The cursor uses
+    /// immutable operation IDs, so updating a lease cannot reorder the sweep.
+    fn recovery_page(
+        &self,
+        _query: AdmissionRecoveryPageQuery<'_>,
+    ) -> Result<AdmissionRecoveryPageV1, AdmissionRecoveryPortError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "bounded recovery cursor pages are unsupported".into(),
+        )
+        .into())
+    }
+
+    fn load_recovery_status(
+        &self,
+        _operation_id: &AdmissionOperationId,
+        _fence: &StoreMutationFence,
+        _trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionRecoveryStatusV1>, AdmissionRecoveryPortError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "durable recovery deferrals are unsupported".into(),
+        )
+        .into())
+    }
+
+    fn defer_recovery(
+        &self,
+        _request: AdmissionRecoveryDeferralWrite<'_>,
+    ) -> Result<AdmissionRecoveryStatusV1, AdmissionRecoveryPortError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "durable recovery deferrals are unsupported".into(),
+        )
+        .into())
+    }
+
+    fn clear_recovery_deferral(
+        &self,
+        _request: AdmissionRecoveryDeferralClear<'_>,
+    ) -> Result<(), AdmissionRecoveryPortError> {
+        Err(AdmissionOperationStoreError::Unavailable(
+            "durable recovery deferral clearing is unsupported".into(),
+        )
+        .into())
+    }
 
     fn load_terminal_replay(
         &self,

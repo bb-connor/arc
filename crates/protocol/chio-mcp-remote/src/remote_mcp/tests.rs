@@ -1,4 +1,11 @@
 use super::*;
+
+#[path = "tests/durable_bounds.rs"]
+mod durable_bounds;
+#[path = "tests/transport_contract.rs"]
+mod transport_contract;
+#[path = "tests/worker_lifecycle.rs"]
+mod worker_lifecycle;
 use crate::rate_limit::mcp_rate_limit_key;
 use chio_core::session::{SessionAuthMethod, SessionTransport};
 use chio_kernel::operator_report::CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER;
@@ -14,6 +21,8 @@ mod bearer_verifier;
 mod clock_custody;
 #[path = "tests/dpop_replay.rs"]
 mod dpop_replay;
+#[path = "tests/protocol_refusal.rs"]
+mod protocol_refusal;
 #[path = "tests/session_recovery.rs"]
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
@@ -1047,7 +1056,7 @@ fn malformed_terminal_state_blocks_active_replay_fail_closed() {
 
 #[test]
 fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
-    let (input_tx, _input_rx) = mpsc::channel::<Value>();
+    let (input_tx, _input_rx) = mcp_inbox();
     let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
     let retained_notification_events =
         Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));

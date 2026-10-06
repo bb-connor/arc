@@ -12,6 +12,7 @@ use chio_kernel::tool_outcome::{
 use chio_store_sqlite::admission_operation_store::SecurityParticipantStateInitialization;
 
 mod faults;
+mod return_binding;
 
 mod preparation;
 
@@ -130,8 +131,18 @@ fn finalizing_with_output(
         &operation,
         fence.clone(),
         now_ms()?,
-        &fixture.request,
-        &context,
+        test_support::NativeReturnedValueContext {
+            request: &fixture.request,
+            security_context: &context,
+            ledger: &store
+                .load_native_dispatch_ledger(&captured.operation_id, &fence, now_ms()?)?
+                .ok_or("original native ledger")?,
+            receipt_signing_public_key: fixture.kernel.receipt_signing_public_key(),
+            // open_kernel installs this original classical floor, including
+            // a P256/P384 fixture when the FIPS backend is selected.
+            receipt_crypto_floor:
+                chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
+        },
         serde_json::json!({"private": "returned secret"}),
     )?;
     let (outcome, operation) = outcomes

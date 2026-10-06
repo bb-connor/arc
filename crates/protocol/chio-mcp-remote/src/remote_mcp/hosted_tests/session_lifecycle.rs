@@ -7,6 +7,194 @@ use serde_json::json;
 use support::{start_http_server, start_http_server_with_lifecycle_tuning, LifecycleTuning};
 
 #[test]
+fn hosted_roots_wait_refuses_notification_accumulation_without_tool_calls() {
+    let server = start_http_server("test-token");
+    let initialize = server.post_json(
+        None,
+        None,
+        &json!({"jsonrpc":"2.0","id":1,
+        "method":"initialize","params":{"protocolVersion":"2025-11-25",
+            "capabilities":{"roots":{"listChanged":true}},
+            "clientInfo":{"name":"bounded-client","version":"1"}}}),
+    );
+    assert_eq!(initialize.status(), reqwest::StatusCode::OK);
+    let session_id = initialize.headers()["MCP-Session-Id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    drop(initialize);
+    struct SessionRescue<'a>(&'a support::TestServer, &'a str);
+    impl Drop for SessionRescue<'_> {
+        fn drop(&mut self) {
+            let _response = self.0.post_admin_session_shutdown(self.1);
+        }
+    }
+    let _rescue = SessionRescue(&server, &session_id);
+    let roots_stream = server.get_session_stream(&session_id, Some("2025-11-25"), None);
+    assert_eq!(roots_stream.status(), reqwest::StatusCode::OK);
+    let initialized = server.post_json(
+        Some(&session_id),
+        Some("2025-11-25"),
+        &json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+    );
+    assert_eq!(initialized.status(), reqwest::StatusCode::ACCEPTED);
+    assert!(initialized.bytes().unwrap().is_empty());
+    let mut reader = std::io::BufReader::new(roots_stream);
+    let mut line = String::new();
+    let mut priming_event_id = None;
+    let mut current_event_id = None;
+    let roots_request_id = loop {
+        use std::io::BufRead;
+        line.clear();
+        assert!(reader.read_line(&mut line).unwrap() > 0);
+        if let Some(id) = line.strip_prefix("id:") {
+            current_event_id = Some(id.trim().to_owned());
+        }
+        if line.trim().is_empty() && priming_event_id.is_none() {
+            priming_event_id = current_event_id.clone();
+        }
+        if let Some(data) = line.strip_prefix("data:") {
+            let data = data.trim();
+            if data.is_empty() {
+                priming_event_id = current_event_id.clone();
+                continue;
+            }
+            let message: serde_json::Value = serde_json::from_str(data).unwrap();
+            if message["method"] == "roots/list" {
+                break message["id"].clone();
+            }
+        }
+    };
+    let roots_event_id = current_event_id.clone().unwrap();
+    assert!(
+        priming_event_id.is_some(),
+        "GET priming cursor was not observed"
+    );
+    drop(reader);
+    let reconnect_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let replay = loop {
+        let response =
+            server.get_session_stream(&session_id, Some("2025-11-25"), priming_event_id.as_deref());
+        if response.status() != reqwest::StatusCode::CONFLICT {
+            break response;
+        }
+        assert!(std::time::Instant::now() < reconnect_deadline);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    assert_eq!(replay.status(), reqwest::StatusCode::OK);
+    assert_eq!(
+        replay.headers()["x-chio-mcp-response-mode"],
+        "get_sse_replay"
+    );
+    let mut reader = std::io::BufReader::new(replay);
+    loop {
+        use std::io::BufRead;
+        line.clear();
+        assert!(reader.read_line(&mut line).unwrap() > 0);
+        if let Some(id) = line.strip_prefix("id:") {
+            current_event_id = Some(id.trim().to_owned());
+        }
+        if let Some(data) = line.strip_prefix("data:") {
+            let data = data.trim();
+            if data.is_empty() {
+                continue;
+            }
+            let message: serde_json::Value = serde_json::from_str(data).unwrap();
+            if message["method"] == "roots/list" {
+                assert_eq!(message["id"], roots_request_id);
+                assert_eq!(current_event_id.as_deref(), Some(roots_event_id.as_str()));
+                break;
+            }
+        }
+    }
+    let mut rejected = false;
+    for _ in 0..20 {
+        let response = server.post_json(
+            Some(&session_id),
+            Some("2025-11-25"),
+            &json!({"jsonrpc":"2.0","method":"notifications/message",
+                "params":{"data":"x".repeat(512 * 1024)}}),
+        );
+        if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            rejected = true;
+            break;
+        }
+        assert_eq!(response.status(), reqwest::StatusCode::ACCEPTED);
+    }
+    let receipts: serde_json::Value = server.get_admin_tool_receipts(&[]).json().unwrap();
+    assert_eq!(receipts["receipts"].as_array().unwrap().len(), 0);
+    assert!(
+        rejected,
+        "withheld roots reply retained unlimited notification bodies"
+    );
+    let wrong_reply = server.post_json(
+        Some(&session_id),
+        Some("2025-11-25"),
+        &json!({"jsonrpc":"2.0","id":"wrong-reply",
+            "result":{"roots":[],"padding":"x".repeat(512 * 1024)}}),
+    );
+    assert_eq!(wrong_reply.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+    let matching_reply = server.post_json(
+        Some(&session_id),
+        Some("2025-11-25"),
+        &json!({"jsonrpc":"2.0","id":roots_request_id,
+            "result":{"roots":[],"padding":"x".repeat(512 * 1024)}}),
+    );
+    assert_eq!(matching_reply.status(), reqwest::StatusCode::ACCEPTED);
+    assert!(matching_reply.bytes().unwrap().is_empty());
+    loop {
+        use std::io::BufRead;
+        line.clear();
+        assert!(reader.read_line(&mut line).unwrap() > 0);
+        if let Some(data) = line.strip_prefix("data:") {
+            let data = data.trim();
+            if data.is_empty() {
+                continue;
+            }
+            let message: serde_json::Value = serde_json::from_str(data).unwrap();
+            assert_ne!(message["params"]["data"]["event"], "roots_refresh_failed");
+            if message["method"] == "notifications/message"
+                && message["params"]["logger"] == "chio.mcp.roots"
+                && message["params"]["data"]["event"] == "roots_refreshed"
+            {
+                assert_eq!(message["params"]["data"]["rootCount"], 0);
+                break;
+            }
+        }
+    }
+    drop(reader);
+    let recovery_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let healthy = loop {
+        let response = server.post_json(
+            Some(&session_id),
+            Some("2025-11-25"),
+            &json!({"jsonrpc":"2.0","id":99,"method":"ping","params":{}}),
+        );
+        if response.status() != reqwest::StatusCode::TOO_MANY_REQUESTS {
+            break response;
+        }
+        assert!(std::time::Instant::now() < recovery_deadline);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    assert_eq!(healthy.status(), reqwest::StatusCode::OK);
+    let mut reader = std::io::BufReader::new(healthy);
+    loop {
+        use std::io::BufRead;
+        line.clear();
+        assert!(reader.read_line(&mut line).unwrap() > 0);
+        if let Some(data) = line.strip_prefix("data:") {
+            let message: serde_json::Value = serde_json::from_str(data.trim()).unwrap();
+            if message["id"] == 99 {
+                assert_eq!(message["result"], json!({}));
+                break;
+            }
+        }
+    }
+    let receipts: serde_json::Value = server.get_admin_tool_receipts(&[]).json().unwrap();
+    assert_eq!(receipts["receipts"].as_array().unwrap().len(), 0);
+}
+
+#[test]
 fn hosted_mcp_sessions_initialize_resume_and_report_ready_state() {
     let server = start_http_server("test-token");
     let session = server.initialize_session();

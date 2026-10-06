@@ -52,6 +52,7 @@ zeroize = { workspace = true }
 workspace = true
 
 [dev-dependencies]
+chio-errors = { workspace = true }
 tempfile = { workspace = true }
 rcgen = "0.13.2"
 chio-siem = { workspace = true }

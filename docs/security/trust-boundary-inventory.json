@@ -279,6 +279,7 @@
     "crates/platform/chio-store-sqlite/src/frost_store/signer/persistence.rs",
     "crates/platform/chio-store-sqlite/src/iou_store.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store.rs",
+    "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/preflight.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/metadata.rs",
@@ -454,6 +455,8 @@
     "crates/protocol/chio-mcp-adapter/src/url_elicitation.rs",
     "crates/protocol/chio-mcp-edge/src/authorization.rs",
     "crates/protocol/chio-mcp-edge/src/ingress.rs",
+    "crates/protocol/chio-mcp-edge/src/ingress/framing.rs",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/framing.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs",
@@ -1416,6 +1419,7 @@
     "crates/platform/chio-store-sqlite/src/frost_store/input.rs::decode_record::from_wire",
     "crates/platform/chio-store-sqlite/src/iou_store.rs::decode_envelope::from_wire",
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::decode_canonical_chio_receipt::from_wire",
+    "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/preflight.rs::table::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs::resolve_sender_constraint_grant::from_wire",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_stored_json::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new",
@@ -1500,6 +1504,8 @@
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission::from_wire",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire",
+    "crates/protocol/chio-mcp-edge/src/ingress/framing.rs::read_document_frame_with_admission::from_wire",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::decode::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire",
@@ -2340,6 +2346,9 @@
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_slice",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_str",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_str",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_slice",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_str",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar::from_str",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_elicitation::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/nested_flow.rs::create_message::from_value",
@@ -2355,7 +2364,7 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value",
-    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message_with_client_inbox::from_value",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value",
@@ -3737,28 +3746,6 @@
       "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
     },
     {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs",
-      "owner": "query_cost_attribution_report",
-      "sha256": "23248f6f8ac5d1f69651355f58d0255586d7e87c7610a604c8fe3aa83fbf9e69",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "SELECT COUNT(*) FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) AND json_type(r.raw_json, '$.metadata.financial') = 'object'",
-      "principal": "receipt-operator",
-      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/cost_attribution.rs",
-      "owner": "query_cost_attribution_report",
-      "sha256": "a45631597479a19a776de4219bacaaf005207de8f4ab10ab7c66d58fe615d021",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id WHERE (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) AND json_type(r.raw_json, '$.metadata.financial') = 'object' ORDER BY r.seq ASC",
-      "principal": "receipt-operator",
-      "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
-    },
-    {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/economic.rs",
       "owner": "query_economic_receipt_projection_report",
       "sha256": "9a982dd453048e75fb684339497a0d98a5fdaf44fc1b24996bac073c09cc3dcc",
@@ -3779,6 +3766,17 @@
       "sql": "SELECT r.seq, r.receipt_id, r.timestamp, r.capability_id, COALESCE(r.subject_key, cl.subject_key), r.tool_server, r.tool_name, COALESCE(sr.reconciliation_state, 'open'), sr.note, sr.updated_at, COALESCE(mbr.reconciliation_state, 'open'), mbr.note, mbr.updated_at, mbr.adapter_kind, mbr.evidence_id, mbr.observed_units, mbr.billed_cost_units, mbr.billed_cost_currency, mbr.evidence_sha256, mbr.recorded_at, r.raw_json FROM chio_tool_receipts r LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id LEFT JOIN metered_billing_reconciliations mbr ON r.receipt_id = mbr.receipt_id WHERE json_type(r.raw_json, '$.metadata.governed_transaction.economic_authorization') = 'object' AND (?1 IS NULL OR r.capability_id = ?1) AND (?2 IS NULL OR r.tool_server = ?2) AND (?3 IS NULL OR r.tool_name = ?3) AND (?4 IS NULL OR r.timestamp >= ?4) AND (?5 IS NULL OR r.timestamp <= ?5) AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6) ORDER BY r.timestamp DESC, r.seq DESC LIMIT ?7",
       "principal": "receipt-operator",
       "contract": "Reporting/listing requires explicit admin context at the exposed wrapper; reconciliation writes require service authentication."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/read_boundary.rs",
+      "owner": "new",
+      "sha256": "15ddf2d623bfa0291d73d5ed14549fc95ee49697f6f064e3d16b46eba78eff8f",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) FROM (SELECT 1 FROM chio_tool_receipts LIMIT 1)",
+      "principal": "receipt-operator",
+      "contract": "ReportSnapshot pins the existing read transaction with a one-row existence query under the shared SQL work budget. Both exposed analytics and cost-attribution callers require AdminService/local-operator receipt read context before constructing it. The pin returns no receipt contents or tenant identity."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
@@ -3878,6 +3876,17 @@
       "sql": "SELECT r.seq, r.raw_json FROM chio_tool_receipts r JOIN claim_receipt_log_entries e ON e.receipt_kind = 'tool_receipt' AND e.source_seq = r.seq AND e.receipt_id = r.receipt_id WHERE r.receipt_id = ?1 AND (?2 IS NULL OR r.tenant_id = ?2) AND e.entry_seq <= ?3",
       "principal": "receipt-read-adapter",
       "contract": "User-facing callers derive the optional tenant solely from effective_read_scope; no tenant requires explicit admin authority. Internal retained provenance lookups use the native receipt-store authority. Both paths pin the authenticated live/archive snapshot, constrain archived claims to the live watermark, and verify signed identity and tenant after decoding."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read.rs",
+      "owner": "validate_source_binding",
+      "sha256": "29fb15f98d8b050fc5f4d5070fd8e7d0133cf87e3f7e5d3017ad75cd81a527ca",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT COUNT(*) = 1 AND COALESCE(MIN(receipt_id = ?2 AND raw_json = ?3 AND tenant_id IS ?4), 0) FROM chio_tool_receipts WHERE seq = ?1",
+      "principal": "receipt-read-adapter",
+      "contract": "The read-only session collector first resolves sealed ReceiptReadContext and authenticates one checkpoint/claim snapshot against the independently supplied kernel key. This bounded exact-sequence lookup compares source receipt ID, complete original raw_json and signed tenant to the authenticated claim row; validation spans the retained corpus but returned rows follow signed session membership and authorized tenant narrowing. IDs or unsigned indexes grant no read authority."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs",
@@ -4777,7 +4786,6 @@
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_governed_intent::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_model_metadata::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
     "crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs::parse_request_supplemental_authorization::from_value": "Wire metadata becomes typed unverified artifacts. Kernel validation binds signed nonce, approvals, governance, model and supplemental authorization to the actual invocation. No serde result is a verification witness.",
-    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::refresh_roots_from_client_with_channel::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_authorization_details_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs::parse_request_time_transaction_context_from_value::from_value": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
@@ -4845,7 +4853,11 @@
     "crates/trust/chio-pheromone-runtime/src/lib.rs::peer_weights_from_json::from_value": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
     "crates/trust/chio-pheromone-runtime/src/lib.rs::runtime_policy_from_json::from_value": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
     "crates/trust/chio-pheromone-runtime/src/lib.rs::validate_json_schema::from_str": "Policy/weight imports reject duplicate original native JSON under a 16 MiB bound before Value projection, embedded schema validation or signed envelope verification. Signature, trusted policy issuer, admission issuer and scarcity gates remain. Embedded schema JSON is repository-owned; typed Value projections preserve native integers.",
-    "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding."
+    "crates/trust/chio-weights/src/card.rs::schema::custom_deserialize": "Model-card import requires 1 MiB bounded native canonical typed byte equality and existing card validation. StringSet custom Deserialize still rejects duplicates, blanks and padding; signature/cosign verification remains outside structural decoding.",
+    "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs::create_message_with_client_inbox::from_value": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_slice": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity::from_str": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar::from_str": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority."
   },
   "proofs": [
     {
@@ -5804,6 +5816,9 @@
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs": [
       "compare_and_swap::from_slice"
     ],
+    "crates/platform/chio-control-plane/src/policy/guard_api_key.rs": [
+      "serialize::custom_deserialize"
+    ],
     "crates/platform/chio-control-plane/src/reputation.rs": [
       "load_passport_verifier_policy::from_value",
       "load_passport_verifier_policy::from_value"
@@ -6132,11 +6147,6 @@
     "crates/protocol/chio-mcp-adapter/src/transport/nested_flow.rs": [
       "parse_requested_task::from_value"
     ],
-    "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs": [
-      "add::custom_deserialize",
-      "measure::Deserializer::from_str",
-      "visit_map::custom_deserialize"
-    ],
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc": [
       "call_tool_with_params::from_value",
       "complete_prompt_argument::from_value",
@@ -6156,6 +6166,16 @@
     ],
     "crates/protocol/chio-mcp-edge/src/authorization.rs": [
       "negotiate_authorization_capabilities::from_value"
+    ],
+    "crates/protocol/chio-mcp-edge/src/ingress/budget/admission.rs": [
+      "add::custom_deserialize",
+      "measure::Deserializer::from_str",
+      "visit_map::custom_deserialize"
+    ],
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs": [
+      "control_identity::from_slice",
+      "control_identity::from_str",
+      "scalar::from_str"
     ],
     "crates/protocol/chio-mcp-edge/src/ingress.rs": [
       "decode_mcp_request::from_slice",
@@ -6182,7 +6202,7 @@
       "parse_request_supplemental_authorization::from_value"
     ],
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs": [
-      "create_message::from_value",
+      "create_message_with_client_inbox::from_value",
       "refresh_roots_from_client_with_channel::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": [
@@ -9918,7 +9938,7 @@
       "contract": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
       "readers": [
         {
-          "reader": "create_message",
+          "reader": "create_message_with_client_inbox",
           "decoders": [
             "from_value"
           ],
@@ -11127,7 +11147,7 @@
         }
       ]
     },
-    "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs": {
+    "crates/protocol/chio-mcp-edge/src/ingress/budget/admission.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Non-authorizing structural preflight checks wire bytes, node and text growth with checked accounting and terminal JSON parsing before the duplicate-aware document decoder. Named source witnesses and mutation calibration retain every bound.",
       "readers": [
@@ -11149,6 +11169,49 @@
           ],
           "apis": [
             "Counter::checked_add+ValueSeed::structural_limits+Deserializer::end"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority.",
+      "readers": [
+        {
+          "reader": "control_identity",
+          "decoders": [
+            "from_slice",
+            "from_str"
+          ],
+          "apis": [
+            "call::scalar::borrowed-control::bounded_scalar+same_wire_aggregate_admission"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "scalar",
+          "decoders": [
+            "from_str"
+          ],
+          "apis": [
+            "borrowed-control::bounded_scalar+same_wire_aggregate_admission"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/policy/guard_api_key.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Typed policy credential-field deserialization receives serde Deserializer input and moves its String into the wiping GuardApiKey owner. This field wrapper preserves private serialization and redacted Debug; policy loading supplies the enclosing bounded format contract. The wrapper creates no signed or verified authority.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
           ],
           "checked": true
         }
@@ -12705,6 +12768,13 @@
           "decode_signed",
           "64 * 1024 * 1024"
         ]
+      ],
+      "retained_typed_conversions": []
+    },
+    "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/preflight.rs": {
+      "contract": "Session snapshot preflight borrows each original raw_json tuple, bounds per-value and aggregate authentication bytes/rows, and bounds lexical JSON nodes before decode_signed on that exact borrowed raw text. Membership and tenant projections here charge selected-session capacity only; authenticated checkpoint/source validation and sealed ReceiptReadContext govern the later exported collection. No unsigned membership index supplies authority.",
+      "migrations": [
+        "table::new#1::decode_signed"
       ],
       "retained_typed_conversions": []
     }
@@ -14515,11 +14585,11 @@
     "crates/protocol/chio-mcp-edge/src/runtime/runtime_flow.rs": {
       "contract": "Nested response Values are correlated with the outstanding request and converted into untrusted session data. Conversion does not create a capability or a verified proof.",
       "migrations": [
-        "create_message::from_value",
+        "create_message_with_client_inbox::from_value",
         "refresh_roots_from_client_with_channel::from_value"
       ],
       "retained_typed_conversions": [
-        "create_message::from_value",
+        "create_message_with_client_inbox::from_value",
         "refresh_roots_from_client_with_channel::from_value"
       ]
     },
@@ -15974,6 +16044,14 @@
     "crates/protocol/chio-mcp-edge/src/ingress.rs": {
       "kind": "bounded-original-and-typed-projection",
       "contract": "Bounded original MCP envelope. RawValue retains the invocation proof byte slice for decode_signed before duplicate-aware decode_document of unsigned arguments. This projection is unverified; the kernel binds signature, subject, action, expiry and replay. Stdio and remote HTTP share this reader."
+    },
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "Borrowed Envelope/Params RawValue slices only project <=512-byte scalar control identities. The same original bytes first pass size/UTF-8 validation, then atomic aggregate wire/node/text admission, then shared duplicate-aware MCP document decoding with original signed proof slices. Control identities only select reserved accounting capacity; they create no capability, verified proof or admission authority."
+    },
+    "crates/protocol/chio-mcp-edge/src/ingress/framing.rs": {
+      "kind": "bounded-original-reader",
+      "contract": "Bounded upstream document frames retain the original line, reserve its structural/aggregate footprint before DOM decoding, and decode_document the whitespace-trimmed bytes of that same line. The non-cloned reservation follows the returned message. This unsigned peer-data decoder does not construct invocation proof or capability authority."
     }
   },
   "decoding_contracts": [
@@ -16267,6 +16345,7 @@
     "crates/platform/chio-store-sqlite/src/frost_store/input.rs::decode_record::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/iou_store.rs::decode_envelope::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::decode_canonical_chio_receipt::from_wire#1::decode_signed",
+    "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/preflight.rs::table::new#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs::resolve_sender_constraint_grant::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_stored_json::new#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new#1::decode_signed",
@@ -16338,7 +16417,7 @@
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire#1::decode_canonical",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire#1::decode_signed",
-    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire#1::decode_signed",
+    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire#1::canonicalize",
@@ -16351,6 +16430,8 @@
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#2::decode_signed",
+    "crates/protocol/chio-mcp-edge/src/ingress/framing.rs::read_document_frame_with_admission::from_wire#1::decode_document",
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::decode#1::from_wire#1::bounds_only",
     "crates/protocol/chio-mcp-remote/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire#1::decode_signed",
@@ -18945,8 +19026,16 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs": [
       "query_receipts::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query/read.rs::query_receipts_on_connection",
       "query_receipts::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query/read.rs::query_receipts_on_connection",
-      "with_retained_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity",
-      "with_retained_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection"
+      "with_retained_connection_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity_with_trusted_watermark",
+      "with_retained_connection_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection_with_preflight",
+      "with_retained_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs::with_retained_connection_snapshot"
+    ],
+    "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read.rs": [
+      "collect_retained_session_receipts_read_only::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read.rs::collect_with_limits",
+      "collect_with_limits::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/retained_read.rs::with_retained_connection_snapshot"
+    ],
+    "crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read/preflight.rs": [
+      "table::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs": [
       "backfill_checkpoint_transparency_projections::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
@@ -18989,9 +19078,12 @@
       "trusted_retention_watermark::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::retention_archive_connection_is_trusted",
       "validate_persisted_checkpoint_against_live_or_archived_claim_log::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::trusted_retention_watermark",
       "verify_checkpoint_chain_integrity::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_checkpoint_chain_integrity_with_frontier",
-      "verify_checkpoint_chain_integrity_with_frontier::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
       "verify_checkpoint_chain_integrity_with_frontier::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::trusted_retention_watermark",
-      "verify_latest_checkpoint_integrity::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_checkpoint_chain_integrity"
+      "verify_checkpoint_chain_integrity_with_frontier::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_checkpoint_chain_integrity_with_frontier_at_watermark",
+      "verify_checkpoint_chain_integrity_with_frontier_at_watermark::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
+      "verify_latest_checkpoint_integrity::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::trusted_retention_watermark",
+      "verify_latest_checkpoint_integrity::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_latest_checkpoint_integrity_with_trusted_watermark",
+      "verify_latest_checkpoint_integrity_with_trusted_watermark::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::verify_checkpoint_chain_integrity_with_frontier_at_watermark"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs": [
       "derive_authorization_sender_constraint::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/claim_log/authorization.rs::resolve_sender_constraint_grant",
@@ -19055,7 +19147,8 @@
       "receipt_lineage_verification::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs::ensure_receipt_lineage_statement_for_receipt_id_tx",
       "record_checkpoint_publication_trust_anchor_binding::original-json-reader::UntrustedJsonText",
       "trusted_retention_archive::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection",
-      "trusted_retention_archive_for_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::retention_archive_connection_is_trusted"
+      "trusted_retention_archive_for_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection_with_preflight",
+      "trusted_retention_archive_for_connection_with_preflight::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::retention_archive_connection_is_trusted"
     ],
     "crates/platform/chio-store-sqlite/src/rollback_generation.rs": [
       "decode_slot::original-json-reader::UntrustedJsonText"
@@ -19074,7 +19167,7 @@
       "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
       "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot",
       "ensure_capability_set_suspensions_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
-      "evaluate_capability_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot",
+      "evaluate_capability_suspension::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension/admission_lookup.rs::evaluate",
       "load_capability_set_suspension_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
       "load_capability_set_suspension_result::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
       "load_capability_set_suspensions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot",
@@ -19093,6 +19186,10 @@
       "validate_command_common::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::command_contribution",
       "validate_remove_request::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_command_common",
       "validate_stored_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_command_common"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension/admission_lookup.rs": [
+      "evaluate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension/admission_lookup.rs::evaluate_in_snapshot",
+      "evaluate_in_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_snapshot"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/codec.rs": [
       "decode_label::original-json-reader::UntrustedJsonText",
@@ -19686,6 +19783,9 @@
       "cmd_trust_federated_delegation_policy_create::shared-reader::crates/products/chio-cli/src/admin.rs::load_single_default_capability",
       "cmd_trust_federated_issue::shared-reader::crates/products/chio-cli/src/admin.rs::load_single_default_capability",
       "load_single_default_capability::shared-reader::crates/platform/chio-control-plane/src/policy/loader.rs::load_policy"
+    ],
+    "crates/products/chio-cli/src/cert/session_receipts.rs": [
+      "load_session_receipts::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/session_certificate_read.rs::collect_retained_session_receipts_read_only"
     ],
     "crates/products/chio-cli/src/cli/arena.rs": [
       "cmd_arena_evolve::shared-reader::crates/core/chio-arena/src/scenario.rs::load_scenario",
@@ -20455,18 +20555,22 @@
     "crates/protocol/chio-mcp-adapter/src/fuzz.rs": [
       "fuzz_mcp_envelope_parse::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame"
     ],
-    "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget.rs": [
-      "admit::shared-reader::crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs::measure",
-      "read_message::shared-reader::crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission"
-    ],
-    "crates/protocol/chio-mcp-edge/src/fuzz.rs": [
-      "fuzz_mcp_envelope_decode::shared-reader::crates/protocol/chio-mcp-edge/src/runtime/framing.rs::read_jsonrpc_frame"
-    ],
     "crates/protocol/chio-mcp-edge/src/ingress.rs": [
       "decode_mcp_request::original-json-reader::UntrustedJsonText"
     ],
-    "crates/protocol/chio-mcp-edge/src/runtime/framing.rs": [
-      "read_jsonrpc_frame::shared-reader::crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request"
+    "crates/protocol/chio-mcp-edge/src/ingress/budget.rs": [
+      "admit::shared-reader::crates/protocol/chio-mcp-edge/src/ingress/budget/admission.rs::measure",
+      "read_message::shared-reader::crates/protocol/chio-mcp-edge/src/ingress/framing.rs::read_document_frame_with_admission"
+    ],
+    "crates/protocol/chio-mcp-edge/src/ingress/framing.rs": [
+      "read_document_frame_with_admission::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs": [
+      "control_identity::shared-reader::crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar",
+      "control_identity::shared-reader::crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::scalar",
+      "decode#1::original-json-reader::UntrustedJsonText",
+      "decode#1::shared-reader::crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request",
+      "decode#1::shared-reader::crates/protocol/chio-mcp-edge/src/ingress/inbox.rs::control_identity"
     ],
     "crates/protocol/chio-mcp-remote/src/input.rs": [
       "decode::original-json-reader::UntrustedJsonText",

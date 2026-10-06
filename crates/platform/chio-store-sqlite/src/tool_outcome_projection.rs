@@ -52,6 +52,12 @@ pub(super) fn load_verified_projection(
         // Retention preserves digest and size; there are no payload bytes to decode.
         Some(None) => None,
     };
+    if let Some(raw) = raw.as_ref() {
+        crate::SqliteAdmissionOperationStore::verify_original_native_return_tx(
+            connection, &operation, raw, false,
+        )
+        .map_err(admission_error)?;
+    }
     let returned_digest = returned_participant_digest(
         &outcome,
         outcome.raw_output_digest().as_str(),

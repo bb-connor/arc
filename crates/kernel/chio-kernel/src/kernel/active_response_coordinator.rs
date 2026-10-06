@@ -50,11 +50,12 @@ use super::{
     derive_active_response_dispatch_id, ActiveResponseExecutionApproval,
     ActiveResponseExecutionEvidence, ActiveResponseExecutionOutcome,
     ActiveResponseExecutionRequest, ActiveResponseExecutionRequestParts,
-    ActiveResponseExecutorAuthorityIdentity, ActiveResponseExecutorError,
+    ActiveResponseExecutorAuthorityIdentity,
 };
 use super::{ChioKernel, KernelError};
 
 mod admission_request;
+mod executor_error;
 
 pub use admission_request::{
     ActiveResponseAdmissionRequest, AutomaticActiveResponsePermit,
@@ -92,6 +93,7 @@ impl ChioKernel {
         &self,
         request: &ActiveResponseAdmissionRequest,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         let verified_admission =
             self.verify_active_response_admission_at(request, self.read_authority_time()?.get())?;
         self.prepare_verified_active_response_admission(request, verified_admission)
@@ -102,13 +104,15 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
         verified_admission: VerifiedActiveResponseAdmission,
     ) -> Result<PreparedActiveResponseAdmission, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         match verified_admission {
             VerifiedActiveResponseAdmission::Automatic(permit) => {
                 Ok(PreparedActiveResponseAdmission::Automatic(permit))
             }
             VerifiedActiveResponseAdmission::Governed(mut verified) => {
                 self.validate_active_response_coordinator_profiles()?;
-                let mut operation = self.create_active_response_operation(&verified.operation)?;
+                let (mut operation, created_by_this_attempt) =
+                    self.create_active_response_operation(&verified.operation)?;
                 let executor_authority = self
                     .active_response_executor_identity()
                     .map_err(|error| active_response_denied(error.to_string()))?;
@@ -142,32 +146,21 @@ impl ChioKernel {
                 ) {
                     Ok(anchor) => anchor,
                     Err(ActiveResponseOperationAnchorJournalError::Kernel(error)) => {
-                        match self.claim_pre_dispatch_compensation(
-                            operation.operation_id(),
-                            &error.to_string(),
-                        ) {
-                            Ok(Some(_)) => return Err(error),
-                            Ok(None) => {
-                                return Err(active_response_internal(format!(
-                                    "active-response preparation failed without a compensable operation: {error}"
-                                )))
-                            }
-                            Err(compensation_error) => {
-                                return Err(active_response_internal(format!(
-                                    "active-response preparation failed ({error}); compensation failed: {compensation_error}"
-                                )))
-                            }
-                        }
+                        // An uncertain store result is retryable. This prepare
+                        // attempt cannot cancel another worker's admission.
+                        return Err(error);
                     }
                     Err(ActiveResponseOperationAnchorJournalError::Conflict) => {
                         let denial = active_response_denied(
                             "persisted active-response preparation is stale",
                         );
-                        if matches!(
-                            operation.state(),
-                            AdmissionOperationState::Prepared
-                                | AdmissionOperationState::ApprovalReserved
-                        ) {
+                        if created_by_this_attempt
+                            && matches!(
+                                operation.state(),
+                                AdmissionOperationState::Prepared
+                                    | AdmissionOperationState::ApprovalReserved
+                            )
+                        {
                             let _ = self.claim_pre_dispatch_compensation(
                                 operation.operation_id(),
                                 &denial.to_string(),
@@ -195,23 +188,10 @@ impl ChioKernel {
                 match operation.state() {
                     AdmissionOperationState::Prepared
                     | AdmissionOperationState::ApprovalReserved => {
-                        if let Err(error) = self.reserve_active_response_approval_set(
+                        self.reserve_active_response_approval_set(
                             operation.operation_id(),
                             &verified.approval_set,
-                        ) {
-                            if self
-                                .claim_pre_dispatch_compensation(
-                                    operation.operation_id(),
-                                    &error.to_string(),
-                                )?
-                                .is_none()
-                            {
-                                return Err(active_response_internal(
-                                    "active-response approval failure lost the compensation race",
-                                ));
-                            }
-                            return Err(error);
-                        }
+                        )?;
                     }
                     AdmissionOperationState::DispatchCommitted
                     | AdmissionOperationState::Completed => {
@@ -321,6 +301,7 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
         prepared: &PreparedActiveResponseAdmission,
     ) -> Result<(), KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         match prepared {
             PreparedActiveResponseAdmission::Automatic(_) => Err(active_response_denied(
                 "approval-only active-response commitment requires a governed preparation",
@@ -367,6 +348,7 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
         reservation: &GovernedActiveResponseReservation,
     ) -> Result<ActiveResponseDispatchPermit, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         self.validate_active_response_coordinator_profiles()?;
         let mut operation = self.load_active_response_operation(reservation.operation_id())?;
         if !operation.has_same_prepared_binding(&reservation.operation) {
@@ -555,6 +537,7 @@ impl ChioKernel {
         request: &ActiveResponseAdmissionRequest,
         prepared: &PreparedActiveResponseAdmission,
     ) -> Result<ActiveResponseExecutionEvidence, KernelError> {
+        self.require_governed_active_response_plans_enabled()?;
         let installed = self.active_response_executor.as_ref().ok_or_else(|| {
             active_response_internal("active-response executor authority is not installed")
         })?;
@@ -786,19 +769,7 @@ impl ChioKernel {
         let evidence = installed
             .authority
             .execute_active_response(execution)
-            .map_err(|error| match error {
-                ActiveResponseExecutorError::RejectedBeforeCommit(reason) => {
-                    active_response_denied(format!(
-                        "active-response executor rejected dispatch before commit: {reason}"
-                    ))
-                }
-                ActiveResponseExecutorError::NotReady(reason) => active_response_internal(format!(
-                    "active-response executor became unavailable: {reason}"
-                )),
-                ActiveResponseExecutorError::OutcomeUnknown(reason) => active_response_internal(
-                    format!("active-response executor outcome requires retry: {reason}"),
-                ),
-            })?;
+            .map_err(executor_error::map_executor_dispatch_error)?;
         if installed.authority.identity() != installed.identity {
             return Err(active_response_internal(
                 "active-response executor authority identity changed during execution",
@@ -983,23 +954,28 @@ impl ChioKernel {
     fn create_active_response_operation(
         &self,
         expected: &AdmissionOperation,
-    ) -> Result<AdmissionOperation, KernelError> {
+    ) -> Result<(AdmissionOperation, bool), KernelError> {
         let store = self.admission_operation_store.as_ref().ok_or_else(|| {
             active_response_internal("durable active-response operation store is not installed")
         })?;
         match store.create_prepared(expected.clone()) {
             Ok(AdmissionOperationCreateOutcome::Created(operation))
-            | Ok(AdmissionOperationCreateOutcome::Existing(operation))
                 if operation.has_same_prepared_binding(expected) =>
             {
-                Ok(operation)
+                Ok((operation, true))
+            }
+            Ok(AdmissionOperationCreateOutcome::Existing(operation))
+                if operation.has_same_prepared_binding(expected) =>
+            {
+                Ok((operation, false))
             }
             Ok(_) => Err(active_response_internal(
                 "active-response operation store returned a different operation",
             )),
             Err(error) => match store.load(expected.operation_id()) {
                 Ok(Some(operation)) if operation.has_same_prepared_binding(expected) => {
-                    Ok(operation)
+                    // Readback proves persistence, but not creation ownership.
+                    Ok((operation, false))
                 }
                 _ => Err(active_response_internal(format!(
                     "active-response operation persistence failed: {error}"
@@ -1050,6 +1026,14 @@ impl ChioKernel {
                         && reservation.state() == ReplayReservationState::Reserved =>
                 {
                     Ok(reservation)
+                }
+                Err(readback_error) => Err(active_response_internal(format!(
+                    "active-response approval reservation failed ({error}); readback failed: {readback_error}"
+                ))),
+                _ if matches!(error, crate::approval::ApprovalStoreError::Backend(_)) => {
+                    Err(active_response_internal(format!(
+                        "active-response approval reservation is uncertain: {error}"
+                    )))
                 }
                 _ => Err(active_response_denied(format!(
                     "active-response approval reservation failed: {error}"

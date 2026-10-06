@@ -5,7 +5,7 @@ pub mod test_support;
 use super::active_response_committed_recovery::{
     CommittedAdmissionAuthority, CommittedDispatchAuthority,
 };
-use chio_security_types::FreshLiveAdmission;
+use chio_security_types::{DispatchRejection, FreshLiveAdmission};
 
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::{canonical_json_bytes, sha256_hex, PublicKey};
@@ -703,6 +703,8 @@ pub enum ActiveResponseExecutorError {
     NotReady(String),
     #[error("active-response dispatch was rejected before commit: {0}")]
     RejectedBeforeCommit(String),
+    #[error("active-response dispatch was rejected before commit: {0}")]
+    DispatchRejectedBeforeCommit(#[source] DispatchRejection),
     #[error("active-response dispatch outcome is unknown: {0}")]
     OutcomeUnknown(String),
 }

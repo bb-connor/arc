@@ -206,6 +206,7 @@ impl ChioKernel {
         request: &ToolCallRequest,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        reject_reserved_receipt_metadata(extra_metadata.as_ref())?;
         if request.execution_nonce.is_some() {
             return Err(KernelError::ReservingAuthorizationRejectsPresentedNonce);
         }

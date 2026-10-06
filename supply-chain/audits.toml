@@ -810,6 +810,12 @@ criteria = "safe-to-deploy"
 version = "0.1.1"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
 
+[[audits.iroh-blobs]]
+who = "Codex (OpenAI), source delta review"
+criteria = "safe-to-deploy"
+delta = "0.103.0 -> 0.103.1"
+notes = "Complete published twelve-file source delta reviewed against registry SHA-256 and exact upstream revisions; per-request Push authorization rejects before import. Existing 0.103.0 exemption is the unchanged baseline. See supply-chain/reviews/iroh-blobs-0.103.1-delta.md for scope, other production/build/test changes and separate provider resource/runtime acceptance."
+
 [[audits.itertools]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"

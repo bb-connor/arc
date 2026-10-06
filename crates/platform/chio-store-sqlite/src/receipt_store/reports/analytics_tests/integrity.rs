@@ -116,3 +116,56 @@ fn sparse_subject_queries_have_a_sql_work_budget() -> Result<(), Box<dyn std::er
     assert_eq!(retry, original);
     Ok(())
 }
+
+#[test]
+fn selected_report_projection_corruption_is_not_a_successful_report(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for replacement in [
+        "receipt_id = 'different-id'",
+        "timestamp = timestamp + 1",
+        "capability_id = 'different-capability'",
+        "tool_server = 'different-server'",
+        "tool_name = 'different-tool'",
+        "decision_kind = 'deny'",
+        "subject_key = 'different-subject'",
+        "issuer_key = 'different-issuer'",
+        "grant_index = 1",
+        "policy_hash = 'different-policy'",
+        "content_hash = 'different-content'",
+        "tenant_id = 'different-tenant'",
+    ] {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("selected-projection.db");
+        let store = SqliteReceiptStore::open(&path)?;
+        let receipt = sign_fixture_receipt(
+            0,
+            &FixtureReceipt {
+                capability_id: "cap-selected-integrity".to_owned(),
+                subject_key: "agent-selected-integrity",
+                tool_server: "shell",
+                tool_name: "bash",
+                decision: Decision::Allow,
+                timestamp: DAY_SECS,
+                financial: Some((11, Some(22))),
+            },
+        );
+        store.append_chio_receipt(&receipt)?;
+        assert_eq!(
+            store
+                .query_receipt_analytics(&admin_query())?
+                .summary
+                .total_receipts,
+            1
+        );
+        let external = Connection::open(&path)?;
+        drop_transparency_projection_guards(&external)?;
+        external.execute(&format!("UPDATE chio_tool_receipts SET {replacement}"), [])?;
+        ensure_transparency_projection_guards(&external)?;
+        let result = store.query_receipt_analytics(&admin_query());
+        assert!(
+            matches!(result, Err(ReceiptStoreError::Conflict(_))),
+            "selected {replacement} corruption produced {result:?}"
+        );
+    }
+    Ok(())
+}

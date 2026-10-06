@@ -215,3 +215,49 @@ fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
         authority,
     })
 }
+
+#[test]
+fn native_journal_checkpoint_preserves_egress_pending_then_commit() -> AnchoredTestResult {
+    let fixture = fixture();
+    hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let pending = pending(&fixture, "checkpoint-egress", None)?;
+    let acquired = pending.acquire(&fixture)?;
+    let old = fixture
+        .store
+        .load_security_participant_egress(
+            pending.operation.binding().operation_id(),
+            &fixture.fence,
+            now_ms(),
+        )?
+        .ok_or("acquisition history absent")?;
+    fixture.store.checkpoint_security_participant_history(
+        &pending.initialized,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    let committed = pending.commit(&fixture, &commitment(&acquired)?)?;
+    assert_eq!(committed.fence_id, acquired.fence_id);
+    assert_eq!(committed.request_hash, acquired.request_hash);
+    let history = fixture
+        .store
+        .load_security_participant_egress(
+            pending.operation.binding().operation_id(),
+            &fixture.fence,
+            now_ms(),
+        )?
+        .ok_or("commit history absent")?;
+    assert_eq!(history.historical_fence(), old.historical_fence());
+    assert!(history.historical_commitment().is_some());
+    let fixture = reopen(fixture)?;
+    assert!(fixture
+        .store
+        .load_security_participant_egress(
+            pending.operation.binding().operation_id(),
+            &fixture.fence,
+            now_ms()
+        )?
+        .ok_or("reopened history absent")?
+        .historical_commitment()
+        .is_some());
+    Ok(())
+}

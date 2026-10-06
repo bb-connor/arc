@@ -117,6 +117,7 @@ WORKFLOWS = (
     "apalache-safety.yml",
     "threat-model-coverage.yml",
     "admin-override-audit.yml",
+    "security-nextest-advisory.yml",
 )
 CONTRACT_DOCUMENT = Path("docs/security/committed-linux-evidence.md")
 ACTIONLINT_CONFIG = Path(".github/actionlint.yaml")
@@ -125,6 +126,9 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("deploy/docker/ca-certificates-20260611-r0.apk"),
     Path("deploy/docker/security-evidence-apk.lock"),
     Path("deploy/docker/security-evidence-seccomp.json"),
+    Path("deploy/docker/security-evidence-seccomp-upstream.json"),
+    Path("deploy/docker/security-evidence-seccomp-provenance.json"),
+    Path("deploy/docker/security-evidence-seccomp-upstream.LICENSE"),
     Path("crates/security/chio-cage/scripts/check-linux-enforcement.sh"),
     Path("scripts/check-cage-all-target-inventory.py"),
     Path("scripts/check-cage-enforcement.sh"),
@@ -136,6 +140,8 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/check-supply-chain.sh"),
     Path("scripts/check-temporal-security.sh"),
     Path("scripts/run-security-execution-container.py"),
+    Path("scripts/audit-security-merge-qualification.py"),
+    Path("scripts/check-actions-workflow-syntax.py"),
     Path("scripts/aggregate-security-evidence-shards.py"),
     Path("scripts/security-execution-command-client.py"),
     Path("scripts/security-execution-container-entrypoint.py"),
@@ -783,13 +789,13 @@ assert_rejected(
     "planned main ruleset context changed",
 )
 assert_rejected(
-    "refresh-label recovery removed",
+    "critical CI resubscribes to capture label edits",
     "ci.yml",
     replace_once(
-        "    types: [opened, synchronize, reopened, unlabeled]\n",
         "    types: [opened, synchronize, reopened]\n",
+        "    types: [opened, synchronize, reopened, unlabeled]\n",
     ),
-    "does not rerun after Linux refresh label removal",
+    "must not rerun on capture-label edits",
 )
 assert_rejected(
     "CI top-level contents permission becomes write",
@@ -875,7 +881,7 @@ assert_rejected(
     "enterprise source concurrency widened",
     "enterprise-hardening.yml",
     replace_once(
-        "group: enterprise-security-source-${{ github.repository }}-${{ github.event.pull_request.head.sha || github.sha }}",
+        "group: enterprise-security-source-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}",
         "group: enterprise-security-${{ github.ref }}",
     ),
     "concurrency does not isolate",
@@ -1205,33 +1211,33 @@ assert_boundary_file_rejected(
 assert_boundary_file_rejected(
     "security seccomp permits namespace creation",
     Path("deploy/docker/security-evidence-seccomp.json"),
-    replace_once('"unshare"', '"chio-unshare"'),
+    replace_once('"value": 2114060416', '"value": 0'),
     "seccomp syscall contract changed",
 )
 assert_boundary_file_rejected(
     "security seccomp blocks ptrace proof syscall",
     Path("deploy/docker/security-evidence-seccomp.json"),
-    replace_once('"bpf",', '"bpf", "ptrace",'),
+    replace_once('"ptrace"', '"chio-ptrace"'),
     "seccomp syscall contract changed",
 )
 assert_boundary_file_rejected(
     "security seccomp changes the default action",
     Path("deploy/docker/security-evidence-seccomp.json"),
     replace_once(
-        '"defaultAction": "SCMP_ACT_ALLOW"', '"defaultAction": "SCMP_ACT_LOG"'
+        '"defaultAction": "SCMP_ACT_ERRNO"', '"defaultAction": "SCMP_ACT_LOG"'
     ),
     "seccomp syscall contract changed",
 )
 assert_boundary_file_rejected(
     "security seccomp changes the architecture map",
     Path("deploy/docker/security-evidence-seccomp.json"),
-    replace_once('"SCMP_ARCH_X32"', '"SCMP_ARCH_AARCH64"'),
+    replace_once('"SCMP_ARCH_X86_64"', '"SCMP_ARCH_AARCH64"'),
     "seccomp syscall contract changed",
 )
 assert_boundary_file_rejected(
     "security seccomp weakens a clone namespace mask",
     Path("deploy/docker/security-evidence-seccomp.json"),
-    replace_once('"valueTwo": 268435456', '"valueTwo": 0'),
+    replace_once('"value": 2114060416', '"value": 1845624960'),
     "seccomp syscall contract changed",
 )
 assert_boundary_file_rejected(
@@ -3629,13 +3635,13 @@ assert_rejected(
     "security-contract-revocation.yml",
     replace_in_named_step(
         "Bind failed finalizer to existing authority",
-        'test "$(jq -r \'.run_attempt\' <<< "${upstream}")" = "${run_attempt}"',
+        'test "$(jq -r \'.run_attempt\' <<< "${upstream}")" = "${failed_finalizer_attempt}"',
         "true",
     ),
     "failed-finalizer revocation loses workflow",
 )
 assert_rejected(
-    "failed-finalizer revocation accepts a rerun",
+    "failed-finalizer revocation loses the immutable authorizing first attempt",
     "security-contract-revocation.yml",
     replace_in_named_step(
         "Bind failed finalizer to existing authority",
@@ -5363,10 +5369,10 @@ assert_rejected(
     "admin audit head SHA used",
     "admin-override-audit.yml",
     replace_once(
-        "CHECK_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}",
-        "CHECK_SHA: ${{ github.event.pull_request.head.sha || github.sha }}",
+        "SECURITY_DEFINITION_SHA: ${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}",
+        "SECURITY_DEFINITION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}",
     ),
-    "not bound to the protected test merge",
+    "not bound to the authorized qualification",
 )
 
 # Bind late publication labels, conditional history failures and CI execution.

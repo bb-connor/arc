@@ -51,22 +51,6 @@ impl ChioMcpEdge {
         }
     }
 
-    // Reader/writer transport variant dispatched from `handle_jsonrpc_with_transport`.
-    pub(super) fn handle_request_with_transport<R: BufRead + Send, W: Write + Send>(
-        &mut self,
-        id: Value,
-        method: &str,
-        params: Value,
-        reader: &mut R,
-        writer: &mut W,
-    ) -> Value {
-        match method {
-            "tools/call" => self.handle_tools_call_with_transport(id, params, reader, writer),
-            "tasks/result" => self.handle_tasks_result_with_transport(id, params, reader, writer),
-            _ => self.handle_request(id, method, params),
-        }
-    }
-
     pub(super) fn handle_request_with_transport_channel<W: Write + Send>(
         &mut self,
         id: Value,
@@ -457,8 +441,14 @@ impl ChioMcpEdge {
         };
 
         let capability = match select_capability_for_resource(&self.capabilities, &uri) {
-            Some(capability) => capability,
-            None => {
+            Ok(Some(capability)) => capability,
+            rejected => {
+                let reason = match rejected {
+                    Err(_) => chio_kernel::ProtocolRefusalReason::CapabilityMatcherInvalid,
+                    _ => chio_kernel::ProtocolRefusalReason::CapabilityNotMatched,
+                };
+                let evidence =
+                    self.protocol_refusal_evidence(&session_id, "resources/read", &uri, reason);
                 self.emit_log(
                     LogLevel::Warning,
                     "chio.mcp.resources",
@@ -467,7 +457,10 @@ impl ChioMcpEdge {
                         "uri": uri,
                     }),
                 );
-                return jsonrpc_error(id, -32002, "Resource not found");
+                return attach_refusal_evidence(
+                    jsonrpc_error(id, -32002, "Resource not found"),
+                    evidence,
+                );
             }
         };
 
@@ -561,8 +554,19 @@ impl ChioMcpEdge {
 
         let capability = match select_capability_for_resource_subscription(&self.capabilities, &uri)
         {
-            Some(capability) => capability,
-            None => {
+            Ok(Some(capability)) => capability,
+            rejected => {
+                let reason = if rejected.is_err() {
+                    chio_kernel::ProtocolRefusalReason::CapabilityMatcherInvalid
+                } else {
+                    chio_kernel::ProtocolRefusalReason::CapabilityNotMatched
+                };
+                let evidence = self.protocol_refusal_evidence(
+                    &session_id,
+                    "resources/subscribe",
+                    &uri,
+                    reason,
+                );
                 self.emit_log(
                     LogLevel::Warning,
                     "chio.mcp.resources",
@@ -571,7 +575,10 @@ impl ChioMcpEdge {
                         "uri": uri,
                     }),
                 );
-                return jsonrpc_error(id, -32002, "Resource not found");
+                return attach_refusal_evidence(
+                    jsonrpc_error(id, -32002, "Resource not found"),
+                    evidence,
+                );
             }
         };
 
@@ -690,8 +697,19 @@ impl ChioMcpEdge {
             .cloned()
             .unwrap_or_else(|| json!({}));
         let capability = match select_capability_for_prompt(&self.capabilities, &prompt_name) {
-            Some(capability) => capability,
-            None => {
+            Ok(Some(capability)) => capability,
+            rejected => {
+                let reason = if rejected.is_err() {
+                    chio_kernel::ProtocolRefusalReason::CapabilityMatcherInvalid
+                } else {
+                    chio_kernel::ProtocolRefusalReason::CapabilityNotMatched
+                };
+                let evidence = self.protocol_refusal_evidence(
+                    &session_id,
+                    "prompts/get",
+                    &prompt_name,
+                    reason,
+                );
                 self.emit_log(
                     LogLevel::Warning,
                     "chio.mcp.prompts",
@@ -700,7 +718,10 @@ impl ChioMcpEdge {
                         "prompt": prompt_name,
                     }),
                 );
-                return jsonrpc_error(id, JSONRPC_INVALID_PARAMS, "unknown prompt");
+                return attach_refusal_evidence(
+                    jsonrpc_error(id, JSONRPC_INVALID_PARAMS, "unknown prompt"),
+                    evidence,
+                );
             }
         };
 
@@ -776,21 +797,42 @@ impl ChioMcpEdge {
                 select_capability_for_resource_pattern(&self.capabilities, uri)
             }
         };
-        let Some(capability) = capability else {
-            self.emit_log(
-                LogLevel::Warning,
-                "chio.mcp.completion",
-                json!({
-                    "event": "completion_denied",
-                    "reference": &reference,
-                    "argument": &argument.name,
-                }),
-            );
-            return jsonrpc_error(
-                id,
-                JSONRPC_INVALID_PARAMS,
-                "completion target is not authorized",
-            );
+        let capability = match capability {
+            Ok(Some(capability)) => capability,
+            rejected => {
+                let reason = if rejected.is_err() {
+                    chio_kernel::ProtocolRefusalReason::CapabilityMatcherInvalid
+                } else {
+                    chio_kernel::ProtocolRefusalReason::CapabilityNotMatched
+                };
+                let target = match &reference {
+                    CompletionReference::Prompt { name } => name,
+                    CompletionReference::Resource { uri } => uri,
+                };
+                let evidence = self.protocol_refusal_evidence(
+                    &session_id,
+                    "completion/complete",
+                    target,
+                    reason,
+                );
+                self.emit_log(
+                    LogLevel::Warning,
+                    "chio.mcp.completion",
+                    json!({
+                        "event": "completion_denied",
+                        "reference": &reference,
+                        "argument": &argument.name,
+                    }),
+                );
+                return attach_refusal_evidence(
+                    jsonrpc_error(
+                        id,
+                        JSONRPC_INVALID_PARAMS,
+                        "completion target is not authorized",
+                    ),
+                    evidence,
+                );
+            }
         };
 
         let context = match build_operation_context(

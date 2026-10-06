@@ -24,6 +24,9 @@ use serde::Serialize;
 use super::super::report_validation::validate_service_auth;
 use super::super::*;
 
+#[path = "admission_authority/recovery.rs"]
+mod recovery;
+
 pub(crate) async fn handle_admission_authority(
     State(state): State<TrustServiceState>,
     request: Request,
@@ -106,6 +109,12 @@ fn handle_action(
     budget: &SqliteBudgetStore,
 ) -> Result<serde_json::Value, AdmissionAuthorityWireError> {
     match action {
+        AdmissionAuthorityAction::RecoveryPage
+        | AdmissionAuthorityAction::LoadRecoveryStatus
+        | AdmissionAuthorityAction::DeferRecovery
+        | AdmissionAuthorityAction::ClearRecoveryDeferral => {
+            recovery::handle(action, payload, fence, operations).map_err(recovery::wire_projection)
+        }
         AdmissionAuthorityAction::Status => encode(&AdmissionAuthorityStatusWire {
             fence: fence.clone(),
         }),
@@ -529,6 +538,7 @@ fn handle_action(
                 return Err(AdmissionAuthorityWireError {
                     code: AdmissionAuthorityErrorCode::Fenced,
                     message: "combined budget authorization serving owner changed".to_owned(),
+                    compacted_raw: None,
                 });
             }
             let operation = AdmissionOperationV1::from_persisted(request.operation)
@@ -581,6 +591,7 @@ fn handle_action(
                 return Err(AdmissionAuthorityWireError {
                     code: AdmissionAuthorityErrorCode::Fenced,
                     message: "combined admission capture serving owner changed".to_owned(),
+                    compacted_raw: None,
                 });
             }
             let operation = AdmissionOperationV1::from_persisted(request.operation)
@@ -602,6 +613,7 @@ fn handle_action(
                                 code: AdmissionAuthorityErrorCode::InvalidRequest,
                                 message: "combined admission capture grant index overflowed"
                                     .to_owned(),
+                                compacted_raw: None,
                             }
                         })?,
                         hold_id: request.hold_id.clone(),
@@ -843,6 +855,23 @@ fn payment_journal_store_error(error: AdmissionPaymentJournalError) -> Admission
 }
 
 fn outcome_store_error(error: ToolOutcomeStoreError) -> AdmissionAuthorityWireError {
+    if let ToolOutcomeStoreError::Compacted {
+        raw_output_digest,
+        raw_output_size_bytes,
+    } = &error
+    {
+        return match CompactedRawMetadata::new(raw_output_digest.clone(), *raw_output_size_bytes) {
+            Ok(metadata) => AdmissionAuthorityWireError {
+                code: AdmissionAuthorityErrorCode::Invariant,
+                message: "retained raw invocation payload was compacted".to_owned(),
+                compacted_raw: Some(metadata),
+            },
+            Err(_) => wire_error(
+                AdmissionAuthorityErrorCode::Invariant,
+                "retained raw invocation compaction metadata is invalid",
+            ),
+        };
+    }
     let code = match error {
         ToolOutcomeStoreError::Unavailable(_) => AdmissionAuthorityErrorCode::Unavailable,
         ToolOutcomeStoreError::Fenced => AdmissionAuthorityErrorCode::Fenced,
@@ -850,6 +879,7 @@ fn outcome_store_error(error: ToolOutcomeStoreError) -> AdmissionAuthorityWireEr
         ToolOutcomeStoreError::Conflict => AdmissionAuthorityErrorCode::Conflict,
         ToolOutcomeStoreError::CasConflict => AdmissionAuthorityErrorCode::CasConflict,
         ToolOutcomeStoreError::Invariant(_) => AdmissionAuthorityErrorCode::Invariant,
+        ToolOutcomeStoreError::Compacted { .. } => AdmissionAuthorityErrorCode::Invariant,
     };
     wire_error(code, error.to_string())
 }
@@ -874,5 +904,6 @@ fn wire_error(
     AdmissionAuthorityWireError {
         code,
         message: message.into(),
+        compacted_raw: None,
     }
 }

@@ -1106,6 +1106,21 @@ pub trait AdmissionOperationStore: Send + Sync {
         ))
     }
 
+    /// Traverse recovery candidates in stable operation-ID order. The cursor
+    /// is exclusive and comes from the previous page; retained committed rows
+    /// must not hide later recoverable operations.
+    fn list_admission_recovery_candidates_page(
+        &self,
+        kind: AdmissionOperationKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate.list_admission_recovery_candidates_page(kind, after_operation_id, limit);
+        }
+        Err(AdmissionOperationError::Unavailable("paged admission recovery inventory is unavailable".into()))
+    }
+
     /// Return a bounded deterministic page of nonterminal caller-reservation
     /// operations that can require expiry terminalization. Expiry is deliberately
     /// not evaluated by the store: the only authoritative deadline is inside the
@@ -1238,6 +1253,20 @@ pub trait AdmissionOperationStore: Send + Sync {
         Err(AdmissionOperationError::Unavailable(
             "admission cleanup journal is unavailable".to_string(),
         ))
+    }
+
+    /// Bounded compensation inventory with an exclusive operation-ID cursor.
+    /// Busy or refused cleanup rows remain retained and cannot starve later IDs.
+    fn list_compensated_with_pending_cleanup_page(
+        &self,
+        kind: Option<AdmissionOperationKind>,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        if let Some(delegate) = self.cleanup_journal_delegate() {
+            return delegate.list_compensated_with_pending_cleanup_page(kind, after_operation_id, limit);
+        }
+        Err(AdmissionOperationError::Unavailable("paged admission cleanup inventory is unavailable".into()))
     }
 
     fn list_operations_with_pending_cleanup_action(

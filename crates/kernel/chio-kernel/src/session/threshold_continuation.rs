@@ -50,6 +50,41 @@ impl PendingThresholdApproval {
 
 #[cfg(not(loom))]
 impl Session {
+    /// Restore only the original threshold wait if cancellation has not won.
+    /// False means the kernel must complete its remaining ownership Cancelled.
+    pub(crate) fn restore_dropped_tool_request_claim(
+        &self,
+        context: &OperationContext,
+        original: Option<&PendingThresholdApproval>,
+    ) -> Result<bool, SessionError> {
+        self.validate_context(context)?;
+        let mut requests = self.inflight.write_requests();
+        let Some(request) = requests.get_mut(&context.request_id) else {
+            return Ok(true);
+        };
+        // Decide while holding the same lock that latches cancellation. A
+        // prior copied flag cannot authorize restoration after cancellation.
+        if request.cancellation_requested {
+            return Ok(false);
+        }
+        let Some(original) = original else {
+            return Ok(false);
+        };
+        if request.operation_kind != OperationKind::ToolCall
+            || request
+                .pending_threshold_approval
+                .as_ref()
+                .is_some_and(|prior| prior != original)
+        {
+            return Err(SessionError::ThresholdApprovalRetryMismatch {
+                request_id: context.request_id.clone(),
+            });
+        }
+        request.pending_execution_nonce_id = None;
+        request.pending_threshold_approval = Some(original.clone());
+        Ok(true)
+    }
+
     pub(crate) fn mark_threshold_approval_pending(
         &self,
         context: &OperationContext,

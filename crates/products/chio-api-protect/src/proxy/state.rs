@@ -7,57 +7,32 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
+#[path = "state/admission_maintenance.rs"]
+mod admission_maintenance;
+use admission_maintenance::AdmissionMaintenance;
+
 /// Interval between reserved-hold reaper sweeps. A hold reserved on
 /// `/v1/evaluate` but never reconciled is released once its execution-nonce TTL
 /// lapses; sweeping on this cadence bounds how long abandoned budget stays held.
 const RESERVED_HOLD_REAP_INTERVAL_SECS: u64 = 30;
 
-/// Spawn the reserved-hold reaper and retain its `JoinHandle` on the shared
-/// state so the task can be aborted when the server stops. Dropping a
-/// `JoinHandle` only detaches the task (it keeps running); retaining it is what
-/// binds the reaper's lifetime to the server's. A no-op without a mediation
-/// kernel, since nothing reserves holds there.
-pub(crate) async fn spawn_reserved_hold_reaper(state: &Arc<ProxyState>) {
-    if state.mediation_kernel.is_none() {
-        return;
-    }
-    let reaper_state = Arc::clone(state);
-    let handle = tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(
-            RESERVED_HOLD_REAP_INTERVAL_SECS,
-        ));
-        ticker.tick().await;
-        loop {
-            ticker.tick().await;
-            let now = match reaper_state.clock.signed_seconds() {
-                Ok(now) => now,
-                Err(error) => {
-                    warn!("reserved-hold reaper clock failed: {error}");
-                    continue;
-                }
-            };
-            match reap_expired_reserved_holds_once(&reaper_state, now).await {
-                Ok(0) => {}
-                Ok(released) => {
-                    info!(released, "reaped expired reserved budget holds");
-                }
-                Err(error) => {
-                    warn!("reserved-hold reaper failed: {error}");
-                }
-            }
-        }
-    });
-    *state.reaper_handle.lock().await = Some(handle);
-}
-
-/// Abort the owned async maintenance task even when the serving future is cancelled.
-struct ReaperOwner(Option<tokio::task::JoinHandle<()>>);
-impl Drop for ReaperOwner {
-    fn drop(&mut self) {
-        if let Some(handle) = self.0.take() {
-            handle.abort();
-        }
-    }
+/// Keep native work attached to one owner until its current tick joins.
+pub(crate) fn spawn_reserved_hold_reaper(
+    state: &Arc<ProxyState>,
+    controller: Arc<ShutdownController>,
+) -> Result<Option<AdmissionMaintenance>, ProtectError> {
+    state
+        .mediation_kernel
+        .as_ref()
+        .map(|kernel| {
+            AdmissionMaintenance::spawn(
+                kernel.clone(),
+                state.mediation_hold_capable,
+                controller,
+                Duration::from_secs(RESERVED_HOLD_REAP_INTERVAL_SECS),
+            )
+        })
+        .transpose()
 }
 
 /// Extra window the drain holds open beyond the upstream hop ceiling so a hop
@@ -186,7 +161,7 @@ pub(crate) struct ProxyState {
     /// across requests so the approval-token and DPoP replay stores stay
     /// authoritative, and so the nonce it mints on `/v1/evaluate` is the one it
     /// verifies and consumes on `/v1/reconcile`.
-    pub(crate) mediation_kernel: Option<Mutex<chio_kernel::ChioKernel>>,
+    pub(crate) mediation_kernel: Option<Arc<Mutex<chio_kernel::ChioKernel>>>,
     /// Request ids claimed for a live reservation window on `/v1/evaluate`. The
     /// kernel derives the durable budget hold identity from the request id, so
     /// each id is admitted at most once inside its window; a reuse is rejected
@@ -194,12 +169,6 @@ pub(crate) struct ProxyState {
     /// with the reservation (execution-nonce) TTL and are pruned lazily, so the
     /// set stays bounded rather than growing on every request.
     pub(crate) minted_request_ids: Mutex<MintedRequestIdWindow>,
-    /// Retained `JoinHandle` for the reserved-hold reaper task. Held so the
-    /// reaper can be aborted when the server stops accepting; a dropped
-    /// `JoinHandle` only detaches the task (it keeps running) rather than
-    /// aborting it. `None` until the reaper is spawned (and when no mediation
-    /// kernel is configured, since nothing reserves holds).
-    pub(crate) reaper_handle: Mutex<Option<tokio::task::JoinHandle<()>>>,
     pub(crate) allow_advisory: bool,
     pub(crate) receipt_backend: &'static str,
     pub(crate) revocation_backend: &'static str,
@@ -324,7 +293,14 @@ impl ProtectProxy {
         spec_content: &str,
         pinned: bool,
     ) -> Result<Vec<RouteEntry>, ProtectError> {
-        let spec = chio_openapi::OpenApiSpec::parse(spec_content)?;
+        let spec = chio_openapi::OpenApiSpec::parse(spec_content).map_err(|error| {
+            warn!(
+                code = %error,
+                diagnostic = %error.operator_diagnostic(),
+                "operator OpenAPI route specification rejected"
+            );
+            ProtectError::SpecParse(error)
+        })?;
         let mut routes = Vec::new();
 
         for (path, path_item) in &spec.paths {
@@ -673,7 +649,7 @@ impl ProtectProxy {
                         .reconcile_durable_admission_startup()
                         .map_err(|error| ProtectError::Config(error.to_string()))?;
                 }
-                Some(Mutex::new(kernel))
+                Some(Arc::new(Mutex::new(kernel)))
             }
             None if self.caller_executor.is_some() || self.config.approval.is_some() => {
                 return Err(ProtectError::Config(
@@ -717,7 +693,6 @@ impl ProtectProxy {
             minted_request_ids: Mutex::new(MintedRequestIdWindow::new(
                 chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
             )),
-            reaper_handle: Mutex::new(None),
             allow_advisory: self.config.allow_advisory,
             receipt_backend,
             revocation_backend,
@@ -748,8 +723,9 @@ impl ProtectProxy {
             }
             _ => None,
         };
-        spawn_reserved_hold_reaper(&state).await;
-        let reaper_owner = ReaperOwner(state.reaper_handle.lock().await.take());
+        let controller = Arc::new(ShutdownController::install());
+        let mut reaper_owner = spawn_reserved_hold_reaper(&state, controller.clone())?;
+        let reaper_control = reaper_owner.as_ref().map(AdmissionMaintenance::control);
         observer(local_addr);
 
         // No generic request timeout: every proxied call writes its receipt
@@ -766,7 +742,6 @@ impl ProtectProxy {
             ..ServeHygieneConfig::default()
         };
         let app = apply_server_hygiene(app, &hygiene);
-        let controller = ShutdownController::install();
         // Cap simultaneously accepted connections at the accept loop so a slow or
         // idle connection flood cannot exhaust file descriptors before any request
         // reaches the concurrency limit. The peer address remains transport
@@ -787,6 +762,9 @@ impl ProtectProxy {
             controller.subscribe(),
             hygiene.drain_timeout,
             async move {
+                if let Some(owner) = reaper_owner.as_mut() {
+                    owner.stop_and_join(PROXY_DRAIN_MARGIN).await;
+                }
                 drop(reaper_owner);
                 drop(retention_maintenance);
                 if let Some(store) = flush_store {
@@ -807,6 +785,29 @@ impl ProtectProxy {
         .map(|_outcome| ())
         .map_err(protect_serve_error);
 
+        if let Some(control) = reaper_control {
+            let health = control.health();
+            info!(
+                ticks_attempted = health.ticks_attempted,
+                ticks_completed = health.ticks_completed,
+                recovered = health.recovered,
+                reaped = health.reaped,
+                busy_skips = health.busy_skips,
+                worker_running = health.worker_running,
+                worker_joined = health.worker_joined,
+                shutdown_overdue = health.shutdown_overdue,
+                last_error_code = ?health.last_error_code,
+                "owned mediation maintenance shutdown health"
+            );
+            if let Some(failure) = control.failure() {
+                return Err(ProtectError::MediationMaintenance(failure));
+            }
+            if health.worker_panicked {
+                return Err(ProtectError::Config(
+                    "owned mediation maintenance worker panicked".into(),
+                ));
+            }
+        }
         serve_result?;
 
         Ok(())
@@ -821,6 +822,10 @@ impl ProtectProxy {
 #[cfg(test)]
 #[path = "state/tests/proxy_builder.rs"]
 mod proxy_builder_tests;
+
+#[cfg(test)]
+#[path = "state/admission_maintenance_tests.rs"]
+mod admission_maintenance_tests;
 
 #[cfg(all(test, windows))]
 mod windows_authority_tests {
@@ -1034,3 +1039,7 @@ mod reservation_boundary_tests {
         assert_eq!(window.claim("id", 100), Err(RequestIdClaimError::Reused));
     }
 }
+
+#[cfg(test)]
+#[path = "state/tests/local_diagnostics.rs"]
+mod local_diagnostic_tests;

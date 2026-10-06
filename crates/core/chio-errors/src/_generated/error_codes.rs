@@ -404,6 +404,32 @@ pub const ATTEST_RECEIPT_SIGNING_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel", "chio-attest-verify"],
 };
 
+pub const ATTEST_RECEIPT_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:receipt-verification-failed",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Receipt evidence failed its integrity, signature or session binding checks.",
+    help: "Reject the evidence and restore the authentic receipt history and trusted signer before retrying.",
+    string_code: "CHIO-ATTEST-RECEIPT-VERIFICATION-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-acp-proxy", "chio-control-plane", "chio-cli"],
+};
+
+pub const ATTEST_RECEIPT_STORE_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:receipt-store-unavailable",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "The receipt store could not establish the required durable evidence outcome.",
+    help: "Restore receipt-store availability, retain the original operation identity and reconcile uncertain commits before retrying.",
+    string_code: "CHIO-ATTEST-RECEIPT-STORE-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "unstable",
+    consumed_by: &["chio-control-plane", "chio-cli"],
+};
+
 pub const ATTEST_QUOTE_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:attest:quote-verification-failed",
     domain: Domain::Attest,
@@ -3547,6 +3573,71 @@ pub const TRANSPORT_STREAM_CAPACITY_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-provider-adapter-core", "chio-openai-adapter"],
 };
 
+pub const KERNEL_DPOP_INVALID_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-invalid-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "DPoP replay-store limits are invalid.",
+    help: "Configure a positive marker capacity and valid per-capability and identity-byte limits before starting the replay store.",
+    string_code: "CHIO-KERNEL-DPOP-INVALID-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const KERNEL_DPOP_MALFORMED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-malformed",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The DPoP proof does not match its required wire shape.",
+    help: "Reject the malformed proof and present a newly encoded proof for the exact invocation; do not retry the unchanged input.",
+    string_code: "CHIO-KERNEL-DPOP-MALFORMED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel", "chio-mcp-edge"],
+};
+
+pub const KERNEL_APPROVAL_REPLAY_INVALID_CAPACITY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:approval-replay-invalid-capacity",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The governed-approval replay store was configured with zero marker capacity.",
+    help: "Configure a positive replay marker capacity before constructing the governed-approval replay store.",
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-INVALID-CAPACITY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
+pub const TRANSPORT_UNTRUSTED_PROXY: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:untrusted-proxy",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "An asserted proxy identity was not authenticated or was ambiguous.",
+    help: "Use an explicitly trusted socket peer and dedicated proxy credential, and send one bounded identity value per header.",
+    string_code: "CHIO-TRANSPORT-UNTRUSTED-PROXY",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_INVALID_PROXY_HEADER: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:invalid-proxy-header",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "A proxy authentication or identity header is not valid text.",
+    help: "Reject the request and correct the proxy header encoding before retrying.",
+    string_code: "CHIO-TRANSPORT-INVALID-PROXY-HEADER",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -3577,6 +3668,8 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     GUARD_OUTPUT_REDACTED,
     GUARD_WASM_TRAP,
     ATTEST_RECEIPT_SIGNING_FAILED,
+    ATTEST_RECEIPT_VERIFICATION_FAILED,
+    ATTEST_RECEIPT_STORE_UNAVAILABLE,
     ATTEST_QUOTE_VERIFICATION_FAILED,
     ATTEST_PROVENANCE_MISSING,
     REPLAY_TRACE_NOT_FOUND,
@@ -3812,6 +3905,11 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_RESERVATION_OWNERSHIP,
     TRANSPORT_TASK_CAPACITY_EXCEEDED,
     TRANSPORT_STREAM_CAPACITY_EXCEEDED,
+    KERNEL_DPOP_INVALID_CAPACITY,
+    KERNEL_DPOP_MALFORMED,
+    KERNEL_APPROVAL_REPLAY_INVALID_CAPACITY,
+    TRANSPORT_UNTRUSTED_PROXY,
+    TRANSPORT_INVALID_PROXY_HEADER,
 ];
 
 #[must_use]

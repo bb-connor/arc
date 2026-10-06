@@ -24,8 +24,8 @@ impl ChioKernel {
         let guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(0)?;
         let (operation, original) = custody::custody_call(|| {
-            runtime.store.load_unambiguous_retained_tool_request(
-                &authorization.authorization.invocation.request_id,
+            runtime.store.load_retained_tool_request(
+                &authorization.authorization.invocation.operation_id,
                 &runtime.fence,
                 now,
             )
@@ -85,7 +85,14 @@ impl ChioKernel {
         }
         // No evaluation scope, live operation owner, nonce, hold or dispatch
         // authority is reconstructed from the report's untrusted fields.
+        let namespace = admission.operation().binding().to_persisted();
+        let tenant = (namespace.authenticated_tenant_id.as_str()
+            != crate::admission_operation::LOCAL_SYSTEM_TENANT_ID)
+            .then(|| namespace.authenticated_tenant_id.as_str().to_owned());
         RECEIPT_EVALUATION_SCOPE_KEY.sync_scope(uuid::Uuid::now_v7().to_string(), || {
+            let _request_tenant =
+                self.scope_receipt_tenant_id_for_request(&request.request_id, tenant.clone());
+            let _tenant = scope_receipt_tenant_id(tenant);
             if matches!(
                 admission.state(),
                 AdmissionOperationState::Finalizing

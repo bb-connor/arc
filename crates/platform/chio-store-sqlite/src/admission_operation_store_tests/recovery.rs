@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "recovery/deferred_pages.rs"]
+mod deferred_pages;
+#[path = "recovery/deferred_status.rs"]
+mod deferred_status;
 #[path = "recovery/fused_security.rs"]
 mod fused_security;
 

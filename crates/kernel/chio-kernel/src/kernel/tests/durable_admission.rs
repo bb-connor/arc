@@ -36,12 +36,16 @@ mod native_dispatch_ledger;
 mod native_egress;
 #[path = "durable_admission/operation_store.rs"]
 mod operation_store;
+#[path = "durable_admission/payment_recovery.rs"]
+mod payment_recovery;
 #[path = "durable_admission/receipt_projection.rs"]
 mod receipt_projection;
 #[path = "durable_admission/recovery_lease.rs"]
 mod recovery_lease;
 #[path = "durable_admission/return_context.rs"]
 mod return_context;
+#[path = "durable_admission/review_boundaries.rs"]
+mod review_boundaries;
 #[path = "durable_admission/review_regressions.rs"]
 mod review_regressions;
 #[path = "durable_admission/runtime_participant.rs"]
@@ -62,10 +66,12 @@ pub(super) struct TestAdmissionState {
     budget_authorization: Option<crate::budget_store::BudgetAuthorizeHoldRequest>,
     payment_journal: Option<crate::payment::PaymentJournalRecord>,
     payment_release_evidence: Option<crate::tool_outcome::PersistedMonetaryReleaseEvidenceV1>,
+    recovery_status: Option<crate::admission_operation::AdmissionRecoveryStatusV1>,
 }
 
 pub(super) struct TestAdmissionOperationStore {
     caller_share_times: std::sync::Mutex<Vec<u64>>,
+    recovery_pages: operation_store::TestRecoveryPages,
     recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults,
     native_recovery: native_acquisition::TestNative,
     native_egress: native_egress::TestEgress,
@@ -91,6 +97,7 @@ impl TestAdmissionOperationStore {
     pub(super) fn new(fence: StoreMutationFence) -> Self {
         Self {
             caller_share_times: std::sync::Mutex::new(Vec::new()),
+            recovery_pages: operation_store::TestRecoveryPages::default(),
             recovery_lease_faults: recovery_lease::TestRecoveryLeaseFaults::default(),
             native_recovery: native_acquisition::TestNative::default(),
             native_egress: native_egress::TestEgress::default(),
@@ -465,7 +472,8 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
         }
         match (transition, release_evidence) {
             (
-                crate::payment::PaymentJournalTransition::BeginRelease { authority },
+                crate::payment::PaymentJournalTransition::BeginRelease { authority }
+                | crate::payment::PaymentJournalTransition::BeginPrepaymentRefund { authority },
                 Some(evidence),
             ) => {
                 let persisted = evidence.to_persisted();
@@ -493,7 +501,11 @@ impl QualifiedAdmissionProjectionStore for TestAdmissionOperationStore {
                 }
                 state.payment_release_evidence = Some(persisted);
             }
-            (crate::payment::PaymentJournalTransition::BeginRelease { .. }, None)
+            (
+                crate::payment::PaymentJournalTransition::BeginRelease { .. }
+                | crate::payment::PaymentJournalTransition::BeginPrepaymentRefund { .. },
+                None,
+            )
             | (_, Some(_)) => {
                 return Err(
                     crate::receipt_store::AdmissionPaymentJournalError::Invariant(

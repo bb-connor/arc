@@ -126,6 +126,18 @@ pub(crate) fn build_mediation_kernel(
             ca_public_keys.push(issuer.clone());
         }
     }
+    // Production supplies the same policy digest to HTTP and durable admission.
+    // Preserve that identity; only an absent digest uses this default material.
+    let policy_hash = match policy.hash {
+        Some(hash) => hash.to_owned(),
+        None => {
+            let material = chio_core_types::canonical::canonical_json_bytes(&(
+                "chio-api-protect-mediation-v2",
+                chio_guards::default_runtime_guard_profile_identity()?,
+            ))?;
+            chio_core_types::sha256_hex(&material)
+        }
+    };
     let mut kernel = ChioKernel::new_with_clock(
         KernelConfig {
             keypair: signer.clone(),
@@ -133,10 +145,7 @@ pub(crate) fn build_mediation_kernel(
             max_delegation_depth: 5,
             // Durable admission binds every operation to a canonical SHA-256 policy
             // digest, so the mediation policy is named by its digest.
-            policy_hash: policy
-                .hash
-                .map(str::to_owned)
-                .unwrap_or_else(|| chio_core_types::sha256_hex(b"chio_api_protect_mediation_v1")),
+            policy_hash,
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -161,6 +170,11 @@ pub(crate) fn build_mediation_kernel(
         },
         clock.clone(),
     );
+    let default_guard_profile = chio_guards::default_runtime_guard_profile();
+    for guard in default_guard_profile.pre_invocation_guards {
+        kernel.add_guard(guard);
+    }
+    kernel.set_post_invocation_pipeline(default_guard_profile.post_invocation_pipeline);
     if let Some(store) = policy.receipt_store {
         kernel
             .set_receipt_store_handle(store)
@@ -791,6 +805,7 @@ pub(crate) async fn sidecar_reconcile_handler(
 /// Returns the number of holds released; a sidecar without a configured budget
 /// store (no mediation kernel) releases nothing. Factored out of the startup
 /// interval task so it is directly unit-testable with a controlled clock.
+#[cfg(test)]
 pub(crate) async fn reap_expired_reserved_holds_once(
     state: &Arc<ProxyState>,
     now_unix_secs: i64,

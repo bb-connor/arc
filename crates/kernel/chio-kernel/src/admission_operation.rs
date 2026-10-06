@@ -14,6 +14,7 @@ pub mod governed_approval_claim;
 pub mod governed_approval_replay;
 mod identity;
 mod native_caller_custody;
+mod native_dispatch_binding;
 mod native_dispatch_ledger;
 mod native_egress;
 mod native_flow_join;
@@ -24,6 +25,7 @@ mod native_output_join;
 mod native_security_binding;
 mod nonce_preflight;
 mod projection;
+pub mod recovery;
 mod remote_projection;
 mod retained_request;
 pub mod runtime_participant;
@@ -44,6 +46,11 @@ pub use execution_nonce::{
 };
 pub use identity::*;
 pub use native_caller_custody::{NativeCallerReleaseCustodyV1, NATIVE_CALLER_CONTEXT_SCHEMA};
+pub(crate) use native_dispatch_binding::valid_dispatch_commitment_id;
+pub use native_dispatch_binding::{
+    NativeSecurityDispatchRequestBindingV1, NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA,
+    NATIVE_DISPATCH_LEDGER_SCHEMA,
+};
 pub use native_dispatch_ledger::{
     NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,
 };
@@ -64,6 +71,7 @@ pub use nonce_preflight::{
     AdmissionNoncePreflightRecoveryV1, NONCE_PREFLIGHT_BUDGET_PREFIX,
 };
 pub use projection::*;
+pub use recovery::*;
 pub use remote_projection::*;
 #[cfg(test)]
 pub(crate) use retained_request::immutable_tool_request_hash;

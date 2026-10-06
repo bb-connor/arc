@@ -1347,6 +1347,10 @@ impl ChioKernel {
         }
         let mut local = chio_core::capability::features::CapabilityNegotiation::t1_default();
         local.features.insert(
+            chio_core::capability::features::GOVERNED_ACTIVE_RESPONSE_PLAN.to_string(),
+            self.governed_active_response_plans_enabled,
+        );
+        local.features.insert(
             chio_core::capability::features::AGGREGATE_INVOCATION_BUDGET.to_string(),
             true,
         );

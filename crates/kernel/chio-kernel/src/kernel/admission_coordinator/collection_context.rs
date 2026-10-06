@@ -18,11 +18,21 @@ struct KernelCollectionContextResolver {
 impl ThresholdApprovalContextResolver for KernelCollectionContextResolver {
     fn resolve_context(
         &self,
-        request_id: &str,
+        _request_id: &str,
+        _now: u64,
+    ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError> {
+        Err(denied(
+            "kernel collection requires its original signed proposal identity",
+        ))
+    }
+
+    fn resolve_proposal_context(
+        &self,
+        proposal: &crate::threshold_approval::ThresholdApprovalProposal,
         now: u64,
     ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError> {
         self.kernel
-            .resolve_current_collection_context(&self.policy, request_id, now)
+            .resolve_current_collection_context(&self.policy, proposal, now)
     }
 }
 
@@ -80,18 +90,23 @@ impl ChioKernel {
     fn resolve_current_collection_context(
         &self,
         policy: &ThresholdApprovalCollectionPolicy,
-        request_id: &str,
+        presented: &crate::threshold_approval::ThresholdApprovalProposal,
         now: u64,
     ) -> Result<ThresholdApprovalProposalCreationContext, ApprovalStoreError> {
         let runtime = self.validate_collection_configuration(policy)?;
-        let selector = AdmissionIdentifier::try_new("request_id", request_id).map_err(denied)?;
+        let selector = AdmissionIdentifier::try_new("request_id", &presented.body.request_id)
+            .map_err(denied)?;
+        let operation_id = crate::admission_operation::AdmissionOperationId::from_persisted(
+            presented.body.proposal_id.clone(),
+        )
+        .map_err(denied)?;
         let now_ms = runtime.refresh_trusted_time(
             now.checked_mul(1000)
                 .ok_or_else(|| denied("collection time overflow"))?,
         )?;
         let (operation, retained) = runtime
             .store
-            .load_unambiguous_retained_tool_request(&selector, &runtime.fence, now_ms)
+            .load_retained_tool_request(&operation_id, &runtime.fence, now_ms)
             .map_err(denied)?
             .ok_or_else(|| denied("original request material is unavailable"))?;
         let binding = operation.binding();
@@ -99,6 +114,7 @@ impl ChioKernel {
             || binding.request_id() != &selector
             || binding.coordinator_authority_id().as_str() != runtime.fence.store_uuid
             || binding.policy_hash().as_str() != self.config.policy_hash
+            || operation.threshold_proposal() != Some(presented)
         {
             return Err(denied(
                 "original admission is not eligible for approval collection",
@@ -224,8 +240,8 @@ impl ChioKernel {
         self.validate_collection_configuration(policy)?;
         let (current, original) = runtime
             .store
-            .load_unambiguous_retained_tool_request(
-                &selector,
+            .load_retained_tool_request(
+                &operation_id,
                 &runtime.fence,
                 runtime.refresh_trusted_time(refreshed_ms)?,
             )

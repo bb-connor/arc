@@ -76,6 +76,71 @@ fn prepare(
 }
 
 #[test]
+fn native_journal_checkpoint_preserves_nonce_preflight_and_current_label() -> TestResult {
+    let fixture = fixture();
+    let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
+    let (context, _) = request("checkpoint-nonce")?;
+    let (operation, lease, input) = prepare(&fixture, &context)?;
+    let binding = initialized.admission_binding()?;
+    let before = fixture.store.join_native_security_nonce_preflight(
+        &operation,
+        &lease,
+        &binding,
+        &context,
+        &input,
+        now_ms(),
+    )?;
+    fixture.store.checkpoint_security_participant_history(
+        &initialized,
+        &fixture.fence,
+        now_ms(),
+    )?;
+    let (_, after) = fixture
+        .store
+        .load_native_security_nonce_preflight_join(
+            operation.binding().operation_id(),
+            &fixture.fence,
+            now_ms(),
+        )?
+        .ok_or("nonce history absent")?;
+    assert_eq!(after, Some(before.clone()));
+    let observation = fixture.store.observe_security_participant_flow(
+        &binding,
+        input.key(),
+        &fixture.fence,
+        now_ms(),
+    )?;
+    assert_eq!(
+        observation
+            .snapshot()
+            .ok_or("current nonce label absent")?
+            .principal_label,
+        input::label()?
+    );
+    let (_, dispatch) = fixture
+        .store
+        .load_native_security_input_join(
+            operation.binding().operation_id(),
+            &fixture.fence,
+            now_ms(),
+        )?
+        .ok_or("operation absent")?;
+    assert!(dispatch.is_none());
+    assert_eq!(
+        fixture.store.join_native_security_nonce_preflight(
+            &operation,
+            &lease,
+            &binding,
+            &context,
+            &input,
+            now_ms()
+        )?,
+        before
+    );
+    Ok(())
+}
+
+#[test]
 fn preflight_is_anchored_once_and_never_satisfies_dispatch_input_custody() -> TestResult {
     let fixture = fixture();
     let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;

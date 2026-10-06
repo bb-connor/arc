@@ -9,6 +9,8 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 mod fixture;
 #[path = "clock_tests/native_dispatch.rs"]
 mod native_dispatch;
+#[path = "clock_tests/pinned.rs"]
+mod pinned;
 use fixture::{remote, rotated_status, MutableClock, StatusServer};
 
 fn lifecycle_after_refresh(value: Result<u64, ClockError>) -> TestResult<Result<(), KernelError>> {

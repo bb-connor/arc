@@ -116,6 +116,30 @@ pub(super) struct CallerReservation<'a, 'c> {
 }
 
 impl ChioKernel {
+    /// Caller resumption uses the authenticated original namespace, selected by
+    /// exact physical nonce custody. Ordinary calls use current session identity.
+    pub(super) fn resolve_evaluation_tenant(
+        &self,
+        mode: &DispatchMode,
+        request: &ToolCallRequest,
+        session: Option<&SessionId>,
+        now_unix_ms: u64,
+    ) -> Result<Option<String>, KernelError> {
+        if matches!(
+            mode,
+            DispatchMode::CallerStart | DispatchMode::CallerReport(_)
+        ) {
+            let nonce = request.execution_nonce.as_ref().ok_or_else(|| {
+                KernelError::DurableAdmission("caller resume requires its original nonce".into())
+            })?;
+            self.caller_reserved_tenant_id(nonce, now_unix_ms)
+        } else {
+            Ok(self.resolve_tenant_id_for_session(session))
+        }
+    }
+}
+
+impl ChioKernel {
     /// Complete the start-side evaluation only after the original dispatch is
     /// committed. The outer start producer signs the authorization separately;
     /// this internal receipt and nonce are not permission to execute.
@@ -213,10 +237,7 @@ impl ChioKernel {
         if let Some(authorization) = self.committed_caller_authorization(nonce, arguments)? {
             return Ok(CallerStartResponse::Authorized(Box::new(authorization)));
         }
-        let mut request = self.caller_reserved_request(
-            &nonce.nonce.bound_to.request_id,
-            self.read_authority_time()?.get(),
-        )?;
+        let mut request = self.caller_reserved_request(nonce, self.read_authority_time()?.get())?;
         request.execution_nonce = Some(nonce.clone());
         request.dpop_proof = credentials.dpop_proof;
         request.approval_token = credentials.approval_token;
@@ -427,10 +448,7 @@ impl ChioKernel {
                 "configured caller executor requires authenticated start and delivery; unsigned reports are not accepted".into(),
             ));
         }
-        let mut request = self.caller_reserved_request(
-            &nonce.nonce.bound_to.request_id,
-            self.read_authority_time()?.get(),
-        )?;
+        let mut request = self.caller_reserved_request(nonce, self.read_authority_time()?.get())?;
         let presented = ToolCallAction::from_parameters(arguments.clone()).map_err(|error| {
             KernelError::DurableAdmission(format!(
                 "caller report arguments cannot be hashed: {error}"

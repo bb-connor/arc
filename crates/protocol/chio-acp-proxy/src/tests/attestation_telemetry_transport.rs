@@ -35,9 +35,14 @@ fn telemetry_helpers_map_receipts_and_certificates() {
     assert_eq!(span.events[0].name, "guard.fs_guard");
 
     let cert_body = ComplianceCertificateBody {
-        schema: COMPLIANCE_CERTIFICATE_SCHEMA.to_string(),
+        schema: COMPLIANCE_CERTIFICATE_SCHEMA_V1.to_string(),
         session_id: "session-telemetry".to_string(),
         issued_at: 456,
+        receipt_set_digest: None,
+        compliance_profile_digest: None,
+        invocation_count: None,
+        checks: None,
+        coverage: None,
         receipt_count: 2,
         first_receipt_at: 123,
         last_receipt_at: 124,

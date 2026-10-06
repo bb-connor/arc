@@ -141,6 +141,11 @@ impl<'a> StreamGate<'a> {
             self.close_stream(frame)?;
             return Ok(());
         }
+        if self.phase.is_closed() && (frame.event.is_some() || frame.data.is_some()) {
+            return Err(ProviderError::Malformed(
+                "OpenAI SSE event arrived after terminal completion".to_string(),
+            ));
+        }
 
         let Some(event) = frame.event.as_deref() else {
             return self.forward_or_buffer(frame);
@@ -152,6 +157,9 @@ impl<'a> StreamGate<'a> {
             "response.function_call_arguments.done" => self.argument_done(frame),
             "response.output_item.done" => self.finish_output_item(frame, evaluate),
             "response.completed" | "response.incomplete" => self.complete_response(frame),
+            "response.created" | "response.in_progress" | "response.queued" => {
+                self.forward_lifecycle_response(frame)
+            }
             "error" | "response.error" | "response.failed" => Err(ProviderError::Malformed(
                 format!("OpenAI SSE error event: {}", data_text(&frame)),
             )),
@@ -181,6 +189,15 @@ impl<'a> StreamGate<'a> {
         }
 
         let call = response_tool_call_start_from_item(item)?;
+        if self
+            .evaluated_calls
+            .iter()
+            .any(|evaluated| evaluated.call_id == call.call_id)
+        {
+            return Err(ProviderError::Malformed(
+                "OpenAI streamed tool call reused an evaluated call_id".to_string(),
+            ));
+        }
         self.phase = transition(
             &self.phase,
             StreamEvent::StartBlock {
@@ -344,6 +361,11 @@ impl<'a> StreamGate<'a> {
                     )));
                 }
             }
+            if reconciled.len() != self.evaluated_calls.len() {
+                return Err(ProviderError::Malformed(
+                    "OpenAI completed output omitted an evaluated tool call".to_string(),
+                ));
+            }
         }
         self.close_stream(frame)
     }
@@ -362,6 +384,27 @@ impl<'a> StreamGate<'a> {
         self.phase = transition(&self.phase, StreamEvent::Close)?;
         self.output.extend_from_slice(&frame.raw);
         Ok(())
+    }
+
+    fn forward_lifecycle_response(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
+        let output = frame
+            .data
+            .as_ref()
+            .and_then(|data| data.get("response"))
+            .and_then(|response| response.get("output"));
+        if let Some(output) = output {
+            let items = output.as_array().ok_or_else(|| {
+                ProviderError::Malformed("OpenAI lifecycle response output was not an array".into())
+            })?;
+            for item in items {
+                if classify_output_item(item)? == OutputItemKind::Evaluated {
+                    return Err(ProviderError::Malformed(
+                        "OpenAI lifecycle response carried a client-executed tool call".into(),
+                    ));
+                }
+            }
+        }
+        self.forward_or_buffer(frame)
     }
 
     fn forward_or_buffer(&mut self, frame: SseFrame) -> Result<(), ProviderError> {
@@ -736,28 +779,47 @@ fn classify_output_item(item: &Value) -> Result<OutputItemKind, ProviderError> {
     }
 }
 
-/// Events that carry no client-executed effect and are forwarded as-is.
+/// Exact documented members of the existing passthrough event families.
+/// Unknown suffixes require explicit support rather than prefix admission.
 fn is_passthrough_event(event: &str) -> bool {
     const EXACT: &[&str] = &[
         "response.created",
         "response.in_progress",
         "response.queued",
+        "response.content_part.added",
+        "response.content_part.done",
+        "response.output_text.delta",
+        "response.output_text.done",
+        "response.output_text.annotation.added",
+        "response.refusal.delta",
+        "response.refusal.done",
+        "response.reasoning_summary_part.added",
+        "response.reasoning_summary_part.done",
+        "response.reasoning_summary_text.delta",
+        "response.reasoning_summary_text.done",
+        "response.reasoning_text.delta",
+        "response.reasoning_text.done",
+        "response.web_search_call.in_progress",
+        "response.web_search_call.searching",
+        "response.web_search_call.completed",
+        "response.file_search_call.in_progress",
+        "response.file_search_call.searching",
+        "response.file_search_call.completed",
+        "response.code_interpreter_call.in_progress",
+        "response.code_interpreter_call.interpreting",
+        "response.code_interpreter_call.completed",
+        "response.code_interpreter_call_code.delta",
+        "response.code_interpreter_call_code.done",
+        "response.image_generation_call.in_progress",
+        "response.image_generation_call.generating",
+        "response.image_generation_call.partial_image",
+        "response.image_generation_call.completed",
+        "response.audio.delta",
+        "response.audio.done",
+        "response.audio.transcript.delta",
+        "response.audio.transcript.done",
     ];
-    const PREFIXES: &[&str] = &[
-        "response.content_part.",
-        "response.output_text.",
-        "response.refusal.",
-        "response.reasoning_summary_part.",
-        "response.reasoning_summary_text.",
-        "response.reasoning_text.",
-        "response.web_search_call.",
-        "response.file_search_call.",
-        "response.code_interpreter_call.",
-        "response.code_interpreter_call_code.",
-        "response.image_generation_call.",
-        "response.audio.",
-    ];
-    EXACT.contains(&event) || PREFIXES.iter().any(|prefix| event.starts_with(prefix))
+    EXACT.contains(&event)
 }
 
 fn frame_output_index(data: &Value) -> Option<u64> {
@@ -833,8 +895,8 @@ fn ensure_streaming_allow(call_id: &str, verdict: &VerdictResult) -> Result<(), 
     )
 }
 
+// Preserve provider identity bytes for matching and ordinary native validation.
 fn non_empty(value: &str) -> Option<String> {
-    let value = value.trim();
     if value.is_empty() {
         None
     } else {

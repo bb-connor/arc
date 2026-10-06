@@ -129,47 +129,16 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
         kind: AdmissionOperationKind,
         limit: usize,
     ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let state = self.lock()?;
-        let mut operations = state
-            .operations
-            .values()
-            .filter(|operation| operation.kind() == kind)
-            .filter(|operation| {
-                !matches!(
-                    operation.state(),
-                    AdmissionOperationState::Completed
-                        | AdmissionOperationState::CompensatedBeforeDispatch
-                        | AdmissionOperationState::OutcomeUnknownAfterDispatch
-                )
-            })
-            .map(|operation| {
-                let priority = if operation.state() != AdmissionOperationState::CallerReserved {
-                    0u8
-                } else if state.cleanup_actions.values().any(|action| {
-                    action.operation_id() == operation.operation_id()
-                        && action.kind() == AdmissionCleanupActionKind::CallerReservationHandoff
-                        && action.state() != AdmissionCleanupActionState::Completed
-                }) {
-                    1
-                } else {
-                    2
-                };
-                (priority, operation.clone())
-            })
-            .collect::<Vec<_>>();
-        operations.sort_unstable_by(|left, right| {
-            left.0
-                .cmp(&right.0)
-                .then_with(|| left.1.operation_id().cmp(right.1.operation_id()))
-        });
-        operations.truncate(limit);
-        Ok(operations
-            .into_iter()
-            .map(|(_, operation)| operation)
-            .collect())
+        self.recovery_candidates_legacy(kind, limit)
+    }
+
+    fn list_admission_recovery_candidates_page(
+        &self,
+        kind: AdmissionOperationKind,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<AdmissionOperation>, AdmissionOperationError> {
+        self.recovery_candidates_page(kind, after_operation_id, limit)
     }
 
     fn list_caller_reservation_reap_candidates(
@@ -501,34 +470,16 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
         kind: Option<AdmissionOperationKind>,
         limit: usize,
     ) -> Result<Vec<String>, AdmissionOperationError> {
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let state = self.lock()?;
-        let mut operation_ids = state
-            .operations
-            .values()
-            .filter(|operation| {
-                matches!(
-                    operation.state(),
-                    AdmissionOperationState::CompensationPending
-                        | AdmissionOperationState::CompensatedBeforeDispatch
-                ) && kind.is_none_or(|kind| operation.kind() == kind)
-                    && state.cleanup_actions.values().any(|action| {
-                        action.operation_id() == operation.operation_id()
-                            && !matches!(
-                                action.kind(),
-                                AdmissionCleanupActionKind::CallerReservationHandoffIntent
-                                    | AdmissionCleanupActionKind::CallerReservationHandoff
-                            )
-                            && action.state() != AdmissionCleanupActionState::Completed
-                    })
-            })
-            .map(|operation| operation.operation_id().to_string())
-            .collect::<Vec<_>>();
-        operation_ids.sort_unstable();
-        operation_ids.truncate(limit);
-        Ok(operation_ids)
+        self.compensation_cleanup_legacy(kind, limit)
+    }
+
+    fn list_compensated_with_pending_cleanup_page(
+        &self,
+        kind: Option<AdmissionOperationKind>,
+        after_operation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<String>, AdmissionOperationError> {
+        self.compensation_cleanup_page(kind, after_operation_id, limit)
     }
 
     fn list_operations_with_pending_cleanup_action(

@@ -16,6 +16,8 @@ mod faults;
 mod history_integrity;
 #[path = "mutations/input.rs"]
 mod input;
+#[path = "mutations/journal_capacity.rs"]
+mod journal_capacity;
 #[path = "mutations/monotonicity.rs"]
 mod monotonicity;
 #[path = "mutations/nonce_preflight.rs"]

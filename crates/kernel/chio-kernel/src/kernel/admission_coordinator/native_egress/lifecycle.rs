@@ -84,7 +84,16 @@ impl CapturedLifecycle {
         let runtime = kernel.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(0)?;
-        if now >= self.valid_until_unix_ms || admission.operation() != &self.operation {
+        if now >= self.valid_until_unix_ms
+            || admission.operation() != &self.operation
+            || self
+                .context
+                .original_security_dispatch_binding
+                .as_ref()
+                .is_none_or(|binding| {
+                    binding.dispatch_commitment_id() != &self.dispatch_commitment_id
+                })
+        {
             return Err(invalid("native lifecycle capture expired or changed"));
         }
         let (operation, retained) = store_call(|| {
@@ -204,6 +213,7 @@ impl ChioKernel {
             credentials,
             metadata: metadata.as_ref(),
             attempted: false,
+            store_entered: false,
             failed: false,
             return_input: Some(input),
             captured_lifecycle: None,
@@ -211,7 +221,7 @@ impl ChioKernel {
         let result = crate::kernel::security_dispatch::callback("native dispatch capture", || {
             hook.commit_native_dispatch(&mut authority)
         });
-        let attempted = authority.attempted;
+        let store_entered = authority.store_entered;
         let result = result.and_then(|()| {
             if authority.failed {
                 return Err(invalid(
@@ -226,7 +236,7 @@ impl ChioKernel {
             })
         });
         result.map_err(|error| {
-            if attempted {
+            if store_entered {
                 DurableDispatchCommitError::CommitUnconfirmed(error)
             } else {
                 rejected(error)

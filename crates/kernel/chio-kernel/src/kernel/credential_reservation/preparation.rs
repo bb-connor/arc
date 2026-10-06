@@ -94,7 +94,10 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
 
     /// Exclusive deadline of the original, verified artifacts. This is a
     /// restriction on dispatch, not a replacement for live reservation custody.
-    pub(crate) fn valid_until_unix_ms(&self) -> Result<u64, KernelError> {
+    pub(crate) fn valid_until_unix_ms(
+        &self,
+        nonce_binding: Option<&super::native_dispatch::VerifiedBoundExecutionNonceTime>,
+    ) -> Result<u64, KernelError> {
         let invalid = |reason: &str| KernelError::DurableAdmission(reason.to_owned());
         let millis = |seconds: u64| {
             seconds
@@ -104,6 +107,12 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
         let mut deadline = millis(self.input.cap.expires_at)?;
         if let Some(approval) = self.approval_credential()? {
             deadline = deadline.min(millis(approval.expires_at_unix_secs)?);
+        }
+        for approval in &self.input.request.approval_tokens {
+            deadline = deadline.min(millis(approval.expires_at)?);
+        }
+        if let Some(proposal) = self.input.request.threshold_approval_proposal.as_ref() {
+            deadline = deadline.min(millis(proposal.body.proposal_deadline)?);
         }
         if let Some(dpop) = self.dpop_credential() {
             let exclusive = dpop
@@ -118,9 +127,22 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             ));
         }
         if let Some(nonce) = &self.input.request.execution_nonce {
-            let seconds = u64::try_from(nonce.expires_at())
-                .map_err(|_| invalid("execution nonce deadline is invalid"))?;
-            deadline = deadline.min(millis(seconds)?);
+            if let Some(binding) = nonce_binding {
+                if !self.durable_nonce_presented || !binding.matches_nonce(nonce) {
+                    return Err(invalid(
+                        "nonce deadline cannot use another operation's binding",
+                    ));
+                }
+                deadline = deadline.min(binding.approval_valid_until_unix_ms());
+            } else {
+                let seconds = u64::try_from(nonce.expires_at())
+                    .map_err(|_| invalid("execution nonce deadline is invalid"))?;
+                deadline = deadline.min(millis(seconds)?);
+            }
+        } else if nonce_binding.is_some() {
+            return Err(invalid(
+                "nonce binding cannot replace a missing presentation",
+            ));
         }
         if let Some(grant) = &self.input.request.declassification_grant {
             // Issuer trust, policy and consumption remain the live flow

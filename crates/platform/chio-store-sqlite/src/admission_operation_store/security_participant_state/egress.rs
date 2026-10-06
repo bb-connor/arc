@@ -8,7 +8,6 @@ use chio_security_types::ports::{
 };
 
 mod contract;
-pub(super) use contract::live_request_hash;
 mod integrity;
 mod readback;
 mod record;

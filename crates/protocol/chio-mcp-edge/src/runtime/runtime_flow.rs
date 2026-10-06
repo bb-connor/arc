@@ -1,6 +1,8 @@
 use super::*;
 
 impl ChioMcpEdge {
+    /// Borrowed readers cannot interrupt a withheld reply. Use the inbox API
+    /// or the owned-reader serving entrypoint for bounded nested client flows.
     pub fn create_message<R: BufRead + Send, W: Write + Send>(
         &mut self,
         parent_context: &OperationContext,
@@ -8,6 +10,26 @@ impl ChioMcpEdge {
         reader: &mut R,
         writer: &mut W,
     ) -> Result<CreateMessageResult, AdapterError> {
+        let _ = (parent_context, operation, reader, writer);
+        Err(borrowed_reader_refusal())
+    }
+
+    /// Create a sampling child through an interruptible, accounted inbox.
+    pub fn create_message_with_client_inbox<W: Write + Send>(
+        &mut self,
+        parent_context: &OperationContext,
+        operation: CreateMessageOperation,
+        inbox: &mut McpInboxReceiver,
+        writer: &mut W,
+    ) -> Result<CreateMessageResult, AdapterError> {
+        if self
+            .deferred_client_messages
+            .iter()
+            .any(|message| !inbox.admission.owns(message))
+        {
+            return Err(AdapterError::IngressCapacity);
+        }
+        self.inbox_admission = inbox.admission.clone();
         match &self.state {
             EdgeState::Ready { session_id } if session_id == &parent_context.session_id => {}
             _ => {
@@ -29,6 +51,8 @@ impl ChioMcpEdge {
             )
             .map_err(|error| AdapterError::NestedFlowDenied(error.to_string()))?;
 
+        // Keep the original reply admission through child request completion.
+        let mut _reply_reservation = None;
         let result = (|| {
             self.kernel
                 .validate_sampling_request(&child_context, &operation)
@@ -50,8 +74,14 @@ impl ChioMcpEdge {
                     "failed to serialize sampling/createMessage params: {error}"
                 ))
             })?;
-            let result =
-                self.send_client_request(reader, writer, "sampling/createMessage", params)?;
+            let reply = self.send_client_request_with_channel(
+                &mut inbox.receiver,
+                writer,
+                "sampling/createMessage",
+                params,
+            )?;
+            let (result, reservation) = reply.into_parts();
+            _reply_reservation = Some(reservation);
             let message: CreateMessageResult = serde_json::from_value(result).map_err(|error| {
                 AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(
                     error,
@@ -136,17 +166,22 @@ impl ChioMcpEdge {
         client_rx: &mut mpsc::Receiver<ClientInbound>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
-        let result =
-            self.send_client_request_with_channel(client_rx, writer, "roots/list", json!({}))?;
-        let roots_value = result.get("roots").cloned().ok_or_else(|| {
-            AdapterError::ParseError("roots/list response missing 'roots'".into())
-        })?;
+        let (mut result, _reservation) = self
+            .send_client_request_with_channel(client_rx, writer, "roots/list", json!({}))?
+            .into_parts();
+        let roots_value = result
+            .as_object_mut()
+            .and_then(|object| object.remove("roots"))
+            .ok_or_else(|| {
+                AdapterError::ParseError("roots/list response missing 'roots'".into())
+            })?;
         let roots: Vec<RootDefinition> = serde_json::from_value(roots_value).map_err(|error| {
             AdapterError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(error))
         })?;
 
+        let root_count = roots.len();
         self.kernel
-            .replace_session_roots(session_id, roots.clone())
+            .replace_session_roots(session_id, roots)
             .map_err(|error| {
                 AdapterError::ConnectionFailed(format!("failed to update session roots: {error}"))
             })?;
@@ -156,12 +191,13 @@ impl ChioMcpEdge {
             "chio.mcp.roots",
             json!({
                 "event": "roots_refreshed",
-                "rootCount": roots.len(),
+                "rootCount": root_count,
             }),
         );
         Ok(())
     }
 
+    #[cfg(test)]
     pub(super) fn send_client_request<R: BufRead + Send, W: Write + Send>(
         &mut self,
         reader: &mut R,
@@ -169,59 +205,8 @@ impl ChioMcpEdge {
         method: &str,
         params: Value,
     ) -> Result<Value, AdapterError> {
-        self.client_request_counter = self
-            .client_request_counter
-            .checked_add(1)
-            .ok_or(chio_security_types::clock::ClockError::Overflow)?;
-        let request_id = format!("edge-client-{}", self.client_request_counter);
-        write_jsonrpc_line(
-            writer,
-            &json!({
-                "jsonrpc": "2.0",
-                "id": request_id,
-                "method": method,
-                "params": params,
-            }),
-        )?;
-
-        loop {
-            let message = read_jsonrpc_line(reader)?;
-            if message.get("id") == Some(&Value::String(request_id.clone()))
-                && message.get("method").is_none()
-            {
-                if let Some(error) = message.get("error") {
-                    return Err(adapter_jsonrpc_error(error));
-                }
-
-                return message.get("result").cloned().ok_or_else(|| {
-                    AdapterError::ParseError("response missing 'result' field".into())
-                });
-            }
-
-            if cancellation_matches_request(&message, &request_id) {
-                return Err(AdapterError::McpError {
-                    code: -32800,
-                    message: cancellation_reason(&message),
-                    data: None,
-                });
-            }
-
-            if message.get("method").is_some() {
-                let response = self.handle_jsonrpc_with_transport(message, reader, writer);
-                for notification in self.take_pending_notifications() {
-                    write_jsonrpc_line(writer, &notification)?;
-                }
-                if let Some(response) = response {
-                    write_jsonrpc_line(writer, &response)?;
-                }
-                continue;
-            }
-
-            return Err(AdapterError::ParseError(
-                "outer MCP client sent an unexpected response while a child request was in flight"
-                    .into(),
-            ));
-        }
+        let _ = (reader, writer, method, params);
+        Err(borrowed_reader_refusal())
     }
 
     pub(super) fn send_client_request_with_channel<W: Write + Send>(
@@ -230,12 +215,14 @@ impl ChioMcpEdge {
         writer: &mut W,
         method: &str,
         params: Value,
-    ) -> Result<Value, AdapterError> {
+    ) -> Result<AccountedMessage, AdapterError> {
         self.client_request_counter = self
             .client_request_counter
             .checked_add(1)
             .ok_or(chio_security_types::clock::ClockError::Overflow)?;
         let request_id = format!("edge-client-{}", self.client_request_counter);
+        let _control = self.inbox_admission.begin_wait(json!(request_id))?;
+        let mut deadline = ClientReplyDeadline::new(self.kernel.authority_clock(), None, None)?;
         write_jsonrpc_line(
             writer,
             &json!({
@@ -247,7 +234,9 @@ impl ChioMcpEdge {
         )?;
 
         loop {
-            let message = next_client_message(client_rx)?;
+            let message = deadline.receive(client_rx, &self.inbox_admission, |command| {
+                self.handle_host_protocol_refusal(command)
+            })?;
             if message.get("id") == Some(&Value::String(request_id.clone()))
                 && message.get("method").is_none()
             {
@@ -255,9 +244,7 @@ impl ChioMcpEdge {
                     return Err(adapter_jsonrpc_error(error));
                 }
 
-                return message.get("result").cloned().ok_or_else(|| {
-                    AdapterError::ParseError("response missing 'result' field".into())
-                });
+                return message.into_accounted_result();
             }
 
             if cancellation_matches_request(&message, &request_id) {
@@ -269,7 +256,7 @@ impl ChioMcpEdge {
             }
 
             if message.get("method").is_some() {
-                self.deferred_client_messages.push(message);
+                self.deferred_client_messages.push_back(message);
                 continue;
             }
 
@@ -484,11 +471,11 @@ impl ChioMcpEdge {
         });
     }
 
-    pub(super) fn take_deferred_client_message(&mut self) -> Option<Value> {
+    pub(super) fn take_deferred_client_message(&mut self) -> Option<AccountedMessage> {
         if self.deferred_client_messages.is_empty() {
             None
         } else {
-            Some(self.deferred_client_messages.remove(0))
+            self.deferred_client_messages.pop_front()
         }
     }
 

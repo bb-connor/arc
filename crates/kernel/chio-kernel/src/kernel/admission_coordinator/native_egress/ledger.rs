@@ -2,6 +2,7 @@
 use super::*;
 use crate::admission_operation::{
     NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,
+    NATIVE_DISPATCH_LEDGER_SCHEMA,
 };
 
 impl<'a> PreparedNativeSecurityEgress<'a> {
@@ -219,7 +220,11 @@ impl<'a> PreparedNativeSecurityEgress<'a> {
             .map_err(|_| invalid("native dispatch ledger is not canonical"))?
             != record.canonical_record
             || value.get("schema").and_then(serde_json::Value::as_str)
-                != Some("chio.native-dispatch-preparation-ledger.v1")
+                != Some(NATIVE_DISPATCH_LEDGER_SCHEMA)
+            || value
+                .get("original_dispatch_commitment_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(self.dispatch_commitment_id.as_str())
             || value.get("operation") != Some(&operation)
             || value.get("context") != Some(&context)
             || value.get("policy") != Some(policy)

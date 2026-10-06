@@ -10,6 +10,12 @@ mod nonce_preflight;
 mod output;
 
 #[cfg(unix)]
+#[path = "security_participant_state/checkpoint.rs"]
+mod checkpoint;
+#[cfg(unix)]
+#[path = "security_participant_state/checkpoint_migration.rs"]
+mod checkpoint_migration;
+#[cfg(unix)]
 #[path = "security_participant_state/cutpoints.rs"]
 mod cutpoints;
 #[cfg(unix)]

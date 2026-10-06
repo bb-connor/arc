@@ -1,5 +1,13 @@
 use super::obligation::{insert_obligation_projection, verify_obligation_projection};
 use super::*;
+use chio_kernel::admission_operation::MAX_ADMISSION_IDENTIFIER_BYTES;
+
+#[path = "projection/terminal_record_read.rs"]
+mod terminal_record_read;
+use terminal_record_read::{
+    load_terminal_projection_tx, load_terminal_records, read_terminal_record_bytes, terminal_text,
+    StoredProjectionRecord, StoredTerminalProjection,
+};
 
 pub(super) fn full_projection_capabilities() -> AdmissionProjectionCapabilities {
     AdmissionProjectionCapabilities::ALL
@@ -501,61 +509,9 @@ pub(super) fn terminal_from_operation(
     })
 }
 
-struct StoredTerminalProjection {
-    source_operation_version: i64,
-    terminal_operation_version: i64,
-    terminal_state: String,
-    projection_body_digest: String,
-    projection_digest: String,
-    projection_json: Vec<u8>,
-    manifest_json: Vec<u8>,
-    record_count: i64,
-    committed_at_unix_ms: i64,
-    store_uuid: String,
-    store_lease_id: String,
-    store_owner_epoch: i64,
-}
-
 #[derive(Deserialize)]
 struct StoredTerminalProjectionBody {
     context: AdmissionProjectionContext,
-}
-
-fn load_terminal_projection_tx(
-    connection: &Connection,
-    operation_id: &AdmissionOperationId,
-) -> Result<Option<StoredTerminalProjection>, AdmissionOperationStoreError> {
-    connection
-        .query_row(
-            r#"
-            SELECT source_operation_version, terminal_operation_version,
-                   terminal_state, projection_body_digest, projection_digest,
-                   projection_json, manifest_json, record_count,
-                   committed_at_unix_ms, store_uuid, store_lease_id,
-                   store_owner_epoch
-            FROM admission_operation_terminal_projections
-            WHERE operation_id = ?1
-            "#,
-            [operation_id.as_str()],
-            |row| {
-                Ok(StoredTerminalProjection {
-                    source_operation_version: row.get(0)?,
-                    terminal_operation_version: row.get(1)?,
-                    terminal_state: row.get(2)?,
-                    projection_body_digest: row.get(3)?,
-                    projection_digest: row.get(4)?,
-                    projection_json: row.get(5)?,
-                    manifest_json: row.get(6)?,
-                    record_count: row.get(7)?,
-                    committed_at_unix_ms: row.get(8)?,
-                    store_uuid: row.get(9)?,
-                    store_lease_id: row.get(10)?,
-                    store_owner_epoch: row.get(11)?,
-                })
-            },
-        )
-        .optional()
-        .map_err(sqlite_error)
 }
 
 pub(super) fn verify_exact_terminal_replay(
@@ -706,38 +662,17 @@ fn verify_exact_terminal_records(
     operation_id: &AdmissionOperationId,
     canonical: &CanonicalAdmissionTerminalProjection,
 ) -> Result<(), AdmissionOperationStoreError> {
-    let mut statement = connection
-        .prepare(
-            r#"
-            SELECT record_kind, record_id, record_digest, record_json
-            FROM admission_operation_terminal_records
-            WHERE operation_id = ?1
-            ORDER BY record_kind, record_id
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    let stored = statement
-        .query_map([operation_id.as_str()], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Vec<u8>>(3)?,
-            ))
-        })
-        .map_err(sqlite_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(sqlite_error)?;
+    let stored = load_terminal_records(connection, operation_id)?;
     if stored.len() != canonical.records().len()
         || stored
             .iter()
             .zip(canonical.records())
             .any(|(stored, expected)| {
                 let commitment = expected.commitment();
-                stored.0 != commitment.kind().as_str()
-                    || stored.1 != commitment.record_id().as_str()
-                    || stored.2 != commitment.record_digest().as_str()
-                    || stored.3 != expected.canonical_bytes()
+                stored.kind != commitment.kind().as_str()
+                    || stored.record_id != commitment.record_id().as_str()
+                    || stored.record_digest != commitment.record_digest().as_str()
+                    || stored.record_json != expected.canonical_bytes()
             })
     {
         return Err(invariant(
@@ -940,42 +875,6 @@ fn verify_exact_typed_projection_rows(
     )
 }
 
-struct StoredProjectionRecord {
-    kind: String,
-    record_id: String,
-    record_digest: String,
-    record_json: Vec<u8>,
-}
-
-fn load_terminal_records(
-    connection: &Connection,
-    operation_id: &AdmissionOperationId,
-) -> Result<Vec<StoredProjectionRecord>, AdmissionOperationStoreError> {
-    let mut statement = connection
-        .prepare(
-            r#"
-            SELECT record_kind, record_id, record_digest, record_json
-            FROM admission_operation_terminal_records
-            WHERE operation_id = ?1
-            ORDER BY record_kind, record_id
-            "#,
-        )
-        .map_err(sqlite_error)?;
-    let records = statement
-        .query_map([operation_id.as_str()], |row| {
-            Ok(StoredProjectionRecord {
-                kind: row.get(0)?,
-                record_id: row.get(1)?,
-                record_digest: row.get(2)?,
-                record_json: row.get(3)?,
-            })
-        })
-        .map_err(sqlite_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(sqlite_error)?;
-    Ok(records)
-}
-
 pub(super) fn verify_stored_terminal_projection(
     connection: &Connection,
     stored_operation: &StoredOperation,
@@ -1061,7 +960,7 @@ pub(super) fn verify_stored_terminal_projection(
     for (record, commitment) in records.iter().zip(manifest.records()) {
         let value: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
             &record.record_json,
-            64 * 1024 * 1024,
+            MAX_TERMINAL_RECORD_BYTES,
         )
         .and_then(|input| input.decode_signed())
         .map_err(|error| invariant(format!("terminal record is invalid: {error}")))?;
@@ -1095,7 +994,7 @@ pub(super) fn verify_stored_terminal_projection(
     let projection_body: StoredTerminalProjectionBody =
         chio_core::canonical::UntrustedJsonText::from_wire(
             &projection.projection_json,
-            64 * 1024 * 1024,
+            MAX_TERMINAL_PROJECTION_BYTES,
         )
         .and_then(|input| input.decode_signed())
         .map_err(|error| invariant(format!("terminal projection body is invalid: {error}")))?;
@@ -1214,12 +1113,12 @@ fn verify_stored_denied_record_shape(
     projection_json: &[u8],
     records: &[StoredProjectionRecord],
 ) -> Result<(), AdmissionOperationStoreError> {
-    let body: serde_json::Value =
-        chio_core::canonical::UntrustedJsonText::from_wire(projection_json, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed())
-            .map_err(|error| {
-                invariant(format!("delivery-denied projection is invalid: {error}"))
-            })?;
+    let body: serde_json::Value = chio_core::canonical::UntrustedJsonText::from_wire(
+        projection_json,
+        MAX_TERMINAL_PROJECTION_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|error| invariant(format!("delivery-denied projection is invalid: {error}")))?;
     let body = body
         .as_object()
         .ok_or_else(|| invariant("delivery-denied projection is not an object"))?;
@@ -1274,10 +1173,12 @@ fn verify_stored_denied_record_shape(
     }
     let receipt = projection_record(records, AdmissionProjectionRecordKind::Receipt)?
         .ok_or_else(|| invariant("delivery-denied projection has no receipt record"))?;
-    let receipt_value: ChioReceipt =
-        chio_core::canonical::UntrustedJsonText::from_wire(&receipt.record_json, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed())
-            .map_err(|error| invariant(format!("delivery-denied receipt is invalid: {error}")))?;
+    let receipt_value: ChioReceipt = chio_core::canonical::UntrustedJsonText::from_wire(
+        &receipt.record_json,
+        MAX_TERMINAL_RECORD_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(|error| invariant(format!("delivery-denied receipt is invalid: {error}")))?;
     let payment = projection_record(records, AdmissionProjectionRecordKind::PaymentTerminal)?;
     let observer = projection_record(
         records,
@@ -1459,7 +1360,7 @@ fn verify_stored_observer_projection(
             let pending: PendingSettlementObservation =
                 chio_core::canonical::UntrustedJsonText::from_wire(
                     &record.record_json,
-                    64 * 1024 * 1024,
+                    MAX_TERMINAL_RECORD_BYTES,
                 )
                 .and_then(|input| input.decode_signed())
                 .map_err(|error| invariant(format!("observer attempt zero is invalid: {error}")))?;
@@ -1538,16 +1439,14 @@ impl SqliteAdmissionOperationStore {
                 LIMIT ?2
                 "#,
             )?;
-            let rows = statement.query_map(params![after_receipt_id, limit], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, Vec<u8>>(2)?,
-                ))
-            })?;
+            let mut rows = statement.query(params![after_receipt_id, limit])?;
             let mut receipts = Vec::new();
-            for row in rows {
-                let (operation_id, record_id, bytes) = row?;
+            while let Some(row) = rows.next()? {
+                let operation_id =
+                    terminal_text(row, 0, 64, "operation_id").map_err(receipt_projection_error)?;
+                let record_id = terminal_text(row, 1, MAX_ADMISSION_IDENTIFIER_BYTES, "record_id")
+                    .map_err(receipt_projection_error)?;
+                let bytes = read_terminal_record_bytes(row, 2).map_err(receipt_projection_error)?;
                 let operation_id = AdmissionOperationId::from_persisted(operation_id)
                     .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
                 let operation = load_by_operation_id_tx(&transaction, &operation_id)
@@ -1608,17 +1507,26 @@ impl ReceiptStore for SqliteAdmissionOperationStore {
         let transaction = self
             .begin_read(&mut connection)
             .map_err(receipt_projection_error)?;
-        let stored = transaction
-            .query_row(
+        let stored = {
+            let mut statement = transaction.prepare(
                 r#"
                 SELECT operation_id, record_json
                 FROM admission_operation_terminal_records
                 WHERE record_kind = 'receipt' AND record_id = ?1
                 "#,
-                [receipt_id.as_str()],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Vec<u8>>(1)?)),
-            )
-            .optional()?;
+            )?;
+            let mut rows = statement.query([receipt_id.as_str()])?;
+            match rows.next()? {
+                Some(row) => {
+                    let operation_id = terminal_text(row, 0, 64, "operation_id")
+                        .map_err(receipt_projection_error)?;
+                    let bytes =
+                        read_terminal_record_bytes(row, 1).map_err(receipt_projection_error)?;
+                    Some((operation_id.to_owned(), bytes))
+                }
+                None => None,
+            }
+        };
         let receipt = match stored {
             None => None,
             Some((operation_id, bytes)) => {

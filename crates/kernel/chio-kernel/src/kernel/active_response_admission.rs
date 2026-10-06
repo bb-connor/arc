@@ -425,13 +425,14 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Remove the finding authority and immediately disable negotiation.
+    /// Disable active response and remove an independently installed authority.
+    /// Atomically published authority identities remain pinned.
     pub fn clear_active_response_finding_authority(&mut self) {
+        self.governed_active_response_plans_enabled = false;
         if self.has_atomic_security_runtime_publication() {
             return;
         }
         self.active_response_finding_authority = None;
-        self.governed_active_response_plans_enabled = false;
     }
 
     pub(super) fn ensure_active_response_finding_authority_ready(&self) -> Result<(), KernelError> {

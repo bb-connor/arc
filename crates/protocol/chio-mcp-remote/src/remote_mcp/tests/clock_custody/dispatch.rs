@@ -5,10 +5,10 @@ fn tool_call() -> Value {
     json!({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{"name":"test", "arguments":{}}})
 }
 
-fn ready_session() -> (Arc<TestClock>, Arc<RemoteSession>, mpsc::Receiver<Value>) {
+fn ready_session() -> (Arc<TestClock>, Arc<RemoteSession>, McpInboxReceiver) {
     let source = Arc::new(TestClock(StdMutex::new(reading(1_000, 0))));
     let mut init = session_init(RemoteClock::new(source.clone()));
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mcp_inbox();
     init.input_tx = tx;
     let session = Arc::new(RemoteSession::new(init).unwrap());
     session
@@ -27,7 +27,7 @@ fn p0p1_session_send_refuses_terminal_and_draining_handles() {
     ] {
         let (_, session, rx) = ready_session();
         session.send(tool_call()).unwrap();
-        assert_eq!(rx.try_recv().unwrap(), tool_call());
+        assert_eq!(*rx.try_recv().unwrap().unwrap().value(), tool_call());
         if state == RemoteSessionState::Draining {
             session.begin_draining().unwrap();
         } else {
@@ -42,7 +42,7 @@ fn p0p1_session_send_refuses_terminal_and_draining_handles() {
             ),
             "{state:?}"
         );
-        assert!(matches!(rx.try_recv(), Err(mpsc::TryRecvError::Empty)));
+        assert!(matches!(rx.try_recv(), Ok(None)));
     }
 }
 
@@ -57,7 +57,7 @@ fn p0p1_session_send_refuses_expired_and_faulted_clocks() {
         let (clock, session, rx) = ready_session();
         *clock.0.lock().unwrap() = fault;
         assert!(matches!(session.send(tool_call()), Err(CliError::Clock(_))));
-        assert!(matches!(rx.try_recv(), Err(mpsc::TryRecvError::Empty)));
+        assert!(matches!(rx.try_recv(), Ok(None)));
     }
 }
 
@@ -66,7 +66,7 @@ fn p0p1_initializing_session_only_accepts_initialize() {
     let mut init = session_init(RemoteClock::new(Arc::new(TestClock(StdMutex::new(
         reading(1_000, 0),
     )))));
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mcp_inbox();
     init.input_tx = tx;
     let session = RemoteSession::new(init).unwrap();
     assert!(matches!(
@@ -75,10 +75,10 @@ fn p0p1_initializing_session_only_accepts_initialize() {
             chio_kernel::KernelError::GovernedTransactionDenied(_)
         ))
     ));
-    assert!(matches!(rx.try_recv(), Err(mpsc::TryRecvError::Empty)));
+    assert!(matches!(rx.try_recv(), Ok(None)));
     let initialize = json!({"jsonrpc":"2.0", "id":1, "method":"initialize", "params":{}});
     session.send(initialize.clone()).unwrap();
-    assert_eq!(rx.try_recv().unwrap(), initialize);
+    assert_eq!(*rx.try_recv().unwrap().unwrap().value(), initialize);
 }
 
 #[tokio::test]
@@ -100,7 +100,7 @@ async fn p0p1_http_request_waiting_for_stream_cannot_send_after_close() {
     let clock = RemoteClock::new(Arc::new(TestClock(StdMutex::new(reading(1_000, 0)))));
     let mut init = session_init(clock.clone());
     init.auth_context = build_static_bearer_session_auth_context(&headers, "queue-token");
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mcp_inbox();
     init.input_tx = tx;
     let sessions = Arc::new(
         RemoteSessionLedger::new(clock, init.lifecycle_policy.clone(), None, None).unwrap(),
@@ -145,5 +145,5 @@ async fn p0p1_http_request_waiting_for_stream_cannot_send_after_close() {
     drop(held_stream);
     let response = response.await;
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
-    assert!(matches!(rx.try_recv(), Err(mpsc::TryRecvError::Empty)));
+    assert!(matches!(rx.try_recv(), Ok(None)));
 }

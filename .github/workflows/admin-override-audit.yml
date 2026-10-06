@@ -4,92 +4,51 @@ on:
   pull_request:
     types: [closed]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Exact merged pull request whose qualification is audited
+        required: true
+        type: string
 
 permissions:
+  actions: read
   checks: read
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   audit:
     name: admin-override-audit
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
-      CHECK_SHA: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-      PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+      PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+      SECURITY_APP_ID: ${{ vars.CHIO_SECURITY_APP_ID }}
+      SECURITY_DEFINITION_SHA: ${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}
+      AUDIT_WORKFLOW_SHA: ${{ github.workflow_sha }}
     steps:
-      # gh CLI calls below (gh api, gh pr comment) require a repository
-      # working directory to resolve the target repo. Without this checkout
-      # the very first step fails with "fatal: not a git repository".
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Checkout authorized auditor without credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
+          ref: ${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}
+          path: authorized-auditor
           fetch-depth: 1
+          persist-credentials: false
 
-      - name: Audit required checks at protected merge commit
+      - name: Audit recorded qualification and protected merge
         shell: bash
         run: |
           set -euo pipefail
-
-          required_checks=(
-            "Security mirror / Build, lint, test"
-            "Security mirror / MSRV build and test"
-            "Security mirror / cargo-vet (locked supply-chain audit)"
-            "Security mirror / cargo-deny (supply-chain bans/advisories/licenses)"
-            "Security contract"
-          )
-
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            "repos/${GITHUB_REPOSITORY}/commits/${CHECK_SHA}/check-runs" \
-            --paginate \
-            --jq '.check_runs[] | [.name, .status, (.conclusion // "pending"), .html_url] | @tsv' \
-            > check-runs.tsv
-
-          {
-            echo "## Admin override audit"
-            echo
-            echo "Protected merge commit: \`${CHECK_SHA}\`"
-            echo
-            echo "| Required check | Status | Conclusion | Run |"
-            echo "|----------------|--------|------------|-----|"
-          } > audit.md
-
-          red=0
-          for check in "${required_checks[@]}"; do
-            line="$(awk -F '\t' -v want="${check}" '$1 == want {print; found=1; exit} END {if (!found) exit 1}' check-runs.tsv || true)"
-            if [[ -z "${line}" ]]; then
-              status="missing"
-              conclusion="missing"
-              url=""
-              red=1
-            else
-              IFS=$'\t' read -r _name status conclusion url <<< "${line}"
-              case "${status}:${conclusion}" in
-                completed:success|completed:neutral|completed:skipped)
-                  ;;
-                *)
-                  red=1
-                  ;;
-              esac
-            fi
-
-            if [[ -n "${url}" ]]; then
-              run_cell="[run](${url})"
-            else
-              run_cell="n/a"
-            fi
-            printf '| %s | %s | %s | %s |\n' "${check}" "${status}" "${conclusion}" "${run_cell}" >> audit.md
-          done
-
+          audit_rc=0
+          python3 -I authorized-auditor/scripts/audit-security-merge-qualification.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --pr-number "${PR_NUMBER}" \
+            --security-app-id "${SECURITY_APP_ID}" \
+            --definition-sha "${SECURITY_DEFINITION_SHA}" \
+            --audit-workflow-sha "${AUDIT_WORKFLOW_SHA}" \
+            --output audit.json \
+            --markdown audit.md || audit_rc=$?
           cat audit.md >> "${GITHUB_STEP_SUMMARY}"
-
-          if [[ "${red}" == "1" && -n "${PR_NUMBER}" ]]; then
-            {
-              echo "Admin override audit detected a missing or non-success required check on protected merge commit \`${CHECK_SHA}\`."
-              echo
-              cat audit.md
-            } > comment.md
-            gh pr comment "${PR_NUMBER}" --body-file comment.md
-          fi
+          exit "${audit_rc}"

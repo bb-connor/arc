@@ -3,6 +3,13 @@ use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
 use serde::Deserialize;
 use serde_json::{value::RawValue, Value};
 
+mod budget;
+pub(crate) mod framing;
+mod inbox;
+pub use budget::{AccountedMessage, FrameReservation, IngressBudget, IngressUsage};
+pub use inbox::{mcp_inbox, McpInboxReceiver, McpInboxSender, ProtocolRefusalAcknowledgement};
+pub(crate) use inbox::{ClientInbound, HostProtocolRefusal, InboxAdmission};
+
 #[derive(Deserialize)]
 struct Envelope {
     params: Option<Box<RawValue>>,

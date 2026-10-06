@@ -6,6 +6,7 @@ use chio_kernel::{CallerExecutionReport, CallerStartCredentials, CallerStartResp
 use chio_store_sqlite::caller_execution_ledger::SqliteCallerExecutionLedger;
 
 mod denial;
+mod dispatch_binding;
 
 #[cfg(unix)]
 mod restart;
@@ -311,6 +312,7 @@ fn assert_native_original_evidence(
     let ledger = store
         .load_native_dispatch_ledger(id, &fence, observed_at)?
         .ok_or("native ledger")?;
+    dispatch_binding::verify(&raw, &operation, &ledger)?;
     assert_eq!(custody.ledger_bytes(), ledger.canonical_record);
     assert_eq!(custody.ledger_digest(), &ledger.record_digest);
     assert!(

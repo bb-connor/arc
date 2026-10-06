@@ -4,12 +4,14 @@ use super::super::{dpop_claim, governed_approval_claim, retained_request, runtim
 use super::*;
 use chio_kernel::admission_operation::{
     NativeSecurityAuthorityBindingV1, NativeSecurityDispatchLedgerContext,
-    NativeSecurityDispatchLedgerRecordV1,
+    NativeSecurityDispatchLedgerRecordV1, NativeSecurityDispatchRequestBindingV1,
+    NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA, NATIVE_DISPATCH_LEDGER_SCHEMA,
 };
 
 mod capture;
 mod policy;
 mod record;
+mod return_binding;
 mod storage;
 mod write;
 pub(in crate::admission_operation_store) use capture::verify_capture_attachment;
@@ -18,7 +20,8 @@ pub(crate) use capture::{NativeCaptureBinding, VerifiedNativeCapture};
 use record::Record;
 pub(in crate::admission_operation_store) use storage::verify_all;
 
-const SCHEMA: &str = "chio.native-dispatch-preparation-ledger.v1";
+const SCHEMA: &str = NATIVE_DISPATCH_LEDGER_SCHEMA;
+const LEGACY_SCHEMA: &str = NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA;
 const PROJECTION: &str = "native_dispatch_ledger";
 const MUTATION: &str = "retain_native_dispatch_ledger";
 const MAX_RECORD_BYTES: usize = 1024 * 1024;

@@ -128,9 +128,22 @@ impl ChioKernel {
                 "native caller release differs from authenticated original custody",
             ));
         }
-        let dispatch_commitment_id = raw
-            .security_dispatch_commitment_id()
-            .map_err(recovery_required)?;
+        let original_binding = crate::tool_outcome::OriginalSecurityDispatchBindingV1::from_ledger(
+            &ledger,
+            custody.security_context(),
+        )
+        .map_err(recovery_required)?
+        .ok_or_else(|| {
+            recovery_required("legacy native caller custody has no original dispatch commitment")
+        })?;
+        if context.original_security_dispatch_binding.as_deref() != Some(&original_binding)
+            || raw.original_security_dispatch_binding() != Some(&original_binding)
+        {
+            return Err(recovery_required(
+                "native caller original dispatch binding changed",
+            ));
+        }
+        let dispatch_commitment_id = original_binding.dispatch_commitment_id().clone();
         let dispatch = SecurityPreDispatchContext {
             request: original.request_for_revalidation(),
             canonical_request: &canonical,

@@ -10,6 +10,7 @@
 pub mod adapter;
 pub mod edge {
     pub use chio_mcp_edge::authorization;
+    pub use chio_mcp_edge::ingress;
     pub use chio_mcp_edge::{
         decode_mcp_request, AdapterError, ChioMcpEdge, McpEdgeConfig, McpExposedTool,
         McpServerCapabilities, McpToolInfo, McpToolResult, McpTransport,

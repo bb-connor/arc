@@ -31,8 +31,8 @@ env:
   CARGO_BUILD_JOBS: "1"
 
 concurrency:
-  group: threat-model-coverage-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: threat-model-coverage-${{ github.workflow }}-${{ github.run_id }}-${{ github.run_attempt }}
+  cancel-in-progress: false
 
 jobs:
   coverage-gate:

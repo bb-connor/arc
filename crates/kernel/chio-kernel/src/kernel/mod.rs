@@ -148,8 +148,10 @@ const BUDGET_DENIAL_AUTHORITY_METADATA_KEY: &str = "budget_denial_authority";
 const FINANCIAL_METADATA_KEY: &str = "financial";
 const GOVERNED_TRANSACTION_METADATA_KEY: &str = "governed_transaction";
 const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
+const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
+const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 7] = [
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 9] = [
     MANIFEST_SECURITY_METADATA_KEY,
     PROTOCOL_ADMISSION_METADATA_KEY,
     BUDGET_AUTHORITY_METADATA_KEY,
@@ -157,6 +159,8 @@ const RESERVED_RECEIPT_METADATA_KEYS: [&str; 7] = [
     FINANCIAL_METADATA_KEY,
     GOVERNED_TRANSACTION_METADATA_KEY,
     CALLER_DELIVERY_METADATA_KEY,
+    PROTOCOL_REFUSAL_METADATA_KEY,
+    RUNTIME_ADMISSION_METADATA_KEY,
 ];
 
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
@@ -182,6 +186,7 @@ fn reject_reserved_receipt_metadata(
         FINANCIAL_METADATA_KEY | GOVERNED_TRANSACTION_METADATA_KEY => {
             "kernel-derived economic receipts"
         }
+        RUNTIME_ADMISSION_METADATA_KEY => "kernel-derived runtime admission reservations",
         _ => "kernel-derived receipts",
     };
     Err(KernelError::InvalidReceiptMetadata(format!(
@@ -1838,7 +1843,10 @@ mod recovery_gate;
 mod responses;
 #[path = "session_ops.rs"]
 mod session_ops;
-pub use session_ops::NestedToolCallProofs;
+pub use session_ops::{
+    NestedToolCallProofs, ProtocolRefusalReason, ProtocolRefusalSummary, ProtocolRequestDigest,
+    ProtocolRequestDigestSource,
+};
 // Settlement observer slot. Wires `chio-settle::SettlementHook` into
 // the post-dispatch surface so finalized receipts can be routed through
 // the existing `chio-settle/ops.rs` pipeline. The observer is strictly

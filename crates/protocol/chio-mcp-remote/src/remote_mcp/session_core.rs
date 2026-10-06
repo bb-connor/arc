@@ -1,10 +1,12 @@
+#[cfg(test)]
+use chio_mcp_adapter::edge::ingress::McpInboxReceiver;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::convert::Infallible;
 use std::io::{self, Read, Write};
 use std::net::SocketAddr;
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex as StdMutex, Weak};
+use std::sync::{Arc, Mutex as StdMutex, Weak};
 use std::thread;
 use std::time::Duration;
 
@@ -41,6 +43,7 @@ use chio_kernel::{
     CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
 };
 use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
+use chio_mcp_adapter::edge::ingress::{mcp_inbox, AccountedMessage, McpInboxSender};
 use chio_mcp_adapter::edge::{AdapterError, ChioMcpEdge, McpEdgeConfig, McpTransport};
 use chio_mcp_adapter::server::AdaptedMcpServer;
 use chio_mcp_adapter::transport::StdioMcpTransport;
@@ -63,7 +66,7 @@ use url::Url;
 use zeroize::{Zeroize, Zeroizing};
 
 use chio_control_plane::policy::{load_policy, LoadedPolicy};
-use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority;
+use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority_with_clock;
 use chio_control_plane::trust_control::{
     self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
 };
@@ -107,7 +110,6 @@ const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
 const CHIO_RESPONSE_MODE_HEADER: &str = "x-chio-mcp-response-mode";
 const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
 const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
-const DEFAULT_NOTIFICATION_STREAM_IDLE_MILLIS: u64 = 100;
 const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;
 const DEFAULT_SHARED_NOTIFICATION_POLL_MILLIS: u64 = 25;
 const DEFAULT_ADMIN_LIST_LIMIT: usize = 50;
@@ -440,7 +442,14 @@ struct RemoteSessionEvent {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RemoteSessionEventKind {
     Notification,
+    StandaloneRequest,
     RequestCorrelated,
+}
+
+impl RemoteSessionEventKind {
+    fn is_session_owned(self) -> bool {
+        matches!(self, Self::Notification | Self::StandaloneRequest)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -623,10 +632,11 @@ struct RemoteSession {
     peer_capabilities: StdMutex<Option<PeerCapabilities>>,
     initialize_params: StdMutex<Option<Value>>,
     lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
-    input_tx: mpsc::Sender<Value>,
+    input_tx: McpInboxSender,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     active_request_stream: Arc<Mutex<()>>,
+    worker_serving_closed: tokio::sync::watch::Sender<bool>,
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
     session_db_path: Option<PathBuf>,
@@ -666,7 +676,7 @@ struct RemoteSessionInit {
     peer_capabilities: Option<PeerCapabilities>,
     initialize_params: Option<Value>,
     lifecycle_snapshot: Option<RemoteSessionLifecycleSnapshot>,
-    input_tx: mpsc::Sender<Value>,
+    input_tx: McpInboxSender,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
@@ -1027,6 +1037,7 @@ struct BroadcastJsonRpcWriter {
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
     session_id: String,
+    active_request_stream: Arc<Mutex<()>>,
     buffer: Vec<u8>,
 }
 
@@ -1036,12 +1047,14 @@ impl BroadcastJsonRpcWriter {
         retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
         next_event_id: Arc<AtomicU64>,
         session_id: String,
+        active_request_stream: Arc<Mutex<()>>,
     ) -> Self {
         Self {
             event_tx,
             retained_notification_events,
             next_event_id,
             session_id,
+            active_request_stream,
             buffer: Vec::new(),
         }
     }
@@ -1050,8 +1063,9 @@ impl BroadcastJsonRpcWriter {
         let next =
             crate::clock::next_counter(&self.next_event_id).map_err(std::io::Error::other)?;
         let event_id = format!("{}-{next}", self.session_id);
-        let kind = classify_remote_session_event(&message);
-        if kind == RemoteSessionEventKind::Notification {
+        let kind =
+            classify_remote_session_event(&message, self.active_request_stream.try_lock().is_err());
+        if kind.is_session_owned() {
             if let Ok(mut retained) = self.retained_notification_events.lock() {
                 retained.push_back(RetainedRemoteSessionEvent {
                     seq: next,

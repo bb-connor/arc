@@ -29,7 +29,7 @@ pub(crate) fn security_participant_projection_reference(
 pub(crate) fn verify_security_participant_migration_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    super::super::security_participant_state::verify_coverage(connection)?;
+    super::super::security_participant_state::verify_archive_coverage(connection)?;
     let records = records::verify_all(connection).map_err(invalid)?;
     let local_count: usize = records.iter().map(|record| record.events.len()).sum();
     if global_count(connection)? != i64::try_from(local_count).map_err(invalid)? {

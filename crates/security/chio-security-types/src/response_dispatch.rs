@@ -126,7 +126,7 @@ impl From<ResponseExecutionBindingError> for DispatchRejection {
 
 impl DispatchRejection {
     /// Registered, input-independent reason retained in evidence and diagnostics.
-    pub fn code(&self) -> &str {
+    pub fn code(&self) -> &'static str {
         match self {
             Self::ExecutionMode { .. } => "urn:chio:error:kernel:response-dispatch-execution-mode",
             Self::ExecutionBinding(..) => {

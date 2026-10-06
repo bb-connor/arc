@@ -18,8 +18,23 @@ use crate::{load_or_create_authority_keypair, CliError};
 #[path = "durable_admission/windows.rs"]
 mod windows;
 
+#[path = "durable_admission/payload_maintenance.rs"]
+mod payload_maintenance;
+pub use payload_maintenance::{
+    LocalTerminalPayloadMaintenance, TerminalPayloadMaintenanceConfig,
+    TerminalPayloadMaintenanceError, TerminalPayloadMaintenanceHealth,
+    TerminalPayloadMaintenanceLifecycle,
+};
+
+#[cfg(test)]
+#[path = "durable_admission/payload_maintenance_tests.rs"]
+pub(crate) mod payload_maintenance_tests;
+
 #[derive(Clone)]
 pub struct DurableAdmissionRuntime {
+    // Drop this shared owner before releasing any authority ports. Its worker
+    // independently retains this same authority until stop and join complete.
+    payload_maintenance: Arc<payload_maintenance::PayloadMaintenanceOwner>,
     operations: Arc<dyn QualifiedAdmissionProjectionStore>,
     outcomes: Arc<dyn QualifiedToolOutcomeStore>,
     budget: Arc<dyn BudgetStore>,
@@ -66,6 +81,7 @@ impl DurableAdmissionRuntime {
         bind_durable_admission_kernel_identity(path, &kernel_keypair.public_key())?;
 
         Ok(Self {
+            payload_maintenance: Arc::new(payload_maintenance::PayloadMaintenanceOwner::default()),
             operations: Arc::new(authority.admission_operation_store()),
             outcomes: Arc::new(authority.tool_outcome_store()),
             budget: Arc::new(budget.clone()),
@@ -197,6 +213,7 @@ impl DurableAdmissionRuntime {
             )?,
         );
         Ok(Self {
+            payload_maintenance: Arc::new(payload_maintenance::PayloadMaintenanceOwner::default()),
             operations: stores.operations,
             outcomes: stores.outcomes,
             budget: stores.budget,

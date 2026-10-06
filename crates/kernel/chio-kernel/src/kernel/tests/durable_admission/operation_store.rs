@@ -1,7 +1,50 @@
 use super::*;
 use crate::admission_operation::RetainedToolAdmissionRequestV1;
 
+#[derive(Default)]
+pub(super) struct TestRecoveryPages {
+    script: std::sync::Mutex<
+        std::collections::VecDeque<
+            Result<
+                Option<crate::admission_operation::AdmissionOperationId>,
+                AdmissionOperationStoreError,
+            >,
+        >,
+    >,
+    trace: std::sync::Mutex<
+        Vec<(
+            usize,
+            Option<crate::admission_operation::AdmissionOperationId>,
+        )>,
+    >,
+}
+
 impl TestAdmissionOperationStore {
+    pub(super) fn script_recovery_pages(
+        &self,
+        pages: Vec<
+            Result<
+                Option<crate::admission_operation::AdmissionOperationId>,
+                AdmissionOperationStoreError,
+            >,
+        >,
+    ) {
+        *self.recovery_pages.script.lock().expect("script lock") = pages.into();
+    }
+
+    pub(super) fn recovery_page_trace(
+        &self,
+    ) -> Vec<(
+        usize,
+        Option<crate::admission_operation::AdmissionOperationId>,
+    )> {
+        self.recovery_pages
+            .trace
+            .lock()
+            .expect("trace lock")
+            .clone()
+    }
+
     pub(super) fn begin_retained_request(
         &self,
         operation: &AdmissionOperationV1,
@@ -41,6 +84,158 @@ impl TestAdmissionOperationStore {
 }
 
 impl AdmissionOperationStore for TestAdmissionOperationStore {
+    fn recovery_page(
+        &self,
+        query: crate::admission_operation::AdmissionRecoveryPageQuery<'_>,
+    ) -> Result<
+        crate::admission_operation::AdmissionRecoveryPageV1,
+        crate::admission_operation::AdmissionRecoveryPortError,
+    > {
+        self.require_fence(query.fence)?;
+        if query.candidate_limit == 0 || query.candidate_limit > 256 {
+            return Err(
+                AdmissionOperationStoreError::Invariant("test recovery page bound".into()).into(),
+            );
+        }
+        self.recovery_pages
+            .trace
+            .lock()
+            .map_err(|_| AdmissionOperationStoreError::Invariant("trace lock".into()))?
+            .push((query.candidate_limit, query.after_operation_id.cloned()));
+        if let Some(page) = self
+            .recovery_pages
+            .script
+            .lock()
+            .map_err(|_| AdmissionOperationStoreError::Invariant("script lock".into()))?
+            .pop_front()
+        {
+            let next_cursor = page?;
+            let scanned_candidates = if next_cursor.is_some() {
+                query.candidate_limit
+            } else {
+                0
+            };
+            return Ok(crate::admission_operation::AdmissionRecoveryPageV1 {
+                operations: vec![],
+                scanned_candidates,
+                next_cursor,
+            });
+        }
+        let mut operations =
+            self.list_recoverable(query.not_after_unix_ms, query.candidate_limit)?;
+        operations.retain(|operation| {
+            query
+                .after_operation_id
+                .is_none_or(|after| operation.binding().operation_id() > after)
+        });
+        operations.sort_by(|left, right| {
+            left.binding()
+                .operation_id()
+                .cmp(right.binding().operation_id())
+        });
+        let scanned_candidates = operations.len();
+        let next_cursor = if scanned_candidates == query.candidate_limit {
+            operations
+                .last()
+                .map(|operation| operation.binding().operation_id().clone())
+        } else {
+            None
+        };
+        Ok(crate::admission_operation::AdmissionRecoveryPageV1 {
+            operations,
+            scanned_candidates,
+            next_cursor,
+        })
+    }
+
+    fn load_recovery_status(
+        &self,
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        _now: u64,
+    ) -> Result<
+        Option<crate::admission_operation::AdmissionRecoveryStatusV1>,
+        crate::admission_operation::AdmissionRecoveryPortError,
+    > {
+        self.require_fence(fence)?;
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| AdmissionOperationStoreError::Invariant("test recovery lock".into()))?;
+        let operation = state
+            .operation
+            .as_ref()
+            .ok_or(AdmissionOperationStoreError::NotFound)?;
+        if operation.binding().operation_id() != operation_id {
+            return Err(AdmissionOperationStoreError::Fenced.into());
+        }
+        if let Some(status) = state.recovery_status.as_ref() {
+            status.deferral.validate_for(operation)?;
+        }
+        Ok(state.recovery_status.clone())
+    }
+
+    fn defer_recovery(
+        &self,
+        request: crate::admission_operation::AdmissionRecoveryDeferralWrite<'_>,
+    ) -> Result<
+        crate::admission_operation::AdmissionRecoveryStatusV1,
+        crate::admission_operation::AdmissionRecoveryPortError,
+    > {
+        self.revalidate_recovery_claim(
+            request.operation,
+            request.lease.untrusted_claim(),
+            request.trusted_now_unix_ms,
+            request.fence,
+        )?;
+        request.deferral.validate_for(request.operation)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| AdmissionOperationStoreError::Invariant("test recovery lock".into()))?;
+        let desired = crate::admission_operation::AdmissionRecoveryStatusV1 {
+            quarantined: true,
+            deferral: request.deferral.clone(),
+        };
+        if state.operation.as_ref() != Some(request.operation)
+            || state.recovery_status.as_ref() != request.expected
+        {
+            return Err(AdmissionOperationStoreError::Fenced.into());
+        }
+        state.recovery_status = Some(desired.clone());
+        Ok(desired)
+    }
+
+    fn clear_recovery_deferral(
+        &self,
+        request: crate::admission_operation::AdmissionRecoveryDeferralClear<'_>,
+    ) -> Result<(), crate::admission_operation::AdmissionRecoveryPortError> {
+        self.require_fence(request.fence)?;
+        if let Some(lease) = request.lease {
+            self.revalidate_recovery_claim(
+                request.operation,
+                lease.untrusted_claim(),
+                request.trusted_now_unix_ms,
+                request.fence,
+            )?;
+        } else if !request.operation.state().is_terminal() {
+            return Err(AdmissionOperationStoreError::Fenced.into());
+        }
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| AdmissionOperationStoreError::Invariant("test recovery lock".into()))?;
+        if state.operation.as_ref() != Some(request.operation)
+            || state.recovery_status.as_ref() != Some(request.expected)
+        {
+            return Err(AdmissionOperationStoreError::Fenced.into());
+        }
+        state.recovery_status = Some(crate::admission_operation::AdmissionRecoveryStatusV1 {
+            quarantined: false,
+            deferral: request.expected.deferral.clone(),
+        });
+        Ok(())
+    }
     fn load_caller_budget_shares(
         &self,
         _parent_id: &AdmissionIdentifier,

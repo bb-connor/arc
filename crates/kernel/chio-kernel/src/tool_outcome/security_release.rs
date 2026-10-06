@@ -174,7 +174,7 @@ impl SecurityReleaseRecordV1 {
     ) -> Result<(), ToolOutcomeError> {
         outcome.validate_canonical_blob(operation, &raw.canonical_blob()?)?;
         if !raw.requires_security_release()?
-            || self.dispatch_commitment_id != raw.security_dispatch_commitment_id()?
+            || self.dispatch_commitment_id != raw.retained_security_dispatch_commitment_id()?
         {
             return Err(ToolOutcomeError::Binding("security_release.dispatch"));
         }
@@ -220,6 +220,21 @@ impl RawInvocationOutcomeV1 {
     pub(crate) fn security_dispatch_commitment_id(
         &self,
     ) -> Result<chio_security_types::ports::RecordId, ToolOutcomeError> {
+        self.original_security_dispatch_binding()
+            .ok_or(ToolOutcomeError::Binding(
+                "security_release.original_dispatch",
+            ))
+            .map(|binding| binding.dispatch_commitment_id().clone())
+    }
+
+    // Only compare already retained checkpoint data for an old raw schema.
+    // Fresh pending records and release contexts require the original tuple.
+    fn retained_security_dispatch_commitment_id(
+        &self,
+    ) -> Result<chio_security_types::ports::RecordId, ToolOutcomeError> {
+        if self.original_security_dispatch_binding().is_some() {
+            return self.security_dispatch_commitment_id();
+        }
         let request = self
             .request_canonical_json
             .as_ref()

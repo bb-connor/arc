@@ -14,9 +14,10 @@ pub(super) fn require_available(
     let occupied: bool = connection.query_row(
         "SELECT EXISTS(SELECT 1 FROM dpop_replay_claim_resources AS resource
          WHERE dpop_authority_id = ?1 AND capability_id = ?2 AND nonce = ?3
-           AND NOT EXISTS(SELECT 1 FROM dpop_replay_claim_releases AS released
-             WHERE released.operation_id = resource.operation_id AND released.episode_id = resource.episode_id))",
-        params![authority, credential.capability_id(), credential.nonce()], |row| row.get(0),
+           AND (resource.operation_id != ?4
+             OR NOT EXISTS(SELECT 1 FROM dpop_replay_claim_releases AS released
+               WHERE released.operation_id = resource.operation_id AND released.episode_id = resource.episode_id)))",
+        params![authority, credential.capability_id(), credential.nonce(), operation.binding().operation_id().as_str()], |row| row.get(0),
     ).map_err(sqlite_error)?;
     if occupied {
         return Err(invariant(

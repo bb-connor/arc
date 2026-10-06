@@ -232,7 +232,15 @@ class ContractScopeCalibration(unittest.TestCase):
 
     def evidence(self, source, path="crates/synthetic/src/reader.rs"):
         code = gate._lexer.blank_rust_noise(source)
-        return gate._contracts.reader_evidence(path, code, list(gate.json_decoders(code)), code)
+        supports = {
+            support: gate._lexer.blank_rust_noise((ROOT / support).read_text())
+            for support in gate._contracts.SUPPORT_PATHS
+        }
+        if path in supports:
+            supports[path] = code
+        return gate._contracts.reader_evidence(
+            path, code, list(gate.json_decoders(code)), code, supports
+        )
 
     def test_siem_pin_reader_requires_typed_list_and_both_bounds(self):
         path = "crates/products/chio-wall/src/commands/siem_pins.rs"
@@ -248,7 +256,7 @@ class ContractScopeCalibration(unittest.TestCase):
                 self.assertTrue(any(not row["checked"] for row in self.evidence(source.replace(before, after, 1), path)))
 
     def test_mcp_admission_reader_requires_full_structural_preflight(self):
-        path = "crates/protocol/chio-mcp-adapter/src/transport/stdio/ingress_budget/admission.rs"
+        path = "crates/protocol/chio-mcp-edge/src/ingress/budget/admission.rs"
         source = (ROOT / path).read_text()
         self.assertTrue(all(row["checked"] for row in self.evidence(source, path)))
         for before, after in (
@@ -263,6 +271,62 @@ class ContractScopeCalibration(unittest.TestCase):
             self.assertIn(before, source)
             with self.subTest(before=before):
                 self.assertTrue(any(not row["checked"] for row in self.evidence(source.replace(before, after, 1), path)))
+
+    def test_mcp_control_projection_requires_borrowed_fields_and_scalar_bound(self):
+        path = "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs"
+        source = (ROOT / path).read_text()
+        observed = self.evidence(source, path)
+        self.assertTrue(observed, observed)
+        self.assertTrue(all(row["checked"] for row in observed), observed)
+        for before, after in (
+            ("const IDENTITY_BYTES: usize = 512;", "const IDENTITY_BYTES: usize = 512 * 1024 * 1024;"),
+            ("jsonrpc: Option<&'a RawValue>", "jsonrpc: Option<serde_json::Value>"),
+            ("task: Option<&'a RawValue>", "task: Option<Box<RawValue>>"),
+            ("<&'de RawValue>::deserialize(decoder)", "Value::deserialize(decoder)"),
+            ("raw.get().len() <= IDENTITY_BYTES", "true"),
+            ("serde_json::from_str(raw.get())", "serde_json::from_str(other)"),
+            ("serde_json::from_slice::<Envelope<'_>>(bytes)", "serde_json::from_slice::<Value>(bytes)"),
+            ("bounded_id(&value).then_some(value)", "Some(value)"),
+        ):
+            self.assertIn(before, source)
+            with self.subTest(before=before):
+                changed = source.replace(before, after, 1)
+                self.assertTrue(any(not row["checked"] for row in self.evidence(changed, path)))
+
+    def test_mcp_control_projection_requires_same_wire_admission_before_full_decode(self):
+        path = "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs"
+        source = (ROOT / path).read_text()
+        self.assertTrue(all(row["checked"] for row in self.evidence(source, path)))
+        for before, after in (
+            ("UntrustedJsonText::from_wire(bytes, bound)?", "UntrustedJsonText::from_wire(other, bound)?"),
+            ("control_identity(bytes)", "control_identity(other)"),
+            ("std::str::from_utf8(bytes)", "std::str::from_utf8(other)"),
+            ("let reservation = budget.admit(wire)?;", "let reservation = unrelated();"),
+            ("super::decode_mcp_request(bytes, bound)?", "super::decode_mcp_request(other, bound)?"),
+        ):
+            self.assertIn(before, source)
+            with self.subTest(before=before):
+                changed = source.replace(before, after, 1)
+                self.assertTrue(any(not row["checked"] for row in self.evidence(changed, path)))
+        before = "let reservation = budget.admit(wire)?;\n        let value = super::decode_mcp_request(bytes, bound)?;"
+        self.assertIn(before, source)
+        changed = source.replace(
+            before,
+            "let value = super::decode_mcp_request(bytes, bound)?;\n        let reservation = budget.admit(wire)?;",
+            1,
+        )
+        self.assertTrue(any(not row["checked"] for row in self.evidence(changed, path)))
+
+    def test_mcp_control_projection_cannot_borrow_an_unrelated_readers_witness(self):
+        path = "crates/protocol/chio-mcp-edge/src/ingress/inbox.rs"
+        source = (ROOT / path).read_text()
+        changed = source.replace(
+            "serde_json::from_slice::<Envelope<'_>>(bytes)",
+            "serde_json::from_slice::<Value>(bytes)",
+            1,
+        ) + "\nfn unrelated(bytes: &[u8]) { serde_json::from_slice::<Envelope<'_>>(bytes); }\n"
+        observed = {row["reader"]: row for row in self.evidence(changed, path)}
+        self.assertFalse(observed["control_identity"]["checked"], observed)
 
     def test_import_and_local_aliases_keep_the_actual_contract(self):
         source = """

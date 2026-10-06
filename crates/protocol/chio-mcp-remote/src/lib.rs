@@ -27,10 +27,17 @@ mod remote_mcp_admin;
 #[path = "remote_mcp/approval_policy.rs"]
 mod remote_mcp_approval_policy;
 pub use remote_mcp_approval_policy::RemoteApprovalConfig;
+#[path = "remote_mcp/http_body.rs"]
+mod http_body;
+#[path = "remote_mcp/protocol_refusal_http.rs"]
+mod protocol_refusal_http;
 #[path = "remote_mcp/approvals.rs"]
 mod remote_mcp_approvals;
 #[path = "remote_mcp/session_credentials.rs"]
 mod remote_mcp_session_credentials;
+#[path = "remote_mcp/session_worker.rs"]
+mod session_worker;
+use http_body::read_limited_mcp_post_body;
 #[path = "remote_mcp/session_store.rs"]
 mod remote_mcp_session_store;
 

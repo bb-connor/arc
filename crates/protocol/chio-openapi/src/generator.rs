@@ -117,7 +117,7 @@ impl ManifestGenerator {
                 method,
                 HttpMethod::Get | HttpMethod::Put | HttpMethod::Delete
             ),
-            requires_approval: extensions.approval_required.unwrap_or(false),
+            requires_approval: extensions.requires_approval(),
         };
 
         ToolDefinition {

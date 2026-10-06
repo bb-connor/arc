@@ -7,6 +7,8 @@
 mod capabilities;
 #[path = "policy/capability_config.rs"]
 mod capability_config;
+#[path = "policy/guard_api_key.rs"]
+mod guard_api_key;
 #[path = "policy/guard_config.rs"]
 mod guard_config;
 #[path = "policy/guards.rs"]
@@ -27,6 +29,7 @@ pub use capability_config::{
     CapabilityPolicyConfig, DefaultCapabilityConfig, PromptGrantConfig, ResourceGrantConfig,
     ToolGrantConfig,
 };
+pub use guard_api_key::GuardApiKey;
 pub use guard_config::{
     AzureContentSafetyPolicyConfig, CloudGuardrailsPolicyConfig, EgressAllowlistConfig,
     ExternalAdapterPolicyConfig, ForbiddenPathConfig, GuardPolicyConfig, InternalNetworkConfig,

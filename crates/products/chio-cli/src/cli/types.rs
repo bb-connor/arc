@@ -213,16 +213,41 @@ mod cli_env_tests {
 
     #[test]
     fn receipt_retention_cli_accepts_explicit_policy_on_both_launchers() {
-        for prefix in [vec!["chio", "start"], vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"]] {
+        for prefix in [
+            vec!["chio", "start"],
+            vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"],
+        ] {
             let mut argv = prefix;
-            argv.extend(["--receipt-retention-days", "7", "--receipt-archive", "/tmp/receipts-archive.db", "--receipt-retention-interval-secs", "60"]);
-            assert!(parse_cli(argv).is_ok(), "explicit retention arguments must parse");
+            argv.extend([
+                "--receipt-retention-days",
+                "7",
+                "--receipt-archive",
+                "/tmp/receipts-archive.db",
+                "--receipt-retention-interval-secs",
+                "60",
+            ]);
+            assert!(
+                parse_cli(argv).is_ok(),
+                "explicit retention arguments must parse"
+            );
         }
     }
 
     #[test]
     fn receipt_retention_cli_rejects_partial_and_zero_policy() {
-        for args in [vec!["--receipt-retention-days", "7"], vec!["--receipt-archive", "/tmp/a"], vec!["--receipt-retention-interval-secs", "60"], vec!["--receipt-retention-days", "0", "--receipt-archive", "/tmp/a", "--receipt-retention-interval-secs", "60"]] {
+        for args in [
+            vec!["--receipt-retention-days", "7"],
+            vec!["--receipt-archive", "/tmp/a"],
+            vec!["--receipt-retention-interval-secs", "60"],
+            vec![
+                "--receipt-retention-days",
+                "0",
+                "--receipt-archive",
+                "/tmp/a",
+                "--receipt-retention-interval-secs",
+                "60",
+            ],
+        ] {
             let mut argv = vec!["chio", "start"];
             argv.extend(args);
             assert!(parse_cli(argv).is_err());
@@ -1072,7 +1097,12 @@ pub(crate) enum CertCommands {
         #[arg(long)]
         receipt_db: PathBuf,
 
-        /// Maximum invocation budget (0 = unlimited).
+        /// Explicit bounded compliance profile (tool targets, guards, allowed receipt ceiling, tenant).
+        #[arg(long)]
+        profile: Option<PathBuf>,
+
+        /// Allowed mediated receipt ceiling (0 = no check), not actual financial spend.
+        /// A nonzero value requires a matching --profile for later full verification.
         #[arg(long, default_value_t = 0)]
         budget_limit: u64,
 
@@ -1093,7 +1123,11 @@ pub(crate) enum CertCommands {
         #[arg(long, value_name = "PATH")]
         trusted_kernel_pubkey: PathBuf,
 
-        /// Enable full-bundle verification (re-verify all receipt signatures).
+        /// The exact independent compliance profile used during generation.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+
+        /// Verify the exact authenticated retained tool snapshot and committed bundle.
         #[arg(long, default_value_t = false)]
         full: bool,
 
@@ -1125,6 +1159,10 @@ pub(crate) struct ServerTransportArgs {
 
 impl From<ServerTransportArgs> for chio_http_serve::ServerTransportConfig {
     fn from(args: ServerTransportArgs) -> Self {
-        Self { tls_cert: args.tls_cert, tls_key: args.tls_key, allow_plaintext: args.allow_plaintext }
+        Self {
+            tls_cert: args.tls_cert,
+            tls_key: args.tls_key,
+            allow_plaintext: args.allow_plaintext,
+        }
     }
 }

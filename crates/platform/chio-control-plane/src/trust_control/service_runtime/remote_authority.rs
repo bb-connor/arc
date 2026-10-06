@@ -41,7 +41,24 @@ pub fn build_pinned_remote_capability_authority(
     control_url: &str,
     workload_token: &str,
     pinned_current: PublicKey,
+    pinned_trusted: Vec<PublicKey>,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    build_pinned_remote_capability_authority_with_clock(
+        control_url,
+        workload_token,
+        pinned_current,
+        pinned_trusted,
+        Arc::new(chio_security_types::clock::SystemClock),
+    )
+}
+
+/// Build an operator-pinned authority using its owner's trusted clock.
+pub fn build_pinned_remote_capability_authority_with_clock(
+    control_url: &str,
+    workload_token: &str,
+    pinned_current: PublicKey,
     mut pinned_trusted: Vec<PublicKey>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
     if !pinned_trusted.contains(&pinned_current) {
         pinned_trusted.push(pinned_current.clone());
@@ -54,7 +71,7 @@ pub fn build_pinned_remote_capability_authority(
     let cache = AuthorityKeyCache::from_status(&status)?;
     validate_authority_pins(&cache, &pinned_current, &pinned_trusted)?;
     Ok(Box::new(RemoteCapabilityAuthority {
-        clock: Arc::new(chio_security_types::clock::SystemClock),
+        clock,
         client,
         cache: Mutex::new(cache),
         refresh_lock: Mutex::new(()),

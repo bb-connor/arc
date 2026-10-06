@@ -1,5 +1,9 @@
 use super::*;
 
+#[path = "real_adapter/kernel_review.rs"]
+mod kernel_review;
+#[path = "real_adapter/legacy_commit.rs"]
+mod legacy_commit;
 #[path = "real_adapter/reservation_ownership.rs"]
 mod reservation_ownership;
 use crate::security::event_consumer::tests::*;
@@ -119,6 +123,7 @@ struct RealAdapterRecordingExecutor {
     approvals: Arc<SqliteApprovalStore>,
     calls: AtomicUsize,
     fail_before_effect_once: AtomicBool,
+    preparation_lease: Mutex<Option<chio_security_types::ports::ResponseDispatchLease>>,
     observed_commit_states: Mutex<Vec<(AdmissionOperationState, ReplayReservationState)>>,
 }
 
@@ -208,6 +213,16 @@ impl ActiveResponseExecutorAuthority for RealAdapterRecordingExecutor {
                 ActiveResponseExecutorError::NotReady("record governed dispatch state".to_string())
             })?
             .push((operation.state(), approval.state()));
+        if let Some(lease) = self
+            .preparation_lease
+            .lock()
+            .map_err(|_| {
+                ActiveResponseExecutorError::NotReady("preparation lease lock".to_owned())
+            })?
+            .clone()
+        {
+            request.prepare_dispatch(lease, request.authorized_at_unix_ms())?;
+        }
         if self.fail_before_effect_once.swap(false, Ordering::AcqRel) {
             return Err(ActiveResponseExecutorError::NotReady(
                 "injected failure after governed dispatch commitment".to_string(),
@@ -272,6 +287,26 @@ struct RealAdapterRuntime {
     approvals: Arc<SqliteApprovalStore>,
     effects: Arc<RealAdapterEffects>,
     executor: Arc<RealAdapterRecordingExecutor>,
+}
+
+type OperationStoreDecorator<'a> =
+    &'a dyn Fn(Arc<SqliteSecurityAdmissionOperationStore>) -> Arc<dyn AdmissionOperationStore>;
+type ApprovalStoreDecorator<'a> = &'a dyn Fn(Arc<SqliteApprovalStore>) -> Arc<dyn ApprovalStore>;
+
+struct RealAdapterFixtureOptions<'a> {
+    operations: Option<OperationStoreDecorator<'a>>,
+    approvals: Option<ApprovalStoreDecorator<'a>>,
+    publish_runtime: bool,
+}
+
+impl Default for RealAdapterFixtureOptions<'_> {
+    fn default() -> Self {
+        Self {
+            operations: None,
+            approvals: None,
+            publish_runtime: true,
+        }
+    }
 }
 
 struct RealAdapterFixture {
@@ -427,6 +462,34 @@ fn build_real_adapter_runtime(
     clock: Arc<FixedClock>,
     fail_before_effect_once: bool,
 ) -> RealAdapterRuntime {
+    build_real_adapter_runtime_with_options(
+        paths,
+        operator_authority,
+        executor_signer,
+        submission_authority,
+        threshold_policy_authority,
+        threshold_requirement,
+        finding,
+        response_plan,
+        clock,
+        fail_before_effect_once,
+        &RealAdapterFixtureOptions::default(),
+    )
+}
+
+fn build_real_adapter_runtime_with_options(
+    paths: &RealAdapterPaths,
+    operator_authority: &Keypair,
+    executor_signer: &Keypair,
+    submission_authority: &Keypair,
+    threshold_policy_authority: &Keypair,
+    threshold_requirement: &ThresholdApprovalRequirement,
+    finding: &AuthoritativeCorrelatedFindingEvidence,
+    response_plan: &chio_security_types::ResponsePlan,
+    clock: Arc<FixedClock>,
+    fail_before_effect_once: bool,
+    options: &RealAdapterFixtureOptions<'_>,
+) -> RealAdapterRuntime {
     let admission_operations = Arc::new(
         SqliteSecurityAdmissionOperationStore::open(&paths.admission_operations)
             .unwrap_or_else(|error| panic!("open real adapter operation store: {error}")),
@@ -477,6 +540,7 @@ fn build_real_adapter_runtime(
         approvals: Arc::clone(&approvals),
         calls: AtomicUsize::new(0),
         fail_before_effect_once: AtomicBool::new(fail_before_effect_once),
+        preparation_lease: Mutex::new(None),
         observed_commit_states: Mutex::new(Vec::new()),
     });
 
@@ -552,34 +616,58 @@ fn build_real_adapter_runtime(
         .unwrap_or_else(|error| panic!("install real adapter submission authority: {error}"));
 
     let budget_authority: Arc<dyn chio_kernel::budget_store::BudgetStore> = budgets;
-    let approval_authority: Arc<dyn ApprovalStore> = approvals.clone();
-    let operation_authority: Arc<dyn AdmissionOperationStore> = admission_operations.clone();
+    let approval_authority: Arc<dyn ApprovalStore> = options.approvals.map_or_else(
+        || approvals.clone() as Arc<dyn ApprovalStore>,
+        |decorate| decorate(approvals.clone()),
+    );
+    let operation_authority: Arc<dyn AdmissionOperationStore> = options.operations.map_or_else(
+        || admission_operations.clone() as Arc<dyn AdmissionOperationStore>,
+        |decorate| decorate(admission_operations.clone()),
+    );
     let executor_authority: Arc<dyn ActiveResponseExecutorAuthority> = executor.clone();
-    kernel
-        .publish_governed_security_runtime(GovernedSecurityRuntimePublication {
-            active_response_requirement_resolver: active_response_requirement,
-            threshold_approval_requirement_resolver: threshold_resolver,
-            admission_operation_store: operation_authority,
-            approval_store: approval_authority,
-            budget_store: budget_authority,
-            finding_authority: Arc::new(TestFindingAuthority::new(std::slice::from_ref(finding))),
-            executor_authority,
-            capability_issuance_admission_authority: Arc::new(RealAdapterIssuanceAuthority),
-            threshold_policy_authorities: vec![threshold_policy_authority.public_key()],
-            guards: Vec::new(),
-            pre_dispatch_hook: Arc::new(RealAdapterPreDispatch),
-            post_invocation_pipeline: chio_kernel::PostInvocationPipeline::new(),
-        })
-        .unwrap_or_else(|error| panic!("publish real adapter governed runtime: {error}"));
+    if options.publish_runtime {
+        kernel
+            .publish_governed_security_runtime(GovernedSecurityRuntimePublication {
+                active_response_requirement_resolver: active_response_requirement,
+                threshold_approval_requirement_resolver: threshold_resolver,
+                admission_operation_store: operation_authority,
+                approval_store: approval_authority,
+                budget_store: budget_authority,
+                finding_authority: Arc::new(TestFindingAuthority::new(std::slice::from_ref(
+                    finding,
+                ))),
+                executor_authority,
+                capability_issuance_admission_authority: Arc::new(RealAdapterIssuanceAuthority),
+                threshold_policy_authorities: vec![threshold_policy_authority.public_key()],
+                guards: Vec::new(),
+                pre_dispatch_hook: Arc::new(RealAdapterPreDispatch),
+                post_invocation_pipeline: chio_kernel::PostInvocationPipeline::new(),
+            })
+            .unwrap_or_else(|error| panic!("publish real adapter governed runtime: {error}"));
+    } else {
+        kernel
+            .set_active_response_requirement_resolver(active_response_requirement)
+            .unwrap_or_else(|error| panic!("install disabled policy: {error}"));
+        kernel
+            .set_active_response_finding_authority(Arc::new(TestFindingAuthority::new(
+                std::slice::from_ref(finding),
+            )))
+            .unwrap_or_else(|error| panic!("install disabled finding authority: {error}"));
+        kernel
+            .set_active_response_executor_authority(executor_authority)
+            .unwrap_or_else(|error| panic!("install disabled executor: {error}"));
+    }
     let kernel = Arc::new(kernel);
     let coordinator = Arc::new(KernelAttestedFindingResponseCoordinator::new_unbound(
         executor_identity,
         Arc::clone(&clock) as Arc<dyn Clock>,
         crate::security::ActiveResponseExecutionProfile::Live,
     ));
-    coordinator
-        .bind_kernel(Arc::clone(&kernel))
-        .unwrap_or_else(|error| panic!("bind real adapter kernel: {error}"));
+    if options.publish_runtime {
+        coordinator
+            .bind_kernel(Arc::clone(&kernel))
+            .unwrap_or_else(|error| panic!("bind real adapter kernel: {error}"));
+    }
     RealAdapterRuntime {
         kernel,
         coordinator,
@@ -597,6 +685,14 @@ fn real_adapter_fixture() -> RealAdapterFixture {
 fn real_adapter_fixture_for_mode(
     mode: chio_security_types::ResponseExecutionMode,
     governed: bool,
+) -> RealAdapterFixture {
+    real_adapter_fixture_with_options(mode, governed, RealAdapterFixtureOptions::default())
+}
+
+fn real_adapter_fixture_with_options(
+    mode: chio_security_types::ResponseExecutionMode,
+    governed: bool,
+    options: RealAdapterFixtureOptions<'_>,
 ) -> RealAdapterFixture {
     let directory = tempfile::tempdir()
         .unwrap_or_else(|error| panic!("create real adapter directory: {error}"));
@@ -895,7 +991,7 @@ fn real_adapter_fixture_for_mode(
         .unwrap_or_else(|| panic!("real adapter execution time overflow"));
     assert!(execution_now_unix_ms < plan.response_plan().expires_at_unix_ms);
     let clock = Arc::new(FixedClock(execution_now_unix_ms));
-    let runtime = build_real_adapter_runtime(
+    let runtime = build_real_adapter_runtime_with_options(
         &paths,
         &operator_authority,
         &executor_signer,
@@ -906,6 +1002,7 @@ fn real_adapter_fixture_for_mode(
         plan.response_plan(),
         Arc::clone(&clock),
         true,
+        &options,
     );
     RealAdapterFixture {
         _directory: directory,
@@ -998,6 +1095,9 @@ fn mutate_real_adapter_artifact_digest(request: &mut GovernedApprovalRequest) {
 
 #[path = "real_adapter/execution_mode.rs"]
 mod execution_mode;
+
+#[path = "real_adapter/dispatch_rejections.rs"]
+mod dispatch_rejections;
 #[path = "real_adapter/response_dry_run.rs"]
 mod response_dry_run;
 #[cfg(unix)]

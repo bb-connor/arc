@@ -205,6 +205,9 @@ impl OpenApiSpec {
     }
 
     fn parse_operation(op_value: &Value, root: &Value) -> Result<Operation> {
+        // Reject invalid authority declarations before constructing an operation.
+        ChioExtensions::from_operation(op_value)?;
+
         let operation_id = op_value
             .get("operationId")
             .and_then(|v| v.as_str())

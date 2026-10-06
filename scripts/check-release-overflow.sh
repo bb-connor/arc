@@ -66,4 +66,6 @@ if ! grep -qF 'attempt to subtract with overflow' <<<"${output}"; then
   exit 1
 fi
 
+python3 scripts/check-standalone-release-overflow.py
+
 echo "release overflow: the ${profile} profile traps u64 subtraction below zero (status ${status})"

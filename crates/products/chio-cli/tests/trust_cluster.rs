@@ -42,55 +42,12 @@ const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
 const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
 const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
 
-fn internal_peer_registry() -> &'static Mutex<HashMap<String, String>> {
-    static REGISTRY: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
-    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn trust_cluster_test_lock() -> std::sync::MutexGuard<'static, ()> {
-    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
-fn register_internal_peer(base_url: &str, peer_urls: &[String]) {
-    let mut registry = internal_peer_registry()
-        .lock()
-        .expect("lock internal peer registry");
-    if let Some(peer_url) = peer_urls.first() {
-        registry.insert(base_url.to_string(), peer_url.clone());
-    } else {
-        registry.remove(base_url);
-    }
-}
-
-fn internal_peer_node_id(base_url: &str) -> Option<String> {
-    internal_peer_registry()
-        .lock()
-        .expect("lock internal peer registry")
-        .get(base_url)
-        .cloned()
-}
-
-fn cluster_peer_auth_signature(
-    service_token: &str,
-    node_id: &str,
-    endpoint: &str,
-    issued_at: i64,
-    term: Option<u64>,
-) -> String {
-    let payload = canonical_json_bytes(&json!({
-        "scheme": CLUSTER_AUTH_SCHEME,
-        "serviceToken": service_token,
-        "nodeId": node_id,
-        "endpoint": endpoint,
-        "issuedAt": issued_at,
-        "term": term,
-    }))
-    .expect("encode cluster peer auth payload");
-    sha256_hex(&payload)
-}
+#[path = "trust_cluster/peer_identity.rs"]
+mod peer_identity;
+use peer_identity::{
+    cluster_peer_auth_signature, internal_peer_node_id, register_internal_peer,
+    trust_cluster_test_lock,
+};
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

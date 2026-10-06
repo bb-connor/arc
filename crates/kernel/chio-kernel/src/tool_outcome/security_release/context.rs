@@ -26,6 +26,8 @@ impl<'a> DurableSecurityReleaseContext<'a> {
         record: &'a SecurityReleaseRecordV1,
         artifacts: &SecurityReleaseArtifacts<'a>,
     ) -> Result<Self, ToolOutcomeError> {
+        // A fresh callback cannot acquire missing historical provenance.
+        artifacts.raw.security_dispatch_commitment_id()?;
         record.validate_against(
             artifacts.operation,
             artifacts.raw,

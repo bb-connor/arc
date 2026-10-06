@@ -1153,6 +1153,7 @@ pub(super) fn persist_active_session_record(
     keyring: &RemoteSessionHmacKeyring,
     now: u64,
 ) -> Result<(), CliError> {
+    let record_json = crate::input::encode_session(record)?;
     validate_resume_record_integrity_with_keyring(keyring, record, now)?;
     let mut conn = open_session_state_db(path)?;
     let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1202,7 +1203,6 @@ pub(super) fn persist_active_session_record(
         }
     }
 
-    let record_json = serde_json::to_string(record)?;
     transaction.execute(
         &format!(
             "INSERT INTO {table} (session_id, updated_at, record_json)

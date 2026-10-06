@@ -2275,9 +2275,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "cfg_aliases"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "chacha20"
@@ -2494,6 +2494,7 @@ dependencies = [
  "axum",
  "chio-control-plane",
  "chio-core-types",
+ "chio-guards",
  "chio-http-core",
  "chio-http-serve",
  "chio-kernel",
@@ -3971,6 +3972,7 @@ dependencies = [
  "chio-control-plane",
  "chio-core-types",
  "chio-egress-contract",
+ "chio-errors",
  "chio-http-serve",
  "chio-kernel",
  "chio-manifest",
@@ -4092,6 +4094,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "chio-http-core",
+ "chio-log-redact",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -7949,9 +7952,9 @@ dependencies = [
 
 [[package]]
 name = "iroh-blobs"
-version = "0.103.0"
+version = "0.103.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5be50b0e2d0a9ba65cee4e0dfb708b3704e02ad12bd4c14c6307e94245943126"
+checksum = "a3148ad01585eb6b7cfb641e4100564f4f56db644f4cbed8c10ab2478663161f"
 dependencies = [
  "arrayvec",
  "bao-tree",
@@ -15305,39 +15308,3 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
-
-[[patch.unused]]
-name = "cmpv2"
-version = "0.2.0"
-
-[[patch.unused]]
-name = "crmf"
-version = "0.2.0"
-
-[[patch.unused]]
-name = "ignore"
-version = "0.4.32"
-
-[[patch.unused]]
-name = "nono"
-version = "0.53.0"
-
-[[patch.unused]]
-name = "regress"
-version = "0.11.1"
-
-[[patch.unused]]
-name = "sigstore-crypto"
-version = "0.6.6"
-
-[[patch.unused]]
-name = "sigstore-merkle"
-version = "0.6.6"
-
-[[patch.unused]]
-name = "sigstore-trust-root"
-version = "0.6.3"
-
-[[patch.unused]]
-name = "sigstore-verify"
-version = "0.6.3"

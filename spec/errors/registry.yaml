@@ -425,6 +425,29 @@ codes:
     consumed_by:
       - chio-kernel
       - chio-attest-verify
+  - urn: "urn:chio:error:attest:receipt-verification-failed"
+    domain: attest
+    severity: error
+    summary: "Receipt evidence failed its integrity, signature or session binding checks."
+    help: "Reject the evidence and restore the authentic receipt history and trusted signer before retrying."
+    string_code: "CHIO-ATTEST-RECEIPT-VERIFICATION-FAILED"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-acp-proxy
+      - chio-control-plane
+      - chio-cli
+  - urn: "urn:chio:error:attest:receipt-store-unavailable"
+    domain: attest
+    severity: error
+    summary: "The receipt store could not establish the required durable evidence outcome."
+    help: "Restore receipt-store availability, retain the original operation identity and reconcile uncertain commits before retrying."
+    string_code: "CHIO-ATTEST-RECEIPT-STORE-UNAVAILABLE"
+    since: "0.1.0"
+    stability: unstable
+    consumed_by:
+      - chio-control-plane
+      - chio-cli
   - urn: "urn:chio:error:attest:quote-verification-failed"
     domain: attest
     severity: fatal
@@ -3225,3 +3248,59 @@ codes:
     consumed_by:
       - chio-provider-adapter-core
       - chio-openai-adapter
+
+  - urn: "urn:chio:error:kernel:dpop-invalid-capacity"
+    domain: kernel
+    severity: error
+    summary: "DPoP replay-store limits are invalid."
+    help: "Configure a positive marker capacity and valid per-capability and identity-byte limits before starting the replay store."
+    string_code: "CHIO-KERNEL-DPOP-INVALID-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:kernel:dpop-malformed"
+    domain: kernel
+    severity: error
+    summary: "The DPoP proof does not match its required wire shape."
+    help: "Reject the malformed proof and present a newly encoded proof for the exact invocation; do not retry the unchanged input."
+    string_code: "CHIO-KERNEL-DPOP-MALFORMED"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+      - chio-mcp-edge
+
+  - urn: "urn:chio:error:kernel:approval-replay-invalid-capacity"
+    domain: kernel
+    severity: error
+    summary: "The governed-approval replay store was configured with zero marker capacity."
+    help: "Configure a positive replay marker capacity before constructing the governed-approval replay store."
+    string_code: "CHIO-KERNEL-APPROVAL-REPLAY-INVALID-CAPACITY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
+  - urn: "urn:chio:error:transport:untrusted-proxy"
+    domain: transport
+    severity: error
+    summary: "An asserted proxy identity was not authenticated or was ambiguous."
+    help: "Use an explicitly trusted socket peer and dedicated proxy credential, and send one bounded identity value per header."
+    string_code: "CHIO-TRANSPORT-UNTRUSTED-PROXY"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
+
+  - urn: "urn:chio:error:transport:invalid-proxy-header"
+    domain: transport
+    severity: error
+    summary: "A proxy authentication or identity header is not valid text."
+    help: "Reject the request and correct the proxy header encoding before retrying."
+    string_code: "CHIO-TRANSPORT-INVALID-PROXY-HEADER"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote

@@ -445,3 +445,6 @@ fn member_and_command_integrity_corruption_fail_closed() {
 
 #[path = "capability_set_suspensions/tenant_isolation.rs"]
 mod tenant_isolation;
+
+#[path = "capability_set_suspensions/work_bounds.rs"]
+mod work_bounds;

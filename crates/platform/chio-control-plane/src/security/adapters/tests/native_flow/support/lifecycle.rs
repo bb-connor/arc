@@ -76,6 +76,7 @@ enum Fault {
     FailAfterCapture,
     PanicAfterCapture,
     SuppressRepeatedCapture,
+    SuppressFailedCapture,
     ExpireAfterCapture,
     RefuseOutput,
     RevokeAfterOutputJoin,
@@ -151,6 +152,31 @@ impl SecurityPreDispatchHook for FaultHook {
         if matches!(self.fault, Fault::OmitCapture) {
             return Ok(());
         }
+        if matches!(self.fault, Fault::SuppressFailedCapture) {
+            let first = authority.prepare_egress()?;
+            let second = authority.prepare_egress()?;
+            let grant_index = authority.grant_index()?;
+            let custody = self
+                .resolver
+                .prepare_dispatch(authority.prepare_egress()?)
+                .and_then(|prepared| prepared.commit_custody_with_dispatch_ledger(grant_index))
+                .map_err(|error| KernelError::GuardDenied(error.to_string()))?;
+            let ledger = custody
+                .dispatch_ledger()
+                .ok_or_else(|| KernelError::Internal("ledger absent".into()))?;
+            self.clock.mode.store(4, Ordering::SeqCst);
+            let failed =
+                authority.capture(first, ledger, custody.policy_evidence().canonical_bytes());
+            self.clock.mode.store(0, Ordering::SeqCst);
+            assert!(matches!(failed, Err(KernelError::Clock(_))), "{failed:?}");
+            if authority
+                .capture(second, ledger, custody.policy_evidence().canonical_bytes())
+                .is_ok()
+            {
+                self.captured.fetch_add(1, Ordering::SeqCst);
+            }
+            return Ok(());
+        }
         let second = if matches!(self.fault, Fault::SuppressRepeatedCapture) {
             Some(authority.prepare_egress()?)
         } else {
@@ -197,6 +223,7 @@ impl SecurityPreDispatchHook for FaultHook {
             Fault::RefuseOutput
             | Fault::RevokeAfterOutputJoin
             | Fault::StopAfterOutputJoin
+            | Fault::SuppressFailedCapture
             | Fault::OmitCapture => Ok(()),
         }
     }
@@ -232,7 +259,7 @@ fn fault_case(fault: Fault) -> TestResult {
         1,
         "{fault:?}: {result:?}"
     );
-    let expected_capture = !matches!(fault, Fault::OmitCapture);
+    let expected_capture = !matches!(fault, Fault::OmitCapture | Fault::SuppressFailedCapture);
     assert_eq!(
         hook.captured.load(Ordering::SeqCst),
         usize::from(expected_capture),
@@ -285,6 +312,19 @@ fn fault_case(fault: Fault) -> TestResult {
         assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
     }
     assert_eq!(operation.dispatch_commit().is_some(), expected_capture);
+    if matches!(fault, Fault::SuppressFailedCapture) {
+        assert_eq!(
+            operation.state(),
+            AdmissionOperationState::CompensatedBeforeDispatch
+        );
+        assert!(store
+            .load_native_dispatch_capture(
+                operation.binding().operation_id(),
+                &fence,
+                fixture.clock.snapshot(),
+            )?
+            .is_none());
+    }
     if joined_before_denial {
         assert!(store
             .load_native_security_output_join(
@@ -322,6 +362,11 @@ fn native_captured_lifecycle_requires_one_successful_live_handoff() -> TestResul
         fault_case(fault)?;
     }
     Ok(())
+}
+
+#[test]
+fn native_captured_lifecycle_refuses_retry_after_a_failed_freeze() -> TestResult {
+    fault_case(Fault::SuppressFailedCapture)
 }
 
 #[test]

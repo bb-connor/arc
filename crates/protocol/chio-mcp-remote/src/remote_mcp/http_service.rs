@@ -29,7 +29,8 @@ fn load_enterprise_provider_registry(
 }
 
 async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {
-    let transport = chio_control_plane::server_transport::prepare(&config.transport, config.listen)?;
+    let transport =
+        chio_control_plane::server_transport::prepare(&config.transport, config.listen)?;
     let tls = transport.is_tls();
     if let Some(proxy) = &config.trusted_proxy {
         proxy.validate_separation(&config)?;
@@ -288,19 +289,82 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         Ok(body) => body,
         Err(response) => return response,
     };
-    let message: Value =
-        match chio_mcp_adapter::edge::decode_mcp_request(&body, MCP_MAX_POST_BODY_BYTES) {
-            Ok(message) => message,
-            Err(error) => {
-                return input::with_source(
-                    jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
-                    error,
-                );
-            }
+    // Reserve authenticated session ingress before allocating the full DOM.
+    // Initialization has a temporary owner until its fresh inbox exists.
+    let ingress_session = if let Some(header) = headers.get(MCP_SESSION_ID_HEADER) {
+        let session_id = match header.to_str() {
+            Ok(session_id) => session_id,
+            Err(_) => return plain_http_error(StatusCode::BAD_REQUEST, "invalid MCP-Session-Id"),
         };
+        match resolve_session_entry(&state, session_id).await {
+            Some(RemoteSessionEntry::Active(session)) => {
+                if let Err(response) =
+                    validate_session_auth_context(&request_auth_context, session.auth_context())
+                {
+                    return response;
+                }
+                if let Err(response) = validate_session_lifecycle(&session) {
+                    return response;
+                }
+                Some(session)
+            }
+            Some(RemoteSessionEntry::Terminal(record)) => {
+                if let Err(response) =
+                    validate_session_auth_context(&request_auth_context, &record.auth_context)
+                {
+                    return response;
+                }
+                return terminal_session_response(record.lifecycle.state);
+            }
+            None => return plain_http_error(StatusCode::NOT_FOUND, "unknown MCP session"),
+        }
+    } else {
+        None
+    };
+    let (initial_sender, _initial_receiver) = mcp_inbox();
+    let sender = ingress_session
+        .as_ref()
+        .map_or(&initial_sender, |session| &session.input_tx);
+    let message = match sender.decode(&body, MCP_MAX_POST_BODY_BYTES) {
+        Ok(message) => message,
+        Err(AdapterError::IngressCapacity) => {
+            return jsonrpc_http_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                -32000,
+                "urn:chio:error:transport:stream-capacity-exceeded",
+            )
+        }
+        Err(AdapterError::UntrustedInput(error)) => {
+            return input::with_source(
+                jsonrpc_http_error(StatusCode::BAD_REQUEST, -32700, error.code()),
+                error,
+            )
+        }
+        Err(error) => {
+            return input::with_source(
+                plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "MCP ingress is unavailable",
+                ),
+                error,
+            )
+        }
+    };
 
     if let Some(credential) = session_credential.as_ref() {
-        if let Err(response) = credential.validate_message(&message) {
+        if let Err(mut response) = credential.validate_message(&message) {
+            if let Some(reason) = response
+                .extensions_mut()
+                .remove::<chio_kernel::ProtocolRefusalReason>()
+            {
+                return protocol_refusal_http::persist_restricted_refusal_response(
+                    ingress_session.as_deref(),
+                    message,
+                    response,
+                    reason,
+                )
+                .await;
+            }
             return response;
         }
     }
@@ -319,6 +383,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 "initialize must be a JSON-RPC request with an id",
             );
         }
+        let (message, _reservation) = message.into_parts();
         return handle_initialize_post(state, request_auth_context, &headers, message).await;
     }
 
@@ -374,56 +439,25 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             {
                 return response;
             }
-            if let Err(error) = session.send(message) {
-                return remote_session_send_error(error);
-            }
-            return response_with_mode(
-                StatusCode::ACCEPTED.into_response(),
-                "post_notification_accepted",
-            );
         }
-        let mut event_rx = session.subscribe();
-        let stream_lock = session.active_request_stream.clone().try_lock_owned().ok();
-        if let Err(error) = session.send(message) {
+        if let Err(error) = session.send_accounted(message) {
             return remote_session_send_error(error);
         }
-        let Some(stream_lock) = stream_lock else {
-            return response_with_mode(
-                StatusCode::ACCEPTED.into_response(),
-                "post_notification_accepted",
-            );
-        };
-
-        let buffered_events = match collect_session_events_until_idle(&session, &mut event_rx).await
-        {
-            Ok(buffered_events) => buffered_events,
-            Err(response) => return response,
-        };
-        let buffered_events = buffered_events
-            .into_iter()
-            .filter(|event| {
-                should_emit_post_stream_event(event, None, session.has_active_notification_stream())
-            })
-            .collect::<Vec<_>>();
-        if buffered_events.is_empty() {
-            drop(stream_lock);
-            return response_with_mode(
-                StatusCode::ACCEPTED.into_response(),
-                "post_notification_accepted",
-            );
-        }
-
-        return sse_response_from_buffered_events(
-            session.clone(),
-            buffered_events,
-            stream_lock,
-            "post_notification_sse",
+        return response_with_mode(
+            StatusCode::ACCEPTED.into_response(),
+            "post_notification_accepted",
         );
     }
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
     let mut event_rx = session.subscribe();
-    let stream_lock = session.active_request_stream.clone().lock_owned().await;
+    let Some(stream_lock) = session_worker::acquire_request_owner(&session).await else {
+        session_worker::close(&state, &session).await;
+        return plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "remote MCP session worker is unavailable",
+        );
+    };
     // Authority may expire or be revoked while waiting behind another request.
     if session_credential.is_some() {
         if let Err(response) = remote_mcp_session_credentials::authenticate_request(
@@ -462,7 +496,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
     } else {
         None
     };
-    if let Err(error) = session.send(message) {
+    if let Err(error) = session.send_accounted(message) {
         drop(stream_lock);
         return remote_session_send_error(error);
     }
@@ -478,7 +512,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         );
 
         loop {
-            match event_rx.recv().await {
+            match session_worker::receive(&session_for_stream, &mut event_rx).await {
                 Ok(event) => {
                     let mut outgoing = event.message.clone();
                     if is_terminal_response_for_request(&event.message, &request_id) {
@@ -516,9 +550,17 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
                 }
                 Err(broadcast::error::RecvError::Lagged(skipped)) => {
                     warn!(skipped, session_id = %session_for_stream.session_id, "remote SSE consumer lagged behind session output");
-                    continue;
+                    session_worker::close(&state, &session_for_stream).await;
+                    let failure = json!({"jsonrpc":"2.0","id":request_id,
+                        "error":{"code":-32603,"message":"session response was lost; effect is uncertain"}});
+                    yield Ok(Event::default().data(failure.to_string()));
+                    break;
                 }
                 Err(broadcast::error::RecvError::Closed) => {
+                    session_worker::close(&state, &session_for_stream).await;
+                    let failure = json!({"jsonrpc":"2.0","id":request_id,
+                        "error":{"code":-32603,"message":"session worker stopped; effect is uncertain"}});
+                    yield Ok(Event::default().data(failure.to_string()));
                     break;
                 }
             }
@@ -570,7 +612,7 @@ async fn handle_initialize_post(
 
     let mut buffered_events = Vec::new();
     loop {
-        match event_rx.recv().await {
+        match session_worker::receive(&session, &mut event_rx).await {
             Ok(event) => {
                 let is_terminal = is_terminal_response_for_request(&event.message, &request_id);
                 let is_success = is_successful_initialize_response(&event.message, &request_id);
@@ -611,8 +653,14 @@ async fn handle_initialize_post(
                     session_id = %session.session_id,
                     "remote initialize SSE consumer lagged behind session output"
                 );
+                session_worker::close(&state, &session).await;
+                return plain_http_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "remote MCP initialize response was lost",
+                );
             }
             Err(broadcast::error::RecvError::Closed) => {
+                session_worker::close(&state, &session).await;
                 return plain_http_error(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "remote MCP session worker closed during initialize",
@@ -655,71 +703,6 @@ fn sse_response_from_events(
         }
     }
     response_with_mode(response, response_mode)
-}
-
-fn sse_response_from_buffered_events(
-    session: Arc<RemoteSession>,
-    buffered_events: Vec<RemoteSessionEvent>,
-    stream_lock: tokio::sync::OwnedMutexGuard<()>,
-    response_mode: &'static str,
-) -> Response {
-    let priming_event_id = match session.next_stream_event_id() {
-        Ok(id) => id,
-        Err(error) => return clock::rejection(error),
-    };
-    let stream = stream! {
-        let _stream_lock = stream_lock;
-        yield Ok::<Event, Infallible>(
-            Event::default()
-                .id(priming_event_id)
-                .retry(std::time::Duration::from_millis(DEFAULT_STREAM_RETRY_MILLIS))
-                .data("")
-        );
-
-        for event in buffered_events {
-            let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
-            yield Ok(Event::default().id(event.event_id).data(data));
-        }
-    };
-
-    response_with_mode(Sse::new(stream).into_response(), response_mode)
-}
-
-async fn collect_session_events_until_idle(
-    session: &RemoteSession,
-    event_rx: &mut broadcast::Receiver<RemoteSessionEvent>,
-) -> Result<Vec<RemoteSessionEvent>, Response> {
-    let mut buffered_events = Vec::new();
-
-    loop {
-        match tokio::time::timeout(
-            std::time::Duration::from_millis(DEFAULT_NOTIFICATION_STREAM_IDLE_MILLIS),
-            event_rx.recv(),
-        )
-        .await
-        {
-            Ok(Ok(event)) => buffered_events.push(event),
-            Ok(Err(broadcast::error::RecvError::Lagged(skipped))) => {
-                warn!(
-                    skipped,
-                    session_id = %session.session_id,
-                    "remote notification SSE consumer lagged behind session output"
-                );
-            }
-            Ok(Err(broadcast::error::RecvError::Closed)) => {
-                if buffered_events.is_empty() {
-                    return Err(plain_http_error(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "remote MCP session worker closed while processing notification",
-                    ));
-                }
-                break;
-            }
-            Err(_) => break,
-        }
-    }
-
-    Ok(buffered_events)
 }
 
 async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Response {
@@ -788,84 +771,73 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         }
     };
 
-    let Some(last_event_id) = request
+    let last_event_id = request
         .headers()
         .get(HeaderName::from_static("last-event-id"))
-        .and_then(|value| value.to_str().ok())
-    else {
-        if !session.try_attach_notification_stream() {
-            return plain_http_error(
-                StatusCode::CONFLICT,
-                "an MCP GET notification stream is already active for this session",
-            );
-        }
-        let mut event_rx = session.subscribe();
-        let session_for_stream = session.clone();
-        let stream = stream! {
-            let _attachment = NotificationStreamAttachment {
-                session: session_for_stream.clone(),
-            };
-            loop {
-                match event_rx.recv().await {
-                    Ok(event) => {
-                        if event.kind != RemoteSessionEventKind::Notification {
-                            continue;
-                        }
-                        let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
-                        yield Ok::<Event, Infallible>(Event::default().id(event.event_id).data(data));
-                    }
-                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                        warn!(skipped, session_id = %session_for_stream.session_id, "remote GET notification consumer lagged behind session output");
-                    }
-                    Err(broadcast::error::RecvError::Closed) => break,
-                }
-            }
-        };
-
-        return response_with_mode(Sse::new(stream).into_response(), "get_sse_live");
-    };
-
+        .and_then(|value| value.to_str().ok());
+    // Subscribe before snapshotting the bounded retained window. Events already
+    // in both routes are emitted once using their unchanged sequence identity.
+    let mut event_rx = session.subscribe();
     let (mut delivered_through, replay_events) =
-        match session.replay_notifications_after(Some(last_event_id)) {
+        match session.replay_notifications_after(last_event_id) {
             Ok(result) => result,
             Err(response) => return response,
         };
+    let priming_event_id = if last_event_id.is_none() && replay_events.is_empty() {
+        match session.next_stream_event_id() {
+            Ok(id) => Some(id),
+            Err(error) => return clock::rejection(error),
+        }
+    } else {
+        None
+    };
     if !session.try_attach_notification_stream() {
         return plain_http_error(
             StatusCode::CONFLICT,
             "an MCP GET notification stream is already active for this session",
         );
     }
-    let mut event_rx = session.subscribe();
     let session_for_stream = session.clone();
+    let attachment = NotificationStreamAttachment {
+        session: session.clone(),
+    };
     let stream = stream! {
-        let _attachment = NotificationStreamAttachment {
-            session: session_for_stream.clone(),
-        };
+        let _attachment = attachment;
+        if let Some(id) = priming_event_id {
+            yield Ok::<Event, Infallible>(Event::default().id(id)
+                .retry(std::time::Duration::from_millis(DEFAULT_STREAM_RETRY_MILLIS)).data(""));
+        }
         for event in replay_events {
+            if *session_for_stream.worker_serving_closed.borrow() { break; }
             delivered_through = delivered_through.max(event.seq);
             let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
             yield Ok::<Event, Infallible>(Event::default().id(event.event_id).data(data));
         }
         loop {
-            match event_rx.recv().await {
+            match session_worker::receive(&session_for_stream, &mut event_rx).await {
                 Ok(event) => {
-                    if event.kind != RemoteSessionEventKind::Notification || event.seq <= delivered_through {
-                        continue;
-                    }
+                    if !event.kind.is_session_owned() || event.seq <= delivered_through { continue; }
                     delivered_through = event.seq;
                     let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
                     yield Ok::<Event, Infallible>(Event::default().id(event.event_id).data(data));
                 }
-                Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                    warn!(skipped, session_id = %session_for_stream.session_id, "remote GET notification consumer lagged behind session output");
+                Err(error) => {
+                    warn!(error = %error, session_id = %session_for_stream.session_id,
+                        "remote GET session output ended or was lost");
+                    session_worker::close(&state, &session_for_stream).await;
+                    break;
                 }
-                Err(broadcast::error::RecvError::Closed) => break,
             }
         }
     };
-
-    response_with_mode(Sse::new(stream).into_response(), "get_sse_replay")
+    response_with_mode(
+        Sse::new(stream).into_response(),
+        if last_event_id.is_some() {
+            "get_sse_replay"
+        } else {
+            "get_sse_live"
+        },
+    )
 }
 
 async fn handle_protected_resource_metadata(State(state): State<RemoteAppState>) -> Response {
@@ -1031,47 +1003,6 @@ async fn handle_delete(State(state): State<RemoteAppState>, request: Request) ->
     StatusCode::NO_CONTENT.into_response()
 }
 
-async fn read_limited_mcp_post_body(
-    request: Request,
-) -> Result<(HeaderMap, axum::body::Bytes), Response> {
-    let headers = request.headers().clone();
-    validate_mcp_post_content_length(&headers)?;
-    match axum::body::to_bytes(request.into_body(), MCP_MAX_POST_BODY_BYTES).await {
-        Ok(body) => Ok((headers, body)),
-        Err(error) if error.to_string().contains("length limit") => Err(jsonrpc_http_error(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            -32600,
-            &format!("request body exceeds {MCP_MAX_POST_BODY_BYTES}-byte limit"),
-        )),
-        Err(error) => Err(jsonrpc_http_error(
-            StatusCode::BAD_REQUEST,
-            -32700,
-            &format!("failed to read request body: {error}"),
-        )),
-    }
-}
-
-fn validate_mcp_post_content_length(headers: &HeaderMap) -> Result<(), Response> {
-    let Some(value) = headers.get(axum::http::header::CONTENT_LENGTH) else {
-        return Ok(());
-    };
-    let length = value
-        .to_str()
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .ok_or_else(|| {
-            jsonrpc_http_error(StatusCode::BAD_REQUEST, -32600, "invalid Content-Length")
-        })?;
-    if length > MCP_MAX_POST_BODY_BYTES as u64 {
-        return Err(jsonrpc_http_error(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            -32600,
-            &format!("request body exceeds {MCP_MAX_POST_BODY_BYTES}-byte limit"),
-        ));
-    }
-    Ok(())
-}
-
 fn is_initialize_request(message: &Value) -> bool {
     message.get("method").and_then(Value::as_str) == Some("initialize")
 }
@@ -1084,9 +1015,14 @@ fn is_successful_initialize_response(message: &Value, request_id: &Value) -> boo
     is_terminal_response_for_request(message, request_id) && message.get("result").is_some()
 }
 
-fn classify_remote_session_event(message: &Value) -> RemoteSessionEventKind {
+fn classify_remote_session_event(
+    message: &Value,
+    request_stream_active: bool,
+) -> RemoteSessionEventKind {
     if message.get("method").is_some() && message.get("id").is_none() {
         RemoteSessionEventKind::Notification
+    } else if message.get("method").is_some() && !request_stream_active {
+        RemoteSessionEventKind::StandaloneRequest
     } else {
         RemoteSessionEventKind::RequestCorrelated
     }
@@ -1348,6 +1284,11 @@ mod http_service_tests {
 
 fn remote_session_send_error(error: CliError) -> Response {
     match error {
+        CliError::Adapter(AdapterError::IngressCapacity) => jsonrpc_http_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            -32000,
+            "urn:chio:error:transport:stream-capacity-exceeded",
+        ),
         CliError::Kernel(chio_kernel::KernelError::GovernedTransactionDenied(message)) => {
             jsonrpc_http_error(StatusCode::FORBIDDEN, -32003, &message)
         }

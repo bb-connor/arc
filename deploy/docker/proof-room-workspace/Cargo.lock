@@ -10122,45 +10122,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[patch.unused]]
-name = "cmpv2"
-version = "0.2.0"
-
-[[patch.unused]]
-name = "crmf"
-version = "0.2.0"
-
-[[patch.unused]]
 name = "enumflags2_derive"
 version = "0.7.12"
 
 [[patch.unused]]
-name = "ignore"
-version = "0.4.32"
-
-[[patch.unused]]
-name = "nono"
-version = "0.53.0"
-
-[[patch.unused]]
-name = "regress"
-version = "0.11.1"
-
-[[patch.unused]]
 name = "seccompiler"
 version = "0.5.0"
-
-[[patch.unused]]
-name = "sigstore-crypto"
-version = "0.6.6"
-
-[[patch.unused]]
-name = "sigstore-merkle"
-version = "0.6.6"
-
-[[patch.unused]]
-name = "sigstore-trust-root"
-version = "0.6.3"
-
-[[patch.unused]]
-name = "sigstore-verify"
-version = "0.6.3"

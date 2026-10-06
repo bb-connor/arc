@@ -8,6 +8,9 @@ use chio_http_serve::{
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
+#[path = "init/payload_maintenance.rs"]
+mod payload_maintenance;
+
 pub(crate) async fn serve_async(
     config: TrustServiceConfig,
     injected_joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
@@ -55,6 +58,11 @@ async fn serve_async_inner(
     >,
 ) -> Result<(), CliError> {
     config.validate()?;
+    let payload_maintenance_config = crate::TerminalPayloadMaintenanceConfig::from_env()?;
+    payload_maintenance::validate_requested_authority(
+        config.joint_authority_db_path.as_deref(),
+        payload_maintenance_config,
+    )?;
     let transport = crate::server_transport::prepare(&config.transport, config.listen)?;
     let authority_keyring_seed_path = config
         .authority_keyring_config_path
@@ -125,6 +133,10 @@ async fn serve_async_inner(
     let fiscal_runtime = compose_trust_fiscal_runtime(
         joint_authority_store.as_ref(),
         config.fiscal_runtime.as_ref(),
+    )?;
+    let payload_maintenance_owner = payload_maintenance::start_on_existing_authority(
+        joint_authority_store.as_ref(),
+        payload_maintenance_config,
     )?;
     let listener = transport.bind(config.listen).await?;
     let local_addr = listener.local_addr()?;
@@ -252,6 +264,16 @@ async fn serve_async_inner(
             cluster_join_budget(hygiene.drain_timeout, observed.elapsed())
         });
         let _ = tokio::time::timeout(join_budget, task).await;
+    }
+
+    if let Some(owner) = payload_maintenance_owner.as_ref() {
+        owner.shutdown().map_err(|source| {
+            CliError::with_public_source(
+                &chio_errors::_generated::error_codes::CLI_OTHER,
+                "terminal raw payload maintenance server worker joined with a failure",
+                source,
+            )
+        })?;
     }
 
     serve_result.map(|_outcome| ()).map_err(|error| {

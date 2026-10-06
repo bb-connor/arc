@@ -21,9 +21,7 @@ use crate::execution_nonce::{
     mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
     InMemoryExecutionNonceStore, NonceBinding,
 };
-use crate::governed_active_response::{
-    GovernedActiveResponseDispatchCommit, GovernedActiveResponseRequest,
-};
+use crate::governed_active_response::GovernedActiveResponseRequest;
 use crate::operator_report::ComplianceReport;
 use crate::receipt_store::{QualifiedAdmissionProjectionStore, ReceiptStore, ReceiptStoreError};
 use crate::threshold_approval::ThresholdApprovalRequirementResolver;
@@ -94,7 +92,6 @@ use chio_federation::{
     trust_establishment::PeerHandshakeEnvelope,
 };
 use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
-use chio_log_redact::redacted;
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -206,6 +203,8 @@ mod inbound_authority;
 mod plan_evaluation;
 #[path = "tests/receipts.rs"]
 mod receipts;
+#[path = "tests/reserved_session_metadata.rs"]
+mod reserved_session_metadata;
 #[path = "tests/security_dispatch.rs"]
 mod security_dispatch;
 #[path = "tests/session.rs"]
@@ -223,6 +222,9 @@ mod boot_receipts;
 mod execution_nonce_support;
 #[path = "tests/session_reports.rs"]
 mod session_reports;
+
+#[path = "tests/protocol_refusal.rs"]
+mod protocol_refusal;
 #[path = "tests/threshold_crypto_floor.rs"]
 mod threshold_crypto_floor;
 #[path = "tests/threshold_issuance.rs"]

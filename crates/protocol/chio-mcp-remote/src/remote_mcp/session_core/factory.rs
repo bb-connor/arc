@@ -231,11 +231,12 @@ impl RemoteSessionFactory {
                         "remote capability-authority key pin is unavailable".to_string(),
                     )
                 })?;
-            kernel.set_capability_authority(build_pinned_remote_capability_authority(
+            kernel.set_capability_authority(build_pinned_remote_capability_authority_with_clock(
                 control_url,
                 workload_token,
                 current,
                 self.config.control_authority_trusted_public_keys.clone(),
+                kernel.authority_clock(),
             )?);
             return Ok(());
         }
@@ -461,25 +462,12 @@ impl RemoteSessionFactory {
 
         let approval_redemption =
             remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
-        let (input_tx, input_rx) = mpsc::channel::<Value>();
+        let (input_tx, input_rx) = mcp_inbox();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
         let retained_notification_events =
             Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
         let next_event_id = Arc::new(AtomicU64::new(0));
-        let writer = BroadcastJsonRpcWriter::new(
-            event_tx.clone(),
-            retained_notification_events.clone(),
-            next_event_id.clone(),
-            session_id.clone(),
-        );
-
-        std::thread::spawn(move || {
-            if let Err(error) = edge.serve_message_channels(input_rx, writer) {
-                error!(error = %error, "remote MCP edge session worker exited with error");
-            }
-        });
-
-        Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
+        let session = Arc::new(RemoteSession::new(RemoteSessionInit {
             clock: self.config.clock.clone(),
             session_id,
             agent_id,
@@ -505,7 +493,22 @@ impl RemoteSessionFactory {
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: 0,
             upstream_transport: upstream_notification_source,
-        })?))
+        })?);
+        let writer = BroadcastJsonRpcWriter::new(
+            session.event_tx.clone(),
+            session.retained_notification_events.clone(),
+            session.next_event_id.clone(),
+            session.session_id.clone(),
+            session.active_request_stream.clone(),
+        );
+        let worker_exit = session_worker::WorkerExit::new(&session);
+        std::thread::spawn(move || {
+            let _worker_exit = worker_exit;
+            if let Err(error) = edge.serve_inbox(input_rx, writer) {
+                error!(error = %error, "remote MCP edge session worker exited with error");
+            }
+        });
+        Ok(session)
     }
 
     /// Incompatible authenticated sessions remain inactive (`None`). A failed
@@ -677,25 +680,12 @@ impl RemoteSessionFactory {
 
         let approval_redemption =
             remote_mcp_approvals::ApprovalRedemption::new(&self.config, kernel_kp.public_key())?;
-        let (input_tx, input_rx) = mpsc::channel::<Value>();
+        let (input_tx, input_rx) = mcp_inbox();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(256);
         let retained_notification_events =
             Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
         let next_event_id = Arc::new(AtomicU64::new(0));
-        let writer = BroadcastJsonRpcWriter::new(
-            event_tx.clone(),
-            retained_notification_events.clone(),
-            next_event_id.clone(),
-            record.session_id.clone(),
-        );
-
-        std::thread::spawn(move || {
-            if let Err(error) = edge.serve_message_channels(input_rx, writer) {
-                error!(error = %error, "remote MCP edge session worker exited with error");
-            }
-        });
-
-        Ok(Some(Arc::new(RemoteSession::new(RemoteSessionInit {
+        let session = Arc::new(RemoteSession::new(RemoteSessionInit {
             clock: self.config.clock.clone(),
             session_id: record.session_id.clone(),
             agent_id: record.agent_id.clone(),
@@ -721,7 +711,22 @@ impl RemoteSessionFactory {
             resume_hmac_keyring: self.resume_hmac_keyring.clone(),
             resume_generation: record.resume_generation,
             upstream_transport: upstream_notification_source,
-        })?)))
+        })?);
+        let writer = BroadcastJsonRpcWriter::new(
+            session.event_tx.clone(),
+            session.retained_notification_events.clone(),
+            session.next_event_id.clone(),
+            session.session_id.clone(),
+            session.active_request_stream.clone(),
+        );
+        let worker_exit = session_worker::WorkerExit::new(&session);
+        std::thread::spawn(move || {
+            let _worker_exit = worker_exit;
+            if let Err(error) = edge.serve_inbox(input_rx, writer) {
+                error!(error = %error, "remote MCP edge session worker exited with error");
+            }
+        });
+        Ok(Some(session))
     }
 }
 

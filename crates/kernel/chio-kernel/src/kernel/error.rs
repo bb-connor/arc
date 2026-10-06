@@ -183,6 +183,9 @@ pub enum KernelError {
     #[error("governed transaction denied: {0}")]
     GovernedTransactionDenied(String),
 
+    #[error("active-response dispatch was rejected: {0}")]
+    ResponseDispatchRejected(#[source] chio_security_types::DispatchRejection),
+
     #[error("active-response dispatch was never committed: {0}")]
     ActiveResponseNeverCommitted(String),
 
@@ -263,6 +266,9 @@ pub enum KernelError {
     #[error("receipt signing failed: {0}")]
     ReceiptSigningFailed(String),
 
+    #[error("receipt verification failed")]
+    ReceiptVerificationFailed(#[source] chio_core::receipt::crypto_floor::ReceiptFloorVerifyError),
+
     #[error("receipt persistence failed: {0}")]
     ReceiptPersistence(#[from] ReceiptStoreError),
 
@@ -274,6 +280,11 @@ pub enum KernelError {
 
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
+
+    /// Recovery preserves the deciding typed source. Global authority and
+    /// integrity faults cannot be reclassified from diagnostic prose.
+    #[error("durable admission failed: {0}")]
+    AdmissionRecovery(#[source] Box<crate::admission_operation::AdmissionRecoveryError>),
 
     /// A replay observed a retained unknown outcome. Box the full historical
     /// projection so refusal does not widen every kernel error. This metadata
@@ -538,6 +549,11 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Adjust the governed transaction intent so it satisfies the configured approval and policy requirements.",
             ),
+            Self::ResponseDispatchRejected(rejection) => self.report_with_context(
+                rejection.code(),
+                serde_json::json!({ "reason": rejection.to_string() }),
+                "Correct the dispatch binding through the response's admission or recovery path.",
+            ),
             Self::ActiveResponseNeverCommitted(reason) => self.report_with_context(
                 "active_response.never_committed",
                 serde_json::json!({
@@ -668,6 +684,11 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Inspect the kernel signing key configuration and signing payload integrity, then retry receipt generation.",
             ),
+            Self::ReceiptVerificationFailed(_) => self.report_with_context(
+                "urn:chio:error:attest:receipt-verification-failed",
+                serde_json::json!({"rejection":"receipt_verification_failed"}),
+                "Restore the authentic receipt evidence and independently selected signer before replaying.",
+            ),
             Self::ReceiptPersistence(error) => self.report_with_context(
                 "CHIO-KERNEL-RECEIPT-PERSISTENCE",
                 serde_json::json!({ "source": error.to_string() }),
@@ -691,6 +712,11 @@ impl KernelError {
             Self::DurableAdmission(reason) => self.report_with_context(
                 "CHIO-KERNEL-DURABLE-ADMISSION",
                 serde_json::json!({ "reason": reason }),
+                "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
+            ),
+            Self::AdmissionRecovery(failure) => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({ "reason": failure.to_string() }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
             ),
             Self::DurableAdmissionRetained(projection) => self.report_with_context(

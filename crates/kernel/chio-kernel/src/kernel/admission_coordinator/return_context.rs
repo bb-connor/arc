@@ -37,6 +37,8 @@ pub(crate) struct DurableToolReturnContext {
     pub(super) pre_invocation_guard_evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
     pub(super) security_invocation_context: Option<SecurityInvocationContext>,
     pub(super) security_release_required: bool,
+    pub(super) original_security_dispatch_binding:
+        Option<Box<crate::tool_outcome::OriginalSecurityDispatchBindingV1>>,
     // Set only after authenticating a returned caller report. Never frozen as
     // pre-dispatch evidence or serialized into the caller admission snapshot.
     pub(super) caller_delivery_evidence:
@@ -104,6 +106,19 @@ impl DurableToolReturnContext {
                 "request differs from its frozen admission material".into(),
             ));
         }
+        if self
+            .original_security_dispatch_binding
+            .as_ref()
+            .is_some_and(|binding| {
+                !self.security_release_required
+                    || binding.native_dispatch_ledger_digest()
+                        != admission.operation.native_dispatch_ledger_digest()
+            })
+        {
+            return Err(KernelError::DurableAdmission(
+                "frozen return context changed its original dispatch binding".into(),
+            ));
+        }
         if !admission.permits_grant(self.matched_grant_index) {
             return Err(KernelError::DurableAdmission(
                 "frozen return context lost its selected grant".into(),
@@ -117,19 +132,33 @@ impl DurableToolReturnContext {
 
     pub(super) fn bind_native_dispatch(
         &mut self,
-        digest: &AdmissionDigest,
+        ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
     ) -> Result<(), KernelError> {
-        if !self.security_release_required {
+        if !self.security_release_required || ledger.operation_id != self.operation_id {
             return Err(KernelError::DurableAdmission(
                 "native dispatch binding requires the original security release context".into(),
             ));
         }
+        let context = self.security_invocation_context.as_ref().ok_or_else(|| {
+            KernelError::DurableAdmission("native dispatch lost its original context".into())
+        })?;
+        let mut binding = self
+            .original_security_dispatch_binding
+            .clone()
+            .ok_or_else(|| {
+                KernelError::DurableAdmission("native dispatch lost its original commitment".into())
+            })?;
+        binding
+            .bind_native_ledger(ledger, context)
+            .map_err(tool_outcome_error)?;
         self.participants
             .as_mut()
             .ok_or_else(|| {
                 KernelError::DurableAdmission("native dispatch lost frozen participants".into())
             })?
-            .bind_native_dispatch(digest)
+            .bind_native_dispatch(&ledger.record_digest)?;
+        self.original_security_dispatch_binding = Some(binding);
+        Ok(())
     }
 }
 
@@ -244,6 +273,19 @@ impl ChioKernel {
             merge_metadata_objects(request_metadata, extra_receipt_metadata),
             receipt_attribution_metadata(&request.capability, Some(matched_grant_index))?,
         );
+        let original_security_dispatch_binding = if security_release_required {
+            let context = security_invocation_context.ok_or_else(|| {
+                KernelError::DurableAdmission("original dispatch requires security context".into())
+            })?;
+            let binding = crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(request, context)
+                .map_err(durable_store_error)?;
+            Some(Box::new(
+                crate::tool_outcome::OriginalSecurityDispatchBindingV1::new(&binding)
+                    .map_err(tool_outcome_error)?,
+            ))
+        } else {
+            None
+        };
         let context = DurableToolReturnContext {
             operation_id: admission.operation.binding().operation_id().clone(),
             request_binding_hash: admission.operation.binding().request_binding_hash().clone(),
@@ -260,6 +302,7 @@ impl ChioKernel {
             pre_invocation_guard_evidence: pre_invocation_guard_evidence.to_vec(),
             security_invocation_context: security_invocation_context.cloned(),
             security_release_required,
+            original_security_dispatch_binding,
             caller_delivery_evidence: None,
             federation_context: self.freeze_federation_return_context(
                 admission,

@@ -201,7 +201,7 @@ pub use governance::generic::{
     SignedGenericGovernanceCase, SignedGenericGovernanceCharter,
     GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA, GENERIC_GOVERNANCE_CHARTER_ARTIFACT_SCHEMA,
 };
-pub use hashing::{sha256, Hash};
+pub use hashing::{sha256, Hash, Sha256State};
 pub use identity_network::{
     validate_identity_interop_qualification_matrix, validate_public_identity_profile,
     validate_public_wallet_directory_entry, validate_public_wallet_routing_manifest,

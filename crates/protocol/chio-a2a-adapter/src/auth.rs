@@ -288,7 +288,7 @@ fn read_json_response_with_contract<T: for<'de> Deserialize<'de>>(
             AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {err}"))
         })?;
     chio_core::canonical::UntrustedJsonText::from_wire(&body, MAX_A2A_JSON_BYTES)?
-        .decode_signed()
+        .decode_document()
         .map_err(Into::into)
 }
 

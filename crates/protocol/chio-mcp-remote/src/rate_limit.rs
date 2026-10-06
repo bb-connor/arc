@@ -8,7 +8,7 @@ use axum::{
 use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError};
 use std::{
     collections::HashMap,
-    net::SocketAddr,
+    net::{IpAddr, Ipv6Addr, SocketAddr},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -16,6 +16,10 @@ use std::{
 const MCP_RATE_LIMIT_MAX_REQUESTS: u32 = 600;
 const MCP_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
 const MCP_RATE_LIMIT_MAX_KEYS: usize = 4096;
+
+#[cfg(test)]
+#[path = "rate_limit/availability_tests.rs"]
+mod availability_tests;
 
 #[derive(Clone)]
 pub(crate) struct McpRateLimiter {
@@ -46,7 +50,10 @@ impl McpRateLimiter {
     fn check(&self, key: String) -> Result<(), Rejection> {
         let mut windows = self.windows.lock().map_err(|_| ClockError::Unavailable)?;
         let now = self.clock.read()?;
-        let deadline = AuthorityDeadline::for_timeout_ms(now, 60_000)?;
+        let deadline = AuthorityDeadline::for_timeout_ms(
+            now,
+            u64::try_from(MCP_RATE_LIMIT_WINDOW.as_millis()).map_err(|_| ClockError::Overflow)?,
+        )?;
         let mut expired = Vec::new();
         for (key, window) in windows.iter_mut() {
             match window.deadline.remaining(now) {
@@ -69,16 +76,29 @@ impl McpRateLimiter {
                 ));
             }
             window.count = window.count.checked_add(1).ok_or(ClockError::Overflow)?;
-        } else if windows.len() >= MCP_RATE_LIMIT_MAX_KEYS {
-            return Err(Rejection::Limited(MCP_RATE_LIMIT_WINDOW.as_secs()));
         } else {
+            if windows.len() >= MCP_RATE_LIMIT_MAX_KEYS {
+                let oldest = windows
+                    .iter()
+                    .min_by_key(|(key, window)| (window.deadline.monotonic_deadline(), *key))
+                    .map(|(key, _)| key.clone())
+                    .ok_or(ClockError::Unavailable)?;
+                windows.remove(&oldest);
+            }
             windows.insert(key, McpRateWindow { deadline, count: 1 });
         }
         Ok(())
     }
 }
 pub(crate) fn mcp_rate_limit_key(remote_addr: SocketAddr) -> String {
-    format!("ip:{}", remote_addr.ip())
+    let address = match remote_addr.ip() {
+        IpAddr::V6(address) => match address.to_ipv4_mapped() {
+            Some(address) => IpAddr::V4(address),
+            None => IpAddr::V6(Ipv6Addr::from(u128::from(address) & (u128::MAX << 64))),
+        },
+        address => address,
+    };
+    format!("ip:{address}")
 }
 pub(crate) async fn rate_limit_mcp_request(
     axum::extract::ConnectInfo(chio_http_serve::CappedPeerAddr(remote_addr)): axum::extract::ConnectInfo<chio_http_serve::CappedPeerAddr>,
@@ -152,10 +172,11 @@ mod tests {
         for idx in 0..MCP_RATE_LIMIT_MAX_KEYS {
             assert!(limiter.check(format!("session:{idx}")).is_ok());
         }
-        assert!(matches!(
-            limiter.check("overflow".into()),
-            Err(Rejection::Limited(60))
-        ));
+        assert!(limiter.check("overflow".into()).is_ok());
+        assert_eq!(
+            limiter.windows.lock().unwrap().len(),
+            MCP_RATE_LIMIT_MAX_KEYS
+        );
         assert!(limiter.check("session:0".into()).is_ok());
     }
 }
