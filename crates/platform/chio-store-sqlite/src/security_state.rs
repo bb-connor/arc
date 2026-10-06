@@ -234,7 +234,16 @@ impl SqliteSecurityStateStore {
                 fs::create_dir_all(parent).map_err(|_| PortError::unavailable())?;
             }
         }
+        #[cfg(unix)]
+        let database_path = canonical_database_path(path)?;
+        #[cfg(unix)]
+        let connection = open_unaliased_database(&database_path)?;
+        #[cfg(not(unix))]
         let connection = Connection::open(path).map_err(sqlite_error)?;
+        // Bind the identity before the first statement so an aliased path is
+        // refused before migration writes through it.
+        #[cfg(unix)]
+        let database_identity = security_state_database_path_identity(&database_path)?;
         // Reuse suspension lookup bytecode, never the observed authority state.
         connection
             .set_prepared_statement_cache_capacity(crate::AUTHORIZATION_STATEMENT_CACHE_CAPACITY);
@@ -244,10 +253,6 @@ impl SqliteSecurityStateStore {
             .map_err(sqlite_error)?;
         migrate(&connection)?;
         SqliteEncryptedBlobStore::open(path).map_err(|_| PortError::unavailable())?;
-        #[cfg(unix)]
-        let database_path = absolute_database_path(path)?;
-        #[cfg(unix)]
-        let database_identity = security_state_database_path_identity(&database_path)?;
         Ok(Self {
             connection: StoreConnection::transaction_only("security_state", connection),
             isolation_epoch_verifier,
@@ -455,6 +460,38 @@ fn absolute_database_path(path: &Path) -> PortResult<PathBuf> {
     std::env::current_dir()
         .map(|directory| directory.join(path))
         .map_err(|_| PortError::unavailable())
+}
+
+/// The absolute path with its parent resolved, so the only component left
+/// for `SQLITE_OPEN_NOFOLLOW` to check is the database file itself.
+#[cfg(unix)]
+fn canonical_database_path(path: &Path) -> PortResult<PathBuf> {
+    let absolute = absolute_database_path(path)?;
+    let file_name = absolute.file_name().ok_or_else(PortError::invalid_data)?;
+    let parent = absolute.parent().ok_or_else(PortError::invalid_data)?;
+    let parent = fs::canonicalize(parent).map_err(|_| PortError::unavailable())?;
+    Ok(parent.join(file_name))
+}
+
+/// Refuse an existing symlink or multiply linked file, then open without
+/// following a final-component symlink planted after that check.
+#[cfg(unix)]
+fn open_unaliased_database(path: &Path) -> PortResult<Connection> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => {
+            security_state_database_path_identity(path)?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(PortError::unavailable()),
+    }
+    Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+            | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(sqlite_error)
 }
 
 #[cfg(target_os = "macos")]
