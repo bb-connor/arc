@@ -474,7 +474,8 @@ fn absolute_database_path(path: &Path) -> PortResult<PathBuf> {
 
 /// The absolute path with its parent resolved, so the only component left
 /// for `SQLITE_OPEN_NOFOLLOW` to check is the database file itself. The
-/// parent must belong to the effective user and admit no other writer.
+/// parent must belong to the effective user and must not be world-writable;
+/// the owner-only database file keeps group members out.
 #[cfg(unix)]
 fn canonical_database_path(path: &Path) -> PortResult<PathBuf> {
     let absolute = absolute_database_path(path)?;
@@ -484,7 +485,7 @@ fn canonical_database_path(path: &Path) -> PortResult<PathBuf> {
     let metadata = fs::symlink_metadata(&parent).map_err(|_| PortError::unavailable())?;
     if !metadata.is_dir()
         || metadata.uid() != nix::unistd::geteuid().as_raw()
-        || metadata.mode() & 0o022 != 0
+        || metadata.mode() & 0o002 != 0
     {
         return Err(PortError::invalid_data());
     }

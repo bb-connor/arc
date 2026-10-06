@@ -87,3 +87,19 @@ fn a_shared_writable_parent_is_refused_before_the_store_is_created() {
     assert!(SqliteSecurityStateStore::open(shared.join("security.db")).is_err());
     assert!(entries(&shared).is_empty());
 }
+
+#[test]
+fn a_group_writable_parent_owned_by_the_user_is_accepted() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // A umask of 002 with user-private groups creates directories like this.
+    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let parent = directory.path().join("group-writable");
+    std::fs::create_dir(&parent).unwrap_or_else(|error| panic!("parent: {error}"));
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o775))
+        .unwrap_or_else(|error| panic!("chmod: {error}"));
+    drop(
+        SqliteSecurityStateStore::open(parent.join("security.db"))
+            .unwrap_or_else(|error| panic!("open security state: {error}")),
+    );
+}
