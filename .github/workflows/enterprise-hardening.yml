@@ -95,7 +95,7 @@ jobs:
               libssl-dev musl-tools perl pkg-config
           } 2>&1 | tee "${DIAGNOSTIC_ARTIFACTS}/native-prerequisites.log"
 
-      - name: Run eleven independent exact diagnostic test nodes
+      - name: Run full native cage targets and independent enforcement mutations
         id: diagnostics
         shell: bash
         env:
@@ -134,7 +134,7 @@ jobs:
               json.dumps(states, indent=2, sort_keys=True) + "\n")
           if not (root / "result.json").exists():
               (root / "result.json").write_text(json.dumps({
-                  "schema": "chio.native-cage-diagnostics.v1",
+                  "schema": "chio.native-cage-full-diagnostics.v1",
                   "evidence_class": "diagnostic-only-unattested",
                   "status": "incomplete", "reason": "diagnostic runner did not produce a terminal result",
                   "workflow_step_states": states}, indent=2, sort_keys=True) + "\n")
