@@ -561,6 +561,19 @@ assert_app_token_bootstrap(
 )
 assert_nonzero_bootstrap_accepted()
 
+assert_boundary_file_rejected(
+    "workspace lockfile digest ratchet",
+    Path("Cargo.lock"),
+    lambda original: original + "\n# altered workspace lockfile\n",
+    "workspace Cargo.lock digest ratchet changed",
+)
+assert_boundary_file_rejected(
+    "security image workspace lockfile pin",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(CHECKER.EXPECTED_CARGO_LOCK_SHA256, "0" * 64),
+    "security execution image authority graph changed",
+)
+
 # Full control-plane lanes must retain the same fixture isolation as the flow
 # security gate. Tests still exercise their explicit thread and process races.
 SERIAL_FIXTURE_STEPS = (

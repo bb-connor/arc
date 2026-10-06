@@ -764,6 +764,10 @@ run_exact_target --label "checked-output rejection custody" --allow-filtered --e
   kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_by_later_acceptance \
   kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_by_later_acceptance \
   kernel::tests::durable_admission::checked_output::checked_output_first_rejection_survives_terminal_projection_recovery \
+  kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_after_later_guard_failure \
+  kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_after_later_guard_failure \
+  kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_after_post_invocation_failure \
+  kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_after_post_invocation_failure \
   kernel::tests::durable_admission::checked_output::checked_output_rejection_releases_only_its_hold_and_never_upgrades_on_replay \
   kernel::tests::durable_admission::checked_output::ordinary_output_rejection_has_no_zero_charge_authority \
   kernel::tests::durable_admission::checked_output::checked_output_contract_cannot_mix_with_digest_delivery \

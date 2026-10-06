@@ -114,7 +114,7 @@ expected_counts = {
     "strict manifest v2": 25,
     "operator-owned manifest migration": 8,
     "transport preparation provenance": 10,
-    "checked-output rejection custody": 6,
+    "checked-output rejection custody": 10,
     "security kernel adapters": 34,
     "durable flow state": 33,
     "native flow custody": 94,
@@ -321,6 +321,10 @@ required_security_boundary_tests = {
         "kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_by_later_acceptance",
         "kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_by_later_acceptance",
         "kernel::tests::durable_admission::checked_output::checked_output_first_rejection_survives_terminal_projection_recovery",
+        "kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_after_later_guard_failure",
+        "kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_after_later_guard_failure",
+        "kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_after_post_invocation_failure",
+        "kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_after_post_invocation_failure",
         "kernel::tests::durable_admission::checked_output::checked_output_rejection_releases_only_its_hold_and_never_upgrades_on_replay",
         "kernel::tests::durable_admission::checked_output::ordinary_output_rejection_has_no_zero_charge_authority",
         "kernel::tests::durable_admission::checked_output::checked_output_contract_cannot_mix_with_digest_delivery",
@@ -421,6 +425,13 @@ for label, required in required_security_boundary_tests.items():
             source.replace(name, "mutated_security_boundary::required_case"),
             "required security boundary coverage is missing",
         )
+# Omitting any checked-output case must also reject, without preserving its count.
+for name in required_security_boundary_tests["checked-output rejection custody"]:
+    rejects(
+        f"omitted checked-output boundary {name}",
+        source.replace(name, ""),
+        "flow exact inventory labels/counts changed without updating the contract",
+    )
 rejects(
     "changed security types library target",
     source.replace(

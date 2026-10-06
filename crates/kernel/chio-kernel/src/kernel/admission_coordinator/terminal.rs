@@ -3,7 +3,6 @@ use serde::Serialize;
 use super::*;
 use crate::finding_denial::{record_finding_denial, FindingDenial};
 use crate::kernel::delivery_contract;
-use crate::kernel::output_guard::OutputGuardPhase;
 
 #[path = "terminal_payment.rs"]
 mod payment;
@@ -395,16 +394,17 @@ impl ChioKernel {
             })
             .transpose()?
             .unwrap_or(false);
-        let raw_guard_rejected = retained_denial
-            || self.check_guarded_output(
-                request,
-                matched_grant_index,
-                &invocation_output_to_server_output(raw.output()),
-                false,
-                OutputGuardPhase::DurableEvaluation,
-            )?;
+        let guards = if retained_denial {
+            None
+        } else {
+            Some(self.prepare_durable_output_guards(request, matched_grant_index)?)
+        };
+        let raw_output = invocation_output_to_server_output(raw.output());
+        if let Some(guards) = &guards {
+            guards.validate_ordinary_output(&raw_output, false)?;
+        }
         let materialized = self.apply_stream_limit_snapshot(
-            invocation_output_to_server_output(raw.output()),
+            raw_output.clone(),
             Duration::from_millis(raw.elapsed_millis()),
             raw.stream_limits(),
         )?;
@@ -440,14 +440,10 @@ impl ChioKernel {
                     .to_owned(),
             ));
         }
-        let released_guard_rejected = retained_denial
-            || self.check_guarded_output(
-                request,
-                matched_grant_index,
-                &handling.output,
-                true,
-                OutputGuardPhase::DurableEvaluation,
-            )?;
+        if let Some(guards) = &guards {
+            guards.validate_ordinary_output(&handling.output, true)?;
+        }
+        let released_output = handling.output.clone();
         let (output, transformed_incomplete_reason) =
             Self::terminal_tool_call_output(handling.output);
         let incomplete_reason = materialized_incomplete_reason.or(transformed_incomplete_reason);
@@ -464,8 +460,20 @@ impl ChioKernel {
                 "durable post-invocation result count changed after admission".to_owned(),
             ));
         }
+        // Complete canonicalization before observing a contractual rejection.
+        // The caller uses this same immutable value for its resolved outcome.
+        let chunks = match (&output, &incomplete_reason) {
+            (ToolCallOutput::Stream(stream), None) => Some(stream.chunk_count()),
+            _ => None,
+        };
+        receipt_content_for_output(Some(&output), chunks)?;
+        let mut output_guard_rejected = retained_denial;
+        if let Some(guards) = guards {
+            output_guard_rejected |= guards.contractual_rejection(&raw_output, false);
+            output_guard_rejected |= guards.contractual_rejection(&released_output, true);
+        }
         Ok(DurableEvaluatedOutput {
-            output_guard_rejected: raw_guard_rejected || released_guard_rejected,
+            output_guard_rejected,
             output,
             incomplete_reason,
             post_invocation_metadata: handling.extra_metadata,

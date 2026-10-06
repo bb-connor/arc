@@ -85,7 +85,7 @@ main() {
   run_tests "scheduler broken executor cannot complete work" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_broken_executor_cannot_complete_nonterminal_state -- --exact
   run_tests "scheduler rejects clock rollback" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_direct_process_rejects_clock_rollback -- --exact
   run_tests "scheduler renewal preserves current fence" cargo test -p chio-quarantine --test response_scheduler scheduler_fencing_renewal_preserves_token_and_only_current_lease_releases -- --exact
-  run_tests "terminal scheduler work rejects renewal" cargo test -p chio-store-sqlite --test response_dispatch terminal_response_work_rejects_scheduler_lease_renewal -- --exact
+  run_tests "terminal scheduler work rejects renewal" cargo test -p chio-store-sqlite --test response_dispatch scheduler_lease::terminal_response_work_rejects_scheduler_lease_renewal -- --exact
   run_tests "executor overlapping reverse removal" cargo test -p chio-quarantine --test response_executor executor_overlap_removes_contributions_in_reverse_application_order -- --exact
   run_tests "ThrottleSession overlapping out-of-order removal" cargo test -p chio-store-sqlite --test session_throttles overlapping_windows_are_a_conjunction_and_remove_out_of_order -- --exact
   run_tests "RestrictEgress overlapping out-of-order removal" cargo test -p chio-store-sqlite --test egress_restrictions restrictions_survive_restart_and_overlap_removes_out_of_order -- --exact

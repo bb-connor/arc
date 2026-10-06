@@ -35,9 +35,80 @@ impl Guard for RejectFirstOutputGuard {
     }
 }
 
+struct RejectSecondOrdinaryOutputGuard {
+    validations: AtomicUsize,
+}
+
+impl Guard for RejectSecondOrdinaryOutputGuard {
+    fn name(&self) -> &str {
+        "reject-second-ordinary-output"
+    }
+
+    fn evaluate(&self, _: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
+        Ok(GuardDecision::allow())
+    }
+
+    fn validate_output_before_release(
+        &self,
+        _: &GuardContext<'_>,
+        _: &ToolServerOutput,
+    ) -> Result<(), KernelError> {
+        if self.validations.fetch_add(1, Ordering::SeqCst) == 1 {
+            return Err(KernelError::GuardDenied(
+                "temporary ordinary output rejection".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+struct TemporarilyBlockingDurableHook {
+    inspections: AtomicUsize,
+}
+
+impl crate::post_invocation::PostInvocationHook for TemporarilyBlockingDurableHook {
+    fn name(&self) -> &str {
+        "temporarily-blocking-durable-hook"
+    }
+
+    fn inspect(
+        &self,
+        _: &crate::post_invocation::PostInvocationContext<'_>,
+        _: &serde_json::Value,
+    ) -> crate::post_invocation::PostInvocationVerdict {
+        if self.inspections.fetch_add(1, Ordering::SeqCst) == 0 {
+            crate::post_invocation::PostInvocationVerdict::Block(
+                "injected non-blocking contract violation".into(),
+            )
+        } else {
+            crate::post_invocation::PostInvocationVerdict::Allow
+        }
+    }
+
+    fn durable_identity(
+        &self,
+    ) -> Result<Option<crate::post_invocation::PostInvocationHookIdentity>, String> {
+        crate::post_invocation::PostInvocationHookIdentity::from_canonical_config(
+            self.name(),
+            "1",
+            "chio-kernel.tests.temporary-output-preparation-failure.v1",
+            &(),
+        )
+        .map(Some)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum OutputPreparationFailure {
+    None,
+    OrdinaryGuard,
+    PostInvocation,
+}
+
 fn assert_first_checked_output_rejection_is_retained(
     panic_on_rejection: bool,
     fail_projection: bool,
+    preparation_failure: OutputPreparationFailure,
 ) {
     let mut grant = make_grant("durable-server", "mutate");
     grant.max_invocations = Some(1);
@@ -53,12 +124,48 @@ fn assert_first_checked_output_rejection_is_retained(
         validations: validations.clone(),
         panic_on_rejection,
     }));
+    match preparation_failure {
+        OutputPreparationFailure::None => {}
+        OutputPreparationFailure::OrdinaryGuard => {
+            kernel.add_guard(Box::new(RejectSecondOrdinaryOutputGuard {
+                validations: AtomicUsize::new(0),
+            }));
+        }
+        OutputPreparationFailure::PostInvocation => {
+            kernel.add_post_invocation_hook(Box::new(TemporarilyBlockingDurableHook {
+                inspections: AtomicUsize::new(0),
+            }));
+        }
+    }
     let actions = Arc::new(std::sync::Mutex::new(Vec::new()));
     kernel.set_payment_adapter(Box::new(QualifiedDurablePaymentAdapter {
         authorization_references: Default::default(),
         settlement_actions: actions.clone(),
         settlement_references: Default::default(),
     }));
+    if !matches!(preparation_failure, OutputPreparationFailure::None) {
+        let error = kernel
+            .evaluate_tool_call_blocking(&request)
+            .expect_err("output preparation temporarily refuses release");
+        match preparation_failure {
+            OutputPreparationFailure::OrdinaryGuard => assert!(matches!(
+                error,
+                KernelError::GuardDenied(ref reason)
+                    if reason.contains("temporary ordinary output rejection")
+            )),
+            OutputPreparationFailure::PostInvocation => assert!(matches!(
+                error,
+                KernelError::DurableAdmission(ref reason)
+                    if reason.contains("violated its non-blocking contract")
+            )),
+            OutputPreparationFailure::None => unreachable!("preparation failure selected"),
+        }
+        assert_eq!(
+            store.operation().state(),
+            AdmissionOperationState::Finalizing
+        );
+        assert!(actions.lock().expect("no premature settlement").is_empty());
+    }
     if fail_projection {
         store.fail_next_terminal_projection();
         let error = kernel
@@ -107,17 +214,53 @@ fn assert_first_checked_output_rejection_is_retained(
 
 #[test]
 fn checked_output_first_rejection_is_not_upgraded_by_later_acceptance() {
-    assert_first_checked_output_rejection_is_retained(false, false);
+    assert_first_checked_output_rejection_is_retained(false, false, OutputPreparationFailure::None);
 }
 
 #[test]
 fn checked_output_first_panic_is_not_upgraded_by_later_acceptance() {
-    assert_first_checked_output_rejection_is_retained(true, false);
+    assert_first_checked_output_rejection_is_retained(true, false, OutputPreparationFailure::None);
 }
 
 #[test]
 fn checked_output_first_rejection_survives_terminal_projection_recovery() {
-    assert_first_checked_output_rejection_is_retained(false, true);
+    assert_first_checked_output_rejection_is_retained(false, true, OutputPreparationFailure::None);
+}
+
+#[test]
+fn checked_output_first_rejection_is_not_upgraded_after_later_guard_failure() {
+    assert_first_checked_output_rejection_is_retained(
+        false,
+        false,
+        OutputPreparationFailure::OrdinaryGuard,
+    );
+}
+
+#[test]
+fn checked_output_first_panic_is_not_upgraded_after_later_guard_failure() {
+    assert_first_checked_output_rejection_is_retained(
+        true,
+        false,
+        OutputPreparationFailure::OrdinaryGuard,
+    );
+}
+
+#[test]
+fn checked_output_first_rejection_is_not_upgraded_after_post_invocation_failure() {
+    assert_first_checked_output_rejection_is_retained(
+        false,
+        false,
+        OutputPreparationFailure::PostInvocation,
+    );
+}
+
+#[test]
+fn checked_output_first_panic_is_not_upgraded_after_post_invocation_failure() {
+    assert_first_checked_output_rejection_is_retained(
+        true,
+        false,
+        OutputPreparationFailure::PostInvocation,
+    );
 }
 
 struct CheckedOutputGuard {
