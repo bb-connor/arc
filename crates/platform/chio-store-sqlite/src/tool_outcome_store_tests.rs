@@ -26,6 +26,8 @@ use crate::{SqliteAdmissionOperationStore, SqliteAuthorityStore};
 mod pure_finalization;
 #[path = "tool_outcome_store_tests/qualified_claims.rs"]
 mod qualified_claims;
+#[path = "tool_outcome_store_tests/recovery_component.rs"]
+mod recovery_component;
 
 #[path = "tool_outcome_store_tests/compaction_fixture.rs"]
 mod compaction_fixture;

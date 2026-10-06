@@ -196,3 +196,12 @@ pub(super) fn verify_all(connection: &Connection) -> Result<(), AdmissionOperati
     }
     Ok(())
 }
+
+// The caller holds its owner-verified admission/outcome transaction. This
+// bounded component check does not replace chain/owner/anchor verification.
+pub(crate) fn verify_outcome_recovery_status(
+    connection: &Connection,
+    operation: &AdmissionOperationV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    status::load(connection, operation).map(|_| ())
+}

@@ -84,6 +84,7 @@ mod obligation;
 mod participant;
 mod projection;
 mod recovery;
+pub(crate) use recovery::verify_outcome_recovery_status;
 mod retained_request;
 mod runtime_participant;
 mod runtime_replay;

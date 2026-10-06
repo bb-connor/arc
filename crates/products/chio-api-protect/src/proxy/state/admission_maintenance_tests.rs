@@ -489,6 +489,67 @@ async fn admission_host_retry_pending_payment_completes_without_new_request() ->
         .ok_or("original payment intent")?;
     assert_eq!(journal.state, PaymentJournalState::Settling);
     assert_eq!(journal.settle_amount_units, Some(10));
+    {
+        use chio_kernel::tool_outcome::{
+            PostReturnEvaluationStateV1, ResolvedToolOutcomeV1, ToolOutcomeStore,
+        };
+        let outcomes = fixture.authority.tool_outcome_store();
+        let raw = outcomes
+            .load_raw_invocation_by_operation(&operation_id)?
+            .ok_or("actual original raw return")?;
+        assert!(
+            !raw.requires_security_release()?,
+            "the genuine local fixture requires no missing release owner"
+        );
+        let outcome = outcomes
+            .lookup_by_operation(&operation_id)?
+            .ok_or("actual original outcome")?;
+        let evaluation = outcomes
+            .lookup_post_return_evaluation(&operation_id)?
+            .ok_or("actual resolved evaluation")?;
+        outcome.validate_against(&operation)?;
+        evaluation.validate_against(&operation, &outcome)?;
+        assert!(matches!(
+            outcome.disposition(),
+            ResolvedToolOutcomeV1::Resolved { .. }
+        ));
+        assert!(matches!(
+            evaluation.state(),
+            PostReturnEvaluationStateV1::Resolved { .. }
+        ));
+        let canonical_status_digest = chio_core_types::sha256_hex(
+            &chio_core_types::canonical::canonical_json_bytes(&marker)?,
+        );
+        let connection = rusqlite::Connection::open_with_flags(
+            &fixture.database,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?;
+        let (latest_kind, latest_digest, status_digest, finalization_digest, evaluation_digest, latest_non_recovery):
+            (String, String, String, String, String, Option<String>) = connection.query_row(
+                "SELECT c.mutation_kind, c.participant_digest, d.status_digest,
+                        o.participant_digest, e.participant_digest,
+                        (SELECT participant_digest FROM admission_operation_commits
+                         WHERE operation_id=c.operation_id AND participant_digest IS NOT NULL
+                           AND mutation_kind NOT IN ('recovery_deferred','recovery_deferral_cleared')
+                         ORDER BY commit_sequence DESC LIMIT 1)
+                 FROM admission_operation_commits c
+                 JOIN admission_operation_recovery_deferrals d USING(operation_id)
+                 JOIN tool_outcomes o USING(operation_id)
+                 JOIN post_return_evaluations e USING(operation_id)
+                 WHERE c.operation_id=?1 AND c.participant_digest IS NOT NULL
+                 ORDER BY c.commit_sequence DESC LIMIT 1",
+                [operation_id.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+            )?;
+        // These source preconditions compare actual producer commitments. Do
+        // not render identifiers, digests or retained payload on failure.
+        assert!(latest_kind == "recovery_deferred");
+        assert!(status_digest == canonical_status_digest);
+        assert!(latest_digest == canonical_status_digest);
+        assert!(finalization_digest == evaluation_digest);
+        assert!(latest_digest != finalization_digest);
+        assert!(latest_non_recovery.as_deref() == Some(finalization_digest.as_str()));
+    }
     let captures_before = fixture
         .trace
         .captures

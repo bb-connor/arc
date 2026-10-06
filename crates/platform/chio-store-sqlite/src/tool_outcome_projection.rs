@@ -130,11 +130,16 @@ pub(super) fn load_verified_projection(
     )? {
         expected_latest_digest = digest;
     }
+    // Recovery owns a separate canonical participant. Validate that current
+    // component before selecting the latest outcome-bearing commitment.
+    crate::admission_operation_store::verify_outcome_recovery_status(connection, &operation)
+        .map_err(admission_error)?;
     let latest: Option<String> = connection
         .query_row(
             r#"
             SELECT participant_digest FROM admission_operation_commits
             WHERE operation_id = ?1 AND participant_digest IS NOT NULL
+              AND mutation_kind NOT IN ('recovery_deferred', 'recovery_deferral_cleared')
             ORDER BY commit_sequence DESC LIMIT 1
             "#,
             [operation_id],
