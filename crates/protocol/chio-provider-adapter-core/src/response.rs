@@ -67,7 +67,8 @@ pub fn nested_response_body(value: &Value) -> Result<Value, ProviderError> {
 /// `{ id, type: "function", function: { name, arguments } }` into a normalized
 /// call built by `build`.
 ///
-/// Non-function tool-call kinds are skipped (returning [`None`]). The
+/// Any other tool-call kind (for example `custom`) is rejected: skipping it
+/// would hand the client a call the kernel never evaluated. The
 /// `build` constructor receives the decoded `(id, name, arguments)` so each
 /// adapter can produce its own native call struct without duplicating the
 /// decode logic. `provider_label` only varies the fail-closed error text.
@@ -75,13 +76,15 @@ pub fn openai_tool_call_to_function_call<T>(
     entry: &Value,
     provider_label: &str,
     build: impl FnOnce(String, String, Value) -> T,
-) -> Result<Option<T>, ProviderError> {
+) -> Result<T, ProviderError> {
     let kind = entry
         .get("type")
         .and_then(Value::as_str)
         .unwrap_or("function");
     if kind != "function" {
-        return Ok(None);
+        return Err(ProviderError::Malformed(format!(
+            "{provider_label} tool_calls[] type {kind} is not supported by the gate"
+        )));
     }
     let id = entry
         .get("id")
@@ -130,5 +133,22 @@ pub fn openai_tool_call_to_function_call<T>(
         }
     }
 
-    Ok(Some(build(id, name, args_value)))
+    Ok(build(id, name, args_value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn non_function_tool_call_entry_is_rejected_not_skipped() {
+        let entry = serde_json::json!({
+            "id": "call_custom_1",
+            "type": "custom",
+            "custom": {"name": "apply_patch", "input": "*** Begin Patch"}
+        });
+        let decoded =
+            openai_tool_call_to_function_call(&entry, "Test", |id, name, args| (id, name, args));
+        assert!(matches!(decoded, Err(ProviderError::Malformed(_))));
+    }
 }

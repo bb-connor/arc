@@ -455,3 +455,192 @@ fn non_append_start_frame_bytes_count_toward_buffered_raw_byte_limit() {
         ProviderError::UntrustedInput(chio_core::canonical::UntrustedJsonError::TooLarge { .. })
     ));
 }
+
+fn sse(events: &[(&str, serde_json::Value)]) -> String {
+    events
+        .iter()
+        .map(|(event, data)| format!("event: {event}\ndata: {data}\n\n"))
+        .collect()
+}
+
+fn assert_rejected_without_evaluation(stream: &str) {
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let mut evaluated = 0_usize;
+    let result = adapter.gate_sse_stream(stream.as_bytes(), |_| {
+        evaluated += 1;
+        Ok(allow_verdict())
+    });
+    assert!(
+        matches!(result, Err(ProviderError::Malformed(_))),
+        "stream must fail closed, got {result:?}"
+    );
+    assert_eq!(evaluated, 0);
+}
+
+#[test]
+fn client_executed_local_shell_call_item_fails_closed() {
+    let item = json!({"type":"local_shell_call","id":"lsh_1","call_id":"call_shell_1",
+        "action":{"type":"exec","command":["rm","-rf","/work"]},"status":"completed"});
+    assert_rejected_without_evaluation(&sse(&[
+        (
+            "response.created",
+            json!({"type":"response.created","response":{"id":"resp_1"}}),
+        ),
+        (
+            "response.output_item.added",
+            json!({"type":"response.output_item.added","output_index":0,"item":item}),
+        ),
+        (
+            "response.output_item.done",
+            json!({"type":"response.output_item.done","output_index":0,"item":item}),
+        ),
+        (
+            "response.completed",
+            json!({"type":"response.completed","response":{"id":"resp_1","output":[item]}}),
+        ),
+    ]));
+}
+
+#[test]
+fn custom_tool_call_item_fails_closed() {
+    let item = json!({"type":"custom_tool_call","id":"ctc_1","call_id":"call_patch_1",
+        "name":"apply_patch","input":"*** Begin Patch"});
+    assert_rejected_without_evaluation(&sse(&[
+        (
+            "response.output_item.added",
+            json!({"type":"response.output_item.added","output_index":0,"item":item}),
+        ),
+        (
+            "response.output_item.done",
+            json!({"type":"response.output_item.done","output_index":0,"item":item}),
+        ),
+    ]));
+}
+
+#[test]
+fn unknown_event_name_fails_closed() {
+    assert_rejected_without_evaluation(&sse(&[
+        (
+            "response.created",
+            json!({"type":"response.created","response":{"id":"resp_1"}}),
+        ),
+        (
+            "response.future_client_action.done",
+            json!({"type":"response.future_client_action.done"}),
+        ),
+    ]));
+}
+
+#[test]
+fn completed_output_with_unevaluated_arguments_fails_closed() {
+    let altered = json!({"type":"function_call","id":"fc_calendar_1","call_id":"call_calendar_1",
+        "name":"create_calendar_event","arguments":"{\"title\":\"../../etc\",\"duration_minutes\":30}"});
+    let stream = tool_call_stream().replace(
+        "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_stream_1\"}}",
+        &format!("data: {}", json!({"type":"response.completed","response":{"id":"resp_stream_1","output":[altered]}})),
+    );
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let result = adapter.gate_sse_stream(stream.as_bytes(), |_| Ok(allow_verdict()));
+    assert!(
+        matches!(result, Err(ProviderError::Malformed(_))),
+        "got {result:?}"
+    );
+}
+
+#[test]
+fn completed_output_with_an_extra_function_call_fails_closed() {
+    let evaluated = json!({"type":"function_call","id":"fc_calendar_1","call_id":"call_calendar_1",
+        "name":"create_calendar_event","arguments":"{\"title\":\"Chio sync\",\"duration_minutes\":30}"});
+    let extra = json!({"type":"function_call","id":"fc_extra","call_id":"call_extra",
+        "name":"delete_calendar","arguments":"{}"});
+    let stream = tool_call_stream().replace(
+        "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_stream_1\"}}",
+        &format!("data: {}", json!({"type":"response.completed","response":{"id":"resp_stream_1","output":[evaluated, extra]}})),
+    );
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let result = adapter.gate_sse_stream(stream.as_bytes(), |_| Ok(allow_verdict()));
+    assert!(
+        matches!(result, Err(ProviderError::Malformed(_))),
+        "got {result:?}"
+    );
+}
+
+#[test]
+fn completed_output_matching_the_evaluated_call_is_forwarded() {
+    let evaluated = json!({"type":"function_call","id":"fc_calendar_1","call_id":"call_calendar_1",
+        "name":"create_calendar_event","arguments":"{\"title\":\"Chio sync\",\"duration_minutes\":30}"});
+    let message = json!({"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"done"}]});
+    let stream = tool_call_stream().replace(
+        "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_stream_1\"}}",
+        &format!("data: {}", json!({"type":"response.completed","response":{"id":"resp_stream_1","output":[evaluated, message]}})),
+    );
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let gated = adapter
+        .gate_sse_stream(stream.as_bytes(), |_| Ok(allow_verdict()))
+        .unwrap();
+    assert_eq!(gated.invocations.len(), 1);
+}
+
+#[test]
+fn provider_executed_message_and_reasoning_items_are_forwarded() {
+    let message = json!({"type":"message","id":"msg_1","role":"assistant","content":[]});
+    let reasoning = json!({"type":"reasoning","id":"rs_1","summary":[]});
+    let stream = sse(&[
+        (
+            "response.created",
+            json!({"type":"response.created","response":{"id":"resp_1"}}),
+        ),
+        (
+            "response.in_progress",
+            json!({"type":"response.in_progress","response":{"id":"resp_1"}}),
+        ),
+        (
+            "response.output_item.added",
+            json!({"type":"response.output_item.added","output_index":0,"item":reasoning}),
+        ),
+        (
+            "response.reasoning_summary_text.delta",
+            json!({"type":"response.reasoning_summary_text.delta","delta":"thinking"}),
+        ),
+        (
+            "response.output_item.done",
+            json!({"type":"response.output_item.done","output_index":0,"item":reasoning}),
+        ),
+        (
+            "response.output_item.added",
+            json!({"type":"response.output_item.added","output_index":1,"item":message}),
+        ),
+        (
+            "response.content_part.added",
+            json!({"type":"response.content_part.added","part":{"type":"output_text","text":""}}),
+        ),
+        (
+            "response.output_text.delta",
+            json!({"type":"response.output_text.delta","delta":"hello"}),
+        ),
+        (
+            "response.output_text.done",
+            json!({"type":"response.output_text.done","text":"hello"}),
+        ),
+        (
+            "response.content_part.done",
+            json!({"type":"response.content_part.done","part":{"type":"output_text","text":"hello"}}),
+        ),
+        (
+            "response.output_item.done",
+            json!({"type":"response.output_item.done","output_index":1,"item":message}),
+        ),
+        (
+            "response.completed",
+            json!({"type":"response.completed","response":{"id":"resp_1","output":[reasoning, message]}}),
+        ),
+    ]);
+    let adapter = OpenAiAdapter::new("org_chio_demo");
+    let gated = adapter
+        .gate_sse_stream(stream.as_bytes(), |_| Ok(allow_verdict()))
+        .unwrap();
+    assert!(gated.invocations.is_empty());
+    assert!(String::from_utf8(gated.bytes)
+        .unwrap()
+        .contains("response.output_text.delta"));
+}

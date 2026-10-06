@@ -540,17 +540,21 @@ impl ChioOpenAiAdapter {
             OpenAiAdapterError::InvalidRequest("output must be an array".to_string())
         })?;
 
-        items
-            .iter()
-            .enumerate()
-            .filter_map(|(index, item)| {
-                let item_type = item.get("type").and_then(Value::as_str)?;
-                if item_type == "function_call" {
-                    Some((index, item))
-                } else {
-                    None
-                }
-            })
+        let mut calls = Vec::new();
+        for (index, item) in items.iter().enumerate() {
+            let item_type = item.get("type").and_then(Value::as_str).ok_or_else(|| {
+                OpenAiAdapterError::InvalidRequest(format!("output[{index}] missing type"))
+            })?;
+            if item_type == "function_call" {
+                calls.push((index, item));
+            } else if !PROVIDER_EXECUTED_ITEM_TYPES.contains(&item_type) {
+                return Err(OpenAiAdapterError::InvalidRequest(format!(
+                    "output[{index}] type {item_type} is not an item the adapter can evaluate"
+                )));
+            }
+        }
+        calls
+            .into_iter()
             .map(|(index, item)| {
                 let context = format!("output[{index}] function_call");
                 let name = required_string_field(item, "name", &context)?;
@@ -568,6 +572,18 @@ impl ChioOpenAiAdapter {
             .collect()
     }
 }
+
+/// Responses output item types the provider executes or renders. They ask the
+/// client to run nothing, so the adapter forwards them without evaluation; every
+/// other non-`function_call` item is rejected.
+pub(crate) const PROVIDER_EXECUTED_ITEM_TYPES: &[&str] = &[
+    "message",
+    "reasoning",
+    "web_search_call",
+    "file_search_call",
+    "code_interpreter_call",
+    "image_generation_call",
+];
 
 fn required_string_field(
     value: &Value,
