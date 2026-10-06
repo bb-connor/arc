@@ -1,6 +1,6 @@
 use chio_core::{
-    receipt::body::chio_receipt_id, receipt::body::ChioReceipt, receipt::decision::Decision,
-    PublicKey,
+    canonical::UntrustedJsonText, receipt::body::chio_receipt_id, receipt::body::ChioReceipt,
+    receipt::decision::Decision, PublicKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -68,8 +68,13 @@ pub struct ReceiptVerification {
     pub ok: bool,
 }
 
+/// Decodes receipt JSON with the signed-wire contract: a duplicate object
+/// key at any depth, or a number token that would change representation,
+/// fails with [`crate::ErrorCode::UntrustedInput`] before any field is read.
 pub fn parse_receipt_json(input: &str) -> Result<ChioReceipt> {
-    Ok(serde_json::from_str(input)?)
+    UntrustedJsonText::new(input)
+        .decode_signed()
+        .map_err(|error| chio_core::Error::UntrustedInput(error.into()).into())
 }
 
 pub fn receipt_body_canonical_json(receipt: &ChioReceipt) -> Result<String> {
