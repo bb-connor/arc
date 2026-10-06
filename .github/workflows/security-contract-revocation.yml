@@ -172,9 +172,34 @@ jobs:
             echo "security_definition_sha=${SECURITY_DEFINITION_SHA}"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Resolve exact completed workflow identity
+        id: route
+        if: ${{ github.event_name == 'workflow_run' }}
+        env:
+          EVENT_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s inherit_errexit
+          [[ "${EVENT_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]
+          workflow="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/${EVENT_WORKFLOW_ID}")"
+          test "$(jq -r '.id' <<< "${workflow}")" = "${EVENT_WORKFLOW_ID}"
+          workflow_path="$(jq -r '.path' <<< "${workflow}")"
+          case "${workflow_path}" in
+            .github/workflows/ci.yml|.github/workflows/enterprise-evidence-finalizer.yml) ;;
+            *) exit 1 ;;
+          esac
+          test "$(jq -r '.state' <<< "${workflow}")" = active
+          workflow_file="${workflow_path##*/}"
+          registered="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}")"
+          test "$(jq -r '.id' <<< "${registered}")" = "${EVENT_WORKFLOW_ID}"
+          test "$(jq -r '.path' <<< "${registered}")" = "${workflow_path}"
+          test "$(jq -r '.state' <<< "${registered}")" = active
+          echo "workflow_path=${workflow_path}" >> "${GITHUB_OUTPUT}"
+
       - name: Bind later failed CI rerun to existing authority
         id: failure
-        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'CI' }}
+        if: ${{ github.event_name == 'workflow_run' && steps.route.outputs.workflow_path == '.github/workflows/ci.yml' }}
         env:
           AUTHORIZED_SOURCE_SHA: ${{ vars.CHIO_AUTHORIZED_SECURITY_SOURCE_SHA }}
           COMMITTED_EVIDENCE_SHA: ${{ vars.CHIO_COMMITTED_LINUX_EVIDENCE_SHA }}
@@ -257,7 +282,6 @@ jobs:
           })"
           test "$(jq -r '.id' <<< "${upstream}")" = "${EVENT_RUN_ID}"
           test "$(jq -r '.workflow_id' <<< "${upstream}")" = "${EVENT_WORKFLOW_ID}"
-          test "$(jq -r '.name' <<< "${upstream}")" = "CI"
           test "$(jq -r '.path' <<< "${upstream}")" = ".github/workflows/ci.yml"
           test "$(jq -r '.event' <<< "${upstream}")" = "pull_request"
           test "$(jq -r '.status' <<< "${upstream}")" = "completed"
@@ -562,7 +586,7 @@ jobs:
 
       - name: Bind failed finalizer to existing authority
         id: finalizer
-        if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name == 'Enterprise evidence finalizer' }}
+        if: ${{ github.event_name == 'workflow_run' && steps.route.outputs.workflow_path == '.github/workflows/enterprise-evidence-finalizer.yml' }}
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           EVENT_ACTION: ${{ github.event.action }}
@@ -618,18 +642,34 @@ jobs:
           upstream="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}")"
           test "$(jq -r '.id' <<< "${upstream}")" = "${EVENT_RUN_ID}"
           test "$(jq -r '.workflow_id' <<< "${upstream}")" = "${EVENT_WORKFLOW_ID}"
-          test "$(jq -r '.name' <<< "${upstream}")" = "Enterprise evidence finalizer"
           test "$(jq -r '.path' <<< "${upstream}")" = .github/workflows/enterprise-evidence-finalizer.yml
           test "$(jq -r '.event' <<< "${upstream}")" = workflow_dispatch
           test "$(jq -r '.status' <<< "${upstream}")" = completed
           test "$(jq -r '.conclusion // ""' <<< "${upstream}")" = "${EVENT_CONCLUSION}"
           test "$(jq -r '.head_branch' <<< "${upstream}")" = main
           test "$(jq -r '.actor.login' <<< "${upstream}")" = "github-actions[bot]"
-          test "$(jq -r '.triggering_actor.login' <<< "${upstream}")" = "github-actions[bot]"
           upstream_sha="$(jq -r '.head_sha' <<< "${upstream}")"
-          run_attempt="${EVENT_RUN_ATTEMPT}"
+          failed_finalizer_attempt="${EVENT_RUN_ATTEMPT}"
           [[ "${upstream_sha}" =~ ^[0-9a-f]{40}$ ]]
-          test "$(jq -r '.run_attempt' <<< "${upstream}")" = "${run_attempt}"
+          test "$(jq -r '.run_attempt' <<< "${upstream}")" = "${failed_finalizer_attempt}"
+          failed_finalizer_title="$(jq -r '.display_title' <<< "${upstream}")"
+          if test "${failed_finalizer_attempt}" -gt 1; then
+            # Only this run's immutable successful first attempt can anchor
+            # withdrawal after a later failure. A same-title sibling cannot.
+            upstream="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/1")"
+            test "$(jq -r '.id' <<< "${upstream}")" = "${EVENT_RUN_ID}"
+            test "$(jq -r '.workflow_id' <<< "${upstream}")" = "${EVENT_WORKFLOW_ID}"
+            test "$(jq -r '.path' <<< "${upstream}")" = .github/workflows/enterprise-evidence-finalizer.yml
+            test "$(jq -r '.event' <<< "${upstream}")" = workflow_dispatch
+            test "$(jq -r '.status' <<< "${upstream}")" = completed
+            test "$(jq -r '.conclusion' <<< "${upstream}")" = success
+            test "$(jq -r '.head_sha' <<< "${upstream}")" = "${upstream_sha}"
+            test "$(jq -r '.head_branch' <<< "${upstream}")" = main
+            test "$(jq -r '.actor.login' <<< "${upstream}")" = "github-actions[bot]"
+            test "$(jq -r '.display_title' <<< "${upstream}")" = "${failed_finalizer_title}"
+          fi
+          test "$(jq -r '.triggering_actor.login' <<< "${upstream}")" = "github-actions[bot]"
+          run_attempt="$(jq -r '.run_attempt' <<< "${upstream}")"
           test "${run_attempt}" = "1"
 
           finalizer_jobs="$({
@@ -648,7 +688,7 @@ jobs:
             finalizer_job="$(jq -cS '.[0]' <<< "${matching_jobs}")"
             test "$(jq -r '.run_id' <<< "${finalizer_job}")" = "${EVENT_RUN_ID}"
             test "$(jq -r '.head_sha' <<< "${finalizer_job}")" = "${upstream_sha}"
-            test "$(jq -r '.workflow_name' <<< "${finalizer_job}")" = "Enterprise evidence finalizer"
+            test "$(jq -r '.workflow_name' <<< "${finalizer_job}")" = "$(jq -r '.display_title' <<< "${upstream}")"
             test "$(jq -r '.status' <<< "${finalizer_job}")" = completed
             test "$(jq -r '.conclusion' <<< "${finalizer_job}")" = success
             [[ "$(jq -r '.started_at' <<< "${finalizer_job}")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]
@@ -662,9 +702,13 @@ jobs:
           publisher_job="$(jq -cS '.[0]' <<< "${publisher_jobs}")"
           test "$(jq -r '.run_id' <<< "${publisher_job}")" = "${EVENT_RUN_ID}"
           test "$(jq -r '.head_sha' <<< "${publisher_job}")" = "${upstream_sha}"
-          test "$(jq -r '.workflow_name' <<< "${publisher_job}")" = "Enterprise evidence finalizer"
+          test "$(jq -r '.workflow_name' <<< "${publisher_job}")" = "$(jq -r '.display_title' <<< "${upstream}")"
           test "$(jq -r '.status' <<< "${publisher_job}")" = completed
-          test "$(jq -r '.conclusion // ""' <<< "${publisher_job}")" != success
+          if test "${failed_finalizer_attempt}" -gt 1; then
+            test "$(jq -r '.conclusion' <<< "${publisher_job}")" = success
+          else
+            test "$(jq -r '.conclusion // ""' <<< "${publisher_job}")" != success
+          fi
           [[ "$(jq -r '.started_at' <<< "${publisher_job}")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]
           [[ "$(jq -r '.completed_at' <<< "${publisher_job}")" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]
 
@@ -838,6 +882,29 @@ jobs:
           if test "${relevant_count}" = 0; then
             echo "eligible=false" >> "${GITHUB_OUTPUT}"
             exit 0
+          fi
+          if test "${failed_finalizer_attempt}" -gt 1; then
+            recorded_authority="$(jq -cS --arg app_id "${SECURITY_APP_ID}" --arg details_url "${finalizer_details_url}" --arg external_id "${external_id}" '[.[] | select(.status == "completed" and .conclusion == "success" and .details_url == $details_url and (.app.id | tostring) == $app_id and .name == "Security contract" and .external_id == $external_id)][0]' <<< "${existing_checks}")"
+            test "$(jq -r '.app.slug' <<< "${recorded_authority}")" = chio-security-authority
+            test "$(jq -r '.head_sha' <<< "${recorded_authority}")" = "${merge_commit_sha}"
+            recorded_metadata="$(jq -cS '.output.text | fromjson' <<< "${recorded_authority}")"
+            recorded_identity="$(jq -cS -n --arg source "${authorized_source_sha}" --arg evidence "${evidence_sha}" --arg merge "${merge_commit_sha}" --arg pr "${pr_number}" '{authorized_source_sha: $source, evidence_sha: $evidence, merge_commit_sha: $merge, pr_number: $pr}')"
+            test "$(jq -r --argjson identity "${recorded_identity}" '.schema == "chio.security-check-authority.v2" and .identity == $identity and (.publication_binding_digest | test("^[0-9a-f]{64}$")) and (.source_ci | keys) == ["run_attempt", "run_id", "workflow_id"] and all(.source_ci[]; type == "string" and test("^[1-9][0-9]*$"))' <<< "${recorded_metadata}")" = true
+            recorded_ci_id="$(jq -r '.source_ci.run_id' <<< "${recorded_metadata}")"
+            recorded_ci_attempt="$(jq -r '.source_ci.run_attempt' <<< "${recorded_metadata}")"
+            recorded_ci_workflow="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml")"
+            test "$(jq -r '.path' <<< "${recorded_ci_workflow}")" = .github/workflows/ci.yml
+            test "$(jq -r '.id' <<< "${recorded_ci_workflow}")" = "$(jq -r '.source_ci.workflow_id' <<< "${recorded_metadata}")"
+            recorded_ci="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${recorded_ci_id}/attempts/${recorded_ci_attempt}")"
+            test "$(jq -r --argjson source_ci "$(jq -cS '.source_ci' <<< "${recorded_metadata}")" --arg evidence "${evidence_sha}" --arg repository "${GITHUB_REPOSITORY}" --arg title "CI N=${pr_number} E=${evidence_sha} B=${base_sha} M=${merge_commit_sha}" '(.id | tostring) == $source_ci.run_id and (.run_attempt | tostring) == $source_ci.run_attempt and (.workflow_id | tostring) == $source_ci.workflow_id and .path == ".github/workflows/ci.yml" and .event == "pull_request" and .head_sha == $evidence and .display_title == $title and .repository.full_name == $repository and .head_repository.full_name == $repository and .status == "completed" and .conclusion == "success"' <<< "${recorded_ci}")" = true
+            recorded_source_blob=""
+            for recorded_ref in "${authorized_source_sha}" "${evidence_sha}" "${merge_commit_sha}"; do
+              recorded_content="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/contents/.github/workflows/ci.yml?ref=${recorded_ref}")"
+              recorded_blob="$(jq -r '.sha' <<< "${recorded_content}")"
+              [[ "${recorded_blob}" =~ ^[0-9a-f]{40}$ ]]
+              if test -z "${recorded_source_blob}"; then recorded_source_blob="${recorded_blob}"; fi
+              test "${recorded_blob}" = "${recorded_source_blob}"
+            done
           fi
           {
             echo "authorized_source_sha=${authorized_source_sha}"
