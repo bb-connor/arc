@@ -67,7 +67,9 @@ The helper must be a static PIE. Unsupported or partial enforcement fails closed
 The helper applies a non-root Unix identity and `RLIMIT_NOFILE`; namespace,
 cgroup, CPU, and memory isolation require deployment controls outside this crate.
 Direct network creation is blocked; brokered access uses an authenticated,
-preconnected Unix socket. Real enforcement tests require a separately built
+preconnected Unix socket. `ioctl` is limited to TCGETS, TIOCGWINSZ, FIONREAD,
+FIONBIO and FIOCLEX, so a target cannot enumerate host interfaces through its
+stdio sockets or clear close-on-exec. Real enforcement tests require a separately built
 helper and probe fixtures; ordinary tests cover compilation and evidence shapes.
 
 ## Related

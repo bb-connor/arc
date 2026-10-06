@@ -1286,6 +1286,13 @@ fn rapid_stop_continue_then_drop_reaps_the_target() {
 }
 
 #[test]
+fn seccomp_kills_unreviewed_ioctl_requests() {
+    assert_probe_sigsys("CHIO_CAGE_TEST_IOCTL_INTERFACES");
+    assert_probe_sigsys("CHIO_CAGE_TEST_IOCTL_CLEAR_CLOEXEC");
+    assert_probe_exit("CHIO_CAGE_TEST_IOCTL_REVIEWED", 0);
+}
+
+#[test]
 fn the_target_starts_with_every_signal_at_its_default_disposition() {
     assert_probe_exit("CHIO_CAGE_TEST_SIGNAL_DEFAULTS", 0);
 }
