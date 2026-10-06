@@ -23,6 +23,9 @@ use artifact_io::{require_canonical_json, sync_directory, write_report_to_stdout
 mod discovery;
 #[path = "provision/linkage.rs"]
 mod linkage;
+#[path = "provision/private_files.rs"]
+mod private_files;
+use private_files::{restrict_private_file, validate_private_handle};
 #[path = "provision/reference_runtime.rs"]
 mod reference_runtime;
 #[path = "provision/shared_objects.rs"]
@@ -1706,14 +1709,7 @@ fn read_bounded_regular_file(
 }
 
 fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<File, CliError> {
-    let mut options = OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
-    }
-    let file = options.open(path).map_err(|error| {
+    let file = open_without_following(path).map_err(|error| {
         CliError::cli_io_error(format!(
             "failed to open {label} {}: {error}",
             path.display()
@@ -1742,23 +1738,20 @@ fn open_regular_file(path: &Path, require_private: bool, label: &str) -> Result<
     Ok(file)
 }
 
+fn open_without_following(path: &Path) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    options.open(path)
+}
+
 fn validate_private_regular_file(path: &Path, max_bytes: u64, label: &str) -> Result<(), CliError> {
     let file = open_regular_file(path, true, label)?;
-    let length = file
-        .metadata()
-        .map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to inspect {label} {}: {error}",
-                path.display()
-            ))
-        })?
-        .len();
-    if length == 0 || length > max_bytes {
-        return Err(CliError::cli_other_error(format!(
-            "{label} is empty or exceeds {max_bytes} bytes"
-        )));
-    }
-    Ok(())
+    validate_private_handle(&file, path, max_bytes, label)
 }
 
 fn write_private_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), CliError> {
@@ -1794,23 +1787,12 @@ fn write_private_file(path: &Path, bytes: &[u8], label: &str) -> Result<(), CliE
             path.display()
         ))
     })?;
-    set_private_file_permissions(path)
+    restrict_private_file(&file, path, label)
 }
 
 fn set_private_file_permissions(path: &Path) -> Result<(), CliError> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(
-            |error| {
-                CliError::cli_io_error(format!(
-                    "failed to set private permissions on {}: {error}",
-                    path.display()
-                ))
-            },
-        )?;
-    }
-    validate_private_regular_file(path, MAX_MIGRATION_DATABASE_BYTES, "provisioned artifact")
+    let file = open_regular_file(path, false, "provisioned artifact")?;
+    restrict_private_file(&file, path, "provisioned artifact")
 }
 
 fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliError> {
@@ -1818,12 +1800,12 @@ fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliErr
         let mut sidecar = database_path.as_os_str().to_os_string();
         sidecar.push(suffix);
         let sidecar = PathBuf::from(sidecar);
-        match std::fs::symlink_metadata(&sidecar) {
-            Ok(_) => set_private_file_permissions(&sidecar)?,
+        match open_without_following(&sidecar) {
+            Ok(file) => restrict_private_file(&file, &sidecar, "migration database sidecar")?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
                 return Err(CliError::cli_io_error(format!(
-                    "failed to inspect migration database sidecar {}: {error}",
+                    "failed to open migration database sidecar {}: {error}",
                     sidecar.display()
                 )))
             }
@@ -1835,15 +1817,20 @@ fn secure_existing_migration_sidecars(database_path: &Path) -> Result<(), CliErr
 fn set_private_directory_permissions(path: &Path) -> Result<(), CliError> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt as _;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).map_err(
-            |error| {
+        use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+        OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .open(path)
+            .and_then(|directory| {
+                directory.set_permissions(std::fs::Permissions::from_mode(0o700))
+            })
+            .map_err(|error| {
                 CliError::cli_io_error(format!(
                     "failed to set private directory permissions on {}: {error}",
                     path.display()
                 ))
-            },
-        )?;
+            })?;
     }
     Ok(())
 }
@@ -1860,10 +1847,10 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::MetadataExt as _;
-        if metadata.mode() & 0o777 != 0o700 {
-            return Err(tampered("demo output directory mode is not 0700"));
-        }
+        // SAFETY: geteuid takes no arguments and only reads the calling
+        // process identity.
+        let operator = unsafe { libc::geteuid() };
+        private_files::require_private_directory_metadata(&metadata, operator)?;
     }
     Ok(())
 }
@@ -1940,3 +1927,6 @@ fn tampered(message: &str) -> CliError {
 #[cfg(test)]
 #[path = "provision/document_tests.rs"]
 mod document_tests;
+#[cfg(all(test, unix))]
+#[path = "provision/private_artifact_tests.rs"]
+mod private_artifact_tests;
