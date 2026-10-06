@@ -166,6 +166,8 @@ The review's architecture judgment and recommended order are in section 9.
 
 These are specification changes and acceptance scenarios, not implemented or executed runtime tests.
 
+**Revision 4n, PR round 34 (2026-10-06, reviewed head `269cca446`).** One P1 comment corrected Part B end acknowledgement (4198496611). Spec 5 now acknowledges by the stable subscription id within the authenticated session. Transport rebasing on another GET stream or restore cannot invalidate an already observed end, and no extra token or event-id history is needed. Removal and rebasing serialize through the existing session-record owner so a stale signed candidate cannot restore an acknowledged marker. The wire schema, lifecycle predicate and acceptance cases agree, including a newly attached stream disconnecting before delivery and crash/lost-response retries.
+
 ## 1. Summary
 
 FTL and Chio share a thesis: a small trusted mediator, with everything dialect-specific running as tenant code outside it.
