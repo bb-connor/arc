@@ -229,3 +229,39 @@ pub(super) fn pending(
         .map(decode_declassification_evidence_row)
         .collect()
 }
+
+pub(super) fn retried(
+    reader: ScopedReader<'_>,
+    query: &DeclassificationRetriedEvidenceQuery,
+) -> PortResult<Vec<DeclassificationEvidenceRecord>> {
+    if query.max_records == 0 || query.max_records > MAX_DECLASSIFICATION_EVIDENCE_BATCH {
+        return Err(PortError::invalid_data());
+    }
+    let limit = i64::from(query.max_records);
+    let rows = match (
+        &query.after_tenant_id,
+        &query.after_grant_id,
+        query.after_phase,
+    ) {
+        (None, None, None) => reader.collect(
+            sql::RETRIED_FIRST,
+            params![limit],
+            declassification_evidence_row,
+        ),
+        (Some(tenant), Some(grant), Some(phase)) => reader.collect(
+            sql::RETRIED_AFTER,
+            params![
+                tenant.as_str(),
+                grant.as_str(),
+                i64::from(phase.ordinal()),
+                limit
+            ],
+            declassification_evidence_row,
+        ),
+        _ => return Err(PortError::invalid_data()),
+    }
+    .map_err(sqlite_error)?;
+    rows.into_iter()
+        .map(decode_declassification_evidence_row)
+        .collect()
+}

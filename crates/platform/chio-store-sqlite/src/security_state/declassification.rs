@@ -25,6 +25,7 @@ use super::{
     Transaction, TransactionBehavior, DECLASSIFICATION_READINESS_CURSOR, MAX_CLOCK_SKEW_MS,
     MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
+use chio_security_types::ports::DeclassificationRetriedEvidenceQuery;
 
 mod compaction;
 mod integrity;
