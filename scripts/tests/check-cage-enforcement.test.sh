@@ -326,7 +326,8 @@ if [[ "$args" == *" --all-targets "* ]] ||
       admission_with_a_missing_write_grant_creates_nothing
       a_denied_admission_leaves_no_write_grant_behind
       compile_creates_a_pending_write_grant_owned_by_the_execution_identity
-      a_failed_compile_removes_only_the_grants_it_created
+      a_failed_compile_keeps_its_created_grant_and_the_other_creators_file
+      the_next_compile_retains_a_grant_left_by_a_failed_compile
       an_unprivileged_compile_refuses_a_pending_grant_for_another_identity
     )
     print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
@@ -419,7 +420,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=101 probes=38 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=102 probes=38 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py
