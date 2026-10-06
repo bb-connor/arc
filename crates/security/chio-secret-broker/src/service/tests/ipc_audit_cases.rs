@@ -773,7 +773,8 @@ fn an_authority_outage_fails_only_its_audit_session() {
         read_privileged_audit_challenge_frame, write_privileged_audit_commit_frame,
         write_privileged_audit_open_frame, BrokerPrivilegedAuditCommitRequest,
         BrokerPrivilegedAuditEndpoint, BrokerPrivilegedAuditEndpointConfig,
-        BrokerPrivilegedAuditOpenRequest, BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA,
+        BrokerPrivilegedAuditOpenRequest, BrokerPrivilegedAuditServeOutcome,
+        BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA,
     };
 
     let fixture = fixture(1, false, false);
