@@ -378,6 +378,9 @@ impl HttpTransport {
                 code: status.as_u16(),
             });
         }
+        if accept == "text/event-stream" {
+            require_sse_content_type(response.headers())?;
+        }
         let bytes = collect_response(response, self.config.max_response_bytes).await?;
 
         Ok(HttpResponse {
@@ -385,6 +388,33 @@ impl HttpTransport {
             body: bytes,
             content_type,
         })
+    }
+}
+
+// Check the provider's declared response shape before attempting any body read.
+// Details are closed labels; neither raw headers nor response bytes enter errors.
+fn require_sse_content_type(headers: &HeaderMap) -> Result<(), HttpTransportError> {
+    let invalid = || HttpTransportError::InvalidHeader {
+        name: "content-type".into(),
+        detail: "expected text/event-stream".into(),
+        source: None,
+    };
+    let value = headers.get(CONTENT_TYPE).ok_or_else(invalid)?;
+    let text = value
+        .to_str()
+        .map_err(|error| HttpTransportError::InvalidHeader {
+            name: "content-type".into(),
+            detail: "expected text/event-stream".into(),
+            source: Some(Box::new(error)),
+        })?;
+    if text
+        .split(';')
+        .next()
+        .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("text/event-stream"))
+    {
+        Ok(())
+    } else {
+        Err(invalid())
     }
 }
 
@@ -865,7 +895,7 @@ impl ProviderHttpTransport for MockHttpTransport {
 mod tests {
     use super::*;
     use chio_test_support::prelude::*;
-    use wiremock::matchers::{body_string, header, header_exists, method, path, query_param};
+    use wiremock::matchers::{body_string, header, method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn assert_error<T, E>(result: Result<T, E>, message: &str) -> E {
@@ -1273,11 +1303,9 @@ mod tests {
         let sse = "event: ping\ndata: {\"type\":\"ping\"}\n\ndata: [DONE]\n\n";
         Mock::given(method("POST"))
             .and(path("/v1/responses"))
-            .and(header_exists("accept"))
+            .and(header("accept", "text/event-stream"))
             .respond_with(
-                ResponseTemplate::new(200)
-                    .insert_header("content-type", "text/event-stream")
-                    .set_body_string(sse),
+                ResponseTemplate::new(200).set_body_raw(sse.as_bytes(), "text/event-stream"),
             )
             .mount(&server)
             .await;
@@ -1287,7 +1315,7 @@ mod tests {
             .post_sse("/v1/responses", b"{}")
             .await
             .test_unwrap();
-        assert_eq!(String::from_utf8_lossy(&body), sse);
+        assert_eq!(body.as_slice(), sse.as_bytes());
     }
 
     #[tokio::test]
@@ -1355,3 +1383,7 @@ mod tests {
 
 #[cfg(test)]
 mod boundary_tests;
+
+#[cfg(test)]
+#[path = "http/sse_mime_tests.rs"]
+mod sse_mime_tests;
