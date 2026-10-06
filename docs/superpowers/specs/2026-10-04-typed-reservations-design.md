@@ -548,7 +548,7 @@ Rules:
 
 ### 4.10 Release exits
 
-20. No path in this design releases a hold on its own authority. `compensate_before_dispatch` releases only `compensable` entries, and only before `DispatchCommitted`. `CommitUnconfirmed` releases nothing. After an unknown terminal, the only hold release is `MutuallyAgreedUnknown` (V: `payment/journal.rs:88-96`; spec 9 M7a). `ContractualCaptureWaiver` resolves only a known return's positive pending capture in `Finalizing` (spec 9 M7b). Both are separately authorized. A post-effect refusal is not financial authority: a positive-cost refusal keeps its hold until the payment owner settles it (spec 9 M11a). Neither `fail`, `Drop`, a latch nor the flusher may construct a release. The post-execution releases inside monetary finalization are named by rule 27.
+20. No path in this design releases a hold on its own authority. `compensate_before_dispatch` releases only `compensable` entries, and only before `DispatchCommitted`. `CommitUnconfirmed` releases nothing. After an unknown terminal, the only hold release is `MutuallyAgreedUnknown` (V: `payment/journal.rs:88-96`; spec 9 M7a). `ContractualCaptureWaiver` resolves only a known return's positive pending capture in `Finalizing` (spec 9 M7b). Both are separately authorized. A post-effect refusal is not financial authority, and it never re-decides a payment the journal already records: a recorded capture, release or resolved waiver stands, an in-flight intent completes under its original identity, and only an `Open` positive hold is kept until the payment owner settles it (spec 9 M11a). Neither `fail`, `Drop`, a latch nor the flusher may construct a release. The post-execution releases inside monetary finalization are named by rule 27.
 
 ### 4.11 Safety predicates
 
@@ -588,6 +588,8 @@ waive_capture(op) -> finalizing(op) and known_outcome(op) and reversible_hold(op
                      and pending_positive_capture(op)
 zero_charge(op) -> recomputed_amount(op) = 0
                    or (contractual_delivery_denial(op) and reversible_hold(op))
+delivery_refused(op) and payment_final(op) ->
+    terminal(op) and no new settlement(op) and charge(op) = recorded_charge(op)
 work_profile_installed -> forall call: durable_admission(call) or denied(call)
 ```
 
@@ -968,6 +970,7 @@ Open decisions:
 |---|---|---|---|
 | R-9-03 (spec 3 side) | A withheld result is incorrectly sufficient authority for zero-charge settlement | Fixed with spec 9 M11a. `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. `PostEffectRejection` splits ordinary `OutputContract` from `ContractualDelivery(DeliveryDenialReason)`, which only the durable finalizer can produce. Rule 27's capture-error site no longer releases: the authorization stays open for the payment owner, with `release_outcome: not_released` and an `audit_fault` | section 2.6; section 4.5 enum and rule 13; rule 20; section 4.11 predicates; rule 27; section 9 unit test |
 | R-9-04 (spec 3 side) | The machine puts contractual capture waivers in the wrong execution phase | Fixed with spec 9 M7b. Only `MutuallyAgreedUnknown` releases an unknown hold. `ContractualCaptureWaiver` resolves a known return's positive pending capture in `Finalizing`, and the predicates state each phase separately | section 2.6; rule 20; section 4.11 predicates; revision 2 note |
+| R-9-05 (spec 3 side) | Delivery refusal strands a payment whose ordinary capture already completed | Fixed with spec 9 M11a. Rule 20 and the predicates say that a refusal never re-decides a journal that already records a capture, release or resolved waiver; such an operation terminalizes with the recorded charge. Only an `Open` positive hold waits for the payment owner | rule 20; section 4.11 predicates |
 
 ## Appendix A. FTL reference
 

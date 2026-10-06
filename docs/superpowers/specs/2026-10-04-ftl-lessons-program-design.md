@@ -87,8 +87,9 @@ The pass audited 40 defect rows: 37 confirmed, and 3 correctly reclassified as n
 - spec 4 closure joins W1's qualified issuer and its one migration (R-4-03);
 - spec 1 and spec 10 cover the P6 setup, maintenance and signed-policy surface and keep the setup gate as a participant precondition (R-1-03).
 
-**Revision 4g, independent review pass 5 (2026-10-05, head `038e2e190`).** It found 0 Blockers and raised 4 Major findings and 1 Minor, all applied through the existing owners, with no new manager or ledger:
+**Revision 4g, independent review pass 5 (2026-10-05, head `038e2e190`).** It found 0 Blockers and raised 4 Major findings and 1 Minor, plus 1 Major in its follow-up check of the fix, all applied through the existing owners, with no new manager or ledger:
 - spec 9 separates delivery from money. A refusal after the effect decides delivery only. `ContractualZeroCharge` needs a zero amount or a verified contractual delivery denial under a reversible hold, and a positive-cost ordinary refusal keeps its return and hold in `Finalizing(DeliveryRefused)` until the payment owner's own successor settles it (M11a). Specs 3, 4 and 10 follow (R-9-03);
+- the follow-up check found that this could strand a payment that had already settled. The decision now reads the journal's actual stage first: a `Final` payment is recognized at the terminal with no new settlement, an in-flight intent completes under its original identity, and only an `Open` hold is retained (R-9-05);
 - spec 9 gives each payment successor its own phase. `MutuallyAgreedUnknown` stays on the unknown terminal (M7a), and `ContractualCaptureWaiver` resolves a known return's positive pending capture in `Finalizing` (M7b) (R-9-04);
 - spec 2 extends W:'s exclusive origin claim with one bounded successor chain (section 6.10, rules O1-O8). A replacement continuation keeps the original's verified provenance, and denials without a retained native row get no remedy until a retained-denial profile exists. Spec 11 carries the prerequisite (R-2-02);
 - spec 8 keeps every incident stopper on the anchored stop chain. Bypass proofs carry the subsumed contributors, an unread entry retires only through an anchored `Reconcile` record, and resume waits for it (S19, S19a, S25a). Spec 10 adds `Reconcile` to the priority lane (R-8-03);
@@ -238,7 +239,7 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
 4. **Reservation classes.**
    - Recovery call slots, provider lookups, grant issuance, D1 seals, F1 backing and process slots are `Commitment` entries with no compensator.
    - The machine's own releases are `PreDispatchNoEffect`, `TransportNotAccepted` and `ContractualZeroCharge` (spec 9 `MachineRelease`). The drain uses only the first two.
-   - `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. A delivery refusal alone is never pricing authority: a positive-cost refused return keeps its hold until the payment owner's own successor settles it (spec 9 M11a).
+   - `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. A delivery refusal alone is never pricing authority, and it never re-decides a payment the journal already records: a settled capture, authorized release or resolved waiver stands, and an in-flight intent completes under its original identity. Only a refused return whose positive hold is still `Open` keeps it until the payment owner's own successor settles it (spec 9 M11a).
    - After an unknown outcome, only `MutuallyAgreedUnknown` releases a hold (spec 9 M7a). `ContractualCaptureWaiver` resolves only a known return's positive pending capture in `Finalizing` (spec 9 M7b).
 5. **Durability for work.** Every work profile requires durable admission.
 6. **One escape-hatch gate.** It is the Mechanism D gate, and it includes W:'s `Drop`-quarantine sites.
