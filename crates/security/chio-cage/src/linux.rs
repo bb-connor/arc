@@ -64,6 +64,8 @@ const SYS_OPENAT2: c_long = libc::SYS_openat2;
 const ENOENT: i32 = 2;
 const SOL_SOCKET: c_int = 1;
 const SO_PEERCRED: c_int = 17;
+const SO_TYPE: c_int = 3;
+const SO_DOMAIN: c_int = 39;
 
 const DIRECTORY_SCAN_BUFFER_BYTES: usize = 64 * 1024;
 const LINUX_DIRENT64_NAME_OFFSET: usize = 19;
@@ -103,6 +105,40 @@ unsafe extern "C" {
         option_value: *mut std::ffi::c_void,
         option_length: *mut c_uint,
     ) -> c_int;
+}
+
+/// The broker profile allows `sendto` and `sendmsg` with any destination. A
+/// connected datagram socket honors an explicit destination, so only stream
+/// and sequenced-packet Unix sockets can carry broker IPC.
+pub(crate) fn require_connection_oriented_unix_socket(file: &File) -> Result<(), CageError> {
+    let domain = socket_option(file, SO_DOMAIN)?;
+    let kind = socket_option(file, SO_TYPE)?;
+    if domain != libc::AF_UNIX || !matches!(kind, libc::SOCK_STREAM | libc::SOCK_SEQPACKET) {
+        return Err(CageError::InvalidBrokerDescriptor);
+    }
+    Ok(())
+}
+
+fn socket_option(file: &File, option: c_int) -> Result<c_int, CageError> {
+    let mut value: c_int = 0;
+    let mut length = u32::try_from(std::mem::size_of::<c_int>())
+        .map_err(|_| CageError::InvalidBrokerDescriptor)?;
+    // SAFETY: `file` owns a live descriptor, the output points to an
+    // initialized c_int, and the length pointer is valid for the call.
+    if unsafe {
+        getsockopt(
+            file.as_raw_fd(),
+            SOL_SOCKET,
+            option,
+            (&raw mut value).cast(),
+            &mut length,
+        )
+    } != 0
+        || usize::try_from(length).ok() != Some(std::mem::size_of::<c_int>())
+    {
+        return Err(CageError::InvalidBrokerDescriptor);
+    }
+    Ok(value)
 }
 
 pub(crate) fn broker_peer_identity(file: &File) -> Result<crate::BrokerPeerIdentity, CageError> {
@@ -1022,6 +1058,7 @@ pub(crate) fn verify_broker_ipc(broker: &BrokerIpc) -> Result<(), CageError> {
     if current != broker.identity || current.kind() != ResourceKind::UnixSocket {
         return Err(CageError::InvalidBrokerDescriptor);
     }
+    require_connection_oriented_unix_socket(&broker.file)?;
     if broker_peer_identity(&broker.file)? != broker.peer_identity {
         return Err(CageError::BrokerPeerIdentityMismatch);
     }
