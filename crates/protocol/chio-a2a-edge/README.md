@@ -34,7 +34,9 @@ fixed. Continuation preserves the task deadline and does not allocate another
 slot. Polling with approvals remains observational. Cancellation and expiry
 prevent continuation. A retry of the original stable message without `taskId`
 uses the kernel's durable outcome replay after terminal delivery.
-Validation refusals preserve pending custody. Once continuation enters execution,
+Validation and preparation refusals preserve pending custody, including a
+transient authority clock failure at its final deadline check. A private completion
+marker records whether orchestration was entered. Once continuation enters evaluation,
 an execution or result-projection error retains a failed protocol task until the
 original deadline. It cannot restore the earlier approval response. An already
 projected terminal kernel response remains intact; otherwise failed-task status

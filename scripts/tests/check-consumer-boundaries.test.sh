@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 runner="scripts/check-consumer-boundaries.sh"
 test -x "${runner}"
 bash -n "${runner}"
-test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 15
+test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 16
 grep -Fq '  support::a2a_v1::pending_approval_preserves_caller_isolation_and_text_mode_through_cancel \' "${runner}"
 grep -Fq '  support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts \' "${runner}"
 test "$(grep -c '^run_case ' "${runner}")" -eq 23
@@ -60,6 +60,7 @@ legacy = [
     "support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts",
 ]
 continuation = [
+    "support::a2a_continuation_clock::transient_deadline_clock_failure_preserves_the_original_task_for_retry",
     "support::a2a_v1::continuation_error_does_not_restore_pending_approval_after_terminal_dispatch",
     "support::a2a_v1::continuation_conceals_inaccessible_tasks_and_preserves_the_original_owner",
     "support::a2a_v1::continuation_refuses_frozen_authority_changes_without_losing_pending_custody",
@@ -71,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix="chio-continuation-inventory-") as direc
     listed, executed = Path(directory) / "list", Path(directory) / "run"
     listed.write_text("".join(f"{name}: test\n" for name in names))
     executed.write_text("".join(f"test {name} ... ok\n" for name in names)
-        + "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n")
+        + "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n")
     command = ["python3", "scripts/check-exact-cargo-test-inventory.py",
         "--label", "continuation producer", "--list-output", str(listed),
         "--run-output", str(executed)]
@@ -84,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix="chio-continuation-inventory-") as direc
             result = subprocess.run(command + mutated, capture_output=True, text=True)
             if result.returncode != 1 or "exact inventory mismatch" not in result.stderr:
                 raise SystemExit(f"continuation inventory accepted or misdiagnosed {name}: {result}")
-print("Continuation inventory rejects all five omissions and substitutions")
+print("Continuation inventory rejects all six omissions and substitutions")
 PY_CONTINUATION
 
 # The shared harness supplies behavioral missing/renamed/ignored/zero-match

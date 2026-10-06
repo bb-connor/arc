@@ -17,6 +17,8 @@ use chio_manifest::{RuntimeToolTopology, VerifiedManifestRegistry};
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 use serde_json::{json, Value};
 
+#[path = "a2a_continuation_clock.rs"]
+mod a2a_continuation_clock;
 #[path = "a2a_v1.rs"]
 mod a2a_v1;
 
@@ -192,28 +194,39 @@ impl Fixture {
     }
 
     pub fn open(&self, protocol: Protocol) -> TestResult<Consumer> {
+        self.open_with_clock(protocol, Arc::new(chio_security_types::clock::SystemClock))
+    }
+
+    pub fn open_with_clock(
+        &self,
+        protocol: Protocol,
+        clock: Arc<dyn chio_security_types::clock::Clock>,
+    ) -> TestResult<Consumer> {
         let authority = SqliteAuthorityStore::open_serving(
             self.directory.path().join("authority.db"),
             self.directory.path().join("locks"),
         )?;
-        let mut kernel = ChioKernel::new(KernelConfig {
-            keypair: self.signer.clone(),
-            ca_public_keys: vec![self.signer.public_key()],
-            max_delegation_depth: 5,
-            policy_hash: policy_hash(),
-            allow_sampling: false,
-            allow_sampling_tool_use: false,
-            allow_elicitation: false,
-            max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-            max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-            require_web3_evidence: false,
-            allow_ephemeral_receipt_log: false,
-            allow_ephemeral_revocation_store: false,
-            checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-            retention_config: None,
-            memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-            deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-        });
+        let mut kernel = ChioKernel::new_with_clock(
+            KernelConfig {
+                keypair: self.signer.clone(),
+                ca_public_keys: vec![self.signer.public_key()],
+                max_delegation_depth: 5,
+                policy_hash: policy_hash(),
+                allow_sampling: false,
+                allow_sampling_tool_use: false,
+                allow_elicitation: false,
+                max_stream_duration_secs: chio_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+                max_stream_total_bytes: chio_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+                require_web3_evidence: false,
+                allow_ephemeral_receipt_log: false,
+                allow_ephemeral_revocation_store: false,
+                checkpoint_batch_size: chio_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+                retention_config: None,
+                memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+                deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+            },
+            clock,
+        );
         let receipts = SqliteReceiptStore::open(self.directory.path().join("receipts.db"))?;
         receipts.wait_for_writer_ready(std::time::Duration::from_secs(30))?;
         kernel.set_receipt_store_handle(Arc::new(receipts))?;

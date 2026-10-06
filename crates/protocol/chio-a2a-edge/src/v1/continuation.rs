@@ -1,6 +1,7 @@
 //! Owner-authorized continuation of a frozen v1 work request.
 
 use super::*;
+use crate::task_completion::TaskCompletionAttempt;
 
 fn immutable_request_bytes(
     request: &CrossProtocolExecutionRequest,
@@ -75,6 +76,7 @@ impl ChioA2aEdge {
                 "continuation must preserve its original request authority",
             ));
         }
+        let original_request = retained.request.clone();
         let retained = self
             .tasks
             .get_mut(task_id)
@@ -84,7 +86,11 @@ impl ChioA2aEdge {
         // Explicit SendMessage resumes the accepted work. Polling never enters
         // this path. The kernel validates the new signatures against the same
         // invocation and retains all outcome, replay and settlement authority.
-        let response = self.complete_task(task_id, kernel, execution, id);
+        let (response, evaluation_attempted) =
+            match self.attempt_task_completion(task_id, kernel, execution, id) {
+                TaskCompletionAttempt::NotEvaluated(response) => (response, false),
+                TaskCompletionAttempt::Evaluated(response) => (response, true),
+            };
         let projected = self.v1_project_response(response, true);
         let successful = projected
             .as_ref()
@@ -98,6 +104,13 @@ impl ChioA2aEdge {
                 self.tasks.remove(task_id);
             }
         } else if let Some(retained) = self.tasks.get_mut(task_id) {
+            if !evaluation_attempted {
+                // Preparation made no kernel decision or dispatch. Restore the
+                // preceding request, keeping its response and original deadline.
+                // Removed expired tasks are never recreated by this branch.
+                retained.request = original_request;
+                return projected;
+            }
             // A raw error can follow a committed dispatch and signed terminal
             // cancellation. Never restore the obsolete approval response or
             // invent a kernel receipt. Keep bounded protocol failure custody;

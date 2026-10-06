@@ -93,6 +93,7 @@ use conversion::{
     extract_arguments_from_message, pending_task_metadata, task_response_from_orchestrated,
 };
 include!("edge.rs");
+mod task_completion;
 include!("jsonrpc.rs");
 mod v1;
 use v1::V1OutputMode;

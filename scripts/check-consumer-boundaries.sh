@@ -19,6 +19,7 @@ umask 022
   mcp_threshold_proposal_approval_and_restart_preserve_one_capture \
   native_aggregate_capture_survives_consumer_restart \
   native_threshold_proposal_approval_and_restart_preserve_one_capture \
+  support::a2a_continuation_clock::transient_deadline_clock_failure_preserves_the_original_task_for_retry \
   support::a2a_v1::continuation_error_does_not_restore_pending_approval_after_terminal_dispatch \
   support::a2a_v1::continuation_conceals_inaccessible_tasks_and_preserves_the_original_owner \
   support::a2a_v1::continuation_refuses_frozen_authority_changes_without_losing_pending_custody \

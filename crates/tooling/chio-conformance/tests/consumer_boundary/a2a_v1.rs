@@ -3,7 +3,11 @@
 use super::*;
 use chio_core::capability::governance::ThresholdApprovalProposal;
 
-fn call(consumer: &mut Consumer, request: &ToolCallRequest, wire: Value) -> TestResult<Value> {
+pub(super) fn call(
+    consumer: &mut Consumer,
+    request: &ToolCallRequest,
+    wire: Value,
+) -> TestResult<Value> {
     let Frontend::A2a(kernel, edge) = &mut consumer.frontend else {
         return Err("expected the A2A consumer fixture".into());
     };
@@ -25,7 +29,7 @@ fn call(consumer: &mut Consumer, request: &ToolCallRequest, wire: Value) -> Test
         .ok_or("missing A2A wire response")?)
 }
 
-fn send(request: &ToolCallRequest, mode: &str) -> Value {
+pub(super) fn send(request: &ToolCallRequest, mode: &str) -> Value {
     json!({
         "jsonrpc": "2.0", "id": "send", "method": "SendMessage",
         "params": {
@@ -39,7 +43,7 @@ fn send(request: &ToolCallRequest, mode: &str) -> Value {
     })
 }
 
-fn lookup(method: &str, id: &str) -> Value {
+pub(super) fn lookup(method: &str, id: &str) -> Value {
     json!({"jsonrpc": "2.0", "id": method, "method": method, "params": {"id": id}})
 }
 
