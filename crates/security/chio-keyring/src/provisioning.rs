@@ -13,12 +13,19 @@ const RECORD_BYTES: u64 = 65;
 /// Open a service store, provisioning it only on its first start.
 ///
 /// `build(true)` provisions a new store and `build(false)` opens the existing
-/// one. The first provisioning records the store's identity in
-/// `<file>.provisioned` beside it. A later start that finds the record but no
-/// store, or a store whose identity differs from the record, fails closed: an
-/// empty replacement would discard the decisions, pin and conflict history a
-/// witness or auditor must keep. A store provisioned before records existed
-/// adopts one when it is opened.
+/// one. `provision_allowed` is the operator's explicit authorization, and it
+/// covers exactly two cases: creating a store when neither the store nor its
+/// `<file>.provisioned` record exists, and adopting an existing store that
+/// has no record. Without it both cases fail closed. Creation and adoption
+/// write the store's identity to the record. A start that finds the record but
+/// no store, or a store whose identity differs from the record, fails closed
+/// whatever the authorization: an empty or substituted store would discard
+/// the decisions, pin and conflict history a witness or auditor must keep.
+///
+/// The record lives beside the store, so a principal able to delete both can
+/// make an authorized start provision again. Auditors pin each witness's
+/// storage identity and highest observed pin durably and refuse such a
+/// witness.
 pub fn open_or_provision_once<T>(
     database_path: &Path,
     provision_allowed: bool,
@@ -34,11 +41,18 @@ pub fn open_or_provision_once<T>(
             ));
         }
         if !provision_allowed {
-            return build(false);
+            return Err(KeyringError::StateInvariant(
+                "key-log store is missing and provisioning is not authorized",
+            ));
         }
         let store = build(true)?;
         write_record(database_path, &record_path, identity(&store))?;
         return Ok(store);
+    }
+    if recorded.is_none() && !provision_allowed {
+        return Err(KeyringError::StateInvariant(
+            "key-log store has no provisioning record and adopting it is not authorized",
+        ));
     }
     let store = build(false)?;
     match recorded {

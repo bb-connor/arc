@@ -1435,3 +1435,111 @@ fn review_namespace_verifier_reopen_refuses_retained_local_fork() {
         .test_unwrap();
     assert_eq!(retained, 1);
 }
+
+fn observed_pin(checkpoint_sequence: u64) -> chio_keyring::KeyLogPin {
+    chio_keyring::KeyLogPin {
+        checkpoint_sequence,
+        tree_size: checkpoint_sequence.checked_add(1).test_unwrap(),
+        checkpoint_hash: chio_core_types::sha256(&checkpoint_sequence.to_be_bytes()),
+        root_hash: chio_core_types::sha256(b"observed-root"),
+        signing_epoch: 0,
+    }
+}
+
+fn audit_store(fixture: &Fixture, path: &Path) -> SqlitePinnedKeyLogVerifier {
+    if path.exists() {
+        SqlitePinnedKeyLogVerifier::open(path, fixture.policy.clone(), Arc::new(FixedClock(5_000)))
+            .test_unwrap()
+    } else {
+        SqlitePinnedKeyLogVerifier::provision(
+            path,
+            fixture.policy.clone(),
+            Arc::new(FixedClock(5_000)),
+        )
+        .test_unwrap()
+    }
+}
+
+#[test]
+fn an_auditor_pins_each_witness_storage_identity_across_its_restart() {
+    let fixture = Fixture::new();
+    let directory = private_tempdir().test_unwrap();
+    let path = trusted_temp_path(&directory, "audit.sqlite");
+    let witness = WitnessId::new("witness.a").test_unwrap();
+    let original = chio_core_types::sha256(b"witness.a.original-store");
+    let replacement = chio_core_types::sha256(b"witness.a.replacement-store");
+    {
+        let auditor = audit_store(&fixture, &path);
+        auditor
+            .pin_witness_observation(&witness, original, None)
+            .test_unwrap();
+        auditor
+            .pin_witness_observation(&witness, original, Some(&observed_pin(0)))
+            .test_unwrap();
+        assert!(matches!(
+            auditor.pin_witness_observation(&witness, replacement, Some(&observed_pin(0))),
+            Err(KeyringError::WitnessIdentityChanged)
+        ));
+    }
+
+    let restarted = audit_store(&fixture, &path);
+    restarted
+        .pin_witness_observation(&witness, original, Some(&observed_pin(1)))
+        .test_unwrap();
+    assert!(matches!(
+        restarted.pin_witness_observation(&witness, replacement, Some(&observed_pin(1))),
+        Err(KeyringError::WitnessIdentityChanged)
+    ));
+    restarted
+        .pin_witness_observation(
+            &WitnessId::new("witness.b").test_unwrap(),
+            replacement,
+            None,
+        )
+        .test_unwrap();
+}
+
+#[test]
+fn an_auditor_refuses_a_witness_whose_pin_falls_behind_what_it_observed() {
+    let fixture = Fixture::new();
+    let directory = private_tempdir().test_unwrap();
+    let path = trusted_temp_path(&directory, "audit.sqlite");
+    let witness = WitnessId::new("witness.a").test_unwrap();
+    let identity = chio_core_types::sha256(b"witness.a.store");
+    {
+        let auditor = audit_store(&fixture, &path);
+        auditor
+            .pin_witness_observation(&witness, identity, Some(&observed_pin(2)))
+            .test_unwrap();
+        assert!(matches!(
+            auditor.pin_witness_observation(&witness, identity, Some(&observed_pin(1))),
+            Err(KeyringError::WitnessIdentityChanged)
+        ));
+    }
+
+    let restarted = audit_store(&fixture, &path);
+    assert!(matches!(
+        restarted.pin_witness_observation(&witness, identity, None),
+        Err(KeyringError::WitnessIdentityChanged)
+    ));
+    restarted
+        .pin_witness_observation(&witness, identity, Some(&observed_pin(2)))
+        .test_unwrap();
+    restarted
+        .pin_witness_observation(&witness, identity, Some(&observed_pin(3)))
+        .test_unwrap();
+}
+
+#[test]
+fn an_auditor_refuses_to_pin_a_witness_outside_its_policy() {
+    let fixture = Fixture::new();
+    let directory = private_tempdir().test_unwrap();
+    let auditor = audit_store(&fixture, &trusted_temp_path(&directory, "audit.sqlite"));
+    assert!(auditor
+        .pin_witness_observation(
+            &WitnessId::new("witness.unknown").test_unwrap(),
+            chio_core_types::sha256(b"unknown-store"),
+            None,
+        )
+        .is_err());
+}

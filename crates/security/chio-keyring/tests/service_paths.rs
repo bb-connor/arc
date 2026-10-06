@@ -416,3 +416,63 @@ fn a_client_refuses_an_endpoint_served_by_another_user_before_sending_its_reques
         "{result:?}"
     );
 }
+
+#[test]
+fn a_store_without_its_record_is_not_adopted_without_provisioning_authorization() {
+    let directory = support::private_tempdir().test_unwrap();
+    let database = provisioned_store(&support::trusted_temp_path(&directory, ""));
+    std::fs::remove_file(record_path(&database)).test_unwrap();
+    let opened = std::cell::Cell::new(false);
+    let result = open_or_provision_once(
+        &database,
+        false,
+        |_| {
+            opened.set(true);
+            Ok(())
+        },
+        |_: &()| identity(),
+    );
+    assert_refused_by_policy(result);
+    assert!(!opened.get());
+    assert!(!record_path(&database).exists());
+}
+
+#[test]
+fn a_store_without_its_record_is_adopted_under_provisioning_authorization() {
+    let directory = support::private_tempdir().test_unwrap();
+    let database = provisioned_store(&support::trusted_temp_path(&directory, ""));
+    std::fs::remove_file(record_path(&database)).test_unwrap();
+    open_or_provision_once(
+        &database,
+        true,
+        |provision| {
+            assert!(!provision);
+            Ok(())
+        },
+        |_: &()| identity(),
+    )
+    .test_unwrap();
+    assert_eq!(
+        std::fs::read(record_path(&database)).test_unwrap(),
+        record_bytes()
+    );
+}
+
+#[test]
+fn a_missing_store_is_not_provisioned_without_authorization() {
+    let directory = support::private_tempdir().test_unwrap();
+    let database = support::trusted_temp_path(&directory, "witness.sqlite");
+    let built = std::cell::Cell::new(false);
+    let result = open_or_provision_once(
+        &database,
+        false,
+        |_| {
+            built.set(true);
+            Ok(())
+        },
+        |_: &()| identity(),
+    );
+    assert_refused_by_policy(result);
+    assert!(!built.get());
+    assert!(!record_path(&database).exists());
+}

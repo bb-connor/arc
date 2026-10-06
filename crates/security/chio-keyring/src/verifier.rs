@@ -10,7 +10,7 @@ use crate::{
     CheckpointConflictKind, CheckpointEquivocationEvidence, CheckpointGossip, Clock, KeyId,
     KeyLogPin, KeyLogPolicy, KeyLogState, KeyLogSyncResponse, KeyRecord, KeyringArtifactSignature,
     KeyringError, Result, SignedArtifactTimeAnchor, SignedKeyActivationCommit,
-    SignedKeyLogCheckpoint, SignedKeyLogEvent, CHECKPOINT_EQUIVOCATION_SCHEMA,
+    SignedKeyLogCheckpoint, SignedKeyLogEvent, WitnessId, CHECKPOINT_EQUIVOCATION_SCHEMA,
 };
 
 const VERIFIER_SCHEMA: &str = r#"
@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS verifier_gossip (
     tree_size INTEGER NOT NULL CHECK (tree_size > 0),
     canonical_gossip BLOB NOT NULL CHECK (length(canonical_gossip) <= 1048576),
     PRIMARY KEY (checkpoint_hash, witness_id)
+);
+CREATE TABLE IF NOT EXISTS verifier_witness_identities (
+    witness_id TEXT PRIMARY KEY,
+    storage_identity TEXT NOT NULL,
+    highest_checkpoint_sequence INTEGER CHECK (highest_checkpoint_sequence >= 0)
 );
 "#;
 
@@ -109,7 +114,7 @@ impl SqlitePinnedKeyLogVerifier {
         )?;
         connection.execute_batch(VERIFIER_SCHEMA)?;
         let durable_state_exists = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM verifier_events UNION ALL SELECT 1 FROM verifier_checkpoints UNION ALL SELECT 1 FROM verifier_activation_commits UNION ALL SELECT 1 FROM verifier_pin UNION ALL SELECT 1 FROM verifier_conflicts UNION ALL SELECT 1 FROM verifier_gossip LIMIT 1)",
+            "SELECT EXISTS(SELECT 1 FROM verifier_events UNION ALL SELECT 1 FROM verifier_checkpoints UNION ALL SELECT 1 FROM verifier_activation_commits UNION ALL SELECT 1 FROM verifier_pin UNION ALL SELECT 1 FROM verifier_conflicts UNION ALL SELECT 1 FROM verifier_gossip UNION ALL SELECT 1 FROM verifier_witness_identities LIMIT 1)",
             [],
             |row| row.get::<_, i64>(0),
         )? != 0;
@@ -311,6 +316,51 @@ impl SqlitePinnedKeyLogVerifier {
         crate::gossip::scoped_conflicts(load_conflicts(&*self.connection()?)?, &self.policy)
     }
 
+    /// Pin a witness's durable storage identity the first time this verifier
+    /// observes it, and refuse a later observation under the same witness
+    /// identifier that presents another storage identity or a pin behind the
+    /// highest checkpoint this verifier saw it hold. A replaced, restored or
+    /// re-provisioned witness store has lost the decisions that keep its
+    /// signatures non-equivocating. The record is durable, so it also binds
+    /// the observations made after this verifier restarts.
+    pub fn pin_witness_observation(
+        &self,
+        witness_id: &WitnessId,
+        storage_identity: Hash,
+        pin: Option<&KeyLogPin>,
+    ) -> Result<()> {
+        if !self.policy.witness_keys.contains_key(witness_id) {
+            return Err(KeyringError::InvalidSignature);
+        }
+        let observed = pin.map(|pin| to_i64(pin.checkpoint_sequence)).transpose()?;
+        let identity = storage_identity.to_hex();
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let recorded = transaction
+            .query_row(
+                "SELECT storage_identity, highest_checkpoint_sequence FROM verifier_witness_identities WHERE witness_id = ?1",
+                params![witness_id.as_str()],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<i64>>(1)?)),
+            )
+            .optional()?;
+        let highest = match recorded {
+            None => observed,
+            Some((recorded_identity, _)) if recorded_identity != identity => {
+                return Err(KeyringError::WitnessIdentityChanged);
+            }
+            Some((_, Some(recorded))) if observed.is_none_or(|observed| observed < recorded) => {
+                return Err(KeyringError::WitnessIdentityChanged);
+            }
+            Some((_, recorded)) => recorded.max(observed),
+        };
+        transaction.execute(
+            "INSERT INTO verifier_witness_identities (witness_id, storage_identity, highest_checkpoint_sequence) VALUES (?1, ?2, ?3) ON CONFLICT (witness_id) DO UPDATE SET highest_checkpoint_sequence = excluded.highest_checkpoint_sequence",
+            params![witness_id.as_str(), identity, highest],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
     fn validate_startup(&self) -> Result<()> {
         let connection = self.connection()?;
         let events = load_events(&connection)?;
@@ -388,6 +438,16 @@ impl KeyLogAuditMonitor {
 
     pub fn gossip_observations(&self) -> Result<Vec<CheckpointGossip>> {
         self.verifier.gossip_observations()
+    }
+
+    pub fn pin_witness_observation(
+        &self,
+        witness_id: &WitnessId,
+        storage_identity: Hash,
+        pin: Option<&KeyLogPin>,
+    ) -> Result<()> {
+        self.verifier
+            .pin_witness_observation(witness_id, storage_identity, pin)
     }
 }
 

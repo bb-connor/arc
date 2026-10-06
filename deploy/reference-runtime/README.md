@@ -298,11 +298,20 @@ baseline is present, and the keylog example configs agree with the units.
    `socket_path` lives in the unit's runtime directory, which the manager
    removes on stop so a restart never meets a stale socket.
 
-   `provision: true` permits exclusive database creation on the first start.
-   Subsequent starts reopen and validate the original database, retaining its
-   witnessed history and pins. Set it to `false` after initial provisioning
-   when a missing database must fail startup. Existing corrupt or mismatched
-   stores are never replaced. Each audit config's `operator_database_path`
+   `provision: true` authorizes exactly two things: exclusive database
+   creation when neither the database nor its `<database>.provisioned` record
+   exists, and adoption of an existing database that has no record. Both write
+   the record. Subsequent starts reopen and validate the original database,
+   retaining its witnessed history and pins. A start that finds the record
+   without its database, or a database whose identity differs from the record,
+   fails whatever the setting. Set it to `false` after initial provisioning so
+   that a missing database or record also fails startup. The record sits beside
+   the database, so a principal that can write the state directory and deletes
+   both can still provision a fresh witness under the same name. Each audit
+   monitor durably pins every witness's storage identity and highest observed
+   pin, and fails closed when a witness presents a different identity or an
+   older pin, including after the monitor restarts. Existing corrupt or
+   mismatched stores are never replaced. Each audit config's `operator_database_path`
    must name the already provisioned operator database for this key-log policy;
    the audit service opens it read-only and does not create an operator store.
 

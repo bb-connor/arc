@@ -966,3 +966,236 @@ fn a_same_user_client_completes_a_witness_exchange_and_a_foreign_expectation_is_
     );
     wait_for_witness(&client, "after-foreign-expectation");
 }
+
+impl Fixture {
+    fn audit_config(&self, index: usize, operator_path: &std::path::Path) -> PathBuf {
+        let config = AuditServiceConfig {
+            schema: chio_keyring::KEY_LOG_AUDIT_SERVICE_CONFIG_SCHEMA.to_string(),
+            policy_path: self.policy_path.clone(),
+            database_path: self.path(format!("audit-{index}.sqlite")),
+            operator_database_path: operator_path.to_path_buf(),
+            socket_path: self.path(format!("audit-{index}.sock")),
+            monitor_id: format!(
+                "audit.{}",
+                char::from(b'a' + u8::try_from(index).test_unwrap())
+            ),
+            seed_file_path: self.audit_seed_path(index),
+            witness_sockets: (0..3)
+                .map(|witness| {
+                    (
+                        self.witness_ids[witness].to_string(),
+                        self.path(format!("witness-{witness}.sock")),
+                    )
+                })
+                .collect(),
+            poll_interval_millis: 20,
+            provision: true,
+        };
+        let config_path = self.path(format!("audit-{index}.json"));
+        write_private_file(&config_path, serde_json::to_vec(&config).test_unwrap()).test_unwrap();
+        config_path
+    }
+
+    fn audit_client(&self, index: usize) -> UnixKeyLogAuditClient {
+        let policy = chio_keyring::load_key_log_policy(&self.policy_path).test_unwrap();
+        UnixKeyLogAuditClient::new(
+            self.path(format!("audit-{index}.sock")),
+            format!(
+                "audit.{}",
+                char::from(b'a' + u8::try_from(index).test_unwrap())
+            ),
+            self.audit_backends[index].public_key(),
+            policy.configuration_binding().test_unwrap(),
+        )
+        .test_unwrap()
+    }
+
+    /// Writes a genesis checkpoint to a new operator store and has witnesses
+    /// 0 and 1 sign it, so an auditor can complete a full poll.
+    fn witnessed_genesis(
+        &self,
+        witness_clients: &[UnixKeyLogWitnessClient],
+    ) -> (Arc<chio_keyring::SqliteKeyLogStore>, PathBuf) {
+        let policy = chio_keyring::load_key_log_policy(&self.policy_path).test_unwrap();
+        let operator_path = self.path("operator.sqlite");
+        let store =
+            Arc::new(chio_keyring::SqliteKeyLogStore::open(&operator_path, policy).test_unwrap());
+        let issued_at = now_millis();
+        let body = KeyLogEventBody {
+            schema: KEY_LOG_EVENT_SCHEMA.to_string(),
+            log_id: LogId::new("log.independent.processes").test_unwrap(),
+            sequence: 0,
+            event_id: EventId::new("event.independent.genesis").test_unwrap(),
+            previous_event_hash: None,
+            authority_id: AuthorityId::new("authority.independent.processes").test_unwrap(),
+            key_id: derive_key_id(self.active.algorithm(), &self.active.public_key()).test_unwrap(),
+            algorithm: self.active.algorithm(),
+            public_key: self.active.public_key(),
+            operation: KeyLogOperation::Genesis,
+            effective_at: issued_at,
+            verify_until: None,
+            reason: Some(EventReason::new("independent service genesis").test_unwrap()),
+            issued_at,
+        };
+        let event = chio_keyring::SignedKeyLogEvent {
+            authorizations: KeyLogAuthorizations::bootstrap(
+                BootstrapAuthorization::sign(&body, &backend(1)).test_unwrap(),
+            ),
+            body,
+        };
+        let checkpoint = store.append_event(&event, &self.operator).test_unwrap();
+        let checkpoint_hash = checkpoint.checkpoint_hash().test_unwrap();
+        for client in witness_clients.iter().take(2) {
+            let response = store.synchronization_response(None).test_unwrap();
+            let signature =
+                chio_keyring::KeyLogWitnessClient::sign_candidate(client, &checkpoint, &response)
+                    .test_unwrap();
+            store
+                .store_witness_signature(&checkpoint_hash, &signature)
+                .test_unwrap();
+        }
+        (store, operator_path)
+    }
+}
+
+fn spawn_audit(config_path: &std::path::Path) -> Child {
+    Command::new(env!("CARGO_BIN_EXE_chio-keylog-audit"))
+        .arg("--config")
+        .arg(config_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .test_unwrap()
+}
+
+fn wait_for_audit(client: &UnixKeyLogAuditClient, nonce: &str) {
+    let started = Instant::now();
+    while client.readiness(nonce).is_err() {
+        assert!(started.elapsed() < WAIT_LIMIT, "audit did not become ready");
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn wait_for_exit(child: &mut Child, still_running: &str) -> std::process::ExitStatus {
+    let started = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait().test_unwrap() {
+            return status;
+        }
+        assert!(started.elapsed() < WAIT_LIMIT, "{still_running}");
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// Starts three witnesses, a witnessed genesis and auditor 0, and waits until
+/// the auditor has completed a full poll. Children are witnesses 0..3 then
+/// the auditor.
+fn audited_witnesses(
+    fixture: &Fixture,
+) -> (
+    Children,
+    Vec<UnixKeyLogWitnessClient>,
+    Arc<chio_keyring::SqliteKeyLogStore>,
+    PathBuf,
+) {
+    let mut children = Children(
+        (0..3)
+            .map(|index| fixture.spawn_witness(index, true))
+            .collect(),
+    );
+    let witness_clients = (0..3)
+        .map(|index| fixture.witness_client(index))
+        .collect::<Vec<_>>();
+    for (index, client) in witness_clients.iter().enumerate() {
+        wait_for_witness(client, &format!("audited-setup-{index}"));
+    }
+    let (store, operator_path) = fixture.witnessed_genesis(&witness_clients);
+    let audit_config = fixture.audit_config(0, &operator_path);
+    children.0.push(spawn_audit(&audit_config));
+    wait_for_audit(&fixture.audit_client(0), "audited-setup");
+    (children, witness_clients, store, audit_config)
+}
+
+#[test]
+fn an_auditor_refuses_a_witness_reprovisioned_under_its_name_across_a_restart() {
+    let fixture = Fixture::new();
+    let (mut children, witness_clients, _store, audit_config) = audited_witnesses(&fixture);
+    let auditor = fixture.audit_client(0);
+
+    children.0[3].kill().test_unwrap();
+    children.0[3].wait().test_unwrap();
+    children.0[3] = spawn_audit(&audit_config);
+    wait_for_audit(&auditor, "restart-keeps-pins");
+
+    children.0[0].kill().test_unwrap();
+    children.0[0].wait().test_unwrap();
+    let database = fixture.path("witness-0.sqlite");
+    for suffix in ["", "-wal", "-shm", ".provisioned"] {
+        let _ = std::fs::remove_file(format!("{}{suffix}", database.display()));
+    }
+    children.0[0] = fixture.spawn_witness(0, true);
+    let fresh = wait_for_witness(&witness_clients[0], "reprovisioned");
+    assert!(fresh.body.pin.is_none());
+
+    let status = wait_for_exit(
+        &mut children.0[3],
+        "auditor kept serving after a witness was re-provisioned under its name",
+    );
+    assert!(!status.success());
+    children.0[3] = spawn_audit(&audit_config);
+    let status = wait_for_exit(
+        &mut children.0[3],
+        "restarted auditor accepted a witness re-provisioned under its name",
+    );
+    assert!(!status.success());
+}
+
+#[test]
+fn an_auditor_refuses_a_witness_store_replaced_by_an_adopted_copy_across_a_restart() {
+    let fixture = Fixture::new();
+    let (mut children, witness_clients, _store, audit_config) = audited_witnesses(&fixture);
+    let before = wait_for_witness(&witness_clients[0], "before-copy");
+
+    children.0[0].kill().test_unwrap();
+    children.0[0].wait().test_unwrap();
+    let database = fixture.path("witness-0.sqlite");
+    let copy = fixture.path("witness-0.copy.sqlite");
+    std::fs::copy(&database, &copy).test_unwrap();
+    std::fs::rename(&copy, &database).test_unwrap();
+    std::fs::remove_file(fixture.path("witness-0.sqlite.provisioned")).test_unwrap();
+    children.0[0] = fixture.spawn_witness(0, true);
+    let adopted = wait_for_witness(&witness_clients[0], "adopted-copy");
+    assert_ne!(before.body.storage_identity, adopted.body.storage_identity);
+
+    let status = wait_for_exit(
+        &mut children.0[3],
+        "auditor kept serving after a witness store was replaced by a copy",
+    );
+    assert!(!status.success());
+    children.0[3] = spawn_audit(&audit_config);
+    let status = wait_for_exit(
+        &mut children.0[3],
+        "restarted auditor accepted a witness store replaced by a copy",
+    );
+    assert!(!status.success());
+}
+
+#[test]
+fn a_private_witness_layout_provisions_once_and_restarts_without_provisioning() {
+    let fixture = Fixture::new();
+    let mut children = Children(vec![fixture.spawn_witness(0, true)]);
+    let client = fixture.witness_client(0);
+    let first = wait_for_witness(&client, "first-start");
+    let record = fixture.path("witness-0.sqlite.provisioned");
+    let metadata = std::fs::symlink_metadata(&record).test_unwrap();
+    assert!(metadata.file_type().is_file());
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+
+    children.0[0].kill().test_unwrap();
+    children.0[0].wait().test_unwrap();
+    children.0[0] = fixture.spawn_witness(0, false);
+    let restarted = wait_for_witness(&client, "restart-without-provisioning");
+    assert_eq!(first.body.storage_identity, restarted.body.storage_identity);
+    assert_ne!(first.body.process_id, restarted.body.process_id);
+}

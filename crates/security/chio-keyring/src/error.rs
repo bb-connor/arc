@@ -45,6 +45,8 @@ pub enum KeyringError {
     InvalidWitnessActivation,
     #[error("durable checkpoint equivocation detected")]
     EquivocationDetected,
+    #[error("witness storage identity or retained pin contradicts the auditor's durable record")]
+    WitnessIdentityChanged,
     #[error("checkpoint validation failed: {0}")]
     InvalidCheckpoint(&'static str),
     #[error("numeric value is outside the supported range")]

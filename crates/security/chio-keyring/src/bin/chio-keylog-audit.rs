@@ -348,6 +348,11 @@ fn poll_once(
         if readiness.conflict_count != 0 || state.conflict_count != 0 {
             return Err(KeyringError::EquivocationDetected);
         }
+        monitor.pin_witness_observation(
+            &readiness.witness_id,
+            readiness.storage_identity,
+            state.pin.as_ref(),
+        )?;
         witness_views.insert(
             readiness.witness_id.clone(),
             WitnessServiceView {
