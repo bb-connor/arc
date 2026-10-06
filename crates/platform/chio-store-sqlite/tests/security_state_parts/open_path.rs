@@ -52,3 +52,38 @@ fn a_hard_linked_path_is_refused_before_it_is_written() {
     );
     assert_eq!(std::fs::read(&victim).unwrap_or_default().len(), 0);
 }
+
+#[test]
+fn a_new_store_is_private_to_its_owner() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let parent = directory.path().join("state");
+    let path = parent.join("security.db");
+    drop(
+        SqliteSecurityStateStore::open(&path)
+            .unwrap_or_else(|error| panic!("open security state: {error}")),
+    );
+    let mode = |path: &Path| {
+        std::fs::metadata(path)
+            .unwrap_or_else(|error| panic!("metadata: {error}"))
+            .permissions()
+            .mode()
+            & 0o777
+    };
+    assert_eq!(mode(&parent), 0o700);
+    assert_eq!(mode(&path), 0o600);
+}
+
+#[test]
+fn a_shared_writable_parent_is_refused_before_the_store_is_created() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let shared = directory.path().join("shared");
+    std::fs::create_dir(&shared).unwrap_or_else(|error| panic!("shared: {error}"));
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o777))
+        .unwrap_or_else(|error| panic!("chmod: {error}"));
+    assert!(SqliteSecurityStateStore::open(shared.join("security.db")).is_err());
+    assert!(entries(&shared).is_empty());
+}

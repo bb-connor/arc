@@ -231,6 +231,16 @@ impl SqliteSecurityStateStore {
         }
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::DirBuilderExt;
+                    fs::DirBuilder::new()
+                        .recursive(true)
+                        .mode(0o700)
+                        .create(parent)
+                        .map_err(|_| PortError::unavailable())?;
+                }
+                #[cfg(not(unix))]
                 fs::create_dir_all(parent).map_err(|_| PortError::unavailable())?;
             }
         }
@@ -463,31 +473,46 @@ fn absolute_database_path(path: &Path) -> PortResult<PathBuf> {
 }
 
 /// The absolute path with its parent resolved, so the only component left
-/// for `SQLITE_OPEN_NOFOLLOW` to check is the database file itself.
+/// for `SQLITE_OPEN_NOFOLLOW` to check is the database file itself. The
+/// parent must belong to the effective user and admit no other writer.
 #[cfg(unix)]
 fn canonical_database_path(path: &Path) -> PortResult<PathBuf> {
     let absolute = absolute_database_path(path)?;
     let file_name = absolute.file_name().ok_or_else(PortError::invalid_data)?;
     let parent = absolute.parent().ok_or_else(PortError::invalid_data)?;
     let parent = fs::canonicalize(parent).map_err(|_| PortError::unavailable())?;
+    let metadata = fs::symlink_metadata(&parent).map_err(|_| PortError::unavailable())?;
+    if !metadata.is_dir()
+        || metadata.uid() != nix::unistd::geteuid().as_raw()
+        || metadata.mode() & 0o022 != 0
+    {
+        return Err(PortError::invalid_data());
+    }
     Ok(parent.join(file_name))
 }
 
-/// Refuse an existing symlink or multiply linked file, then open without
-/// following a final-component symlink planted after that check.
+/// Create a missing database owner-only, refuse a symlink or multiply linked
+/// file, then open without following a final-component symlink planted after
+/// that check. SQLite gives its journal files the database's mode.
 #[cfg(unix)]
 fn open_unaliased_database(path: &Path) -> PortResult<Connection> {
-    match fs::symlink_metadata(path) {
-        Ok(_) => {
-            security_state_database_path_identity(path)?;
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+    use std::os::unix::fs::OpenOptionsExt;
+
+    match fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path)
+    {
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
         Err(_) => return Err(PortError::unavailable()),
     }
+    security_state_database_path_identity(path)?;
     Connection::open_with_flags(
         path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
-            | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
             | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
