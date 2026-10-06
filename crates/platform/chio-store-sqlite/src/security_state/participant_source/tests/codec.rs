@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn fingerprint_decoder_rejects_noncanonical_unbounded_and_unknown_shapes() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let _store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -70,7 +70,7 @@ fn fingerprint_decoder_rejects_noncanonical_unbounded_and_unknown_shapes() -> Te
 
 #[test]
 fn destination_labels_are_pinned_but_are_not_activation_authority() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let _store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;

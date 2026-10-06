@@ -25,7 +25,7 @@ use crate::store_connection::test_support::{
 use crate::store_connection::FenceReason;
 
 fn seeded() -> (TempDir, PathBuf, SqliteSecurityStateStore) {
-    let directory = tempfile::tempdir().expect("tempdir");
+    let directory = chio_test_support::private_tempdir().expect("private tempdir");
     let path = directory.path().join("security.db");
     let store = seed(&path).expect("seed the security state");
     (directory, path, store)

@@ -515,7 +515,7 @@ fn last_unit_race_allows_exactly_one_invocation() {
                 store
                     .consume_session_invocation(&SessionThrottleConsumeRequest {
                         key: key(),
-                        invocation_id: record(&format!("invocation-race-{index}")),
+                        invocation_id: record(format!("invocation-race-{index}")),
                         observed_at_unix_ms: 120_001,
                     })
                     .unwrap_or_else(|error| panic!("race consume: {error}"))

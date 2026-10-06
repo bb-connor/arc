@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn opening_refuses_missing_uri_memory_symlink_hardlink_and_replaced_paths() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     assert!(SqliteSecurityParticipantSource::open(&path).is_err());
     assert!(!path.exists());
@@ -28,7 +28,7 @@ fn opening_refuses_missing_uri_memory_symlink_hardlink_and_replaced_paths() -> T
 
 #[test]
 fn open_handle_rejects_a_path_replaced_with_another_real_sqlite_file() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -46,7 +46,7 @@ fn open_handle_rejects_a_path_replaced_with_another_real_sqlite_file() -> TestRe
 
 #[test]
 fn a_byte_copy_cannot_recreate_the_original_physical_source_seal() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -74,7 +74,7 @@ fn unqualified_source_open_never_normalizes_catalog_or_version_evidence() -> Tes
         "DELETE FROM security_declassification_lifecycle",
         "UPDATE security_declassification_lifecycle SET compaction_active = 1",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         drop(seed(&path)?);
         let legacy = Connection::open(&path)?;
@@ -99,7 +99,7 @@ fn oversized_row_count_cell_and_invalid_flow_labels_fail_closed() -> TestResult 
         "INSERT INTO security_flow_sequences VALUES ('real-number', 1.5)",
         "INSERT INTO security_flow_sequences VALUES (CAST(x'ff' AS TEXT), 1)",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let _store = seed(&path)?;
         let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -114,7 +114,7 @@ fn oversized_row_count_cell_and_invalid_flow_labels_fail_closed() -> TestResult 
 
 #[test]
 fn source_requires_wal_and_rechecks_full_synchronous_at_each_observation() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     drop(seed(&path)?);
     let legacy = Connection::open(&path)?;
