@@ -27,6 +27,14 @@ Kernel denials retain their signed result; protocol and transport errors throw
 `WorkerError` with a `code`. A timeout may follow a committed effect. Retry the
 original key and identical arguments. The client never retries automatically.
 
+For a model query or any call whose unknown outcome must never be
+regenerated, pass `{ knownOutcomeOnly: true }` to `invoke`. Chio can dispatch
+it once and replay a completed outcome, but never redispatches an unknown one,
+even for a tool its server declares read-only. Keep the option unchanged
+across retries of the same key. `prepareInvocation` retains a host-prepared
+envelope without dispatching an effect. The Python package's
+`BrokerProcessClient` has no Node equivalent yet.
+
 Preserve `receipt_json` unchanged for a Chio verifier. The client returns
 receipts without verifying their signatures. Revision strings remain strings;
 application integers outside JavaScript's safe range must use strings too.

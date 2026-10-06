@@ -32,11 +32,15 @@ export interface ToolResult {
 export interface InvokeOptions {
   /** Untrusted governed intent, validated by the kernel. Preserve on retries. */
   governedIntent?: { [key: string]: Json };
+  /** Never redispatch an unknown outcome, even for a tool declared read-only.
+   * Stored with the operation key: changing it on retry returns `conflict`. */
+  knownOutcomeOnly?: boolean;
 }
 export class ProcessClient {
   constructor(socketPath: string, credential: string, options?: { timeoutMs?: number });
   inspect(): Promise<ProcessSnapshot>;
   invoke(operationKey: string, serverId: string, toolName: string, args: Json, options?: InvokeOptions): Promise<ToolResult>;
+  prepareInvocation(operationKey: string, serverId: string, toolName: string, args: Json): Promise<Json>;
   checkpoint(expectedRevision: string, value: Json): Promise<Checkpoint>;
   putBlob(value: Uint8Array): Promise<StateBlobRef>;
   readBlob(sha256: string): Promise<Uint8Array>;
