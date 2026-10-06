@@ -1450,8 +1450,9 @@ fn build_landlock_plan(
             FdPurpose::WriteGrant { .. } => Some(FilesystemGrantAccess::WriteExactFile),
             // A retained runtime file with executable mode may be the ELF
             // interpreter selected by PT_INTERP. Landlock must authorize the
-            // kernel's interpreter transition, while seccomp still prevents
-            // every target-side exec except the retained target FD.
+            // kernel's interpreter transition; the lifetime tracer kills any
+            // exec after the target's own, so the grant cannot start a
+            // second image.
             FdPurpose::RuntimeFile { .. } if entry.identity.mode() & 0o111 != 0 => {
                 Some(FilesystemGrantAccess::ExecuteRead)
             }

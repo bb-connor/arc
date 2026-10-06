@@ -265,19 +265,64 @@ fn prepare_bound(
     })
 }
 
+/// Launch on a dedicated supervisor thread. That thread spawns and seizes the
+/// helper, so it is the tracer and the thread the helper's parent-death signal
+/// is bound to; it stays alive and traces the target until the target exits.
 pub(super) fn launch_prepared(
     prepared: PreparedLaunchContract,
     options: CageLaunchOptions,
 ) -> Result<EnforcedChild, CageLaunchError> {
     let receipt_bindings = CageReceiptBindings::from_compiled(&prepared.compiled);
-    launch_bound(prepared, options)
-        .map_err(|error| error.with_receipt_bindings_if_missing(receipt_bindings))
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let supervisor = std::thread::Builder::new()
+        .name("chio-cage-supervisor".to_string())
+        .spawn(move || match launch_bound(prepared, options) {
+            Ok((child, traced)) => {
+                if sender.send(Ok(child)).is_ok() {
+                    supervise_traced_target(&traced);
+                }
+            }
+            Err(error) => {
+                let _ = sender.send(Err(error));
+            }
+        })
+        .map_err(|_| {
+            CageLaunchError::bootstrap_failed(
+                CageEnforcementFailureCode::TraceHandshakeFailed,
+                "supervisor_start",
+            )
+            .with_receipt_bindings_if_missing(receipt_bindings.clone())
+        })?;
+    match receiver.recv() {
+        Ok(Ok(mut child)) => {
+            child.attach_supervisor(supervisor);
+            Ok(child)
+        }
+        Ok(Err(error)) => {
+            let _ = supervisor.join();
+            Err(error.with_receipt_bindings_if_missing(receipt_bindings))
+        }
+        Err(_) => {
+            let _ = supervisor.join();
+            Err(CageLaunchError::bootstrap_failed(
+                CageEnforcementFailureCode::TraceHandshakeFailed,
+                "supervisor_launch",
+            )
+            .with_receipt_bindings_if_missing(receipt_bindings))
+        }
+    }
+}
+
+/// The traced target the supervisor keeps after a verified launch.
+struct TracedTarget {
+    process_id: u32,
+    pidfd: Arc<OwnedFd>,
 }
 
 fn launch_bound(
     prepared: PreparedLaunchContract,
     options: CageLaunchOptions,
-) -> Result<EnforcedChild, CageLaunchError> {
+) -> Result<(EnforcedChild, TracedTarget), CageLaunchError> {
     let PreparedLaunchContract {
         mut compiled,
         envelope,
@@ -369,6 +414,7 @@ fn launch_bound(
         "helper_live_identity",
     )?;
     validate_helper_pidfd(&pidfd, process_id)?;
+    ptrace_seize(process_id)?;
 
     let mut descriptors = Vec::with_capacity(compiled.plan().fd_table.len() + 1);
     descriptors.push(plan_memfd.as_raw_fd());
@@ -383,8 +429,7 @@ fn launch_bound(
     send_descriptors(parent_control.as_raw_fd(), &descriptors)?;
 
     wait_for_initial_trace_stop(cleanup.child_mut()?, parent_control.as_raw_fd(), deadline)?;
-    ptrace_set_options(process_id)?;
-    ptrace_continue(process_id)?;
+    ptrace_resume(process_id, 0, "trace_continue")?;
 
     let expected_filter = compile_seccomp_filter(&compiled.plan().seccomp)?;
     let expected_filter_digest = filter_digest(&expected_filter)?;
@@ -538,15 +583,148 @@ fn launch_bound(
         )
     })?;
     let stdio = EnforcedStdio::new(stdin, stdout, stderr);
-    ptrace_detach(process_id)?;
+    ptrace_resume(process_id, 0, "exec_continue")?;
     let (child, pidfd, custody_permit) = cleanup.disarm()?;
-    Ok(enforced_child(
-        child,
-        pidfd,
-        custody_permit,
-        evidence,
-        stdio,
+    let traced = TracedTarget {
+        process_id,
+        pidfd: Arc::clone(&pidfd),
+    };
+    Ok((
+        enforced_child(child, pidfd, custody_permit, evidence, stdio),
+        traced,
     ))
+}
+
+enum TraceEvent {
+    Stopped(i32),
+    Exited,
+    Gone,
+    WaitFailed,
+}
+
+const SUPERVISOR_KILL_SETTLE: Duration = Duration::from_secs(5);
+
+/// Trace the target until it exits. The launch already consumed and verified
+/// the one permitted exec, so a later exec event is killed at the stop,
+/// before the new image runs an instruction. A signal-delivery stop resumes
+/// with exactly its signal. A group stop is held with `PTRACE_LISTEN`, so
+/// SIGSTOP and SIGCONT keep their ordinary meaning, and the
+/// `PTRACE_EVENT_STOP` that follows SIGCONT resumes with no signal. Any other
+/// event, or a failed ptrace request, is resolved by killing the target
+/// through its pidfd; the exit is then observed, never assumed. Every wait
+/// uses `WNOWAIT`, so reaping stays with the child handle.
+fn supervise_traced_target(traced: &TracedTarget) {
+    let mut killed_at: Option<Instant> = None;
+    loop {
+        let status = match next_trace_event(&traced.pidfd) {
+            TraceEvent::Stopped(status) => status,
+            TraceEvent::Exited | TraceEvent::Gone => return,
+            TraceEvent::WaitFailed => {
+                let _ = kill_pidfd(&traced.pidfd);
+                return;
+            }
+        };
+        if let Some(killed) = killed_at {
+            // A stop can still be reported while SIGKILL takes effect.
+            if killed.elapsed() > SUPERVISOR_KILL_SETTLE {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+            continue;
+        }
+        let event = (status >> 8) & 0xff;
+        let signal = status & 0x7f;
+        let handled = match event {
+            0 => ptrace_resume(traced.process_id, signal, "signal_continue"),
+            libc::PTRACE_EVENT_STOP if is_job_control_stop(signal) => {
+                ptrace_listen(traced.process_id)
+            }
+            libc::PTRACE_EVENT_STOP => ptrace_resume(traced.process_id, 0, "event_stop_continue"),
+            _ => Err(CageLaunchError::bootstrap_failed(
+                CageEnforcementFailureCode::ExecEventMissing,
+                "unexpected_trace_event",
+            )),
+        };
+        if handled.is_err() {
+            if kill_pidfd(&traced.pidfd).is_err() {
+                return;
+            }
+            killed_at = Some(Instant::now());
+        }
+    }
+}
+
+const fn is_job_control_stop(signal: i32) -> bool {
+    matches!(
+        signal,
+        libc::SIGSTOP | libc::SIGTSTP | libc::SIGTTIN | libc::SIGTTOU
+    )
+}
+
+fn next_trace_event(pidfd: &OwnedFd) -> TraceEvent {
+    let Ok(id) = libc::id_t::try_from(pidfd.as_raw_fd()) else {
+        return TraceEvent::WaitFailed;
+    };
+    loop {
+        // SAFETY: siginfo_t is a plain kernel output structure.
+        let mut information = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
+        // SAFETY: information is writable and id names the retained pidfd.
+        // WNOWAIT leaves every stop and exit for its owner.
+        let result = unsafe {
+            libc::waitid(
+                libc::P_PIDFD,
+                id,
+                &mut information,
+                libc::WEXITED | libc::WSTOPPED | libc::WNOWAIT | libc::__WALL,
+            )
+        };
+        if result == 0 {
+            return match information.si_code {
+                libc::CLD_TRAPPED | libc::CLD_STOPPED => {
+                    // SAFETY: si_status is set for the CLD_* codes waitid
+                    // reports. A ptrace stop reports `(event << 8) | signal`.
+                    let status = unsafe { information.si_status() };
+                    TraceEvent::Stopped(status)
+                }
+                libc::CLD_EXITED | libc::CLD_KILLED | libc::CLD_DUMPED => TraceEvent::Exited,
+                _ => TraceEvent::WaitFailed,
+            };
+        }
+        let error = io::Error::last_os_error();
+        if error.kind() == io::ErrorKind::Interrupted {
+            continue;
+        }
+        if error.raw_os_error() == Some(libc::ECHILD) {
+            return TraceEvent::Gone;
+        }
+        return TraceEvent::WaitFailed;
+    }
+}
+
+fn ptrace_listen(process_id: u32) -> Result<(), CageLaunchError> {
+    let pid = i32::try_from(process_id).map_err(|_| {
+        CageLaunchError::bootstrap_failed(
+            CageEnforcementFailureCode::TraceHandshakeFailed,
+            "process_id",
+        )
+    })?;
+    // SAFETY: the seized target is in a group stop of this tracer; LISTEN
+    // takes no address or data.
+    if unsafe {
+        libc::ptrace(
+            libc::PTRACE_LISTEN,
+            pid,
+            std::ptr::null_mut::<libc::c_void>(),
+            std::ptr::null_mut::<libc::c_void>(),
+        )
+    } != 0
+    {
+        return Err(CageLaunchError::bootstrap_failed(
+            CageEnforcementFailureCode::TraceHandshakeFailed,
+            "group_stop_listen",
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn exit_evidence(
@@ -615,13 +793,22 @@ fn waitid_pidfd(pidfd: &OwnedFd, nonblocking: bool) -> Result<PidfdReap, CageLau
             "pidfd_wait_id",
         )
     })?;
+    // While its supervisor traces the target, any thread of this process
+    // that waits on it also sees its ptrace stops, whatever the flags. Each
+    // wait therefore observes with WNOWAIT first: a stop belongs to the
+    // supervisor and reads as still running, and only an observed exit is
+    // then reaped, which no stop can precede.
+    let mut observed_exit = false;
     loop {
-        // SAFETY: siginfo_t is a plain kernel output structure. waitid receives
-        // an owned pidfd and WEXITED consumes only that exact child's status.
+        // SAFETY: siginfo_t is a plain kernel output structure.
         let mut information = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-        let options = libc::WEXITED | if nonblocking { libc::WNOHANG } else { 0 };
+        let options = if observed_exit {
+            libc::WEXITED | libc::WNOHANG
+        } else {
+            libc::WEXITED | libc::WNOWAIT | if nonblocking { libc::WNOHANG } else { 0 }
+        };
         // SAFETY: information is writable, id names the owned pidfd, and the
-        // options request only terminal child state.
+        // options request terminal child state for that exact child.
         let result = unsafe { libc::waitid(libc::P_PIDFD, id, &mut information, options) };
         if result != 0 {
             let error = io::Error::last_os_error();
@@ -640,9 +827,23 @@ fn waitid_pidfd(pidfd: &OwnedFd, nonblocking: bool) -> Result<PidfdReap, CageLau
         // is Linux's WNOHANG indication that the exact child is still live.
         let observed_pid = unsafe { information.si_pid() };
         if observed_pid == 0 {
+            if nonblocking || observed_exit {
+                return Ok(PidfdReap::Running);
+            }
+            continue;
+        }
+        if matches!(
+            information.si_code,
+            libc::CLD_TRAPPED | libc::CLD_STOPPED | libc::CLD_CONTINUED
+        ) {
             if nonblocking {
                 return Ok(PidfdReap::Running);
             }
+            std::thread::sleep(Duration::from_millis(5));
+            continue;
+        }
+        if !observed_exit {
+            observed_exit = true;
             continue;
         }
         // SAFETY: si_status is initialized for the CLD_* codes returned by
@@ -1247,7 +1448,11 @@ fn wait_for_initial_trace_stop(
             ));
         }
         if waited > 0 {
-            if libc::WIFSTOPPED(status) && libc::WSTOPSIG(status) == libc::SIGSTOP {
+            if libc::WIFSTOPPED(status)
+                && libc::WSTOPSIG(status) == libc::SIGSTOP
+                && (status >> 16) == 0
+                && is_bootstrap_stop(pid)
+            {
                 return Ok(());
             }
             return Err(CageLaunchError::bootstrap_failed(
@@ -1263,55 +1468,77 @@ fn wait_for_initial_trace_stop(
     ))
 }
 
-fn ptrace_set_options(process_id: u32) -> Result<(), CageLaunchError> {
+fn ptrace_seize(process_id: u32) -> Result<(), CageLaunchError> {
     let pid = i32::try_from(process_id).map_err(|_| {
         CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::TraceHandshakeFailed,
             "process_id",
         )
     })?;
-    // SAFETY: the child is stopped under PTRACE_TRACEME and the options value
-    // contains only TRACEEXEC and EXITKILL.
-    if unsafe { libc::ptrace(libc::PTRACE_SETOPTIONS, pid, 0, PTRACE_OPTIONS) } != 0 {
+    // SAFETY: pid names the verified helper, which is blocked waiting for its
+    // descriptors; the options value contains only TRACEEXEC and EXITKILL.
+    if unsafe {
+        libc::ptrace(
+            libc::PTRACE_SEIZE,
+            pid,
+            std::ptr::null_mut::<libc::c_void>(),
+            PTRACE_OPTIONS,
+        )
+    } != 0
+    {
         return Err(CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::TraceHandshakeFailed,
-            "trace_options",
+            "trace_seize",
         ));
     }
     Ok(())
 }
 
-fn ptrace_continue(process_id: u32) -> Result<(), CageLaunchError> {
-    let pid = i32::try_from(process_id).map_err(|_| {
-        CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::TraceHandshakeFailed,
-            "process_id",
+/// The handshake stop is the helper's own `raise(SIGSTOP)`: a SIGSTOP the
+/// helper sent itself with tgkill.
+fn is_bootstrap_stop(pid: i32) -> bool {
+    // SAFETY: siginfo_t is a plain kernel output structure.
+    let mut information = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
+    // SAFETY: this thread is the seized helper's tracer and information is a
+    // writable siginfo_t.
+    let result = unsafe {
+        libc::ptrace(
+            libc::PTRACE_GETSIGINFO,
+            pid,
+            std::ptr::null_mut::<libc::c_void>(),
+            std::ptr::from_mut(&mut information),
         )
-    })?;
-    // SAFETY: the child is stopped under ptrace and signal zero resumes it
-    // without injecting an application-visible signal.
-    if unsafe { libc::ptrace(libc::PTRACE_CONT, pid, 0, 0) } != 0 {
-        return Err(CageLaunchError::bootstrap_failed(
-            CageEnforcementFailureCode::TraceHandshakeFailed,
-            "trace_continue",
-        ));
+    };
+    if result != 0 {
+        return false;
     }
-    Ok(())
+    // SAFETY: GETSIGINFO succeeded, so the kill view of siginfo_t is set.
+    let sender = unsafe { information.si_pid() };
+    information.si_signo == libc::SIGSTOP && information.si_code == libc::SI_TKILL && sender == pid
 }
 
-fn ptrace_detach(process_id: u32) -> Result<(), CageLaunchError> {
+fn ptrace_resume(process_id: u32, signal: i32, stage: &'static str) -> Result<(), CageLaunchError> {
     let pid = i32::try_from(process_id).map_err(|_| {
         CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::TraceHandshakeFailed,
             "process_id",
         )
     })?;
-    // SAFETY: the child is stopped at PTRACE_EVENT_EXEC and signal zero
-    // resumes it without exposing the trace stop to the target.
-    if unsafe { libc::ptrace(libc::PTRACE_DETACH, pid, 0, 0) } != 0 {
+    let signal = libc::c_long::from(signal);
+    // SAFETY: the child is in a ptrace stop of this tracer; the data argument
+    // is the signal to deliver on resume, zero for none.
+    if unsafe {
+        libc::ptrace(
+            libc::PTRACE_CONT,
+            pid,
+            std::ptr::null_mut::<libc::c_void>(),
+            signal,
+        )
+    } != 0
+    {
         return Err(CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::TraceHandshakeFailed,
-            "trace_detach",
+            stage,
         ));
     }
     Ok(())
