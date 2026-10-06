@@ -9,7 +9,7 @@
 //! and [`lower_function_response`](GeminiAdapter::lower_function_response)
 //! lowers a kernel verdict back into a [`FunctionResponsePart`].
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -235,18 +235,21 @@ impl GeminiAdapter {
                 "Gemini generateContent payload did not contain functionCall parts".to_string(),
             ));
         }
+        let mut identities = CallIdentities::default();
         calls
             .iter()
-            .map(|call| self.invocation_from_function_call(call))
+            .map(|call| self.invocation_from_function_call(call, &mut identities))
             .collect()
     }
 
     pub(crate) fn invocation_from_function_call(
         &self,
         call: &FunctionCallPart,
+        identities: &mut CallIdentities,
     ) -> Result<ToolInvocation, ProviderError> {
         self.ensure_supported_api_version()?;
         validate_function_call(call)?;
+        let request_id = identities.next(call)?;
         let bridge_security = self.bridge_security_for_tool(&call.name)?;
         let arguments = canonical_json_bytes(&call.args).map_err(|error| {
             ProviderError::BadToolArgs(format!(
@@ -260,7 +263,7 @@ impl GeminiAdapter {
             arguments,
             provenance: ProvenanceStamp {
                 provider: ProviderId::Gemini,
-                request_id: format!("gemini_{}_call", call.name),
+                request_id,
                 api_version: self.config.api_version.clone(),
                 principal: Principal::GeminiProject {
                     project_id: self.config.project_id.clone(),
@@ -269,6 +272,19 @@ impl GeminiAdapter {
             },
             bridge_security,
         })
+    }
+
+    /// Lower a verdict and tool result into the response for `call`, carrying
+    /// the call's id so parallel calls to one function stay matched.
+    pub fn lower_function_call_response(
+        &self,
+        call: &FunctionCallPart,
+        verdict: VerdictResult,
+        result: ToolResult,
+    ) -> Result<FunctionResponsePart, ProviderError> {
+        let mut part = self.lower_function_response(&call.name, verdict, result)?;
+        part.id = call.id.clone();
+        Ok(part)
     }
 
     /// Lower a kernel verdict and tool result into a
@@ -327,8 +343,43 @@ pub enum GeminiAdapterError {
     },
 }
 
+/// Request identities for one response's function calls: the provider call id
+/// when present, otherwise the function name with its position among
+/// same-name calls. A repeated identity fails closed.
+#[derive(Default)]
+pub(crate) struct CallIdentities {
+    issued: BTreeSet<String>,
+    same_name_calls: BTreeMap<String, usize>,
+}
+
+impl CallIdentities {
+    fn next(&mut self, call: &FunctionCallPart) -> Result<String, ProviderError> {
+        let request_id = match &call.id {
+            Some(id) => id.clone(),
+            None => {
+                let position = self.same_name_calls.entry(call.name.clone()).or_default();
+                *position = position.saturating_add(1);
+                if *position == 1 {
+                    format!("gemini_{}_call", call.name)
+                } else {
+                    format!("gemini_{}_call_{position}", call.name)
+                }
+            }
+        };
+        if !self.issued.insert(request_id.clone()) {
+            return Err(ProviderError::Malformed(format!(
+                "Gemini functionCall id `{request_id}` repeats within one response"
+            )));
+        }
+        Ok(request_id)
+    }
+}
+
 fn validate_function_call(call: &FunctionCallPart) -> Result<(), ProviderError> {
     non_empty_str(&call.name, "functionCall name")?;
+    if let Some(id) = &call.id {
+        non_empty_str(id, "functionCall id")?;
+    }
     if !call.args.is_object() {
         return Err(ProviderError::BadToolArgs(format!(
             "Gemini functionCall `{}` args were not a JSON object",
@@ -801,7 +852,7 @@ mod tests {
         let call = FunctionCallPart::new("get_weather", json!({"city": "Paris"}));
 
         let err = adapter
-            .invocation_from_function_call(&call)
+            .invocation_from_function_call(&call, &mut CallIdentities::default())
             .expect_err("drifted Gemini API version must fail before provenance stamping");
 
         assert_api_version_drift(err);
@@ -921,6 +972,54 @@ mod tests {
         assert!(err
             .to_string()
             .contains("functionCall name must not contain surrounding whitespace"));
+    }
+
+    #[test]
+    fn parallel_calls_to_one_function_get_distinct_request_ids() {
+        let adapter = GeminiAdapter::new(config(), Arc::new(transport::MockTransport::new()));
+        let payload = json!({"candidates": [{"content": {"parts": [
+            {"functionCall": {"name": "get_weather", "args": {"city": "Paris"}}},
+            {"functionCall": {"name": "get_weather", "args": {"city": "Rome"}}},
+            {"functionCall": {"id": "call-7", "name": "get_time", "args": {}}}
+        ]}}]});
+        let request_ids: Vec<String> = adapter
+            .lift_batch(raw_payload(payload))
+            .unwrap()
+            .into_iter()
+            .map(|invocation| invocation.provenance.request_id)
+            .collect();
+        assert_eq!(
+            request_ids,
+            [
+                "gemini_get_weather_call",
+                "gemini_get_weather_call_2",
+                "call-7"
+            ]
+        );
+    }
+
+    #[test]
+    fn duplicate_provider_call_ids_are_rejected() {
+        let adapter = GeminiAdapter::new(config(), Arc::new(transport::MockTransport::new()));
+        let payload = json!({"candidates": [{"content": {"parts": [
+            {"functionCall": {"id": "call-1", "name": "get_weather", "args": {}}},
+            {"functionCall": {"id": "call-1", "name": "get_time", "args": {}}}
+        ]}}]});
+        let error = adapter
+            .lift_batch(raw_payload(payload))
+            .expect_err("a repeated call id must fail closed");
+        assert!(matches!(error, ProviderError::Malformed(_)));
+    }
+
+    #[test]
+    fn a_function_response_echoes_its_call_id() {
+        let adapter = GeminiAdapter::new(config(), Arc::new(transport::MockTransport::new()));
+        let call = FunctionCallPart::new("get_weather", json!({})).with_id("call-7");
+        let part = adapter
+            .lower_function_call_response(&call, allow_verdict(), ToolResult(b"{}".to_vec()))
+            .unwrap();
+        assert_eq!(part.id.as_deref(), Some("call-7"));
+        assert_eq!(serde_json::to_value(&part).unwrap()["id"], "call-7");
     }
 
     #[test]
