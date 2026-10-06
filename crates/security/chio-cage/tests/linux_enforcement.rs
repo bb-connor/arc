@@ -243,6 +243,7 @@ fn compiled_with_profile_argv(
 fn execution_identity() -> ExecutionIdentity {
     // SAFETY: the credential accessors have no pointer arguments.
     let uid = unsafe { libc::geteuid() };
+    // SAFETY: the credential accessors have no pointer arguments.
     let gid = unsafe { libc::getegid() };
     if uid == 0 {
         return ExecutionIdentity::new(10001, 10001, Vec::new()).test_unwrap();
@@ -253,10 +254,8 @@ fn execution_identity() -> ExecutionIdentity {
     let mut groups = vec![0; usize::try_from(group_count).test_unwrap()];
     if group_count > 0 {
         // SAFETY: groups has exactly group_count writable gid_t elements.
-        assert_eq!(
-            unsafe { libc::getgroups(group_count, groups.as_mut_ptr()) },
-            group_count
-        );
+        let filled = unsafe { libc::getgroups(group_count, groups.as_mut_ptr()) };
+        assert_eq!(filled, group_count);
     }
     ExecutionIdentity::from_observed_credentials(uid, gid, groups).test_unwrap()
 }
@@ -268,16 +267,14 @@ fn prepare_write_owner(path: &Path, execution_identity: &ExecutionIdentity) {
     }
     let path = std::ffi::CString::new(path.as_os_str().as_bytes()).test_unwrap();
     // SAFETY: path is NUL terminated and both IDs are validated non-root IDs.
-    assert_eq!(
-        unsafe {
-            libc::chown(
-                path.as_ptr(),
-                execution_identity.uid(),
-                execution_identity.gid(),
-            )
-        },
-        0
-    );
+    let changed = unsafe {
+        libc::chown(
+            path.as_ptr(),
+            execution_identity.uid(),
+            execution_identity.gid(),
+        )
+    };
+    assert_eq!(changed, 0);
 }
 
 struct TestTree(PathBuf);
@@ -933,10 +930,10 @@ fn pidfd_forwards_an_allowed_termination_signal() {
     assert!(elapsed < Duration::from_secs(10));
     assert!(!Path::new(&format!("/proc/{process_id}")).exists());
 
-    // Linux binds the parent-death signal to the thread that created the
-    // target. Moving its handle to a surviving thread must not detach that
-    // lifetime requirement. No explicit signal or handle drop ends this target.
-    let mut child = std::thread::spawn(|| {
+    // The tracer and the parent-death signal belong to the target's own
+    // supervisor thread, so the target outlives the thread that called
+    // launch and ends with its handle.
+    let child = std::thread::spawn(|| {
         launch(
             compiled(&required_path("CHIO_CAGE_TEST_WAIT")),
             CageLaunchOptions::default(),
@@ -946,21 +943,14 @@ fn pidfd_forwards_an_allowed_termination_signal() {
     .join()
     .test_unwrap();
     let process_id = child.process_id();
-    let deadline = Instant::now() + Duration::from_secs(5);
-    let record = loop {
-        if let Some(record) = child.try_wait().test_unwrap() {
-            break record;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "target survived its launch thread"
-        );
-        std::thread::sleep(Duration::from_millis(10));
-    };
-    assert_eq!(
-        record.exit.as_ref().and_then(|exit| exit.signal),
-        Some(libc::SIGKILL)
+    std::thread::sleep(Duration::from_millis(200));
+    assert!(
+        Path::new(&format!("/proc/{process_id}")).exists(),
+        "target ended with the thread that launched it"
     );
+    let started = Instant::now();
+    drop(child);
+    assert!(started.elapsed() < Duration::from_secs(10));
     assert!(!Path::new(&format!("/proc/{process_id}")).exists());
 }
 
@@ -1127,6 +1117,81 @@ fn assert_second_exec_is_killed(probe: &str, runtime_files: BTreeSet<PathBuf>) {
         Some(libc::SIGKILL),
         "{probe}: a second exec must kill the target before the new image runs"
     );
+}
+
+fn process_state(process_id: u32) -> Option<char> {
+    let stat = std::fs::read_to_string(format!("/proc/{process_id}/stat")).ok()?;
+    stat.rsplit_once(')')?.1.trim_start().chars().next()
+}
+
+fn wait_for_state(process_id: u32, accepted: &[char], timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if process_state(process_id).is_some_and(|state| accepted.contains(&state)) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    false
+}
+
+fn send_signal(process_id: u32, signal: i32) -> i32 {
+    let pid = libc::pid_t::try_from(process_id).test_unwrap();
+    // SAFETY: kill takes no pointers and pid names this test's unreaped target.
+    unsafe { libc::kill(pid, signal) }
+}
+
+#[test]
+fn a_stopped_target_stays_stopped_until_it_is_continued() {
+    let child = launch(
+        compiled(&required_path("CHIO_CAGE_TEST_WAIT")),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap();
+    let process_id = child.process_id();
+    assert_eq!(send_signal(process_id, libc::SIGSTOP), 0);
+    assert!(
+        wait_for_state(process_id, &['t', 'T'], Duration::from_secs(5)),
+        "the target did not stop"
+    );
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(
+        matches!(process_state(process_id), Some('t' | 'T')),
+        "a stopped target resumed without SIGCONT"
+    );
+    assert_eq!(send_signal(process_id, libc::SIGCONT), 0);
+    assert!(
+        wait_for_state(process_id, &['R', 'S'], Duration::from_secs(5)),
+        "the target did not continue"
+    );
+    let record = child.terminate().test_unwrap();
+    assert_eq!(
+        record.exit.as_ref().and_then(|exit| exit.signal),
+        Some(libc::SIGTERM)
+    );
+}
+
+#[test]
+fn racing_stops_continues_and_a_kill_end_with_an_observed_exit() {
+    let child = launch(
+        compiled(&required_path("CHIO_CAGE_TEST_WAIT")),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap();
+    let process_id = child.process_id();
+    for _ in 0..200 {
+        assert_eq!(send_signal(process_id, libc::SIGSTOP), 0);
+        assert_eq!(send_signal(process_id, libc::SIGCONT), 0);
+    }
+    assert_eq!(send_signal(process_id, libc::SIGKILL), 0);
+    let started = Instant::now();
+    let record = child.wait().test_unwrap();
+    assert!(started.elapsed() < Duration::from_secs(10));
+    assert_eq!(
+        record.exit.as_ref().and_then(|exit| exit.signal),
+        Some(libc::SIGKILL)
+    );
+    assert!(!Path::new(&format!("/proc/{process_id}")).exists());
 }
 
 #[test]

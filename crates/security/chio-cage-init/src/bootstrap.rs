@@ -107,16 +107,10 @@ fn child_main(control: File) -> Result<(), BootstrapFault> {
     verify_descriptor_table(&envelope, &descriptor_files)?;
     verify_helper_self(&envelope, &descriptor_files)?;
 
-    // SAFETY: PTRACE_TRACEME takes no pointers and establishes the documented
-    // parent-child trace relationship before confinement.
-    if unsafe { libc::ptrace(libc::PTRACE_TRACEME, 0, 0, 0) } != 0 {
-        return Err(BootstrapFault::new(
-            CageEnforcementFailureCode::TraceHandshakeFailed,
-            "trace_me",
-        ));
-    }
-    // SAFETY: raising SIGSTOP in this single-threaded helper creates the trace
-    // handshake stop required before any confinement state is changed.
+    // The parent seized this helper before releasing its descriptors. This
+    // stop is the handshake point it authenticates and consumes before any
+    // confinement state is changed.
+    // SAFETY: raising SIGSTOP in this single-threaded helper takes no pointers.
     if unsafe { libc::raise(libc::SIGSTOP) } != 0 {
         return Err(BootstrapFault::new(
             CageEnforcementFailureCode::TraceHandshakeFailed,
