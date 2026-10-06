@@ -246,11 +246,11 @@ remains historical.
 The `acf34b0746` campaign supplies three further reproducible source findings.
 Complete them before the next source freeze:
 
-- [ ] Remove only the four obsolete `regress` and `typify*` duplicate-baseline
+- [x] Remove only the four obsolete `regress` and `typify*` duplicate-baseline
   rows and matching Cargo Deny skips. The locked graph has no remaining split
   for these packages. Require the unchanged baseline checker and actual bans
   check to pass; add no new allowance.
-- [ ] Import `alloc::string::ToString` inside the bounded-reader test module.
+- [x] Import `alloc::string::ToString` inside the bounded-reader test module.
   The isolated `chio-security-types --no-default-features` suite reproduces the
   missing trait; run its full suite and Clippy in both portable and `std` modes.
 - [ ] Qualify nested auditing under an enforcing AppArmor profile attached only
@@ -318,6 +318,42 @@ kernel, silently block an asynchronous request, or create another scheduler.
   historical; do not rewrite their recorded protocol or execution evidence.
 - [x] Run full edge tests (116 passed, zero ignored), live conformance (three
   real HTTP scenarios) and both strict affected Clippy commands.
-- [ ] Commit the source repair. Renew all 21 native qualification commands and
+- [x] Commit the A2A source repair (`0cbb658e1f`).
+- [ ] Renew all 21 native qualification commands and
   the artifact freeze only after the hosted-failure source review is closed.
   Preserve the c510 interrupted campaign separately, with no aggregate pass.
+
+## CLI authority custody fixtures
+
+The final acf34b MSRV job fails two positive `capability_lineage` cases because
+their timestamp-named directory uses ordinary `create_dir_all` permissions.
+The authority store correctly requires the effective user's private `0700`
+database parent. Related trust-service fixtures use the same setup.
+
+- [x] Replace manual temporary directory allocation in
+  `crates/products/chio-cli/tests/capability_lineage.rs`, `trust_revocation.rs`
+  and `trust_cluster.rs` with `tempfile::TempDir` ownership. Keep each directory
+  alive until its service guards shut down; create no permissive intermediate
+  database parent. Preserve every authority, quorum, replication and receipt
+  assertion. Change no production custody check or policy.
+- [x] Run all three integration targets and strict selected-target Clippy.
+  Record default and opt-in slow cases separately; ignored cases are not passes.
+  Keep the original hosted failure and any local reproduction.
+- [ ] Commit the fixture repair before renewing the complete native source
+  package and hosted candidate. Refresh formal input inventory if needed.
+
+The private-directory repair reveals a second stale fixture contract. Actual
+cluster snapshot endpoints reject replication without an out-of-band pinned
+anchor. Provision cluster test authorities through the existing
+`initialize_replication_with_recovery`, `pin_replication_anchor` and
+`apply_signed_snapshot` APIs before starting peers. Preserve each node's
+private signing custody and retain an independent test recovery root. An
+elected follower acquires signing custody only through that explicit recovery
+API; election itself does not grant it. Reuse `chio_test_support::private_tempdir`
+instead of duplicating directory creation.
+
+Move the two snapshot integration scenarios into a private test module so
+fixture enrollment fits the existing frozen file-size cap. Preserve their
+full assertions, deadlines and actual network paths. Record the late-joiner
+replication failure, the original endpoint refusal and interrupted broader
+campaign separately. Run the complete default targets after this repair.

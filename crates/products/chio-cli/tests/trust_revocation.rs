@@ -16,14 +16,6 @@ fn unique_revocation_db_path(prefix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
 }
 
-fn unique_dir(prefix: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}"))
-}
-
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
@@ -174,8 +166,8 @@ fn trust_revoke_and_status_can_target_control_service() {
         return;
     }
 
-    let dir = unique_dir("chio-cli-trust-service");
-    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let state = chio_test_support::private_tempdir().expect("create private state directory");
+    let dir = state.path().to_path_buf();
     let receipt_db_path = dir.join("receipts.sqlite3");
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
