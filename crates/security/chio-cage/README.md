@@ -32,9 +32,15 @@ or self-asserted flow predicate cannot authorize cage compilation.
 
 Existing grants are opened once beneath a retained root descriptor. Missing
 writable files are accepted only as exact files beneath an existing retained
-parent. Admission creates them exclusively with mode 0600 and current effective
-ownership, reopens them as `O_PATH`, and compares kernel object identity.
-Writable directory grants are rejected.
+parent. Admission records them and creates nothing. Compile creates each one
+after every admission, runtime and alias check: exclusively, with mode 0600,
+through the retained parent, owned by the execution identity (an unprivileged
+runner can create files only for its own identity). It then reopens the file as
+`O_PATH` and compares kernel object identity. Compile never deletes a file: a
+pathname cannot be removed conditionally on the inode it names, so a grant
+created before a later compile failure stays as an owned empty file, and the
+next compile retains it as an existing write grant. Writable directory grants
+are rejected.
 
 Read-directory grants are closed over their existing regular-file and
 directory descendants at admission, bounded by the 64-slot read-grant limit.
