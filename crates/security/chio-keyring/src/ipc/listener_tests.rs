@@ -18,15 +18,56 @@ fn a_service_socket_directory_replaced_before_bind_is_detected() {
     std::fs::set_permissions(&run, Permissions::from_mode(0o700)).test_unwrap();
     let displaced = root.join("run.displaced");
 
-    let result = bind_private_unix_listener_with(&run.join("witness.sock"), || {
-        std::fs::rename(&run, &displaced)?;
-        std::fs::create_dir(&run)?;
-        std::fs::set_permissions(&run, Permissions::from_mode(0o700))
-    })
+    let result = bind_private_unix_listener_with(
+        &run.join("witness.sock"),
+        || Ok(()),
+        || {
+            std::fs::rename(&run, &displaced)?;
+            std::fs::create_dir(&run)?;
+            std::fs::set_permissions(&run, Permissions::from_mode(0o700))
+        },
+    )
     .map(drop);
     assert!(
         matches!(result, Err(KeyringError::StateInvariant(_))),
         "{result:?}"
+    );
+}
+
+#[test]
+fn a_socket_replaced_during_the_stale_check_is_kept() {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let directory = tempfile::Builder::new()
+        .permissions(Permissions::from_mode(0o700))
+        .tempdir()
+        .test_unwrap();
+    let root = std::fs::canonicalize(directory.path()).test_unwrap();
+    let socket = root.join("witness.sock");
+    drop(std::os::unix::net::UnixListener::bind(&socket).test_unwrap());
+    let replacement = std::cell::Cell::new(None);
+
+    let result = bind_private_unix_listener_with(
+        &socket,
+        || {
+            // Bound beside the original and renamed over it, so the replacement
+            // cannot reuse the original's inode number.
+            let beside = root.join("replacement.sock");
+            drop(std::os::unix::net::UnixListener::bind(&beside)?);
+            std::fs::rename(&beside, &socket)?;
+            replacement.set(Some(std::fs::symlink_metadata(&socket)?.ino()));
+            Ok(())
+        },
+        || Ok(()),
+    )
+    .map(drop);
+    assert!(
+        matches!(result, Err(KeyringError::StateInvariant(_))),
+        "{result:?}"
+    );
+    assert_eq!(
+        Some(std::fs::symlink_metadata(&socket).test_unwrap().ino()),
+        replacement.get()
     );
 }
 

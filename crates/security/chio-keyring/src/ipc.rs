@@ -1573,12 +1573,13 @@ impl std::ops::Deref for PrivateUnixListener {
 /// socket.
 #[cfg(unix)]
 pub fn bind_private_unix_listener(path: &Path) -> Result<PrivateUnixListener> {
-    bind_private_unix_listener_with(path, || Ok(()))
+    bind_private_unix_listener_with(path, || Ok(()), || Ok(()))
 }
 
 #[cfg(unix)]
 fn bind_private_unix_listener_with(
     path: &Path,
+    before_stale_unlink: impl FnOnce() -> std::io::Result<()>,
     before_bind: impl FnOnce() -> std::io::Result<()>,
 ) -> Result<PrivateUnixListener> {
     use std::os::unix::net::UnixListener;
@@ -1646,6 +1647,14 @@ fn bind_private_unix_listener_with(
             if live {
                 return Err(KeyringError::StateInvariant(
                     "service socket already has a live listener",
+                ));
+            }
+            before_stale_unlink()?;
+            let probed = rustix::fs::statat(&parent, socket_name, AtFlags::SYMLINK_NOFOLLOW)
+                .map_err(std::io::Error::from)?;
+            if (probed.st_dev, probed.st_ino) != (existing.st_dev, existing.st_ino) {
+                return Err(KeyringError::StateInvariant(
+                    "service socket changed during its stale check",
                 ));
             }
             rustix::fs::unlinkat(&parent, socket_name, AtFlags::empty())
