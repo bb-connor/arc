@@ -41,6 +41,14 @@ interface FixtureCase {
   instance: ProtocolPrimitive | Record<string, unknown>;
 }
 
+/** Exact wire bytes; duplicate keys do not survive a parse of the corpus. */
+interface RawFixtureCase {
+  name: string;
+  schema_file: string;
+  valid: false;
+  instance_text: string;
+}
+
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 const schemaRoot = resolve(workspaceRoot, "spec/schemas/chio-wire/v1");
 const corpus = JSON.parse(
@@ -48,9 +56,16 @@ const corpus = JSON.parse(
     resolve(workspaceRoot, "tests/bindings/fixtures/protocol-primitives-v1.json"),
     "utf8",
   ),
-) as { cases: FixtureCase[] };
+) as { cases: FixtureCase[]; raw_cases: RawFixtureCase[] };
 
-const schemaFiles = new Set(corpus.cases.map((fixture) => fixture.schema_file));
+// Raw cases this consumer accepts. Wire bytes reach the validator through
+// JSON.parse, which keeps the last of each duplicate key, and the collapsed
+// value validates. it.fails turns red once these reject.
+const lastWinsRawCases = new Set(["receipt-duplicate-id", "receipt-duplicate-parameter"]);
+
+const schemaFiles = new Set(
+  [...corpus.cases, ...corpus.raw_cases].map((fixture) => fixture.schema_file),
+);
 schemaFiles.add("capability/aggregate-budget-root.schema.json");
 schemaFiles.add("capability/cumulative-approval-root.schema.json");
 
@@ -70,4 +85,20 @@ describe("protocol primitive generated schemas", () => {
       }
     }
   });
+
+  for (const fixture of corpus.raw_cases) {
+    const schema = JSON.parse(
+      readFileSync(resolve(schemaRoot, fixture.schema_file), "utf8"),
+    ) as { $id: string };
+    const title = `raw ${fixture.name} rejects duplicate keys`;
+    const check = () => {
+      expect(fixture.valid).toBe(false);
+      expect(validateWire(schema.$id, JSON.parse(fixture.instance_text))).toBe(false);
+    };
+    if (lastWinsRawCases.has(fixture.name)) {
+      it.fails(`${title} (known gap: JSON.parse keeps the last duplicate)`, check);
+    } else {
+      it(title, check);
+    }
+  }
 });

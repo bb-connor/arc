@@ -15,6 +15,7 @@ trap 'rm -rf "${consumer_evidence}"' EXIT
 "${consumer_python}" -m pytest -q \
   sdks/python/chio-sdk-python/tests/test_generated_manifest_v2.py \
   sdks/python/chio-sdk-python/tests/test_models.py::TestGeneratedWireModels::test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip \
+  sdks/python/chio-sdk-python/tests/test_models.py::TestGeneratedWireModels::test_protocol_primitives_raw_cases_reject_duplicate_keys \
   --junitxml="${consumer_evidence}/python.xml"
 
 (
