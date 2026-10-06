@@ -112,6 +112,13 @@ The review's architecture judgment and recommended order are in section 9.
 - spec 7 rejects mismatched worker attribution or launch evidence even on an ordinary call; unavailable evidence may still yield an unverified claim, subject to the existing mandatory-claim checks (4190699733).
 
 
+**Revision 4j, PR round 30 (2026-10-06, reviewed head `f5ced410e`).** Four comments covered three issues:
+
+- spec 2 adds `RetireSuccessorReservation` to the existing recovery command protocol, under predecessor-scope `Cancel` authority. It retires an exact uncreated reservation even if its destination is gone, preserving history, scope binding and the original continuation's eligibility. Creation races and lost acknowledgements use the same claim transaction and command replay. Specs 1, 8 and 10 register its command, stop and commit classifications (4197009035, 4197054899);
+- spec 5 Part A now owns ongoing standard-subscription authorization, quiet expiry and the shared terminal-intent persistence helper (A30/A31). Live delivery, replay, resync, rotation and post-persist activation all check authority; failure ends the standard session. Part B extends those same owners with negotiated subjects and wire events (4197054908);
+- A17 persists the new generation together with all staged negotiated-subscription transitions and rebased end-event ids. H5a uses that one signed record, and emitted ids exactly match its durable markers. A failed write containing a new end takes the journaled terminal path rather than restoring a stale live entry (4197054921).
+
+
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.
 - **Spec 2 (faults)** now plugs in as a recovery planner fact. W: maps an unsatisfied capability fact to the terminal `BlockedByCapability`, and the new `Authority` remedy kind is the upcall tier for exactly that case. W: pins one capability per workflow, so a resolution runs as a linked `AuthorityContinuation` workflow. Because recovery refuses delegated control tokens, an operator-assigned actor drives it.
 - **Spec 7 (isolation)** recognizes that P5 already cage-confines a zero-authority `confined_reader` child. It adds that profile, an exporter requirement (P5 emits no receipt), and an `output_channels` surface.

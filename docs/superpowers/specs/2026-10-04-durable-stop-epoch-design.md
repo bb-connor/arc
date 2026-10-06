@@ -479,7 +479,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | Entry point | Disposition | Rationale |
 |---|---|---|
 | `authenticate_recovery_actor` (W: `recovery/ports.rs:193`) | `allow` | `CancelWorkflow` and recovery-scope stop must authenticate |
-| `execute_recovery_command` | per variant (R5a): `InspectWorkflow` and `CancelWorkflow` allow; every other variant denies | as spec 1 R5a |
+| `execute_recovery_command` | per variant (R5a): `InspectWorkflow`, `CancelWorkflow` and proposed `RetireSuccessorReservation` allow; every other variant denies | as spec 1 R5a. Spec 2 O5 retirement requires predecessor-scope Cancel authority and an exact Reserved link; it never creates or retargets a successor |
 | `read_recovery_workflow` | `allow` | observation |
 | `load_recovery_request_custody` (W: `recovery/ports.rs:272`) | `allow` | an actor-authenticated read; it crosses no effect custody |
 | `observe_recovery_capability_liveness` | `allow` | observation |
@@ -519,7 +519,7 @@ P6 component operations (control plane and store, not `KernelOp`). Spec 1 sectio
 - **L2 work (contract anchors).** `Delegate`, `Select`, `Seal`, `Extend` and `Submit` deny. `Reconcile`, `Cancel` and every `WorkQueryV1` allow.
 - **L3 recovery.**
   - `CreateWorkflow`, `SelectOffer`, `SubmitApproval`, `ResumeWorkflow`, `ReportDecision` and `/v1/recovery/review` deny.
-  - `InspectWorkflow`, `CancelWorkflow`, `/v1/recovery/settle` (`attach_provider_finality`) and `/v1/recovery/explain` allow. Explain is pure advisory, and settle records provider finality for effects that already happened.
+  - `InspectWorkflow`, `CancelWorkflow`, proposed `RetireSuccessorReservation` (spec 2 O5), `/v1/recovery/settle` (`attach_provider_finality`) and `/v1/recovery/explain` allow. Explain is pure advisory, and settle records provider finality for effects that already happened.
 
 ```text
 forall kind in CrossingKind: stop_disposition(kind) defined     (exhaustive match, spec 1 R2)

@@ -376,7 +376,7 @@ The rollback anchor detects a database restored behind its last anchored state, 
 | Class | Commits | Anchor |
 |---|---|---|
 | Crossing-authorizing | Every `CrossingTx` with a write, including every commit that precedes an external call | Synced before acknowledgement |
-| Restrictive | Revocations; stop and resume epochs (spec 8 S1); closure fences (spec 4); recovery cancellation tombstones; deny tombstones (X15); `DeniedAfterDelivery` terminals and `DeliveryRefused` records reached by refusal (X16); origin-claim chain mutations (spec 2 section 6.10); knowledge and taint joins; isolation-epoch changes; export seals | Synced before acknowledgement |
+| Restrictive | Revocations; stop and resume epochs (spec 8 S1); closure fences (spec 4); recovery cancellation tombstones; deny tombstones (X15); `DeniedAfterDelivery` terminals and `DeliveryRefused` records reached by refusal (X16); origin-claim chain mutations, including uncreated-reservation retirement (spec 2 section 6.10 O5); knowledge and taint joins; isolation-epoch changes; export seals | Synced before acknowledgement |
 | Progress-only | Begin and attachments on slow paths; pre-dispatch budget holds of operations that have not crossed; parked states; the return record; finalize records of pure post-return results that are not fused; external-step journal entries after the external call | Synced within bounded lag (X7) |
 
 Rules:
