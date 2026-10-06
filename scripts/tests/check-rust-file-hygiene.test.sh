@@ -293,8 +293,8 @@ for path in third_party/regress-chio/src/unicodetables.rs third_party/regress-ch
   cp "$REPO_ROOT/$path" "$vendored_generated/$path"
 done
 write_lines "$vendored_generated/third_party/regress-chio/src/other.rs" 2001
-assert_rc "$(run_checker "$vendored_generated" "$work/vendor-handwritten.out" "$work/vendor-handwritten.err")" 1 \
-  "other vendored Rust remains subject to the size limit"
+assert_rc "$(run_checker "$vendored_generated" "$work/vendor-handwritten.out" "$work/vendor-handwritten.err")" 0 \
+  "vendor archives do not inherit first-party module size deadlines"
 
 assembled_over_limit="$work/assembled-over-limit"
 init_case "$assembled_over_limit"

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Fail on oversized hand-maintained Rust modules and malformed generated Rust.
+"""Fail on oversized first-party Rust modules and malformed generated Rust.
+
+Vendor archives retain upstream organization and are qualified by their owning
+supply-chain gates. First-party size deadlines must not force local rewrites of
+upstream source. The previously reviewed generated archive bytes remain checked
+against their immutable hashes here.
 
 Size is measured on the assembled logical module: a file plus every fragment
 it splices in through `include!`, transitively. `include!` creates no module
@@ -125,11 +130,6 @@ ALLOWLIST_WAVES = 4
 # The waves are ordered by cap, smallest first, so the files that are
 # cheapest to bring back under their limit come due first.
 ALLOWLIST: dict[str, AllowlistEntry] = {
-    "third_party/aws-lc-rs-chio/src/cipher.rs": allow(
-        "2026-11-30",
-        "reviewed upstream AWS-LC cipher surface; capped to exact vendored size until split upstream",
-        max_lines=2_266,
-    ),
     "crates/products/chio-cli/tests/mcp_serve_http.rs": allow(
         "2027-01-31",
         "existing oversized CLI MCP HTTP integration suite; capped to current size until split",
@@ -536,12 +536,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "policy evaluation production fragments remain pending module ownership; tests are a separate module",
         max_fragments=4,
     ),
-    "third_party/regress-chio/tests/unicodesets.rs": allow(
-        "2026-12-31",
-        "vendored regress unicode-set suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=3_161,
-        max_fragments=2,
-    ),
     "crates/core/chio-core-types/src/receipt/security.rs": allow(
         "2026-12-31",
         "security receipt projection assembled from include! fragments; capped until the fragments become modules",
@@ -564,12 +558,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-10-31",
         "cage crate surface assembled from include! fragments; capped until the fragments become modules",
         max_lines=1_975,
-    ),
-    "third_party/regress-chio/tests/tests.rs": allow(
-        "2026-11-30",
-        "vendored regress case suite assembled from include! fragments; capped until the fragments become modules",
-        max_lines=2_376,
-        max_fragments=2,
     ),
     "crates/platform/chio-store-sqlite/src/security_admission_operation_store.rs": allow(
         "2026-11-30",
@@ -748,6 +736,7 @@ def discover_rust_files(root: Path) -> list[str]:
         line
         for line in result.stdout.splitlines()
         if line and (root / line).is_file()
+        and (not line.startswith("third_party/") or line in VENDORED_GENERATED_SHA256)
     ]
 
 
