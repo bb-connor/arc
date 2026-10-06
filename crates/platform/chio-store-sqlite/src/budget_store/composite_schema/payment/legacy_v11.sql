@@ -152,4 +152,3 @@
         BEGIN
             SELECT RAISE(ABORT, 'payment journal is append-preserving');
         END;
-
