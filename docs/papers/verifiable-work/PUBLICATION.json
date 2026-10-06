@@ -20,7 +20,7 @@
         "results.tex",
         "ARTIFACT.md"
       ],
-      "result": "All 21 terminal native commands pass against 37,322 unchanged inputs and 48 outputs; actual continuation and dependency red/green evidence retains earlier 697 raw records without relabeling. Current derived results, source/evidence inventory and reproducible PDF agree. Hosted production and independent publication gates remain separate."
+      "result": "All21 terminal native commands pass against 37,322 unchanged inputs and48 outputs; actual terminal-continuation RED/GREEN retains the preceding 784 raw records without relabeling. Current derived results, source/evidence inventory and reproducible PDF agree. Hosted production and independent publication gates remain separate."
     },
     {
       "id": "funded-security-integration",

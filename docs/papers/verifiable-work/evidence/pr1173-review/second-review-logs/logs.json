@@ -4704,6 +4704,282 @@
       "observed_result": "Fixed shell-quote upstream registry metadata and tarball integrity.",
       "bytes": 145,
       "sha256": "861bdeed95fe0fcb74ed6dac4536caf3f563738b0b222e3a5c96c55ec381b3e1"
+    },
+    {
+      "log": "19993187da-a2a-continuation-thread-resolution.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 426,
+      "sha256": "e77988e3d55aa32014f95fd77d698dc3aa13dbdd53551de67a65c0bcea6e4968"
+    },
+    {
+      "log": "19993187da-ci-before-terminal-artifacts.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 50100,
+      "sha256": "aa6424b3920f8281f2cfa57c66bee65bba49edc5e36c4cb7b26cb491bae1dc22"
+    },
+    {
+      "log": "19993187da-cve-artifact-metadata.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 788,
+      "sha256": "1374b8723fe30a6d1c0b3bc4156996022f57f4c8e26bb4f9bc80c0631481ff64"
+    },
+    {
+      "log": "19993187da-cve-artifact.zip.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 12061,
+      "sha256": "a8ec8a86fbb6209e56836432cb193da522ab73e9785e20d65e1500206c235cef"
+    },
+    {
+      "log": "19993187da-cve-hosted-job.log.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 81589,
+      "sha256": "bbd1e1fac9855fe5b40c2a9e09579551283530f59254fe5da39c150608e7da8a"
+    },
+    {
+      "log": "19993187da-cve-hosted-verification.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 20986,
+      "sha256": "cd928ade5db4fcf0332ef8153f09bf866ea98ebbef5645719aa2740fc6be7eda"
+    },
+    {
+      "log": "19993187da-reviews-after-greptile.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 100774,
+      "sha256": "046da245ea70f55e2abdb4772994f46063850b13742824593b7debfe01a1ce96"
+    },
+    {
+      "log": "19993187da-reviews-after-greptile.log.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 66726,
+      "sha256": "60567b0ba392350851fd4bef8d076d77d18e1d794837354baaa99ad3d9d7982d"
+    },
+    {
+      "log": "19993187da-reviews-after-push.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 99229,
+      "sha256": "bf55eb668c0e4ec43d572b2704d9df1edadd30323b2fd5cbdf3bf2b44cd7d537"
+    },
+    {
+      "log": "19993187da-reviews-after-push.log.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 65641,
+      "sha256": "f1acee424df4b67f92093d6e954bf70d24323b6e4dca1615b3649689ff8d7dd1"
+    },
+    {
+      "log": "19993187da-reviews-before-terminal-fix.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 100774,
+      "sha256": "046da245ea70f55e2abdb4772994f46063850b13742824593b7debfe01a1ce96"
+    },
+    {
+      "log": "19993187da-reviews-before-terminal-fix.log.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 66726,
+      "sha256": "60567b0ba392350851fd4bef8d076d77d18e1d794837354baaa99ad3d9d7982d"
+    },
+    {
+      "log": "19993187da-reviews-initial-ci.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 99229,
+      "sha256": "bf55eb668c0e4ec43d572b2704d9df1edadd30323b2fd5cbdf3bf2b44cd7d537"
+    },
+    {
+      "log": "19993187da-reviews-initial-ci.log.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 65641,
+      "sha256": "f1acee424df4b67f92093d6e954bf70d24323b6e4dca1615b3649689ff8d7dd1"
+    },
+    {
+      "log": "19993187da-vet-success-job-112412040647.json.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 3428,
+      "sha256": "4a150944d591ceea19bc4935e4f2e9ae86875a97721583ef3abcb8ff6a466dc2"
+    },
+    {
+      "log": "19993187da-vet-success-job-112412040647.log.gz",
+      "observed_result": "Authenticated preceding199 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 61916,
+      "sha256": "fda214cdeec64cc67f9d1c2401c115fb5df79239fe2c2dfa959aacec5bbe2183"
+    },
+    {
+      "log": "a2a-terminal-error-confirmed-red-continuation.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 10452,
+      "sha256": "53dd8e07018e50317c6304f3eec6e03846808f3111c28f5663f35686199b2098"
+    },
+    {
+      "log": "a2a-terminal-error-confirmed-red.status.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 824369,
+      "sha256": "1bfea771e59d9f82c4e1549d6711dab472ae7806b977e2079eb0576550f4f37b"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-consumer-clippy.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 1883,
+      "sha256": "c3f79d541fdc48424fa0a86f8f2172fe3a9492758e4d35a47ff6b1b75d4d74fa"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-consumer-contract.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 197,
+      "sha256": "5bf3075779591763f210c73d5ea983f7c9668280eae61d49aa7f01e5d0ea4b6b"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-consumer-prefix.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 6138,
+      "sha256": "de3d2849ec42532f64aa747258381960327af79c2d58209f93e616c4d8f5f10d"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-consumer.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 3134,
+      "sha256": "169d1d93550fbf488976dbd656d03d5daad2850cb44309253154d834da0ab909"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-diff.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-edge-clippy.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 1769,
+      "sha256": "f9f1e7e632397fb61f0b1bd76f6fc0489870cbbca8343db66fe7494d9ccff95a"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-edge.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 10512,
+      "sha256": "daea972ec949d6b2eb06dcab663544f3c5f17a6852fa3c9118f785d550b02929"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-format.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-hygiene.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 52024,
+      "sha256": "52d77640b283aeec0cd0edd3646c27dc44b2b8d3ae62bf73dbc5e66c571053a4"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-mirrors.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "a2a-terminal-error-final-green-proof-check.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "a2a-terminal-error-final-green.status.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 830264,
+      "sha256": "95b7a3c1be06ba5c59ef324afc897c66c640257f60ed71d168fdddfbb0457ebb"
+    },
+    {
+      "log": "a2a-terminal-error-inline-review.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 1873,
+      "sha256": "d0cfa761bb090a2cfe8264cb8e95fbe38eb1205fac449483430c0859e6647e2e"
+    },
+    {
+      "log": "a2a-terminal-error-proof-refresh.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "a2a-terminal-error-proof-refresh.status.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 446,
+      "sha256": "f5bc46fd322f12d98b24931b9676393def186a64f0920c828e59551af7825afb"
+    },
+    {
+      "log": "a2a-terminal-error-red-continuation.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 2675,
+      "sha256": "c698bddff30cb76f28274730c67a54bff437bc32da4eb9cb48fd8df3da64c60b"
+    },
+    {
+      "log": "a2a-terminal-error-red.status.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 824361,
+      "sha256": "81f291919f155615784e61d228f380f6ed3f533b98a5988a4aa5720794d93031"
+    },
+    {
+      "log": "a2a-terminal-error-regression-green-consumer-regressions.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 3358,
+      "sha256": "920db79c765b577ab25509064ec70202211d420a0753994016b81180332ea64b"
+    },
+    {
+      "log": "a2a-terminal-error-regression-green-edge-regressions.log.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 2120,
+      "sha256": "7c7a8ebefbf179c6721433f26573e6b5854fb2eb7414a07f0e85400fc74e3b6e"
+    },
+    {
+      "log": "a2a-terminal-error-regression-green.status.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 824718,
+      "sha256": "93b5b907f14d35413e34ea1b6f6b40ada5ea18515f653146c3357b3ec525039c"
+    },
+    {
+      "log": "a2a-terminal-error-reviewed-source.diff.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 17791,
+      "sha256": "500b83a11caf855e3066fa953c4b0272ffee175693b9b2185f07c981f25ed9b6"
+    },
+    {
+      "log": "a2a-terminal-error-unchanged-dependency-inputs.json.gz",
+      "observed_result": "Actual terminal-continuation regression, RED/GREEN, exact consumer inventory and inline author review. Initial diagnostic assertion failure is unaccepted and remains distinct from the confirmed state-machine failure. Original source inputs and terminal results remain authoritative.",
+      "bytes": 1101,
+      "sha256": "0a55479d55797b6e03dafd9bd51a4916443a497e022c4756f86d586c344aae2d"
+    },
+    {
+      "log": "qualification-2f20769dbd.status.json.gz",
+      "observed_result": "Actual current-source21-command native qualification, with canonical source/output inventory authoritative.",
+      "bytes": 268,
+      "sha256": "c052ca329c9ce8c7fcd1fad6c40e9029b403b174fc37b984ae3710dbd21ffddf"
+    },
+    {
+      "log": "receipt-verifier-2f20769dbd-build.log.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated binary on ARM; no physical x86 acceptance.",
+      "bytes": 1660,
+      "sha256": "784f16426094862ea5202a6946156e97e7c874676b585bfd084ca75f312a8d9e"
+    },
+    {
+      "log": "receipt-verifier-2f20769dbd.status.json.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated binary on ARM; no physical x86 acceptance.",
+      "bytes": 566,
+      "sha256": "563ad599c860c6aef78d556d983ce29eedd82c892f21b7a901c77281aeea1cce"
+    },
+    {
+      "log": "review-native-qualification-2f20769dbd.log.gz",
+      "observed_result": "Actual terminal current-source21-command native output; no hosted or physical x86 claim.",
+      "bytes": 539,
+      "sha256": "165399492b8a7f8a2c7de37ee2f0f456ebc954c371ba1425c508050281ed06ee"
+    },
+    {
+      "log": "security-authorities-a2a-terminal-error-corrected.json.gz",
+      "observed_result": "Read-only security-owned authority/package/policy presence observations; a mistaken variable-name query is explicitly diagnostic and corrected independently without authority mutation.",
+      "bytes": 812,
+      "sha256": "87bf570ed8df9e4964d2324e2c179e6a7b35ed30c7f0bf311f1126578b019a5b"
+    },
+    {
+      "log": "security-authorities-a2a-terminal-error.json.gz",
+      "observed_result": "Read-only security-owned authority/package/policy presence observations; a mistaken variable-name query is explicitly diagnostic and corrected independently without authority mutation.",
+      "bytes": 568,
+      "sha256": "353adbecc80249bde3e8eab1113e6b5817f51c03460243979680b555415858ad"
     }
   ]
 }
