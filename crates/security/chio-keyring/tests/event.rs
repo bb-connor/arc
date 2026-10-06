@@ -1,6 +1,8 @@
 use chio_test_support::prelude::*;
 
-use chio_core_types::{Ed25519Backend, Hash, Keypair, SigningAlgorithm, SigningBackend};
+use chio_core_types::{
+    Ed25519Backend, Hash, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
 use chio_keyring::{
     derive_key_id, AuthorityId, BootstrapAuthorization, EventId, EventReason, KeyLogAuthorizations,
     KeyLogEventBody, KeyLogOperation, LogId, NewKeyProofOfPossession, OldKeyAuthorization,
@@ -302,6 +304,54 @@ fn common_validation_rejects_schema_sequence_predecessor_and_time_errors() {
             &reversed.body.log_id,
             &reversed.body.authority_id,
             None,
+        )
+        .is_err());
+}
+
+const IDENTITY_POINT_HEX: &str = "0100000000000000000000000000000000000000000000000000000000000000";
+
+fn identity_point_rotation(genesis: &SignedKeyLogEvent, old: &Ed25519Backend) -> SignedKeyLogEvent {
+    let identity = PublicKey::from_hex(IDENTITY_POINT_HEX).test_unwrap();
+    let mut body = rotation(genesis, old, &backend(3)).body;
+    body.key_id = derive_key_id(SigningAlgorithm::Ed25519, &identity).test_unwrap();
+    body.public_key = identity;
+    // R = identity point, s = 0 verifies for every message under the identity key
+    // unless the verifier rejects small-order points.
+    let universal =
+        Signature::from_hex(&format!("{IDENTITY_POINT_HEX}{}", "0".repeat(64))).test_unwrap();
+    SignedKeyLogEvent {
+        authorizations: KeyLogAuthorizations::rotation(
+            OldKeyAuthorization::sign(&body, old).test_unwrap(),
+            NewKeyProofOfPossession {
+                key_id: body.key_id,
+                algorithm: SigningAlgorithm::Ed25519,
+                signature: universal,
+            },
+        ),
+        body,
+    }
+}
+
+#[test]
+fn rotation_to_the_identity_point_fails_proof_of_possession() {
+    let old = backend(2);
+    let genesis = genesis(&backend(1), &old);
+    let rotation = identity_point_rotation(&genesis, &old);
+    assert!(rotation.verify_rotation(&old.public_key()).is_err());
+}
+
+#[test]
+fn common_validation_rejects_a_small_order_event_key() {
+    let old = backend(2);
+    let genesis = genesis(&backend(1), &old);
+    let rotation = identity_point_rotation(&genesis, &old);
+    assert!(rotation
+        .validate_common(
+            1,
+            Some(&genesis.envelope_hash().test_unwrap()),
+            &genesis.body.log_id,
+            &genesis.body.authority_id,
+            Some(genesis.body.issued_at),
         )
         .is_err());
 }

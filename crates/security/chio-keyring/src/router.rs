@@ -69,7 +69,7 @@ impl KeyringArtifactSignature {
             || self.artifact_signature.algorithm() != self.algorithm
             || self.fence_signature.algorithm() != self.algorithm
             || derive_key_id(public_key.algorithm(), public_key)? != self.key_id
-            || !public_key.verify(
+            || !public_key.verify_strict(
                 &artifact_signature_bytes(
                     self.artifact_hash,
                     self.key_id,
@@ -88,7 +88,7 @@ impl KeyringArtifactSignature {
     pub fn verify_artifact_bytes(&self, public_key: &PublicKey, artifact: &[u8]) -> Result<()> {
         self.verify(public_key)?;
         if domain_hash(ARTIFACT_HASH_DOMAIN, artifact)? != self.artifact_hash
-            || !public_key.verify(artifact, &self.artifact_signature)
+            || !public_key.verify_strict(artifact, &self.artifact_signature)
         {
             return Err(KeyringError::InvalidSignature);
         }

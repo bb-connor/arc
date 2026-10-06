@@ -925,3 +925,31 @@ fn complete_history_and_replay_reject_malformed_sequences_and_role_key_overlap()
         .key(&derive_key_id(backend(99).algorithm(), &backend(99).public_key()).test_unwrap())
         .is_err());
 }
+
+#[test]
+fn policy_rejects_a_small_order_role_key() {
+    let fixture = Fixture::new();
+    let identity = chio_core_types::PublicKey::from_hex(
+        "0100000000000000000000000000000000000000000000000000000000000000",
+    )
+    .test_unwrap();
+    let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
+        log_id: LogId::new("log.enterprise.test").test_unwrap(),
+        authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
+        bootstrap_key: fixture.bootstrap.public_key(),
+        operator_key: fixture.operator.public_key(),
+        witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
+        witness_keys: BTreeMap::from([
+            (
+                WitnessId::new("witness.a").test_unwrap(),
+                fixture.witness_a.public_key(),
+            ),
+            (WitnessId::new("witness.weak").test_unwrap(), identity),
+        ]),
+        recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.v1").test_unwrap(),
+        recovery_keys: BTreeMap::new(),
+        recovery_threshold: 0,
+        max_checkpoint_future_skew: 100,
+    });
+    assert!(matches!(policy, Err(chio_keyring::KeyringError::WeakKey)));
+}

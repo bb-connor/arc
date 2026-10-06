@@ -71,6 +71,9 @@ impl KeyLogPolicy {
             .chain(witness_keys.values())
             .chain(recovery_keys.values())
         {
+            if key.is_weak_ed25519() {
+                return Err(KeyringError::WeakKey);
+            }
             if !role_key_ids.insert(derive_key_id(key.algorithm(), key)?) {
                 return Err(KeyringError::DuplicateIdentifier);
             }

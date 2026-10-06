@@ -31,6 +31,8 @@ pub enum KeyringError {
     InvalidAuthorizationSet,
     #[error("event authorization signature is invalid")]
     InvalidSignature,
+    #[error("public key is a weak or small-order Ed25519 point")]
+    WeakKey,
     #[error("duplicate event or key identifier")]
     DuplicateIdentifier,
     #[error("key-log state invariant failed: {0}")]

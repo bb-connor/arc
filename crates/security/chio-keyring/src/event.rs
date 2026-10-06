@@ -555,6 +555,9 @@ impl SignedKeyLogEvent {
         if self.body.public_key.algorithm() != self.body.algorithm {
             return Err(KeyringError::AlgorithmMismatch);
         }
+        if self.body.public_key.is_weak_ed25519() {
+            return Err(KeyringError::WeakKey);
+        }
         if derive_key_id(self.body.algorithm, &self.body.public_key)? != self.body.key_id {
             return Err(KeyringError::KeyIdMismatch);
         }
@@ -736,7 +739,7 @@ fn verify_signature(
     if key.algorithm() != algorithm || signature.algorithm() != algorithm {
         return Err(KeyringError::AlgorithmMismatch);
     }
-    if !key.verify(bytes, signature) {
+    if !key.verify_strict(bytes, signature) {
         return Err(KeyringError::InvalidSignature);
     }
     Ok(())
