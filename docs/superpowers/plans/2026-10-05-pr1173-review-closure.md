@@ -68,6 +68,28 @@ registry packages. This is a bounded dependency repair under task 3.
 - [x] Resolve adjacent consistency vocabulary, journal codec and error-code
   precedence findings with narrow compatibility tests where warranted.
 
+### Nonterminal v1 custody follow-up
+
+The final-candidate review finds that blocking `SendMessage` removes a
+`Working` task returned by actual cumulative approval admission. Reuse the
+SQLite consumer fixture in `chio-conformance/tests/consumer_boundary/support.rs`
+and add a private `a2a_v1.rs` test module beside it. No new dependency or
+approval engine is required.
+
+- [x] Exercise actual pending approval through v1 `SendMessage`, repeated
+  observational `GetTask`, caller isolation and `CancelTask`. Require signed
+  proposal/receipt authority, stable task identity and zero tool dispatches.
+  The original implementation must fail lookup of the returned working task.
+- [x] In `chio-a2a-edge/src/v1.rs::handle_v1_send`, retain successfully projected
+  nonterminal tasks. Continue releasing terminal results and failed projections
+  or executions. Existing caller quotas, deadlines and output mode apply.
+- [ ] Require the complete consumer boundary and A2A suites, strict Clippy,
+  structural checks and renewed source-bound qualification before a new push.
+- [x] Update the four existing threshold consumer fixtures to bind their exact
+  tool invocation and install their explicit approver roster. Their original
+  successful capture and restart assertions must pass with production approval
+  validation unchanged; retain the first four-failure run separately.
+
 ## 3. CI and supply-chain coverage
 
 - [x] Select the main CI workflow for packet/integration PR bases and require its

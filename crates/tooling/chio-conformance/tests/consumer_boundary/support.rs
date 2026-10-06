@@ -17,9 +17,17 @@ use chio_manifest::{RuntimeToolTopology, VerifiedManifestRegistry};
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 use serde_json::{json, Value};
 
+#[path = "a2a_v1.rs"]
+mod a2a_v1;
+
 pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 pub const SERVER: &str = "consumer-server";
 pub const TOOL: &str = "read_file";
+const APPROVAL_TENANT: &str = "consumer-boundary";
+
+fn policy_hash() -> String {
+    chio_core::sha256_hex(b"consumer-boundary-policy")
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Protocol {
@@ -124,6 +132,25 @@ impl Fixture {
         }))?)
     }
 
+    pub fn approval_request(&self, id: &str) -> TestResult<ToolCallRequest> {
+        let mut request = self.request(id)?;
+        let mut intent = serde_json::from_value(json!({
+            "id": format!("intent-{id}"), "server_id": SERVER, "tool_name": TOOL,
+            "purpose": "authorize one counted consumer invocation",
+            "max_amount": {"units": 100, "currency": "USD"}
+        }))?;
+        chio_kernel::approval::ToolApprovalContext::bind(
+            &mut intent,
+            &request.capability,
+            &request.arguments,
+            &request.request_id,
+            &policy_hash(),
+            APPROVAL_TENANT,
+        )?;
+        request.governed_intent = Some(intent);
+        Ok(request)
+    }
+
     pub fn open(&self, protocol: Protocol) -> TestResult<Consumer> {
         let authority = SqliteAuthorityStore::open_serving(
             self.directory.path().join("authority.db"),
@@ -133,7 +160,7 @@ impl Fixture {
             keypair: self.signer.clone(),
             ca_public_keys: vec![self.signer.public_key()],
             max_delegation_depth: 5,
-            policy_hash: chio_core::sha256_hex(b"consumer-boundary-policy"),
+            policy_hash: policy_hash(),
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
@@ -161,7 +188,11 @@ impl Fixture {
             use chio_core::capability::threshold_approval::{
                 ThresholdApprovalRequirement, ThresholdApproverIdentity,
             };
-            let policy = chio_core::sha256_hex(b"consumer-boundary-policy");
+            kernel.set_governed_approval_policy(
+                APPROVAL_TENANT.into(),
+                self.approvers.iter().map(Keypair::public_key).collect(),
+            )?;
+            let policy = policy_hash();
             let requirement = ThresholdApprovalRequirement::new(
                 policy.clone(),
                 2,

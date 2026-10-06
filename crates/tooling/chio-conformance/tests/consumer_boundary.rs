@@ -43,11 +43,7 @@ fn threshold_restart(protocol: Protocol) -> TestResult {
         ThresholdApprovalProposal,
     };
     let fixture = Fixture::new()?.with_threshold_approval()?;
-    let mut request = fixture.request("threshold-operation")?;
-    request.governed_intent = Some(serde_json::from_value(serde_json::json!({
-        "id":"threshold-intent", "server_id":SERVER, "tool_name":TOOL,
-        "purpose":"authorize one counted consumer invocation", "max_amount":{"units":100,"currency":"USD"}
-    }))?);
+    let mut request = fixture.approval_request("threshold-operation")?;
     let mut consumer = fixture.open(protocol)?;
     let pending = consumer.invoke(&request)?;
     assert_eq!(

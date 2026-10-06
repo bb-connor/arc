@@ -214,9 +214,19 @@ impl ChioA2aEdge {
         }
         let response = self.complete_task(&task.id, kernel, execution, id);
         let projected = self.v1_project_response(response, true);
-        // Blocking responses transfer their terminal result directly to the
-        // caller. Cleanup also covers execution and projection errors.
-        self.tasks.remove(&task.id);
+        // Successful nonterminal admission retains bounded custody for lookup
+        // and cancellation. Terminal results transfer directly to the caller;
+        // execution and projection errors must also release their task slot.
+        let retain_task = projected
+            .as_ref()
+            .is_ok_and(|response| response.get("error").is_none())
+            && self
+                .tasks
+                .get(&task.id)
+                .is_some_and(|task| !task.response.status.is_terminal());
+        if !retain_task {
+            self.tasks.remove(&task.id);
+        }
         projected
     }
 
