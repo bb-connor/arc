@@ -417,30 +417,77 @@ fn a_client_refuses_an_endpoint_served_by_another_user_before_sending_its_reques
     );
 }
 
-/// A listener bound at `socket` with a zero backlog, plus the queued
-/// connections that fill its accept queue. Nothing ever accepts them.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+/// A listener bound at `socket`, plus the queued connections that fill its
+/// accept queue. Nothing ever accepts them. Linux reports the full queue to a
+/// non-blocking connect as `EAGAIN`; BSD kernels refuse it as `ECONNREFUSED`.
 fn full_queue_listener(
     socket: &Path,
 ) -> std::io::Result<(rustix::fd::OwnedFd, Vec<rustix::fd::OwnedFd>)> {
-    use rustix::net::{AddressFamily, SocketAddrUnix, SocketFlags, SocketType};
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketType};
 
-    let unix_socket =
-        |flags| rustix::net::socket_with(AddressFamily::UNIX, SocketType::STREAM, flags, None);
     let address = SocketAddrUnix::new(socket)?;
-    let listener = unix_socket(SocketFlags::CLOEXEC)?;
+    let listener = close_on_exec(rustix::net::socket(
+        AddressFamily::UNIX,
+        SocketType::STREAM,
+        None,
+    )?)?;
     rustix::net::bind(&listener, &address)?;
-    rustix::net::listen(&listener, 0)?;
+    // Darwin treats a zero backlog as its default of 128.
+    rustix::net::listen(&listener, if cfg!(target_vendor = "apple") { 1 } else { 0 })?;
     let mut queued = Vec::new();
     for _ in 0..64 {
-        let client = unix_socket(SocketFlags::CLOEXEC | SocketFlags::NONBLOCK)?;
+        let client = close_on_exec(rustix::net::socket(
+            AddressFamily::UNIX,
+            SocketType::STREAM,
+            None,
+        )?)?;
+        if cfg!(any(target_os = "linux", target_os = "android")) {
+            rustix::fs::fcntl_setfl(&client, rustix::fs::OFlags::NONBLOCK)?;
+        }
         match rustix::net::connect(&client, &address) {
             Ok(()) => queued.push(client),
-            Err(rustix::io::Errno::AGAIN) => return Ok((listener, queued)),
+            Err(rustix::io::Errno::AGAIN)
+                if cfg!(any(target_os = "linux", target_os = "android")) =>
+            {
+                return Ok((listener, queued));
+            }
+            Err(rustix::io::Errno::CONNREFUSED) if cfg!(target_vendor = "apple") => {
+                return Ok((listener, queued));
+            }
             Err(error) => return Err(error.into()),
         }
     }
     Err(std::io::Error::other("the accept queue never filled"))
+}
+
+fn close_on_exec(descriptor: rustix::fd::OwnedFd) -> std::io::Result<rustix::fd::OwnedFd> {
+    rustix::io::fcntl_setfd(&descriptor, rustix::io::FdFlags::CLOEXEC)?;
+    Ok(descriptor)
+}
+
+fn inode(path: &Path) -> u64 {
+    use std::os::unix::fs::MetadataExt as _;
+
+    std::fs::symlink_metadata(path).test_unwrap().ino()
+}
+
+fn lock_path(socket: &Path) -> PathBuf {
+    let mut name = socket.file_name().test_unwrap().to_os_string();
+    name.push(".lock");
+    socket.with_file_name(name)
+}
+
+/// The refusal a socket this service cannot prove it created gets: the
+/// kernel's own `ECONNREFUSED`, with the socket left in place.
+fn assert_refused_as_unproven(result: chio_keyring::Result<()>) {
+    assert!(
+        matches!(
+            &result,
+            Err(KeyringError::Io(error))
+                if error.raw_os_error() == Some(rustix::io::Errno::CONNREFUSED.raw_os_error())
+        ),
+        "{result:?}"
+    );
 }
 
 const PROBE_HELPER_SOCKET: &str = "CHIO_KEYRING_TEST_PROBE_SOCKET";
@@ -510,6 +557,102 @@ fn a_live_listener_outside_the_lifecycle_lock_keeps_its_socket() {
     let live = std::fs::symlink_metadata(&socket).test_unwrap().ino();
     assert_refused_by_policy(bind(&socket));
     assert_eq!(std::fs::symlink_metadata(&socket).test_unwrap().ino(), live);
+}
+
+#[cfg(target_vendor = "apple")]
+#[test]
+fn a_full_unmanaged_listener_is_refused_and_kept_on_darwin() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let (listener, _queued) = full_queue_listener(&socket).test_unwrap();
+    let refused = std::os::unix::net::UnixStream::connect(&socket);
+    assert_eq!(
+        refused
+            .as_ref()
+            .err()
+            .and_then(std::io::Error::raw_os_error),
+        Some(rustix::io::Errno::CONNREFUSED.raw_os_error()),
+        "{refused:?}"
+    );
+    let live = inode(&socket);
+    assert_refused_as_unproven(bind(&socket));
+    assert_eq!(inode(&socket), live);
+    rustix::net::accept(&listener).test_unwrap();
+}
+
+#[test]
+fn a_failed_live_probe_leaves_no_authority_to_remove_the_socket() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let listener = UnixListener::bind(&socket).test_unwrap();
+    assert_refused_by_policy(bind(&socket));
+    drop(listener);
+    let stale = inode(&socket);
+    assert_refused_as_unproven(bind(&socket));
+    assert_eq!(inode(&socket), stale);
+}
+
+#[test]
+fn a_socket_without_a_generation_record_waits_for_operator_recovery() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    drop(UnixListener::bind(&socket).test_unwrap());
+    let legacy = inode(&socket);
+    assert_refused_as_unproven(bind(&socket));
+    assert_eq!(inode(&socket), legacy);
+
+    std::fs::remove_file(&socket).test_unwrap();
+    std::fs::remove_file(lock_path(&socket)).test_unwrap();
+    bind(&socket).test_unwrap();
+}
+
+#[test]
+fn a_dropped_managed_listener_removes_its_socket_and_keeps_its_record() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    drop(chio_keyring::bind_private_unix_listener(&socket).test_unwrap());
+    assert!(!socket.exists());
+    assert_eq!(std::fs::read(lock_path(&socket)).test_unwrap().len(), 65);
+    bind(&socket).test_unwrap();
+}
+
+const CRASH_HELPER_SOCKET: &str = "CHIO_KEYRING_TEST_CRASH_SOCKET";
+
+/// Runs only in the child process that
+/// `a_crashed_managed_listener_is_recovered_at_restart` starts: binds the
+/// socket the parent names and exits while still holding it, so no destructor
+/// removes the socket.
+#[test]
+fn managed_crash_helper() {
+    let Some(socket) = std::env::var_os(CRASH_HELPER_SOCKET) else {
+        return;
+    };
+    match chio_keyring::bind_private_unix_listener(Path::new(&socket)) {
+        Ok(_held) => std::process::exit(0),
+        Err(_) => std::process::exit(2),
+    }
+}
+
+#[test]
+fn a_crashed_managed_listener_is_recovered_at_restart() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let status = std::process::Command::new(std::env::current_exe().test_unwrap())
+        .args(["--exact", "managed_crash_helper", "--nocapture"])
+        .env(CRASH_HELPER_SOCKET, &socket)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .test_unwrap();
+    assert_eq!(status.code(), Some(0));
+    let crashed = inode(&socket);
+    let record = std::fs::read(lock_path(&socket)).test_unwrap();
+    assert_eq!(record.len(), 65);
+
+    let listener = chio_keyring::bind_private_unix_listener(&socket).test_unwrap();
+    assert_ne!(inode(&socket), crashed);
+    assert_ne!(std::fs::read(lock_path(&socket)).test_unwrap(), record);
+    std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
+    drop(listener);
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
