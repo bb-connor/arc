@@ -1,16 +1,16 @@
 
 running 11 tests
-test kernel::tests::durable_admission::execution_evidence::execution_export_contains_signer_panic_without_publishing ... ok
-test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_retained_request_change_during_signing ... ok
-test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_fence_change_during_signing ... ok
-test kernel::tests::durable_admission::execution_evidence::execution_export_signer_runs_outside_mutation_sequencer ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_replay_respects_the_current_crypto_floor ... ok
 test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_signer_identity_substitution ... ok
 test kernel::tests::durable_admission::execution_evidence::execution_export_revalidates_original_lease_after_signer_callback ... ok
-test kernel::tests::durable_admission::execution_evidence::execution_export_identity_callback_runs_outside_mutation_sequencer ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_signer_runs_outside_mutation_sequencer ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_retained_request_change_during_signing ... ok
 test kernel::tests::durable_admission::execution_evidence::execution_export_replays_original_receipt_after_signer_replacement ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_rejects_fence_change_during_signing ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_contains_signer_panic_without_publishing ... ok
 test kernel::tests::durable_admission::execution_evidence::federated_execution_export_uses_original_admission_without_remote_completion ... ok
-test kernel::tests::durable_admission::execution_evidence::execution_export_replay_respects_the_current_crypto_floor ... ok
+test kernel::tests::durable_admission::execution_evidence::execution_export_identity_callback_runs_outside_mutation_sequencer ... ok
 test kernel::tests::durable_admission::execution_evidence::federated_execution_export_rejects_missing_or_substituted_frozen_context ... ok
 
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 1531 filtered out; finished in 0.58s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 1531 filtered out; finished in 0.78s
 

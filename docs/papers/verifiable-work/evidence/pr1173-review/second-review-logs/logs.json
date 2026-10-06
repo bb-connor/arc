@@ -5220,6 +5220,972 @@
       "observed_result": "Actual terminal current-source21-command native output; no hosted or physical x86 claim.",
       "bytes": 539,
       "sha256": "e82bb9877f4c5a75624498329b72fec52e05e5306c0b09a37bbf6b481732dfb5"
+    },
+    {
+      "log": "9ca40c81f5-active-branch-runs.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 96016,
+      "sha256": "dbeb2ccad5a2eeb62060edbe063d71aba2e755be265eebc3b1f4fe66ccfd423d"
+    },
+    {
+      "log": "9ca40c81f5-additional-skipped-gate-classification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 4107,
+      "sha256": "a02cf75b40689d20f1758ea0d0d241241f84dc0ca3a8d69a532efb1c10018fc2"
+    },
+    {
+      "log": "9ca40c81f5-ci-current.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 42297,
+      "sha256": "fdbe83467c635a1bbb0feb015a2b64e92357a2b25181961643962880669b0d6f"
+    },
+    {
+      "log": "9ca40c81f5-ci-progress-20261006T211933Z.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 49008,
+      "sha256": "3a09e1d7b5b2d109fa6ee25339ebc89f6f2ff8f056fb46623f2e5dde33b96761"
+    },
+    {
+      "log": "9ca40c81f5-ci-progress-after-source-repairs.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 49008,
+      "sha256": "3a09e1d7b5b2d109fa6ee25339ebc89f6f2ff8f056fb46623f2e5dde33b96761"
+    },
+    {
+      "log": "9ca40c81f5-clock-thread-resolution.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 308,
+      "sha256": "7096606d817cd94aebb86925f16bf4a9db40a4ddf21cafe22959a1077fcd7e72"
+    },
+    {
+      "log": "9ca40c81f5-critical-queue-inspection.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 9329,
+      "sha256": "89bb072f0b57b7811871529e95628c974db29e177d8b799684209c21a3fc173b"
+    },
+    {
+      "log": "9ca40c81f5-current-review-blocker-progress.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 48564,
+      "sha256": "45276f9ff29d0fdda31b051a1e2d172d49929dc238c43ad2f0f45bad88e84295"
+    },
+    {
+      "log": "9ca40c81f5-cve-artifact-authentication.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 719,
+      "sha256": "202240e480944a293bec3922535c8cd7ec9372449f1487fa0db2f413ea65cfc3"
+    },
+    {
+      "log": "9ca40c81f5-cve-artifact-metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 788,
+      "sha256": "c1c4922d64c73e57f4cae080696a6767a6d7a38d4b9a87dec616f73040543b43"
+    },
+    {
+      "log": "9ca40c81f5-cve-artifact.zip.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 12062,
+      "sha256": "24fb54b00f6fee8a96f2cd13c527c83c1a5c9ae6090d525ba142129b33997818"
+    },
+    {
+      "log": "9ca40c81f5-event-skip-conditions.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 4378,
+      "sha256": "3d4eaaecfc31cede89e459ec09d60e081b88ae54f0aab351e0da1747803b80ae"
+    },
+    {
+      "log": "9ca40c81f5-failed-job-112459178997.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 165288,
+      "sha256": "54d4a427a03c1b5476662e198d70f894db60320e4d12b53e001b410267f3ce4f"
+    },
+    {
+      "log": "9ca40c81f5-failed-job-112459179015.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 151330,
+      "sha256": "4f0b28f45b6eb82109e1affb00d6b448de10a1e2bec401be12c42a722e5ba8dc"
+    },
+    {
+      "log": "9ca40c81f5-failed-job-112459179015.metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 3949,
+      "sha256": "97f571a73651299806f164380114117e96f018b1c40a5400ce317ef1a52d865e"
+    },
+    {
+      "log": "9ca40c81f5-failed-job-112459179158.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 151117,
+      "sha256": "c001371a4c8b1b2b8d623045f167cd9452a46c4ba2d9f97fb3b2e85dfd05b340"
+    },
+    {
+      "log": "9ca40c81f5-failed-job-112459179158.metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 3694,
+      "sha256": "c35d8de4f4218f4046226724c7df47422543d3e0a4a23285f751c101f1bca8ab"
+    },
+    {
+      "log": "9ca40c81f5-fuzz-closure-job-112460477027.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 6253,
+      "sha256": "7d749148fcb8cd279c82da1edc859127a980f7dedb50b0a9267f2f9d0a6cd95a"
+    },
+    {
+      "log": "9ca40c81f5-fuzz-closure-job-112460477027.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 2498746,
+      "sha256": "144da70765357b66a9a50515c2c05549194b5b98a1557641c27941e21c5903be"
+    },
+    {
+      "log": "9ca40c81f5-fuzz-closure-job-112460477027.verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 2416,
+      "sha256": "248b37438e81d08a3d7f9db39997f53a22abe3c3fc6427726dd930aae5755341"
+    },
+    {
+      "log": "9ca40c81f5-git-replacement-source-probe.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 394,
+      "sha256": "21f22c2edfc9bff50001df784d3779a17fe4d70b66cb358d3c509812fa8a3109"
+    },
+    {
+      "log": "9ca40c81f5-greptile-check-runs.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 502142,
+      "sha256": "a9989594c5b48b7d4f4c563d78116908beb6586f4d6956a6f005f2745f4715a1"
+    },
+    {
+      "log": "9ca40c81f5-hosted-collector-prerequisite-stop.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 381,
+      "sha256": "02efe1b9f11c7b892a8e6054e54d6cf4811f7fba2fd6fe3ce73341f26149818a"
+    },
+    {
+      "log": "9ca40c81f5-hosted-job-112453270307.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 81523,
+      "sha256": "ddaa2978ab82fb3c351c8089f8ee5a8a2a04b47b56e751ec1e993e6aea1a581f"
+    },
+    {
+      "log": "9ca40c81f5-hosted-job-112453694529.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 108252355,
+      "sha256": "c0b0e84fd94dde00d46ed1f35bb93c97660cbf811bcb73c1a5026a8874606821"
+    },
+    {
+      "log": "9ca40c81f5-hosted-job-112453694529.verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 5430,
+      "sha256": "84aba0a3658fe7ad943cdb10852b62c5de90dfc66128511af9aa2d044b9cc530"
+    },
+    {
+      "log": "9ca40c81f5-kani-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 156,
+      "sha256": "89b499828cfc8690ba2647a8fb6d9f5f69f80b11f47bc131f973a5f7297c3741"
+    },
+    {
+      "log": "9ca40c81f5-portable-source-diagnostic.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 296,
+      "sha256": "6be1387e6e7a823cede17433a356de9ab202ecb018061836a850be59d14dc079"
+    },
+    {
+      "log": "9ca40c81f5-postgres-artifact-index.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 2699,
+      "sha256": "e6719088d6cf990c57b28c907576e23f609efb8dad18ea0c16ee30f8a42e5e86"
+    },
+    {
+      "log": "9ca40c81f5-postgres-download.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 362,
+      "sha256": "bb7ae182a216c8ea98e3201caef62ed0b97d8c446dacde2dadc146a81eb20ac0"
+    },
+    {
+      "log": "9ca40c81f5-postgres-verification.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 321,
+      "sha256": "00a1e17f86be87c1140bd5404a882cfd82aec4438bdfb813eb8d3429a34ebf4f"
+    },
+    {
+      "log": "9ca40c81f5-pr-body-reconciliation.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 17143,
+      "sha256": "55c3f3be078c96e8a92068723eec7da6fb73e579cbf3bb8fd195516e5b75dfbb"
+    },
+    {
+      "log": "9ca40c81f5-review-issue-comments.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 50242,
+      "sha256": "5aab8cc872d4e1619dc2122afc62f61dcf1c3220a9af8ce653b9244a02033859"
+    },
+    {
+      "log": "9ca40c81f5-reviews-after-greptile.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 103547,
+      "sha256": "4437ce165fe1ed48612d1157a2ba540bfc06a318eb93cba2f4948018c53c2f74"
+    },
+    {
+      "log": "9ca40c81f5-reviews-after-greptile.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 68097,
+      "sha256": "e1bb06469a00ebe69a047fb2a942926b50ee91bbfc0f7dfe8104018f3a4a13fb"
+    },
+    {
+      "log": "9ca40c81f5-reviews-after-push.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 103695,
+      "sha256": "7e49d3eb5eb9ac9ff090bebfbbb582c726f08ce5daa7a0aa4b99b4149b045a39"
+    },
+    {
+      "log": "9ca40c81f5-reviews-after-push.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 68159,
+      "sha256": "d780db7fbae8b644ac41b339f9c60fb7ce809b52d49c5eb6035ff7aefa6dc46f"
+    },
+    {
+      "log": "9ca40c81f5-security-authority-snapshot-20261006T192802Z.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 782,
+      "sha256": "cbd60bc711f1ca180f6d9e584aaa36e25ed8a46cdfe715842ac96da02fca521c"
+    },
+    {
+      "log": "9ca40c81f5-security-authority-snapshot-20261006T195150Z.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 782,
+      "sha256": "e47920227edf6862bbd7a7bb7aa98deede135cfc5be2919c6400526c564e47a4"
+    },
+    {
+      "log": "9ca40c81f5-security-authority-snapshot-20261006T201231Z.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 756,
+      "sha256": "ef9437d15c4873c0f877e114d1672b2aa708f3787890d0bac69ddbacb1a97e21"
+    },
+    {
+      "log": "9ca40c81f5-security-authority-snapshot.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 756,
+      "sha256": "ba4baa9c69c39160a9c67cca312fef27f818616bffaf8fc8dd87c71600d14cd7"
+    },
+    {
+      "log": "9ca40c81f5-skip-workflow-inventory.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 5411,
+      "sha256": "f0056da0cab148d27dadd257923bfd3454e047f502748803220ee8622232b26c"
+    },
+    {
+      "log": "9ca40c81f5-superseded-run-cancellations-retry.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 250581,
+      "sha256": "fbe40cc88b00f9636f9559a99e24aa8fda566a626288fc07cb655b90631af7d8"
+    },
+    {
+      "log": "9ca40c81f5-superseded-run-cancellations.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 34231,
+      "sha256": "100290129715b65e6f13c14fd746d10aafe7cf2a0812f69203e5f8955de2ad21"
+    },
+    {
+      "log": "9ca40c81f5-x86-image-job.json.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 2720,
+      "sha256": "d41d26972dc379c2ba57ec82ea015e2f8276f0bae193e2edea607024b1f391d1"
+    },
+    {
+      "log": "9ca40c81f5-x86-image-job.log.gz",
+      "observed_result": "Actual preceding-candidate hosted results and diagnostics. PostgreSQL receipts and lifetime, Kani, CVE and candidate image successes retain this original source scope. Portable and authorized-image failures remain failed, and pending checks remain pending.",
+      "bytes": 157110,
+      "sha256": "5c33043377a9a47fb6b10168d1382101af635c6625e7f2e9528fe7c7164f09e5"
+    },
+    {
+      "log": "approved-security-ci-contract-delta.patch.gz",
+      "observed_result": "Reviewed repository-authorized source and exact prerequisite reconciliation; current image, Cargo and workflow repairs retained.",
+      "bytes": 26333,
+      "sha256": "f4ef3478c66006958fe7f4bd27c0c678de15dcb965b2178232693e0e86ddc2dc"
+    },
+    {
+      "log": "approved-security-ci-contract-tests-delta.patch.gz",
+      "observed_result": "Reviewed repository-authorized source and exact prerequisite reconciliation; current image, Cargo and workflow repairs retained.",
+      "bytes": 18039,
+      "sha256": "7689cba9b440872a1257d699157c5eba224aa58b0309943a2ef93643642341d3"
+    },
+    {
+      "log": "approved-security-ci-prerequisite-reconciliation.json.gz",
+      "observed_result": "Reviewed repository-authorized source and exact prerequisite reconciliation; current image, Cargo and workflow repairs retained.",
+      "bytes": 794,
+      "sha256": "d3c5376151e6013fee6a7cdb2dc2f397e3e330617b0725fe2d96f4e439018f4a"
+    },
+    {
+      "log": "approved-security-source-prerequisite-import.json.gz",
+      "observed_result": "Reviewed repository-authorized source and exact prerequisite reconciliation; current image, Cargo and workflow repairs retained.",
+      "bytes": 4622,
+      "sha256": "43b6341f6ae7ec3ab54be8374b1aeaec90445be8f2e11d6f5f252667330a33fe"
+    },
+    {
+      "log": "qualification-feb12ee950.status.json.gz",
+      "observed_result": "Actual current-source21-command native qualification; canonical source/output inventory authoritative.",
+      "bytes": 268,
+      "sha256": "0875d03af2b62c76351b0a328347dab291b33a3fbd297858fb98b2a6582bfa8c"
+    },
+    {
+      "log": "receipt-verifier-feb12ee950-build.log.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated binary on ARM; no physical x86 acceptance.",
+      "bytes": 1660,
+      "sha256": "995a0bdf9c6b92e5ae701ff8190ffe8d2c2696193ca385bd54d3bc3fc9807cc1"
+    },
+    {
+      "log": "receipt-verifier-feb12ee950.status.json.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated binary on ARM; no physical x86 acceptance.",
+      "bytes": 566,
+      "sha256": "b081cd1404d742003a2ac853ff5bc3ee7b78c8f66d1c26eee1c91e7a23ce7187"
+    },
+    {
+      "log": "review-native-qualification-feb12ee950.log.gz",
+      "observed_result": "Actual terminal current-source21-command native output; no hosted or physical x86 claim.",
+      "bytes": 539,
+      "sha256": "fe3e00369ba6fb9521ad04b6123fd6a456acf5a345f3a2af68ce164f3e52a185"
+    },
+    {
+      "log": "security-adversarial-fixture-controls-v1.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 51,
+      "sha256": "151c9e26167cf9206d6eefb30b08c8d707f8f14dd0db0fa5d6dcd8afb7d2dff2"
+    },
+    {
+      "log": "security-adversarial-fixture-controls.provenance.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 611,
+      "sha256": "e1c9fa51dff89fac71a083cf2b1a30e5623e688e03cfc68baf8046c6bfe5f300"
+    },
+    {
+      "log": "security-aggregate-filter-red.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 878,
+      "sha256": "dd628512644afc5ca7f0d53e0dcad47e237d693dc878eb9550a9e1b2c10ca794"
+    },
+    {
+      "log": "security-aggregate-source-identity-red.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2673,
+      "sha256": "d66ac4e8ec700d5ee15ff85b11c95fc0dc6dd43592449331cbfa160db646fa90"
+    },
+    {
+      "log": "security-authorities-before-final-9c152fbdfa.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 538,
+      "sha256": "47e615a6b31e83b6067de24df2cb4514e8a5a62671bc87ca7a07bd62f1552372"
+    },
+    {
+      "log": "security-contract-apk-caller-controls.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "security-contract-apk-controls.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1249,
+      "sha256": "9d3d93daea7c8b14556c045981aaf211269e238de476795567d95affa22bea74"
+    },
+    {
+      "log": "security-contract-apk-refresh.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "security-contract-before-merge.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "security-contract-controls-final.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "security-contract-image-update.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 114,
+      "sha256": "79a6c07c1cf15ed9fc7c8b7ca51a01117651f790daa0b0ad0edbde1bc6dbd894"
+    },
+    {
+      "log": "security-contract-updated.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "security-definitions-final.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2844,
+      "sha256": "c42f80d870daff8c9affae20985cb5df65a5a336510baf60d70ad51ca9e1635e"
+    },
+    {
+      "log": "security-evidence-shards-first-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 111,
+      "sha256": "165aaaa3c9b4abc47ace3a8acc4c2fa6b093fab1b85f1a6feecb8979a80f9ca3"
+    },
+    {
+      "log": "security-image-apk.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 7116,
+      "sha256": "948a8453c3508725984157e253c3b3cff5c85fc3b3d35acda9a21176336eaf37"
+    },
+    {
+      "log": "security-keyring-prerequisite-reconciliation.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 460,
+      "sha256": "14af22d7d6c1225517f45803128d439bd2750bb8fad9d4b2058866876a1d32fb"
+    },
+    {
+      "log": "security-native-launch-owner.patch.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 12827,
+      "sha256": "701cd5bce9ec888b8d67e546480b58fbf96f92c1255893fe5fec245361c6add8"
+    },
+    {
+      "log": "security-portable-python-install.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2314,
+      "sha256": "d3c4a6505ffd411b91102fde97f5d14af37f11af6ce1eba95cdeb32a633f11f9"
+    },
+    {
+      "log": "security-portable-python.lock.txt.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 147,
+      "sha256": "60252c68934d3bd71a69fe7d0d671a5c030a3a770584aed04f14a9ba313b7ffb"
+    },
+    {
+      "log": "security-prerequisite-authority-20261006T205740Z.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 712,
+      "sha256": "34f7b3873b502442cba1e5543ab6c558695cf9f6fb938484d1d927201f22658b"
+    },
+    {
+      "log": "security-prerequisite-authority-corrected-20261006T205830Z.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 901,
+      "sha256": "701ceaf1ca619650c7796ccb96d96649f123434353aa3cfe380a89bcfaf0d196"
+    },
+    {
+      "log": "security-prerequisite-new-head-failures.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 819,
+      "sha256": "fe135bc54897d94248f329cbc0e7f50cb5e418a2acf311299e3b4de5d8bf0175"
+    },
+    {
+      "log": "security-prerequisite-reviewed-failure-ledger.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1369,
+      "sha256": "bb408829b774ffb326071545e13a1ffc04ecf2ee3d5cbd4ccafca866a246a88d"
+    },
+    {
+      "log": "security-prerequisites-ci-contract-first-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1300,
+      "sha256": "b8b02583f75afa0cffd2602711d016da2a81dd5b586768e9f180c453c64c74f4"
+    },
+    {
+      "log": "security-prerequisites-ci-contract-green-v2.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "security-prerequisites-ci-contract-verification.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 457,
+      "sha256": "6ece0110607fc192469a7a583f88bd86d6f368462fa25bace33793fd23a0c7d0"
+    },
+    {
+      "log": "security-prerequisites-controls-final-adversarial-fixture-controls.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 51,
+      "sha256": "151c9e26167cf9206d6eefb30b08c8d707f8f14dd0db0fa5d6dcd8afb7d2dff2"
+    },
+    {
+      "log": "security-prerequisites-controls-final-broker-helper-lifetime.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 98,
+      "sha256": "4131517bd3f7f092ff8f4c837ff6895442ecb3c283da6e2e2323292341e55d51"
+    },
+    {
+      "log": "security-prerequisites-controls-final-derived-inputs.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2229,
+      "sha256": "a8912a9a88bdfa90c49c09717486d714e53be57f6ab378c8a3ae369998c604f5"
+    },
+    {
+      "log": "security-prerequisites-controls-final-execution-container.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 198,
+      "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+    },
+    {
+      "log": "security-prerequisites-controls-final-git-source.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1326,
+      "sha256": "398850492ec7d5943a386465de90f26b299ff0c4b5a8e40ef79711cb7a24ae9f"
+    },
+    {
+      "log": "security-prerequisites-controls-final-mutant-controls.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 761,
+      "sha256": "2dc775215da7c4c4a2c820568e3d5c9f8d133d70e4bb7ae6a8879a5f68cb707e"
+    },
+    {
+      "log": "security-prerequisites-controls-final-mutant-paths.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1156,
+      "sha256": "3d8dcfb65f75631b3c300fb3a6e8a428aea3166a0b469e066c7280d8cb9ad228"
+    },
+    {
+      "log": "security-prerequisites-controls-final-mutant-refresh.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1100,
+      "sha256": "9b7ab2349b5f93c1a16f3fc795049f9e7844183ba11c0567e954a2ce1c65eed6"
+    },
+    {
+      "log": "security-prerequisites-controls-final-shards.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 113,
+      "sha256": "52b0d4694e10ad7f29a4d68ec24cbe455edf7750a3543df250d110a7a6472f22"
+    },
+    {
+      "log": "security-prerequisites-controls-final.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 6968,
+      "sha256": "e490df139c546e12a78bb0b649d829eb82ace2101f592ed20a3aa11249e00fe0"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-adversarial-controls.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 5650,
+      "sha256": "39075f1ed4154ec96b83e04a14f6b5b360445b236900496f7731cd7303d71e91"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-broker-helper-lifetime.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 98,
+      "sha256": "1680bbc6f487933c36f0fbcd9cad24a7aafaebffc78d5625f4548457860cd9ac"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-derived-inputs.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2229,
+      "sha256": "8e63cd3ff6b0d6d87677a3b549ff1a7b48d1a533f5b9c74eec942bebf08dc708"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-execution-container.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 198,
+      "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-git-source.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1008,
+      "sha256": "1403eb1dd7cf63fb861e34b0ee4113a2c9cd370e92f23dbf2bae6391ef89cda4"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-mutant-controls.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 761,
+      "sha256": "8b955ec10c950eb84c2792d246fa0dd391585486558b24172cbee1db0d4a8597"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-mutant-paths.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1156,
+      "sha256": "d4ec592495231b726cf11bd51e2c344831a71625f4d855e6a46d90f107f0ceac"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-mutant-refresh.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1100,
+      "sha256": "fac6f284c13ef8a3f1a84ceb2690dad42d8ec05c6f503da34f71fc03bcc6eb73"
+    },
+    {
+      "log": "security-prerequisites-controls-v1-shards.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 113,
+      "sha256": "c1fa6c35d44a86d2a36a9b3b30dade5f3629157bd204e94850ced11960a091d6"
+    },
+    {
+      "log": "security-prerequisites-controls-v1.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 6753,
+      "sha256": "ef96c03eeae482cfe7a4ed16f8513241e5ececc615a3da64949fda7fc4c6ba19"
+    },
+    {
+      "log": "security-prerequisites-finish-final-diff.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-prerequisites-finish-final-format.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "security-prerequisites-finish-final-hygiene.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 52024,
+      "sha256": "3e644c33241bbec07be9bccc55346dfa3fffcfd7b5b842ec47c84154fbd4aa41"
+    },
+    {
+      "log": "security-prerequisites-finish-final-mirrors.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "security-prerequisites-finish-final-proof-check.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "security-prerequisites-finish-final-proof-refresh.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "security-prerequisites-finish-final.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 5475,
+      "sha256": "082b85c64898842bc7a04278b222a3107e32837934325a9b9e658990e506d59b"
+    },
+    {
+      "log": "security-prerequisites-inline-review.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2617,
+      "sha256": "fea33080490bc76bce4dd48cf1156d0d28d7acfbbf088aa379cdd393077e8e36"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v2-wire-lane-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 102,
+      "sha256": "4a160235c0add54f7a5997815d0e01a072210439de4899c702c94dd3cd814662"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v2-wire-vectors-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 559,
+      "sha256": "c8768b42a55f9514c48106c404b49f4518fda3b9fd1c434cedc70a8e31f643b1"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v2.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 3692,
+      "sha256": "2ee86f24faa658e8d25e5de80f6080c41486c648cfec25c5e2455f8dff2aaba3"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v3-enterprise-provenance-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 286,
+      "sha256": "55b336a0d39a3691ddccfde4f6050358ff430eb257756bf29bb1e03609fdb882"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v3-enterprise-provenance.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 35,
+      "sha256": "7836ba9d1210d6ea171fc21a78eb065d1d13cb9273aa02b2189ce1b392c196d1"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v3-keyring-producer.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 12802,
+      "sha256": "23f22354390dedb2a9762f39e790397db85c22c736c290e01d319ea95cf1bce5"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v3-wire-lane-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 102,
+      "sha256": "b6a161abed43b9a0dba9259cd451b39b20b10425ac13cc14786554c0e6fac7f1"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v3-wire-vectors-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 115,
+      "sha256": "2a771e45660d93d5d993c156001c82f731e92429c197dff420eceeafa5a35154"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v3.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 5125,
+      "sha256": "1cc77cfe81f66faeedede7ac5a10a4bca94d51e8aab468c027892c52102fbcec"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-broker-portable-producer.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 88300,
+      "sha256": "e49f324bc27efe4b0f14ad1272deb6ce05ace46e18f969fcbeec1a9c41cfd050"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-enterprise-provenance-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 286,
+      "sha256": "55b336a0d39a3691ddccfde4f6050358ff430eb257756bf29bb1e03609fdb882"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-enterprise-provenance.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 35,
+      "sha256": "7836ba9d1210d6ea171fc21a78eb065d1d13cb9273aa02b2189ce1b392c196d1"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-keyring-producer.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 59001,
+      "sha256": "6a4a62b12a46791643e29fd2f1c3a2fa980f311f1edb187e81dd5791c929f1c8"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-schema-producer.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 33,
+      "sha256": "f08ca40211ee4cf16919c55a0c548472ee01a0ff6808eadb1e60a66f4aa43553"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-wire-lane-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 102,
+      "sha256": "b6a161abed43b9a0dba9259cd451b39b20b10425ac13cc14786554c0e6fac7f1"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-wire-vectors-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 115,
+      "sha256": "e9ca5bb7d8661afabb22251f89213454dff50cd2a21d4ad3c36c107bfc7fcb1b"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4-wire-vectors-producer.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 63,
+      "sha256": "d7e078ac42109dc972c684dc2a9f0bd82df8d30f154b52571cf30f3589bb964e"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-v4.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 6586,
+      "sha256": "4b590a775ee7b936dc8396830e0c9e63c9f44e7295b489811477e13f09608d30"
+    },
+    {
+      "log": "security-prerequisites-portable-tail-wire-lane-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1351,
+      "sha256": "fb4352212bcbaf309333e8a49061aacdc6cc535f221543737c084a10dbd6c8f3"
+    },
+    {
+      "log": "security-prerequisites-portable-tail.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 3073,
+      "sha256": "e6256c871ec92c88da89d1985ff6b356f64882d74fb71c91342ca4c4139b4bbb"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-active-defense-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 64,
+      "sha256": "49e0b289b6a16d1d8593ca663e5438b00c832014974e6c45abdcdbe300aeff15"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-cage-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 108,
+      "sha256": "3279c61c6da9453f2870e4c2b2864be4e48585ff92e7198a7383a48d8c03e012"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-cargo-inventory-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1426,
+      "sha256": "61e6d19db53c125ae7718dfd0c707d27b9b6518ca0021944e6c64ab3a84eed76"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-consumer-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 196,
+      "sha256": "8dfb53dbd36657af7304c2bb2a758e41ab8e174a2c50743c3fa424ce792a1c40"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-consumer-sdk-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 98,
+      "sha256": "26a2157691aecf52871e13521306b611618cafe5bfc90d41154d52b360a51897"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-deception-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1499,
+      "sha256": "7f6591b386516b68dbfe7b9bec11a1429d1598bd6503731aa9b5ba568143f1d0"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-flow-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 58,
+      "sha256": "e3f5c0e94f3809efb913817dcc0856be7f259530a6d770cba8009dbb9254ca38"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-peer-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 47,
+      "sha256": "b723c30ba2e0ce5c6669a2821cd03515ef81d2579e994f168875a0139dfc3921"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-response-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 39,
+      "sha256": "9f5144daad94c61478d9eda3beab8456249f4dab2bffefc0a80f3dd288ce4c41"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-security-ci-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1265,
+      "sha256": "8fea530c828165f631177fbcbf88edefdc19fb919da13bf3aa39c25bb47e54db"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-shard-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 113,
+      "sha256": "3403b23548c914199eaeb7ee90d5c2297f3b3a9e2d116fbe91aac78f8f8598a4"
+    },
+    {
+      "log": "security-prerequisites-portable-v1-temporal-contract.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1503,
+      "sha256": "ed8ec9daf11a994a5cb76863187f4bc497fd0b35b1d2f2c3804be56b8894997e"
+    },
+    {
+      "log": "security-prerequisites-portable-v1.status.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 8082,
+      "sha256": "6135116e07cf66fa797c7d4f368e900d98a79812de6a357d38efe16f76ce5f9a"
+    },
+    {
+      "log": "security-source-authority-20261006T213016Z.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 809,
+      "sha256": "e488f17a71542887d38a831a5dcadaa1251344c799142955bad9bdb792bd77eb"
+    },
+    {
+      "log": "security-source-checkpoint-commit.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 855,
+      "sha256": "eb23abf82738be657b4017f2b4a919e195bc47fffcd3e58b1a0518404f6f4283"
+    },
+    {
+      "log": "security-source-checkpoint-feb12ee950.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 6934,
+      "sha256": "d7e9fba6a70236a6c9d3ce3b4b2529f331f0c0791bc497393dfdd093a687c33c"
+    },
+    {
+      "log": "security-source-execution-container-first-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 198,
+      "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+    },
+    {
+      "log": "security-source-execution-final-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 198,
+      "sha256": "1d3d7e123cfb602ca813555b2a85ba9754d5852c0fcb1aba25b0d012dce31c35"
+    },
+    {
+      "log": "security-source-filter-red.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1031,
+      "sha256": "a31d4eaee3b825e28c927a1f254d16b8090e692c77b70f4e9ff864bb57389c02"
+    },
+    {
+      "log": "security-source-git-and-filter-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1161,
+      "sha256": "70016ce1e72c93f0e4ecad455402f7b0abff3a06adc4bc0b07bab90233c68520"
+    },
+    {
+      "log": "security-source-identity-eight-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1326,
+      "sha256": "6dab8c9ccd2f2c714d828d698e515b8faeba9031899b662b0120010f512f202e"
+    },
+    {
+      "log": "security-source-identity-final-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1008,
+      "sha256": "4e182814fa1315bdb16a31f6e146052b6df25a44074b5b6e432680b3de483db0"
+    },
+    {
+      "log": "security-source-identity-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1533,
+      "sha256": "eb464e4ae29192187ecfee68b2f7702cd1cc1f57b8bb82ec467960dba3757308"
+    },
+    {
+      "log": "security-source-identity-red.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 4225,
+      "sha256": "befa6d53040aa6772156002a0a4a1a19a650bc9b814fc353510884e77090b3e5"
+    },
+    {
+      "log": "security-source-import-static-red.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 745,
+      "sha256": "b9570e891069ad1a9694951c3df4b23ecb705410f7bafda3daabee8aad99168f"
+    },
+    {
+      "log": "security-source-shards-and-callbacks-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 113,
+      "sha256": "782d3c1f5a5645cf336822be59cc4214228f0153618e803d7e09c8284b316776"
+    },
+    {
+      "log": "security-source-signature-program-red.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2305,
+      "sha256": "22b4dd0e77a2d4e629bab73293ab9d6fd4ffe5c79f12b3bdf9f8c2df1357e618"
+    },
+    {
+      "log": "security-types-followup-0.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 9142,
+      "sha256": "b9c7dcaba93517410e212718e4740836f0f06945081cbfa9380746b82bdb9fce"
+    },
+    {
+      "log": "security-types-followup-1.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 2975,
+      "sha256": "9aa2d5fe95f404661c5a4bb7818fe2e61cd657a517c240ed712777df7e835f6c"
+    },
+    {
+      "log": "security-types-followup-2.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1808,
+      "sha256": "955fa8148e7506076e308071bbfbc753537e941a9f680acec6eb7d1c807acada"
+    },
+    {
+      "log": "security-vars-acf34b-handoff.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 1152,
+      "sha256": "13e7389fbdc2c08c4ef7b44d283bfdab0ded6a828317e448e6a39b11a6bb70f5"
+    },
+    {
+      "log": "security-wire-lane-green.log.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 745,
+      "sha256": "158b5f4ea8b5c9854f4b93e8b5422c9ead9be8a13dfb81dfa623c8df921c9d34"
+    },
+    {
+      "log": "security-wire-prerequisite-reconciliation.json.gz",
+      "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
+      "bytes": 450,
+      "sha256": "44e02377df5b4e1a4594d6d1e591f44986afcfe6322b22af27474231148ef48e"
     }
   ]
 }

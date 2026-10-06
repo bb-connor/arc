@@ -1,0 +1,3214 @@
+{
+  "child": {
+    "allocationId": "0x75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+    "authorityUuid": "01a1129c-867a-7972-abed-c697de35bb93",
+    "authorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe:0",
+    "nativeAuthorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "child",
+    "runtimeClaimHistory": [
+      {
+        "disposition": "retained_after_dispatch_commit",
+        "intent": {
+          "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+          "expectationId": "5e5606902fd3562fcf1fbedba39ba6fcdede5f5ee84abaf232b15bfa5f227d85",
+          "grantIndex": 0,
+          "phase": "dispatch",
+          "planDigest": "920f2d3847119a7660e248daad017544b1dbc244f53d9cb235e3346867070b4a",
+          "requestBindingHash": "21dc3244e75882e4ec56ed8924291ead8593fff3be5a292eaf7132df24f78087",
+          "resources": [
+            {
+              "artifactDigest": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c",
+              "kind": "treaty_continuation",
+              "resourceId": "treaty-continuation-child"
+            },
+            {
+              "artifactDigest": "ee0da1715e9f15c4b17df0bef42a16cc607c41be9cb9857047474b1405cbcdaf",
+              "kind": "swarm_continuation",
+              "resourceId": "continue-child"
+            }
+          ],
+          "runtimeAuthorityId": "runtime-01a1129c-867a-7972-abed-c697de35bb93"
+        },
+        "reference": {
+          "claimDigest": "3c37c5f577fbd226cff8648c649768e64d213ba79a584508dbe5d741360601b9",
+          "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+          "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe"
+        }
+      }
+    ],
+    "settlementObservationError": null,
+    "settlementTransaction": "0x086b7e67190826888cd0b4ed0621cae65f14f906e05935456493e07b37d1f1e4",
+    "startupReconciliationError": "internal error: federation cosigner missing for request child bound to origin kernel did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+  },
+  "collection": {
+    "replay": {
+      "allocationId": "0x75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "authorityUuid": "01a1129c-867a-7972-abed-c697de35bb93",
+      "authorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "executions": 1,
+      "externalFundsTransferred": true,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe:0",
+      "nativeAuthorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "nativePaymentAction": "capture",
+      "nativePaymentState": "Settled",
+      "nativeState": "Completed",
+      "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe",
+      "paymentState": "paid",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "child",
+      "runtimeClaimHistory": [
+        {
+          "disposition": "retained_after_dispatch_commit",
+          "intent": {
+            "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+            "expectationId": "5e5606902fd3562fcf1fbedba39ba6fcdede5f5ee84abaf232b15bfa5f227d85",
+            "grantIndex": 0,
+            "phase": "dispatch",
+            "planDigest": "920f2d3847119a7660e248daad017544b1dbc244f53d9cb235e3346867070b4a",
+            "requestBindingHash": "21dc3244e75882e4ec56ed8924291ead8593fff3be5a292eaf7132df24f78087",
+            "resources": [
+              {
+                "artifactDigest": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c",
+                "kind": "treaty_continuation",
+                "resourceId": "treaty-continuation-child"
+              },
+              {
+                "artifactDigest": "ee0da1715e9f15c4b17df0bef42a16cc607c41be9cb9857047474b1405cbcdaf",
+                "kind": "swarm_continuation",
+                "resourceId": "continue-child"
+              }
+            ],
+            "runtimeAuthorityId": "runtime-01a1129c-867a-7972-abed-c697de35bb93"
+          },
+          "reference": {
+            "claimDigest": "3c37c5f577fbd226cff8648c649768e64d213ba79a584508dbe5d741360601b9",
+            "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+            "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe"
+          }
+        }
+      ],
+      "settlementObservationError": null,
+      "settlementTransaction": "0x086b7e67190826888cd0b4ed0621cae65f14f906e05935456493e07b37d1f1e4",
+      "startupReconciliationError": "internal error: federation cosigner missing for request child bound to origin kernel did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+    },
+    "transactionHash": "0x086b7e67190826888cd0b4ed0621cae65f14f906e05935456493e07b37d1f1e4"
+  },
+  "collectionReplay": {
+    "replay": {
+      "allocationId": "0x75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "authorityUuid": "01a1129c-867a-7972-abed-c697de35bb93",
+      "authorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "executions": 1,
+      "externalFundsTransferred": true,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe:0",
+      "nativeAuthorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "nativePaymentAction": "capture",
+      "nativePaymentState": "Settled",
+      "nativeState": "Completed",
+      "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe",
+      "paymentState": "paid",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "child",
+      "runtimeClaimHistory": [
+        {
+          "disposition": "retained_after_dispatch_commit",
+          "intent": {
+            "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+            "expectationId": "5e5606902fd3562fcf1fbedba39ba6fcdede5f5ee84abaf232b15bfa5f227d85",
+            "grantIndex": 0,
+            "phase": "dispatch",
+            "planDigest": "920f2d3847119a7660e248daad017544b1dbc244f53d9cb235e3346867070b4a",
+            "requestBindingHash": "21dc3244e75882e4ec56ed8924291ead8593fff3be5a292eaf7132df24f78087",
+            "resources": [
+              {
+                "artifactDigest": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c",
+                "kind": "treaty_continuation",
+                "resourceId": "treaty-continuation-child"
+              },
+              {
+                "artifactDigest": "ee0da1715e9f15c4b17df0bef42a16cc607c41be9cb9857047474b1405cbcdaf",
+                "kind": "swarm_continuation",
+                "resourceId": "continue-child"
+              }
+            ],
+            "runtimeAuthorityId": "runtime-01a1129c-867a-7972-abed-c697de35bb93"
+          },
+          "reference": {
+            "claimDigest": "3c37c5f577fbd226cff8648c649768e64d213ba79a584508dbe5d741360601b9",
+            "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+            "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe"
+          }
+        }
+      ],
+      "settlementObservationError": null,
+      "settlementTransaction": "0x086b7e67190826888cd0b4ed0621cae65f14f906e05935456493e07b37d1f1e4",
+      "startupReconciliationError": null
+    },
+    "transactionHash": "0x086b7e67190826888cd0b4ed0621cae65f14f906e05935456493e07b37d1f1e4"
+  },
+  "discoveredAfterScout": true,
+  "discovery": {
+    "output": [
+      {
+        "authenticationRequired": true,
+        "method": "get",
+        "path": "/accounts"
+      },
+      {
+        "authenticationRequired": false,
+        "method": "get",
+        "path": "/health"
+      },
+      {
+        "authenticationRequired": false,
+        "method": "post",
+        "path": "/refunds"
+      },
+      {
+        "authenticationRequired": true,
+        "method": "delete",
+        "path": "/sessions"
+      }
+    ],
+    "outputSha256": "8b10121606f72f738c76abee3bf4b88f077ff3b1964ddeff36227887593bb350",
+    "selectedTask": "child",
+    "sourceOperation": "79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4"
+  },
+  "earned": {
+    "beneficiaryBalance": "0",
+    "escrowBalance": "300",
+    "events": {
+      "ClaimSubmitted": 1,
+      "DecisionRecorded": 1,
+      "Funded": 1,
+      "Paid": 0,
+      "Refunded": 0,
+      "TimedOut": 0
+    },
+    "fundingTransaction": "0x08698ed693ee47668f5ef2ea888a881dea51166c6f8ae65826f2950b54be0955",
+    "paid": "0",
+    "payerBalance": "900",
+    "refunded": "0",
+    "state": "Payable",
+    "transactions": {
+      "pay": [],
+      "record": [
+        {
+          "hash": "0xc7e2e796f9f94e9f64c042803d1f5d89a6bcf1089615b834463231c7b31ebc83",
+          "nonce": 0,
+          "status": 1
+        }
+      ],
+      "refund": [],
+      "submit": [
+        {
+          "hash": "0x98f44ffcb77bfca0738fc41348afe0bbb2960ea43f51ddce2c45b96decaa4ad7",
+          "nonce": 0,
+          "status": 1
+        }
+      ]
+    }
+  },
+  "final": {
+    "balances": {
+      "buyer": "900",
+      "child": "100",
+      "escrow": "0",
+      "intermediary": "1000",
+      "supply": "2000"
+    },
+    "child": {
+      "beneficiaryBalance": "100",
+      "escrowBalance": "0",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 1,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "fundingTransaction": "0x08698ed693ee47668f5ef2ea888a881dea51166c6f8ae65826f2950b54be0955",
+      "paid": "100",
+      "payerBalance": "1000",
+      "refunded": "0",
+      "state": "Paid",
+      "transactions": {
+        "pay": [
+          {
+            "hash": "0x086b7e67190826888cd0b4ed0621cae65f14f906e05935456493e07b37d1f1e4",
+            "nonce": 1,
+            "status": 1
+          }
+        ],
+        "record": [
+          {
+            "hash": "0xc7e2e796f9f94e9f64c042803d1f5d89a6bcf1089615b834463231c7b31ebc83",
+            "nonce": 0,
+            "status": 1
+          }
+        ],
+        "refund": [],
+        "submit": [
+          {
+            "hash": "0x98f44ffcb77bfca0738fc41348afe0bbb2960ea43f51ddce2c45b96decaa4ad7",
+            "nonce": 0,
+            "status": 1
+          }
+        ]
+      }
+    },
+    "parent": {
+      "beneficiaryBalance": "1000",
+      "escrowBalance": "0",
+      "events": {
+        "ClaimSubmitted": 0,
+        "DecisionRecorded": 0,
+        "Funded": 1,
+        "Paid": 0,
+        "Refunded": 1,
+        "TimedOut": 1
+      },
+      "fundingTransaction": "0x40d557b777da4b54903257425d3c0178fcfdace515c539bba33f3dbca257cef1",
+      "paid": "0",
+      "payerBalance": "900",
+      "refunded": "100",
+      "state": "Refunded",
+      "transactions": {
+        "pay": [],
+        "record": [],
+        "refund": [
+          {
+            "hash": "0x7a0ae9f09f1b4c1dcea8d4d2220091cfdaadb247ea34957e03d71f2d0aef4586",
+            "nonce": 3,
+            "status": 1
+          }
+        ],
+        "submit": []
+      }
+    },
+    "scout": {
+      "beneficiaryBalance": "1000",
+      "escrowBalance": "0",
+      "events": {
+        "ClaimSubmitted": 1,
+        "DecisionRecorded": 1,
+        "Funded": 1,
+        "Paid": 1,
+        "Refunded": 0,
+        "TimedOut": 0
+      },
+      "fundingTransaction": "0xb262415d655885d81db16f11a2c6e76c503fbb49ee3c95e76b72cab794bba1e5",
+      "paid": "100",
+      "payerBalance": "900",
+      "refunded": "0",
+      "state": "Paid",
+      "transactions": {
+        "pay": [
+          {
+            "hash": "0x86d39176659f8880bcad5cc274eef5cf588a2672dda4bc35e48b3ad5a9c7645d",
+            "nonce": 3,
+            "status": 1
+          }
+        ],
+        "record": [
+          {
+            "hash": "0x3b45937065811da9beeced4f0cdfb1e7eb1964db10f74b18fb37935443b2957b",
+            "nonce": 1,
+            "status": 1
+          }
+        ],
+        "refund": [],
+        "submit": [
+          {
+            "hash": "0x5737485e112866e290529acf30d1512a56d17b24a35d75127934f8e70090d85f",
+            "nonce": 2,
+            "status": 1
+          }
+        ]
+      }
+    }
+  },
+  "graphNodeCounts": [
+    3,
+    4
+  ],
+  "original": {
+    "child": {
+      "allocationId": "0x75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "authorityUuid": "01a1129c-867a-7972-abed-c697de35bb93",
+      "authorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "executions": 1,
+      "externalFundsTransferred": false,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe:0",
+      "nativeAuthorizationId": "funded-75f0445174c8f7ad0a75574bd16093fc61785aa762389a6aab26c1dbccb15125",
+      "nativePaymentAction": "capture",
+      "nativePaymentState": "Settling",
+      "nativeState": "Finalizing",
+      "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe",
+      "paymentState": "pending",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "child",
+      "runtimeClaimHistory": [
+        {
+          "disposition": "retained_after_dispatch_commit",
+          "intent": {
+            "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+            "expectationId": "5e5606902fd3562fcf1fbedba39ba6fcdede5f5ee84abaf232b15bfa5f227d85",
+            "grantIndex": 0,
+            "phase": "dispatch",
+            "planDigest": "920f2d3847119a7660e248daad017544b1dbc244f53d9cb235e3346867070b4a",
+            "requestBindingHash": "21dc3244e75882e4ec56ed8924291ead8593fff3be5a292eaf7132df24f78087",
+            "resources": [
+              {
+                "artifactDigest": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c",
+                "kind": "treaty_continuation",
+                "resourceId": "treaty-continuation-child"
+              },
+              {
+                "artifactDigest": "ee0da1715e9f15c4b17df0bef42a16cc607c41be9cb9857047474b1405cbcdaf",
+                "kind": "swarm_continuation",
+                "resourceId": "continue-child"
+              }
+            ],
+            "runtimeAuthorityId": "runtime-01a1129c-867a-7972-abed-c697de35bb93"
+          },
+          "reference": {
+            "claimDigest": "3c37c5f577fbd226cff8648c649768e64d213ba79a584508dbe5d741360601b9",
+            "episodeId": "01a1129c-bb83-7121-b2a6-c685a830f184",
+            "operationId": "79738551fbd9927ca0eb312195cb3edbd8bf3b2112b524470d9ddcbfd9bae8fe"
+          }
+        }
+      ],
+      "settlementObservationError": null,
+      "settlementTransaction": null,
+      "startupReconciliationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending"
+    },
+    "parent": {
+      "allocationId": "0xf5d1437a10c8324a2668474e08dbb568759dd16e0dde351cf755ee6183e55e12",
+      "authorityUuid": "01a1129c-7f69-7ba0-abd1-17639dc9b996",
+      "authorizationId": "funded-f5d1437a10c8324a2668474e08dbb568759dd16e0dde351cf755ee6183e55e12",
+      "executions": 1,
+      "externalFundsTransferred": false,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:c69850c87a9154036b171f240d3c5caea5be334fd0c2c0fa71853cd154c8c6af:0",
+      "nativeAuthorizationId": "funded-f5d1437a10c8324a2668474e08dbb568759dd16e0dde351cf755ee6183e55e12",
+      "nativePaymentAction": null,
+      "nativePaymentState": "Authorized",
+      "nativeState": "OutcomeUnknownAfterDispatch",
+      "operationId": "c69850c87a9154036b171f240d3c5caea5be334fd0c2c0fa71853cd154c8c6af",
+      "paymentState": "pending",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "parent",
+      "runtimeClaimHistory": [
+        {
+          "disposition": "retained_after_dispatch_commit",
+          "intent": {
+            "episodeId": "01a1129c-b582-79b2-b358-1a389120f2f1",
+            "expectationId": "b0ae4ab5b8f35e57489af8afb7a4acf234f3272c502b48848228e96a310f9810",
+            "grantIndex": 0,
+            "phase": "dispatch",
+            "planDigest": "da6d2b905f1652bf8934b3c74507bb5e91478fc2ca87564e4cd8c95201c70a22",
+            "requestBindingHash": "22c3bbe0ebd93b3cc8fe771b5579b37e98a7e6f358e31a6172167232ddd8ee66",
+            "resources": [
+              {
+                "artifactDigest": "3362960e5b937d98107706cc92da18883609f1beea27ce63c9243322cd61c902",
+                "kind": "treaty_continuation",
+                "resourceId": "treaty-continuation-parent"
+              },
+              {
+                "artifactDigest": "393024c24359092438fafb15f4d592519254c868a59dc18e9cf0350320252ed4",
+                "kind": "swarm_continuation",
+                "resourceId": "continue-parent"
+              }
+            ],
+            "runtimeAuthorityId": "runtime-01a1129c-7f69-7ba0-abd1-17639dc9b996"
+          },
+          "reference": {
+            "claimDigest": "e6107e3fac2995232d8a39d5c20fb94a95da72a73e649b0986f15d14c7ebecdd",
+            "episodeId": "01a1129c-b582-79b2-b358-1a389120f2f1",
+            "operationId": "c69850c87a9154036b171f240d3c5caea5be334fd0c2c0fa71853cd154c8c6af"
+          }
+        }
+      ],
+      "settlementObservationError": null,
+      "settlementTransaction": null,
+      "startupReconciliationError": null
+    },
+    "scout": {
+      "allocationId": "0x5fe586d3b31037fd508caefadce9fdf6234da1784147486283e9a31497fe7ac3",
+      "authorityUuid": "01a1129c-780b-7942-acf4-114022194016",
+      "authorizationId": "funded-5fe586d3b31037fd508caefadce9fdf6234da1784147486283e9a31497fe7ac3",
+      "executions": 1,
+      "externalFundsTransferred": false,
+      "fundingCorrelation": "bound",
+      "holdId": "admission-budget:79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4:0",
+      "nativeAuthorizationId": "funded-5fe586d3b31037fd508caefadce9fdf6234da1784147486283e9a31497fe7ac3",
+      "nativeEvaluationError": "durable admission failed: payment rail unavailable: exact ERC20 payout has not been observed; capture remains pending",
+      "nativePaymentAction": "capture",
+      "nativePaymentState": "Settling",
+      "nativeState": "Finalizing",
+      "operationId": "79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4",
+      "paymentState": "pending",
+      "profile": "chio.experimental.local-confirmed-funding.v1",
+      "requestId": "scout",
+      "runtimeClaimHistory": [
+        {
+          "disposition": "retained_after_dispatch_commit",
+          "intent": {
+            "episodeId": "01a1129c-a1df-72f0-868a-7691c14c66e4",
+            "expectationId": "dfbde4df83594ab0de5e2575030c5e8d79b4cee07989ef9b68860b26a4e6c5fe",
+            "grantIndex": 0,
+            "phase": "dispatch",
+            "planDigest": "4babe82f7f7684e4204ac5db619a2eda86a606b2c687174e7326418e56ce8aeb",
+            "requestBindingHash": "50768ed2bfd220cdcfcd9cfcd25e3543ee0726e108511384d25fd0a883b981db",
+            "resources": [
+              {
+                "artifactDigest": "716a02b73ba1791241267b9dc58059616193bcc30c7c0fd750c65ca1ffb3adaa",
+                "kind": "treaty_continuation",
+                "resourceId": "treaty-continuation-scout"
+              },
+              {
+                "artifactDigest": "85ee1532b4309e4636d7d78c71c737d780c9e64254ba59571130cacebb75c9d2",
+                "kind": "swarm_continuation",
+                "resourceId": "continue-scout"
+              }
+            ],
+            "runtimeAuthorityId": "runtime-01a1129c-780b-7942-acf4-114022194016"
+          },
+          "reference": {
+            "claimDigest": "88d81fe779c36a38a3d796cbe2aa198bbe42f6394e2b12c1194b2b0627586c03",
+            "episodeId": "01a1129c-a1df-72f0-868a-7691c14c66e4",
+            "operationId": "79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4"
+          }
+        }
+      ],
+      "settlementObservationError": null,
+      "settlementTransaction": null,
+      "startupReconciliationError": null
+    }
+  },
+  "originalScoutPreserved": true,
+  "parent": {
+    "allocationId": "0xf5d1437a10c8324a2668474e08dbb568759dd16e0dde351cf755ee6183e55e12",
+    "authorityUuid": "01a1129c-7f69-7ba0-abd1-17639dc9b996",
+    "authorizationId": "funded-f5d1437a10c8324a2668474e08dbb568759dd16e0dde351cf755ee6183e55e12",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:c69850c87a9154036b171f240d3c5caea5be334fd0c2c0fa71853cd154c8c6af:0",
+    "nativeAuthorizationId": "funded-f5d1437a10c8324a2668474e08dbb568759dd16e0dde351cf755ee6183e55e12",
+    "nativePaymentAction": null,
+    "nativePaymentState": "Authorized",
+    "nativeState": "OutcomeUnknownAfterDispatch",
+    "operationId": "c69850c87a9154036b171f240d3c5caea5be334fd0c2c0fa71853cd154c8c6af",
+    "paymentState": "refunded",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "parent",
+    "runtimeClaimHistory": [
+      {
+        "disposition": "retained_after_dispatch_commit",
+        "intent": {
+          "episodeId": "01a1129c-b582-79b2-b358-1a389120f2f1",
+          "expectationId": "b0ae4ab5b8f35e57489af8afb7a4acf234f3272c502b48848228e96a310f9810",
+          "grantIndex": 0,
+          "phase": "dispatch",
+          "planDigest": "da6d2b905f1652bf8934b3c74507bb5e91478fc2ca87564e4cd8c95201c70a22",
+          "requestBindingHash": "22c3bbe0ebd93b3cc8fe771b5579b37e98a7e6f358e31a6172167232ddd8ee66",
+          "resources": [
+            {
+              "artifactDigest": "3362960e5b937d98107706cc92da18883609f1beea27ce63c9243322cd61c902",
+              "kind": "treaty_continuation",
+              "resourceId": "treaty-continuation-parent"
+            },
+            {
+              "artifactDigest": "393024c24359092438fafb15f4d592519254c868a59dc18e9cf0350320252ed4",
+              "kind": "swarm_continuation",
+              "resourceId": "continue-parent"
+            }
+          ],
+          "runtimeAuthorityId": "runtime-01a1129c-7f69-7ba0-abd1-17639dc9b996"
+        },
+        "reference": {
+          "claimDigest": "e6107e3fac2995232d8a39d5c20fb94a95da72a73e649b0986f15d14c7ebecdd",
+          "episodeId": "01a1129c-b582-79b2-b358-1a389120f2f1",
+          "operationId": "c69850c87a9154036b171f240d3c5caea5be334fd0c2c0fa71853cd154c8c6af"
+        }
+      }
+    ],
+    "settlementObservationError": null,
+    "settlementTransaction": "0x7a0ae9f09f1b4c1dcea8d4d2220091cfdaadb247ea34957e03d71f2d0aef4586",
+    "startupReconciliationError": null
+  },
+  "parentKilledSignal": 9,
+  "publicArtifacts": {
+    "child": {
+      "agreement": {
+        "body": {
+          "authorityUuid": "01a1129c-867a-7972-abed-c697de35bb93",
+          "buyerKey": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "captureWaiverTerms": {
+            "body": {
+              "capabilityDigest": "888e8b90f94430b67db95a25e7733a7e4b6b0c68984d11d3662e5baa9aec5414",
+              "contractContextDigest": "f4e2f2d5bffe19b50fc7672b719bb0c5867716664b68d6c0003dbbb9dd6bb52e",
+              "expiresAtUnixMs": 1791400019575,
+              "issuedAtUnixMs": 1791313619575,
+              "policyDigest": "3e37f22d0b1858b01bb6e532bd32407a42b288204660b8b9939de6b22ae6a680",
+              "requestId": "child",
+              "schema": "chio.contractual-capture-waiver.v1"
+            },
+            "counterpartySignature": "b4703d9cb8d934a31e0ea8fad3ec5f8e97ea6c4f211f4255cec8e78dbc2be34e6552f349b806cb2ea4fac860d6100be0d31c674b8e5fc1756035bc77df412c0a",
+            "receiverSignature": "5cd5cd0e1cde5971df8cd436115e85a7e9c00f40076f59db9b2c37d0f9be023f941c60b1cae298bb93fb8437070ace329bbaef930916e1731f3c6e0da0623508"
+          },
+          "domain": {
+            "chainId": "31337",
+            "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+            "escrowCodeHash": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+            "genesisHash": "0x637eabdf6886ba16d607232b9297b1c39d66fc280ed51c678dd3d4626516aef5",
+            "profile": "chio.experimental.local-confirmed-funding.v1",
+            "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+            "tokenCodeHash": "0xf146daf64bb55ab200ce3e246927379f7f95125c3c456bce22ab9b10701be0a1"
+          },
+          "findingContextSha256": "a2d504d9d2ae98542f7edab0fccbfeeb31d74599841bd3753169c89d0c74290e",
+          "policySha256": "b09872fbcb8d9168a2f1063de82328a6726b9f581d9ec055fcd78457448bfe64",
+          "providerKey": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+          "requestId": "child",
+          "requestSha256": "1d5c351c5a28757b9db748562e2d01e52faa9798d2dea958f560858d694af65e",
+          "requiredFindingFacets": [
+            "artifact_integrity",
+            "receipt_authenticity",
+            "checkpoint_membership",
+            "guarantee_consistency"
+          ],
+          "schema": "chio.experimental.native-funded-w0-agreement.v2",
+          "work": {
+            "amount": "100",
+            "beneficiary": "0xd03ea8624c8c5987235048901fb614fdca89b117",
+            "challengeUntil": 1791314255,
+            "payer": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+            "refundAfter": 1791314455,
+            "resolveBy": 1791314355,
+            "submitBy": 1791314155,
+            "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d"
+          }
+        },
+        "buyerSignature": "d533b5b7cc631a1f5594a273f88f99ad921a703d010247293cc1d4b5e851636144dbcc5df74ea6f1bb618ab57e8a88ffe63e5bce1e04a2f62b21e3279d174204",
+        "providerSignature": "a6ea8f8211db228a0b33a7180f58d49f83d3bb33259a171765ac01d9164d310c4c0b0a8c45d6f79c3eafe1054b321ef806f479256b868c729b810d21cd2c760d"
+      },
+      "receiverPackage": {
+        "admissionBundle": {
+          "admissionId": "admission-child",
+          "binding": {
+            "capabilityId": "cap-01a1129c-a838-7fb3-939b-d509f5fdbeae",
+            "hostKernelId": "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+            "originKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+            "requestId": "child",
+            "serverId": "experimental-funded-w0",
+            "toolArgsSha256": "c963174a3961aa5c733455869f424148fa6a573bb48b4037af57fa7fef4e3b6d",
+            "toolName": "review"
+          },
+          "destructive": false,
+          "governanceReceiptId": "governance-child",
+          "leaseId": "lease-child",
+          "schema": "chio.runtime.admission-bundle.v1",
+          "stepIndex": 0,
+          "trustBundleSha256": "e72aae3045f3266a50d3107d22613270aabf20ec7842fb5b131ff6a209e04c73",
+          "verificationContextSha256": "3c64ccfd274971b548469c13e7b978223933366dd9f59ec39ba4736941b03caf",
+          "workflowGrantId": "grant-child",
+          "workflowId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+        },
+        "receiverPolicy": {
+          "authorityUuid": "01a1129c-867a-7972-abed-c697de35bb93",
+          "buyerKey": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "composition": {
+            "allocator": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+            "peer": {
+              "capabilities": {
+                "schema": "chio.capabilities.v1"
+              },
+              "conformanceTier": "bronze",
+              "establishedAt": 1791313611,
+              "kernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+              "publicKey": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+              "rotationDue": 1791356811
+            },
+            "profile": {
+              "expiresAtUnixMs": 1791314206390,
+              "issuedAtUnixMs": 1791313606390,
+              "localKernelId": "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+              "profileId": "evolving-funded-review",
+              "schema": "chio.runtime.admission-profile.v1",
+              "verifierId": "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+            },
+            "programId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+            "replay": {
+              "expectation_id": "5e5606902fd3562fcf1fbedba39ba6fcdede5f5ee84abaf232b15bfa5f227d85",
+              "runtime_authority_id": "runtime-01a1129c-867a-7972-abed-c697de35bb93"
+            },
+            "witness": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe"
+          },
+          "domain": {
+            "chainId": "31337",
+            "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+            "escrowCodeHash": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+            "genesisHash": "0x637eabdf6886ba16d607232b9297b1c39d66fc280ed51c678dd3d4626516aef5",
+            "profile": "chio.experimental.local-confirmed-funding.v1",
+            "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+            "tokenCodeHash": "0xf146daf64bb55ab200ce3e246927379f7f95125c3c456bce22ab9b10701be0a1"
+          },
+          "findingContext": {
+            "admittedKernelKey": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+            "collateralAuthority": {
+              "authority_id": "funded-w0-fixture/collateral",
+              "key": "cb2852cb08e6e6a602caa2dc50b13a545531feab0641909e67b367ec031a20b2",
+              "key_epoch": 1,
+              "revocation_status_ref": "funded-w0-fixture/status/collateral",
+              "rotation_policy_ref": "funded-w0-fixture/rotation/collateral",
+              "valid_from": 1791313611,
+              "valid_until": 1791400011
+            },
+            "governanceAuthority": {
+              "authority_id": "funded-w0-fixture/governance",
+              "key": "92d93d272840bd490f6b2b239ec926237846b23d48971c80531de3cdf9f609c8",
+              "key_epoch": 1,
+              "revocation_status_ref": "funded-w0-fixture/status/governance",
+              "rotation_policy_ref": "funded-w0-fixture/rotation/governance",
+              "valid_from": 1791313611,
+              "valid_until": 1791400011
+            },
+            "governanceStanding": {
+              "max_age_secs": 86400,
+              "signed_statuses": [
+                {
+                  "body": {
+                    "authority_id": "funded-w0-fixture/governance",
+                    "key": "92d93d272840bd490f6b2b239ec926237846b23d48971c80531de3cdf9f609c8",
+                    "key_epoch": 1,
+                    "observed_at": 1791313611,
+                    "revoked_from": null,
+                    "schema": "chio.finding.authority-status.v1",
+                    "status_ref": "funded-w0-fixture/status/governance"
+                  },
+                  "signature": "2a252633a45d9f8af87a0646cf5bd67eaf31045175c6e2b9a4912ea44a85b6fa0d9fd849426f5fc235549ff52f3435260b15d2506b80a493f57f231e768b400e",
+                  "signerKey": "7703c14989641d196e8d5084f1c309943e4568bde991e1c017429d698cfb94dc"
+                }
+              ],
+              "status_authority": {
+                "authority_id": "funded-w0-fixture/authority-status",
+                "key": "7703c14989641d196e8d5084f1c309943e4568bde991e1c017429d698cfb94dc",
+                "key_epoch": 1,
+                "revocation_status_ref": "funded-w0-fixture/status/authority-status",
+                "rotation_policy_ref": "funded-w0-fixture/rotation/authority-status",
+                "valid_from": 1791313611,
+                "valid_until": 1791400011
+              }
+            },
+            "profile": {
+              "body": {
+                "allowed_predicates": [
+                  "baseline_fails_candidate_passes_v1"
+                ],
+                "allowed_runner_manifests": [
+                  "6b83bdbfb790f5644758b1d98f130656552bb3ed209a3dff53f5f912ef16dd48"
+                ],
+                "bbs_projection_issuer": {
+                  "issuer_fingerprint": "unavailable:funded-w0-fixture",
+                  "key_epoch": 1,
+                  "key_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+                  "registry_ref": "unavailable:funded-w0-fixture",
+                  "revocation_status_ref": "unavailable:funded-w0-fixture",
+                  "valid_from": 1791313611,
+                  "valid_until": 1791400011
+                },
+                "checkpoint_logs": [
+                  {
+                    "log_id": "local-log-a6b58de7e3c6a8f94dde2c1d10449f4b354a887313cfb8c183f3d0ccc887c5e2",
+                    "signer": {
+                      "authority_id": "funded-w0-fixture/checkpoint",
+                      "key": "83ae356673f0415c21f28b6923aaad3fd884ab7df0d56b30402e745b7999bb00",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/checkpoint",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/checkpoint",
+                      "valid_from": 1791313611,
+                      "valid_until": 1791400011
+                    }
+                  }
+                ],
+                "expires_at": 1791400011,
+                "failed_delivery_authority": {
+                  "authority_id": "funded-w0-fixture/failed-delivery",
+                  "key": "9336332af37e36ed16bfffd669da1ea70ad7dd8d454908ab8c55efe286fe756e",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/failed-delivery",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/failed-delivery",
+                  "valid_from": 1791313611,
+                  "valid_until": 1791400011
+                },
+                "governance_authority": "92d93d272840bd490f6b2b239ec926237846b23d48971c80531de3cdf9f609c8",
+                "issued_at": 1791313611,
+                "operator": "funded-w0-fixture",
+                "predicate_engine": "chio-replay-v1",
+                "profile_id": "909f9c5196bb9e65f2ef98e06e3e6468f1a0e3908419fb2a2a1135127334a3a2",
+                "purchase_authority": {
+                  "authority_id": "funded-w0-fixture/purchase",
+                  "key": "c78eb6851cb041366faa8008298dd91274c10631fb3e875b1c417862709576ac",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/purchase",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/purchase",
+                  "valid_from": 1791313611,
+                  "valid_until": 1791400011
+                },
+                "receipt_signers": [
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/production",
+                      "key": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/production",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/production",
+                      "valid_from": 1791313611,
+                      "valid_until": 1791400011
+                    },
+                    "role": "production"
+                  },
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/delivery",
+                      "key": "e0d5492b4de44ad1f8cd3d9ee1c28ce6b06467eca67a3a28485ae00e2c45c832",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/delivery",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/delivery",
+                      "valid_from": 1791313611,
+                      "valid_until": 1791400011
+                    },
+                    "role": "delivery"
+                  },
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/replay",
+                      "key": "79b59487c7884e448a80dbe9c9e4b53a12c2adf0792b55ef860e401bfb7cd9de",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/replay",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/replay",
+                      "valid_from": 1791313611,
+                      "valid_until": 1791400011
+                    },
+                    "role": "replay"
+                  }
+                ],
+                "required_facets": [
+                  "artifact_integrity",
+                  "receipt_authenticity",
+                  "checkpoint_membership",
+                  "guarantee_consistency"
+                ],
+                "required_receipt_semantics": "chio.pre_settlement_execution.v1",
+                "resolver_policy_ref": "funded-w0-execution-evidence-v1",
+                "resource_caps": {
+                  "max_evidence_receipts": 1,
+                  "max_memory_bytes": 16777216,
+                  "max_recipe_bytes": 262144,
+                  "max_runtime_secs": 60
+                },
+                "retention_policy_ref": "funded-w0-journal-v1",
+                "schema": "chio.finding.challenge-verifier-profile.v1",
+                "verifier_report_signer": {
+                  "authority_id": "funded-w0-fixture/verifier",
+                  "key": "09b89bb2ce64697d4c1f6a31889f0fc2f92450176b393f839b326d90fc044409",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/verifier",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/verifier",
+                  "valid_from": 1791313611,
+                  "valid_until": 1791400011
+                }
+              },
+              "signature": "fb71c1bd917193f3ece021c7e7d629c5cf00172c3dc7893f397b443d91f452f0f99ce39a15279716e2da1944b7b5464ee2303c09329cacf1118af08234dab000",
+              "signerKey": "92d93d272840bd490f6b2b239ec926237846b23d48971c80531de3cdf9f609c8"
+            },
+            "schema": "chio.experimental.funded-finding-context.v2"
+          },
+          "implementationSha256": "aab891d740cb1db416740ea89d2a0cdd87bdf1e2ccfa08df9bf163791d1ef155",
+          "providerKey": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+          "requiredFindingFacets": [
+            "artifact_integrity",
+            "receipt_authenticity",
+            "checkpoint_membership",
+            "guarantee_consistency"
+          ],
+          "verifierKey": "09b89bb2ce64697d4c1f6a31889f0fc2f92450176b393f839b326d90fc044409"
+        },
+        "treatyArtifacts": [
+          {
+            "artifact": {
+              "allowedActionClasses": [
+                "work.review"
+              ],
+              "expiresAtUnixMs": 1791314154000,
+              "issuedAtUnixMs": 1791313606390,
+              "ladderManifestSha256s": [
+                "df67a9e1d9ea332ce536882fccd67b7088a623c3cafe72bbc79c3515d794213f",
+                "a6fdf2da17d37f43d9763c6c378ab92f733cc8ec7eafb95c453fde338e07b945"
+              ],
+              "participantKernelIds": [
+                "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+              ],
+              "participantPublicKeys": [
+                "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+              ],
+              "revocationEpochSha256": "d706cc9b326c7606420353a580617e6b7289305cfe86d80ddb3667e733d6c416",
+              "schema": "chio.federation.treaty-scope.v1",
+              "treatyId": "treaty-child",
+              "trustBundleSha256": "e72aae3045f3266a50d3107d22613270aabf20ec7842fb5b131ff6a209e04c73"
+            },
+            "id": "treaty-child",
+            "kind": "treaty_scope",
+            "sha256": "233b7c6bf86d846574dca003fd15d84c24d44e0b85ac3c13765c5e44444ee9b0"
+          },
+          {
+            "artifact": {
+              "actionClasses": [
+                {
+                  "actionClassId": "work.review",
+                  "coSign": "bilateral_required",
+                  "consistencyModel": "totally-ordered",
+                  "destructive": false,
+                  "evidenceRequired": [
+                    "bilateral_dsse",
+                    "bilateral_invocation",
+                    "receipt_lineage"
+                  ],
+                  "mode": "receipt_backed",
+                  "participantModes": {
+                    "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb": "receipt_backed",
+                    "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f": "receipt_backed"
+                  }
+                }
+              ],
+              "expiresAtUnixMs": 1791314154000,
+              "generatedAtUnixMs": 1791313619576,
+              "intersectionId": "treaty-child:1791313619576",
+              "ladderManifestSha256s": [
+                "df67a9e1d9ea332ce536882fccd67b7088a623c3cafe72bbc79c3515d794213f",
+                "a6fdf2da17d37f43d9763c6c378ab92f733cc8ec7eafb95c453fde338e07b945"
+              ],
+              "participantKernelIds": [
+                "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+              ],
+              "schema": "chio.federation.ladder-intersection.v1",
+              "treatyId": "treaty-child"
+            },
+            "id": "treaty-child:1791313619576",
+            "kind": "ladder_intersection",
+            "sha256": "b5eea0b9cd5986b2a839cbe2f4cf884926dd3a023f4b68828645a83d7699cd0f"
+          },
+          {
+            "artifact": {
+              "actionClassId": "work.review",
+              "audienceTool": "experimental-funded-w0.review",
+              "capabilityId": "cap-01a1129c-a838-7fb3-939b-d509f5fdbeae",
+              "continuationId": "treaty-continuation-child",
+              "expiresAtUnixMs": 1791314154000,
+              "issuedAtUnixMs": 1791313606390,
+              "nonce": "treaty-nonce-child",
+              "parentReceiptSha256": "e9ddfbb86461c30b13c055b4e79430ab1f44301db07f89a711857c9973696d59",
+              "parentSessionAnchorSha256": "4a942424f3326ec7bd3cfd1b9fc013e109b37d0750a4be93302c2a8332dad064",
+              "schema": "chio.federation.cross-kernel-continuation.v1",
+              "sourceKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+              "targetKernelId": "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+            },
+            "id": "treaty-continuation-child",
+            "kind": "cross_kernel_continuation",
+            "sha256": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c"
+          },
+          {
+            "artifact": {
+              "bundleId": "lineage-bundle-child",
+              "leafReceiptSha256": "98db79432e3f93d0004571615eab26c1315e9eabf0f171048cc1cf58f03c6c12",
+              "rootReceiptSha256": "e9ddfbb86461c30b13c055b4e79430ab1f44301db07f89a711857c9973696d59",
+              "schema": "chio.federation.receipt-lineage-bundle.v1",
+              "statements": [
+                {
+                  "bilateralInvocationSha256": "9c4599404390c8d27d0cdfeccd00761b06f11efdca2fcbd8adb46b62211a87ef",
+                  "childReceiptSha256": "98db79432e3f93d0004571615eab26c1315e9eabf0f171048cc1cf58f03c6c12",
+                  "continuationSha256": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c",
+                  "evidenceClass": "verified",
+                  "parentReceiptSha256": "e9ddfbb86461c30b13c055b4e79430ab1f44301db07f89a711857c9973696d59",
+                  "schema": "chio.federation.receipt-lineage-statement.v1",
+                  "sourceKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                  "statementId": "lineage-child",
+                  "targetKernelId": "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+                }
+              ]
+            },
+            "id": "lineage-bundle-child",
+            "kind": "receipt_lineage_bundle",
+            "sha256": "160e328cc2445006480e510fa27ca3f788e97814f701eacfd5385a7b63711e44"
+          },
+          {
+            "artifact": {
+              "actionClassId": "work.review",
+              "capabilityId": "cap-01a1129c-a838-7fb3-939b-d509f5fdbeae",
+              "consistencyModel": "totally-ordered",
+              "continuationSha256": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c",
+              "invocationId": "permission-child",
+              "ladderIntersectionSha256": "b5eea0b9cd5986b2a839cbe2f4cf884926dd3a023f4b68828645a83d7699cd0f",
+              "lineageStatementSha256": "bbcd8621c68295e5c00fb5e82fcb267c2bc0b0d2ba9b326b154e159fd8ecacec",
+              "localReceiptSha256": "e9ddfbb86461c30b13c055b4e79430ab1f44301db07f89a711857c9973696d59",
+              "outcomeSha256": "b6671a13b21d024015d692fdb9d08040a48cb2014915c9e8f3503dc035b03e0a",
+              "remoteReceiptSha256": "98db79432e3f93d0004571615eab26c1315e9eabf0f171048cc1cf58f03c6c12",
+              "requestSha256": "c963174a3961aa5c733455869f424148fa6a573bb48b4037af57fa7fef4e3b6d",
+              "schema": "chio.federation.bilateral-invocation.v1",
+              "signerKernelIds": [
+                "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+              ],
+              "treatyId": "treaty-child"
+            },
+            "id": "permission-child",
+            "kind": "bilateral_invocation",
+            "sha256": "d87becd1dc389d0186b63f8297ec25b5d939d17e12159c692e795a9ade675fea"
+          },
+          {
+            "artifact": {
+              "payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiY2FwYWJpbGl0eV9sZWFzZV9yZWYiOnsiZXhwaXJlc19hdF91bml4X21zIjoxNzkxMzE0MTU0MDAwLCJpc3N1ZXIiOiJkaWQ6Y2hpbzowZTBjYjQ5Y2FhNTExNTBjN2I0MTU1M2Y1YTYwM2MxOWUyM2Q3MGI2NmE4N2UyMzg2NjA3ZWY0ZWI4N2IzMGJiIiwibGVhc2VfaWQiOiJsZWFzZS1jaGlsZCJ9LCJjb19zaWduIjoiYmlsYXRlcmFsX3JlcXVpcmVkIiwiY29uc2lzdGVuY3lfYW5jaG9yIjoiYW5jaG9yLWNoaWxkIiwiY29uc2lzdGVuY3lfbW9kZWwiOiJ0b3RhbGx5LW9yZGVyZWQiLCJjcm9zc19vcmdfdmlzaWJpbGl0eSI6InRyZWF0eV9vbmx5IiwiZ292ZXJuYW5jZV9yZWNlaXB0X3JlZiI6eyJkaWdlc3QiOnsiYWxnIjoic2hhMjU2IiwidmFsdWUiOiIzYzY0Y2NmZDI3NDk3MWI1NDg0NjljMTNlN2I5NzgyMjM5MzMzNjZkZDlmNTllYzM5YmE0NzM2OTQxYjAzY2FmIn0sImtlcm5lbF9pZCI6ImRpZDpjaGlvOmJmNWM2MWQ0YmJkNTk1NzcyNWI1YmU4OWI0Y2UxOWM4YmJiNmJjNjg0MjU3NDVmNzhhNzJiODJjYzQyMjE5N2YiLCJyZWNlaXB0X2lkIjoiZ292ZXJuYW5jZS1jaGlsZCJ9LCJpbnZvY2F0aW9uX2lkIjoiMDZkNzgxZDE1ZDdkYzU0ODNkN2QyMWNlMzUzM2M0MTY4NDQ0ODdhNmUxYmRjNzM0ODAxYTFjNWFlYjQ5ODRmYyIsInBvbGljeV9ldmFsdWF0aW9uX3N1bW1hcnkiOnsiam9pbnRfZGlzcG9zaXRpb24iOiJhbGxvdyIsInNlcnZlcl9hX3ZlcmRpY3QiOnsicG9saWN5X2lkIjoiZGlkOmNoaW86MGUwY2I0OWNhYTUxMTUwYzdiNDE1NTNmNWE2MDNjMTllMjNkNzBiNjZhODdlMjM4NjYwN2VmNGViODdiMzBiYiIsInBvbGljeV92ZXJzaW9uIjoiMSIsInZlcmRpY3QiOiJhbGxvdyJ9LCJzZXJ2ZXJfYl92ZXJkaWN0Ijp7InBvbGljeV9pZCI6ImRpZDpjaGlvOmJmNWM2MWQ0YmJkNTk1NzcyNWI1YmU4OWI0Y2UxOWM4YmJiNmJjNjg0MjU3NDVmNzhhNzJiODJjYzQyMjE5N2YiLCJwb2xpY3lfdmVyc2lvbiI6IjEiLCJ2ZXJkaWN0IjoiYWxsb3cifX0sInRpbWVzdGFtcF91bml4X21zIjoxNzkxMzEzNjE5NTc2LCJ0b29sX2FyZ3NfaGFzaCI6eyJhbGciOiJzaGEyNTYiLCJ2YWx1ZSI6ImM5NjMxNzRhMzk2MWFhNWM3MzM0NTU4NjlmNDI0MTQ4ZmE2YTU3M2JiNDhiNDAzN2FmNTdmYTdmZWY0ZTNiNmQifSwidG9vbF9uYW1lIjoicmV2aWV3IiwidG9vbF9zZXJ2ZXJfYSI6eyJhbGciOiJlZDI1NTE5Iiwia2VybmVsX2lkIjoiZGlkOmNoaW86MGUwY2I0OWNhYTUxMTUwYzdiNDE1NTNmNWE2MDNjMTllMjNkNzBiNjZhODdlMjM4NjYwN2VmNGViODdiMzBiYiIsInBhc3Nwb3J0X2tleV9maW5nZXJwcmludCI6ImE4NjJlMDNkMGJkODA1OTIwNzE5Mzg2ZmQ5Zjc0OTNjZTEyZWRiOThmYmEwYWQzODNmNGYzOWE4NDIzMmU4M2YifSwidG9vbF9zZXJ2ZXJfYiI6eyJhbGciOiJlZDI1NTE5Iiwia2VybmVsX2lkIjoiZGlkOmNoaW86YmY1YzYxZDRiYmQ1OTU3NzI1YjViZTg5YjRjZTE5YzhiYmI2YmM2ODQyNTc0NWY3OGE3MmI4MmNjNDIyMTk3ZiIsInBhc3Nwb3J0X2tleV9maW5nZXJwcmludCI6ImRmMGJjMDI0ZjE2NDk1MmQ4MzNkMGFmNmQwZWFjZmY3NDY3NDE4N2Q1YzIyY2RlYmZhMzlmNmEyYjI0ODcyNDgifSwidHJlYXR5X2JpbmRpbmdfcmVmIjp7ImFjdGlvbl9jbGFzc19pZCI6IndvcmsucmV2aWV3IiwiYWRtaXNzaW9uX3JlcG9ydF9zaGEyNTYiOiJiOTIyYTk4Yjk3NmQ1YzY3YTJjM2YwNWEzN2M2NGJkNGE0YzUyMjgzZDMyNjcyMDlkMmQ0Mjk2MDcwMjZlZThhIiwiY29uc2lzdGVuY3lfbW9kZWwiOiJ0b3RhbGx5LW9yZGVyZWQiLCJjb250aW51YXRpb25fc2hhMjU2IjoiNWY5YWYwNDQzYmNkNmMyYTIwM2Y4ZDk5YWMzYzUyMjllYjk5N2E5NDZmYjY2YmViY2MyNDk5NmQxY2E1ZjM2YyIsImdvdmVybmFuY2VfcmVmcyI6WyJnb3Zlcm5hbmNlLWNoaWxkIl0sImxhZGRlcl9pbnRlcnNlY3Rpb25fc2hhMjU2IjoiYjVlZWEwYjljZDU5ODZiMmE4MzljYmUyZjRjZjg4NDkyNmRkM2EwMjNmNGI2ODgyODY0NWE4M2Q3Njk5Y2QwZiIsImxlYXNlX3JlZnMiOlsibGVhc2UtY2hpbGQiXSwibGluZWFnZV9idW5kbGVfc2hhMjU2IjoiMTYwZTMyOGNjMjQ0NTAwNjQ4MGU1MTBmYTI3Y2EzZjc4OGU5NzgxNGY3MDFlYWNmZDUzODVhN2I2MzcxMWU0NCIsImxvY2FsX3JlY2VpcHRfc2hhMjU2IjoiZTlkZGZiYjg2NDYxYzMwYjEzYzA1NWI0ZTc5NDMwYWIxZjQ0MzAxZGIwN2Y4OWE3MTE4NTdjOTk3MzY5NmQ1OSIsIm91dGNvbWVfc2hhMjU2IjoiYjY2NzFhMTNiMjFkMDI0MDE1ZDY5MmZkYjlkMDgwNDBhNDhjYjIwMTQ5MTVjOWU4ZjM1MDNkYzAzNWIwM2UwYSIsInJlbW90ZV9yZWNlaXB0X3NoYTI1NiI6Ijk4ZGI3OTQzMmUzZjkzZDAwMDQ1NzE2MTVlYWIyNmMxMzE1ZTllYWJmMGYxNzEwNDhjYzFjZjU4ZjAzYzZjMTIiLCJyZXF1ZXN0X3NoYTI1NiI6ImM5NjMxNzRhMzk2MWFhNWM3MzM0NTU4NjlmNDI0MTQ4ZmE2YTU3M2JiNDhiNDAzN2FmNTdmYTdmZWY0ZTNiNmQiLCJzaWduZXJfa2VybmVsX2lkcyI6WyJkaWQ6Y2hpbzowZTBjYjQ5Y2FhNTExNTBjN2I0MTU1M2Y1YTYwM2MxOWUyM2Q3MGI2NmE4N2UyMzg2NjA3ZWY0ZWI4N2IzMGJiIiwiZGlkOmNoaW86YmY1YzYxZDRiYmQ1OTU3NzI1YjViZTg5YjRjZTE5YzhiYmI2YmM2ODQyNTc0NWY3OGE3MmI4MmNjNDIyMTk3ZiJdLCJ0cmVhdHlfaWQiOiJ0cmVhdHktY2hpbGQiLCJ0cmVhdHlfc2NvcGVfc2hhMjU2IjoiMjMzYjdjNmJmODZkODQ2NTc0ZGNhMDAzZmQxNWQ4NGMyNGQ0NGUwYjg1YWMzYzEzNzY1YzVlNDQ0NDRlZTliMCJ9fSwicHJlZGljYXRlVHlwZSI6ImNoaW8uYmlsYXRlcmFsLWNvc2lnbi1pbnZvY2F0aW9uLnYxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjAxZmUyMjBiNWUzODMwZmE1MTVmZjk5ZmY4MjI2MzIxMzQzYTkwMWQzMmQyZjJjY2RhOGI4ZTA0YThlYjNhMmMifSwibmFtZSI6ImNoaW8tcmVjZWlwdDowNmQ3ODFkMTVkN2RjNTQ4M2Q3ZDIxY2UzNTMzYzQxNjg0NDQ4N2E2ZTFiZGM3MzQ4MDFhMWM1YWViNDk4NGZjIn1dfQ==",
+              "payloadType": "application/vnd.in-toto+json",
+              "signatures": [
+                {
+                  "keyid": "a862e03d0bd805920719386fd9f7493ce12edb98fba0ad383f4f39a84232e83f",
+                  "sig": "u7RmlxrwOQExY6jGnkZeIxFUM7trpaDeJXt/hwiVqjCmCnpNnEeJ3w5+/JsuuQXCWAIfneNhVju3dTxtUHBmCg=="
+                },
+                {
+                  "keyid": "df0bc024f164952d833d0af6d0eacff74674187d5c22cdebfa39f6a2b2487248",
+                  "sig": "NjhNy60uDIi3HgDBJtqSEYEWTMuraMSiAe5v8sjoqXPbmrIk/5zubSh1h2maLqZE4PFXc8CihTg8uJWnmISBDQ=="
+                }
+              ]
+            },
+            "id": "dsse-child",
+            "kind": "bilateral_dsse_envelope",
+            "sha256": "aeb0543c31eee44e55154510821c185ff129fb7b9cea2c19557459bd958b7cc8"
+          },
+          {
+            "artifact": {
+              "lease": {
+                "expires_at_unix_ms": 1791314154000,
+                "issuer": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                "lease_id": "lease-child"
+              },
+              "validFromUnixMs": 1791313606390
+            },
+            "id": "lease-child",
+            "kind": "capability_lease",
+            "sha256": "83bdcf76c8581ccc954bcd3d4d95108ffaf6876ecfb05cbeba9f14157253a9e4"
+          },
+          {
+            "artifact": {
+              "receipt": {
+                "digest": {
+                  "alg": "sha256",
+                  "value": "3c64ccfd274971b548469c13e7b978223933366dd9f59ec39ba4736941b03caf"
+                },
+                "kernel_id": "did:chio:bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+                "receipt_id": "governance-child"
+              },
+              "validFromUnixMs": 1791313606390,
+              "validUntilUnixMs": 1791314154000
+            },
+            "id": "governance-child",
+            "kind": "governance_receipt",
+            "sha256": "8173a291d3caab2b4cb69afb347ab4fea4e7a8962f43fdb719f1d1bc4501ba00"
+          }
+        ]
+      },
+      "request": {
+        "agent_id": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+        "arguments": {
+          "chio_capture_waiver_terms_digest": "25b35407125b09226acd493e8b0d6f981d0ff0859b14e61a966281dc69988be5",
+          "input": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\"title\": \"Example company payments API\", \"version\": \"1.0.0\"},\n  \"components\": {\"securitySchemes\": {\"serviceToken\": {\"type\": \"http\", \"scheme\": \"bearer\"}}},\n  \"security\": [{\"serviceToken\": []}],\n  \"paths\": {\n    \"/accounts\": {\"get\": {\"responses\": {\"200\": {\"description\": \"Accounts\"}}}},\n    \"/refunds\": {\"post\": {\"security\": [], \"responses\": {\"201\": {\"description\": \"Refund staged\"}}}},\n    \"/health\": {\"get\": {\"security\": [{}, {\"serviceToken\": []}], \"responses\": {\"200\": {\"description\": \"Healthy\"}}}},\n    \"/sessions\": {\"delete\": {\"security\": [{\"serviceToken\": []}], \"responses\": {\"204\": {\"description\": \"Session ended\"}}}}\n  }\n}\n"
+        },
+        "capability": {
+          "expires_at": 1791314154,
+          "id": "cap-01a1129c-a838-7fb3-939b-d509f5fdbeae",
+          "issued_at": 1791313619,
+          "issuer": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+          "schema": "chio.capability.v1",
+          "scope": {
+            "grants": [
+              {
+                "max_cost_per_invocation": {
+                  "currency": "XTS",
+                  "units": 100
+                },
+                "max_invocations": 1,
+                "max_total_cost": {
+                  "currency": "XTS",
+                  "units": 100
+                },
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "experimental-funded-w0",
+                "tool_name": "review"
+              }
+            ]
+          },
+          "signature": "30e1eae7ba43b61619dc7ddad597ea83aea0c53d3a90cd5f3999df4f0b8623d8c779d6a592f72193b0377cd6d35ce1720c2bcbb2ea8a86f1c2aea73fbda41a0d",
+          "subject": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+        },
+        "federated_origin_kernel_id": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+        "governed_intent": {
+          "context": {
+            "chioAdmission": {
+              "admissionId": "admission-child",
+              "bundleSha256": "570a2383cb3b41382d24cbeb7e250cd05d047e98977b2a9fc728f39ba70e9db0"
+            },
+            "chioDelegation": {
+              "allocation": {
+                "body": {
+                  "allocation_hash": "0d70c8c9b6f773619a1fa3bdf8f6e8a584cab8a01f0e75188b99bd75dfb8776e",
+                  "issued_at": 1791313619,
+                  "root_id": "program",
+                  "selection": {
+                    "body": {
+                      "capability_hash": "5e26866bb39376b39109c024cbee505ba090758f4473a3c8c04e88a04cbe10f8",
+                      "expected_revision": 0,
+                      "offer": {
+                        "body": {
+                          "allocation_hash": "0d70c8c9b6f773619a1fa3bdf8f6e8a584cab8a01f0e75188b99bd75dfb8776e",
+                          "arguments_hash": "9c5ab92566521187a4a7bdef563b81287f91f86faf9129f811d17ceb1b26428d",
+                          "contract_hash": "196f22f7d7a7a7ca815b4116f515dd08c2a4ccf60b58eb3ecf512e6acd018823",
+                          "effect": {
+                            "server": "experimental-funded-w0",
+                            "tool": "review"
+                          },
+                          "expires_at": 1791314206,
+                          "price_units": 100,
+                          "receiver": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+                          "slot_id": "child"
+                        },
+                        "signature": "98193bedd0de5f51a2df6655602dd642860ffc68af0361d96c3eb9387fc9e702b5bb0582b0a85a2ef8d32819a206011d16631207d6f812808d242bc2759d890b",
+                        "signer": "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+                      },
+                      "request_id": "child"
+                    },
+                    "signature": "a6b8ea5624bca32d3e422067942ea24d73ec0673cb02783c2578682ca2956d76e156ab6001473693d20877ff4a5ef5d697da1a8ac16618bffbb9f1d038a74f05",
+                    "signer": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+                  },
+                  "slot": {
+                    "contract": {
+                      "acceptance": {
+                        "clauses": [
+                          {
+                            "kind": "equals",
+                            "pointer": "/0/path",
+                            "value": "/accounts"
+                          }
+                        ]
+                      },
+                      "currency": "XTS",
+                      "depth": 1,
+                      "effects": [
+                        {
+                          "server": "experimental-funded-w0",
+                          "tool": "review"
+                        }
+                      ],
+                      "expires_at": 1791314206,
+                      "max_units": 100,
+                      "readers": [
+                        "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                        "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                        "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+                        "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+                        "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+                      ]
+                    },
+                    "holder": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                    "id": "child"
+                  }
+                },
+                "signature": "3d4fe23f7700ab33bc2a7873160e1f0c14b663bd83a50afd4437f7280b3c510644b99facd138eead76e2dc8e246ee963c0a0561a8eee8988d9f11cfe8900630d",
+                "signer": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe"
+              },
+              "slot_id": "child"
+            },
+            "chioSwarm": {
+              "budgetPool": {
+                "id": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "117562fc2aa8b17f2e3e8074cafb988e67414758f4decda457b035e1572231cb"
+              },
+              "continuationToken": {
+                "id": "continue-child",
+                "sha256": "ee0da1715e9f15c4b17df0bef42a16cc607c41be9cb9857047474b1405cbcdaf"
+              },
+              "delegationWitness": {
+                "id": "witness-child",
+                "sha256": "7216c3017f99bcf4e853e7156a4f1a968a706c0cac7c966e32aa597b99a168df"
+              },
+              "revocationEpoch": {
+                "id": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "f949b2f30e25942deb32f07cd665fe2de5cbe37792f5511c0e261c7c4547eb59"
+              },
+              "routePlanReceipt": {
+                "id": "route-child",
+                "sha256": "8fbd8d440fd4e1388a2a76a2a1590120a26e702758a24381dfe079f0e0000410"
+              },
+              "taskGraph": {
+                "id": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "13c7aa2aeb9c11e285c97248d14d08f0f2d7cafabc2f4a4f686fffb39f185e3d"
+              }
+            },
+            "chioTreaty": {
+              "actionClassId": "work.review",
+              "bilateralDsse": {
+                "id": "dsse-child",
+                "sha256": "aeb0543c31eee44e55154510821c185ff129fb7b9cea2c19557459bd958b7cc8"
+              },
+              "bilateralInvocation": {
+                "id": "permission-child",
+                "sha256": "9c4599404390c8d27d0cdfeccd00761b06f11efdca2fcbd8adb46b62211a87ef"
+              },
+              "crossKernelContinuation": {
+                "id": "treaty-continuation-child",
+                "sha256": "5f9af0443bcd6c2a203f8d99ac3c5229eb997a946fb66bebcc24996d1ca5f36c"
+              },
+              "ladderIntersectionId": "treaty-child:1791313619576",
+              "ladderIntersectionSha256": "b5eea0b9cd5986b2a839cbe2f4cf884926dd3a023f4b68828645a83d7699cd0f",
+              "receiptLineageBundle": {
+                "id": "lineage-bundle-child",
+                "sha256": "160e328cc2445006480e510fa27ca3f788e97814f701eacfd5385a7b63711e44"
+              },
+              "treatyScopeId": "treaty-child",
+              "treatyScopeSha256": "233b7c6bf86d846574dca003fd15d84c24d44e0b85ac3c13765c5e44444ee9b0"
+            }
+          },
+          "id": "intent-child",
+          "purpose": "perform a funded review under receiver-owned admission",
+          "server_id": "experimental-funded-w0",
+          "tool_name": "review"
+        },
+        "request_id": "child",
+        "server_id": "experimental-funded-w0",
+        "tool_name": "review"
+      }
+    },
+    "extendedGraph": {
+      "budgetPool": {
+        "allocations": [
+          {
+            "activeUnits": 100,
+            "allocationId": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+            "consumedUnits": 0,
+            "dimensionId": "xts_base_units",
+            "maxUnits": 100,
+            "releasedUnits": 0,
+            "reservedUnits": 0,
+            "reversedUnits": 0,
+            "state": "active",
+            "taskId": "scout"
+          },
+          {
+            "activeUnits": 100,
+            "allocationId": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+            "consumedUnits": 0,
+            "dimensionId": "xts_base_units",
+            "maxUnits": 100,
+            "releasedUnits": 0,
+            "reservedUnits": 0,
+            "reversedUnits": 0,
+            "state": "active",
+            "taskId": "parent"
+          },
+          {
+            "activeUnits": 100,
+            "allocationId": "0d70c8c9b6f773619a1fa3bdf8f6e8a584cab8a01f0e75188b99bd75dfb8776e",
+            "consumedUnits": 0,
+            "dimensionId": "xts_base_units",
+            "maxUnits": 100,
+            "releasedUnits": 0,
+            "reservedUnits": 0,
+            "reversedUnits": 0,
+            "state": "active",
+            "taskId": "child"
+          }
+        ],
+        "currency": "XTS",
+        "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "poolId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "schema": "chio.swarm.budget-pool.v1",
+        "totalUnits": 300
+      },
+      "continuationTokens": [
+        {
+          "budgetAllocationId": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+          "childTaskId": "scout",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "graphSha256": "13c7aa2aeb9c11e285c97248d14d08f0f2d7cafabc2f4a4f686fffb39f185e3d",
+          "issuedAtUnixMs": 1791313606390,
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "mode": "single_use",
+          "nonce": "nonce-scout",
+          "parentReceiptIds": [
+            "program-consent-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+          ],
+          "parentTaskId": "program",
+          "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "revocationEpochRootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+          "routePlanReceiptId": "route-scout",
+          "schema": "chio.swarm.continuation-token.v1",
+          "sessionAnchorRef": "session-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "signature": "6e06ae446fd9f5b74dd1e58f4c5e6e1ea49e82e985b23f0b8ae85c2fd4c88377132cf198f8220897327da5c882234f194ae699eaa0c36eec4798cfae9497f60e",
+          "tokenId": "continue-scout",
+          "witnessChainRef": "witness-scout",
+          "witnessChainSha256": "42ed7ea532d2c590f2f6ac4342f70602c90d864e2b0c15a416e2d12d63dc08a4"
+        },
+        {
+          "budgetAllocationId": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+          "childTaskId": "parent",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "graphSha256": "13c7aa2aeb9c11e285c97248d14d08f0f2d7cafabc2f4a4f686fffb39f185e3d",
+          "issuedAtUnixMs": 1791313606390,
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "mode": "single_use",
+          "nonce": "nonce-parent",
+          "parentReceiptIds": [
+            "program-consent-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+          ],
+          "parentTaskId": "program",
+          "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "revocationEpochRootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+          "routePlanReceiptId": "route-parent",
+          "schema": "chio.swarm.continuation-token.v1",
+          "sessionAnchorRef": "session-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "signature": "8a3d6bdd141862faecf3678628992267020b08e770c511b4ab7f55ccd4b1177eb609e3854459a9078a7368c865c6b4eb6b6487d99b64b173fcc98bfb05715702",
+          "tokenId": "continue-parent",
+          "witnessChainRef": "witness-parent",
+          "witnessChainSha256": "18cda5af949a6cbea1f7c60e019adb73f47edd27fd98b717be01d77043fbdc37"
+        },
+        {
+          "budgetAllocationId": "0d70c8c9b6f773619a1fa3bdf8f6e8a584cab8a01f0e75188b99bd75dfb8776e",
+          "childTaskId": "child",
+          "expiresAtUnixMs": 1791314154000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "graphSha256": "13c7aa2aeb9c11e285c97248d14d08f0f2d7cafabc2f4a4f686fffb39f185e3d",
+          "issuedAtUnixMs": 1791313606390,
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "mode": "single_use",
+          "nonce": "nonce-child",
+          "parentReceiptIds": [
+            "program-consent-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+          ],
+          "parentTaskId": "program",
+          "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "revocationEpochRootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+          "routePlanReceiptId": "route-child",
+          "schema": "chio.swarm.continuation-token.v1",
+          "sessionAnchorRef": "session-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "signature": "672270e222069ff762d3a2917a7c3d486a6f2093e56df6ca1e8da45cc662fb42607166f11fdadd7f0e529d2b676979f56d8b3b05dc50681859c76ca079798b08",
+          "tokenId": "continue-child",
+          "witnessChainRef": "witness-child",
+          "witnessChainSha256": "7216c3017f99bcf4e853e7156a4f1a968a706c0cac7c966e32aa597b99a168df"
+        }
+      ],
+      "joinReceipts": [],
+      "nowUnixMs": 1791313606390,
+      "revocationEpoch": {
+        "epochId": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "issuedAtUnixMs": 1791313606390,
+        "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+        "revokedSubjects": [],
+        "revokedTaskIds": [],
+        "rootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+        "schema": "chio.swarm.revocation-epoch.v1",
+        "signature": "b0fae99d6de48c20575721c0101a3a6419576f18682894b0edc6b5301b8680ef5b9b8a1f6d3ff69046fc7134924a6cac8329246ca3a7b96df193ac0fb3ce0a0c",
+        "validUntilUnixMs": 1791314206390
+      },
+      "routePlanReceipts": [
+        {
+          "attenuationDecision": "accepted",
+          "bridgeId": "native",
+          "candidateSetDigest": "7ac80138fb1815aadeee8834914115ae080604abf9f3a6d0eadd0840cdb17edf",
+          "egressConstraints": [
+            "deny-private-network"
+          ],
+          "egressContractId": "native:egress-scout",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+          "protocolTarget": "native://85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+          "registrySnapshotHash": "ee2a02324bdfe7401141a0ac51340b6c5d1c3638430b31915199a727141589ef",
+          "routePlanId": "route-scout",
+          "schema": "chio.swarm.route-plan-receipt.v1",
+          "selectedRoute": "native:scout",
+          "signature": "dad12899633547b81cffdcd43c7718ac6de936e2457e7456c68f22f5ec3527ad5f598f077a916d06200bebda259cae94fd1b03afdb92abcf0369ce6ec4e13208",
+          "taskId": "scout"
+        },
+        {
+          "attenuationDecision": "accepted",
+          "bridgeId": "native",
+          "candidateSetDigest": "57eeb947f1daa9c878d79e31847730b78fb9ad81dc5717aa84ffa7638c21da3b",
+          "egressConstraints": [
+            "deny-private-network"
+          ],
+          "egressContractId": "native:egress-parent",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+          "protocolTarget": "native://0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "registrySnapshotHash": "ee2a02324bdfe7401141a0ac51340b6c5d1c3638430b31915199a727141589ef",
+          "routePlanId": "route-parent",
+          "schema": "chio.swarm.route-plan-receipt.v1",
+          "selectedRoute": "native:parent",
+          "signature": "63e65b43f97f2a83d0d565697f4009320f28bbf398827e81c78098c896a6643faa1218296f2acf1d279945a893640b1e6817aec65be70bb77e555deabe555e00",
+          "taskId": "parent"
+        },
+        {
+          "attenuationDecision": "accepted",
+          "bridgeId": "native",
+          "candidateSetDigest": "cc16072f04ca72e572a1a463ee3ce77f7f2bfe102fc249ed503cdb4c08e614b6",
+          "egressConstraints": [
+            "deny-private-network"
+          ],
+          "egressContractId": "native:egress-child",
+          "expiresAtUnixMs": 1791314154000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+          "protocolTarget": "native://bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f",
+          "registrySnapshotHash": "ee2a02324bdfe7401141a0ac51340b6c5d1c3638430b31915199a727141589ef",
+          "routePlanId": "route-child",
+          "schema": "chio.swarm.route-plan-receipt.v1",
+          "selectedRoute": "native:child",
+          "signature": "3bab1c4ee7f78e0fdc308350b14d998262ef285842c82add1c8aec58e71866b19eb1fe6d50047e70f5f719e58fc8f99695988eb28ccb77d9f09837aadb54d003",
+          "taskId": "child"
+        }
+      ],
+      "taskGraph": {
+        "budgetPoolRef": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "createdAtUnixMs": 1791313606390,
+        "edges": [
+          {
+            "edgeType": "delegates",
+            "fromTaskId": "program",
+            "toTaskId": "scout"
+          },
+          {
+            "edgeType": "delegates",
+            "fromTaskId": "program",
+            "toTaskId": "parent"
+          },
+          {
+            "edgeType": "delegates",
+            "fromTaskId": "program",
+            "toTaskId": "child"
+          }
+        ],
+        "expiresAtUnixMs": 1791314206390,
+        "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+        "joins": [],
+        "maxDepth": 1,
+        "maxFanout": 3,
+        "nodes": [
+          {
+            "depth": 0,
+            "scopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+            "taskId": "program"
+          },
+          {
+            "budgetAllocationRef": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+            "continuationTokenRef": "continue-scout",
+            "depth": 1,
+            "parentTaskId": "program",
+            "routePlanRef": "route-scout",
+            "scopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+            "taskId": "scout"
+          },
+          {
+            "budgetAllocationRef": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+            "continuationTokenRef": "continue-parent",
+            "depth": 1,
+            "parentTaskId": "program",
+            "routePlanRef": "route-parent",
+            "scopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+            "taskId": "parent"
+          },
+          {
+            "budgetAllocationRef": "0d70c8c9b6f773619a1fa3bdf8f6e8a584cab8a01f0e75188b99bd75dfb8776e",
+            "continuationTokenRef": "continue-child",
+            "depth": 1,
+            "parentTaskId": "program",
+            "routePlanRef": "route-child",
+            "scopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+            "taskId": "child"
+          }
+        ],
+        "plannerSubject": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+        "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "rootTransactionRef": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "routePlanRefs": [
+          "route-scout",
+          "route-parent",
+          "route-child"
+        ],
+        "schema": "chio.swarm.task-graph.v1",
+        "signature": "d6609ac0df380515c69d5462e3926318e27d7d28b7977399656f30c810ed6056a0b5761b7a205c1ebfd903f370ff8b1a0258aade4cbd28af97769af5a7463103"
+      },
+      "terminalReceipts": [],
+      "witnessChains": [
+        {
+          "chainId": "witness-scout",
+          "childTaskId": "scout",
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "hops": [
+            {
+              "attenuationRuleId": "rule-subset-tool-invocation",
+              "childCapabilityDigest": "03a76fffeb478e23b4506a8d60eb4f3a51ada85c6d1d16c4b7a78d497d647f1c",
+              "childScopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+              "expiresAtUnixMs": 1791314204000,
+              "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+              "parentCapabilityDigest": "d4f09babca88ba7b77c8340c5148b6b5ab9e9fc2d4f63ba5cd717995f9bf5422",
+              "parentScopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+              "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+              "scopeSubsetProof": {
+                "normalizedChildScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":1,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":100},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "normalizedParentScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":3,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":300},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "subsetRelations": [
+                  {
+                    "childIndex": 0,
+                    "grantKind": "tool",
+                    "parentIndex": 0,
+                    "subset": true
+                  }
+                ]
+              },
+              "witnessSignature": "8620801088fd15975822ac8c44e023c04b2e94fcfbad562ccf9d4a3187ddd8b3be7c808db5cfe96eceb6d2eb12d114bdbc3647cf787e257b41dbfec371e83c0d"
+            }
+          ],
+          "parentTaskId": "program",
+          "schema": "chio.swarm.delegation-witness-chain.v1"
+        },
+        {
+          "chainId": "witness-parent",
+          "childTaskId": "parent",
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "hops": [
+            {
+              "attenuationRuleId": "rule-subset-tool-invocation",
+              "childCapabilityDigest": "e4005064c7685dc2bfc3ae6d5c8c454689aa4cf990879dabe15fa314c185243e",
+              "childScopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+              "expiresAtUnixMs": 1791314204000,
+              "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+              "parentCapabilityDigest": "d4f09babca88ba7b77c8340c5148b6b5ab9e9fc2d4f63ba5cd717995f9bf5422",
+              "parentScopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+              "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+              "scopeSubsetProof": {
+                "normalizedChildScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":1,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":100},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "normalizedParentScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":3,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":300},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "subsetRelations": [
+                  {
+                    "childIndex": 0,
+                    "grantKind": "tool",
+                    "parentIndex": 0,
+                    "subset": true
+                  }
+                ]
+              },
+              "witnessSignature": "5a2c899b7323e79a46172b4596a1684eaf42604c9101541cf54ecd2501ecc1a9ee1cb219f3d00a263e33a43d1b10cdc9690d7a0d398e820609a9686859ad9a0f"
+            }
+          ],
+          "parentTaskId": "program",
+          "schema": "chio.swarm.delegation-witness-chain.v1"
+        },
+        {
+          "chainId": "witness-child",
+          "childTaskId": "child",
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "hops": [
+            {
+              "attenuationRuleId": "rule-subset-tool-invocation",
+              "childCapabilityDigest": "888e8b90f94430b67db95a25e7733a7e4b6b0c68984d11d3662e5baa9aec5414",
+              "childScopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+              "expiresAtUnixMs": 1791314154000,
+              "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+              "parentCapabilityDigest": "d4f09babca88ba7b77c8340c5148b6b5ab9e9fc2d4f63ba5cd717995f9bf5422",
+              "parentScopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+              "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+              "scopeSubsetProof": {
+                "normalizedChildScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":1,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":100},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "normalizedParentScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":3,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":300},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "subsetRelations": [
+                  {
+                    "childIndex": 0,
+                    "grantKind": "tool",
+                    "parentIndex": 0,
+                    "subset": true
+                  }
+                ]
+              },
+              "witnessSignature": "e2b19d84d26c3f1b91e61d8e0bd5276df53d69000b495511878c74b920c72baef0644a169a1688121ebd5f07e3e1155de788d9f018bd8daf699c1c2f071d7503"
+            }
+          ],
+          "parentTaskId": "program",
+          "schema": "chio.swarm.delegation-witness-chain.v1"
+        }
+      ]
+    },
+    "initialGraph": {
+      "budgetPool": {
+        "allocations": [
+          {
+            "activeUnits": 100,
+            "allocationId": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+            "consumedUnits": 0,
+            "dimensionId": "xts_base_units",
+            "maxUnits": 100,
+            "releasedUnits": 0,
+            "reservedUnits": 0,
+            "reversedUnits": 0,
+            "state": "active",
+            "taskId": "scout"
+          },
+          {
+            "activeUnits": 100,
+            "allocationId": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+            "consumedUnits": 0,
+            "dimensionId": "xts_base_units",
+            "maxUnits": 100,
+            "releasedUnits": 0,
+            "reservedUnits": 0,
+            "reversedUnits": 0,
+            "state": "active",
+            "taskId": "parent"
+          }
+        ],
+        "currency": "XTS",
+        "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "poolId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "schema": "chio.swarm.budget-pool.v1",
+        "totalUnits": 300
+      },
+      "continuationTokens": [
+        {
+          "budgetAllocationId": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+          "childTaskId": "scout",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "graphSha256": "346b9760541137deb97a18513fa112fb5aa3aa0912a65de1cd3c7d0f51d20f8b",
+          "issuedAtUnixMs": 1791313606390,
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "mode": "single_use",
+          "nonce": "nonce-scout",
+          "parentReceiptIds": [
+            "program-consent-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+          ],
+          "parentTaskId": "program",
+          "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "revocationEpochRootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+          "routePlanReceiptId": "route-scout",
+          "schema": "chio.swarm.continuation-token.v1",
+          "sessionAnchorRef": "session-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "signature": "c8b61fe01a8972a511bb3fe2478b20359ad05095811ffc3c354527f843ee1037e5dbe286c7faa672b4be9b993859e01e9677ececb15faea71f098192d9b36505",
+          "tokenId": "continue-scout",
+          "witnessChainRef": "witness-scout",
+          "witnessChainSha256": "42ed7ea532d2c590f2f6ac4342f70602c90d864e2b0c15a416e2d12d63dc08a4"
+        },
+        {
+          "budgetAllocationId": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+          "childTaskId": "parent",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "graphSha256": "346b9760541137deb97a18513fa112fb5aa3aa0912a65de1cd3c7d0f51d20f8b",
+          "issuedAtUnixMs": 1791313606390,
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "mode": "single_use",
+          "nonce": "nonce-parent",
+          "parentReceiptIds": [
+            "program-consent-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+          ],
+          "parentTaskId": "program",
+          "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "revocationEpochRootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+          "routePlanReceiptId": "route-parent",
+          "schema": "chio.swarm.continuation-token.v1",
+          "sessionAnchorRef": "session-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "signature": "051ee1174e6d8d0cf23cc60e1a6156cc2cbcab0001cfa0df7f2a6beaad39b4dfa12af29979dccf69a48ce50be69d8c127dbd437282f8af60c7dc42dd05bf030e",
+          "tokenId": "continue-parent",
+          "witnessChainRef": "witness-parent",
+          "witnessChainSha256": "18cda5af949a6cbea1f7c60e019adb73f47edd27fd98b717be01d77043fbdc37"
+        }
+      ],
+      "joinReceipts": [],
+      "nowUnixMs": 1791313606390,
+      "revocationEpoch": {
+        "epochId": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "issuedAtUnixMs": 1791313606390,
+        "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+        "revokedSubjects": [],
+        "revokedTaskIds": [],
+        "rootHash": "144bab856830b54b1d138a96909cfac3f8c92cd33090cf6918de3949ac9fb5b2",
+        "schema": "chio.swarm.revocation-epoch.v1",
+        "signature": "b0fae99d6de48c20575721c0101a3a6419576f18682894b0edc6b5301b8680ef5b9b8a1f6d3ff69046fc7134924a6cac8329246ca3a7b96df193ac0fb3ce0a0c",
+        "validUntilUnixMs": 1791314206390
+      },
+      "routePlanReceipts": [
+        {
+          "attenuationDecision": "accepted",
+          "bridgeId": "native",
+          "candidateSetDigest": "7ac80138fb1815aadeee8834914115ae080604abf9f3a6d0eadd0840cdb17edf",
+          "egressConstraints": [
+            "deny-private-network"
+          ],
+          "egressContractId": "native:egress-scout",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+          "protocolTarget": "native://85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+          "registrySnapshotHash": "ee2a02324bdfe7401141a0ac51340b6c5d1c3638430b31915199a727141589ef",
+          "routePlanId": "route-scout",
+          "schema": "chio.swarm.route-plan-receipt.v1",
+          "selectedRoute": "native:scout",
+          "signature": "dad12899633547b81cffdcd43c7718ac6de936e2457e7456c68f22f5ec3527ad5f598f077a916d06200bebda259cae94fd1b03afdb92abcf0369ce6ec4e13208",
+          "taskId": "scout"
+        },
+        {
+          "attenuationDecision": "accepted",
+          "bridgeId": "native",
+          "candidateSetDigest": "57eeb947f1daa9c878d79e31847730b78fb9ad81dc5717aa84ffa7638c21da3b",
+          "egressConstraints": [
+            "deny-private-network"
+          ],
+          "egressContractId": "native:egress-parent",
+          "expiresAtUnixMs": 1791314204000,
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+          "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+          "protocolTarget": "native://0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "registrySnapshotHash": "ee2a02324bdfe7401141a0ac51340b6c5d1c3638430b31915199a727141589ef",
+          "routePlanId": "route-parent",
+          "schema": "chio.swarm.route-plan-receipt.v1",
+          "selectedRoute": "native:parent",
+          "signature": "63e65b43f97f2a83d0d565697f4009320f28bbf398827e81c78098c896a6643faa1218296f2acf1d279945a893640b1e6817aec65be70bb77e555deabe555e00",
+          "taskId": "parent"
+        }
+      ],
+      "taskGraph": {
+        "budgetPoolRef": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "createdAtUnixMs": 1791313606390,
+        "edges": [
+          {
+            "edgeType": "delegates",
+            "fromTaskId": "program",
+            "toTaskId": "scout"
+          },
+          {
+            "edgeType": "delegates",
+            "fromTaskId": "program",
+            "toTaskId": "parent"
+          }
+        ],
+        "expiresAtUnixMs": 1791314206390,
+        "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+        "joins": [],
+        "maxDepth": 1,
+        "maxFanout": 3,
+        "nodes": [
+          {
+            "depth": 0,
+            "scopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+            "taskId": "program"
+          },
+          {
+            "budgetAllocationRef": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+            "continuationTokenRef": "continue-scout",
+            "depth": 1,
+            "parentTaskId": "program",
+            "routePlanRef": "route-scout",
+            "scopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+            "taskId": "scout"
+          },
+          {
+            "budgetAllocationRef": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+            "continuationTokenRef": "continue-parent",
+            "depth": 1,
+            "parentTaskId": "program",
+            "routePlanRef": "route-parent",
+            "scopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+            "taskId": "parent"
+          }
+        ],
+        "plannerSubject": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+        "revocationEpochRef": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "rootTransactionRef": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+        "routePlanRefs": [
+          "route-scout",
+          "route-parent"
+        ],
+        "schema": "chio.swarm.task-graph.v1",
+        "signature": "c8e95827437ec085bb9ecb80a30e2b6a8f8deb02d3be16fffc3f688b8012587526e82e1432e27d0d1a2d3329b5b7ee45f244757c7c083a4ecf8f78200bcfec03"
+      },
+      "terminalReceipts": [],
+      "witnessChains": [
+        {
+          "chainId": "witness-scout",
+          "childTaskId": "scout",
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "hops": [
+            {
+              "attenuationRuleId": "rule-subset-tool-invocation",
+              "childCapabilityDigest": "03a76fffeb478e23b4506a8d60eb4f3a51ada85c6d1d16c4b7a78d497d647f1c",
+              "childScopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+              "expiresAtUnixMs": 1791314204000,
+              "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+              "parentCapabilityDigest": "d4f09babca88ba7b77c8340c5148b6b5ab9e9fc2d4f63ba5cd717995f9bf5422",
+              "parentScopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+              "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+              "scopeSubsetProof": {
+                "normalizedChildScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":1,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":100},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "normalizedParentScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":3,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":300},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "subsetRelations": [
+                  {
+                    "childIndex": 0,
+                    "grantKind": "tool",
+                    "parentIndex": 0,
+                    "subset": true
+                  }
+                ]
+              },
+              "witnessSignature": "8620801088fd15975822ac8c44e023c04b2e94fcfbad562ccf9d4a3187ddd8b3be7c808db5cfe96eceb6d2eb12d114bdbc3647cf787e257b41dbfec371e83c0d"
+            }
+          ],
+          "parentTaskId": "program",
+          "schema": "chio.swarm.delegation-witness-chain.v1"
+        },
+        {
+          "chainId": "witness-parent",
+          "childTaskId": "parent",
+          "graphId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+          "hops": [
+            {
+              "attenuationRuleId": "rule-subset-tool-invocation",
+              "childCapabilityDigest": "e4005064c7685dc2bfc3ae6d5c8c454689aa4cf990879dabe15fa314c185243e",
+              "childScopeHash": "04cc429ca6e90fd6b8b0fe8ec6b8abbe5ee64f28ba23bd96359ad6cb3ee4daf1",
+              "expiresAtUnixMs": 1791314204000,
+              "issuer": "did:chio:97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+              "parentCapabilityDigest": "d4f09babca88ba7b77c8340c5148b6b5ab9e9fc2d4f63ba5cd717995f9bf5422",
+              "parentScopeHash": "659b4ae98ef1d7b7a1737be91ad4761418819b1f599f1fbfb909179a0afb8a9a",
+              "policyDigest": "bbe248d9e4ee7efa4d392af7494f3316ffe8926edd50338ebf73c15e6d3a5798",
+              "scopeSubsetProof": {
+                "normalizedChildScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":1,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":100},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "normalizedParentScope": "{\"grants\":[{\"max_cost_per_invocation\":{\"currency\":\"XTS\",\"units\":100},\"max_invocations\":3,\"max_total_cost\":{\"currency\":\"XTS\",\"units\":300},\"operations\":[\"invoke\"],\"server_id\":\"experimental-funded-w0\",\"tool_name\":\"review\"}]}",
+                "subsetRelations": [
+                  {
+                    "childIndex": 0,
+                    "grantKind": "tool",
+                    "parentIndex": 0,
+                    "subset": true
+                  }
+                ]
+              },
+              "witnessSignature": "5a2c899b7323e79a46172b4596a1684eaf42604c9101541cf54ecd2501ecc1a9ee1cb219f3d00a263e33a43d1b10cdc9690d7a0d398e820609a9686859ad9a0f"
+            }
+          ],
+          "parentTaskId": "program",
+          "schema": "chio.swarm.delegation-witness-chain.v1"
+        }
+      ]
+    },
+    "parent": {
+      "agreement": {
+        "body": {
+          "authorityUuid": "01a1129c-7f69-7ba0-abd1-17639dc9b996",
+          "buyerKey": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+          "captureWaiverTerms": {
+            "body": {
+              "capabilityDigest": "e4005064c7685dc2bfc3ae6d5c8c454689aa4cf990879dabe15fa314c185243e",
+              "contractContextDigest": "ad009f8c57691fe6c405497e147113e8d3d4545d6b03a1cc0fd317ba47565285",
+              "expiresAtUnixMs": 1791400013770,
+              "issuedAtUnixMs": 1791313613770,
+              "policyDigest": "46622d88017fce8382ac7972bc7c8d34655e24ff661135ee2259101b90f4198e",
+              "requestId": "parent",
+              "schema": "chio.contractual-capture-waiver.v1"
+            },
+            "counterpartySignature": "7d52447b4cc8d52eca2258479057d84b14c72962079f790fd376ec32f19a20bb710fe9c35eaa3a4c266e37d7908b4bde15fa4df8b1671e3dbeecd0a774f31709",
+            "receiverSignature": "60100aa9f2b164747fd4637e141202d6ab94500e8150323d623d7efe375d62fc24f301c82142e3bb7a9a2d65428f3be0647f2caa78b6c07e712ad5cade81d109"
+          },
+          "domain": {
+            "chainId": "31337",
+            "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+            "escrowCodeHash": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+            "genesisHash": "0x637eabdf6886ba16d607232b9297b1c39d66fc280ed51c678dd3d4626516aef5",
+            "profile": "chio.experimental.local-confirmed-funding.v1",
+            "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+            "tokenCodeHash": "0xf146daf64bb55ab200ce3e246927379f7f95125c3c456bce22ab9b10701be0a1"
+          },
+          "findingContextSha256": "b79e5de0ecf86e3a4105b979f931f7d27f745e7e70839394a5032115feb03c48",
+          "policySha256": "94ce74a2283cba0debccfa5fd938d8e91884c99dca04f2a4c980f2ce90497e84",
+          "providerKey": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "requestId": "parent",
+          "requestSha256": "fde3598d8cfba36a6ed2e94ad23d42878d8dd3afca45b3b40aaa707ab48c36fe",
+          "requiredFindingFacets": [
+            "artifact_integrity",
+            "receipt_authenticity",
+            "checkpoint_membership",
+            "guarantee_consistency"
+          ],
+          "schema": "chio.experimental.native-funded-w0-agreement.v2",
+          "work": {
+            "amount": "100",
+            "beneficiary": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+            "challengeUntil": 1791314305,
+            "payer": "0xffcf8fdee72ac11b5c542428b35eef5769c409f0",
+            "refundAfter": 1791314505,
+            "resolveBy": 1791314405,
+            "submitBy": 1791314205,
+            "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d"
+          }
+        },
+        "buyerSignature": "195dfb5340bfd75e194c435518e7f384bfe531b54ca6cffd536f013f4dc1ccfbcd0ae68a9abf6a83d0f7e684a0bce66acb2f1ea2b3cb07dd5f3fe8ec91cdee03",
+        "providerSignature": "ac5aaa12a9985e1c6f889283b9139ad57cb98d3e63ddb3718031fae0580ae1ee0f767dda606ba8ff0fd31b44a4106d425a2ca8f70b484d5a818cbb0a6c7e2a04"
+      },
+      "receiverPackage": {
+        "admissionBundle": {
+          "admissionId": "admission-parent",
+          "binding": {
+            "capabilityId": "cap-01a1129c-90c8-77dc-9eef-6d84808eab02",
+            "hostKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+            "originKernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+            "requestId": "parent",
+            "serverId": "experimental-funded-w0",
+            "toolArgsSha256": "85e1bb597177728f8ad62ed5e47016d994ceb8a7a7275edfda182f4018ee8e0d",
+            "toolName": "review"
+          },
+          "destructive": false,
+          "governanceReceiptId": "governance-parent",
+          "leaseId": "lease-parent",
+          "schema": "chio.runtime.admission-bundle.v1",
+          "stepIndex": 0,
+          "trustBundleSha256": "34395d8cf1ce7d8784f232954cae41760099d7e7e84f661d250de7f68cceb302",
+          "verificationContextSha256": "b142e9ea88e2fc7d037f10f279a8ed216c8a71f3f5fbb0ae85e09d229ef1ca72",
+          "workflowGrantId": "grant-parent",
+          "workflowId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+        },
+        "receiverPolicy": {
+          "authorityUuid": "01a1129c-7f69-7ba0-abd1-17639dc9b996",
+          "buyerKey": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+          "composition": {
+            "allocator": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+            "peer": {
+              "capabilities": {
+                "schema": "chio.capabilities.v1"
+              },
+              "conformanceTier": "bronze",
+              "establishedAt": 1791313609,
+              "kernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+              "publicKey": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+              "rotationDue": 1791356809
+            },
+            "profile": {
+              "expiresAtUnixMs": 1791314206390,
+              "issuedAtUnixMs": 1791313606390,
+              "localKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+              "profileId": "evolving-funded-review",
+              "schema": "chio.runtime.admission-profile.v1",
+              "verifierId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+            },
+            "programId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+            "replay": {
+              "expectation_id": "b0ae4ab5b8f35e57489af8afb7a4acf234f3272c502b48848228e96a310f9810",
+              "runtime_authority_id": "runtime-01a1129c-7f69-7ba0-abd1-17639dc9b996"
+            },
+            "witness": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe"
+          },
+          "domain": {
+            "chainId": "31337",
+            "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+            "escrowCodeHash": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+            "genesisHash": "0x637eabdf6886ba16d607232b9297b1c39d66fc280ed51c678dd3d4626516aef5",
+            "profile": "chio.experimental.local-confirmed-funding.v1",
+            "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+            "tokenCodeHash": "0xf146daf64bb55ab200ce3e246927379f7f95125c3c456bce22ab9b10701be0a1"
+          },
+          "findingContext": {
+            "admittedKernelKey": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+            "collateralAuthority": {
+              "authority_id": "funded-w0-fixture/collateral",
+              "key": "32f40276fcfb274bd7e7ea31998d2055d777cbbabf2509ac007758ce23a3c4bf",
+              "key_epoch": 1,
+              "revocation_status_ref": "funded-w0-fixture/status/collateral",
+              "rotation_policy_ref": "funded-w0-fixture/rotation/collateral",
+              "valid_from": 1791313609,
+              "valid_until": 1791400009
+            },
+            "governanceAuthority": {
+              "authority_id": "funded-w0-fixture/governance",
+              "key": "4ce72887d8eeacbd5dc975e43f521646819c4c94764c0cf573984131ae6e55c7",
+              "key_epoch": 1,
+              "revocation_status_ref": "funded-w0-fixture/status/governance",
+              "rotation_policy_ref": "funded-w0-fixture/rotation/governance",
+              "valid_from": 1791313609,
+              "valid_until": 1791400009
+            },
+            "governanceStanding": {
+              "max_age_secs": 86400,
+              "signed_statuses": [
+                {
+                  "body": {
+                    "authority_id": "funded-w0-fixture/governance",
+                    "key": "4ce72887d8eeacbd5dc975e43f521646819c4c94764c0cf573984131ae6e55c7",
+                    "key_epoch": 1,
+                    "observed_at": 1791313609,
+                    "revoked_from": null,
+                    "schema": "chio.finding.authority-status.v1",
+                    "status_ref": "funded-w0-fixture/status/governance"
+                  },
+                  "signature": "fc4e411ea45ae3368064a1868f6415c90df801d08dddd7eb56e6d6654c72f62b272bbd3a04433892d14f02f528f10acb4e98c370cf8723d96a2d28ba6eaaa809",
+                  "signerKey": "6650202214fbfcccb8d2135d812646a409c7865fc8d809184a15453dbcf3bac3"
+                }
+              ],
+              "status_authority": {
+                "authority_id": "funded-w0-fixture/authority-status",
+                "key": "6650202214fbfcccb8d2135d812646a409c7865fc8d809184a15453dbcf3bac3",
+                "key_epoch": 1,
+                "revocation_status_ref": "funded-w0-fixture/status/authority-status",
+                "rotation_policy_ref": "funded-w0-fixture/rotation/authority-status",
+                "valid_from": 1791313609,
+                "valid_until": 1791400009
+              }
+            },
+            "profile": {
+              "body": {
+                "allowed_predicates": [
+                  "baseline_fails_candidate_passes_v1"
+                ],
+                "allowed_runner_manifests": [
+                  "6b83bdbfb790f5644758b1d98f130656552bb3ed209a3dff53f5f912ef16dd48"
+                ],
+                "bbs_projection_issuer": {
+                  "issuer_fingerprint": "unavailable:funded-w0-fixture",
+                  "key_epoch": 1,
+                  "key_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+                  "registry_ref": "unavailable:funded-w0-fixture",
+                  "revocation_status_ref": "unavailable:funded-w0-fixture",
+                  "valid_from": 1791313609,
+                  "valid_until": 1791400009
+                },
+                "checkpoint_logs": [
+                  {
+                    "log_id": "local-log-89bdd61f8c41464bdc65384150235230560f64679aebefa76e092859e6223344",
+                    "signer": {
+                      "authority_id": "funded-w0-fixture/checkpoint",
+                      "key": "f448078d2eaeddf99eacb5e975fb34ff32c29e35a97bd995eed2d07ee41745b0",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/checkpoint",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/checkpoint",
+                      "valid_from": 1791313609,
+                      "valid_until": 1791400009
+                    }
+                  }
+                ],
+                "expires_at": 1791400009,
+                "failed_delivery_authority": {
+                  "authority_id": "funded-w0-fixture/failed-delivery",
+                  "key": "e7280c0e11542ebd5ea8a6e0a8ac87c30ea73984f9df64b245c3dfb357546660",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/failed-delivery",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/failed-delivery",
+                  "valid_from": 1791313609,
+                  "valid_until": 1791400009
+                },
+                "governance_authority": "4ce72887d8eeacbd5dc975e43f521646819c4c94764c0cf573984131ae6e55c7",
+                "issued_at": 1791313609,
+                "operator": "funded-w0-fixture",
+                "predicate_engine": "chio-replay-v1",
+                "profile_id": "60cd49289effdbe9de736ab0e1013ffb1d11e13475c86300c1544ff480e33b15",
+                "purchase_authority": {
+                  "authority_id": "funded-w0-fixture/purchase",
+                  "key": "c013dcb3238925de21732adc1bf5be500159a886c28043f4924102a717bd1bb9",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/purchase",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/purchase",
+                  "valid_from": 1791313609,
+                  "valid_until": 1791400009
+                },
+                "receipt_signers": [
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/production",
+                      "key": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/production",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/production",
+                      "valid_from": 1791313609,
+                      "valid_until": 1791400009
+                    },
+                    "role": "production"
+                  },
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/delivery",
+                      "key": "56ea8ffb5a36943dd6657b2ca2f89bc7b70db8145ffde3c0d790b66f6606c45e",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/delivery",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/delivery",
+                      "valid_from": 1791313609,
+                      "valid_until": 1791400009
+                    },
+                    "role": "delivery"
+                  },
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/replay",
+                      "key": "bcab1e3f9d8b22f4e32453b79f01ab354eaf9f94b64b3e1ed47fa2e6438d9c5f",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/replay",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/replay",
+                      "valid_from": 1791313609,
+                      "valid_until": 1791400009
+                    },
+                    "role": "replay"
+                  }
+                ],
+                "required_facets": [
+                  "artifact_integrity",
+                  "receipt_authenticity",
+                  "checkpoint_membership",
+                  "guarantee_consistency"
+                ],
+                "required_receipt_semantics": "chio.pre_settlement_execution.v1",
+                "resolver_policy_ref": "funded-w0-execution-evidence-v1",
+                "resource_caps": {
+                  "max_evidence_receipts": 1,
+                  "max_memory_bytes": 16777216,
+                  "max_recipe_bytes": 262144,
+                  "max_runtime_secs": 60
+                },
+                "retention_policy_ref": "funded-w0-journal-v1",
+                "schema": "chio.finding.challenge-verifier-profile.v1",
+                "verifier_report_signer": {
+                  "authority_id": "funded-w0-fixture/verifier",
+                  "key": "2c11d765d775454f50b7c6725c99f988097184257526b1ec68e72351eb301214",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/verifier",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/verifier",
+                  "valid_from": 1791313609,
+                  "valid_until": 1791400009
+                }
+              },
+              "signature": "b65106dad19e8fa5a478fa39e6aef937bc09a709b5606244c864eafcdf95868b64dba7de0d47f53b2be9100674a7ac145639c21b215503e1ac288e631856a30d",
+              "signerKey": "4ce72887d8eeacbd5dc975e43f521646819c4c94764c0cf573984131ae6e55c7"
+            },
+            "schema": "chio.experimental.funded-finding-context.v2"
+          },
+          "implementationSha256": "aab891d740cb1db416740ea89d2a0cdd87bdf1e2ccfa08df9bf163791d1ef155",
+          "providerKey": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "requiredFindingFacets": [
+            "artifact_integrity",
+            "receipt_authenticity",
+            "checkpoint_membership",
+            "guarantee_consistency"
+          ],
+          "verifierKey": "2c11d765d775454f50b7c6725c99f988097184257526b1ec68e72351eb301214"
+        },
+        "treatyArtifacts": [
+          {
+            "artifact": {
+              "allowedActionClasses": [
+                "work.review"
+              ],
+              "expiresAtUnixMs": 1791314204000,
+              "issuedAtUnixMs": 1791313606390,
+              "ladderManifestSha256s": [
+                "e99a647eef1b8731fb95c84207e8ec5754d9501a2d38cb823bd04bd160a37b31",
+                "3ed245e761cf11c2f47cf7da0a9cc59f80ad3877b39821ad5e2876358e9e0f34"
+              ],
+              "participantKernelIds": [
+                "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+              ],
+              "participantPublicKeys": [
+                "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+              ],
+              "revocationEpochSha256": "d706cc9b326c7606420353a580617e6b7289305cfe86d80ddb3667e733d6c416",
+              "schema": "chio.federation.treaty-scope.v1",
+              "treatyId": "treaty-parent",
+              "trustBundleSha256": "34395d8cf1ce7d8784f232954cae41760099d7e7e84f661d250de7f68cceb302"
+            },
+            "id": "treaty-parent",
+            "kind": "treaty_scope",
+            "sha256": "6d846d01ec21e2196798de016fee84a7d72618e92263a67f911b621e1f5c1e32"
+          },
+          {
+            "artifact": {
+              "actionClasses": [
+                {
+                  "actionClassId": "work.review",
+                  "coSign": "bilateral_required",
+                  "consistencyModel": "totally-ordered",
+                  "destructive": false,
+                  "evidenceRequired": [
+                    "bilateral_dsse",
+                    "bilateral_invocation",
+                    "receipt_lineage"
+                  ],
+                  "mode": "receipt_backed",
+                  "participantModes": {
+                    "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf": "receipt_backed",
+                    "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb": "receipt_backed"
+                  }
+                }
+              ],
+              "expiresAtUnixMs": 1791314204000,
+              "generatedAtUnixMs": 1791313613771,
+              "intersectionId": "treaty-parent:1791313613771",
+              "ladderManifestSha256s": [
+                "e99a647eef1b8731fb95c84207e8ec5754d9501a2d38cb823bd04bd160a37b31",
+                "3ed245e761cf11c2f47cf7da0a9cc59f80ad3877b39821ad5e2876358e9e0f34"
+              ],
+              "participantKernelIds": [
+                "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+              ],
+              "schema": "chio.federation.ladder-intersection.v1",
+              "treatyId": "treaty-parent"
+            },
+            "id": "treaty-parent:1791313613771",
+            "kind": "ladder_intersection",
+            "sha256": "951cf47a909cbd7713be137120d750f9b2ad4d51c0a53a9592b0f8a22b6b8b0a"
+          },
+          {
+            "artifact": {
+              "actionClassId": "work.review",
+              "audienceTool": "experimental-funded-w0.review",
+              "capabilityId": "cap-01a1129c-90c8-77dc-9eef-6d84808eab02",
+              "continuationId": "treaty-continuation-parent",
+              "expiresAtUnixMs": 1791314204000,
+              "issuedAtUnixMs": 1791313606390,
+              "nonce": "treaty-nonce-parent",
+              "parentReceiptSha256": "4ef8ebceaca089443caf85adfdb04eb63b96f762b8066224f7058dbf51a3a906",
+              "parentSessionAnchorSha256": "e1b8fe83de5de637c3973201533cbd1d0791f29fdddd1655d9ebcd5cd86042e1",
+              "schema": "chio.federation.cross-kernel-continuation.v1",
+              "sourceKernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+              "targetKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+            },
+            "id": "treaty-continuation-parent",
+            "kind": "cross_kernel_continuation",
+            "sha256": "3362960e5b937d98107706cc92da18883609f1beea27ce63c9243322cd61c902"
+          },
+          {
+            "artifact": {
+              "bundleId": "lineage-bundle-parent",
+              "leafReceiptSha256": "465e2f09d6db0e685817fde3c95589eca47051d384e6ceb2964301cd49ac645e",
+              "rootReceiptSha256": "4ef8ebceaca089443caf85adfdb04eb63b96f762b8066224f7058dbf51a3a906",
+              "schema": "chio.federation.receipt-lineage-bundle.v1",
+              "statements": [
+                {
+                  "bilateralInvocationSha256": "b91545f27369bb8e0c4837205fe00e4680f8e8aadd78e6ca2f51081071c1a00e",
+                  "childReceiptSha256": "465e2f09d6db0e685817fde3c95589eca47051d384e6ceb2964301cd49ac645e",
+                  "continuationSha256": "3362960e5b937d98107706cc92da18883609f1beea27ce63c9243322cd61c902",
+                  "evidenceClass": "verified",
+                  "parentReceiptSha256": "4ef8ebceaca089443caf85adfdb04eb63b96f762b8066224f7058dbf51a3a906",
+                  "schema": "chio.federation.receipt-lineage-statement.v1",
+                  "sourceKernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                  "statementId": "lineage-parent",
+                  "targetKernelId": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+                }
+              ]
+            },
+            "id": "lineage-bundle-parent",
+            "kind": "receipt_lineage_bundle",
+            "sha256": "551bd1dd299bacabc5789fb534ae588c1cdaa6297cbf167b509a3950408580b9"
+          },
+          {
+            "artifact": {
+              "actionClassId": "work.review",
+              "capabilityId": "cap-01a1129c-90c8-77dc-9eef-6d84808eab02",
+              "consistencyModel": "totally-ordered",
+              "continuationSha256": "3362960e5b937d98107706cc92da18883609f1beea27ce63c9243322cd61c902",
+              "invocationId": "permission-parent",
+              "ladderIntersectionSha256": "951cf47a909cbd7713be137120d750f9b2ad4d51c0a53a9592b0f8a22b6b8b0a",
+              "lineageStatementSha256": "00669df45b469847ea24213b7274c14f3840736a552a38175fa85777e65cd6f9",
+              "localReceiptSha256": "4ef8ebceaca089443caf85adfdb04eb63b96f762b8066224f7058dbf51a3a906",
+              "outcomeSha256": "b6671a13b21d024015d692fdb9d08040a48cb2014915c9e8f3503dc035b03e0a",
+              "remoteReceiptSha256": "465e2f09d6db0e685817fde3c95589eca47051d384e6ceb2964301cd49ac645e",
+              "requestSha256": "85e1bb597177728f8ad62ed5e47016d994ceb8a7a7275edfda182f4018ee8e0d",
+              "schema": "chio.federation.bilateral-invocation.v1",
+              "signerKernelIds": [
+                "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+              ],
+              "treatyId": "treaty-parent"
+            },
+            "id": "permission-parent",
+            "kind": "bilateral_invocation",
+            "sha256": "8096f5115d5ff4dc96d0bda9f415d61ed894620d5f73ae84f5ec113a00ac32fe"
+          },
+          {
+            "artifact": {
+              "payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiY2FwYWJpbGl0eV9sZWFzZV9yZWYiOnsiZXhwaXJlc19hdF91bml4X21zIjoxNzkxMzE0MjA0MDAwLCJpc3N1ZXIiOiJkaWQ6Y2hpbzowNjlkM2M5ZmY1MzQzMzQ4ZTAwYzI4ODI1YjJhYWJhMjU2MDI1MjNlNzQyOWIwYzM1M2ZhOTcyNTc2NzI4ZGFmIiwibGVhc2VfaWQiOiJsZWFzZS1wYXJlbnQifSwiY29fc2lnbiI6ImJpbGF0ZXJhbF9yZXF1aXJlZCIsImNvbnNpc3RlbmN5X2FuY2hvciI6ImFuY2hvci1wYXJlbnQiLCJjb25zaXN0ZW5jeV9tb2RlbCI6InRvdGFsbHktb3JkZXJlZCIsImNyb3NzX29yZ192aXNpYmlsaXR5IjoidHJlYXR5X29ubHkiLCJnb3Zlcm5hbmNlX3JlY2VpcHRfcmVmIjp7ImRpZ2VzdCI6eyJhbGciOiJzaGEyNTYiLCJ2YWx1ZSI6ImIxNDJlOWVhODhlMmZjN2QwMzdmMTBmMjc5YThlZDIxNmM4YTcxZjNmNWZiYjBhZTg1ZTA5ZDIyOWVmMWNhNzIifSwia2VybmVsX2lkIjoiZGlkOmNoaW86MGUwY2I0OWNhYTUxMTUwYzdiNDE1NTNmNWE2MDNjMTllMjNkNzBiNjZhODdlMjM4NjYwN2VmNGViODdiMzBiYiIsInJlY2VpcHRfaWQiOiJnb3Zlcm5hbmNlLXBhcmVudCJ9LCJpbnZvY2F0aW9uX2lkIjoiYzQwOTVjYjZkNTVhOWNhZTI3MzkzMGRiZWNmMDFmMWQxZWZkZmRkYmI2NzdiNTBhYThmNTJjOGFhZjFlNWI5YyIsInBvbGljeV9ldmFsdWF0aW9uX3N1bW1hcnkiOnsiam9pbnRfZGlzcG9zaXRpb24iOiJhbGxvdyIsInNlcnZlcl9hX3ZlcmRpY3QiOnsicG9saWN5X2lkIjoiZGlkOmNoaW86MDY5ZDNjOWZmNTM0MzM0OGUwMGMyODgyNWIyYWFiYTI1NjAyNTIzZTc0MjliMGMzNTNmYTk3MjU3NjcyOGRhZiIsInBvbGljeV92ZXJzaW9uIjoiMSIsInZlcmRpY3QiOiJhbGxvdyJ9LCJzZXJ2ZXJfYl92ZXJkaWN0Ijp7InBvbGljeV9pZCI6ImRpZDpjaGlvOjBlMGNiNDljYWE1MTE1MGM3YjQxNTUzZjVhNjAzYzE5ZTIzZDcwYjY2YTg3ZTIzODY2MDdlZjRlYjg3YjMwYmIiLCJwb2xpY3lfdmVyc2lvbiI6IjEiLCJ2ZXJkaWN0IjoiYWxsb3cifX0sInRpbWVzdGFtcF91bml4X21zIjoxNzkxMzEzNjEzNzcxLCJ0b29sX2FyZ3NfaGFzaCI6eyJhbGciOiJzaGEyNTYiLCJ2YWx1ZSI6Ijg1ZTFiYjU5NzE3NzcyOGY4YWQ2MmVkNWU0NzAxNmQ5OTRjZWI4YTdhNzI3NWVkZmRhMTgyZjQwMThlZThlMGQifSwidG9vbF9uYW1lIjoicmV2aWV3IiwidG9vbF9zZXJ2ZXJfYSI6eyJhbGciOiJlZDI1NTE5Iiwia2VybmVsX2lkIjoiZGlkOmNoaW86MDY5ZDNjOWZmNTM0MzM0OGUwMGMyODgyNWIyYWFiYTI1NjAyNTIzZTc0MjliMGMzNTNmYTk3MjU3NjcyOGRhZiIsInBhc3Nwb3J0X2tleV9maW5nZXJwcmludCI6ImRjYzE4ODgyMjAxMzdhNjNhMTQ5OTU0NjIxODZkZjY3NGYzOTlhMGQ3NDlmZDA4ZGRkYWJmMjI0MTA3ZjZiMzcifSwidG9vbF9zZXJ2ZXJfYiI6eyJhbGciOiJlZDI1NTE5Iiwia2VybmVsX2lkIjoiZGlkOmNoaW86MGUwY2I0OWNhYTUxMTUwYzdiNDE1NTNmNWE2MDNjMTllMjNkNzBiNjZhODdlMjM4NjYwN2VmNGViODdiMzBiYiIsInBhc3Nwb3J0X2tleV9maW5nZXJwcmludCI6ImE4NjJlMDNkMGJkODA1OTIwNzE5Mzg2ZmQ5Zjc0OTNjZTEyZWRiOThmYmEwYWQzODNmNGYzOWE4NDIzMmU4M2YifSwidHJlYXR5X2JpbmRpbmdfcmVmIjp7ImFjdGlvbl9jbGFzc19pZCI6IndvcmsucmV2aWV3IiwiYWRtaXNzaW9uX3JlcG9ydF9zaGEyNTYiOiJkNzk0NWIwN2M2ZWQ5NmQyZDE1M2Q0N2ZlOTdhYWMyMTFjOGNjY2QxY2ExZjM3ZjIyZjAwYzljNTA1MTU1Y2FmIiwiY29uc2lzdGVuY3lfbW9kZWwiOiJ0b3RhbGx5LW9yZGVyZWQiLCJjb250aW51YXRpb25fc2hhMjU2IjoiMzM2Mjk2MGU1YjkzN2Q5ODEwNzcwNmNjOTJkYTE4ODgzNjA5ZjFiZWVhMjdjZTYzYzkyNDMzMjJjZDYxYzkwMiIsImdvdmVybmFuY2VfcmVmcyI6WyJnb3Zlcm5hbmNlLXBhcmVudCJdLCJsYWRkZXJfaW50ZXJzZWN0aW9uX3NoYTI1NiI6Ijk1MWNmNDdhOTA5Y2JkNzcxM2JlMTM3MTIwZDc1MGY5YjJhZDRkNTFjMGE1M2E5NTkyYjBmOGEyMmI2YjhiMGEiLCJsZWFzZV9yZWZzIjpbImxlYXNlLXBhcmVudCJdLCJsaW5lYWdlX2J1bmRsZV9zaGEyNTYiOiI1NTFiZDFkZDI5OWJhY2FiYzU3ODlmYjUzNGFlNTg4YzFjZGFhNjI5N2NiZjE2N2I1MDlhMzk1MDQwODU4MGI5IiwibG9jYWxfcmVjZWlwdF9zaGEyNTYiOiI0ZWY4ZWJjZWFjYTA4OTQ0M2NhZjg1YWRmZGIwNGViNjNiOTZmNzYyYjgwNjYyMjRmNzA1OGRiZjUxYTNhOTA2Iiwib3V0Y29tZV9zaGEyNTYiOiJiNjY3MWExM2IyMWQwMjQwMTVkNjkyZmRiOWQwODA0MGE0OGNiMjAxNDkxNWM5ZThmMzUwM2RjMDM1YjAzZTBhIiwicmVtb3RlX3JlY2VpcHRfc2hhMjU2IjoiNDY1ZTJmMDlkNmRiMGU2ODU4MTdmZGUzYzk1NTg5ZWNhNDcwNTFkMzg0ZTZjZWIyOTY0MzAxY2Q0OWFjNjQ1ZSIsInJlcXVlc3Rfc2hhMjU2IjoiODVlMWJiNTk3MTc3NzI4ZjhhZDYyZWQ1ZTQ3MDE2ZDk5NGNlYjhhN2E3Mjc1ZWRmZGExODJmNDAxOGVlOGUwZCIsInNpZ25lcl9rZXJuZWxfaWRzIjpbImRpZDpjaGlvOjA2OWQzYzlmZjUzNDMzNDhlMDBjMjg4MjViMmFhYmEyNTYwMjUyM2U3NDI5YjBjMzUzZmE5NzI1NzY3MjhkYWYiLCJkaWQ6Y2hpbzowZTBjYjQ5Y2FhNTExNTBjN2I0MTU1M2Y1YTYwM2MxOWUyM2Q3MGI2NmE4N2UyMzg2NjA3ZWY0ZWI4N2IzMGJiIl0sInRyZWF0eV9pZCI6InRyZWF0eS1wYXJlbnQiLCJ0cmVhdHlfc2NvcGVfc2hhMjU2IjoiNmQ4NDZkMDFlYzIxZTIxOTY3OThkZTAxNmZlZTg0YTdkNzI2MThlOTIyNjNhNjdmOTExYjYyMWUxZjVjMWUzMiJ9fSwicHJlZGljYXRlVHlwZSI6ImNoaW8uYmlsYXRlcmFsLWNvc2lnbi1pbnZvY2F0aW9uLnYxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6Ijc0NTJkZThmMmUxNDYzNWNjYTI1ZmI5MTUwYmEzY2U4YTc1ZmM0NjFhMjZhYzBkNzJkNGFmMGI3NjViYjhjMjMifSwibmFtZSI6ImNoaW8tcmVjZWlwdDpjNDA5NWNiNmQ1NWE5Y2FlMjczOTMwZGJlY2YwMWYxZDFlZmRmZGRiYjY3N2I1MGFhOGY1MmM4YWFmMWU1YjljIn1dfQ==",
+              "payloadType": "application/vnd.in-toto+json",
+              "signatures": [
+                {
+                  "keyid": "dcc1888220137a63a14995462186df674f399a0d749fd08dddabf224107f6b37",
+                  "sig": "YkiPKho/8YXDgNa8gAKrA5CXWHxJNFr7jny0K3Cig3B4XVS0IlNbcdVCn+xwj8Epxljv7GuPQXYqX/o4sFRDCw=="
+                },
+                {
+                  "keyid": "a862e03d0bd805920719386fd9f7493ce12edb98fba0ad383f4f39a84232e83f",
+                  "sig": "0Z+E+PaXjk17Y6+jjw2KVn6Nm2bCZMWh4qdxpX1NOP9lxxtOrMV2+lvBzYrNDMOPj9OZJY9zvQcwCf8kF/TTDA=="
+                }
+              ]
+            },
+            "id": "dsse-parent",
+            "kind": "bilateral_dsse_envelope",
+            "sha256": "368ff98e25dba799dce23a7e18f5ef1108e149b7b6394d6b9c3529e11331e634"
+          },
+          {
+            "artifact": {
+              "lease": {
+                "expires_at_unix_ms": 1791314204000,
+                "issuer": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "lease_id": "lease-parent"
+              },
+              "validFromUnixMs": 1791313606390
+            },
+            "id": "lease-parent",
+            "kind": "capability_lease",
+            "sha256": "53783e7ad0acb7e13e01c6643503ca98a302277f0d50db1e8e2bd023756c4498"
+          },
+          {
+            "artifact": {
+              "receipt": {
+                "digest": {
+                  "alg": "sha256",
+                  "value": "b142e9ea88e2fc7d037f10f279a8ed216c8a71f3f5fbb0ae85e09d229ef1ca72"
+                },
+                "kernel_id": "did:chio:0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                "receipt_id": "governance-parent"
+              },
+              "validFromUnixMs": 1791313606390,
+              "validUntilUnixMs": 1791314204000
+            },
+            "id": "governance-parent",
+            "kind": "governance_receipt",
+            "sha256": "f38deea3474e4f0a3c55713d374a124159673480ccd179e759ce25069fb6c1aa"
+          }
+        ]
+      },
+      "request": {
+        "agent_id": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+        "arguments": {
+          "chio_capture_waiver_terms_digest": "9cf6d553179c1d765e96ce5285c1485d5bf36f72750d24c04308a1322b3f6c76",
+          "input": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\"title\": \"Example company payments API\", \"version\": \"1.0.0\"},\n  \"components\": {\"securitySchemes\": {\"serviceToken\": {\"type\": \"http\", \"scheme\": \"bearer\"}}},\n  \"security\": [{\"serviceToken\": []}],\n  \"paths\": {\n    \"/accounts\": {\"get\": {\"responses\": {\"200\": {\"description\": \"Accounts\"}}}},\n    \"/refunds\": {\"post\": {\"security\": [], \"responses\": {\"201\": {\"description\": \"Refund staged\"}}}},\n    \"/health\": {\"get\": {\"security\": [{}, {\"serviceToken\": []}], \"responses\": {\"200\": {\"description\": \"Healthy\"}}}},\n    \"/sessions\": {\"delete\": {\"security\": [{\"serviceToken\": []}], \"responses\": {\"204\": {\"description\": \"Session ended\"}}}}\n  }\n}\n"
+        },
+        "capability": {
+          "expires_at": 1791314204,
+          "id": "cap-01a1129c-90c8-77dc-9eef-6d84808eab02",
+          "issued_at": 1791313613,
+          "issuer": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+          "schema": "chio.capability.v1",
+          "scope": {
+            "grants": [
+              {
+                "max_cost_per_invocation": {
+                  "currency": "XTS",
+                  "units": 100
+                },
+                "max_invocations": 1,
+                "max_total_cost": {
+                  "currency": "XTS",
+                  "units": 100
+                },
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "experimental-funded-w0",
+                "tool_name": "review"
+              }
+            ]
+          },
+          "signature": "f66a855dd9794ff5762b1df917606fb42f8c99647cb14ffc0f5c689d260a07757ca96cb45a9bb4dc796b9cc4946cd0fadcb4952ec96669fda8184a6757d94608",
+          "subject": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf"
+        },
+        "federated_origin_kernel_id": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+        "governed_intent": {
+          "context": {
+            "chioAdmission": {
+              "admissionId": "admission-parent",
+              "bundleSha256": "eb3b55187458deccb3a6cbfcd820f0f3ed3cbf99fcba37fec8ab3935c3f33b39"
+            },
+            "chioDelegation": {
+              "allocation": {
+                "body": {
+                  "allocation_hash": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+                  "issued_at": 1791313613,
+                  "root_id": "program",
+                  "selection": {
+                    "body": {
+                      "capability_hash": "9d58d113538fd1cb34460e192085bd5abd7659ccca3e30c45853170d91999866",
+                      "expected_revision": 0,
+                      "offer": {
+                        "body": {
+                          "allocation_hash": "2431bdd6518611bab1ecd6d5b9da8db4402858df5b93317cb34b14b7778cee5d",
+                          "arguments_hash": "3ec6a530f9583732ff18ec278b56d031a5f2c8b4eddf249a4fd3994ee644d03c",
+                          "contract_hash": "61bc11cc2c6a1e42af6a9aa4f1926fb09229416e84806c2e1750898c1001aa3e",
+                          "effect": {
+                            "server": "experimental-funded-w0",
+                            "tool": "review"
+                          },
+                          "expires_at": 1791314206,
+                          "price_units": 100,
+                          "receiver": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                          "slot_id": "parent"
+                        },
+                        "signature": "4d9c91ca28b8e4adef39eaf90a472f5666a515f9a68bf39f702f77fe6c375b866b4e4af8a5400441665578379989f537f69d14899c035bb8451b55e11f266d0d",
+                        "signer": "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb"
+                      },
+                      "request_id": "parent"
+                    },
+                    "signature": "e72d3aa65f792437341d75eb71026efac57ecdf67898b891e237b43e46772467c7721e7db32f21622eebf1108c6ab14d5cf8cf238365b490b1b9aa6982accb01",
+                    "signer": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf"
+                  },
+                  "slot": {
+                    "contract": {
+                      "acceptance": {
+                        "clauses": [
+                          {
+                            "kind": "equals",
+                            "pointer": "/0/path",
+                            "value": "/accounts"
+                          }
+                        ]
+                      },
+                      "currency": "XTS",
+                      "depth": 1,
+                      "effects": [
+                        {
+                          "server": "experimental-funded-w0",
+                          "tool": "review"
+                        }
+                      ],
+                      "expires_at": 1791314206,
+                      "max_units": 100,
+                      "readers": [
+                        "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                        "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                        "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+                        "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+                        "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+                      ]
+                    },
+                    "holder": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                    "id": "parent"
+                  }
+                },
+                "signature": "6516437add1eae9eac46bfda4941e104edbeb39c87962434289f0da0c8ddef2d4bbca123e754d043d83c8420b31a0b7d6ab276be90ce2c1261b9ed785736a504",
+                "signer": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe"
+              },
+              "slot_id": "parent"
+            },
+            "chioSwarm": {
+              "budgetPool": {
+                "id": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "695b854ec3354739f74ce3c620eb79d21a3909c9008f26d7694aad3daf089192"
+              },
+              "continuationToken": {
+                "id": "continue-parent",
+                "sha256": "393024c24359092438fafb15f4d592519254c868a59dc18e9cf0350320252ed4"
+              },
+              "delegationWitness": {
+                "id": "witness-parent",
+                "sha256": "18cda5af949a6cbea1f7c60e019adb73f47edd27fd98b717be01d77043fbdc37"
+              },
+              "revocationEpoch": {
+                "id": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "f949b2f30e25942deb32f07cd665fe2de5cbe37792f5511c0e261c7c4547eb59"
+              },
+              "routePlanReceipt": {
+                "id": "route-parent",
+                "sha256": "4140e6eb4986d2a83261af3d3da7fce0e09d17d474d535ff7aee45cfec74f7dc"
+              },
+              "taskGraph": {
+                "id": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "346b9760541137deb97a18513fa112fb5aa3aa0912a65de1cd3c7d0f51d20f8b"
+              }
+            },
+            "chioTreaty": {
+              "actionClassId": "work.review",
+              "bilateralDsse": {
+                "id": "dsse-parent",
+                "sha256": "368ff98e25dba799dce23a7e18f5ef1108e149b7b6394d6b9c3529e11331e634"
+              },
+              "bilateralInvocation": {
+                "id": "permission-parent",
+                "sha256": "b91545f27369bb8e0c4837205fe00e4680f8e8aadd78e6ca2f51081071c1a00e"
+              },
+              "crossKernelContinuation": {
+                "id": "treaty-continuation-parent",
+                "sha256": "3362960e5b937d98107706cc92da18883609f1beea27ce63c9243322cd61c902"
+              },
+              "ladderIntersectionId": "treaty-parent:1791313613771",
+              "ladderIntersectionSha256": "951cf47a909cbd7713be137120d750f9b2ad4d51c0a53a9592b0f8a22b6b8b0a",
+              "receiptLineageBundle": {
+                "id": "lineage-bundle-parent",
+                "sha256": "551bd1dd299bacabc5789fb534ae588c1cdaa6297cbf167b509a3950408580b9"
+              },
+              "treatyScopeId": "treaty-parent",
+              "treatyScopeSha256": "6d846d01ec21e2196798de016fee84a7d72618e92263a67f911b621e1f5c1e32"
+            }
+          },
+          "id": "intent-parent",
+          "purpose": "perform a funded review under receiver-owned admission",
+          "server_id": "experimental-funded-w0",
+          "tool_name": "review"
+        },
+        "request_id": "parent",
+        "server_id": "experimental-funded-w0",
+        "tool_name": "review"
+      }
+    },
+    "rootAllocationSha256": "c64353b7a22bfbcebdeb77587a146607ad1e4ac9a02ac3d64bf5bdf896bd7e83",
+    "scout": {
+      "agreement": {
+        "body": {
+          "authorityUuid": "01a1129c-780b-7942-acf4-114022194016",
+          "buyerKey": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+          "captureWaiverTerms": {
+            "body": {
+              "capabilityDigest": "03a76fffeb478e23b4506a8d60eb4f3a51ada85c6d1d16c4b7a78d497d647f1c",
+              "contractContextDigest": "ad009f8c57691fe6c405497e147113e8d3d4545d6b03a1cc0fd317ba47565285",
+              "expiresAtUnixMs": 1791400012874,
+              "issuedAtUnixMs": 1791313612874,
+              "policyDigest": "9a5535de718eadb419ba109b3709fe0d6a20471e7f5bc235d0ec83383804b6a0",
+              "requestId": "scout",
+              "schema": "chio.contractual-capture-waiver.v1"
+            },
+            "counterpartySignature": "c700ae31dcb5c271553c446014e51e4d58e44be61b9a7bd994763bfdeac97d8bde52b012a396c09505402699d9a41c2133ca4084bfc7d1445d1c7b84c35cd009",
+            "receiverSignature": "f4381c5f71468439c834830f24aa710f65fd2c27db784d4731dde4b17e1a3ada1bbc3c682b8c94c7b15580719bb39344cba69af09d62c3bbfac555daed32080c"
+          },
+          "domain": {
+            "chainId": "31337",
+            "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+            "escrowCodeHash": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+            "genesisHash": "0x637eabdf6886ba16d607232b9297b1c39d66fc280ed51c678dd3d4626516aef5",
+            "profile": "chio.experimental.local-confirmed-funding.v1",
+            "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+            "tokenCodeHash": "0xf146daf64bb55ab200ce3e246927379f7f95125c3c456bce22ab9b10701be0a1"
+          },
+          "findingContextSha256": "8aaa4c4905c50006ab912d5f860b4ec2fcd440e51444e38cc50d0c85b02d025d",
+          "policySha256": "1208dc171bfda3a238492b63191a3c0d2f51a86e37dd6f05d383d3f774062ae6",
+          "providerKey": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+          "requestId": "scout",
+          "requestSha256": "b8601c612f8d2637ee18d62905353eae47baf3bca9414af4f2e65e867c208992",
+          "requiredFindingFacets": [
+            "artifact_integrity",
+            "receipt_authenticity",
+            "checkpoint_membership",
+            "guarantee_consistency"
+          ],
+          "schema": "chio.experimental.native-funded-w0-agreement.v2",
+          "work": {
+            "amount": "100",
+            "beneficiary": "0x22d491bde2303f2f43325b2108d26f1eaba1e32b",
+            "challengeUntil": 1791314305,
+            "payer": "0xffcf8fdee72ac11b5c542428b35eef5769c409f0",
+            "refundAfter": 1791314505,
+            "resolveBy": 1791314405,
+            "submitBy": 1791314205,
+            "verifier": "0xe11ba2b4d45eaed5996cd0823791e0c93114882d"
+          }
+        },
+        "buyerSignature": "5749e97f0af47cce0a6450af8e45517cf88189628be50bc5bdb7b58fac0b94d2d3d788bc70dfdd00aae64bb7c44bc345500e762d2b9f737a4a64a055dfc77001",
+        "providerSignature": "40ff59942b3e8db123e7c79181d8ce51518f8e98257dcf5858187d2d496b7a8d8cd873dc9b76933aa2234f3bf5b7d03286e37d8e51ac7127d9976b623ab2310d"
+      },
+      "receiverPackage": {
+        "admissionBundle": {
+          "admissionId": "admission-scout",
+          "binding": {
+            "capabilityId": "cap-01a1129c-8ce0-7dd6-969f-5d9ee5780769",
+            "hostKernelId": "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+            "originKernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+            "requestId": "scout",
+            "serverId": "experimental-funded-w0",
+            "toolArgsSha256": "7b255b073f74eac1018a8471703c987dcef55e8b2e8760f7e25588b5aeb753f4",
+            "toolName": "review"
+          },
+          "destructive": false,
+          "governanceReceiptId": "governance-scout",
+          "leaseId": "lease-scout",
+          "schema": "chio.runtime.admission-bundle.v1",
+          "stepIndex": 0,
+          "trustBundleSha256": "e400e309672f1b959d213b01f76562a3388b07bfe1ed5ea90fae5898c6a218dc",
+          "verificationContextSha256": "5f1207a12478115eb05e6e9188c01ad9675e05b4ec506e01dc269a199b06a816",
+          "workflowGrantId": "grant-scout",
+          "workflowId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3"
+        },
+        "receiverPolicy": {
+          "authorityUuid": "01a1129c-780b-7942-acf4-114022194016",
+          "buyerKey": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+          "composition": {
+            "allocator": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+            "peer": {
+              "capabilities": {
+                "schema": "chio.capabilities.v1"
+              },
+              "conformanceTier": "bronze",
+              "establishedAt": 1791313608,
+              "kernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+              "publicKey": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+              "rotationDue": 1791356808
+            },
+            "profile": {
+              "expiresAtUnixMs": 1791314206390,
+              "issuedAtUnixMs": 1791313606390,
+              "localKernelId": "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+              "profileId": "evolving-funded-review",
+              "schema": "chio.runtime.admission-profile.v1",
+              "verifierId": "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+            },
+            "programId": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+            "replay": {
+              "expectation_id": "dfbde4df83594ab0de5e2575030c5e8d79b4cee07989ef9b68860b26a4e6c5fe",
+              "runtime_authority_id": "runtime-01a1129c-780b-7942-acf4-114022194016"
+            },
+            "witness": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe"
+          },
+          "domain": {
+            "chainId": "31337",
+            "escrow": "0xe78a0f7e598cc8b0bb87894b0f60dd2a88d6a8ab",
+            "escrowCodeHash": "0x1415ce95a2559f1e05d9ababaee638e13ee61de833f03de2b0cca8940d0c186f",
+            "genesisHash": "0x637eabdf6886ba16d607232b9297b1c39d66fc280ed51c678dd3d4626516aef5",
+            "profile": "chio.experimental.local-confirmed-funding.v1",
+            "token": "0x5b1869d9a4c187f2eaa108f3062412ecf0526b24",
+            "tokenCodeHash": "0xf146daf64bb55ab200ce3e246927379f7f95125c3c456bce22ab9b10701be0a1"
+          },
+          "findingContext": {
+            "admittedKernelKey": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+            "collateralAuthority": {
+              "authority_id": "funded-w0-fixture/collateral",
+              "key": "1c5d9ea3314c0b2d4a765aadcc2da6fc5dd3087ba4a808dddbe83d7b74cfb762",
+              "key_epoch": 1,
+              "revocation_status_ref": "funded-w0-fixture/status/collateral",
+              "rotation_policy_ref": "funded-w0-fixture/rotation/collateral",
+              "valid_from": 1791313608,
+              "valid_until": 1791400008
+            },
+            "governanceAuthority": {
+              "authority_id": "funded-w0-fixture/governance",
+              "key": "0f1ab8e06963c06b87bcf40fbd6b79a5ca86d743c0b4f6760b8493f420eedc5c",
+              "key_epoch": 1,
+              "revocation_status_ref": "funded-w0-fixture/status/governance",
+              "rotation_policy_ref": "funded-w0-fixture/rotation/governance",
+              "valid_from": 1791313608,
+              "valid_until": 1791400008
+            },
+            "governanceStanding": {
+              "max_age_secs": 86400,
+              "signed_statuses": [
+                {
+                  "body": {
+                    "authority_id": "funded-w0-fixture/governance",
+                    "key": "0f1ab8e06963c06b87bcf40fbd6b79a5ca86d743c0b4f6760b8493f420eedc5c",
+                    "key_epoch": 1,
+                    "observed_at": 1791313608,
+                    "revoked_from": null,
+                    "schema": "chio.finding.authority-status.v1",
+                    "status_ref": "funded-w0-fixture/status/governance"
+                  },
+                  "signature": "e02b52bd5849f9d59ed8588c239c47d9cf3bad54a1399ff0241539e2ef00c3c8d98e76ff040f6b708208d46ec9a1c16cedc6573edf903e04d7663396347a6e0d",
+                  "signerKey": "01a65a034503f20e3597b862348c26e64d503650fd28ec54720485e66aeb890d"
+                }
+              ],
+              "status_authority": {
+                "authority_id": "funded-w0-fixture/authority-status",
+                "key": "01a65a034503f20e3597b862348c26e64d503650fd28ec54720485e66aeb890d",
+                "key_epoch": 1,
+                "revocation_status_ref": "funded-w0-fixture/status/authority-status",
+                "rotation_policy_ref": "funded-w0-fixture/rotation/authority-status",
+                "valid_from": 1791313608,
+                "valid_until": 1791400008
+              }
+            },
+            "profile": {
+              "body": {
+                "allowed_predicates": [
+                  "baseline_fails_candidate_passes_v1"
+                ],
+                "allowed_runner_manifests": [
+                  "6b83bdbfb790f5644758b1d98f130656552bb3ed209a3dff53f5f912ef16dd48"
+                ],
+                "bbs_projection_issuer": {
+                  "issuer_fingerprint": "unavailable:funded-w0-fixture",
+                  "key_epoch": 1,
+                  "key_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+                  "registry_ref": "unavailable:funded-w0-fixture",
+                  "revocation_status_ref": "unavailable:funded-w0-fixture",
+                  "valid_from": 1791313608,
+                  "valid_until": 1791400008
+                },
+                "checkpoint_logs": [
+                  {
+                    "log_id": "local-log-bddfb79856f41b178c984272505aff7d7fca37e1e5ce07622a03be6edce5b555",
+                    "signer": {
+                      "authority_id": "funded-w0-fixture/checkpoint",
+                      "key": "07ac17350db42c9b482fdfc2e86d962aa8dc69a33c10b80e5fa0fd282be511e3",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/checkpoint",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/checkpoint",
+                      "valid_from": 1791313608,
+                      "valid_until": 1791400008
+                    }
+                  }
+                ],
+                "expires_at": 1791400008,
+                "failed_delivery_authority": {
+                  "authority_id": "funded-w0-fixture/failed-delivery",
+                  "key": "38666bfbfb18d2d17e31580fd75315bf1051dc73abd6d88cb8dc4fe8652f7f3d",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/failed-delivery",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/failed-delivery",
+                  "valid_from": 1791313608,
+                  "valid_until": 1791400008
+                },
+                "governance_authority": "0f1ab8e06963c06b87bcf40fbd6b79a5ca86d743c0b4f6760b8493f420eedc5c",
+                "issued_at": 1791313608,
+                "operator": "funded-w0-fixture",
+                "predicate_engine": "chio-replay-v1",
+                "profile_id": "bd48f947afb5aeb48425c9ebaa8bf7693bcc181ff8b1c335f8f477afb3298847",
+                "purchase_authority": {
+                  "authority_id": "funded-w0-fixture/purchase",
+                  "key": "b7ec647074b16f7105489dd88b1ec37f9bebd45537f29f040a2f9aaf19adbdc8",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/purchase",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/purchase",
+                  "valid_from": 1791313608,
+                  "valid_until": 1791400008
+                },
+                "receipt_signers": [
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/production",
+                      "key": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/production",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/production",
+                      "valid_from": 1791313608,
+                      "valid_until": 1791400008
+                    },
+                    "role": "production"
+                  },
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/delivery",
+                      "key": "2034ff0dc382c1affa3b6c78299e1f7362fb2c8c7a4008b632e3ef65565f81c8",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/delivery",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/delivery",
+                      "valid_from": 1791313608,
+                      "valid_until": 1791400008
+                    },
+                    "role": "delivery"
+                  },
+                  {
+                    "policy": {
+                      "authority_id": "funded-w0-fixture/replay",
+                      "key": "d2d9b68d7fa1cffe07fad3a82e2fdb878c4c650c1db52e33d75b41f4ee015106",
+                      "key_epoch": 1,
+                      "revocation_status_ref": "funded-w0-fixture/status/replay",
+                      "rotation_policy_ref": "funded-w0-fixture/rotation/replay",
+                      "valid_from": 1791313608,
+                      "valid_until": 1791400008
+                    },
+                    "role": "replay"
+                  }
+                ],
+                "required_facets": [
+                  "artifact_integrity",
+                  "receipt_authenticity",
+                  "checkpoint_membership",
+                  "guarantee_consistency"
+                ],
+                "required_receipt_semantics": "chio.pre_settlement_execution.v1",
+                "resolver_policy_ref": "funded-w0-execution-evidence-v1",
+                "resource_caps": {
+                  "max_evidence_receipts": 1,
+                  "max_memory_bytes": 16777216,
+                  "max_recipe_bytes": 262144,
+                  "max_runtime_secs": 60
+                },
+                "retention_policy_ref": "funded-w0-journal-v1",
+                "schema": "chio.finding.challenge-verifier-profile.v1",
+                "verifier_report_signer": {
+                  "authority_id": "funded-w0-fixture/verifier",
+                  "key": "a32dad0528d4c7b7a22fef2eaf97fe268fed709e922718bf1107320a2363e97e",
+                  "key_epoch": 1,
+                  "revocation_status_ref": "funded-w0-fixture/status/verifier",
+                  "rotation_policy_ref": "funded-w0-fixture/rotation/verifier",
+                  "valid_from": 1791313608,
+                  "valid_until": 1791400008
+                }
+              },
+              "signature": "f6af3a0bff037d66c0ae7f55d2494056a3c57ded0fb11e498fe595fc1924b620974bf8d1f1fb0c4d0c91df7aa91ca17b938e6f8159257a098be0202e222aee09",
+              "signerKey": "0f1ab8e06963c06b87bcf40fbd6b79a5ca86d743c0b4f6760b8493f420eedc5c"
+            },
+            "schema": "chio.experimental.funded-finding-context.v2"
+          },
+          "implementationSha256": "aab891d740cb1db416740ea89d2a0cdd87bdf1e2ccfa08df9bf163791d1ef155",
+          "providerKey": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+          "requiredFindingFacets": [
+            "artifact_integrity",
+            "receipt_authenticity",
+            "checkpoint_membership",
+            "guarantee_consistency"
+          ],
+          "verifierKey": "a32dad0528d4c7b7a22fef2eaf97fe268fed709e922718bf1107320a2363e97e"
+        },
+        "treatyArtifacts": [
+          {
+            "artifact": {
+              "allowedActionClasses": [
+                "work.review"
+              ],
+              "expiresAtUnixMs": 1791314204000,
+              "issuedAtUnixMs": 1791313606390,
+              "ladderManifestSha256s": [
+                "e99a647eef1b8731fb95c84207e8ec5754d9501a2d38cb823bd04bd160a37b31",
+                "192088a0e87d86501c3227adfda792bf2b476781dbb25f18ad2f5834a115e3ae"
+              ],
+              "participantKernelIds": [
+                "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+              ],
+              "participantPublicKeys": [
+                "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+              ],
+              "revocationEpochSha256": "d706cc9b326c7606420353a580617e6b7289305cfe86d80ddb3667e733d6c416",
+              "schema": "chio.federation.treaty-scope.v1",
+              "treatyId": "treaty-scout",
+              "trustBundleSha256": "e400e309672f1b959d213b01f76562a3388b07bfe1ed5ea90fae5898c6a218dc"
+            },
+            "id": "treaty-scout",
+            "kind": "treaty_scope",
+            "sha256": "9aac1b83000a02ddea5162883345fd45bcfaedef2e1f10041684e84d896d9b7f"
+          },
+          {
+            "artifact": {
+              "actionClasses": [
+                {
+                  "actionClassId": "work.review",
+                  "coSign": "bilateral_required",
+                  "consistencyModel": "totally-ordered",
+                  "destructive": false,
+                  "evidenceRequired": [
+                    "bilateral_dsse",
+                    "bilateral_invocation",
+                    "receipt_lineage"
+                  ],
+                  "mode": "receipt_backed",
+                  "participantModes": {
+                    "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf": "receipt_backed",
+                    "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee": "receipt_backed"
+                  }
+                }
+              ],
+              "expiresAtUnixMs": 1791314204000,
+              "generatedAtUnixMs": 1791313612875,
+              "intersectionId": "treaty-scout:1791313612875",
+              "ladderManifestSha256s": [
+                "e99a647eef1b8731fb95c84207e8ec5754d9501a2d38cb823bd04bd160a37b31",
+                "192088a0e87d86501c3227adfda792bf2b476781dbb25f18ad2f5834a115e3ae"
+              ],
+              "participantKernelIds": [
+                "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+              ],
+              "schema": "chio.federation.ladder-intersection.v1",
+              "treatyId": "treaty-scout"
+            },
+            "id": "treaty-scout:1791313612875",
+            "kind": "ladder_intersection",
+            "sha256": "ace7d22dc57369a9706889ca02992879d71278a61df76a45ca9485080fbf37d0"
+          },
+          {
+            "artifact": {
+              "actionClassId": "work.review",
+              "audienceTool": "experimental-funded-w0.review",
+              "capabilityId": "cap-01a1129c-8ce0-7dd6-969f-5d9ee5780769",
+              "continuationId": "treaty-continuation-scout",
+              "expiresAtUnixMs": 1791314204000,
+              "issuedAtUnixMs": 1791313606390,
+              "nonce": "treaty-nonce-scout",
+              "parentReceiptSha256": "b7ca3f62d51ee811be091b05bc3ec7d7023f67c7743d812e7c35373d78877b1a",
+              "parentSessionAnchorSha256": "136357334191face0683d8b47f3482a7ac45033bb74073d34dec516c26b3b3ea",
+              "schema": "chio.federation.cross-kernel-continuation.v1",
+              "sourceKernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+              "targetKernelId": "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+            },
+            "id": "treaty-continuation-scout",
+            "kind": "cross_kernel_continuation",
+            "sha256": "716a02b73ba1791241267b9dc58059616193bcc30c7c0fd750c65ca1ffb3adaa"
+          },
+          {
+            "artifact": {
+              "bundleId": "lineage-bundle-scout",
+              "leafReceiptSha256": "b951685694cf4a10436690367dac320c6183b4a4a87278ccfe1b6f5cb85d7dc8",
+              "rootReceiptSha256": "b7ca3f62d51ee811be091b05bc3ec7d7023f67c7743d812e7c35373d78877b1a",
+              "schema": "chio.federation.receipt-lineage-bundle.v1",
+              "statements": [
+                {
+                  "bilateralInvocationSha256": "d5a950cf1b673c8aa6cf000f2bd2e56c1b861484aa908d8be111e13d8fb6336d",
+                  "childReceiptSha256": "b951685694cf4a10436690367dac320c6183b4a4a87278ccfe1b6f5cb85d7dc8",
+                  "continuationSha256": "716a02b73ba1791241267b9dc58059616193bcc30c7c0fd750c65ca1ffb3adaa",
+                  "evidenceClass": "verified",
+                  "parentReceiptSha256": "b7ca3f62d51ee811be091b05bc3ec7d7023f67c7743d812e7c35373d78877b1a",
+                  "schema": "chio.federation.receipt-lineage-statement.v1",
+                  "sourceKernelId": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                  "statementId": "lineage-scout",
+                  "targetKernelId": "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+                }
+              ]
+            },
+            "id": "lineage-bundle-scout",
+            "kind": "receipt_lineage_bundle",
+            "sha256": "b07568482c37f7fd7c46d92c8e454e944fb17ccf3d57ee97825c3f6fd7f379e4"
+          },
+          {
+            "artifact": {
+              "actionClassId": "work.review",
+              "capabilityId": "cap-01a1129c-8ce0-7dd6-969f-5d9ee5780769",
+              "consistencyModel": "totally-ordered",
+              "continuationSha256": "716a02b73ba1791241267b9dc58059616193bcc30c7c0fd750c65ca1ffb3adaa",
+              "invocationId": "permission-scout",
+              "ladderIntersectionSha256": "ace7d22dc57369a9706889ca02992879d71278a61df76a45ca9485080fbf37d0",
+              "lineageStatementSha256": "58b11db5bee5708b65a6d32193782c7281d542be75824638faa015f2084dcc8f",
+              "localReceiptSha256": "b7ca3f62d51ee811be091b05bc3ec7d7023f67c7743d812e7c35373d78877b1a",
+              "outcomeSha256": "b6671a13b21d024015d692fdb9d08040a48cb2014915c9e8f3503dc035b03e0a",
+              "remoteReceiptSha256": "b951685694cf4a10436690367dac320c6183b4a4a87278ccfe1b6f5cb85d7dc8",
+              "requestSha256": "7b255b073f74eac1018a8471703c987dcef55e8b2e8760f7e25588b5aeb753f4",
+              "schema": "chio.federation.bilateral-invocation.v1",
+              "signerKernelIds": [
+                "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+              ],
+              "treatyId": "treaty-scout"
+            },
+            "id": "permission-scout",
+            "kind": "bilateral_invocation",
+            "sha256": "6473bb8e629cc4b91160ebef5dbcb548b061454a108a7b58707ce0278289d601"
+          },
+          {
+            "artifact": {
+              "payload": "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiY2FwYWJpbGl0eV9sZWFzZV9yZWYiOnsiZXhwaXJlc19hdF91bml4X21zIjoxNzkxMzE0MjA0MDAwLCJpc3N1ZXIiOiJkaWQ6Y2hpbzowNjlkM2M5ZmY1MzQzMzQ4ZTAwYzI4ODI1YjJhYWJhMjU2MDI1MjNlNzQyOWIwYzM1M2ZhOTcyNTc2NzI4ZGFmIiwibGVhc2VfaWQiOiJsZWFzZS1zY291dCJ9LCJjb19zaWduIjoiYmlsYXRlcmFsX3JlcXVpcmVkIiwiY29uc2lzdGVuY3lfYW5jaG9yIjoiYW5jaG9yLXNjb3V0IiwiY29uc2lzdGVuY3lfbW9kZWwiOiJ0b3RhbGx5LW9yZGVyZWQiLCJjcm9zc19vcmdfdmlzaWJpbGl0eSI6InRyZWF0eV9vbmx5IiwiZ292ZXJuYW5jZV9yZWNlaXB0X3JlZiI6eyJkaWdlc3QiOnsiYWxnIjoic2hhMjU2IiwidmFsdWUiOiI1ZjEyMDdhMTI0NzgxMTVlYjA1ZTZlOTE4OGMwMWFkOTY3NWUwNWI0ZWM1MDZlMDFkYzI2OWExOTliMDZhODE2In0sImtlcm5lbF9pZCI6ImRpZDpjaGlvOjg1MzU1Mjk2YTI2MDE2NTRmYzhkOWQzNjA2NjgxMGJlNWJkNWQzZGFjNmM0MTNhYjY5OTc1YWY2MDA5YTBjZWUiLCJyZWNlaXB0X2lkIjoiZ292ZXJuYW5jZS1zY291dCJ9LCJpbnZvY2F0aW9uX2lkIjoiNjFmZTJkZGFlZWM2YjVmMGI1ZTU5ZmRmYzA4ZmJmZTVjMmM3MTE5NTIwOGVmN2JhYTAzMmZiMmY5MWVhNDgyOCIsInBvbGljeV9ldmFsdWF0aW9uX3N1bW1hcnkiOnsiam9pbnRfZGlzcG9zaXRpb24iOiJhbGxvdyIsInNlcnZlcl9hX3ZlcmRpY3QiOnsicG9saWN5X2lkIjoiZGlkOmNoaW86MDY5ZDNjOWZmNTM0MzM0OGUwMGMyODgyNWIyYWFiYTI1NjAyNTIzZTc0MjliMGMzNTNmYTk3MjU3NjcyOGRhZiIsInBvbGljeV92ZXJzaW9uIjoiMSIsInZlcmRpY3QiOiJhbGxvdyJ9LCJzZXJ2ZXJfYl92ZXJkaWN0Ijp7InBvbGljeV9pZCI6ImRpZDpjaGlvOjg1MzU1Mjk2YTI2MDE2NTRmYzhkOWQzNjA2NjgxMGJlNWJkNWQzZGFjNmM0MTNhYjY5OTc1YWY2MDA5YTBjZWUiLCJwb2xpY3lfdmVyc2lvbiI6IjEiLCJ2ZXJkaWN0IjoiYWxsb3cifX0sInRpbWVzdGFtcF91bml4X21zIjoxNzkxMzEzNjEyODc1LCJ0b29sX2FyZ3NfaGFzaCI6eyJhbGciOiJzaGEyNTYiLCJ2YWx1ZSI6IjdiMjU1YjA3M2Y3NGVhYzEwMThhODQ3MTcwM2M5ODdkY2VmNTVlOGIyZTg3NjBmN2UyNTU4OGI1YWViNzUzZjQifSwidG9vbF9uYW1lIjoicmV2aWV3IiwidG9vbF9zZXJ2ZXJfYSI6eyJhbGciOiJlZDI1NTE5Iiwia2VybmVsX2lkIjoiZGlkOmNoaW86MDY5ZDNjOWZmNTM0MzM0OGUwMGMyODgyNWIyYWFiYTI1NjAyNTIzZTc0MjliMGMzNTNmYTk3MjU3NjcyOGRhZiIsInBhc3Nwb3J0X2tleV9maW5nZXJwcmludCI6ImRjYzE4ODgyMjAxMzdhNjNhMTQ5OTU0NjIxODZkZjY3NGYzOTlhMGQ3NDlmZDA4ZGRkYWJmMjI0MTA3ZjZiMzcifSwidG9vbF9zZXJ2ZXJfYiI6eyJhbGciOiJlZDI1NTE5Iiwia2VybmVsX2lkIjoiZGlkOmNoaW86ODUzNTUyOTZhMjYwMTY1NGZjOGQ5ZDM2MDY2ODEwYmU1YmQ1ZDNkYWM2YzQxM2FiNjk5NzVhZjYwMDlhMGNlZSIsInBhc3Nwb3J0X2tleV9maW5nZXJwcmludCI6IjAxZGMyNjY3NDVhMDQzODk1NDUzY2QyNzJhZWY3NTBmMjYwZTVhMDI4ZGUyZTkyMWU2YmI4ZGY4MWFjNTM0NmQifSwidHJlYXR5X2JpbmRpbmdfcmVmIjp7ImFjdGlvbl9jbGFzc19pZCI6IndvcmsucmV2aWV3IiwiYWRtaXNzaW9uX3JlcG9ydF9zaGEyNTYiOiI2YmYzYmE3NzE4NDRmYWY5ODRkOWZlMjBiOGQ5OGVmNDk4NTYzYmRmOTJmZWYxYmU5MjgyNWQ0Mzg1ODVlMDA3IiwiY29uc2lzdGVuY3lfbW9kZWwiOiJ0b3RhbGx5LW9yZGVyZWQiLCJjb250aW51YXRpb25fc2hhMjU2IjoiNzE2YTAyYjczYmExNzkxMjQxMjY3YjlkYzU4MDU5NjE2MTkzYmNjMzBjN2MwZmQ3NTBjNjVjYTFmZmIzYWRhYSIsImdvdmVybmFuY2VfcmVmcyI6WyJnb3Zlcm5hbmNlLXNjb3V0Il0sImxhZGRlcl9pbnRlcnNlY3Rpb25fc2hhMjU2IjoiYWNlN2QyMmRjNTczNjlhOTcwNjg4OWNhMDI5OTI4NzlkNzEyNzhhNjFkZjc2YTQ1Y2E5NDg1MDgwZmJmMzdkMCIsImxlYXNlX3JlZnMiOlsibGVhc2Utc2NvdXQiXSwibGluZWFnZV9idW5kbGVfc2hhMjU2IjoiYjA3NTY4NDgyYzM3ZjdmZDdjNDZkOTJjOGU0NTRlOTQ0ZmIxN2NjZjNkNTdlZTk3ODI1YzNmNmZkN2YzNzllNCIsImxvY2FsX3JlY2VpcHRfc2hhMjU2IjoiYjdjYTNmNjJkNTFlZTgxMWJlMDkxYjA1YmMzZWM3ZDcwMjNmNjdjNzc0M2Q4MTJlN2MzNTM3M2Q3ODg3N2IxYSIsIm91dGNvbWVfc2hhMjU2IjoiYjY2NzFhMTNiMjFkMDI0MDE1ZDY5MmZkYjlkMDgwNDBhNDhjYjIwMTQ5MTVjOWU4ZjM1MDNkYzAzNWIwM2UwYSIsInJlbW90ZV9yZWNlaXB0X3NoYTI1NiI6ImI5NTE2ODU2OTRjZjRhMTA0MzY2OTAzNjdkYWMzMjBjNjE4M2I0YTRhODcyNzhjY2ZlMWI2ZjVjYjg1ZDdkYzgiLCJyZXF1ZXN0X3NoYTI1NiI6IjdiMjU1YjA3M2Y3NGVhYzEwMThhODQ3MTcwM2M5ODdkY2VmNTVlOGIyZTg3NjBmN2UyNTU4OGI1YWViNzUzZjQiLCJzaWduZXJfa2VybmVsX2lkcyI6WyJkaWQ6Y2hpbzowNjlkM2M5ZmY1MzQzMzQ4ZTAwYzI4ODI1YjJhYWJhMjU2MDI1MjNlNzQyOWIwYzM1M2ZhOTcyNTc2NzI4ZGFmIiwiZGlkOmNoaW86ODUzNTUyOTZhMjYwMTY1NGZjOGQ5ZDM2MDY2ODEwYmU1YmQ1ZDNkYWM2YzQxM2FiNjk5NzVhZjYwMDlhMGNlZSJdLCJ0cmVhdHlfaWQiOiJ0cmVhdHktc2NvdXQiLCJ0cmVhdHlfc2NvcGVfc2hhMjU2IjoiOWFhYzFiODMwMDBhMDJkZGVhNTE2Mjg4MzM0NWZkNDViY2ZhZWRlZjJlMWYxMDA0MTY4NGU4NGQ4OTZkOWI3ZiJ9fSwicHJlZGljYXRlVHlwZSI6ImNoaW8uYmlsYXRlcmFsLWNvc2lnbi1pbnZvY2F0aW9uLnYxIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6ImEyZTZiNTI1ZjM3ODQ5ZGYwYjkwOTZhZGJkMzZmZjY5ZmJiNWFjMjE5ZjQ5YmUwMmFlZjg3ODZmNTkwOGU2YzUifSwibmFtZSI6ImNoaW8tcmVjZWlwdDo2MWZlMmRkYWVlYzZiNWYwYjVlNTlmZGZjMDhmYmZlNWMyYzcxMTk1MjA4ZWY3YmFhMDMyZmIyZjkxZWE0ODI4In1dfQ==",
+              "payloadType": "application/vnd.in-toto+json",
+              "signatures": [
+                {
+                  "keyid": "dcc1888220137a63a14995462186df674f399a0d749fd08dddabf224107f6b37",
+                  "sig": "voC7GIOhlRdi0jKSnoUC3BteDYnf0BYl7m0NTaqdqXC0tiJARCE7kcroG5FjRyf6l+R+H4eeeT52pHYAQ3AICQ=="
+                },
+                {
+                  "keyid": "01dc266745a043895453cd272aef750f260e5a028de2e921e6bb8df81ac5346d",
+                  "sig": "hYpqdxdmaWLalXb7A2I9+mhqeN44pcbseblP4WUEO4LrYbFHw+FolRE9EgqAGJz9EiwpXQBSZZveWHDE9b+LAw=="
+                }
+              ]
+            },
+            "id": "dsse-scout",
+            "kind": "bilateral_dsse_envelope",
+            "sha256": "e61a43c41e43977bdd30167ff63d1bdfc1ee7afd17494601ceb205e9481a508c"
+          },
+          {
+            "artifact": {
+              "lease": {
+                "expires_at_unix_ms": 1791314204000,
+                "issuer": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                "lease_id": "lease-scout"
+              },
+              "validFromUnixMs": 1791313606390
+            },
+            "id": "lease-scout",
+            "kind": "capability_lease",
+            "sha256": "74f5ecafcdf73e3e8b7c5a923156e64587c118bccc520a06688827bc4701c230"
+          },
+          {
+            "artifact": {
+              "receipt": {
+                "digest": {
+                  "alg": "sha256",
+                  "value": "5f1207a12478115eb05e6e9188c01ad9675e05b4ec506e01dc269a199b06a816"
+                },
+                "kernel_id": "did:chio:85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+                "receipt_id": "governance-scout"
+              },
+              "validFromUnixMs": 1791313606390,
+              "validUntilUnixMs": 1791314204000
+            },
+            "id": "governance-scout",
+            "kind": "governance_receipt",
+            "sha256": "b603ece586929ba850218607dcaac27fb5c67bca65163750fb5b68fba725aebe"
+          }
+        ]
+      },
+      "request": {
+        "agent_id": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+        "arguments": {
+          "chio_capture_waiver_terms_digest": "5a66b7504e12f4cffabd7778ebaacda8936fd7e22caa94a76c08ec43e10cc9f3",
+          "input": "{\n  \"openapi\": \"3.1.0\",\n  \"info\": {\"title\": \"Example company payments API\", \"version\": \"1.0.0\"},\n  \"components\": {\"securitySchemes\": {\"serviceToken\": {\"type\": \"http\", \"scheme\": \"bearer\"}}},\n  \"security\": [{\"serviceToken\": []}],\n  \"paths\": {\n    \"/accounts\": {\"get\": {\"responses\": {\"200\": {\"description\": \"Accounts\"}}}},\n    \"/refunds\": {\"post\": {\"security\": [], \"responses\": {\"201\": {\"description\": \"Refund staged\"}}}},\n    \"/health\": {\"get\": {\"security\": [{}, {\"serviceToken\": []}], \"responses\": {\"200\": {\"description\": \"Healthy\"}}}},\n    \"/sessions\": {\"delete\": {\"security\": [{\"serviceToken\": []}], \"responses\": {\"204\": {\"description\": \"Session ended\"}}}}\n  }\n}\n"
+        },
+        "capability": {
+          "expires_at": 1791314204,
+          "id": "cap-01a1129c-8ce0-7dd6-969f-5d9ee5780769",
+          "issued_at": 1791313612,
+          "issuer": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+          "schema": "chio.capability.v1",
+          "scope": {
+            "grants": [
+              {
+                "max_cost_per_invocation": {
+                  "currency": "XTS",
+                  "units": 100
+                },
+                "max_invocations": 1,
+                "max_total_cost": {
+                  "currency": "XTS",
+                  "units": 100
+                },
+                "operations": [
+                  "invoke"
+                ],
+                "server_id": "experimental-funded-w0",
+                "tool_name": "review"
+              }
+            ]
+          },
+          "signature": "52b9641907dfa2cc2e39704fba36b249dfa6c7b4f3ab5cfbb30eb2c1447d42b65299907d3bba30875c14c26614a10ecdcd70851f1eee8ba1a7fc3b43f642060e",
+          "subject": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf"
+        },
+        "federated_origin_kernel_id": "did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+        "governed_intent": {
+          "context": {
+            "chioAdmission": {
+              "admissionId": "admission-scout",
+              "bundleSha256": "8c4e74aada288c4fb6bfa46635e505b9e8d267d6e1d2593392ea7ca4208f9b9d"
+            },
+            "chioDelegation": {
+              "allocation": {
+                "body": {
+                  "allocation_hash": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+                  "issued_at": 1791313613,
+                  "root_id": "program",
+                  "selection": {
+                    "body": {
+                      "capability_hash": "ebfc35ba53e91096187d641f2116c510236cc99d4727b4bf83561b737dc73b63",
+                      "expected_revision": 0,
+                      "offer": {
+                        "body": {
+                          "allocation_hash": "bea64b32661ac336e288d708cf7efaeef28ce7ef505d90bde4c8b3ef82e7fbd7",
+                          "arguments_hash": "8f9c23a241a140780614538ca559a0022f1822828261abaf95cfbbe3bbc41e6e",
+                          "contract_hash": "7e15488505962c6ebec6f0934699013c802d4fd8542f3a5bf7109b2f3612dfd2",
+                          "effect": {
+                            "server": "experimental-funded-w0",
+                            "tool": "review"
+                          },
+                          "expires_at": 1791314206,
+                          "price_units": 100,
+                          "receiver": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+                          "slot_id": "scout"
+                        },
+                        "signature": "8e57fcbfda53912ad5c3bef73a9827fc6d428eb856288d8dfd9b5d3ca99f7359fb348b8f99372c9f89e30c30121847c3c7b045be9dce70f96dc40baccaa4ea02",
+                        "signer": "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee"
+                      },
+                      "request_id": "scout"
+                    },
+                    "signature": "a253654066a7938acbd3eec8b3a1567da4bd627f35a6680d5c6b2eb4528dce19dbf21443a67a9e1b6b41ff1cfdf9987b6f9c6a92a7f8fff664a30ae7de4fa000",
+                    "signer": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf"
+                  },
+                  "slot": {
+                    "contract": {
+                      "acceptance": {
+                        "clauses": [
+                          {
+                            "kind": "equals",
+                            "pointer": "/0/path",
+                            "value": "/accounts"
+                          }
+                        ]
+                      },
+                      "currency": "XTS",
+                      "depth": 2,
+                      "effects": [
+                        {
+                          "server": "experimental-funded-w0",
+                          "tool": "review"
+                        }
+                      ],
+                      "expires_at": 1791314206,
+                      "max_units": 100,
+                      "readers": [
+                        "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                        "0e0cb49caa51150c7b41553f5a603c19e23d70b66a87e2386607ef4eb87b30bb",
+                        "85355296a2601654fc8d9d36066810be5bd5d3dac6c413ab69975af6009a0cee",
+                        "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe",
+                        "bf5c61d4bbd5957725b5be89b4ce19c8bbb6bc68425745f78a72b82cc422197f"
+                      ]
+                    },
+                    "holder": "069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf",
+                    "id": "scout"
+                  }
+                },
+                "signature": "44231046df57dfa8d3f9575e76c2a4c4fea66c5c4a7c26a75b4bb583fadd93d929490beb036d9e7dd8fba622e8d0687aaff7400e5f4477ec4fb4ac5ad772990d",
+                "signer": "97046c8375ac3e8705c5e3c9de12df2b2a239ae30a5f1b44d8ad04a8bc3bfbfe"
+              },
+              "slot_id": "scout"
+            },
+            "chioSwarm": {
+              "budgetPool": {
+                "id": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "695b854ec3354739f74ce3c620eb79d21a3909c9008f26d7694aad3daf089192"
+              },
+              "continuationToken": {
+                "id": "continue-scout",
+                "sha256": "85ee1532b4309e4636d7d78c71c737d780c9e64254ba59571130cacebb75c9d2"
+              },
+              "delegationWitness": {
+                "id": "witness-scout",
+                "sha256": "42ed7ea532d2c590f2f6ac4342f70602c90d864e2b0c15a416e2d12d63dc08a4"
+              },
+              "revocationEpoch": {
+                "id": "epoch-dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "f949b2f30e25942deb32f07cd665fe2de5cbe37792f5511c0e261c7c4547eb59"
+              },
+              "routePlanReceipt": {
+                "id": "route-scout",
+                "sha256": "213b5b1d062f44a407788f28c0609216b50f00004053b14a84b0e402215a1f02"
+              },
+              "taskGraph": {
+                "id": "dc6298d452c1238ac7000337142166ccaf96414d05ab44e2154c250df8603dc3",
+                "sha256": "346b9760541137deb97a18513fa112fb5aa3aa0912a65de1cd3c7d0f51d20f8b"
+              }
+            },
+            "chioTreaty": {
+              "actionClassId": "work.review",
+              "bilateralDsse": {
+                "id": "dsse-scout",
+                "sha256": "e61a43c41e43977bdd30167ff63d1bdfc1ee7afd17494601ceb205e9481a508c"
+              },
+              "bilateralInvocation": {
+                "id": "permission-scout",
+                "sha256": "d5a950cf1b673c8aa6cf000f2bd2e56c1b861484aa908d8be111e13d8fb6336d"
+              },
+              "crossKernelContinuation": {
+                "id": "treaty-continuation-scout",
+                "sha256": "716a02b73ba1791241267b9dc58059616193bcc30c7c0fd750c65ca1ffb3adaa"
+              },
+              "ladderIntersectionId": "treaty-scout:1791313612875",
+              "ladderIntersectionSha256": "ace7d22dc57369a9706889ca02992879d71278a61df76a45ca9485080fbf37d0",
+              "receiptLineageBundle": {
+                "id": "lineage-bundle-scout",
+                "sha256": "b07568482c37f7fd7c46d92c8e454e944fb17ccf3d57ee97825c3f6fd7f379e4"
+              },
+              "treatyScopeId": "treaty-scout",
+              "treatyScopeSha256": "9aac1b83000a02ddea5162883345fd45bcfaedef2e1f10041684e84d896d9b7f"
+            }
+          },
+          "id": "intent-scout",
+          "purpose": "perform a funded review under receiver-owned admission",
+          "server_id": "experimental-funded-w0",
+          "tool_name": "review"
+        },
+        "request_id": "scout",
+        "server_id": "experimental-funded-w0",
+        "tool_name": "review"
+      }
+    }
+  },
+  "rejectionReasons": {
+    "allocation": "allocation or dispatch identity conflicts with durable state",
+    "continuation": "runtime admission rejected: runtime_swarm_extension_rejected: swarm extension rejected: issued continuation changed",
+    "receiver": "agreement changes pinned native funding authority or request",
+    "treaty": "composed admission changed treaty, origin or task identity"
+  },
+  "rejections": {
+    "allocation": true,
+    "continuation": true,
+    "receiver": true,
+    "treaty": true
+  },
+  "retired": {
+    "parentActionsDisabled": true,
+    "verifierSigningDisabled": true
+  },
+  "schema": "chio.experimental.evolving-funded-run.v1",
+  "scope": "one host, locally enrolled receivers, private chain and mock tokens",
+  "scout": {
+    "allocationId": "0x5fe586d3b31037fd508caefadce9fdf6234da1784147486283e9a31497fe7ac3",
+    "authorityUuid": "01a1129c-780b-7942-acf4-114022194016",
+    "authorizationId": "funded-5fe586d3b31037fd508caefadce9fdf6234da1784147486283e9a31497fe7ac3",
+    "executions": 1,
+    "externalFundsTransferred": true,
+    "fundingCorrelation": "bound",
+    "holdId": "admission-budget:79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4:0",
+    "nativeAuthorizationId": "funded-5fe586d3b31037fd508caefadce9fdf6234da1784147486283e9a31497fe7ac3",
+    "nativePaymentAction": "capture",
+    "nativePaymentState": "Settled",
+    "nativeState": "Completed",
+    "operationId": "79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4",
+    "paymentState": "paid",
+    "profile": "chio.experimental.local-confirmed-funding.v1",
+    "requestId": "scout",
+    "runtimeClaimHistory": [
+      {
+        "disposition": "retained_after_dispatch_commit",
+        "intent": {
+          "episodeId": "01a1129c-a1df-72f0-868a-7691c14c66e4",
+          "expectationId": "dfbde4df83594ab0de5e2575030c5e8d79b4cee07989ef9b68860b26a4e6c5fe",
+          "grantIndex": 0,
+          "phase": "dispatch",
+          "planDigest": "4babe82f7f7684e4204ac5db619a2eda86a606b2c687174e7326418e56ce8aeb",
+          "requestBindingHash": "50768ed2bfd220cdcfcd9cfcd25e3543ee0726e108511384d25fd0a883b981db",
+          "resources": [
+            {
+              "artifactDigest": "716a02b73ba1791241267b9dc58059616193bcc30c7c0fd750c65ca1ffb3adaa",
+              "kind": "treaty_continuation",
+              "resourceId": "treaty-continuation-scout"
+            },
+            {
+              "artifactDigest": "85ee1532b4309e4636d7d78c71c737d780c9e64254ba59571130cacebb75c9d2",
+              "kind": "swarm_continuation",
+              "resourceId": "continue-scout"
+            }
+          ],
+          "runtimeAuthorityId": "runtime-01a1129c-780b-7942-acf4-114022194016"
+        },
+        "reference": {
+          "claimDigest": "88d81fe779c36a38a3d796cbe2aa198bbe42f6394e2b12c1194b2b0627586c03",
+          "episodeId": "01a1129c-a1df-72f0-868a-7691c14c66e4",
+          "operationId": "79e4b151a7cc415fe8931a6b379e782099754504b384beec24692b79064cb8a4"
+        }
+      }
+    ],
+    "settlementObservationError": null,
+    "settlementTransaction": "0x86d39176659f8880bcad5cc274eef5cf588a2672dda4bc35e48b3ad5a9c7645d",
+    "startupReconciliationError": "internal error: federation cosigner missing for request scout bound to origin kernel did:chio:069d3c9ff5343348e00c28825b2aaba25602523e7429b0c353fa972576728daf"
+  }
+}
