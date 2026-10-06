@@ -73,7 +73,7 @@ fn exact_declassification_identifiers_are_tenant_bound_in_both_scopes() -> TestR
         tx.rollback()?;
         Ok(())
     })?;
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("exact-declassification.sqlite");
     let consumed = consumption("tenant-a", "exact-grant")?;
     {

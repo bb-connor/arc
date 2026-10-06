@@ -39,7 +39,7 @@ fn acquisition_replay_rejects_partial_or_impossible_commitment_history() -> Test
         "UPDATE security_egress_fences SET dispatch_commitment_id = 'dispatch', committed_at = 2001",
         "UPDATE security_egress_fences SET principal_id = 'another-principal'",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(Clock))?;
         let request = prepare(&store)?;
@@ -57,7 +57,7 @@ fn live_fence_validation_rejects_partial_commitment_history() -> TestResult {
         "UPDATE security_egress_fences SET dispatch_commitment_id = 'dispatch'",
         "UPDATE security_egress_fences SET dispatch_commitment_id = 'dispatch', committed_at = 2001",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(Clock))?;
         let fence = store.acquire_egress_fence(&prepare(&store)?)?;
@@ -69,7 +69,7 @@ fn live_fence_validation_rejects_partial_commitment_history() -> TestResult {
 
 #[test]
 fn historical_commit_rejects_noncanonical_fence_identity() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, Arc::new(Clock))?;
     let fence = store.acquire_egress_fence(&prepare(&store)?)?;

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn periodic_tick_claims_recovery_before_one_bounded_outbox_batch() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("bounded-outbox-tick.sqlite"))
             .unwrap_or_else(|error| panic!("security store: {error}")),

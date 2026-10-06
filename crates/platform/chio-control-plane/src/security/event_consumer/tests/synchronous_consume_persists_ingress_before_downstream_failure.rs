@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn synchronous_consume_persists_ingress_before_downstream_failure() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("synchronous-consume-crash.sqlite");
     let store = Arc::new(
         SqliteSecurityStateStore::open(&path)

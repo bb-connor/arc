@@ -31,7 +31,7 @@ fn request(transition_id: &str) -> TestResult<FlowJoinRequest> {
 
 #[test]
 fn join_and_fence_wait_for_the_outer_commit() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = SqliteSecurityStateStore::open(&path)?;
     let observer = Connection::open(&path)?;
@@ -84,7 +84,7 @@ fn join_and_fence_wait_for_the_outer_commit() -> TestResult {
 
 #[test]
 fn dropping_successful_flow_owner_rolls_back_earlier_outer_writes() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let store = SqliteSecurityStateStore::open(directory.path().join("security.db"))?;
     let join = request("join")?;
     let mut connection = store.connection()?;
@@ -106,7 +106,7 @@ fn dropping_successful_flow_owner_rolls_back_earlier_outer_writes() -> TestResul
 
 #[test]
 fn late_flow_error_rolls_back_even_if_caller_requested_commit_on_drop() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let store = SqliteSecurityStateStore::open(directory.path().join("security.db"))?;
     let join = request("join")?;
     let mut connection = store.connection()?;
@@ -138,7 +138,7 @@ fn late_flow_error_rolls_back_even_if_caller_requested_commit_on_drop() -> TestR
 #[test]
 fn flow_owner_rejects_an_unacquired_or_read_only_transaction() -> TestResult {
     for read in [false, true] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let store = SqliteSecurityStateStore::open(directory.path().join("security.db"))?;
         let mut connection = store.connection()?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Deferred)?;

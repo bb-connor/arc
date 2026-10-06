@@ -34,7 +34,6 @@ use chio_security_types::{
     ResponseState, ResponseTarget,
 };
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FaultMoment {

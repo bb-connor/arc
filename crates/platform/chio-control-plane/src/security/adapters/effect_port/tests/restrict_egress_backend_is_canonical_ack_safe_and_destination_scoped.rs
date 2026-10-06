@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("response-egress.db"))
             .unwrap_or_else(|error| panic!("open SQLite store: {error}")),

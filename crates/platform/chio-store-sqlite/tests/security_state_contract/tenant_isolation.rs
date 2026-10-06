@@ -160,7 +160,7 @@ fn exact_identifiers_cannot_cross_tenants_in_model() -> PortResult<()> {
 
 #[test]
 fn exact_identifiers_cannot_cross_tenants_in_sqlite_or_after_restart() {
-    let directory = tempdir().test_expect("directory");
+    let directory = chio_test_support::private_tempdir().test_expect("directory");
     let path = directory.path().join("exact-tenants.sqlite");
     let store = SqliteSecurityStateStore::open(&path).test_expect("store");
     populate(&store).test_expect("tenant boundaries");
@@ -236,7 +236,7 @@ fn colliding_flow_identifiers_do_not_inherit_foreign_labels_or_fences_in_model()
 
 #[test]
 fn colliding_flow_identifiers_do_not_inherit_foreign_labels_or_fences_after_restart() {
-    let directory = tempdir().test_expect("directory");
+    let directory = chio_test_support::private_tempdir().test_expect("directory");
     let path = directory.path().join("colliding-flow.sqlite");
     let store = SqliteSecurityStateStore::open(&path).test_expect("store");
     let fence = populate_colliding_flow_scopes(&store).test_expect("independent scopes");

@@ -12,7 +12,7 @@ fn signed_ingress_cannot_be_relabelled_to_a_foreign_tenant_after_restart(
     use super::*;
     use chio_security_types::ports::{CorrelationIngressStore, EventAppend};
 
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("tenant-ingress.sqlite");
     let key = chio_core::Keypair::from_seed(&[77; 32]);
     let event = signed_event(&key);
@@ -49,7 +49,8 @@ fn signed_ingress_cannot_be_relabelled_to_a_foreign_tenant_after_restart(
 
 #[test]
 fn exact_attested_batch_and_outbox_ids_are_tenant_bound_after_restart() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("tenant-attested-batch.sqlite");
     let store =
         SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("store: {error}"));

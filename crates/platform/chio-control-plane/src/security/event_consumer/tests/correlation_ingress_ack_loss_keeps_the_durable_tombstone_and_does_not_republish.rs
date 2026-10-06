@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn correlation_ingress_ack_loss_keeps_the_durable_tombstone_and_does_not_republish() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("correlation-ack-loss.sqlite"))
             .unwrap_or_else(|error| panic!("open ingress store: {error}")),

@@ -14,7 +14,7 @@ fn child_process_crash() -> TestResult {
 #[test]
 fn independent_process_crash_is_unsealed_before_commit_and_sealed_after_commit() -> TestResult {
     for stage in 1..=5 {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         drop(seed(&path)?);
         let source = SqliteSecurityParticipantSource::open(&path)?;

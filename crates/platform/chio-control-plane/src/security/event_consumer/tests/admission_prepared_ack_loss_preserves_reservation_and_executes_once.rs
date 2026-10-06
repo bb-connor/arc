@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn admission_prepared_ack_loss_preserves_reservation_and_executes_once() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("prepared-ack-loss.sqlite"))
             .unwrap_or_else(|error| panic!("prepared-ack-loss store: {error}")),

@@ -312,7 +312,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
         let capture = Capture::default();
         let _subscriber =
             tracing::subscriber::set_default(Registry::default().with(capture.clone()));
-        let root = require_success(tempfile::tempdir(), "trace directory");
+        let root = require_success(chio_test_support::private_tempdir(), "trace directory");
         let now = 1_800_000_000_000;
         let clock = Arc::new(FixedClock::new(now));
         let request = raw_request(

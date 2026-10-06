@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn startup_drain_does_not_confuse_deferred_backlog_with_empty_due_scan() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("deferred-startup.sqlite"))
             .unwrap_or_else(|error| panic!("deferred store: {error}")),

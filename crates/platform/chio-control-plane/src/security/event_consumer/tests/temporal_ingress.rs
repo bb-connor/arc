@@ -71,7 +71,7 @@ fn assert_ingress_mutation_rejected<F>(
 ) where
     F: FnOnce(&Keypair, &Keypair, &Keypair) -> UnverifiedSecurityEvent,
 {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("create verifier ingress directory: {error}"));
     let database_path = directory
         .path()

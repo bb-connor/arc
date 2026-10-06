@@ -34,7 +34,8 @@ struct Fixture {
 
 impl Fixture {
     fn new(declassify: bool) -> Self {
-        let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+        let directory =
+            chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
         let clock = Arc::new(ControlledClock(AtomicU64::new(150_000)));
         let state = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(

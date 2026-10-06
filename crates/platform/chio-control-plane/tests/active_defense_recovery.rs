@@ -35,7 +35,6 @@ use chio_security_types::{
     ResponseEffectSpec, ResponsePlanInput, ResponseState, ResponseTarget,
 };
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 const POSTURE_TTL_MS: u64 = 120_000;
 
@@ -234,7 +233,8 @@ fn session_verdict(store: &Arc<SqliteSecurityStateStore>) -> Verdict {
 
 #[test]
 fn normal_to_restricted_to_normal_at_ttl() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let action_id = action("normal-restricted-normal-action");
     let effect_id = effect("normal-restricted-normal-effect");
     let (store, work) = open_claimed_store(
@@ -296,7 +296,8 @@ fn normal_to_restricted_to_normal_at_ttl() {
 
 #[test]
 fn normal_to_quarantined_to_rollback_partial_remains_denied() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("rollback-partial.db"))
             .unwrap_or_else(|error| panic!("open SQLite security store: {error}")),
@@ -544,7 +545,8 @@ fn normal_to_quarantined_to_rollback_partial_remains_denied() {
 #[test]
 fn overlapping_temporary_actions_expire_in_both_orders_preserving_remaining_contribution() {
     for reverse in [false, true] {
-        let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+        let directory = chio_test_support::private_tempdir()
+            .unwrap_or_else(|error| panic!("temporary directory: {error}"));
         let first_action = action("overlap-first-action");
         let second_action = action("overlap-second-action");
         let actions = [first_action.clone(), second_action.clone()];
@@ -634,7 +636,8 @@ fn overlapping_temporary_actions_expire_in_both_orders_preserving_remaining_cont
 
 #[test]
 fn exact_subtree_root_and_every_recorded_descendant_lift() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("temporary directory: {error}"));
+    let directory = chio_test_support::private_tempdir()
+        .unwrap_or_else(|error| panic!("temporary directory: {error}"));
     let action_id = action("subtree-lift-action");
     let (store, work) = open_claimed_store(
         directory.path().join("subtree.db").as_path(),

@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use chio_store_sqlite::SqliteSecurityStateStore;
-use tempfile::tempdir;
 
 fn entries(directory: &Path) -> BTreeSet<String> {
     std::fs::read_dir(directory)
@@ -19,7 +18,8 @@ fn entries(directory: &Path) -> BTreeSet<String> {
 
 #[test]
 fn a_symlinked_path_is_refused_before_the_target_is_created_or_written() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let victim = directory.path().join("victim.db");
     let alias = directory.path().join("alias.db");
     std::os::unix::fs::symlink(&victim, &alias).unwrap_or_else(|error| panic!("symlink: {error}"));
@@ -40,7 +40,8 @@ fn a_symlinked_path_is_refused_before_the_target_is_created_or_written() {
 
 #[test]
 fn a_hard_linked_path_is_refused_before_it_is_written() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let victim = directory.path().join("victim.db");
     let linked = directory.path().join("linked.db");
     std::fs::write(&victim, b"").unwrap_or_else(|error| panic!("victim: {error}"));
@@ -57,7 +58,8 @@ fn a_hard_linked_path_is_refused_before_it_is_written() {
 fn a_new_store_is_private_to_its_owner() {
     use std::os::unix::fs::PermissionsExt;
 
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let parent = directory.path().join("state");
     let path = parent.join("security.db");
     drop(
@@ -79,7 +81,8 @@ fn a_new_store_is_private_to_its_owner() {
 fn a_shared_writable_parent_is_refused_before_the_store_is_created() {
     use std::os::unix::fs::PermissionsExt;
 
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let shared = directory.path().join("shared");
     std::fs::create_dir(&shared).unwrap_or_else(|error| panic!("shared: {error}"));
     std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o777))
@@ -89,17 +92,16 @@ fn a_shared_writable_parent_is_refused_before_the_store_is_created() {
 }
 
 #[test]
-fn a_group_writable_parent_owned_by_the_user_is_accepted() {
+fn a_group_writable_parent_is_refused_before_the_store_is_created() {
     use std::os::unix::fs::PermissionsExt;
 
-    // A umask of 002 with user-private groups creates directories like this.
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    // A group member could unlink or replace the database through this parent.
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let parent = directory.path().join("group-writable");
     std::fs::create_dir(&parent).unwrap_or_else(|error| panic!("parent: {error}"));
-    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o775))
+    std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o770))
         .unwrap_or_else(|error| panic!("chmod: {error}"));
-    drop(
-        SqliteSecurityStateStore::open(parent.join("security.db"))
-            .unwrap_or_else(|error| panic!("open security state: {error}")),
-    );
+    assert!(SqliteSecurityStateStore::open(parent.join("security.db")).is_err());
+    assert!(entries(&parent).is_empty());
 }

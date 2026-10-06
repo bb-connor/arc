@@ -65,7 +65,7 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> TestResult<Self> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let clock = Arc::new(Clock(AtomicU64::new(1_000)));
         let store = SqliteSecurityStateStore::open_with_trusted_clock(
             directory.path().join("security.db"),

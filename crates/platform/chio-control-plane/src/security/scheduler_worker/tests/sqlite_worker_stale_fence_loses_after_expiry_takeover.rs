@@ -3,7 +3,8 @@ use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_stale_fence_loses_after_expiry_takeover() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("response-fence.sqlite"))
             .unwrap_or_else(|error| panic!("security store: {error}")),

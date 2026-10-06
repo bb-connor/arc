@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn prepared_recovery_is_not_starved_by_sustained_fresh_ingress() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("recovery-fairness.sqlite"))
             .unwrap_or_else(|error| panic!("fairness store: {error}")),

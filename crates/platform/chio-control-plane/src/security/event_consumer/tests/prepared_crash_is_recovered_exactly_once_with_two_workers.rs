@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn prepared_crash_is_recovered_exactly_once_with_two_workers() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("two-workers.sqlite"))
             .unwrap_or_else(|error| panic!("two-worker store: {error}")),

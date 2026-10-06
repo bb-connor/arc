@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn old_sql_connections_cannot_insert_replace_update_delete_or_relabel_metadata() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     super::declassification::seed_history(&store)?;
@@ -83,7 +83,7 @@ fn every_partial_seal_or_modified_guard_is_rejected_without_repair() -> TestResu
         "PRAGMA application_id = 0",
         "CREATE TABLE security_flow_future (value BLOB)",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let _store = seed(&path)?;
         let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -105,7 +105,7 @@ fn every_partial_seal_or_modified_guard_is_rejected_without_repair() -> TestResu
 
 #[test]
 fn restored_barrier_does_not_hide_a_modified_critical_row() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let _store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;

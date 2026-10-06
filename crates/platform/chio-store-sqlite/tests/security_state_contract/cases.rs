@@ -7,7 +7,8 @@ fn cross_key_flow_contract_holds_for_in_memory_model() {
 
 #[test]
 fn cross_key_flow_contract_holds_for_sqlite() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("flow-contract.db"))
         .unwrap_or_else(|error| panic!("open security store: {error}"));
     exercise_cross_key_flow_contract(&store);
@@ -20,7 +21,8 @@ fn scheduler_takeover_contract_holds_for_in_memory_model() {
 
 #[test]
 fn scheduler_takeover_contract_holds_for_sqlite() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("scheduler-contract.db"))
         .unwrap_or_else(|error| panic!("open security store: {error}"));
     exercise_scheduler_takeover_contract(&store);
@@ -33,7 +35,8 @@ fn response_effect_recovery_contract_holds_for_in_memory_model() {
 
 #[test]
 fn response_effect_recovery_contract_holds_for_sqlite() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("effect-recovery.db"))
         .unwrap_or_else(|error| panic!("open security store: {error}"));
     exercise_response_effect_recovery_contract(&store);
@@ -46,7 +49,8 @@ fn overlay_action_binding_contract_holds_for_in_memory_model() {
 
 #[test]
 fn overlay_action_binding_contract_holds_for_sqlite() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("overlay-contract.db"))
         .unwrap_or_else(|error| panic!("open security store: {error}"));
     exercise_overlay_action_binding_contract(&store);
@@ -60,7 +64,8 @@ fn durable_write_contracts_hold_for_in_memory_model() {
 
 #[test]
 fn durable_write_contracts_hold_for_sqlite() {
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("security-contract.db");
     let sqlite = SqliteSecurityStateStore::open_with_isolation_epoch_verifier(
         &path,

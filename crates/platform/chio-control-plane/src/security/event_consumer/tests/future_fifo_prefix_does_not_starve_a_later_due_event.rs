@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn future_fifo_prefix_does_not_starve_a_later_due_event() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("future-prefix-correlation.sqlite");
     let store = Arc::new(
         SqliteSecurityStateStore::open(&path)

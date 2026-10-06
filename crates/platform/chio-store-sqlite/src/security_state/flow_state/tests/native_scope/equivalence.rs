@@ -49,7 +49,7 @@ fn rows(
 #[test]
 fn native_and_legacy_domain_mutations_produce_identical_retained_cells() -> TestResult {
     with_flow_sql_fixture(false, |connection| {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let legacy = SqliteSecurityStateStore::open(directory.path().join("legacy.db"))?;
         let mut legacy_connection = legacy.connection()?;
         let mut owner = SecurityStateWriteTransaction::new(
@@ -131,7 +131,7 @@ fn native_and_legacy_domain_mutations_produce_identical_retained_cells() -> Test
 
 #[test]
 fn absent_native_schema_never_falls_back_to_populated_legacy_state() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let legacy = SqliteSecurityStateStore::open(directory.path().join("legacy.db"))?;
     let join = request("initial")?;
     let expected = legacy.join(&join)?;
@@ -144,7 +144,7 @@ fn absent_native_schema_never_falls_back_to_populated_legacy_state() -> TestResu
 #[test]
 fn nonpositive_stored_generations_are_integrity_errors_in_both_scopes() -> TestResult {
     with_flow_sql_fixture(false, |connection| {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let legacy = SqliteSecurityStateStore::open(directory.path().join("legacy.db"))?;
         let mut legacy_connection = legacy.connection()?;
         for suffix in [

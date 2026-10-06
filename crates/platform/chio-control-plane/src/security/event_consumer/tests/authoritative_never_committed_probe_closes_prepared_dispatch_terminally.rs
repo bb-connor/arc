@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn authoritative_never_committed_probe_closes_prepared_dispatch_terminally() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("never-committed.sqlite"))
             .unwrap_or_else(|error| panic!("never-committed store: {error}")),

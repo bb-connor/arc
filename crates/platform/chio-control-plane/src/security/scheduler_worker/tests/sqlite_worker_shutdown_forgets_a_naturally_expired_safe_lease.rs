@@ -3,7 +3,8 @@ use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_shutdown_forgets_a_naturally_expired_safe_lease() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("expired-safe-shutdown.sqlite");
     let now_unix_ms = current_unix_ms();
     let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));

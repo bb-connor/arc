@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn expired_terminal_cleanup_rolls_back_the_batch_on_late_corruption() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("terminal-cleanup-rollback.sqlite");
     let now_unix_ms = current_unix_ms();
     let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));

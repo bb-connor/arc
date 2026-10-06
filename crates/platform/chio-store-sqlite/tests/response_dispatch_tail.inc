@@ -1,6 +1,6 @@
 #[test]
 fn empty_scheduler_claim_replay_rejects_corrupt_commit_time() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("corrupt-empty-claim-replay.db");
     let store = SqliteSecurityStateStore::open(&path)
@@ -65,7 +65,7 @@ fn empty_scheduler_claim_replay_rejects_corrupt_commit_time() {
 
 #[test]
 fn delayed_scheduler_renewal_and_retry_replays_remain_idempotent() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("delayed-scheduler-replays.db");
     let initial_now_unix_ms = 100_000;
@@ -150,7 +150,7 @@ fn delayed_scheduler_renewal_and_retry_replays_remain_idempotent() {
 
 #[test]
 fn exact_claim_replay_returns_the_current_renewed_lease() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let initial_now_unix_ms = 100_000;
     let clock = Arc::new(MutableSecurityStateClock::new(initial_now_unix_ms));
@@ -198,7 +198,7 @@ fn exact_claim_replay_returns_the_current_renewed_lease() {
 
 #[test]
 fn earlier_renewal_replay_returns_the_current_successor_lease() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let initial_now_unix_ms = 100_000;
     let clock = Arc::new(MutableSecurityStateClock::new(initial_now_unix_ms));
@@ -248,7 +248,7 @@ fn earlier_renewal_replay_returns_the_current_successor_lease() {
 
 #[test]
 fn superseded_retry_replay_returns_a_stale_conflict() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let initial_now_unix_ms = 100_000;
     let clock = Arc::new(MutableSecurityStateClock::new(initial_now_unix_ms));
@@ -319,7 +319,7 @@ fn superseded_retry_replay_returns_a_stale_conflict() {
 
 #[test]
 fn automatic_dispatch_fence_wins_before_commit() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("fence-wins.db"))
         .unwrap_or_else(|error| panic!("security store open failed: {error}"));
@@ -355,7 +355,7 @@ fn automatic_dispatch_fence_wins_before_commit() {
 
 #[test]
 fn automatic_dispatch_commit_wins_before_fence() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("commit-wins.db"))
         .unwrap_or_else(|error| panic!("security store open failed: {error}"));
@@ -387,7 +387,7 @@ fn automatic_dispatch_commit_wins_before_fence() {
 
 #[test]
 fn simultaneous_two_handle_commit_and_fence_preserve_durable_exclusivity() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("simultaneous-commit-fence.db");
     let bootstrap = SqliteSecurityStateStore::open(&path)
@@ -438,7 +438,7 @@ fn simultaneous_two_handle_commit_and_fence_preserve_durable_exclusivity() {
 
 #[test]
 fn durable_fence_winner_survives_simultaneous_two_handle_retries() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("durable-fence-winner-race.db");
     let created_at_unix_ms = now_unix_ms();
@@ -480,7 +480,7 @@ fn durable_fence_winner_survives_simultaneous_two_handle_retries() {
 
 #[test]
 fn durable_commit_winner_survives_simultaneous_two_handle_retries() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("durable-commit-winner-race.db");
     let created_at_unix_ms = now_unix_ms();
@@ -522,7 +522,7 @@ fn durable_commit_winner_survives_simultaneous_two_handle_retries() {
 
 #[test]
 fn automatic_dispatch_fence_rejects_alternate_id_for_same_action() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("alternate-id.db"))
         .unwrap_or_else(|error| panic!("security store open failed: {error}"));
@@ -562,7 +562,7 @@ fn automatic_dispatch_fence_rejects_alternate_id_for_same_action() {
 
 #[test]
 fn automatic_dispatch_fences_are_tenant_independent() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("tenant-fences.db"))
         .unwrap_or_else(|error| panic!("security store open failed: {error}"));
@@ -588,7 +588,7 @@ fn automatic_dispatch_fences_are_tenant_independent() {
 
 #[test]
 fn automatic_dispatch_fence_retry_recovers_after_persisted_result_is_lost() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("persisted-fence-retry.db");
     let created_at_unix_ms = now_unix_ms();
@@ -628,7 +628,7 @@ fn automatic_dispatch_fence_retry_recovers_after_persisted_result_is_lost() {
 
 #[test]
 fn automatic_dispatch_fence_retry_rejects_corrupt_persisted_hash() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("corrupt-persisted-fence-hash.db");
     let created_at_unix_ms = now_unix_ms();
@@ -668,7 +668,7 @@ fn automatic_dispatch_fence_retry_rejects_corrupt_persisted_hash() {
 
 #[test]
 fn dispatch_readiness_rejects_canonical_but_invalid_fence_binding() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("invalid-persisted-fence-binding.db");
     let created_at_unix_ms = now_unix_ms();
@@ -713,7 +713,7 @@ fn dispatch_readiness_rejects_canonical_but_invalid_fence_binding() {
 
 #[test]
 fn load_dispatch_reports_missing_explicitly() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = SqliteSecurityStateStore::open(directory.path().join("missing-dispatch.db"))
         .unwrap_or_else(|error| panic!("security store open failed: {error}"));
@@ -732,7 +732,7 @@ fn load_dispatch_reports_missing_explicitly() {
 
 #[test]
 fn historical_governed_commit_is_unclaimable_until_zero_effect_terminalization() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("historical-dispatch.db"))
@@ -837,7 +837,7 @@ fn historical_governed_commit_is_unclaimable_until_zero_effect_terminalization()
 
 #[test]
 fn live_dispatch_recovery_rejects_unfenced_wrong_owner_and_stale_fencing_token() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let created_at_unix_ms = now_unix_ms();
     let request = dispatch_request(
@@ -899,7 +899,7 @@ fn live_dispatch_recovery_rejects_unfenced_wrong_owner_and_stale_fencing_token()
 
 #[test]
 fn scheduler_lease_body_hash_covers_dispatch_and_takeover_origins() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let initial_now_unix_ms = 100_000;
     let initial_clock = Arc::new(MutableSecurityStateClock::new(initial_now_unix_ms));
@@ -1045,7 +1045,7 @@ fn scheduler_lease_body_hash_covers_dispatch_and_takeover_origins() {
 
 #[test]
 fn exact_dispatch_recovery_is_live_idempotent_and_fenced_after_restart() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("response-recovery.db");
     let created_at_unix_ms = now_unix_ms();
@@ -1185,7 +1185,7 @@ fn exact_dispatch_recovery_is_live_idempotent_and_fenced_after_restart() {
 
 #[test]
 fn dispatch_recovery_rejects_non_due_work_without_a_live_lease() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let created_at_unix_ms = now_unix_ms();
     let request = dispatch_request(
@@ -1233,7 +1233,7 @@ fn dispatch_recovery_rejects_non_due_work_without_a_live_lease() {
 
 #[test]
 fn response_receipt_cursor_is_plan_bound_and_exactly_cas_idempotent() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let created_at_unix_ms = now_unix_ms();
     let request = dispatch_request(
@@ -1337,7 +1337,7 @@ fn response_receipt_cursor_is_plan_bound_and_exactly_cas_idempotent() {
 
 #[test]
 fn dispatch_readiness_rejects_a_corrupt_schema() {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("temporary directory creation failed: {error}"));
     let path = directory.path().join("corrupt-dispatch-schema.db");
     let store = SqliteSecurityStateStore::open(&path)

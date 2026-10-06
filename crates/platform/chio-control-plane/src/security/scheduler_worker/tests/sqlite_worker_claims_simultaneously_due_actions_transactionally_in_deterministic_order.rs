@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn sqlite_worker_claims_simultaneously_due_actions_transactionally_in_deterministic_order() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let now_unix_ms = current_unix_ms();
     let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));
     let store = Arc::new(

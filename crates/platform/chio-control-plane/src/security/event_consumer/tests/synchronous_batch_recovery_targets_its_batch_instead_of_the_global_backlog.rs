@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn synchronous_batch_recovery_targets_its_batch_instead_of_the_global_backlog() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("exact-batch-recovery.sqlite"))
             .unwrap_or_else(|error| panic!("exact batch store: {error}")),

@@ -3,7 +3,8 @@ use crate::security::scheduler_worker::tests::*;
 
 #[test]
 fn sqlite_worker_restart_replays_lost_claim_ack_and_shutdown_releases_lease() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("response-worker.sqlite");
     let now_unix_ms = current_unix_ms();
     let clock = Arc::new(SqliteTestClock(AtomicU64::new(now_unix_ms)));

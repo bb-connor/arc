@@ -3,7 +3,8 @@ use crate::security::event_consumer::tests::*;
 
 #[test]
 fn committed_correlation_outcome_survives_crash_before_attestation_and_reaches_outbox_once() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("correlation-outcome-crash.sqlite");
     let keypair = Keypair::from_seed(&[95_u8; 32]);
     let event = signed_event_kind(

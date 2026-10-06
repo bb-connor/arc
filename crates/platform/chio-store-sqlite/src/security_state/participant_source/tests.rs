@@ -121,7 +121,7 @@ pub(crate) fn seeded_security_history(
 
 #[test]
 fn seals_exact_populated_flow_inventory_and_disables_existing_typed_handles() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -149,7 +149,7 @@ fn seals_exact_populated_flow_inventory_and_disables_existing_typed_handles() ->
 
 #[test]
 fn stale_source_expectation_fails_before_first_ddl_and_preserves_writers() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let store = seed(&path)?;
     let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -166,7 +166,7 @@ fn stale_source_expectation_fails_before_first_ddl_and_preserves_writers() -> Te
 fn seal_errors_roll_back_every_precommit_cutpoint_and_recover_lost_ack() -> TestResult {
     let _reset = ResetCutpoint;
     for stage in 1..=5 {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let store = seed(&path)?;
         let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -191,7 +191,7 @@ fn seal_errors_roll_back_every_precommit_cutpoint_and_recover_lost_ack() -> Test
 #[test]
 fn racing_new_join_and_seal_cannot_both_commit_against_the_old_inventory() -> TestResult {
     for _ in 0..8 {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let store = seed(&path)?;
         let source = SqliteSecurityParticipantSource::open(&path)?;

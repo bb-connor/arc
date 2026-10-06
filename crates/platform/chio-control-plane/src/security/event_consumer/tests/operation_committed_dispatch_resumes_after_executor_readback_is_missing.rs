@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn operation_committed_dispatch_resumes_after_executor_readback_is_missing() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("operation-committed.sqlite"))
             .unwrap_or_else(|error| panic!("operation committed store: {error}")),

@@ -2,7 +2,8 @@ use super::*;
 
 #[test]
 fn synchronous_batch_recovery_processes_every_binding_and_preserves_the_first_error() {
-    let directory = tempfile::tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         SqliteSecurityStateStore::open(directory.path().join("complete-batch-recovery.sqlite"))
             .unwrap_or_else(|error| panic!("complete batch store: {error}")),

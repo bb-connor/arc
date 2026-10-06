@@ -13,7 +13,7 @@ fn migration_refuses_malformed_egress_history_without_retiring_the_source() -> T
         "UPDATE security_flow_sequences SET last_generation = X'31'",
         "UPDATE security_egress_fences SET dispatch_commitment_id = 'dispatch', committed_at = 'invalid-time'",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let _store = seed(&path)?;
         let source = SqliteSecurityParticipantSource::open(&path)?;
@@ -40,7 +40,7 @@ fn historical_fences_cannot_reference_missing_or_regressed_flow_state() -> TestR
          UPDATE security_lineage_flow_state SET generation = 1;
          UPDATE security_session_flow_state SET generation = 1;",
     ] {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("security.db");
         let store = seed(&path)?;
         let snapshot = store.join(&join_request("second-join")?)?;
@@ -86,7 +86,7 @@ fn expired_stale_and_committed_fences_remain_exact_migratable_history() -> TestR
             )
         }
     }
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
     let clock = Arc::new(Clock(AtomicU64::new(1_000)));
     let store = SqliteSecurityStateStore::open_with_trusted_clock(&path, clock.clone())?;
