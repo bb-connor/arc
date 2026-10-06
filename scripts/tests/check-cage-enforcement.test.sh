@@ -229,10 +229,17 @@ if [[ "$args" == *" --all-targets "* ]] ||
     seccomp_kills_foreign_architecture_syscall
     target_receives_no_parent_secret_or_loader_injection_environment
     default_deny_blocks_undeclared_executable_path
+    a_second_exec_by_absolute_path_is_killed
+    a_second_exec_through_proc_self_fd_is_killed
+    a_second_exec_through_the_interpreter_is_killed
+    a_fault_in_the_target_reaches_its_default_action
+    a_timer_signal_reaches_the_target
+    a_stopped_target_stays_stopped_until_it_is_continued
+    racing_stops_continues_and_a_kill_end_with_an_observed_exit
   )
   case "$mode" in
     zero_probes) probes=() ;;
-    removed_probe) probes=("${probes[@]:0:26}") ;;
+    removed_probe) probes=("${probes[@]:0:33}") ;;
     extra_probe) probes+=(unratcheted_real_linux_probe) ;;
   esac
 
@@ -277,6 +284,7 @@ if [[ "$args" == *" --all-targets "* ]] ||
       construction_rejects_unconfined_limits_and_invalid_arguments
       empty_alternatives_cannot_introduce_unconditional_syscall_authority
       wire_decode_uses_the_same_plan_validator_and_closed_syscall_keys
+      the_syscall_vocabulary_cannot_name_process_creation
     )
     init_tests=(
       exact_target_argv_is_used_and_mutation_is_rejected
@@ -313,6 +321,11 @@ if [[ "$args" == *" --all-targets "* ]] ||
       forbidden_directory_scan_admits_an_unrelated_hard_link_beside_a_socket
       only_connection_oriented_unix_sockets_can_carry_broker_ipc
       group_writable_runtime_file_without_an_execute_bit_is_rejected
+      admission_with_a_missing_write_grant_creates_nothing
+      a_denied_admission_leaves_no_write_grant_behind
+      compile_creates_a_pending_write_grant_owned_by_the_execution_identity
+      a_failed_compile_removes_only_the_grants_it_created
+      an_unprivileged_compile_refuses_a_pending_grant_for_another_identity
     )
     print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
     print_target "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)" "${plan_tests[@]}"
@@ -404,7 +417,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=86 probes=29 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=99 probes=36 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py
