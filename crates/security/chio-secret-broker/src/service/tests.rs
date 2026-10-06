@@ -550,6 +550,7 @@ pub(super) struct Fixture {
     audit_authority: PublicKey,
     audit_receipt_signer: PublicKey,
     audit_approval_sequence: AtomicU64,
+    secret_database: Option<std::path::PathBuf>,
     _audit_directory: tempfile::TempDir,
 }
 
@@ -558,6 +559,7 @@ struct FixtureServiceOptions {
     fail_transport: bool,
     deny_capture: bool,
     receipt_signer: Arc<dyn SigningBackend>,
+    durable_secrets: bool,
 }
 
 pub(super) fn fixture(
@@ -600,9 +602,36 @@ fn fixture_with_stores(
             fail_transport,
             deny_capture,
             receipt_signer: Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32]))),
+            durable_secrets: false,
         },
         attempts,
         receipt_sink,
+        receipts,
+    )
+}
+
+/// The credential store is a private SQLite file whose path the test owns.
+#[cfg(target_os = "linux")]
+pub(super) fn durable_secret_fixture() -> Fixture {
+    let receipts = Arc::new(Mutex::new(Vec::new()));
+    fixture_with_receipt_signer(
+        FixtureServiceOptions {
+            maximum_executions: 1,
+            fail_transport: false,
+            deny_capture: false,
+            receipt_signer: Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32]))),
+            durable_secrets: true,
+        },
+        Arc::new(SqliteAttemptStore::open_in_memory().test_expect("attempt store")),
+        Arc::new(InspectingReceiptSink {
+            canary: b"unique-service-credential-canary".to_vec(),
+            receipts: Arc::clone(&receipts),
+            failures: Mutex::new(BTreeMap::new()),
+            completed: Mutex::new(BTreeMap::new()),
+            failure_persist_entered: None,
+            failure_persist_release: None,
+            fail_completed: false,
+        }),
         receipts,
     )
 }
@@ -618,6 +647,7 @@ fn fixture_with_receipt_signer(
         fail_transport,
         deny_capture,
         receipt_signer,
+        durable_secrets,
     } = options;
     let canary = b"unique-service-credential-canary".to_vec();
     let audit_directory = crate::private_tempdir().test_expect("audit admin directory");
@@ -648,9 +678,21 @@ fn fixture_with_receipt_signer(
         )
         .test_expect("audit admin authorizer"),
     );
+    let secret_database = durable_secrets.then(|| {
+        std::fs::canonicalize(audit_directory.path())
+            .test_expect("canonicalize secret database directory")
+            .join("secrets.sqlite3")
+    });
     let backend = Arc::new(
-        EncryptedBlobSecretBackend::open_in_memory_for_test("tenant-a", [7; 32])
-            .test_expect("backend"),
+        match &secret_database {
+            Some(path) => EncryptedBlobSecretBackend::open_with_tenant_key(
+                path,
+                "tenant-a".to_string(),
+                chio_store_sqlite::TenantKey::from_bytes([7; 32]),
+            ),
+            None => EncryptedBlobSecretBackend::open_in_memory_for_test("tenant-a", [7; 32]),
+        }
+        .test_expect("backend"),
     );
     backend
         .provision(
@@ -752,6 +794,7 @@ fn fixture_with_receipt_signer(
         audit_authority: audit_authority_signer.public_key(),
         audit_receipt_signer,
         audit_approval_sequence: AtomicU64::new(0),
+        secret_database,
         _audit_directory: audit_directory,
     }
 }

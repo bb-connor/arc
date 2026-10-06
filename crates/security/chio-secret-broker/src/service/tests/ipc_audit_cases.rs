@@ -858,6 +858,127 @@ fn an_authority_outage_fails_only_its_audit_session() {
     );
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn a_credential_store_fault_during_an_audit_ends_the_audit_endpoint() {
+    use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    use crate::privileged_audit::{
+        read_privileged_audit_challenge_frame, write_privileged_audit_commit_frame,
+        write_privileged_audit_open_frame, BrokerPrivilegedAuditCommitRequest,
+        BrokerPrivilegedAuditEndpoint, BrokerPrivilegedAuditEndpointConfig,
+        BrokerPrivilegedAuditOpenRequest, BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA,
+    };
+
+    let fixture = durable_secret_fixture();
+    let secret_database = fixture
+        .secret_database
+        .clone()
+        .test_expect("durable secret database");
+    let (request, _trusted) = execution(&fixture, 147, 1);
+    let (reference_head, reference_body) = audit_reference_parts(&fixture, &request, true);
+    let reference_precommitment =
+        crate::audit::BrokerAuditReferencePrecommitment::generate(&reference_head, &reference_body)
+            .test_expect("runner reference precommitment");
+    let directory = crate::private_tempdir().test_expect("privileged audit socket directory");
+    let socket_path = directory.path().join("privileged-audit").join("audit.sock");
+    let service_uid = rustix::process::geteuid().as_raw();
+    let runner_gid = rustix::process::getegid().as_raw();
+    let broker_signer: Arc<dyn SigningBackend> =
+        Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
+    let trusted_broker = broker_signer.public_key();
+    let endpoint = BrokerPrivilegedAuditEndpoint::bind(
+        BrokerPrivilegedAuditEndpointConfig {
+            socket_path: socket_path.clone(),
+            trusted_service_uid: service_uid,
+            authorized_runner_uid: service_uid,
+            authorized_runner_gid: runner_gid,
+            read_timeout_ms: 2_000,
+            write_timeout_ms: 2_000,
+            authorization_lifetime_seconds: 60,
+            deployment_id: "test-deployment".to_string(),
+            broker_instance_id: "test-broker-instance".to_string(),
+            tenant_scope: "tenant-a".to_string(),
+            runner_id: "test-enterprise-runner".to_string(),
+        },
+        broker_signer,
+        Arc::new(SocketAuditHandler {
+            service: Arc::clone(&fixture.service),
+            admin: Arc::clone(&fixture.audit_admin),
+            trusted_runner: fixture.audit_runner_key.clone(),
+        }),
+    )
+    .test_expect("bind privileged audit endpoint");
+    rusqlite::Connection::open(&secret_database)
+        .test_expect("own temporary database")
+        .execute_batch("DROP TABLE chio_encrypted_blob_references;")
+        .test_expect("actual durable schema fault");
+    let server = thread::spawn(move || endpoint.try_serve_one());
+
+    let mut stream = UnixStream::connect(&socket_path).test_expect("connect privileged audit");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .test_expect("privileged audit client read timeout");
+    let open = BrokerPrivilegedAuditOpenRequest::new(
+        "audit-socket-credential-store-147".to_string(),
+        "legacy-provider-observation".to_string(),
+        "combined-authority".to_string(),
+        request,
+        reference_head,
+        reference_body,
+        &reference_precommitment,
+    )
+    .test_expect("construct privileged audit open request");
+    write_privileged_audit_open_frame(&mut stream, &open)
+        .test_expect("write privileged audit open request");
+    let challenge = read_privileged_audit_challenge_frame(
+        &mut stream,
+        &trusted_broker,
+        &reference_precommitment,
+    )
+    .test_expect("read runner-bound privileged audit challenge");
+    let runner_authorization = crate::audit::SignedBrokerAuditRunnerAuthorization::sign(
+        challenge.body.runner_authorization_body.clone(),
+        fixture.audit_runner.as_ref(),
+    )
+    .test_expect("sign privileged audit runner authorization");
+    let governed_intent =
+        crate::audit::broker_audit_governed_intent_for_runner_authorization(&runner_authorization)
+            .test_expect("derive privileged audit governed intent");
+    let admin = governed_audit_authorization(&fixture, &governed_intent);
+    let commit = BrokerPrivilegedAuditCommitRequest {
+        schema: BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA.to_string(),
+        session_nonce: challenge.body.session_nonce.clone(),
+        session_commitment_sha256: challenge.body.session_commitment_sha256.clone(),
+        runner_authorization,
+        governed_admin_authorization: admin.as_bytes().to_vec(),
+    };
+    write_privileged_audit_commit_frame(&mut stream, &commit, &challenge)
+        .test_expect("write privileged audit commit");
+    let error = match server.join().test_expect("join privileged audit server") {
+        Err(error) => error,
+        Ok(outcome) => {
+            panic!("a credential-store fault must end the audit endpoint, served {outcome:?}")
+        }
+    };
+    assert!(matches!(error, BrokerError::CredentialStorage(_)));
+    assert_eq!(error.diagnostic_code(), "storage");
+    let mut source = std::error::Error::source(&error);
+    let mut native = None;
+    while let Some(cause) = source {
+        if let Some(store) = cause.downcast_ref::<chio_store_sqlite::BlobStoreError>() {
+            native = Some(store);
+            break;
+        }
+        source = cause.source();
+    }
+    assert!(
+        matches!(native, Some(chio_store_sqlite::BlobStoreError::Sqlite(_))),
+        "native credential-store cause was discarded"
+    );
+}
+
 #[test]
 fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
     let fixture = fixture(1, false, false);

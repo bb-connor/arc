@@ -582,6 +582,7 @@ fn response_signing_failure_is_committed_terminal_and_exact_retry_never_resends(
                 keypair: Keypair::from_seed(&[3; 32]),
                 fail_next: AtomicBool::new(true),
             }),
+            durable_secrets: false,
         },
         attempts,
         receipt_sink,
