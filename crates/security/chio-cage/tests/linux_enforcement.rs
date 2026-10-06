@@ -1141,6 +1141,47 @@ fn send_signal(process_id: u32, signal: i32) -> i32 {
     unsafe { libc::kill(pid, signal) }
 }
 
+fn open_target_pidfd(process_id: u32) -> OwnedFd {
+    let pid = libc::pid_t::try_from(process_id).test_unwrap();
+    // SAFETY: pidfd_open takes no pointers; pid names this test's unreaped
+    // target and the flags are zero.
+    let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) };
+    assert!(
+        raw >= 0,
+        "pidfd_open failed: {}",
+        std::io::Error::last_os_error()
+    );
+    let raw_fd = i32::try_from(raw).test_unwrap();
+    // SAFETY: a successful pidfd_open returned one new owned descriptor.
+    unsafe { OwnedFd::from_raw_fd(raw_fd) }
+}
+
+fn send_pidfd_signal(pidfd: &OwnedFd, signal: i32) -> libc::c_long {
+    // SAFETY: pidfd is a live descriptor, the siginfo pointer is null, and
+    // the flags are zero.
+    unsafe {
+        libc::syscall(
+            libc::SYS_pidfd_send_signal,
+            pidfd.as_raw_fd(),
+            signal,
+            std::ptr::null::<libc::siginfo_t>(),
+            0,
+        )
+    }
+}
+
+fn wait_until_reaped(process_id: u32, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    let proc_entry = format!("/proc/{process_id}");
+    while Instant::now() < deadline {
+        if !Path::new(&proc_entry).exists() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    !Path::new(&proc_entry).exists()
+}
+
 #[test]
 fn a_stopped_target_stays_stopped_until_it_is_continued() {
     let child = launch(
@@ -1192,6 +1233,56 @@ fn racing_stops_continues_and_a_kill_end_with_an_observed_exit() {
         Some(libc::SIGKILL)
     );
     assert!(!Path::new(&format!("/proc/{process_id}")).exists());
+}
+
+#[test]
+fn dropping_a_stopped_target_reaps_it() {
+    let child = launch(
+        compiled(&required_path("CHIO_CAGE_TEST_WAIT")),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap();
+    let process_id = child.process_id();
+    let pidfd = open_target_pidfd(process_id);
+    assert_eq!(send_pidfd_signal(&pidfd, libc::SIGSTOP), 0);
+    assert!(
+        wait_for_state(process_id, &['t', 'T'], Duration::from_secs(5)),
+        "the target did not stop"
+    );
+    let started = Instant::now();
+    drop(child);
+    assert!(
+        wait_until_reaped(process_id, Duration::from_secs(10)),
+        "a dropped stopped target was not reaped"
+    );
+    assert!(started.elapsed() < Duration::from_secs(10));
+}
+
+#[test]
+fn rapid_stop_continue_then_drop_reaps_the_target() {
+    let child = launch(
+        compiled(&required_path("CHIO_CAGE_TEST_WAIT")),
+        CageLaunchOptions::default(),
+    )
+    .test_unwrap();
+    let process_id = child.process_id();
+    let pidfd = open_target_pidfd(process_id);
+    for _ in 0..200 {
+        assert_eq!(send_pidfd_signal(&pidfd, libc::SIGSTOP), 0);
+        assert_eq!(send_pidfd_signal(&pidfd, libc::SIGCONT), 0);
+    }
+    assert!(
+        wait_for_state(process_id, &['R', 'S'], Duration::from_secs(5)),
+        "the target did not run after the final SIGCONT"
+    );
+    assert_eq!(send_pidfd_signal(&pidfd, libc::SIGSTOP), 0);
+    let started = Instant::now();
+    drop(child);
+    assert!(
+        wait_until_reaped(process_id, Duration::from_secs(10)),
+        "a target dropped during stop and continue was not reaped"
+    );
+    assert!(started.elapsed() < Duration::from_secs(10));
 }
 
 #[test]

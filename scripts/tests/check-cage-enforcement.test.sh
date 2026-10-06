@@ -236,10 +236,12 @@ if [[ "$args" == *" --all-targets "* ]] ||
     a_timer_signal_reaches_the_target
     a_stopped_target_stays_stopped_until_it_is_continued
     racing_stops_continues_and_a_kill_end_with_an_observed_exit
+    dropping_a_stopped_target_reaps_it
+    rapid_stop_continue_then_drop_reaps_the_target
   )
   case "$mode" in
     zero_probes) probes=() ;;
-    removed_probe) probes=("${probes[@]:0:33}") ;;
+    removed_probe) probes=("${probes[@]:0:35}") ;;
     extra_probe) probes+=(unratcheted_real_linux_probe) ;;
   esac
 
@@ -417,7 +419,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=99 probes=36 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=101 probes=38 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py
