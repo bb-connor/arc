@@ -119,6 +119,14 @@ The review's architecture judgment and recommended order are in section 9.
 - A17 persists the new generation together with all staged negotiated-subscription transitions and rebased end-event ids. H5a uses that one signed record, and emitted ids exactly match its durable markers. A failed write containing a new end takes the journaled terminal path rather than restoring a stale live entry (4197054921).
 
 
+**Revision 4k, PR round 31 (2026-10-06, reviewed head `efce5522c`).** Four comments tightened existing ownership and wire contracts:
+
+- spec 2 no longer shares a reserved or open ordinal between distinct resolution attempts, including in the same scope. Only exact attempt/scope retries read back the original link; deliberate retirement precedes a replacement at a new ordinal (4197548040);
+- predecessor-scope `InspectWorkflow` exposes the workflow revision and bounded successor chain in one authenticated snapshot. An operator with `Inspect` and `Cancel` can construct exact retirement even after the successor destination is removed; reservation readback also includes the chain revision (4197555183);
+- specs 1 and 2 freeze the legacy seven-command schema and introduce recovery-command profile 1.1 with explicit request/result schemas, registry advertisement, protected deployment selection and a dual-profile migration through the existing command owner (4197555199);
+- spec 5 defines one `TerminalReason` vocabulary, including `subscription_not_restored` and `subscription_authority_lost`. The same cause is authenticated by versioned native terminal records, retained in the shared journal and used by Part B's unsigned terminal hint. Part A adds no client notification (4197555214).
+
+
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.
 - **Spec 2 (faults)** now plugs in as a recovery planner fact. W: maps an unsatisfied capability fact to the terminal `BlockedByCapability`, and the new `Authority` remedy kind is the upcall tier for exactly that case. W: pins one capability per workflow, so a resolution runs as a linked `AuthorityContinuation` workflow. Because recovery refuses delegated control tokens, an operator-assigned actor drives it.
 - **Spec 7 (isolation)** recognizes that P5 already cage-confines a zero-authority `confined_reader` child. It adds that profile, an exporter requirement (P5 emits no receipt), and an `output_channels` surface.

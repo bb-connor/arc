@@ -142,7 +142,7 @@ This does not replace:
 | L0 | `KernelOp` (section 5): `ChioKernel` live methods, core free functions, binding exports, native wire messages, sidecar endpoints | `KERNEL_ABI_VERSION` (new) | `spec/PROTOCOL.md` section 8.6 (new) |
 | L1 | Worker ops `inspect`, `invoke`, `checkpoint`, `blob_put`, `blob_read`, `cancel`; reserved native-tool namespaces `chio-process/*`, `chio-ipc/*`. Under durable knowledge, the raw state routes refuse | `PROCESS_ABI`, recorded as `chio.process.abi.v4` for the M ∪ W union (the two v3s are incompatible) | M: `chio-process/WORKER_PROTOCOL.md`, M: `chio-cli/PROCESS_HOST.md` |
 | L2 | `WorkRequestV1` variants, `WorkPreparationV1` proposals, `WorkActionV1`, `WorkQueryV1` (assumed shipped) | `chio.work.v1` | V: `2026-10-03-work-runtime-design.md` |
-| L3 | `RecoveryCommandBodyV1` (7 variants in W:; spec 2 O5 adds proposed eighth `RetireSuccessorReservation`); endpoints `review`, `settle`, `explain`; `RecoveryPermission` (16 variants, including P6's `maintain`; retirement reuses `Cancel`; grant tool names on `chio.recovery`; W: `chio-kernel/src/recovery/records.rs:52-88`) | the `V1` command schema and the recovery deployment profile | W: `chio-security-types/src/recovery/commands.rs`, W: `docs/architecture/recoverable-agent-runtime/`; spec 2 O5 |
+| L3 | Legacy `RecoveryCommandBodyV1` (7 variants in W:, frozen); proposed `RecoveryCommandBodyV1_1` adds eighth `RetireSuccessorReservation`; endpoints `review`, `settle`, `explain`; `RecoveryPermission` (16 variants, including P6's `maintain`; retirement reuses `Cancel`; grant tool names on `chio.recovery`; W: `chio-kernel/src/recovery/records.rs:52-88`) | recovery-command profile 1.0 (`chio.recovery.command.v1`) and proposed minor 1.1 (`chio.recovery.command.v1.1`, result `chio.recovery.command-result.v1.1`), pinned by the recovery deployment | W: `chio-security-types/src/recovery/commands.rs`, W: `docs/architecture/recoverable-agent-runtime/`; spec 2 O5 and section 8.1 |
 | C | Component op enums: keyring witness/audit, broker authority, active-response authority, verifiers, W2 owner-service routes. Connector coverage census: each P3 semantic package classifies every exposed operation `covered`, `operator-authorized dynamic resolution` or `refused` (W: `05-semantic-contracts.md:15`) | per component | each component's design |
 
 Normative rules (R1-R10 from revision 1 are retained and now apply per layer):
@@ -155,7 +155,7 @@ Normative rules (R1-R10 from revision 1 are retained and now apply per layer):
    - a sidecar endpoint.
    At L1-L3, every protocol variant and every reserved native-tool name counts.
 2. **R2. Exhaustive matches.** No wildcard arm over any layer's op enum or class enum in the owning crates (ADR-0019 item 6).
-3. **R3. Numbering.** Ids are dense and never reused. Retired ids stay listed. Adding an op is a minor bump of that layer's version. Retiring an op, or changing its class or emergency-stop disposition, is a major bump. L1 keeps `PROCESS_ABI`'s stricter rule: any incompatible change is a new ABI with no implicit migration.
+3. **R3. Numbering.** Ids are dense and never reused. Retired ids stay listed. Adding an op is a minor bump of that layer's version. Retiring an op, or changing its class or emergency-stop disposition, is a major bump. L1 keeps `PROCESS_ABI`'s stricter rule: any incompatible change is a new ABI with no implicit migration. For L3's proposed retirement command, publish recovery-command profile 1.1 as specified in spec 2 section 8.1: a distinct required schema identifies the minor while numeric `version: 1` remains the major. Keep the seven-command V1 schema closed and byte-compatible. The generated registry advertises both profiles and their request/response schemas; protected deployment setup pins 1.1 before enabling authority successors. This L3 version is independent of L0's `KERNEL_ABI_VERSION`.
 4. **R4. Spec coupling.** Every row carries `spec_ref`. The census requires the op's id to appear in the owning document's table with matching id, class and status.
 5. **R5. Emergency-stop disposition.**
    - Each L0 op declares `emergency_stop = "deny" | "allow"` with a rationale. A generated test asserts refusal while stopped for every entry point of a `deny` op.
@@ -379,7 +379,7 @@ H11 measures name/version pairs. Revision 1's numbers were distinct names; this 
   - rules R1-R13.
 - L1-L3 rows link to their owners' documents rather than duplicating them.
 - Section 3 gains one sentence: the kernel's trusted live operations are the closed sets in 8.6.
-- No wire, schema, receipt or negotiation change.
+- The L0 registry itself changes no receipt or negotiation format. The linked L3 retirement command does change the recovery wire vocabulary: spec 2 section 8.1 publishes profile 1.1 and its request/result schemas, including O5's authenticated chain inspection. Retain the legacy V1 codec, reject unknown profiles before mutation, and preserve the exact profile and command identity on replay. The existing command endpoint and execution owner serve both profiles.
 
 ## 10. Rollout and migration
 
@@ -402,7 +402,7 @@ H11 measures name/version pairs. Revision 1's numbers were distinct names; this 
 
    Measured on `main` at `f5a9d2ab2` (aarch64-apple-darwin, `cargo tree -p chio-kernel -e normal`; an archived measurement, not reproduced for the M:/V:/W: integrated closure), the first two cuts reach 281 distinct names with no `reqwest`, `hyper` or sigstore. Adding the `chio-settle` web3 cut reaches 262. The facade and R13 cuts remove the remaining alloy crate and `ureq`; they still need to be measured.
    - **Re-measurement.** Phase 0 re-measures every closure and cut count on the gated tree with a retained script and a retained resolved graph (`cargo metadata` output, target and feature set recorded). Those re-measured values, not the archived ones, become the R13 budgets.
-4. **Phase 3 (L2 pinning).** When W1 code lands, replace the contract-anchor rows with exact variants and descent lists. L3 is already pinned to W:; its rows move with any change to the recovery template or command enums (today one template, `SupportTicketPublicIssue`).
+4. **Phase 3 (L2 pinning).** When W1 code lands, replace the contract-anchor rows with exact variants and descent lists. L3 is already pinned to W:; its rows move with any change to the recovery template or command enums (today one template, `SupportTicketPublicIssue`). Spec 2's authority successors publish the separate L3 recovery-command profile 1.1 only after its dual-codec/store/operator migration (spec 2 section 8.1). The registry and deployment pin must name that profile before its reservation or retirement operations are enabled; L0's version does not imply L3 support.
 
 The phases are order-independent with respect to merging #1160 and #1173, because the inventory is regenerated against whatever is on `main`.
 
@@ -419,7 +419,7 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
   - The census detects all 16 `RecoveryPermission` variants and every P6 route and store mutation in the section 6 table, and an unlisted one fails.
   - Native capture, semantic capture and artifact operations keep the setup gate after spec 10 refactors them (spec 10 X5b).
   - Stale deployment generation, wrong operator, a lost acknowledgement of `apply_reviewed_semantic_deployment` (it replays, never re-applies), a stop (mutations refuse, reads succeed) and a restart each exercise the existing owners.
-- No new `chio-conformance` verdict scenarios, since there is no wire change.
+- The registry alone adds no verdict scenario. The L3 extension requires spec 2 section 10's legacy/new-profile wire vectors, schema/version refusals and exact-profile replay cases; the census asserts seven legacy command variants, eight 1.1 variants, and the inherited per-variant stop dispositions without an extra L0 entry point.
 
 ## 12. Residual risks and open decisions
 
@@ -506,3 +506,9 @@ Where the analogy breaks:
 | Comment or finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-2-03 / 4190476138 (spec 1 side) | Reserving a successor can permanently supersede the root while recovery creation is stopped | Applied here. R5b lists spec 2's proposed `reserve_successor_ordinal` as a `deny` `RecoveryControl` entry point, and the census row records that it makes eight when it lands. The generated test then asserts its refusal while stopped | R5b; section 5 census row |
+
+### PR #1174 review round 31
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4197555199 | Version the new recovery command variant | Fixed. The seven-command V1 schema stays frozen; recovery-command profile 1.1 has explicit request/result schemas, an advertised registry and protected deployment pin. Spec 2 defines dual-profile migration and exact-identity replay in the existing owner. L3 versioning is independent of L0 | L3 row; R3; sections 9-11; spec 2 section 8.1 |
