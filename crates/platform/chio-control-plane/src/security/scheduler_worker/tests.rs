@@ -377,6 +377,7 @@ mod periodic_compaction_failure_fails_maintenance_and_outbox_health;
 
 mod pending_outbox_is_ready_and_no_progress_fails_the_drain;
 
+mod a_fatal_delivery_failure_keeps_the_outbox_closed_until_delivery;
 mod backed_off_outbox_is_pending_work_not_a_stalled_drain;
 
 pub(super) fn tick(action: &str) -> ResponseWorkerTick {

@@ -2,7 +2,8 @@ use super::{
     Arc, DeclassificationCompactionReport, DeclassificationEvidenceCommitStore,
     DeclassificationOutboxHealth, DeclassificationReceiptDrainReport,
     DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport, GrantId, Mutex,
-    PortError, ResponseWorkerTickError, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    PortError, PortErrorKind, ResponseWorkerTickError, TenantId,
+    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 
 pub(super) const MAX_DECLASSIFICATION_OUTBOX_DRAIN_PASSES: u32 = 4_096;
@@ -12,6 +13,11 @@ pub(in crate::security) struct ProductionDeclassificationReceiptOutbox {
     port: Arc<dyn DeclassificationReceiptOutboxPort>,
     health: Arc<Mutex<DeclassificationOutboxHealth>>,
     compaction_cursor: Arc<Mutex<(Option<TenantId>, Option<GrantId>)>>,
+    /// The first non-transient delivery or integrity failure. The store
+    /// schedules the failed receipt for retry, so later drains can find
+    /// nothing due; until every receipt is delivered or a full revalidation
+    /// passes, those drains and readiness keep failing with this cause.
+    fatal_failure: Arc<Mutex<Option<PortError>>>,
 }
 
 pub(super) trait DeclassificationReceiptOutboxPort: Send + Sync {
@@ -94,6 +100,7 @@ impl ProductionDeclassificationReceiptOutbox {
                 receipts: 0,
             })),
             compaction_cursor: Arc::new(Mutex::new((None, None))),
+            fatal_failure: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -105,6 +112,7 @@ impl ProductionDeclassificationReceiptOutbox {
                 receipts: 0,
             })),
             compaction_cursor: Arc::new(Mutex::new((None, None))),
+            fatal_failure: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -115,7 +123,12 @@ impl ProductionDeclassificationReceiptOutbox {
     pub(super) fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
         let pending = self.map_port(self.port.count_pending())?;
         if pending == 0 {
+            self.clear_fatal_failure();
             self.set_health(DeclassificationOutboxHealth::Ready);
+        } else if let Some(source) = self.fatal_failure() {
+            let error = ResponseWorkerTickError::DeclassificationOutbox(source);
+            self.record_failure(&error, Some(pending));
+            return Err(error);
         } else if !matches!(self.health(), DeclassificationOutboxHealth::Failed { .. }) {
             self.set_health(DeclassificationOutboxHealth::Pending { receipts: pending });
         }
@@ -126,6 +139,9 @@ impl ProductionDeclassificationReceiptOutbox {
         &self,
     ) -> Result<DeclassificationReceiptDrainReport, ResponseWorkerTickError> {
         self.map_port(self.port.ensure_ready())?;
+        // The full integrity audit passed, which revalidates any receipt a
+        // previous failure left in retry.
+        self.clear_fatal_failure();
         let mut remaining = self.map_port(self.port.count_stranded())?;
         if remaining > 0 {
             let mut aggregate = DeclassificationReconciliationReport {
@@ -170,6 +186,7 @@ impl ProductionDeclassificationReceiptOutbox {
     ) -> Result<DeclassificationReceiptDrainReport, ResponseWorkerTickError> {
         let mut remaining = self.map_port(self.port.count_pending())?;
         if remaining == 0 {
+            self.clear_fatal_failure();
             self.set_health(DeclassificationOutboxHealth::Ready);
             return Ok(DeclassificationReceiptDrainReport::default());
         }
@@ -201,9 +218,11 @@ impl ProductionDeclassificationReceiptOutbox {
             aggregate.remaining = report.remaining;
             aggregate.remaining_due = report.remaining_due;
             if report.remaining == 0 {
+                self.clear_fatal_failure();
                 self.set_health(DeclassificationOutboxHealth::Ready);
                 return Ok(aggregate);
             }
+            self.fail_if_fatal(report.remaining)?;
             if report.remaining_due == 0 {
                 // Every remaining receipt is in retry backoff: durable pending
                 // work, not a failure to make progress.
@@ -233,9 +252,11 @@ impl ProductionDeclassificationReceiptOutbox {
     ) -> Result<DeclassificationReceiptDrainReport, ResponseWorkerTickError> {
         let report = self.map_port(self.port.drain_once(MAX_DECLASSIFICATION_EVIDENCE_BATCH))?;
         if report.remaining == 0 {
+            self.clear_fatal_failure();
             self.set_health(DeclassificationOutboxHealth::Ready);
             return Ok(report);
         }
+        self.fail_if_fatal(report.remaining)?;
         if report.acknowledged == 0 && report.remaining_due > 0 {
             let error = ResponseWorkerTickError::DeclassificationOutboxNoProgress(report.remaining);
             self.record_failure(&error, Some(report.remaining));
@@ -303,6 +324,9 @@ impl ProductionDeclassificationReceiptOutbox {
 
     fn map_port<T>(&self, result: Result<T, PortError>) -> Result<T, ResponseWorkerTickError> {
         result.map_err(|source| {
+            if source.kind() != PortErrorKind::Unavailable {
+                self.latch_fatal_failure(&source);
+            }
             let error = ResponseWorkerTickError::DeclassificationOutbox(source);
             let pending = self.pending_count();
             self.record_failure(&error, pending);
@@ -317,6 +341,38 @@ impl ProductionDeclassificationReceiptOutbox {
     fn set_health(&self, health: DeclassificationOutboxHealth) {
         if let Ok(mut current) = self.health.lock() {
             *current = health;
+        }
+    }
+
+    fn fatal_failure(&self) -> Option<PortError> {
+        self.fatal_failure.lock().map_or_else(
+            |_| Some(PortError::unavailable()),
+            |latched| latched.clone(),
+        )
+    }
+
+    fn latch_fatal_failure(&self, source: &PortError) {
+        if let Ok(mut latched) = self.fatal_failure.lock() {
+            latched.get_or_insert_with(|| source.clone());
+        }
+    }
+
+    fn clear_fatal_failure(&self) {
+        if let Ok(mut latched) = self.fatal_failure.lock() {
+            *latched = None;
+        }
+    }
+
+    /// Receipts remain after a latched fatal failure, so the drain fails with
+    /// the original cause even when nothing was due.
+    fn fail_if_fatal(&self, remaining: u64) -> Result<(), ResponseWorkerTickError> {
+        match self.fatal_failure() {
+            Some(source) => {
+                let error = ResponseWorkerTickError::DeclassificationOutbox(source);
+                self.record_failure(&error, Some(remaining));
+                Err(error)
+            }
+            None => Ok(()),
         }
     }
 
