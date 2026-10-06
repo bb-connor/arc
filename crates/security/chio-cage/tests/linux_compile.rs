@@ -748,9 +748,10 @@ fn the_next_compile_retains_a_grant_left_by_a_failed_compile() {
         vec![first.clone(), second.clone()],
         BTreeSet::new(),
     );
+    let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
     std::fs::write(&second, b"created by someone else").test_unwrap();
     assert!(compile(
-        admit(&signed, &keypair.public_key(), &ceilings).test_unwrap(),
+        admitted,
         retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
         &BTreeMap::new(),
         None,
