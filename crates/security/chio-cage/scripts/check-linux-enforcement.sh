@@ -121,7 +121,12 @@ exec_marker="$probe_dir/probe-36"
 dynamic_exec_marker="$probe_dir/dynamic-exec-marker"
 cc -O2 -fno-stack-protector -Wl,--build-id=none -DPROBE_EXIT=171 \
   "$crate/tests/fixtures/cage_dynamic_probe.c" -o "$dynamic_exec_marker"
-interpreter="$(readlink -e -- "$(awk '/^[[:space:]]*\// { print $1; exit }' <<<"$dynamic_dependencies")")"
+interpreter_path="$(awk '/^[[:space:]]*\// { print $1; exit }' <<<"$dynamic_dependencies")"
+if [[ -z "$interpreter_path" ]]; then
+  echo "dynamic probe did not resolve an ELF interpreter" >&2
+  exit 1
+fi
+interpreter="$(readlink -e -- "$interpreter_path")"
 for mode in 34 35; do
   cc -nostdlib -static -fno-stack-protector -fno-pie -no-pie \
     -Wl,--build-id=none -DPROBE_MODE="$mode" -DPROBE_PATH="\"$exec_marker\"" \

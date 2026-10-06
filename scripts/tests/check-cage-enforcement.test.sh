@@ -112,6 +112,7 @@ cat >"$fake_bin/ldd" <<'EOF'
 #!/usr/bin/env bash
 printf 'libc.so.6 => /bin/sh (0x1)\n'
 printf 'libm.so.6 => /bin/ls (0x2)\n'
+printf '\t/bin/cat (0x3)\n'
 EOF
 
 cat >"$fake_bin/readlink" <<'EOF'
