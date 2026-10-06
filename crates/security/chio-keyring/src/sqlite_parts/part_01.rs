@@ -391,7 +391,10 @@ impl SqliteKeyLogStore {
             {
                 return Err(KeyringError::InvalidSignature);
             }
-        } else {
+        } else if stored.stage != CheckpointStage::Activated {
+            // An activated checkpoint's witness set is frozen into its activation
+            // commit and active receipt. A signature that arrives later is
+            // verified above but not recorded, so the stored set keeps matching.
             transaction.execute(
                 "INSERT INTO key_checkpoint_witnesses (checkpoint_hash, witness_id, algorithm, signature) VALUES (?1, ?2, ?3, ?4)",
                 params![
