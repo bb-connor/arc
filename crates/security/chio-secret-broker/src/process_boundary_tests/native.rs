@@ -26,6 +26,8 @@ mod mcp;
 mod process_host;
 #[path = "native_response_tests.rs"]
 mod responses;
+#[path = "native_upstream.rs"]
+mod upstream;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum DeliveryRoute {
@@ -45,6 +47,17 @@ fn native_kernel_broker_daemon_captures_once_and_sends_real_tls_without_secret_c
 fn native_kernel_broker_mcp_tool_preserves_original_capture_and_signed_completion(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     run_native_delivery(DeliveryRoute::ObservedMcp, None)
+}
+
+#[test]
+fn native_kernel_broker_tls_observer_survives_delayed_valid_admission(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    run_native_delivery_with_observer_delay(
+        DeliveryRoute::Direct,
+        None,
+        None,
+        Some(Duration::from_secs(11)),
+    )
 }
 
 #[test]
@@ -72,6 +85,15 @@ fn run_native_delivery_with_cutpoint(
     route: DeliveryRoute,
     fault: Option<mcp::CompletionFault>,
     crash: Option<cutpoints::Point>,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    run_native_delivery_with_observer_delay(route, fault, crash, None)
+}
+
+fn run_native_delivery_with_observer_delay(
+    route: DeliveryRoute,
+    fault: Option<mcp::CompletionFault>,
+    crash: Option<cutpoints::Point>,
+    observer_delay: Option<Duration>,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mcp_route = route != DeliveryRoute::Direct;
     let directory = crate::private_tempdir()?;
@@ -240,11 +262,22 @@ fn run_native_delivery_with_cutpoint(
     let observer = cutpoint
         .as_ref()
         .and_then(|control| control.start_observer(&mut upstream_command));
-    let mut upstream = spawn_with_stdin(
-        upstream_command,
-        OwnedFd::from(listener),
-        "native TLS observer",
-    );
+    let mut upstream = if crash.is_some() {
+        // Zero-effect cutpoints observe the provider before any connection.
+        upstream::UpstreamObserver::immediate(spawn_with_stdin(
+            upstream_command,
+            OwnedFd::from(listener),
+            "native TLS observer",
+        ))
+    } else {
+        upstream::UpstreamObserver::when_connected(upstream_command, listener)?
+    };
+    if let Some(delay) = observer_delay {
+        // The original ten-second helper startup window expires here. The
+        // actual capability, proof, lease and dispatch checks are unchanged.
+        thread::sleep(delay);
+        assert!(upstream.is_waiting_for_dispatch());
+    }
     let outcome = invoke();
     if let Some(control) = cutpoint.as_ref() {
         if let Some(observer) = observer {
