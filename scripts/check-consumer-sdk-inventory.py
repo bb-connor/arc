@@ -10,8 +10,8 @@ from pathlib import Path
 # an ordinary passing test. "last-wins" is a declared decoder gap that must be
 # reported as a strict expected failure (Python xfail, TypeScript it.fails).
 RAW_CASE_STATUS = {
-    "receipt-duplicate-id": {"go": "rejects", "python": "last-wins", "typescript": "last-wins"},
-    "receipt-duplicate-parameter": {"go": "rejects", "python": "last-wins", "typescript": "last-wins"},
+    "receipt-duplicate-id": {"go": "rejects", "python": "rejects", "typescript": "rejects"},
+    "receipt-duplicate-parameter": {"go": "rejects", "python": "rejects", "typescript": "rejects"},
 }
 TYPESCRIPT_GAP_SUFFIX = " (known gap: JSON.parse keeps the last duplicate)"
 

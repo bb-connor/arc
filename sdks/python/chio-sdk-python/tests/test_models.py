@@ -91,27 +91,9 @@ _PROTOCOL_PRIMITIVE_MODELS: dict[str, type[Any]] = {
     "capability/supplemental-authorization.schema.json": ChioOpaqueSupplementalAuthorization,
 }
 
-# Raw cases the SDK accepts. ChioClient decodes sidecar bytes with
-# httpx Response.json (json.loads), which keeps the last of each duplicate key,
-# and the collapsed object validates. Strict xfail turns red once these reject.
-_LAST_WINS_RAW_CASES = {"receipt-duplicate-id", "receipt-duplicate-parameter"}
-
-
 def _raw_case_params() -> list[Any]:
     return [
-        pytest.param(
-            case,
-            id=case["name"],
-            marks=pytest.mark.xfail(
-                strict=True,
-                raises=pytest.fail.Exception,
-                reason="ChioClient decodes wire JSON with json.loads, which keeps "
-                "the last duplicate key; the SDK has no duplicate-rejecting decoder",
-            )
-            if case["name"] in _LAST_WINS_RAW_CASES
-            else (),
-        )
-        for case in _PROTOCOL_PRIMITIVES["raw_cases"]
+        pytest.param(case, id=case["name"]) for case in _PROTOCOL_PRIMITIVES["raw_cases"]
     ]
 
 
@@ -209,11 +191,13 @@ class TestGeneratedWireModels:
         model = _PROTOCOL_PRIMITIVE_MODELS[case["schema_file"]]
         text = case["instance_text"]
         assert case["valid"] is False
-        # The case is valid once a last-wins parser collapses its duplicate keys.
+        # The case is valid once a last-wins parser collapses its duplicate keys;
+        # ChioClient rejects the original bytes before projection.
         model.model_validate(json.loads(text))
-        with pytest.raises((ChioError, ValidationError)):
+        with pytest.raises(ChioError) as error:
             wire = ChioClient._handle_response(httpx.Response(200, content=text.encode()))
             model.model_validate(wire)
+        assert error.value.code == "INVALID_RESPONSE"
 
     def test_top_level_capability_token_alias_is_canonical(self) -> None:
         token = GeneratedCapabilityToken.model_validate(_generated_v1_token())
