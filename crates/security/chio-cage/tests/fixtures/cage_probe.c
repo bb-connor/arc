@@ -478,6 +478,22 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
 #endif
 #elif PROBE_MODE == 36
     terminate(171);
+#elif PROBE_MODE == 40
+    // Exec keeps ignored dispositions, so an ignore in the helper would reach
+    // the target. The kernel action's first word is its handler; 1 is SIG_IGN.
+    static unsigned long action[4];
+    for (long signal = 1; signal <= 64; ++signal) {
+        if (signal == 9 || signal == 19) {
+            continue;
+        }
+        if (invoke(SYS_RT_SIGACTION, signal, 0, (long)action, 8) != 0) {
+            continue;
+        }
+        if (action[0] == 1) {
+            terminate(signal == 13 ? 121 : 122);
+        }
+    }
+    terminate(0);
 #elif PROBE_MODE == 38
     // A synchronous fault must reach its default action. The address is read
     // at run time so the store is not folded into a trap instruction.

@@ -60,7 +60,7 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 39); do
+for mode in $(seq 1 40); do
   if [[ "$mode" == 10 || "$mode" == 34 || "$mode" == 35 || "$mode" == 37 ]]; then
     continue
   fi
@@ -186,6 +186,7 @@ export CHIO_CAGE_TEST_EXEC_ABSOLUTE="$probe_dir/probe-34"
 export CHIO_CAGE_TEST_EXEC_PROC_FD="$probe_dir/probe-35"
 export CHIO_CAGE_TEST_EXEC_INTERPRETER="$probe_dir/probe-37"
 export CHIO_CAGE_TEST_FAULT="$probe_dir/probe-38"
+export CHIO_CAGE_TEST_SIGNAL_DEFAULTS="$probe_dir/probe-40"
 export CHIO_CAGE_TEST_TIMER_SIGNAL="$probe_dir/probe-39"
 CHIO_CAGE_TEST_DYNAMIC_RUNTIME="$(printf '%s\n' "${dynamic_runtime_paths[@]}")"
 export CHIO_CAGE_TEST_DYNAMIC_RUNTIME
@@ -267,8 +268,8 @@ python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 102 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 102 tests" >&2
+if [[ "$all_targets_passed" -ne 103 ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly 103 tests" >&2
   exit 1
 fi
 
@@ -325,6 +326,7 @@ expected_probes=(
   racing_stops_continues_and_a_kill_end_with_an_observed_exit
   dropping_a_stopped_target_reaps_it
   rapid_stop_continue_then_drop_reaps_the_target
+  the_target_starts_with_every_signal_at_its_default_disposition
 )
 for test_name in "${expected_probes[@]}"; do
   if [[ "$(grep -Fxc "test $test_name ... ok" "$probe_output")" -ne 1 ]]; then
