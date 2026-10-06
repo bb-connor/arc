@@ -212,8 +212,55 @@ impl Write for DeadlineTcpStream {
     }
 }
 
+const HEAD_FIXED_FIELDS: &[u8] =
+    b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nContent-Length: ";
+
+/// Build the exact request head in one allocation. Growing the buffer would
+/// free unscrubbed intermediate copies of the secret headers.
 pub(super) fn build_request_head(request: &PinnedHttpsRequest) -> Result<Zeroizing<Vec<u8>>> {
+    for header in &request.caller_headers {
+        validate_header(&header.name, &header.value)?;
+    }
+    for header in &request.secret_headers {
+        validate_header(header.name(), header.expose_secret())?;
+    }
+    let bracketed = request.original_hostname.contains(':');
+    let port = (request.port != 443).then(|| request.port.to_string());
+    let content_length = request.body.len().to_string();
+    let fixed = [
+        request.method.len(),
+        1,
+        request.path_and_query.len(),
+        b" HTTP/1.1\r\nHost: ".len(),
+        request.original_hostname.len(),
+        if bracketed { 2 } else { 0 },
+        port.as_ref().map_or(0, |port| port.len() + 1),
+        HEAD_FIXED_FIELDS.len(),
+        content_length.len(),
+        2,
+        2,
+    ];
+    let header_lines = request
+        .caller_headers
+        .iter()
+        .map(|header| header_line_bytes(&header.name, &header.value))
+        .chain(
+            request
+                .secret_headers
+                .iter()
+                .map(|header| header_line_bytes(header.name(), header.expose_secret())),
+        );
+    let length = fixed
+        .into_iter()
+        .chain(header_lines)
+        .try_fold(0_usize, usize::checked_add)
+        .filter(|length| *length <= MAX_WIRE_BYTES)
+        .ok_or_else(|| {
+            BrokerError::InvalidRequest("HTTP request head exceeds the wire limit".to_string())
+        })?;
     let mut head = Zeroizing::new(Vec::new());
+    head.try_reserve_exact(length)
+        .map_err(|_| BrokerError::Invariant("HTTP request head allocation failed".to_string()))?;
     head.extend_from_slice(request.method.as_bytes());
     head.push(b' ');
     head.extend_from_slice(request.path_and_query.as_bytes());
@@ -229,27 +276,29 @@ pub(super) fn build_request_head(request: &PinnedHttpsRequest) -> Result<Zeroizi
         head.push(b':');
         head.extend_from_slice(request.port.to_string().as_bytes());
     }
-    head.extend_from_slice(
-        b"\r\nConnection: close\r\nAccept-Encoding: identity\r\nContent-Length: ",
-    );
-    head.extend_from_slice(request.body.len().to_string().as_bytes());
+    head.extend_from_slice(HEAD_FIXED_FIELDS);
+    head.extend_from_slice(content_length.as_bytes());
     head.extend_from_slice(b"\r\n");
     for header in &request.caller_headers {
-        append_header(&mut head, &header.name, &header.value)?;
+        append_header(&mut head, &header.name, &header.value);
     }
     for header in &request.secret_headers {
-        append_header(&mut head, header.name(), header.expose_secret())?;
+        append_header(&mut head, header.name(), header.expose_secret());
     }
     head.extend_from_slice(b"\r\n");
-    if head.len() > MAX_WIRE_BYTES {
-        return Err(BrokerError::InvalidRequest(
-            "HTTP request head exceeds the wire limit".to_string(),
+    if head.len() != length || head.capacity() != length {
+        return Err(BrokerError::Invariant(
+            "HTTP request head length was not computed exactly".to_string(),
         ));
     }
     Ok(head)
 }
 
-fn append_header(head: &mut Vec<u8>, name: &str, value: &[u8]) -> Result<()> {
+fn header_line_bytes(name: &str, value: &[u8]) -> usize {
+    name.len() + value.len() + 4
+}
+
+fn validate_header(name: &str, value: &[u8]) -> Result<()> {
     if name.is_empty()
         || name.len() > MAX_HEADER_NAME_BYTES
         || !name
@@ -264,11 +313,14 @@ fn append_header(head: &mut Vec<u8>, name: &str, value: &[u8]) -> Result<()> {
             "outbound HTTP header is invalid".to_string(),
         ));
     }
+    Ok(())
+}
+
+fn append_header(head: &mut Vec<u8>, name: &str, value: &[u8]) {
     head.extend_from_slice(name.as_bytes());
     head.extend_from_slice(b": ");
     head.extend_from_slice(value);
     head.extend_from_slice(b"\r\n");
-    Ok(())
 }
 
 struct ParsedHeader {
@@ -870,6 +922,27 @@ mod tests {
                 allow_exact_address: None,
             },
         )
+    }
+
+    #[test]
+    fn a_long_credential_request_head_is_built_in_one_exact_allocation() {
+        let executor = GenericHttpsExecutor::new(
+            Arc::new(StaticResolver(IpAddr::V4(Ipv4Addr::LOCALHOST))),
+            Arc::new(RustlsPinnedHttpsTransport::new().test_expect("transport")),
+            NetworkPolicy {
+                allow_loopback_test: true,
+                allow_exact_address: None,
+            },
+        );
+        let token = vec![b'k'; 1_024];
+        let credential = SecretMaterial::new(token.clone());
+        let (request, constraints) = request_and_constraints(8443, 2_000);
+        let prepared = executor
+            .prepare(&provider(), &request, &constraints, &credential)
+            .test_expect("prepare");
+        let head = build_request_head(&prepared.outbound).test_expect("request head");
+        assert!(head.windows(token.len()).any(|window| window == token));
+        assert_eq!(head.len(), head.capacity());
     }
 
     #[test]
