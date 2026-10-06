@@ -141,15 +141,17 @@ fn a_service_socket_directory_replaced_before_bind_is_detected() {
 fn a_recorded_stale_generation_is_removed_and_rebound() {
     let (_directory, root) = private_root();
     let socket = root.join("witness.sock");
-    let stale = stale_socket(&socket);
+    stale_socket(&socket);
     record_current_generation(&socket);
     let recorded = std::fs::read(lock_path(&socket)).test_unwrap();
 
     let listener = bind_listener(&socket).test_unwrap();
-    assert_ne!(inode(&socket), stale);
+    // The new socket can reuse the stale one's inode number, so its new
+    // generation and live listener show the replacement.
     let published = std::fs::read(lock_path(&socket)).test_unwrap();
     assert_eq!(published.len(), 65);
     assert_ne!(published, recorded);
+    std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
     drop(listener);
     assert!(!socket.exists());
 }

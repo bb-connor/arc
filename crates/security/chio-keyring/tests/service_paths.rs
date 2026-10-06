@@ -693,12 +693,16 @@ fn a_crashed_managed_listener_is_recovered_at_restart() {
         .status()
         .test_unwrap();
     assert_eq!(status.code(), Some(0));
-    let crashed = inode(&socket);
+    assert!(std::fs::symlink_metadata(&socket)
+        .test_unwrap()
+        .file_type()
+        .is_socket());
     let record = std::fs::read(lock_path(&socket)).test_unwrap();
     assert_eq!(record.len(), 65);
 
+    // The new socket can reuse the crashed one's inode number, so its new
+    // generation and live listener show the recovery.
     let listener = bind_listener(&socket).test_unwrap();
-    assert_ne!(inode(&socket), crashed);
     assert_ne!(std::fs::read(lock_path(&socket)).test_unwrap(), record);
     std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
     drop(listener);
