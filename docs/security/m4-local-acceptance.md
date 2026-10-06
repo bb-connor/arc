@@ -1,5 +1,10 @@
 # M4 local consumer-boundary acceptance
 
+> This is the named September 14 supported-profile local acceptance record.
+> Its "current" results below refer to that checkpoint, not the October 5
+> process/security composition. Use the [landing ledger](landing-ledger.md) for
+> the current source, reviews and remaining hosted/native/trusted acceptance.
+
 Status: M4 local consumer-boundary acceptance is complete on 2026-09-14 UTC.
 All required local execution gates, final documentation review, source graph
 refresh and verification-script calibrations passed. The

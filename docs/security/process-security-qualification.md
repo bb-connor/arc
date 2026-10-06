@@ -1,9 +1,11 @@
 # Combined process and M4 qualification
 
-> **October 4 landing order:** Follow the [authoritative landing ledger](landing-ledger.md).
-> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
-> foundation. Status and evidence below retain their original source boundaries;
-> they do not authorize another implementation batch or establish a main merge.
+> **October 5 current landing status:** Follow the
+> [authoritative landing ledger](landing-ledger.md). Prerequisites #1168, #1167
+> and #1175 are merged; foundation #1160 remains unmerged. Checkpoint sections
+> below retain their historical commit, workflow and local-evidence boundaries.
+> Their audit failures, running-job snapshots or earlier greens are not current
+> candidate status. The ledger owns the current review and qualification queue.
 
 ## Review remediation (2026-09-25)
 

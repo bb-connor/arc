@@ -1,11 +1,13 @@
 # Security launch: current execution status
 
-> **October 4 landing order:** Follow the [authoritative landing ledger](landing-ledger.md).
-> Dependency PR #1168 and trusted definitions #1167 precede the bounded #1160
-> foundation. Status and evidence below retain their original source boundaries;
-> they do not authorize another implementation batch or establish a main merge.
+> **October 5 current landing status:** Follow the
+> [authoritative landing ledger](landing-ledger.md). Prerequisites #1168, #1167
+> and #1175 are merged; foundation #1160 remains unmerged. Current source repairs
+> use `integration/process-security-m4` in `/home/connor/lanes/integration`.
+> The ledger owns the current candidate, review feedback and remaining checks.
+> Milestone and evidence records below retain their historical source boundaries.
 
-**October 3 review-remediation continuation:** current source work is on
+**Historical October 3 review-remediation continuation:** source work was on
 `packet/3-retention-accounting` in `/tmp/arc-security-launch`. AP9/AP10/AP11 and the
 API/start receipt lifecycle continuation are tracked in the
 [receipt evidence lifecycle execution record](../reviews/2026-10-03-receipt-evidence-lifecycle-execution.md),
@@ -13,7 +15,7 @@ following the [transport/revocation batch](../reviews/2026-10-03-transport-revoc
 Those records own their local source and publication evidence. They do not change
 the earlier milestone, hosted, native or release qualification boundaries below.
 
-Updated 2026-09-22. The continuation on `integration/process-security-m4` in
+**Historical September 22 update:** The continuation on `integration/process-security-m4` in
 `/tmp/arc-security-launch` is maintained on
 [draft PR #1160](https://github.com/bb-connor/arc/pull/1160). Original nonce/log
 evidence joins and broker custody/delivery adapters are implemented. The native
@@ -44,6 +46,11 @@ pushed as `90a77c37e50419cdba91b2898213c26d3ea5ae21` on the same branch. Its loc
 acceptance is complete. This is not merge or release approval.
 
 ## Milestone control
+
+This table retains the September 22 milestone observations. It does not qualify
+the October 5 composition or supersede the current ledger. The AWS-LC audit and
+trusted-definition prerequisites subsequently landed; final source, native,
+trusted, hosted, release and operational acceptance remain separately recorded.
 
 | Milestone | State / missing acceptance | Next action / blocker | Evidence |
 | --- | --- | --- | --- |

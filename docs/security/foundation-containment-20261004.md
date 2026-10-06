@@ -24,18 +24,24 @@ KG4 retains the wire variants but rejects `TableAllowlist`, `ColumnDenylist`,
 does not prove that it enforces the narrower constraints of a particular grant.
 Future support needs grant-bound enforcement and production-constructor tests.
 
-Runtime policy hashes intentionally change under `chio.runtime-policy.v2`.
-Historical hashes and approval evidence retain their original meaning. The
-identity includes resolved approval inputs, excluding only its self-referential
-policy-hash field. It does not turn an identity digest into issuer authority.
+The October 4 checkpoint intentionally changed policy hashes under
+`chio.runtime-policy.v2`. The October 5 product-profile repair advances the
+current control-plane identity to `chio.runtime-policy.v3`, also committing the
+installed default guard profile. Historical hashes and approval evidence retain
+their original meaning. The identity includes resolved approval inputs,
+excluding only its self-referential policy-hash field. It does not turn an
+identity digest into issuer authority. The current profile repair and its
+remaining qualification are recorded in the [landing ledger](landing-ledger.md).
 
 KG5 contains automatic default issuance. The pure evaluator retains its
 no-additional-restriction behavior when a tool rule is absent. A present empty
 `tool_access: {}` still uses the existing enabled/Allow schema defaults. The
 development `permissive` builtin opts in explicitly; `remote-desktop` remains
 guard-only. Existing independently issued tokens are not revoked by this change.
-HushSpec TTL configurability and the MCP wrapper's constant identity remain
-separate open limbs of KG5.
+HushSpec TTL configurability remains a separate open limb of KG5. The October 5
+wrapper repair replaces its constant identity with a canonical identity bound
+to the installed default profile; final composition and landing qualification
+remain required.
 
 Higher-assurance live issuance and dispatch remain disabled where only raw
 normalized claims are available. A future authenticated live ingress must bind
