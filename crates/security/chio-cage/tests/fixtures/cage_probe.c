@@ -40,6 +40,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_READLINK 89
 #define SYS_PRLIMIT64 302
 #define SYS_TGKILL 234
+#define SYS_SETITIMER 38
 __asm__(
     ".global _start\n"
     ".type _start,@function\n"
@@ -93,6 +94,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_READLINKAT 78
 #define SYS_PRLIMIT64 261
 #define SYS_TGKILL 131
+#define SYS_SETITIMER 103
 __asm__(
     ".global _start\n"
     ".type _start,%function\n"
@@ -425,6 +427,73 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
 #else
 #error foreign architecture probe requires x86_64
 #endif
+#elif PROBE_MODE == 34 || PROBE_MODE == 35 || PROBE_MODE == 37
+#ifndef PROBE_PATH
+#error PROBE_PATH (the marker probe) is required for modes 34, 35 and 37
+#endif
+    // Every later exec, whatever path it names, must kill the target
+    // before the new image runs. The marker image exits 171 if it ever runs.
+    static char marker[] = PROBE_PATH;
+    static char *environment[] = {0};
+#if PROBE_MODE == 34
+    // Absolute pathname: Linux ignores the dirfd seccomp pins to 255.
+    static char *arguments[] = {marker, 0};
+    long result = invoke5(
+        SYS_EXECVEAT, 255, (long)marker, (long)arguments, (long)environment, AT_EMPTY_PATH);
+    terminate(result < 0 ? 110 : 113);
+#elif PROBE_MODE == 35
+    // Procfs magic link to the descriptor the open returned. The profiles deny
+    // descriptor duplication, so the path names that descriptor directly.
+    static char proc_path[32] = "/proc/self/fd/";
+    static char *arguments[] = {proc_path, 0};
+    long descriptor = invoke(SYS_OPENAT, AT_FDCWD, (long)marker, O_RDONLY, 0);
+    if (descriptor < 0) {
+        terminate(114);
+    }
+    char digits[20];
+    int count = 0;
+    do {
+        digits[count++] = (char)('0' + descriptor % 10);
+        descriptor /= 10;
+    } while (descriptor > 0);
+    int length = 14;
+    while (count > 0) {
+        proc_path[length++] = digits[--count];
+    }
+    proc_path[length] = 0;
+    long result = invoke5(
+        SYS_EXECVEAT, 255, (long)proc_path, (long)arguments, (long)environment, AT_EMPTY_PATH);
+    terminate(result < 0 ? 111 : 113);
+#else
+#ifndef PROBE_LDSO
+#error PROBE_LDSO (the ELF interpreter) is required for mode 37
+#endif
+    // The interpreter has an Execute grant for the target's own exec and runs
+    // any readable ELF it is handed. PROBE_PATH names a dynamic marker here.
+    static char loader[] = PROBE_LDSO;
+    static char *arguments[] = {loader, marker, 0};
+    long result = invoke5(
+        SYS_EXECVEAT, 255, (long)loader, (long)arguments, (long)environment, AT_EMPTY_PATH);
+    terminate(result < 0 ? 112 : 113);
+#endif
+#elif PROBE_MODE == 36
+    terminate(171);
+#elif PROBE_MODE == 38
+    // A synchronous fault must reach its default action. The address is read
+    // at run time so the store is not folded into a trap instruction.
+    static volatile long null_address;
+    *(volatile int *)null_address = 1;
+    terminate(118);
+#elif PROBE_MODE == 39
+    // ITIMER_REAL raises SIGALRM during the bounded wait; its default action
+    // ends the process. Exit 0 means the signal never arrived.
+    static long timer[4] = {0, 0, 0, 10000};
+    static long timeout[2] = {2, 0};
+    if (invoke(SYS_SETITIMER, 0, (long)timer, 0, 0) != 0) {
+        terminate(119);
+    }
+    invoke5(SYS_PPOLL, 0, 0, (long)timeout, 0, 0);
+    terminate(0);
 #else
 #error invalid probe mode
 #endif

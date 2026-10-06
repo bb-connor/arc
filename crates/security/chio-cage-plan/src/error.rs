@@ -65,6 +65,8 @@ pub enum CageError {
     MissingWriteParent(PathBuf),
     #[error("securely created file has unexpected ownership or mode: {0}")]
     UnsafeCreatedFile(PathBuf),
+    #[error("an unprivileged runner can create write grants only for its own identity: {0}")]
+    WriteGrantIdentityUnavailable(PathBuf),
     #[error("descriptor identity changed while retaining path: {0}")]
     DescriptorIdentityChanged(PathBuf),
     #[error("runtime artifact is not an executable regular file: {0}")]

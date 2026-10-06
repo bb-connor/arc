@@ -57,7 +57,11 @@ or `accept`. The one `execveat` rule is constrained to the retained target at FD
 255 with `AT_EMPTY_PATH`. Cage-init sets `RLIMIT_NOFILE` to 192 after installing
 that descriptor. Every grant slot remains below the limit, while the inherited
 close-on-exec target remains usable for the initial transition and cannot be
-recreated after exec.
+recreated after exec. Seccomp cannot read the pathname, and Linux ignores the
+descriptor for an absolute path, so the rule alone does not prevent a later
+exec. The launch tracer stays attached for the target's lifetime and kills the
+target at any exec event after the first, before the new image runs. No native
+profile can create a process, so the target is the only process that can exec.
 
 ## Linux enforcement requirements
 
@@ -72,8 +76,8 @@ recreated after exec.
 - sealed memfds and `SCM_RIGHTS` descriptor passing
 - procfs image and descriptor identity data
 - `pidfd_open`, `pidfd_send_signal`, and `waitid(P_PIDFD)`
-- parent-child `PTRACE_TRACEME` with `PTRACE_O_TRACEEXEC` and
-  `PTRACE_O_EXITKILL`
+- `PTRACE_SEIZE` of the verified helper with `PTRACE_O_TRACEEXEC` and
+  `PTRACE_O_EXITKILL`, and `PTRACE_LISTEN` for group stops
 - `PR_SET_PDEATHSIG` with `SIGKILL` after the final execution identity
 - `close_range` and `execveat` with `AT_EMPTY_PATH`
 - a parent `RLIMIT_NOFILE` soft limit large enough for the collision-free
@@ -179,5 +183,6 @@ no best-effort or unconfined success path.
 Dynamically linked ELF targets must list the resolved ELF interpreter and each
 required shared object as retained runtime files. Runtime files with executable
 mode receive the exact-file execute-and-read Landlock grant needed for the
-kernel's `PT_INTERP` transition; other runtime files remain read-only. Seccomp
-still permits `execveat` only for the retained target descriptor.
+kernel's `PT_INTERP` transition; other runtime files remain read-only. Because
+the lifetime tracer kills any exec after the first, these execute grants cannot
+start a second image, including through the interpreter.

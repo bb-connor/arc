@@ -12,9 +12,9 @@ use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 use crate::{
-    digest, AdmittedManifest, BrokerIpc, CageError, ExpectedAccess, FileIdentity, FileRevision,
-    ResourceKind, RetainedResource, RetainedRuntimeArtifact, RetainedRuntimeResources,
-    RuntimeArtifactRole,
+    digest, AdmittedManifest, BrokerIpc, CageError, ExecutionIdentity, ExpectedAccess,
+    FileIdentity, FileRevision, PendingWriteGrant, ResourceKind, RetainedResource,
+    RetainedRuntimeArtifact, RetainedRuntimeResources, RuntimeArtifactRole,
 };
 
 #[allow(
@@ -515,14 +515,23 @@ impl ForbiddenTreeScan<'_> {
     }
 }
 
+/// Retain existing write grants and record missing ones. Nothing is created.
 pub(crate) fn retain_write_grants(
     paths: &BTreeSet<PathBuf>,
-) -> Result<Vec<RetainedResource>, CageError> {
+) -> Result<(Vec<RetainedResource>, Vec<PendingWriteGrant>), CageError> {
     let root = open_root()?;
-    paths
-        .iter()
-        .map(|path| retain_or_create_write_from_root(&root, path))
-        .collect()
+    let mut existing = Vec::new();
+    let mut pending = Vec::new();
+    for path in paths {
+        match retain_existing_from_root(&root, path, ExpectedAccess::WriteExactFile) {
+            Ok(resource) => existing.push(resource),
+            Err(CageError::RetainPath { source, .. }) if source.raw_os_error() == Some(ENOENT) => {
+                pending.push(pending_write_grant(&root, path)?);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok((existing, pending))
 }
 
 fn open_root() -> Result<File, CageError> {
@@ -565,20 +574,7 @@ fn retain_existing_from_root(
     })
 }
 
-fn retain_or_create_write_from_root(
-    root: &File,
-    path: &Path,
-) -> Result<RetainedResource, CageError> {
-    match retain_existing_from_root(root, path, ExpectedAccess::WriteExactFile) {
-        Ok(resource) => Ok(resource),
-        Err(CageError::RetainPath { source, .. }) if source.raw_os_error() == Some(ENOENT) => {
-            create_exact_write(root, path)
-        }
-        Err(error) => Err(error),
-    }
-}
-
-fn create_exact_write(root: &File, path: &Path) -> Result<RetainedResource, CageError> {
+fn pending_write_grant(root: &File, path: &Path) -> Result<PendingWriteGrant, CageError> {
     let parent = path
         .parent()
         .filter(|parent| *parent != Path::new("/"))
@@ -591,59 +587,168 @@ fn create_exact_write(root: &File, path: &Path) -> Result<RetainedResource, Cage
     if parent_resource.identity.kind() != ResourceKind::Directory {
         return Err(CageError::MissingWriteParent(path.to_path_buf()));
     }
-    let created = openat2(
-        parent_resource.file.as_raw_fd(),
-        file_name.as_bytes(),
-        O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
-        0o600,
+    Ok(PendingWriteGrant {
+        path: path.to_path_buf(),
+        file_name: file_name.to_os_string(),
+        parent: parent_resource,
+    })
+}
+
+/// Write grants created by one compile. Dropping the set removes each name
+/// that still resolves to the inode the compile created; `keep` retains them.
+pub(crate) struct CreatedWriteGrants {
+    created: Vec<CreatedWriteGrant>,
+}
+
+struct CreatedWriteGrant {
+    parent: File,
+    file_name: std::ffi::OsString,
+    identity: FileIdentity,
+}
+
+impl CreatedWriteGrants {
+    pub(crate) fn keep(mut self) {
+        self.created.clear();
+    }
+}
+
+impl Drop for CreatedWriteGrants {
+    fn drop(&mut self) {
+        for created in self.created.drain(..).rev() {
+            remove_created_write_grant(&created);
+        }
+    }
+}
+
+fn remove_created_write_grant(created: &CreatedWriteGrant) {
+    let name = created.file_name.as_bytes();
+    let Ok(current) = openat2(
+        created.parent.as_raw_fd(),
+        name,
+        O_PATH | O_CLOEXEC | O_NOFOLLOW,
+        0,
         strict_resolution(),
-    )
-    .map_err(|source| map_open_error(path, source))?;
+    ) else {
+        return;
+    };
+    let Ok(current_identity) = descriptor_identity(&current, None) else {
+        return;
+    };
+    if !current_identity.same_object(created.identity) {
+        return;
+    }
+    let Ok(name) = CString::new(name) else {
+        return;
+    };
+    // SAFETY: the parent descriptor is live and `name` is a NUL-terminated
+    // single path component; flag zero removes a non-directory entry.
+    let _ = unsafe { libc::unlinkat(created.parent.as_raw_fd(), name.as_ptr(), 0) };
+}
+
+/// Create every pending write grant through its retained parent, owned by the
+/// execution identity, and move it into the write resources. An unprivileged
+/// runner can create files only for its own identity.
+pub(crate) fn create_pending_write_grants(
+    admitted: &mut AdmittedManifest,
+    identity: &ExecutionIdentity,
+) -> Result<CreatedWriteGrants, CageError> {
+    let mut created = CreatedWriteGrants {
+        created: Vec::new(),
+    };
+    let pending = std::mem::take(&mut admitted.pending_write_grants);
+    let Some(first) = pending.first() else {
+        return Ok(created);
+    };
     // SAFETY: these process-identity queries take no pointers and mutate no
     // Rust-owned memory.
     let effective_uid = unsafe { geteuid() };
     // SAFETY: this process-identity query has the same contract as `geteuid`.
     let effective_gid = unsafe { getegid() };
-    // SAFETY: `created` owns a live descriptor and both IDs are the current
-    // effective process identities.
-    if unsafe { fchown(created.as_raw_fd(), effective_uid, effective_gid) } != 0 {
+    if effective_uid != 0 && (identity.uid() != effective_uid || identity.gid() != effective_gid) {
+        return Err(CageError::WriteGrantIdentityUnavailable(first.path.clone()));
+    }
+    for grant in pending {
+        let resource = create_write_grant(grant, identity, &mut created)?;
+        admitted.write_resources.push(resource);
+    }
+    admitted
+        .write_resources
+        .sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(created)
+}
+
+fn create_write_grant(
+    grant: PendingWriteGrant,
+    identity: &ExecutionIdentity,
+    created: &mut CreatedWriteGrants,
+) -> Result<RetainedResource, CageError> {
+    let PendingWriteGrant {
+        path,
+        file_name,
+        parent,
+    } = grant;
+    let rollback_parent = parent
+        .file
+        .try_clone()
+        .map_err(|source| CageError::RetainPath {
+            path: parent.path.clone(),
+            source,
+        })?;
+    let file = openat2(
+        parent.file.as_raw_fd(),
+        file_name.as_bytes(),
+        O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+        0o600,
+        strict_resolution(),
+    )
+    .map_err(|source| map_open_error(&path, source))?;
+    let created_identity = descriptor_identity(&file, Some(&path))?;
+    created.created.push(CreatedWriteGrant {
+        parent: rollback_parent,
+        file_name: file_name.clone(),
+        identity: created_identity,
+    });
+    // SAFETY: `file` owns a live descriptor and both IDs come from the
+    // validated execution identity.
+    if unsafe { fchown(file.as_raw_fd(), identity.uid(), identity.gid()) } != 0 {
         return Err(CageError::RetainPath {
-            path: path.to_path_buf(),
+            path,
             source: io::Error::last_os_error(),
         });
     }
-    // SAFETY: `created` owns a live descriptor and 0600 is a valid file mode.
-    if unsafe { fchmod(created.as_raw_fd(), 0o600) } != 0 {
+    // SAFETY: `file` owns a live descriptor and 0600 is a valid file mode.
+    if unsafe { fchmod(file.as_raw_fd(), 0o600) } != 0 {
         return Err(CageError::RetainPath {
-            path: path.to_path_buf(),
+            path,
             source: io::Error::last_os_error(),
         });
     }
-    let created_identity = descriptor_identity(&created, Some(path))?;
-    if created_identity.kind() != ResourceKind::RegularFile
-        || created_identity.uid() != effective_uid
-        || created_identity.gid() != effective_gid
-        || created_identity.mode() & 0o777 != 0o600
+    let owned_identity = descriptor_identity(&file, Some(&path))?;
+    if owned_identity.kind() != ResourceKind::RegularFile
+        || !owned_identity.same_object(created_identity)
+        || owned_identity.uid() != identity.uid()
+        || owned_identity.gid() != identity.gid()
+        || owned_identity.mode() & 0o777 != 0o600
     {
-        return Err(CageError::UnsafeCreatedFile(path.to_path_buf()));
+        return Err(CageError::UnsafeCreatedFile(path));
     }
     let retained = openat2(
-        parent_resource.file.as_raw_fd(),
+        parent.file.as_raw_fd(),
         file_name.as_bytes(),
         O_PATH | O_CLOEXEC | O_NOFOLLOW,
         0,
         strict_resolution(),
     )
-    .map_err(|source| map_open_error(path, source))?;
-    let retained_identity = descriptor_identity(&retained, Some(path))?;
-    if !created_identity.same_object(retained_identity) {
-        return Err(CageError::DescriptorIdentityChanged(path.to_path_buf()));
+    .map_err(|source| map_open_error(&path, source))?;
+    let retained_identity = descriptor_identity(&retained, Some(&path))?;
+    if !owned_identity.same_object(retained_identity) {
+        return Err(CageError::DescriptorIdentityChanged(path));
     }
     Ok(RetainedResource {
-        path: path.to_path_buf(),
+        path,
         identity: retained_identity,
         expected_access: ExpectedAccess::WriteExactFile,
-        creation_parent: Some(Box::new(parent_resource)),
+        creation_parent: Some(Box::new(parent)),
         file: retained,
     })
 }
@@ -1047,6 +1152,12 @@ pub(crate) fn verify_admitted_resources(admitted: &AdmittedManifest) -> Result<(
         .iter()
         .chain(&admitted.read_resources)
         .chain(&admitted.write_resources)
+        .chain(
+            admitted
+                .pending_write_grants
+                .iter()
+                .map(|grant| &grant.parent),
+        )
     {
         verify_resource(resource)?;
     }

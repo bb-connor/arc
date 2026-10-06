@@ -297,6 +297,10 @@ pub struct EnforcedChild {
     custody_permit: Option<ChildCustodyPermit>,
     #[cfg(target_os = "linux")]
     owner_pid: u32,
+    /// The thread that traces the target for its lifetime. It ends once the
+    /// target has exited; an observed exit joins it.
+    #[cfg(target_os = "linux")]
+    supervisor: Option<std::thread::JoinHandle<()>>,
     evidence: FullyEnforcedEvidence,
     stdio: Option<EnforcedStdio>,
 }
@@ -609,10 +613,11 @@ impl EnforcedChild {
 
     #[cfg(target_os = "linux")]
     fn exited_record(
-        &self,
+        &mut self,
         status: std::process::ExitStatus,
         receipt_bindings: CageReceiptBindings,
     ) -> Result<CageEnforcementRecord, CageLaunchError> {
+        self.join_supervisor();
         let exit = platform::exit_evidence(self.process_id(), status).map_err(|error| {
             CageLaunchError::terminalization_failure(
                 &self.evidence,
@@ -644,8 +649,31 @@ impl EnforcedChild {
             pidfd,
             custody_permit: Some(custody_permit),
             owner_pid,
+            supervisor: None,
             evidence,
             stdio: Some(stdio),
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn attach_supervisor(&mut self, supervisor: std::thread::JoinHandle<()>) {
+        self.supervisor = Some(supervisor);
+    }
+
+    /// Join the tracing supervisor after the target's exit was observed. The
+    /// supervisor stops at that exit, so the wait is bounded; a supervisor
+    /// that has not finished by then is left to end on its own.
+    #[cfg(target_os = "linux")]
+    fn join_supervisor(&mut self) {
+        let Some(supervisor) = self.supervisor.take() else {
+            return;
+        };
+        let deadline = Instant::now().checked_add(TERMINATION_REAP_TIMEOUT);
+        while !supervisor.is_finished() && deadline.is_some_and(|end| Instant::now() < end) {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        if supervisor.is_finished() {
+            let _ = supervisor.join();
         }
     }
 
