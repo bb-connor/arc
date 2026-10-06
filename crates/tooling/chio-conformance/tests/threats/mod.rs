@@ -6,7 +6,7 @@
 //
 // Manual edits will be overwritten by the next regeneration; the
 // `_generated_check` integration test enforces this header on every file
-// under `crates/chio-core-types/src/_generated/`.
+// under `crates/core/chio-core-types/src/_generated/`.
 
 //! Aggregator for the threat-model codegen stubs.
 //!
@@ -32,3 +32,6 @@
 // covers: passkey_credential_theft
 // covers: audience_confusion
 // covers: weights_hash_spoof
+// covers: mobile_attestation_replay
+// covers: device_key_extraction
+// covers: play_integrity_token_replay

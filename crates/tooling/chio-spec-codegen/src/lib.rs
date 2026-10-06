@@ -25,7 +25,7 @@
 //! the generator produces:
 //!
 //! ```text
-//! crates/chio-core-types/src/_generated/
+//! crates/core/chio-core-types/src/_generated/
 //!   chio_wire_v1.rs   (one module per unreferenced root schema)
 //!   mod.rs            (header-only module marker; not pulled into lib.rs yet)
 //! ```
@@ -36,7 +36,7 @@
 //! # Header policy
 //!
 //! Every regenerated file begins with [`GENERATED_HEADER`]. The companion
-//! `crates/chio-core-types/tests/_generated_check.rs` integration test scans
+//! `crates/core/chio-core-types/tests/_generated_check.rs` integration test scans
 //! every `*.rs` file under `_generated/` and fails the build if any file is
 //! missing the header.
 //!
@@ -97,7 +97,7 @@ pub use threat_model::{
 /// Canonical header stamped onto every regenerated Rust source file.
 ///
 /// The phrasing is matched exactly by
-/// `crates/chio-core-types/tests/_generated_check.rs`. Keep this string in
+/// `crates/core/chio-core-types/tests/_generated_check.rs`. Keep this string in
 /// sync with that test and with `xtask::codegen` if either is updated.
 pub const GENERATED_HEADER: &str = "\
 // DO NOT EDIT - regenerate via 'make regen-rust' or 'cargo xtask codegen rust'.
@@ -108,7 +108,7 @@ pub const GENERATED_HEADER: &str = "\
 //
 // Manual edits will be overwritten by the next regeneration; the
 // `_generated_check` integration test enforces this header on every file
-// under `crates/chio-core-types/src/_generated/`.
+// under `crates/core/chio-core-types/src/_generated/`.
 ";
 
 /// File name for the consolidated chio-wire/v1 Rust output.
@@ -239,7 +239,7 @@ pub fn codegen_rust(schemas_dir: &Path, out_dir: &Path) -> Result<()> {
          //! This file intentionally declares no submodules. Generated wire\n\
          //! bindings remain quarantined until the public API and no_std story\n\
          //! are explicitly settled. The header is required by\n\
-         //! `crates/chio-core-types/tests/_generated_check.rs`.\n"
+         //! `crates/core/chio-core-types/tests/_generated_check.rs`.\n"
     );
     let mod_path = out_dir.join(MOD_FILE);
     write_if_changed(&mod_path, mod_body.as_bytes())?;
