@@ -693,6 +693,52 @@ fn trusted_artifact_time_evidence_blocks_post_deactivation_and_preactivation_use
 }
 
 #[test]
+fn historical_and_live_verification_share_a_half_open_window() {
+    let fixture = Fixture::new();
+    let policy = fixture.policy();
+    let genesis = fixture.genesis();
+    let mut rotation = fixture.rotation(&genesis);
+    rotation.body.verify_until = Some(2_500);
+    rotation.authorizations = KeyLogAuthorizations::rotation(
+        OldKeyAuthorization::sign(&rotation.body, &fixture.old).test_unwrap(),
+        NewKeyProofOfPossession::sign(&rotation.body, &fixture.new).test_unwrap(),
+    );
+    let history = fixture.history(&[&genesis, &rotation], Some(1));
+    let state = KeyLogState::replay([&genesis, &rotation], &history, &policy).test_unwrap();
+    let old = state.key(&genesis.body.key_id).test_unwrap();
+    assert_eq!(old.verify_until, Some(2_500));
+    assert!(old
+        .deactivated_at
+        .is_some_and(|deactivated| deactivated > 2_500));
+    let artifact_hash = sha256(b"artifact");
+    let historical = |anchored_at| {
+        state
+            .verification_key_for_artifact(
+                &genesis.body.key_id,
+                &artifact_hash,
+                &verified_time_evidence(&policy, artifact_hash, anchored_at),
+            )
+            .is_ok()
+    };
+    let live = |now| {
+        state
+            .witnessed_verification_keys_at(now)
+            .iter()
+            .any(|record| record.key_id == genesis.body.key_id)
+    };
+
+    for (instant, valid) in [
+        (old.activated_at - 1, false),
+        (old.activated_at, true),
+        (2_499, true),
+        (2_500, false),
+    ] {
+        assert_eq!(historical(instant), valid, "artifact anchored at {instant}");
+        assert_eq!(live(instant), valid, "live verification at {instant}");
+    }
+}
+
+#[test]
 fn abort_retire_and_revoke_are_immutable_events() {
     let fixture = Fixture::new();
     let policy = fixture.policy();
