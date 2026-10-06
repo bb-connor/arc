@@ -89,14 +89,13 @@ not invent a branch-protection guarantee or change repository policy.
 
 ## Local qualification
 
-Source `b7bdfb6ce67c62760f4e5578055f05727119ad11` passes all 21 terminal qualification
-commands against 37,307 source files and 48 retained outputs. Before/after
-hashes agree. Actual parent SIGKILL, evolving funded work and all four
-earned-child payment cases pass. The funded suite retains 96 passing tests
-and six explicit opt-in skips. All 20 artifact-tool tests pass. The earlier
-qualification of `2ce480588721ce206c740ff1a601c4d2a9c9889a` and subsequent
-complete or interrupted attempts remain historical, with their original
-inputs, counts and outputs.
+Source `91373484e6feafce458de730c10e5f2e39af5168` passes all 21 terminal qualification commands against
+37,311 unchanged source files and 48 retained outputs. Actual parent
+SIGKILL, evolving funded work, all four earned-child payment cases and 20
+artifact-tool tests pass. The funded suite retains 96 passing tests and six
+explicit opt-in skips. Earlier complete campaigns retain their original scope;
+the c510 campaign was interrupted after four commands when a new A2A defect
+required another source repair, and has no passing aggregate.
 
 Follow-up platform and structural repairs pass 9 outcome-ledger tests,
 8 API-protect tests, 6 control-plane init tests, the complete 41-test
@@ -160,3 +159,48 @@ enterprise acceptance. The current pin preserves the authorized definition;
 copying only a self-test, changing authority variables or bypassing that source
 closure would supply no qualification. This operational integration remains
 under the security lane's package responsibility.
+
+The `acf34b0746` historical-artifact job failed because a current comparison
+correction had changed the hash-bound archived README. The repaired README
+agrees byte-for-byte with its original assembly; current correction navigation
+now lives in `HISTORICAL_VALIDATION.md`. All 15 historical tests and the actual
+read-only validator pass with unchanged archive pins, file hashes and tamper
+assertions. The failed hosted job remains failed and requires a final-head rerun.
+
+
+Final source `91373484e6feafce458de730c10e5f2e39af5168` repairs the reproduced A2A lifecycle defect by rejecting
+unsupported background execution before accepting work. V1 GetTask observes
+state without dispatch; task access binds both the retained caller label and
+capability subject. Standard v1 task errors preserve local typed causes and
+do not disclose another caller's task. All 116 edge tests, three real client-edge
+HTTP scenarios and both strict Clippy commands pass. Blocking task results retire
+after delivery; the legacy explicit execution-on-poll lifecycle remains bounded.
+
+The other hosted repairs remove only obsolete dependency skips, restore the
+portable test import, qualify an enforcing controller-specific nested-auditor
+profile while proving leaf restrictions with an actual contrast, and update
+six formal test anchors with all 16 real counterexamples reproduced. Formal
+coverage retains 66 rows and 182 artifacts. The PostgreSQL lifetime fixture now
+runs as its actual nonroot caller, with all privileged host checks unchanged.
+
+The CLI authority fixtures reuse the existing private-directory helper and retain
+RAII ownership until all service guards shut down. Cluster fixtures explicitly
+pin authenticated authority anchors before starting peers, using the existing
+replication API with separate signing custody and an independent recovery root.
+Both snapshot scenarios moved to a private module with assertions and deadlines
+preserved, meeting the unchanged frozen file-size cap. All 14 default lineage,
+revocation and cluster integration tests and strict selected-target Clippy pass.
+Three existing opt-in cluster cases remain ignored and are not counted as passes.
+The original hosted failure, failed first permissions repair and compiler
+lifetime failure retain their own raw records. Unenrolled endpoint refusals and
+the interrupted broader cluster campaign are retained separately. Production custody checks,
+quorum and receipt assertions remain enforced.
+
+The acf34b campaign verifies all 34 actual AddressSanitizer fuzz targets,
+53 actual Kani proofs and 23 public PostgreSQL
+receipts. Its complete PostgreSQL gate remains failed because the lifetime
+fixture selected root; neither successful trajectories nor proof history qualify
+the replacement. Its terminal campaign has 108 successes, 13 failures and ten
+skips. Raw failed jobs, authenticated public archives and independent
+receipt verification are retained. Final-head hosted acceptance and the security
+agent's coherent source and signed evidence package remain required.

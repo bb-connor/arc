@@ -528,6 +528,474 @@
       "observed_result": "blocked by four research gates and two false readiness flags",
       "bytes": 276,
       "sha256": "f9ab765b09d13b6e1e451a618bfdcb10928a14d8674a078ce03bc470498b3a6a"
+    },
+    {
+      "log": "acf34b-composite-audit-success.log.gz",
+      "observed_result": "passed historical candidate; replacement still required",
+      "bytes": 61403,
+      "sha256": "64c773e7dc8aff2696e127b3d1ffdd2e6adcaa9efa997229596c130250d93a9c"
+    },
+    {
+      "log": "acf34b-advisory-verification.json.gz",
+      "observed_result": "passed historical candidate; authenticated eight lock scans and unfiltered OSV",
+      "bytes": 945,
+      "sha256": "db729c3dffcca65fd9293614f548ecea8124a3d8a6395df6c2b53ca521a4036d"
+    },
+    {
+      "log": "acf34b-advisory-artifacts.json.gz",
+      "observed_result": "historical artifact metadata",
+      "bytes": 737,
+      "sha256": "570004030515ec00e41840367f989ad82168ed24436be99e9819cfa2cf8e451d"
+    },
+    {
+      "log": "acf34b-artifact-failure.log.gz",
+      "observed_result": "failed",
+      "bytes": 111668,
+      "sha256": "4680a8d54a0ed0148c238f8d93027a4a5347bc807d2cbe402ce125b01dacc981"
+    },
+    {
+      "log": "sovereignty-historical-red-local.log.gz",
+      "observed_result": "failed",
+      "bytes": 1290,
+      "sha256": "421ff2d92d53c019dc6278bd7ba5effed39e4da7dcabb6697f75f644cb41cb1b"
+    },
+    {
+      "log": "sovereignty-historical-green-local.log.gz",
+      "observed_result": "passed",
+      "bytes": 115,
+      "sha256": "c5df3de69fe2d25512418b66c2265949eeef7c2cc8e36b39465cafa30e0408df"
+    },
+    {
+      "log": "sovereignty-historical-real-green.log.gz",
+      "observed_result": "passed",
+      "bytes": 470,
+      "sha256": "5ecce2ec8402737e7caf60608dc3864a1a2879bb36d688c0133bc4320a89df06"
+    },
+    {
+      "log": "qualification-c2d75712df.status.json.gz",
+      "observed_result": "passed",
+      "bytes": 268,
+      "sha256": "92efcb4df2f3d520a29553948a0b3b78ed4393bae0ab9a4b986a2e712185dd3b"
+    },
+    {
+      "log": "review-native-qualification-c2d75712df.log.gz",
+      "observed_result": "passed",
+      "bytes": 539,
+      "sha256": "dca66c22e723454ca899c74fd55ea53909ce0cf3c204c5683db564ab6a9938a8"
+    },
+    {
+      "log": "acf34b-fuzz34-success.log.gz",
+      "observed_result": "34 actual AddressSanitizer targets started and finished without crashes on historical acf34b",
+      "bytes": 2529599,
+      "sha256": "61148729722ed1be131f80b07a95a8dbd5c23d3da618c14ba135401cdb7a6307"
+    },
+    {
+      "log": "acf34b-fuzz34-success.verification.json.gz",
+      "observed_result": "verified historical complete target inventory and authenticated raw log",
+      "bytes": 2397,
+      "sha256": "ebbf5f289f40860e5aa839d9a76bec4f449643aec9f99fdd7eedaf48a2005ece"
+    },
+    {
+      "log": "ci-watch-acf34b0746.status.json.gz",
+      "observed_result": "terminal historical campaign: 108 successes, 13 failures and 10 skips",
+      "bytes": 410,
+      "sha256": "1f1153780fdec06e51deb9b4e77713cac5c0475e861a20d027e1083f0cfba969"
+    },
+    {
+      "log": "acf34b-kani53-success.log.gz",
+      "observed_result": "53 actual CBMC proofs passed on historical acf34b; replacement still required",
+      "bytes": 108252393,
+      "sha256": "d97bf29885f705f1bd7baf8da9a902dbb5653fc5345239e25c0df79f08a743d6"
+    },
+    {
+      "log": "acf34b-kani53-success.verification.json.gz",
+      "observed_result": "verified historical proof inventory and compiler identity",
+      "bytes": 5430,
+      "sha256": "9f9a42ed84d887230b991fc9653f6beeeff9448f70f307142ae1f98b7613d44c"
+    },
+    {
+      "log": "acf34b-postgres-failure.log.gz",
+      "observed_result": "failed real lifetime test; both preceding native trajectories passed",
+      "bytes": 400212,
+      "sha256": "7a27a0b4532f19212db1ef182b157456ceb19997f0f9ce80de65ab6981295a1b"
+    },
+    {
+      "log": "acf34b0746-postgres-artifact-index.json.gz",
+      "observed_result": "authenticated historical public artifact archive metadata",
+      "bytes": 3580,
+      "sha256": "3fb22233613e7deb3fcce15214207be1117e739b2aaeaa84fc3102f583b5911a"
+    },
+    {
+      "log": "acf34b-postgres-trajectory-verification.log.gz",
+      "observed_result": "23 exported historical receipts independently verified",
+      "bytes": 222,
+      "sha256": "30b1eab47e023d8e909ce86500260b65bb206cbccea3ac8799d0e1c268657760"
+    },
+    {
+      "log": "acf34b-postgres-complete-red.log.gz",
+      "observed_result": "complete acceptance rejects the historical failed lifetime test",
+      "bytes": 1938,
+      "sha256": "860618d38c3ef43784d0196f5b107d2a49c17219fe9f671e72c687de18caa424"
+    },
+    {
+      "log": "postgres-broker-preparation-lifetime-acf34b0746.zip.gz",
+      "observed_result": "authenticated failed lifetime artifact",
+      "bytes": 637,
+      "sha256": "6ac95bcbda16fb0b726e69103ab2897c48413a248b40903ca5cd6da053b919a3"
+    },
+    {
+      "log": "postgres-job-process-qualification-acf34b0746.zip.gz",
+      "observed_result": "authenticated historical ownership trajectory and 14 signed receipts",
+      "bytes": 44183,
+      "sha256": "004e1bce185fb088b3da2869a984e6784090e0e1ad9daa67beb7387f2c67662d"
+    },
+    {
+      "log": "postgres-job-claim-loss-qualification-acf34b0746.zip.gz",
+      "observed_result": "authenticated historical claim-loss trajectory and 9 signed receipts",
+      "bytes": 30304,
+      "sha256": "e0875891b78ad439916edb026193c5c4dfe7bc9a2ec08109038330eb9b4d4f55"
+    },
+    {
+      "log": "acf34b-msrv-job.log.gz",
+      "observed_result": "failed private authority directory fixture; the production custody check remains enforced",
+      "bytes": 666469,
+      "sha256": "7359aa4537a50eb98532bd76ec95b8f075e2f8bf407ccb3da47b7c6a6784a5d1"
+    },
+    {
+      "log": "acf34b-security-contract-job.log.gz",
+      "observed_result": "failed full aggregate with absent separately owned signed Linux package",
+      "bytes": 3237,
+      "sha256": "08648ce1cb9d8c4dd9712aa542caba07302d23d6756bc2158c5b63a3f41ea99d"
+    },
+    {
+      "log": "cli-authority-custody-red.log.gz",
+      "observed_result": "local reproduction of authority custody fixture failures",
+      "bytes": 14672,
+      "sha256": "d2196d1c6abd2aa902700d530436d1af4244095d92f46720aa081ababec73eeb"
+    },
+    {
+      "log": "cli-authority-default-tempdir-permissions-red.log.gz",
+      "observed_result": "failed first fixture repair because default tempfile directories were not private",
+      "bytes": 9247,
+      "sha256": "07c594defbbf3b3af58c304727162376630e090b2ab03d15a98329385f06f92d"
+    },
+    {
+      "log": "cli-authority-tempdir-permissions-red.status.json.gz",
+      "observed_result": "completed failed fixture campaign with exit 101",
+      "bytes": 511,
+      "sha256": "cca43021f941a657799971306f8332247109de5f3afe3e7723baf8dd8684e794"
+    },
+    {
+      "log": "cli-authority-prefix-lifetime-compiler-red.log.gz",
+      "observed_result": "compiler rejected a temporary prefix borrowed by the builder",
+      "bytes": 2536,
+      "sha256": "67d35b01c04728f34612587d8032508aa788dd1cb9cc05736ad1ffe0cc0c319f"
+    },
+    {
+      "log": "cli-authority-prefix-lifetime-compiler-red.status.json.gz",
+      "observed_result": "completed compiler failure retained separately",
+      "bytes": 756,
+      "sha256": "0c45c263c0a43c4e6204e5b3d2910b00a1abfc8476745037dcbe56bd9c38adbd"
+    },
+    {
+      "log": "cli-authority-cluster-custody-followup-red.log.gz",
+      "observed_result": "private authority positives passed before separate cluster failures; interrupted without aggregate qualification",
+      "bytes": 3368,
+      "sha256": "49d6ef4ce1dbcb9acb5c2940c8c1eab12637789b5331c5fd5c140c58b892e80f"
+    },
+    {
+      "log": "cli-authority-cluster-custody-followup-interrupted.status.json.gz",
+      "observed_result": "only the tracked failed campaign and its children were stopped",
+      "bytes": 898,
+      "sha256": "309ecac0f60227510deacbd807fbe2abf43ba93d01fd254d0732eded0eef4867"
+    },
+    {
+      "log": "cli-late-joiner-diagnostic-red.log.gz",
+      "observed_result": "actual receipt replication failed because fixture authorities had no pinned anchors",
+      "bytes": 11578,
+      "sha256": "716017811263f687053d663f948d34f455ebe0fe5734e4607a5bac2c7b934f4a"
+    },
+    {
+      "log": "cli-cluster-endpoint-diagnostic.json.gz",
+      "observed_result": "both actual authority snapshot endpoints refused unenrolled peers",
+      "bytes": 1560,
+      "sha256": "8796cc0b86cf08030e6c808b742635ee779f10d1e566722b3bb55b1b343828a0"
+    },
+    {
+      "log": "cli-snapshot-enrollment-followup.log.gz",
+      "observed_result": "both full snapshot integration scenarios passed after offline authenticated enrollment",
+      "bytes": 2170,
+      "sha256": "8eed5c76f61e39ca671e4617e176f089bc7e8f38fba5b6da520510a4e6cecfad"
+    },
+    {
+      "log": "cli-authority-hygiene-red.log.gz",
+      "observed_result": "duplicated helper grew the frozen module beyond its cap",
+      "bytes": 51983,
+      "sha256": "05c5131cba82a1b388f518e839b489910cd0231096dd748030982eea0332c8eb"
+    },
+    {
+      "log": "cli-authority-hygiene.log.gz",
+      "observed_result": "existing helper reuse and private snapshot module pass the unchanged cap",
+      "bytes": 52158,
+      "sha256": "c64492a787ba9fd1368ee6bd2ceae0f3419a76d3563f6f64ce3c90880beef973"
+    },
+    {
+      "log": "cli-authority-proof-coverage-red.log.gz",
+      "observed_result": "private test-module extraction made the formal input inventory stale",
+      "bytes": 317,
+      "sha256": "41d9765868a0396a213a39e6526aa986449e1f57d4e5979f0911063d68910c19"
+    },
+    {
+      "log": "cli-authority-proof-coverage.log.gz",
+      "observed_result": "unchanged 66-row and 182-artifact selection matches the renewed inventory",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "cli-authority-qualification.status.json.gz",
+      "observed_result": "terminal corrected default fixtures and strict Clippy; three existing opt-in cases remain ignored",
+      "bytes": 2133,
+      "sha256": "5e6be3e6cc85009063c6586f63bf6a90ea43d474cc00be0fc16dc3dcbd9154c6"
+    },
+    {
+      "log": "cli-authority-default-green.log.gz",
+      "observed_result": "corrected lineage, revocation and cluster default integration targets",
+      "bytes": 5343,
+      "sha256": "cdcc41da5baca27f73c2a36953e5fc5c1a7cd3e92e3b538f507ce5a74f29374f"
+    },
+    {
+      "log": "cli-authority-clippy-green.log.gz",
+      "observed_result": "strict Clippy for all three selected integration targets",
+      "bytes": 13320,
+      "sha256": "0b36fd707d0b3d5e17d35428d572b6d174c029425b6e6fb536110df11817df55"
+    },
+    {
+      "log": "acf34b-workspace-job.log.gz",
+      "observed_result": "failed stale proof coverage; final source repair is separately recorded",
+      "bytes": 634920,
+      "sha256": "99254bb551b83d1cbc70b096b229171a7bca871d3382c97cea30173b76163f89"
+    },
+    {
+      "log": "acf34b-apalache-subset-job.log.gz",
+      "observed_result": "failed aggregate because negative anchors failed",
+      "bytes": 19660,
+      "sha256": "0197f59b8a90489c22c6dca010978bdd56a5cf82c505e2bc601f5364db7adc40"
+    },
+    {
+      "log": "acf34b-enterprise-portable-failure.log.gz",
+      "observed_result": "failed missing coherent security-lane source handoff",
+      "bytes": 163528,
+      "sha256": "79f74db3f740033d7fd57a770e3f74e3a7722fb99af67d4753c443f45edf0d06"
+    },
+    {
+      "log": "acf34b-enterprise-active-failure.log.gz",
+      "observed_result": "failed isolated portable test import; source repair separately verified",
+      "bytes": 312841,
+      "sha256": "d977c16340e3bcb7b8af64327e9b5e80d6368a48300f50adc7f4c5004edfa2db"
+    },
+    {
+      "log": "acf34b-enterprise-adversarial-failure.log.gz",
+      "observed_result": "failed stale promoted source binding; no digest retag",
+      "bytes": 264794,
+      "sha256": "0f4b9d1970f276b6ccd5cc27870a26ce7843fd72ef3e85f5486c99365fa9e3f9"
+    },
+    {
+      "log": "acf34b-enterprise-native-failure.log.gz",
+      "observed_result": "failed stale promoted source binding; no aggregate qualification",
+      "bytes": 260671,
+      "sha256": "40e454bebdd15d10cdaade63ade32cdaf04905b0ff913ab9c1f91906fa54f141"
+    },
+    {
+      "log": "duplicate-baseline-red.log.gz",
+      "observed_result": "failed obsolete rows",
+      "bytes": 229,
+      "sha256": "1ddacbbc6f831d8a4b5d0161b1d443e0f19fab7eb4b34816575ad27c903bd88c"
+    },
+    {
+      "log": "duplicate-baseline-green.log.gz",
+      "observed_result": "passed with only obsolete rows removed",
+      "bytes": 49,
+      "sha256": "6535fb4fc6213d4dd4320f798dd7b219c458a43a13235c6b6196344df396f491"
+    },
+    {
+      "log": "cargo-deny-green.log.gz",
+      "observed_result": "actual sources and bans passed with unchanged policy",
+      "bytes": 20,
+      "sha256": "c5da30f187b485d42e6032193e675dd425f33d7588ed432f52ef50d664e94709"
+    },
+    {
+      "log": "security-types-no-std-red.log.gz",
+      "observed_result": "failed missing portable test trait import",
+      "bytes": 3663,
+      "sha256": "803d781c68269b4fdda3fdc5f38e58b96893932efa0302c138f9af46f57c28a4"
+    },
+    {
+      "log": "security-types-no-std-green.log.gz",
+      "observed_result": "49 portable tests passed",
+      "bytes": 7693,
+      "sha256": "ecad56e0e2d27db8811d014c921787cd3dd21818cc162a9016ef4e5af6b3d028"
+    },
+    {
+      "log": "security-types-followup.status.json.gz",
+      "observed_result": "71 std tests and both strict Clippy modes passed",
+      "bytes": 887,
+      "sha256": "c27736e6088133680aade80783dc2c732d190b60b7fec29238e34dffd65a3207"
+    },
+    {
+      "log": "outcome-leaf-red.log.gz",
+      "observed_result": "failed absent leaf isolation evidence",
+      "bytes": 8259,
+      "sha256": "3f37435654dc124e52df02dfc8e461658a1d580b4ed95c56dbe3792b0c9ba896"
+    },
+    {
+      "log": "outcome-profile-controls-green.log.gz",
+      "observed_result": "three controls and actual policy parser passed",
+      "bytes": 101,
+      "sha256": "8eae2b9341a0dcb125032f79cad90f202e4eb531cdb3380fe7f24c8dd0b7dda6"
+    },
+    {
+      "log": "outcome-profile-native-green.log.gz",
+      "observed_result": "nine actual nested-auditor and isolation tests passed",
+      "bytes": 3231,
+      "sha256": "417d726bd8b5146793293af0cb21b1e1feb8f6f03d2a87d4f16c0945af5b707d"
+    },
+    {
+      "log": "outcome-profile-native-contrast.json.gz",
+      "observed_result": "actual leaf contrast catches removal of the user namespace limit",
+      "bytes": 572,
+      "sha256": "4f7ec7b9cfc1f4a310788d4d9a56d494b246528092aa3b84b5996a21884398de"
+    },
+    {
+      "log": "outcome-profile-enforcement.log.gz",
+      "observed_result": "candidate executable profile observed enforcing",
+      "bytes": 88,
+      "sha256": "5cd8013904eeff1a50f96ae4e0f4e65cc4b321496961c2b03e27dde2b71d6596"
+    },
+    {
+      "log": "outcome-profile-clippy-green.log.gz",
+      "observed_result": "strict standalone Clippy passed",
+      "bytes": 7435,
+      "sha256": "fa3f9f07c97983f8ae39077960b0f12d7abb3660a0384a98fcc3d5ac0be01ade"
+    },
+    {
+      "log": "broker-lifetime-identity-red.log.gz",
+      "observed_result": "actual workflow selected root instead of the observed nonroot caller",
+      "bytes": 782,
+      "sha256": "55d0d59b4082ba16825f8f98966549b24e66860be3e0703ad4554ee301804ce4"
+    },
+    {
+      "log": "native-ci-controls-followup-green.log.gz",
+      "observed_result": "21 workflow controls passed including actual UID preservation",
+      "bytes": 120,
+      "sha256": "92c4aa9165a4510b73040c5d21b67ca27972ea2b0368887c1f8f932bb4e3258d"
+    },
+    {
+      "log": "native-ci-contract-followup-green.log.gz",
+      "observed_result": "native CI contract passed",
+      "bytes": 93,
+      "sha256": "3bfcf143b70fbbd5232c5352be68d1d18c90870f3a487494dd4e60dd426686cd"
+    },
+    {
+      "log": "apalache-negative-controls-green.log.gz",
+      "observed_result": "all unchanged negative-gate controls passed",
+      "bytes": 82,
+      "sha256": "224f21886741f77eeb8410dad57ec502245276dad8265fd6bdb0fca38716e2ef"
+    },
+    {
+      "log": "apalache-negative-real-followup.log.gz",
+      "observed_result": "all 16 actual counterexamples reproduced",
+      "bytes": 2304,
+      "sha256": "0832a465ce4b88e7fd8776e85c8b1a118b5fd20680c42189c1cbc188288cff9b"
+    },
+    {
+      "log": "proof-coverage-red.log.gz",
+      "observed_result": "failed stale formal input inventory",
+      "bytes": 317,
+      "sha256": "acac6152cd3a40e7722ba504bb5914972cb29f8b6cb24ed9a8f05143a1d3b636"
+    },
+    {
+      "log": "proof-coverage-green.log.gz",
+      "observed_result": "66 rows and 182 artifacts match the unchanged selection",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "qualification-c5106a9ff6-interrupted.status.json.gz",
+      "observed_result": "interrupted after four commands; no aggregate pass",
+      "bytes": 643,
+      "sha256": "89067a6062d84966791731de2b8331353aadfefc84d8c065f70d2a3516d60205"
+    },
+    {
+      "log": "review-native-qualification-c5106a9ff6-interrupted.log.gz",
+      "observed_result": "partial historical source qualification",
+      "bytes": 90,
+      "sha256": "18cc2035469fd96f084e20086d5a6fb77c986da631926ac950a0a683a5b03e66"
+    },
+    {
+      "log": "a2a-v1-lifecycle-red.log.gz",
+      "observed_result": "two actual lifecycle regressions reproduced",
+      "bytes": 9175,
+      "sha256": "6bfab3810f077afdb324688e8fae6358ffe0128cca5ef2917f3460c620dc526d"
+    },
+    {
+      "log": "a2a-v1-task-privacy-red.log.gz",
+      "observed_result": "three task-error regressions reproduced",
+      "bytes": 3866,
+      "sha256": "1b5d537d5b5bfbf51e80dcc7be43b2b5454a4c3390772440eb34f68dd654729b"
+    },
+    {
+      "log": "a2a-subject-ownership-red.log.gz",
+      "observed_result": "different capability subjects with the same label crossed task custody",
+      "bytes": 4099,
+      "sha256": "07d5cc85958be34375f08198350198ba38245ad96baaf207b70b085cc5239477"
+    },
+    {
+      "log": "a2a-live-custody-red.log.gz",
+      "observed_result": "stale live fixture expected retrieval after blocking-result retirement",
+      "bytes": 13081,
+      "sha256": "fda0ff3c33c00f433c195169e2470b48aea0d9cea0c3c7150aeebc1da5c85b0c"
+    },
+    {
+      "log": "a2a-final-qualification.status.json.gz",
+      "observed_result": "all four affected qualification commands passed",
+      "bytes": 1140,
+      "sha256": "bb3bc4263de531d2a87cf2964534f8068ae128525135f054b3fcfd027897fa4d"
+    },
+    {
+      "log": "a2a-final-edge-tests.log.gz",
+      "observed_result": "116 edge tests passed with zero ignored",
+      "bytes": 10389,
+      "sha256": "bb4acf8fd701586031f59238890b7af0849915275dd945cda2ddae041d9239fc"
+    },
+    {
+      "log": "a2a-final-live-conformance.log.gz",
+      "observed_result": "three actual client-edge HTTP scenarios passed",
+      "bytes": 2369,
+      "sha256": "f704212f9076d2e35664d65145d99945844659272af360461d8f52279439e8b5"
+    },
+    {
+      "log": "a2a-final-edge-clippy.log.gz",
+      "observed_result": "strict all-target edge Clippy passed",
+      "bytes": 7423,
+      "sha256": "fff9f818bc28fe916c3ecf5e2027043e587ec238e244ea859b5e47340a65db62"
+    },
+    {
+      "log": "a2a-final-live-clippy.log.gz",
+      "observed_result": "strict live conformance Clippy passed",
+      "bytes": 12206,
+      "sha256": "bfa0154ef44bd182f9459337af1f05bf388e1f985bb9605339ef51db8c3b5679"
+    },
+    {
+      "log": "qualification-91373484e6.status.json.gz",
+      "observed_result": "all 21 terminal native commands passed for this source",
+      "bytes": 268,
+      "sha256": "2a80cb66c1be1823c7acd9e6defdf2f7a28ef09019dd1787cf92804adb6f10d1"
+    },
+    {
+      "log": "review-native-qualification-91373484e6.log.gz",
+      "observed_result": "complete source-bound native qualification",
+      "bytes": 539,
+      "sha256": "8fb6858abb97c55b074849e542498498cca1d0649c0f1382e7e4b6d2542a91ee"
     }
   ]
 }

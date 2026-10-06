@@ -13,4 +13,5 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Finished `dev` profile [unoptimized] target(s) in 0.55s
+   Compiling chio-federated-work v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/examples/federated-work)
+    Finished `dev` profile [unoptimized] target(s) in 24.78s

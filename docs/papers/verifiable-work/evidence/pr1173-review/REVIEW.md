@@ -642,3 +642,32 @@ including coherent integration of that definition's supporting closed-shard
 producer controls. No authority variable is changed. Final-hosted main CI,
 research matrix, fuzz, Kani and confined native acceptance remain required.
 This record establishes no merge, deployment or publication approval.
+
+
+## Archived README follow-up
+
+Source `c2d75712df3ca2bc78c4964bdcf09658baaeb1a7` passes all 21 terminal qualification commands against
+37,307 unchanged inputs and 48 retained outputs. The preceding
+`acf34b0746` hosted artifact job reproduced an altered archived README. Restore
+its original assembly bytes and retain the later comparison correction in the
+current historical-validation document. All 15 historical tests and the actual
+validator pass without a changed source pin, manifest exception or hash waiver.
+Production Rust, measurements, PDFs and archive inputs remain unchanged. The
+archived README is restored to its original bytes.
+
+The refreshed source package includes actual parent SIGKILL, evolving funded
+work, all earned-child cases and 20 artifact-tool tests. Retained prior failed
+and successful campaigns preserve their original scope. Final-head main, x86,
+proof, fuzz, native and PostgreSQL acceptance remain separate, as does the
+security lane's committed Linux package and supporting-source handoff.
+
+
+## Final hosted-campaign source repairs
+
+Source `91373484e6feafce458de730c10e5f2e39af5168` passes all 21 native commands against 37,311 unchanged
+inputs and 48 retained outputs. The additional lifecycle, task-subject,
+portable, nested-auditor, formal-anchor and workflow-identity repairs are recorded
+in SECOND-REVIEW.md. Preserve all original failed and interrupted campaigns.
+All 116 A2A edge tests, three live client scenarios and both strict Clippy
+commands pass. Final hosted qualification and the independently owned security
+evidence package remain separate acceptance requirements.
