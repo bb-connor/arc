@@ -20,7 +20,7 @@
         "results.tex",
         "ARTIFACT.md"
       ],
-      "result": "All 21 terminal native commands pass against 37,318 unchanged inputs and 48 outputs, including all 20 artifact-tool tests. Checked-output denial and replacement-graph regressions retain actual red and green evidence; earlier failures and hosted results retain their original candidate scope. Derived results, reproducible PDF and source/evidence inventory agree. Hosted production and independent publication gates remain separate."
+      "result": "All 21 terminal native commands pass against 37,319 unchanged inputs and 48 outputs, including all 20 artifact-tool tests. Checked-output denial and replacement-graph regressions retain actual red and green evidence; earlier failures and hosted results retain their original candidate scope. Derived results, reproducible PDF and source/evidence inventory agree. Hosted production and independent publication gates remain separate."
     },
     {
       "id": "funded-security-integration",

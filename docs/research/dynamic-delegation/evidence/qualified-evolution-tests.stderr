@@ -19,7 +19,7 @@ help: Check that the patched package version and available features are compatib
    Compiling chio-agent-web-interop v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-agent-web-interop)
    Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
    Compiling chio-runtime-core v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-runtime-core)
-    Finished `test` profile [unoptimized] target(s) in 3m 09s
+    Finished `test` profile [unoptimized] target(s) in 3m 41s
      Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_runtime_core-6cf546f9704af923)
      Running tests/lease_boundaries.rs (/home/connor/chio-pr1173-target/debug/deps/lease_boundaries-b99f4d5935b08bf0)
      Running tests/lease_write_fencing.rs (/home/connor/chio-pr1173-target/debug/deps/lease_write_fencing-23629f90f1db80f0)

@@ -3300,6 +3300,888 @@
       "observed_result": "Actual final-source receipt verifier build metadata and public compiler log; binary hash is retained without claiming native enforcement on ARM.",
       "bytes": 566,
       "sha256": "5aa76ceb0f034c759a455c63dfab301e836063fccc3b62512f6a0fc016be51ce"
+    },
+    {
+      "log": "checked-output-later-guard-green-guard-recovery.log.gz",
+      "observed_result": "Actual initial ordinary-failure red reproduction and first repaired test; the green test passed but its supervisor failed red-only bookkeeping, retained without aggregate acceptance.",
+      "bytes": 2868,
+      "sha256": "b8fc72711848fd847a5ff8b2b28a0326769746779b369e0124ef3f798b0807c4"
+    },
+    {
+      "log": "checked-output-later-guard-green.status.json.gz",
+      "observed_result": "Actual initial ordinary-failure red reproduction and first repaired test; the green test passed but its supervisor failed red-only bookkeeping, retained without aggregate acceptance.",
+      "bytes": 823341,
+      "sha256": "75afdc1e56c1fbe1427fa4f5fc61054dd45522a65bb45d2eeed0d74e0528d8e9"
+    },
+    {
+      "log": "checked-output-later-guard-red-guard-recovery.log.gz",
+      "observed_result": "Actual initial ordinary-failure red reproduction and first repaired test; the green test passed but its supervisor failed red-only bookkeeping, retained without aggregate acceptance.",
+      "bytes": 2826,
+      "sha256": "b6d11fecd227bd08eacebc04838fe5a34c11beec1ee37b3a346358110f9741c9"
+    },
+    {
+      "log": "checked-output-later-guard-red.status.json.gz",
+      "observed_result": "Actual initial ordinary-failure red reproduction and first repaired test; the green test passed but its supervisor failed red-only bookkeeping, retained without aggregate acceptance.",
+      "bytes": 823364,
+      "sha256": "89b6efc17a6455fbd7c07662bd0a3182ce3bfc5dd508456a4affa3353f31f14c"
+    },
+    {
+      "log": "checked-output-preparation-inventory-green-final.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 330,
+      "sha256": "0d6a975ba2efa3b079709b58d799a75333273ab662d150b4058f21475a536217"
+    },
+    {
+      "log": "checked-output-preparation-family-red.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 823321,
+      "sha256": "ee6e96709a32e994d881393d46bf3d479fe1cc5d46d85687fc1475d80a468fee"
+    },
+    {
+      "log": "checked-output-preparation-family-green-supervisor.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 17,
+      "sha256": "c5fd732e48d897f2a9fa38fc8a8e899969fa5fdd01fa2ccdbc7318ce196f48fb"
+    },
+    {
+      "log": "checked-output-preparation-format-verified.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "checked-output-preparation-family-red-guard-recovery.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 5717,
+      "sha256": "7ef1aaa4229e1e9c2c2ec5ba87ffc8662fa61cbb3836c94a7e1a0acc4417dd74"
+    },
+    {
+      "log": "checked-output-preparation-inventory-red-verification.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 348,
+      "sha256": "83eec6ca06d7a91c4c886e0917ba1088c6fec861739aa43ec0f4c1cb66aca9ef"
+    },
+    {
+      "log": "checked-output-preparation-inventory-green-verified.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 58,
+      "sha256": "e3f5c0e94f3809efb913817dcc0856be7f259530a6d770cba8009dbb9254ca38"
+    },
+    {
+      "log": "checked-output-preparation-inventory-green-final.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 5492,
+      "sha256": "85ac58ab30942fa9179b445c127b5ac8c9de2d7fc511e9de410334d39e4421cf"
+    },
+    {
+      "log": "checked-output-preparation-inventory-green.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 5313,
+      "sha256": "239059f9474ce1a2c5c4b2cec80d0aa15e2157baf864cf2be95f83e16963204b"
+    },
+    {
+      "log": "checked-output-preparation-family-red-supervisor.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 19,
+      "sha256": "33d6fee5d4745ba734dc2f29c35aefd2ce245a1fa3754e6c7010f15a94c28403"
+    },
+    {
+      "log": "checked-output-preparation-family-green-guard-recovery.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 3882,
+      "sha256": "f88d518bc056fb25706c5433b10d47cb7f489907fb9bc554a034d61956d88655"
+    },
+    {
+      "log": "checked-output-preparation-diff-verified.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "checked-output-preparation-format-verified.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 325,
+      "sha256": "4f489bf210c2ae9e0543f4124130f180e713900c951301f8dc1d3fc44196f474"
+    },
+    {
+      "log": "checked-output-preparation-family-green.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 823228,
+      "sha256": "582795ee89a4a854b30f3b1d64f66748680a0cbba244cbe658dcbb5b85d8c55d"
+    },
+    {
+      "log": "checked-output-preparation-diff-verified.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 299,
+      "sha256": "c24dd726883208e79cdd7ebe8049809b671fc43e3f4cdd93bbd43cf99ecdc759"
+    },
+    {
+      "log": "checked-output-preparation-inventory-red.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 369,
+      "sha256": "021d23c200f3c61101c4f51e969593c4d80a58524e934ec4ae40ba14cbe22076"
+    },
+    {
+      "log": "checked-output-preparation-inventory-green-verified.status.json.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 333,
+      "sha256": "640c2ab0b2111e67bd49e81140833ebdb9e5bf33087d05f327f7effa537556ca"
+    },
+    {
+      "log": "checked-output-preparation-inventory-red.log.gz",
+      "observed_result": "Actual four-case old-source and repaired-source recovery campaigns plus missing-identity/count failures and final omission/substitution controls; every result preserves its captured inputs and source scope.",
+      "bytes": 81,
+      "sha256": "0fe7ea8b481c0f9e82578c35f15ccf51726b5169c5a7ce220adefe5732623e92"
+    },
+    {
+      "log": "output-preparation-full-green-flow-contract.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 5492,
+      "sha256": "85ac58ab30942fa9179b445c127b5ac8c9de2d7fc511e9de410334d39e4421cf"
+    },
+    {
+      "log": "output-preparation-final-green-flow.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 564618,
+      "sha256": "e05d9fa6a78762323b45ee7a564c7d6c32dec4399bc0144180018acd20724937"
+    },
+    {
+      "log": "output-preparation-ci-repairs-fixtures-green-supervisor.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 44,
+      "sha256": "a481e1fd3e277e2eb96555e2b89f5c69d060882b77986c3d7500b7a427e79e18"
+    },
+    {
+      "log": "output-preparation-final-source-hygiene.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 52024,
+      "sha256": "52d77640b283aeec0cd0edd3646c27dc44b2b8d3ae62bf73dbc5e66c571053a4"
+    },
+    {
+      "log": "output-preparation-ci-repairs-fixtures-green.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 827322,
+      "sha256": "9f47c4d15182a3bb434905c1e0c44a1945fb70122e047b348008acd891e7d889"
+    },
+    {
+      "log": "output-preparation-cli-passport-diagnostic-correct.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 567,
+      "sha256": "6d9448fe5a8ea34474a54eb22bea1a959b494e74171eb4b41d74c8c99db7d8b5"
+    },
+    {
+      "log": "output-preparation-cli-passport-diagnostic-correct.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2535,
+      "sha256": "2f18baf9416d5c5dad2f12e154119a3d0dff2b60636949adc136c65e92fad6a5"
+    },
+    {
+      "log": "output-preparation-ci-repairs-cli-local-cli.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 195156,
+      "sha256": "fc0350eab59080f5ced18550363dfa67015627bc2753647d9e1312ed3e0e73a9"
+    },
+    {
+      "log": "output-preparation-final-green-kernel.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 168260,
+      "sha256": "f33f07409908cac5212d321f56d87d8bceb3ebc778a144b3ba02b4d1797bdb8b"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 827043,
+      "sha256": "aa9cc915fbc7ea5caba053576e522c4f80614e25285756adbb8559d2db4f468f"
+    },
+    {
+      "log": "output-preparation-ci-fixture-diagnostic.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2989,
+      "sha256": "d174708519bde97cbc4d5db5576cef6653d51556d841b6d717eb60e833d24658"
+    },
+    {
+      "log": "output-preparation-ci-failure-triage.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 3535,
+      "sha256": "78c3a4851fccdaca430cd0afdabb2fc31efe23805807b022f2eab879df334a33"
+    },
+    {
+      "log": "output-preparation-lock-ratchet-red-controls.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 1646,
+      "sha256": "f3490aedf34169efe64e85e468b133e27c4dfe0f0dd9aebbaa335ce6d8bb12fe"
+    },
+    {
+      "log": "output-preparation-cli-passport-diagnostic.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2635,
+      "sha256": "d3e75560f24ee4f6461908a8fbbc92db5278320b0692da069668141128fd6e34"
+    },
+    {
+      "log": "output-preparation-formal-mirrors-preflight.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "output-preparation-final-green-proof-refresh.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "output-preparation-ci-repairs-fixtures-green-cli-clippy.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 1760,
+      "sha256": "15bfb117657f52dfefa5ba245f6beb0bceb3e15aafe37e7d53be8312d56bf5f4"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-cli.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 87237,
+      "sha256": "42bc20492d9f30fa1c333477614200b1238796cd9a8d915f20aa23f845bb4a37"
+    },
+    {
+      "log": "output-preparation-ci-repairs-red-handoff.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 114,
+      "sha256": "ea6cd43fd7d15858cb04adfd5669da91a130f3cc53b673de8e049e47b3e86baa"
+    },
+    {
+      "log": "output-preparation-cli-passport-diagnostic-verified.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2740,
+      "sha256": "43b88c2d5316cc92ccb8e2baa6ed88fdf609a5269bad355f829455b4d2bc289f"
+    },
+    {
+      "log": "output-preparation-ci-repair-inline-review.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 1871,
+      "sha256": "04d7935710f29720714a29ae53c2cd1f975d6e89959a4259846513fd98341584"
+    },
+    {
+      "log": "output-preparation-ci-repairs-red-recovery-selector.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2072,
+      "sha256": "6b0d6ab074eb6472bacbca00b399912869910d8cac4a650d627412778ef28d99"
+    },
+    {
+      "log": "output-preparation-followup-handoff.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 91,
+      "sha256": "ece2e88cfdd3f5b9ff5b9e304cb8f1c1eec7033ed318fb9c9d28c4444943adb0"
+    },
+    {
+      "log": "output-preparation-ci-repairs-red.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 824819,
+      "sha256": "3c8b4002e7ddca7f659ab45d205efc4521301a9272713c286820a1e4c6acf7b4"
+    },
+    {
+      "log": "output-preparation-full-green-kernel-clippy.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2509,
+      "sha256": "2ec5e24a9d881192ef2795f7331be1d5780e91b1041b1790fdb699584151d9ce"
+    },
+    {
+      "log": "output-preparation-ci-private-fixture.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2235,
+      "sha256": "a4763ac1f987712d6bc221f2dc0ed4abb7c966f526d81f3a0d8e3737b1031f7d"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-supervisor.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 116,
+      "sha256": "ee4a57d72f03c35cb5d3fb869aa182e71ac5d8f04f76af7561a7f3febfaaacea"
+    },
+    {
+      "log": "output-preparation-ci-repairs-cli-local-supervisor.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 8,
+      "sha256": "b3bab7953abf3854abb47d83cc3185921cec2d46d9a101d8c656c24564cc8714"
+    },
+    {
+      "log": "output-preparation-inline-review.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2221,
+      "sha256": "da3dec02c5506b7a39d6f44a49028596f103d49bd271123090e9278b882e99fb"
+    },
+    {
+      "log": "output-preparation-final-green-flow-contract.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 58,
+      "sha256": "e3f5c0e94f3809efb913817dcc0856be7f259530a6d770cba8009dbb9254ca38"
+    },
+    {
+      "log": "output-preparation-ci-fixture-diagnostic.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 716,
+      "sha256": "1f69300118b238d4ef172181a8ff0fb851e777b7a57c4c4c197565cc438cedbe"
+    },
+    {
+      "log": "output-preparation-ci-private-fixture.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 708,
+      "sha256": "b5d7cbfc270063cd269cc43c01a0665364fc27af42c082fde052f39c87ef5d7a"
+    },
+    {
+      "log": "output-preparation-cli-passport-diagnostic-verified.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 534,
+      "sha256": "27e15223c3a57e1cc2d68e399fc47583db6fedbfcc49b7564c27df866d759b0c"
+    },
+    {
+      "log": "output-preparation-final-source-review.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2918,
+      "sha256": "c255240c327150d13cecfaf148d6ef815e207f33f595b349909746492480de25"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-recovery.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 143710,
+      "sha256": "d9a3dcc00828149e8b3e8ecb2fef48544e484eb3e295243e9888b11a27efa0d4"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-recovery-contract.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 39,
+      "sha256": "9f5144daad94c61478d9eda3beab8456249f4dab2bffefc0a80f3dd288ce4c41"
+    },
+    {
+      "log": "output-preparation-ci-repairs-fixtures-green-format.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "output-preparation-final-green-kernel-clippy.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 1660,
+      "sha256": "8ed7e6bdeaa8303ea426fbfc620e13bcb373dbe2e746416dc15a7d39dfd5b281"
+    },
+    {
+      "log": "output-preparation-ci-repairs-fixtures-green-diff.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "output-preparation-formal-mirrors-preflight.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 446,
+      "sha256": "56a69d92c28a96f4736622cb27c6248e85095d40d251ea0622857c58150848f3"
+    },
+    {
+      "log": "output-preparation-final-green-supervisor.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 114,
+      "sha256": "ec4fc268fcfa32ac53f56faf9d50f89402b24878dd8d55bac18017b7804da173"
+    },
+    {
+      "log": "output-preparation-cli-passport-diagnostic.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 542,
+      "sha256": "3baa5e90bed799d7ee285f9bbd54f72432bbcd9b9958f8f012cb136ecc6ec1d4"
+    },
+    {
+      "log": "output-preparation-ci-repairs-fixtures-green-cli-fixtures.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 15154,
+      "sha256": "93f9bc19cac402990a926b9edb6bbced991d1da6b9eea21403dc8aea204f1663"
+    },
+    {
+      "log": "output-preparation-ci-repairs-red-federation-policy.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2683,
+      "sha256": "ec200e1d4536efce542ba89ee057c343191a8cf5594d567e970410c890a06754"
+    },
+    {
+      "log": "output-preparation-ci-repairs-cli-local.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 824346,
+      "sha256": "249a8d4a105b37471f8a8db3e21ecf5222c2720810ce5bf35533ba55238f4dfb"
+    },
+    {
+      "log": "output-preparation-full-green.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 824344,
+      "sha256": "082ea80c5ec81458358dc9362bf904f45cf965bdb697f25d5da8a892f40bc41e"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-response-dispatch.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 4230,
+      "sha256": "dd68c192634d43115066f4b2e875aa9b0aabaec48f17780e7a6fdbf04f707d3e"
+    },
+    {
+      "log": "output-preparation-lock-ratchet-red-contract.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 73,
+      "sha256": "7254aa68d273e2781fd974e8a19b655b33d6e329aaca8234ae73e0d43fe81200"
+    },
+    {
+      "log": "output-preparation-final-green-proof-check.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "output-preparation-full-green-kernel.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 168260,
+      "sha256": "b834e269c537e0c675751788e00dccf4d62325a558f0e8b02290725256594ecf"
+    },
+    {
+      "log": "output-preparation-final-green-diff.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-security-ci-controls.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 67,
+      "sha256": "ed6d454aa768097d46af3f1580552e4f2d639f51ef7e063b881783fdfdada649"
+    },
+    {
+      "log": "output-preparation-final-green.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 827444,
+      "sha256": "dd13e986b14db26c82010ee907f89d9dbc0663baf6ac3ec0db44748b45d9bf43"
+    },
+    {
+      "log": "output-preparation-final-green-format.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "output-preparation-final-green-mirrors.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "output-preparation-final-green-hygiene.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 52024,
+      "sha256": "168bdea58624adf5ca507b2b8976bccc6031b6dda37b417f05038c2ed3a3d7a7"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-recovery-selector.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 1978,
+      "sha256": "ec340fe2d3598fe0a2b92d487036174742361ec847053ee2d8fc44b391aca5c9"
+    },
+    {
+      "log": "output-preparation-source-checkpoint.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 2319,
+      "sha256": "8bb97e943e46a9d7ae1e591b6f6287d1f12d29535b2b9b8361cbe8a1e0156c6d"
+    },
+    {
+      "log": "output-preparation-lock-ratchet-red.status.json.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 1041,
+      "sha256": "599b6309a523ceeac4ae9612ae28171f0aa648ea884ce9434a1b4bec92c7444c"
+    },
+    {
+      "log": "output-preparation-ci-repairs-green-security-ci.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "output-preparation-full-green-supervisor.log.gz",
+      "observed_result": "Actual kernel/flow and CI repair campaigns, retained diagnostic and supervisory failures, current fixture closure, source checkpoint and author self-review; each record preserves its result and source scope, without independent approval or hosted acceptance.",
+      "bytes": 41,
+      "sha256": "d8c2aaa6f2974ea6ab70c2d9d369cda5dd112df5176eac6e2a45b67506cde057"
+    },
+    {
+      "log": "readiness-preparation-final-green-format.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "readiness-preparation-final-green-docker.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 3038,
+      "sha256": "0363f0c6f2d3cff10e5c2462ede47a58fec159aedfcdd84421ccf3d059564100"
+    },
+    {
+      "log": "readiness-preparation-final-green-deception.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 56910,
+      "sha256": "68a1240396e37761c544213070a353f0fa7355ba9c4dcc651866087490e28cbc"
+    },
+    {
+      "log": "readiness-preparation-final-green-diff.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "readiness-preparation-final-green-deny-advisories.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 14,
+      "sha256": "799fc05e6513bf365cc7565ea51cc5cb9ca6690b1cd1fe7777339be83437131b"
+    },
+    {
+      "log": "readiness-preparation-final-green-proof-check.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "readiness-preparation-final-green-deception-contract.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 1499,
+      "sha256": "7f6591b386516b68dbfe7b9bec11a1429d1598bd6503731aa9b5ba568143f1d0"
+    },
+    {
+      "log": "readiness-preparation-final-green-broker-clippy.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 4744,
+      "sha256": "d7d0567426fa7058b7469d731d4c71eabe1c40ae3cd8aed1abf2024b78b5f8a1"
+    },
+    {
+      "log": "readiness-preparation-final-green-broker.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 28110,
+      "sha256": "35a21f7696d2e819685281a916ca23f6d2ba884e1683ae5da93dd50fc899fdbb"
+    },
+    {
+      "log": "readiness-preparation-final-green-docker-proof-room.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 3596,
+      "sha256": "9536149b967cb487e7e57e42d942796439bb34e75c99dad718b83f429b9f78ba"
+    },
+    {
+      "log": "readiness-preparation-final-green-supply-chain.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 3797,
+      "sha256": "b87a65575fde9431e4f20ddbd4566b85453e1279d19cdd792750a51d5097119f"
+    },
+    {
+      "log": "readiness-preparation-final-green-hygiene.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 52024,
+      "sha256": "168bdea58624adf5ca507b2b8976bccc6031b6dda37b417f05038c2ed3a3d7a7"
+    },
+    {
+      "log": "readiness-preparation-final-green-federation-clippy.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 2874,
+      "sha256": "e2e39d72500e7ed93a3a5be2cbf0f241e5f3f206ce050656e17fe7c2f04ab1c7"
+    },
+    {
+      "log": "readiness-preparation-final-green-federation.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 40059,
+      "sha256": "8901241d2154fd15f908960f5580bc2f744d7d6cc5664dd673707f8ac6ee8e33"
+    },
+    {
+      "log": "readiness-preparation-final-green-deny-sources.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 11,
+      "sha256": "5cba1c1c8bf7b4f0398abfd62fa5e0d2d8f72d9f59aa1ab0ec4c54d3a2cd2f90"
+    },
+    {
+      "log": "readiness-preparation-final-green.status.json.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 832920,
+      "sha256": "d406465d8579fe43fd055f6322a4d43cf766950a2117a455997910a8c0ee330c"
+    },
+    {
+      "log": "readiness-preparation-final-green-deny-licenses.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 12,
+      "sha256": "71dadc8c8978da797b94dc581b666330c737551839c8fc820d7647130930c4b7"
+    },
+    {
+      "log": "readiness-preparation-final-green-supervisor.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 303,
+      "sha256": "f41508af488faee75fad375cf8c88ad28cbda1d2fa1c3688930def49d157ebad"
+    },
+    {
+      "log": "readiness-preparation-final-green-mirrors.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "readiness-preparation-final-green-federation-cli-clippy.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 6858,
+      "sha256": "095bba9a2c6464eb7aa39366777b7d40068801da3c56ade97b1b0735b729b302"
+    },
+    {
+      "log": "readiness-preparation-final-green-federation-cli.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 4288,
+      "sha256": "c57ff9eb1199420efe7a751c630afb845dddbd1a00ba8f7746ee708bbaf02cd3"
+    },
+    {
+      "log": "readiness-preparation-final-green-deny-bans.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 8,
+      "sha256": "eba7f3001f2423b5c5fcdd45d2e210ba11daa9c0e73bba8072de1c60f30b5878"
+    },
+    {
+      "log": "readiness-preparation-final-green-proof-refresh.log.gz",
+      "observed_result": "Actual renewed follow-up source campaign, verified against the final source input map before artifact renewal.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "security-image-2b608eb2d1-job-112243677616.log.gz",
+      "observed_result": "Actual preceding-candidate security-image failure; authenticated job log and mismatch against the pinned authorized source, not final-source acceptance.",
+      "bytes": 83345,
+      "sha256": "3c29ab89629e59fecf189c6132bca92bb334c6c14d182fa02e60b5f6cfbcc8df"
+    },
+    {
+      "log": "security-image-2b608eb2d1-checksum-failure.json.gz",
+      "observed_result": "Actual preceding-candidate security-image failure; authenticated job log and mismatch against the pinned authorized source, not final-source acceptance.",
+      "bytes": 743,
+      "sha256": "0d4bf4cba0bc058e7ae7f417fd32a02f17ceb1cd3dea69db37a010c55881b012"
+    },
+    {
+      "log": "2b608eb2d1-postgres-artifact-index.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 2699,
+      "sha256": "f67fde315f204a72f03f20759631ac5ab1a1f5133c465ee5f6470749492f37d3"
+    },
+    {
+      "log": "2b608eb2d1-postgres-artifact-download.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 362,
+      "sha256": "2e664e4fa23161f5032ddfc7c1e3576ed2a834f8151e556ff533658b0aaa89bb"
+    },
+    {
+      "log": "2b608eb2d1-review-capture.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 63596,
+      "sha256": "7398665b6e09c0fd18eb128e34cd744f6fd65fef3e23304b708e758506bd3b2e"
+    },
+    {
+      "log": "2b608eb2d1-deny-job-112243681331.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 42876,
+      "sha256": "b693cebd51f762e8a0c6ed4a8c5080aa50a11c2b16e12bd1d425751f41368623"
+    },
+    {
+      "log": "2b608eb2d1-vet-standalone-job-112243677615.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 1589,
+      "sha256": "7858aea4a944f619f5fa5f182441d60f0a128ffae19b5200389363b3bcc08e89"
+    },
+    {
+      "log": "2b608eb2d1-checked-output-thread-reopened.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 336,
+      "sha256": "e3ca22dd835288666483e34142594330cab11f9867f9dc346519d82ff412957e"
+    },
+    {
+      "log": "2b608eb2d1-deny-job-112243681331.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 2005,
+      "sha256": "9ec9f1a361d47be38b6c2dc404bb3a6ff562af000b97f65f463171efe2b5350a"
+    },
+    {
+      "log": "2b608eb2d1-reviews-output-preparation.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 96143,
+      "sha256": "656bd82cca8e169256164edc59130c1188a7cda4614be38c6bc6a0382ee07511"
+    },
+    {
+      "log": "2b608eb2d1-vet-main-job-112243681301.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 61393,
+      "sha256": "7b250f23ff9e9c205fa5db66b6b64b09d6ffacb71b463827a104e06c56ca0d0f"
+    },
+    {
+      "log": "2b608eb2d1-msrv-job-112243681287.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 4503,
+      "sha256": "35e95b2b30f70d1e8b39e3b257e96bf9fb268b816bbef465f8bf97065b40b1d3"
+    },
+    {
+      "log": "2b608eb2d1-security-contract-job-112304240684.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 3242,
+      "sha256": "7e294c275f0aec2e3ec761cfb25ef33f4ff65a802247d5d26fda01f65842089f"
+    },
+    {
+      "log": "2b608eb2d1-msrv-job-112243681287.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 682176,
+      "sha256": "f23edbd1d45dfa4ef598972628579d8cba6a21c2836eb38c6540fac45f9b0ad4"
+    },
+    {
+      "log": "2b608eb2d1-security-contract-job-112304240684.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 1786,
+      "sha256": "914f26ef806486aac30cffb5abc07b42803e6241e6ad5725137a10d47f5b3566"
+    },
+    {
+      "log": "2b608eb2d1-reviews-output-preparation.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 63529,
+      "sha256": "b38a7ef5ec259ae1f8ed20b2ccd2ca4fc1e7b9068bfbd6ec4ea957e7d5d416aa"
+    },
+    {
+      "log": "2b608eb2d1-reviews-current.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 96296,
+      "sha256": "9e2665d30d44437604879bc8d1c71d4ab22f03b8bfc71212028473f138b91001"
+    },
+    {
+      "log": "2b608eb2d1-postgres-reverified-d187d763f4.status.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 1354,
+      "sha256": "2e24388b33771b84197373477cf23feedf87aa58f0abf4a306b1b7a651117a59"
+    },
+    {
+      "log": "2b608eb2d1-workspace-job-112243681467.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 519595,
+      "sha256": "2908f9d91fa7124be1868072ce2b7fbc25bb4309d9614d44fa5d2fbb088a2ca6"
+    },
+    {
+      "log": "2b608eb2d1-kani-job-112243681311.verification.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 5430,
+      "sha256": "c86c0d992b0775275498f3c9794e62b7331e12345ebc70bfd2a27e81e5f756ca"
+    },
+    {
+      "log": "2b608eb2d1-enterprise-portable-job-112248011749.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 163723,
+      "sha256": "107c5fd13b6dfb966c751240fe18edaead8a487b7b114ac8b4aafcab0c7324e7"
+    },
+    {
+      "log": "2b608eb2d1-vet-main-job-112243681301.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 1451,
+      "sha256": "ea513d2367e8e0a4f36fb3bcb80cad473a9bd6c5f0e8206657c5aea4e3110f01"
+    },
+    {
+      "log": "2b608eb2d1-postgres-reverified-d187d763f4.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 321,
+      "sha256": "00a1e17f86be87c1140bd5404a882cfd82aec4438bdfb813eb8d3429a34ebf4f"
+    },
+    {
+      "log": "2b608eb2d1-active-defense-job-112248011662.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 1395130,
+      "sha256": "bfe161c92e544df47a85b891cd18b80a706da2a113e1ec94783d272f90a2f7d0"
+    },
+    {
+      "log": "2b608eb2d1-vet-standalone-job-112243677615.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 61468,
+      "sha256": "bd6f474d6db7dae40e1d203f0d0766a18e7f70b01bcc8fa9716bb06c4b3ba335"
+    },
+    {
+      "log": "2b608eb2d1-enterprise-linux-job-112248011865.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 260673,
+      "sha256": "178fa523473bf60185ed215f084d7dfa5cd41e79294126052d6c48f6999a4c06"
+    },
+    {
+      "log": "2b608eb2d1-kani-job-112243681311.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 108252471,
+      "sha256": "9bf1c4022db23a58d829a2061eaa20470510bc5bc405f255964073ab56f801de"
+    },
+    {
+      "log": "2b608eb2d1-enterprise-adversarial-job-112248011745.log.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 265689,
+      "sha256": "654af53c1f765880926be83dfaa977baf4e50bc27c8cc000b3027c24d2fcfa5a"
+    },
+    {
+      "log": "2b608eb2d1-checked-output-thread-resolution.json.gz",
+      "observed_result": "Public preceding-candidate hosted/review records; terminal result, unresolved native/checked-output boundaries and original candidate scope remain retained.",
+      "bytes": 594,
+      "sha256": "39881bd1ba0143a3a8dc85b42d0bba01a66ba67b697b07815a2d3e81461e357c"
+    },
+    {
+      "log": "ci-watch-2b608eb2d1.log.gz",
+      "observed_result": "Preceding-candidate hosted observer and check rollup with actual failed/pending/skipped states; observer completion does not mean acceptance.",
+      "bytes": 16930,
+      "sha256": "8b1678b1b219c370e0307fb6ff98e9559061225f229a8a7007d7a4a9e099863d"
+    },
+    {
+      "log": "ci-watch-2b608eb2d1.status.json.gz",
+      "observed_result": "Preceding-candidate hosted observer and check rollup with actual failed/pending/skipped states; observer completion does not mean acceptance.",
+      "bytes": 409,
+      "sha256": "7d85e065920cbf6c0a42253b25a7b3f792e803f1f8e2d09fde2d3743c7bd151e"
+    },
+    {
+      "log": "ci-watch-2b608eb2d1.latest.json.gz",
+      "observed_result": "Preceding-candidate hosted observer and check rollup with actual failed/pending/skipped states; observer completion does not mean acceptance.",
+      "bytes": 38108,
+      "sha256": "4c1e8e4f0293629251e48aae70a18409a2981193bce950d34dfb41e200f874e5"
+    },
+    {
+      "log": "security-authorities-output-preparation-prequalification.json.gz",
+      "observed_result": "Read-only authorized-source, enterprise definition, evidence-package and policy presence observation; security owner retains authority.",
+      "bytes": 676,
+      "sha256": "29dfb1359c64b1669a7d0e4ef9541174d2b229deae86f63b943a19db3254a3ed"
+    },
+    {
+      "log": "security-authorities-output-preparation-ci-repairs.json.gz",
+      "observed_result": "Read-only authorized-source, enterprise definition, evidence-package and policy presence observation; security owner retains authority.",
+      "bytes": 402,
+      "sha256": "b08ffefb1f3ebcbe6bd13ddde3359be07332c8b7c11d635e399fa8ff7e0108e9"
+    },
+    {
+      "log": "security-authorities-output-preparation-during-flow.json.gz",
+      "observed_result": "Read-only authorized-source, enterprise definition, evidence-package and policy presence observation; security owner retains authority.",
+      "bytes": 676,
+      "sha256": "b291d2102772c7018429d6be841103b75b1e903a35c339f9abc2b116cebfa9b3"
+    },
+    {
+      "log": "security-authorities-output-preparation-prepush.json.gz",
+      "observed_result": "Read-only authorized-source, enterprise definition, evidence-package and policy presence observation; security owner retains authority.",
+      "bytes": 517,
+      "sha256": "2b8164962059db188443e4c8c4357c8ecab00888bef16dd8781bdb0745e0a9f7"
+    },
+    {
+      "log": "qualification-d187d763f4.status.json.gz",
+      "observed_result": "Actual source-checkpoint supervisor; canonical 21-command qualification and raw records remain authoritative.",
+      "bytes": 268,
+      "sha256": "f29ae2439311f3e54cf577d417e3c3892ef59e6cdbd5a6018941773315e23be1"
+    },
+    {
+      "log": "review-native-qualification-d187d763f4.log.gz",
+      "observed_result": "Actual repaired source-bound native command output, checked against the canonical immutable source and output inventory.",
+      "bytes": 539,
+      "sha256": "691abfbdfacc73c8cbeef22b9f97e54850334e64920d01c83cfac4286a827913"
+    },
+    {
+      "log": "receipt-verifier-d187d763f4-supervisor.log.gz",
+      "observed_result": "Actual repaired-source offline ARM receipt verifier build and binary hash; no physical x86 claim.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "receipt-verifier-d187d763f4-build.log.gz",
+      "observed_result": "Actual repaired-source offline ARM receipt verifier build and binary hash; no physical x86 claim.",
+      "bytes": 6858,
+      "sha256": "54f0b60d5bc303c7810c7ecfc707dfd900e704e064c294bdbe9dbbf5d737932d"
+    },
+    {
+      "log": "receipt-verifier-d187d763f4.status.json.gz",
+      "observed_result": "Actual repaired-source offline ARM receipt verifier build and binary hash; no physical x86 claim.",
+      "bytes": 566,
+      "sha256": "1114af2d4889aee1ba93011ba24587dd6982c024cbd81b48e5969fbf223bedf5"
     }
   ]
 }

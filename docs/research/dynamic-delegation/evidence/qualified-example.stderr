@@ -11,7 +11,6 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-   Compiling chio-store-sqlite v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/platform/chio-store-sqlite)
    Compiling chio-kernel v0.1.0 (/home/connor/backbay/arc-agentic-work-plan/crates/kernel/chio-kernel)
-    Finished `dev` profile [unoptimized] target(s) in 58.35s
+    Finished `dev` profile [unoptimized] target(s) in 15.28s
      Running `/home/connor/chio-pr1173-target/debug/examples/dynamic_delegation`
