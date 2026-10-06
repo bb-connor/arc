@@ -85,6 +85,11 @@ async fn fault_reply(
                 receipt = ChioReceipt::sign(body, &other)?;
                 result.value = serde_json::to_value(receipt)?;
                 return Ok::<_, Box<dyn Error>>(envelope);
+            } else if mode == 7 {
+                body.metadata
+                    .as_mut()
+                    .ok_or_else(|| std::io::Error::other("missing metadata"))?["financial"] =
+                    serde_json::json!("PRIVATE_PARSER_VALUE_CANARY");
             } else if mode == 5 {
                 body.metadata
                     .as_mut()
@@ -233,8 +238,18 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
         .lookup_by_operation(&metadata.operation_id)?
         .ok_or("missing outcome")?;
     drop(kernel);
-    let _advanced = chio_test_support::clock::scope_unix_secs(initial + 60);
-    host.compact(&database, outcome.raw_output_digest().as_str())?;
+    // Financial parsing belongs to ordinary retained terminal replay. Adding
+    // metadata produces a new correctly signed receipt id, so compacted replay
+    // rejects its sealed reference before entering that financial validator.
+    let _advanced = (mode != 7).then(|| chio_test_support::clock::scope_unix_secs(initial + 60));
+    if mode == 7 {
+        assert!(raw_payload_present(
+            &database,
+            outcome.raw_output_digest().as_str()
+        )?);
+    } else {
+        host.compact(&database, outcome.raw_output_digest().as_str())?;
+    }
     let remote = DurableAdmissionRuntime::open_remote(&database, &host.url, "payload-rpc-secret")?;
     let recovered = configured_kernel(&remote, calls.clone())?;
     let before = head(&database)?;
@@ -266,7 +281,7 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
             KernelError::ReceiptPersistence(ReceiptStoreError::Fenced)
         ));
     }
-    if mode == 3 {
+    if mode == 3 || mode == 7 {
         let mut source = error.source();
         let mut found = false;
         while let Some(cause) = source {
@@ -274,6 +289,28 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
             source = cause.source();
         }
         assert!(found, "native serde decode source must remain reachable");
+        if mode == 7 {
+            let mut source = error.source();
+            let mut data = false;
+            while let Some(cause) = source {
+                data |= cause
+                    .downcast_ref::<serde_json::Error>()
+                    .is_some_and(serde_json::Error::is_data);
+                source = cause.source();
+            }
+            assert!(
+                data,
+                "financial receipt refusal must keep native serde Data category"
+            );
+            assert!(matches!(&error, KernelError::UntrustedInput(_)));
+            assert!(!format!("{error:?}").contains("PRIVATE_PARSER_VALUE_CANARY"));
+            assert_eq!(
+                error.report().context,
+                serde_json::json!({
+                    "rejection":"urn:chio:error:attest:signed-json-invalid-shape"
+                })
+            );
+        }
         assert!(!error.to_string().contains("PRIVATE_PARSER_VALUE_CANARY"));
     }
     if mode == 6 {
@@ -388,4 +425,9 @@ fn compacted_payload_rpc_cold_reopen_replays_original_receipt_without_effects() 
     drop(remote);
     host.close()?;
     Ok(())
+}
+
+#[test]
+fn retained_financial_receipt_rpc_preserves_native_serde_cause_without_effects() -> TestResult {
+    replay_fault(7, "urn:chio:error:attest:signed-json-invalid-shape", true)
 }

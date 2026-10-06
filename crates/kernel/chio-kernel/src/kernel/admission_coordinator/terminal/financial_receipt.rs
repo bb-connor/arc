@@ -1,6 +1,7 @@
 //! Validate financial receipt facts against the retained journal and resolution.
 
 use super::*;
+use chio_core::canonical::UntrustedJsonError;
 
 impl ChioKernel {
     pub(super) fn validate_retained_financial_receipt(
@@ -18,11 +19,7 @@ impl ChioKernel {
             .cloned()
             .map(serde_json::from_value::<FinancialReceiptMetadata>)
             .transpose()
-            .map_err(|_| {
-                KernelError::DurableAdmission(
-                    "projected receipt financial metadata is invalid".to_owned(),
-                )
-            })?;
+            .map_err(UntrustedJsonError::Decode)?;
         if operation.binding().participant_requirements().payment {
             let journal = runtime
                 .store
@@ -91,9 +88,9 @@ impl ChioKernel {
             );
             let expected_oracle =
                 serde_json::to_value(pricing.and_then(|pricing| pricing.oracle_evidence.as_ref()))
-                    .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                    .map_err(|error| UntrustedJsonError::Canonicalization(error.into()))?;
             let recorded_oracle = serde_json::to_value(&financial.oracle_evidence)
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+                .map_err(|error| UntrustedJsonError::Canonicalization(error.into()))?;
             let payment_reference = journal
                 .transaction_id
                 .as_ref()

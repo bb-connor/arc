@@ -20,6 +20,8 @@ mod continuation_controls;
 mod publication;
 #[path = "payment_recovery/status_only_refund.rs"]
 mod status_only_refund;
+#[path = "payment_recovery/terminal_native_cause.rs"]
+mod terminal_native_cause;
 
 #[test]
 fn review_payment_prepaid_compensation_refunds_original_payment() -> TestResult {
@@ -64,14 +66,16 @@ fn review_payment_compensation_retries_original_release_intent() -> TestResult {
     calls.release_failed.store(true, Ordering::SeqCst);
     let operation = store.operation();
     let policy = serde_json::json!({"authority": "review-regression"});
-    assert!(kernel
-        .compensate_durable_admission_before_dispatch(
-            &operation,
-            policy.clone(),
-            current_unix_timestamp_ms(),
-            None
-        )
-        .is_err());
+    assert!(
+        kernel
+            .compensate_durable_admission_before_dispatch(
+                &operation,
+                policy.clone(),
+                current_unix_timestamp_ms(),
+                None
+            )
+            .is_err()
+    );
     assert_eq!(
         store.payment_journal().ok_or("pending journal")?.state,
         PaymentJournalState::Settling

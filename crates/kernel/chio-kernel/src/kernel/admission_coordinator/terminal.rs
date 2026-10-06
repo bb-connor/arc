@@ -1582,9 +1582,7 @@ impl ChioKernel {
                 &tool_outcome,
             )
         }
-        .map_err(|error| {
-            KernelError::DurableAdmission(format!("terminal receipt qualification failed: {error}"))
-        })?;
+        .map_err(super::recovery::failure::operation_error)?;
         let payment_evidence = payment_terminal
             .as_ref()
             .map(|payment| {
@@ -1674,11 +1672,7 @@ impl ChioKernel {
             let terminal = runtime
                 .store
                 .commit_admission_projection(&projection)
-                .map_err(|error| {
-                    KernelError::DurableAdmission(format!(
-                        "atomic terminal projection failed: {error}"
-                    ))
-                })?;
+                .map_err(KernelError::ReceiptPersistence)?;
             (terminal, AdmissionOperationState::DeniedAfterDelivery)
         } else {
             let projection =
@@ -1722,11 +1716,7 @@ impl ChioKernel {
                 runtime
                     .store
                     .commit_admission_projection(&projection)
-                    .map_err(|error| {
-                        KernelError::DurableAdmission(format!(
-                            "atomic terminal projection failed: {error}"
-                        ))
-                    })?
+                    .map_err(KernelError::ReceiptPersistence)?
             };
             (terminal, AdmissionOperationState::Completed)
         };
