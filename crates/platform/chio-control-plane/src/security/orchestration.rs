@@ -322,10 +322,7 @@ impl ProductionRuntimeLeaseState {
         worker
             .ensure_ready()
             .map_err(|_| ResponseWorkerTickError::RuntimeAdmissionClosed)?;
-        if matches!(
-            worker.health().lifecycle,
-            ResponseWorkerLifecycle::Running | ResponseWorkerLifecycle::Ready
-        ) {
+        if worker.health().lifecycle.is_ready() {
             Ok(())
         } else {
             Err(ResponseWorkerTickError::RuntimeAdmissionClosed)

@@ -108,17 +108,18 @@ impl ProductionDeclassificationReceiptOutbox {
         }
     }
 
+    /// Durably committed receipts awaiting delivery are a health detail, not a
+    /// readiness failure. A drain that fails fails its tick, and the worker's
+    /// readiness follows that tick; its failure stays visible here until
+    /// nothing is pending.
     pub(super) fn ensure_ready(&self) -> Result<(), ResponseWorkerTickError> {
         let pending = self.map_port(self.port.count_pending())?;
         if pending == 0 {
             self.set_health(DeclassificationOutboxHealth::Ready);
-            Ok(())
-        } else {
+        } else if !matches!(self.health(), DeclassificationOutboxHealth::Failed { .. }) {
             self.set_health(DeclassificationOutboxHealth::Pending { receipts: pending });
-            Err(ResponseWorkerTickError::DeclassificationOutboxPending(
-                pending,
-            ))
         }
+        Ok(())
     }
 
     pub(in crate::security) fn reconcile_and_drain_startup(

@@ -58,11 +58,23 @@ pub trait ResponseWorkerPort: Send + Sync {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ResponseWorkerLifecycle {
     Created,
+    /// The first tick is in flight and no tick outcome exists yet. Later
+    /// ticks keep the previous outcome; `ResponseWorkerHealth::tick_in_flight`
+    /// reports them.
     Running,
     Ready,
     Degraded,
     Failed,
     Stopped,
+}
+
+impl ResponseWorkerLifecycle {
+    /// The single readiness predicate for the worker, the host and runtime
+    /// admission: the last completed tick left the worker ready.
+    #[must_use]
+    pub const fn is_ready(self) -> bool {
+        matches!(self, Self::Ready)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

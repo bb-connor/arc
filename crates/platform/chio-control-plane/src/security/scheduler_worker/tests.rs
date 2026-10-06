@@ -375,7 +375,7 @@ mod periodic_compaction_is_bounded_and_paginates_from_the_last_compacted_key;
 
 mod periodic_compaction_failure_fails_maintenance_and_outbox_health;
 
-mod pending_or_no_progress_outbox_fails_readiness_and_drain;
+mod pending_outbox_is_ready_and_no_progress_fails_the_drain;
 
 mod backed_off_outbox_is_pending_work_not_a_stalled_drain;
 
@@ -664,7 +664,7 @@ mod production_worker_surfaces_stale_fence_as_lease_loss_not_completion;
 
 mod worker_progress_deadline_has_an_absolute_validated_boundary;
 
-mod pending_declassification_receipts_keep_worker_health_degraded;
+mod pending_declassification_receipts_leave_the_worker_ready;
 
 mod post_loop_cleanup_releases_owned_work_and_is_idempotent;
 
@@ -683,6 +683,10 @@ mod panicking_worker_preserves_its_crash_when_cleanup_also_fails;
 mod parked_worker_commit_failure_stops_with_zero_ticks;
 
 mod publication_remains_unready_until_the_first_tick_completes;
+
+mod an_in_flight_tick_keeps_the_last_degraded_outcome;
+
+mod published_worker_with_failing_ticks_is_not_ready;
 
 mod cancelled_publication_wait_transfers_join_ownership_without_blocking_drop;
 

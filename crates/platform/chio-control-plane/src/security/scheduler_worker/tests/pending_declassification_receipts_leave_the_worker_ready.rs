@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn pending_declassification_receipts_keep_worker_health_degraded() {
+fn pending_declassification_receipts_leave_the_worker_ready() {
     let mut pending = tick("action-with-pending-evidence");
     pending.declassification_receipts_pending = 3;
     let port = Arc::new(ScriptedWorkerPort::with_ticks(vec![Ok(pending)]));
@@ -13,9 +13,6 @@ fn pending_declassification_receipts_keep_worker_health_degraded() {
         .unwrap_or_else(|error| panic!("pending evidence tick: {error}"));
 
     let health = worker.health();
-    assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Degraded);
-    assert_eq!(
-        health.last_error.as_deref(),
-        Some("3 declassification receipts remain pending")
-    );
+    assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Ready);
+    assert_eq!(health.last_error, None);
 }

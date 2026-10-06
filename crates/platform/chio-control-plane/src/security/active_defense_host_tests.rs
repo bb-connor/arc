@@ -670,10 +670,9 @@ async fn wedged_synchronous_worker_tick_fails_full_host_readiness() {
     .unwrap_or_else(|_| panic!("worker tick did not wedge"));
     tokio::time::sleep(Duration::from_millis(40)).await;
 
-    assert_eq!(
-        host.worker_health().lifecycle,
-        ResponseWorkerLifecycle::Running
-    );
+    let health = host.worker_health();
+    assert!(health.tick_in_flight);
+    assert_eq!(health.lifecycle, ResponseWorkerLifecycle::Ready);
     assert!(host.ensure_ready().is_err());
 
     fixture.clock.release_read();
