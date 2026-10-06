@@ -20,8 +20,14 @@ fn mutate(backend: &EncryptedBlobSecretBackend, delete: bool) -> Result<()> {
     }
 }
 fn assert_missing<T>(result: Result<T>) {
-    assert!(matches!(result, Err(BrokerError::Storage(ref message))
-        if message == "credential reference credential-race was not found"));
+    let Err(error) = result else {
+        panic!("credential unavailable must deny");
+    };
+    assert_eq!(error.diagnostic_code(), "authorization_denied");
+    assert!(matches!(
+        error,
+        BrokerError::CredentialUnavailable(_) | BrokerError::AuthorizationDenied(_)
+    ));
 }
 
 #[test]

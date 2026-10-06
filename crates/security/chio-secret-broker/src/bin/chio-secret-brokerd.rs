@@ -150,12 +150,14 @@ fn error_code(error: &BrokerError) -> &'static str {
         BrokerError::UntrustedInput(error) => error.code(),
         BrokerError::Clock(error) => error.code(),
         BrokerError::InvalidRequest(_) => "invalid_configuration",
-        BrokerError::AuthorizationDenied(_) => "authorization_denied",
+        BrokerError::AuthorizationDenied(_)
+        | BrokerError::AdapterAuthorizationDenied(_)
+        | BrokerError::CredentialUnavailable(_) => "authorization_denied",
         BrokerError::AuthorityUnavailable(_) => "authority_unavailable",
         BrokerError::Conflict(_) => "state_conflict",
         BrokerError::Invariant(_) => "runtime_invariant",
-        BrokerError::Storage(_) => "storage_unavailable",
-        BrokerError::Upstream(_) => "upstream_unavailable",
+        BrokerError::Storage(_) | BrokerError::CredentialStorage(_) => "storage_unavailable",
+        BrokerError::Upstream(_) | BrokerError::AdapterUpstream(_) => "upstream_unavailable",
         BrokerError::ResponseRejected(_) => "response_rejected",
         BrokerError::Custody(_) => "custody_unavailable",
     }

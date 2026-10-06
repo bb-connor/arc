@@ -96,8 +96,12 @@ impl DockerAdapter {
             "Docker container lifetime",
             128,
         )?;
-        config.peer.validate().map_err(|_| denied())?;
-        let metadata = std::fs::symlink_metadata(&config.socket_path).map_err(|_| denied())?;
+        config
+            .peer
+            .validate()
+            .map_err(crate::adapter_error::denied)?;
+        let metadata =
+            std::fs::symlink_metadata(&config.socket_path).map_err(crate::adapter_error::denied)?;
         if !metadata.file_type().is_socket()
             || metadata.uid() != config.peer.user_id
             || metadata.mode() & 0o007 != 0
@@ -120,27 +124,32 @@ impl DockerAdapter {
     }
 
     fn connection(&self, deadline: Instant) -> Result<DeadlineStream> {
-        let metadata = std::fs::symlink_metadata(&self.config.socket_path).map_err(|_| denied())?;
+        let metadata = std::fs::symlink_metadata(&self.config.socket_path)
+            .map_err(crate::adapter_error::denied)?;
         if (metadata.dev(), metadata.ino()) != self.socket_identity
             || !metadata.file_type().is_socket()
         {
             return Err(denied());
         }
-        let address =
-            rustix::net::SocketAddrUnix::new(&self.config.socket_path).map_err(|_| denied())?;
+        let address = rustix::net::SocketAddrUnix::new(&self.config.socket_path)
+            .map_err(crate::adapter_error::denied)?;
         let descriptor = rustix::net::socket_with(
             rustix::net::AddressFamily::UNIX,
             rustix::net::SocketType::STREAM,
             rustix::net::SocketFlags::CLOEXEC | rustix::net::SocketFlags::NONBLOCK,
             None,
         )
-        .map_err(|_| unavailable())?;
+        .map_err(crate::adapter_error::upstream)?;
         // Local backlog exhaustion is a refusal, never an unbounded connect or
         // implicit effect retry. Peer authentication follows successful connect.
-        rustix::net::connect(&descriptor, &address).map_err(|_| unavailable())?;
+        rustix::net::connect(&descriptor, &address).map_err(crate::adapter_error::upstream)?;
         let stream = UnixStream::from(descriptor);
-        stream.set_nonblocking(false).map_err(|_| unavailable())?;
-        if chio_secure_ipc::peer_identity(&stream).map_err(|_| denied())? != self.config.peer {
+        stream
+            .set_nonblocking(false)
+            .map_err(crate::adapter_error::upstream)?;
+        if chio_secure_ipc::peer_identity(&stream).map_err(crate::adapter_error::denied)?
+            != self.config.peer
+        {
             return Err(denied());
         }
         Ok(DeadlineStream { stream, deadline })
@@ -330,5 +339,7 @@ impl Write for DeadlineStream {
     }
 }
 
+#[cfg(test)]
+mod native_cause_tests;
 #[cfg(test)]
 mod tests;

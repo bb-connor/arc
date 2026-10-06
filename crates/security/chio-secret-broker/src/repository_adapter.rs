@@ -20,6 +20,8 @@ use std::{
 };
 
 mod launch;
+#[cfg(test)]
+mod native_cause_tests;
 mod pipes;
 #[cfg(test)]
 mod tests;
@@ -52,7 +54,7 @@ impl RepositoryHttpsConfig {
         let bytes = private_bytes(path, 65_536)?;
         chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, 65_536)
             .and_then(|text| text.decode_signed())
-            .map_err(|_| denied())
+            .map_err(crate::adapter_error::denied)
     }
 }
 

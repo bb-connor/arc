@@ -2,6 +2,24 @@
 use super::*;
 use chio_test_support::prelude::*;
 
+#[cfg(target_os = "linux")]
+#[test]
+fn broker_native_cause_adapter_refusal_denial_classification_control(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let directory = crate::private_tempdir()?;
+    let error = crate::repository_adapter::RepositoryHttpsConfig::load(
+        &directory.path().join("private-adapter-credential.json"),
+    )
+    .err()
+    .ok_or("missing adapter config loaded")?;
+    assert_eq!(error.diagnostic_code(), "authorization_denied");
+    assert_eq!(
+        crate::service::failure::failure_outcome_before_dispatch(&error),
+        BrokerFailureOutcome::Denied
+    );
+    Ok(())
+}
+
 #[test]
 fn response_envelope_preserves_typed_json_and_clock_rejections() {
     use chio_core_types::canonical::UntrustedJsonError;

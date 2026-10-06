@@ -18,7 +18,10 @@ pub(in crate::service) fn classify_broker_ipc_handler_result(
         Err(error)
             if matches!(
                 &error,
-                BrokerError::Invariant(_) | BrokerError::Storage(_) | BrokerError::Custody(_)
+                BrokerError::Invariant(_)
+                    | BrokerError::Storage(_)
+                    | BrokerError::CredentialStorage(_)
+                    | BrokerError::Custody(_)
             ) =>
         {
             Err(BrokerIpcServeFailure::Internal(error))

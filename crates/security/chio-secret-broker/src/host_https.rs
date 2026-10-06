@@ -57,8 +57,8 @@ pub(crate) fn private_bytes(path: &std::path::Path, maximum: u64) -> Result<Zero
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)
-        .map_err(|_| denied())?;
-    let metadata = file.metadata().map_err(|_| denied())?;
+        .map_err(crate::adapter_error::denied)?;
+    let metadata = file.metadata().map_err(crate::adapter_error::denied)?;
     if !metadata.is_file()
         || metadata.nlink() != 1
         || metadata.uid() != rustix::process::geteuid().as_raw()
@@ -72,7 +72,7 @@ pub(crate) fn private_bytes(path: &std::path::Path, maximum: u64) -> Result<Zero
     Read::by_ref(&mut file)
         .take(maximum + 1)
         .read_to_end(&mut bytes)
-        .map_err(|_| denied())?;
+        .map_err(crate::adapter_error::denied)?;
     if u64::try_from(bytes.len()).map_err(|_| denied())? != metadata.len() {
         return Err(denied());
     }

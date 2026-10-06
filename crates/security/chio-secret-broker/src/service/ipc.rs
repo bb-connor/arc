@@ -183,11 +183,18 @@ impl UnixBrokerEndpoint {
             )))
         })?;
         if let Err(error) = validate_broker_peer_uid(stream.stream(), self.authorized_client_uid) {
-            return Err(if matches!(&error, BrokerError::AuthorizationDenied(_)) {
-                BrokerIpcServeFailure::Client(error)
-            } else {
-                BrokerIpcServeFailure::Internal(error)
-            });
+            return Err(
+                if matches!(
+                    &error,
+                    BrokerError::AuthorizationDenied(_)
+                        | BrokerError::AdapterAuthorizationDenied(_)
+                        | BrokerError::CredentialUnavailable(_)
+                ) {
+                    BrokerIpcServeFailure::Client(error)
+                } else {
+                    BrokerIpcServeFailure::Internal(error)
+                },
+            );
         }
         let frame = match read_bounded_sensitive_frame(&mut stream) {
             Ok(frame) => frame,

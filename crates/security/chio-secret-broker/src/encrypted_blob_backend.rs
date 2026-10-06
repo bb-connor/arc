@@ -18,6 +18,9 @@ use crate::protocol::CredentialRef;
 use crate::sqlite::DurableBrokerDatabaseFile;
 use crate::{validate_identifier, BrokerError, Result};
 
+mod error;
+pub use error::CredentialStoreError;
+
 #[cfg(any(test, target_os = "linux", target_os = "android"))]
 const KEY_BYTES: usize = 32;
 const INDEX_DOMAIN: &[u8] = b"chio.secret-broker.index.v1\0";
@@ -277,7 +280,7 @@ impl EncryptedBlobSecretBackend {
         credential.validate()?;
         self.store
             .disable_blob_reference(&self.reference(credential)?)
-            .map_err(|_| missing_credential(credential))
+            .map_err(blob_storage)
     }
 
     pub(crate) fn disable_once(
@@ -309,7 +312,7 @@ impl EncryptedBlobSecretBackend {
         credential.validate()?;
         self.store
             .delete_blob_reference(&self.reference(credential)?)
-            .map_err(|_| missing_credential(credential))
+            .map_err(blob_storage)
     }
 
     pub(crate) fn delete_once(
@@ -343,7 +346,7 @@ impl EncryptedBlobSecretBackend {
         let current = self
             .store
             .resolve_blob_reference(&self.reference(credential)?)
-            .map_err(|_| missing_credential(credential))?;
+            .map_err(blob_storage)?;
         if &current != prepared_version {
             return Err(missing_credential(credential));
         }
@@ -362,16 +365,11 @@ impl EncryptedBlobSecretBackend {
         let handle = self
             .store
             .resolve_blob_reference(&reference)
-            .map_err(|_| missing_credential(credential))?;
+            .map_err(blob_storage)?;
         let plaintext = self
             .store
             .read_encrypted_blob(&handle, &self.tenant_key)
-            .map_err(|_| {
-                BrokerError::Storage(format!(
-                    "credential reference {} failed authentication",
-                    credential.credential_id
-                ))
-            })?;
+            .map_err(blob_storage)?;
         Ok((SecretMaterial::new(plaintext), handle))
     }
 
@@ -409,15 +407,29 @@ fn credential_lock_error<T>(_: std::sync::PoisonError<T>) -> BrokerError {
     BrokerError::AuthorityUnavailable("credential mutation fence is poisoned".to_string())
 }
 
-fn missing_credential(credential: &CredentialRef) -> BrokerError {
-    BrokerError::Storage(format!(
-        "credential reference {} was not found",
-        credential.credential_id
-    ))
+fn missing_credential(_credential: &CredentialRef) -> BrokerError {
+    BrokerError::AuthorizationDenied("credential version is unavailable".into())
 }
 
 fn blob_storage(error: chio_store_sqlite::BlobStoreError) -> BrokerError {
-    BrokerError::Storage(format!("secret encrypted-blob operation failed: {error}"))
+    use chio_store_sqlite::BlobStoreError;
+    match error {
+        BlobStoreError::NotFound => {
+            BrokerError::CredentialUnavailable(CredentialStoreError::new(BlobStoreError::NotFound))
+        }
+        error @ (BlobStoreError::Clock(_)
+        | BlobStoreError::Pool(_)
+        | BlobStoreError::Sqlite(_)
+        | BlobStoreError::Io(_)
+        | BlobStoreError::EmptyTenantId
+        | BlobStoreError::InvalidTenantId
+        | BlobStoreError::InvalidNonceLength(_)
+        | BlobStoreError::InvalidReference
+        | BlobStoreError::MutationConflict
+        | BlobStoreError::Decrypt(_)) => {
+            BrokerError::CredentialStorage(CredentialStoreError::new(error))
+        }
+    }
 }
 
 #[cfg(test)]

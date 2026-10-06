@@ -926,6 +926,9 @@ mod tests {
     use crate::sqlite::SqliteAttemptStore;
     use crate::store::{derive_attempt_ids_for_operation, AttemptRegistration};
 
+    #[cfg(target_os = "linux")]
+    mod credential_unavailable_tests;
+
     struct FixedClock(u64);
 
     impl chio_security_types::clock::Clock for FixedClock {

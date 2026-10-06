@@ -3,13 +3,21 @@ use super::super::{
     derive_attempt_ids_for_operation, execution_failure_after_capture_release,
     prepared_dispatch_id, receipt_digest, response_digest, sign_execution_receipt,
     validate_identifier, validate_revocation_snapshot, verify_execution_receipt, AttemptState,
-    AttemptTransitionEvidence, BrokerDispatchKnowledge, BrokerError, BrokerExecuteOutcome,
-    BrokerExecuteRequest, BrokerExecuteResponse, BrokerExecutionEvidence, BrokerExecutionOutcome,
-    BrokerFailureOutcome, BrokerFailureStage, BrokerReceiptBody, BrokerRevocationRequest,
-    BrokerService, CaptureExecutionHoldRequest, ExecutionFailure, ExecutionHoldState,
-    ExecutionResult, FailureOrigin, FailureProjection, HttpsDispatchFailure, Result,
-    TrustedExecutionContext, BROKER_EVIDENCE_SCHEMA, BROKER_RECEIPT_SCHEMA,
+    AttemptTransitionEvidence, BrokerDispatchKnowledge, BrokerError, BrokerExecuteFailure,
+    BrokerExecuteOutcome, BrokerExecuteRequest, BrokerExecuteResponse, BrokerExecutionEvidence,
+    BrokerExecutionOutcome, BrokerFailureOutcome, BrokerFailureStage, BrokerReceiptBody,
+    BrokerRevocationRequest, BrokerService, CaptureExecutionHoldRequest, ExecutionFailure,
+    ExecutionHoldState, ExecutionResult, FailureOrigin, FailureProjection, HttpsDispatchFailure,
+    Result, TrustedExecutionContext, BROKER_EVIDENCE_SCHEMA, BROKER_RECEIPT_SCHEMA,
 };
+
+enum ProjectedExecuteOutcome {
+    Success(Box<BrokerExecuteResponse>),
+    Failure {
+        failure: Box<BrokerExecuteFailure>,
+        error: Option<BrokerError>,
+    },
+}
 
 impl BrokerService {
     pub fn execute(
@@ -18,12 +26,17 @@ impl BrokerService {
         trusted: &TrustedExecutionContext,
         now_unix_seconds: u64,
     ) -> Result<BrokerExecuteResponse> {
-        match self.execute_evidenced(request, trusted, now_unix_seconds)? {
-            BrokerExecuteOutcome::Success(response) => Ok(*response),
-            BrokerExecuteOutcome::Failure(failure) => {
-                let failure = *failure;
-                Err(BrokerError::AuthorizationDenied(failure.diagnostic_code))
-            }
+        match self.execute_with_failure_cause(request, trusted, now_unix_seconds, &|| {
+            Ok(now_unix_seconds)
+        })? {
+            ProjectedExecuteOutcome::Success(response) => Ok(*response),
+            ProjectedExecuteOutcome::Failure {
+                error: Some(error), ..
+            } => Err(error.redacted()),
+            ProjectedExecuteOutcome::Failure {
+                failure,
+                error: None,
+            } => Err(BrokerError::AuthorizationDenied(failure.diagnostic_code)),
         }
     }
 
@@ -119,25 +132,59 @@ impl BrokerService {
         now_unix_seconds: u64,
         terminal_clock: &dyn Fn() -> Result<u64>,
     ) -> Result<BrokerExecuteOutcome> {
+        match self.execute_with_failure_cause(request, trusted, now_unix_seconds, terminal_clock)? {
+            ProjectedExecuteOutcome::Success(response) => {
+                Ok(BrokerExecuteOutcome::Success(response))
+            }
+            ProjectedExecuteOutcome::Failure { failure, error } => match error {
+                Some(error)
+                    if matches!(
+                        &error,
+                        BrokerError::Invariant(_)
+                            | BrokerError::Storage(_)
+                            | BrokerError::CredentialStorage(_)
+                            | BrokerError::Custody(_)
+                    ) =>
+                {
+                    Err(error.redacted())
+                }
+                _ => Ok(BrokerExecuteOutcome::Failure(failure)),
+            },
+        }
+    }
+
+    fn execute_with_failure_cause(
+        &self,
+        request: &BrokerExecuteRequest,
+        trusted: &TrustedExecutionContext,
+        now_unix_seconds: u64,
+        terminal_clock: &dyn Fn() -> Result<u64>,
+    ) -> Result<ProjectedExecuteOutcome> {
         let _operation_guard = self.attempt_operation_guard_for_request(request)?;
         if let Some(failure) = self.replay_failure_locked(request, now_unix_seconds)? {
-            return Ok(BrokerExecuteOutcome::Failure(Box::new(failure)));
+            return Ok(ProjectedExecuteOutcome::Failure {
+                failure: Box::new(failure),
+                error: None,
+            });
         }
         match self.execute_inner(request, trusted, now_unix_seconds, terminal_clock) {
-            Ok(response) => Ok(BrokerExecuteOutcome::Success(Box::new(response))),
+            Ok(response) => Ok(ProjectedExecuteOutcome::Success(Box::new(response))),
             Err(failure) => {
                 if self.targets_completed_attempt(request)? {
                     return Err(failure.error);
                 }
                 let terminal_unix_seconds = terminal_clock()?.max(now_unix_seconds);
-                self.persist_failure_for_origin(
+                let projected = self.persist_failure_for_origin(
                     request,
                     terminal_unix_seconds,
                     &failure.error,
                     FailureOrigin::Execution,
                     failure.projection,
-                )
-                .map(|failure| BrokerExecuteOutcome::Failure(Box::new(failure)))
+                )?;
+                Ok(ProjectedExecuteOutcome::Failure {
+                    failure: Box::new(projected),
+                    error: Some(failure.error),
+                })
             }
         }
     }

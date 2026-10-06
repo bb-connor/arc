@@ -310,7 +310,12 @@ pub(super) fn failure_bound_request_digest(request: &BrokerExecuteRequest) -> Re
 }
 
 pub(super) fn failure_outcome_before_dispatch(error: &BrokerError) -> BrokerFailureOutcome {
-    if matches!(error, BrokerError::AuthorizationDenied(_)) {
+    if matches!(
+        error,
+        BrokerError::AuthorizationDenied(_)
+            | BrokerError::AdapterAuthorizationDenied(_)
+            | BrokerError::CredentialUnavailable(_)
+    ) {
         BrokerFailureOutcome::Denied
     } else {
         BrokerFailureOutcome::Failed

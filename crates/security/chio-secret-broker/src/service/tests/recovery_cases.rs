@@ -590,10 +590,20 @@ fn response_signing_failure_is_committed_terminal_and_exact_retry_never_resends(
     let (request, trusted) = execution(&fixture, 62, 1);
     register_execution(&fixture, &request, &trusted, 20);
 
-    let first = fixture
+    let error = fixture
         .service
         .execute_evidenced(&request, &trusted, 21)
-        .test_expect("persist response-stage failure");
+        .test_expect_err("response-signing invariant remains fatal after signed projection");
+    assert!(matches!(&error, BrokerError::Invariant(_)));
+    assert_eq!(error.diagnostic_code(), "invariant");
+    assert!(std::error::Error::source(&error).is_none());
+    let first = BrokerExecuteOutcome::Failure(Box::new(
+        fixture
+            .service
+            .replay_failure(&request, 21)
+            .test_expect("read actual persisted response-stage failure")
+            .test_expect("signed response-stage terminal exists"),
+    ));
     let BrokerExecuteOutcome::Failure(failure) = &first else {
         panic!("signing failure unexpectedly completed");
     };
@@ -638,10 +648,20 @@ fn completed_response_persistence_failure_has_distinct_committed_terminal() {
     let (request, trusted) = execution(&fixture, 63, 1);
     register_execution(&fixture, &request, &trusted, 20);
 
-    let first = fixture
+    let error = fixture
         .service
         .execute_evidenced(&request, &trusted, 21)
-        .test_expect("persist completed-response storage failure");
+        .test_expect_err("response persistence storage failure remains fatal after projection");
+    assert!(matches!(&error, BrokerError::Storage(_)));
+    assert_eq!(error.diagnostic_code(), "storage");
+    assert!(std::error::Error::source(&error).is_none());
+    let first = BrokerExecuteOutcome::Failure(Box::new(
+        fixture
+            .service
+            .replay_failure(&request, 21)
+            .test_expect("read actual persisted response-persistence failure")
+            .test_expect("signed persistence-stage terminal exists"),
+    ));
     let BrokerExecuteOutcome::Failure(failure) = &first else {
         panic!("persistence failure unexpectedly completed");
     };

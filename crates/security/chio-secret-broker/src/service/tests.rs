@@ -1511,6 +1511,7 @@ pub(super) fn advancing_authority_fixture(mode: &'static str) -> Fixture {
 }
 pub(super) use endpoint_test_handler_method;
 mod authority_time;
+mod execute_cause_cases;
 mod execution_cases;
 mod ipc_audit_cases;
 mod recovery_cases;

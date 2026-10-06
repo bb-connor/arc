@@ -50,12 +50,18 @@ pub mod service;
 pub mod sqlite;
 pub mod store;
 
+#[cfg(all(test, target_os = "linux"))]
+mod adapter_cause_tests;
+mod adapter_error;
 mod backend;
 mod encrypted_blob_backend;
 #[cfg(all(test, target_os = "linux"))]
 mod process_boundary_tests;
 
-pub use encrypted_blob_backend::{EncryptedBlobSecretBackend, SealedKeyFd, SealedSigningKeyFd};
+pub use adapter_error::AdapterErrorCause;
+pub use encrypted_blob_backend::{
+    CredentialStoreError, EncryptedBlobSecretBackend, SealedKeyFd, SealedSigningKeyFd,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BrokerError {
@@ -67,6 +73,10 @@ pub enum BrokerError {
     InvalidRequest(String),
     #[error("broker authorization denied: {0}")]
     AuthorizationDenied(String),
+    #[error("broker authorization denied: authorization_denied")]
+    AdapterAuthorizationDenied(#[source] AdapterErrorCause),
+    #[error("broker authorization denied: authorization_denied")]
+    CredentialUnavailable(#[source] CredentialStoreError),
     #[error("broker authority is unavailable: {0}")]
     AuthorityUnavailable(String),
     #[error("broker state conflict: {0}")]
@@ -75,8 +85,12 @@ pub enum BrokerError {
     Invariant(String),
     #[error("broker storage failed: {0}")]
     Storage(String),
+    #[error("broker storage failed: storage")]
+    CredentialStorage(#[source] CredentialStoreError),
     #[error("broker upstream request failed: {0}")]
     Upstream(String),
+    #[error("broker upstream request failed: upstream")]
+    AdapterUpstream(#[source] AdapterErrorCause),
     #[error("broker response was rejected: {0}")]
     ResponseRejected(String),
     #[error("broker custody failed: {0}")]
@@ -110,12 +124,14 @@ impl BrokerError {
                 ClockError::InvalidWindow => "clock_invalid_window",
             },
             Self::InvalidRequest(_) => "invalid_request",
-            Self::AuthorizationDenied(_) => "authorization_denied",
+            Self::AuthorizationDenied(_)
+            | Self::AdapterAuthorizationDenied(_)
+            | Self::CredentialUnavailable(_) => "authorization_denied",
             Self::AuthorityUnavailable(_) => "authority_unavailable",
             Self::Conflict(_) => "conflict",
             Self::Invariant(_) => "invariant",
-            Self::Storage(_) => "storage",
-            Self::Upstream(_) => "upstream",
+            Self::Storage(_) | Self::CredentialStorage(_) => "storage",
+            Self::Upstream(_) | Self::AdapterUpstream(_) => "upstream",
             Self::ResponseRejected(_) => "response_rejected",
             Self::Custody(_) => "custody",
         }
@@ -126,6 +142,10 @@ impl BrokerError {
         match self {
             Self::UntrustedInput(error) => Self::UntrustedInput(error),
             Self::Clock(error) => Self::Clock(error),
+            Self::AdapterAuthorizationDenied(source) => Self::AdapterAuthorizationDenied(source),
+            Self::AdapterUpstream(source) => Self::AdapterUpstream(source),
+            Self::CredentialUnavailable(source) => Self::CredentialUnavailable(source),
+            Self::CredentialStorage(source) => Self::CredentialStorage(source),
             Self::InvalidRequest(_) => Self::InvalidRequest(code),
             Self::AuthorizationDenied(_) => Self::AuthorizationDenied(code),
             Self::AuthorityUnavailable(_) => Self::AuthorityUnavailable(code),
