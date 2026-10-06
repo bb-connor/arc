@@ -95,7 +95,7 @@ jobs:
               libssl-dev musl-tools perl pkg-config
           } 2>&1 | tee "${DIAGNOSTIC_ARTIFACTS}/native-prerequisites.log"
 
-      - name: Run seven independent exact diagnostic test nodes
+      - name: Run eleven independent exact diagnostic test nodes
         id: diagnostics
         shell: bash
         env:

@@ -18,15 +18,19 @@ import time
 import tomllib
 
 
-DESIGN_SHA = "c8e0ed88ecbf92e7b6276644c74888a32af568cf"
+DESIGN_SHA = "ee7693c73a58532cff0109912acf87e348f55166"
 CASES = (
     ("F057-admission", "linux_compile", "admission_with_a_missing_write_grant_creates_nothing"),
     ("F057-denied-admission", "linux_compile", "a_denied_admission_leaves_no_write_grant_behind"),
     ("F057-write-owner", "linux_compile", "compile_creates_a_pending_write_grant_owned_by_the_execution_identity"),
+    ("F057-rollback", "linux_compile", "a_failed_compile_removes_only_the_grants_it_created"),
+    ("F057-unprivileged", "linux_compile", "an_unprivileged_compile_refuses_a_pending_grant_for_another_identity"),
     ("F059-absolute", "linux_enforcement", "a_second_exec_by_absolute_path_is_killed"),
     ("F059-proc-fd", "linux_enforcement", "a_second_exec_through_proc_self_fd_is_killed"),
     ("F059-interpreter", "linux_enforcement", "a_second_exec_through_the_interpreter_is_killed"),
     ("control-empty-path", "linux_enforcement", "target_exec_exception_cannot_be_recreated_after_exec"),
+    ("control-segv", "linux_enforcement", "a_fault_in_the_target_reaches_its_default_action"),
+    ("control-alarm", "linux_enforcement", "a_timer_signal_reaches_the_target"),
 )
 
 
@@ -223,7 +227,7 @@ def main():
         require("rust-targets", ["rustup", "target", "list", "--installed", "--toolchain", toolchain["channel"]])
         require("cc-version", ["cc", "--version"])
         require("musl-gcc-version", ["musl-gcc", "--version"])
-        for item in result["cases"][:3]:
+        for item in (item for item in result["cases"] if item["target"] == "linux_compile"):
             case(item)
 
         # Bounded fixture/helper setup derived from DESIGN_SHA's check-linux-enforcement.sh.
@@ -260,7 +264,7 @@ def main():
             raise RuntimeError("dynamic probe did not resolve interpreter and shared library")
         interpreter = require("interpreter-resolve", ["readlink", "-e", "--", interpreter]).strip()
         require("dynamic-marker-build", ["cc", "-O2", "-fno-stack-protector", "-Wl,--build-id=none", "-DPROBE_EXIT=171", dynamic_fixture, "-o", str(dynamic_marker)])
-        for mode, path in ((10, probes / "probe-10"), (34, marker), (35, marker), (37, dynamic_marker)):
+        for mode, path in ((10, probes / "probe-10"), (34, marker), (35, marker), (37, dynamic_marker), (38, marker), (39, marker)):
             defines = ["-DPROBE_MODE=" + str(mode), "-DPROBE_PATH=" + json.dumps(str(path))]
             if mode == 37:
                 defines.append("-DPROBE_LDSO=" + json.dumps(interpreter))
@@ -279,11 +283,12 @@ def main():
         env.update(CHIO_CAGE_TEST_HELPER=str(retained_helper), CHIO_CAGE_TEST_REEXEC=str(probes / "probe-10"),
                    CHIO_CAGE_TEST_EXEC_MARKER=str(marker), CHIO_CAGE_TEST_EXEC_DYNAMIC_MARKER=str(dynamic_marker),
                    CHIO_CAGE_TEST_EXEC_ABSOLUTE=str(probes / "probe-34"), CHIO_CAGE_TEST_EXEC_PROC_FD=str(probes / "probe-35"),
-                   CHIO_CAGE_TEST_EXEC_INTERPRETER=str(probes / "probe-37"), CHIO_CAGE_TEST_DYNAMIC_RUNTIME="\n".join(runtime_paths))
+                   CHIO_CAGE_TEST_EXEC_INTERPRETER=str(probes / "probe-37"), CHIO_CAGE_TEST_FAULT=str(probes / "probe-38"),
+                   CHIO_CAGE_TEST_TIMER_SIGNAL=str(probes / "probe-39"), CHIO_CAGE_TEST_DYNAMIC_RUNTIME="\n".join(runtime_paths))
         write_json(output / "native-fixtures.json", {"environment": {key: value for key, value in env.items() if key.startswith("CHIO_CAGE_TEST_")},
                                                      "binaries": {path.name: digest(path) for path in sorted(probes.iterdir())},
                                                      "dynamic_runtime": {path: digest(Path(path)) for path in runtime_paths}})
-        for item in result["cases"][3:]:
+        for item in (item for item in result["cases"] if item["target"] == "linux_enforcement"):
             case(item)
     except BaseException as error:
         result["error"] = f"{type(error).__name__}: {error}"
