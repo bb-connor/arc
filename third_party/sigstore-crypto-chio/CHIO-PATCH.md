@@ -17,8 +17,8 @@ It no longer treats a digest as a new message and hashes it again.
 
 All upstream source and tests are retained. Four added tests cover RSA artifact
 signatures versus signatures over digest bytes, ECDSA binding, Ed25519 rejection
-and rejection of incompatible digest algorithms. The main and fuzz workspaces
-select this owned source explicitly. No audit certifies the original defective
+and rejection of incompatible digest algorithms. No lockfile in the repository contains
+sigstore-crypto, so this owned source is not compiled into any Chio artifact. No audit certifies the original defective
 registry bytes.
 
 ```sh

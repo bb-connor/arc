@@ -19,7 +19,9 @@ Licensed under the Apache License, Version 2.0.
 Chio includes the upstream nono crate under `third_party/nono-upstream-chio`
 with a filesystem grant provenance repair, and the separate `nono-chio`
 integration adapter under `third_party/nono-chio`. Both components' source,
-license and exact patch inventories are distributed with this product.
+license and exact patch inventories are distributed with this source tree. The
+`nono-chio` adapter is compiled into `chio-cage-init`; the upstream nono crate
+is not compiled into any Chio artifact.
 
 sigstore-verify 0.6.3
 Copyright 2025 prefix.dev GmbH
@@ -30,4 +32,4 @@ Licensed under the BSD 3-Clause License.
 Chio includes the upstream crate under `third_party/sigstore-verify-chio` with
 fail-closed identity, time, transparency-log, certificate, and content-binding
 patches. The source, license, provenance, and patch description are distributed
-with this product.
+with this source tree. It is not compiled into any Chio artifact.

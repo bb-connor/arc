@@ -24,7 +24,8 @@ those facts. Chio's verifier retains its separate strict checks.
 All upstream source, embedded trust data and tests are retained. Five regression
 tests cover malformed bounds, reversed intervals, loader validation, open
 intervals and inclusive endpoints. The original registry bytes are not audited.
-The main and fuzz workspaces explicitly select the repaired source.
+No lockfile in the repository contains sigstore-trust-root, so this source is
+not compiled into any Chio artifact.
 
 ```sh
 cargo test --locked --all-features --manifest-path third_party/sigstore-trust-root-chio/Cargo.toml

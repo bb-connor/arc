@@ -1,5 +1,10 @@
 # nono 0.53.0 confinement dependency review
 
+Status, October 6, 2026: not in the dependency graph. No lockfile in this
+repository (root, fuzz or the generated Docker workspaces) contains `nono`,
+so this fork is not compiled into any Chio artifact. It is kept as reviewed
+source.
+
 September 20, 2026. Confidence is high for source identity, the reproduced
 permission merge and the bounded repair. This is direct source review and
 local testing, not independent certification of all upstream product APIs.
@@ -70,9 +75,10 @@ or selecting the registry package again makes the structural gate reject.
 
 The added regression target covers every access-mode pair for User/Profile
 against System/Group, both input orders, file and directory grants, same-tier
-union, three-entry deferred merges and the empty blocked constructor used by
-Chio. The root, fuzz and generated-Docker workspace lockfiles select the fork;
-all unrelated locked packages and dependency edges remain unchanged.
+union, three-entry deferred merges and the empty blocked constructor. No
+lockfile in the repository contains the upstream nono crate, so this fork is
+not compiled into any artifact. Chio's separate `nono-chio` adapter, which
+`chio-cage-init` builds, depends only on `landlock` and `thiserror`.
 
 On macOS arm64 with Rust 1.94.1 and default features disabled:
 
