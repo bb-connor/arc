@@ -1556,14 +1556,18 @@ pub struct DeadlineUnixStream {
 
 #[cfg(unix)]
 impl DeadlineUnixStream {
+    /// Wrap an accepted connection. A connection accepted from a nonblocking
+    /// listener inherits `O_NONBLOCK` on BSD-derived kernels, which would end
+    /// the exchange at the first read that finds no data. The deadline is
+    /// fixed first, then the connection is made blocking, so every read and
+    /// write waits until data arrives or the deadline passes.
     pub fn new(
         stream: std::os::unix::net::UnixStream,
         budget: std::time::Duration,
     ) -> std::io::Result<Self> {
-        Ok(Self {
-            stream,
-            deadline: deadline_after(budget)?,
-        })
+        let deadline = deadline_after(budget)?;
+        stream.set_nonblocking(false)?;
+        Ok(Self { stream, deadline })
     }
 
     /// Connect to a service socket under one deadline that also bounds the
