@@ -143,7 +143,7 @@ pub fn load_audit_service_config(path: impl AsRef<Path>) -> Result<AuditServiceC
 }
 
 fn load_bounded_json_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
-    let (bytes, _) = crate::service::read_bounded_regular_file(path, MAX_CANONICAL_RECORD_BYTES)?;
+    let bytes = crate::service::read_bounded_regular_file(path, MAX_CANONICAL_RECORD_BYTES)?;
     Ok(chio_core_types::canonical::UntrustedJsonText::from_wire(
         &bytes,
         MAX_CANONICAL_RECORD_BYTES,

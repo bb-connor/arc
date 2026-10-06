@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs::Metadata;
 use std::io::BufRead;
 use std::path::Path;
 
@@ -85,7 +84,7 @@ where
 }
 
 pub fn load_key_log_policy(path: impl AsRef<Path>) -> Result<KeyLogPolicy> {
-    let (bytes, _) = read_bounded_regular_file(path.as_ref(), crate::MAX_CANONICAL_RECORD_BYTES)?;
+    let bytes = read_bounded_regular_file(path.as_ref(), crate::MAX_CANONICAL_RECORD_BYTES)?;
     let document: KeyLogPolicyDocument = chio_core_types::canonical::UntrustedJsonText::from_wire(
         &bytes,
         crate::MAX_CANONICAL_RECORD_BYTES,
@@ -94,49 +93,37 @@ pub fn load_key_log_policy(path: impl AsRef<Path>) -> Result<KeyLogPolicy> {
     document.into_policy()
 }
 
+const WITNESS_SEED_BYTES: usize = 32;
+
+/// Load the witness signing seed. An ordinary seed file must be an owner-only
+/// regular file, checked on its descriptor before any content is read. The
+/// buffer the seed is read into is wiped when dropped, on success and on every
+/// error path, and the seed is borrowed from it without a copy.
 pub fn load_witness_seed_backend(path: impl AsRef<Path>) -> Result<Ed25519Backend> {
     let path = path.as_ref();
-    let ordinary = read_bounded_regular_file(path, 32);
+    let ordinary = crate::read_custody_file(
+        path,
+        WITNESS_SEED_BYTES,
+        crate::CustodyFileAccess::OwnerOnly,
+    );
     #[cfg(target_os = "linux")]
-    let (mut bytes, metadata, managed) = match ordinary {
-        Ok((bytes, metadata)) => (bytes, metadata, false),
+    let bytes = match ordinary {
+        Ok(bytes) => bytes,
         Err(original) => match read_systemd_seed(path) {
-            Ok((bytes, metadata)) => (bytes, metadata, true),
+            Ok(bytes) => bytes,
             Err(_) => return Err(original),
         },
     };
     #[cfg(not(target_os = "linux"))]
-    let (mut bytes, metadata, managed) = {
-        let (bytes, metadata) = ordinary?;
-        (bytes, metadata, false)
-    };
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        if !managed && (metadata.mode() & 0o077 != 0 || metadata.nlink() != 1) {
-            return Err(KeyringError::StateInvariant(
-                "witness seed must have mode 0600 or stricter and one hard link",
-            ));
-        }
-    }
-    if bytes.len() != 32 {
-        bytes.fill(0);
-        return Err(KeyringError::StateInvariant(
-            "witness seed must contain exactly 32 bytes",
-        ));
-    }
-    let mut seed = [0_u8; 32];
-    seed.copy_from_slice(&bytes);
-    bytes.fill(0);
-    let keypair = Keypair::from_seed(&seed);
-    seed.fill(0);
-    Ok(Ed25519Backend::new(keypair))
+    let bytes = ordinary?;
+    let seed = <&[u8; WITNESS_SEED_BYTES]>::try_from(bytes.as_slice())
+        .map_err(|_| KeyringError::StateInvariant("witness seed must contain exactly 32 bytes"))?;
+    Ok(Ed25519Backend::new(Keypair::from_seed(seed)))
 }
 
 #[cfg(target_os = "linux")]
-fn read_systemd_seed(path: &Path) -> Result<(Vec<u8>, Metadata)> {
+fn read_systemd_seed(path: &Path) -> Result<zeroize::Zeroizing<Vec<u8>>> {
     use rustix::fs::{open, Mode, OFlags};
-    use std::io::Read;
 
     if !path.is_absolute() {
         return Err(KeyringError::StateInvariant(
@@ -159,22 +146,19 @@ fn read_systemd_seed(path: &Path) -> Result<(Vec<u8>, Metadata)> {
             "invalid systemd credential custody",
         ));
     }
-    let metadata = file.metadata()?;
-    if metadata.len() != 32 {
+    if file.metadata()?.len() != 32 {
         return Err(KeyringError::StateInvariant(
             "witness seed must contain exactly 32 bytes",
         ));
     }
-    let mut bytes = Vec::with_capacity(32);
-    file.by_ref().take(33).read_to_end(&mut bytes)?;
-    Ok((bytes, metadata))
+    crate::read_bounded_zeroizing(&mut file, WITNESS_SEED_BYTES)
 }
 
 pub(crate) fn read_bounded_regular_file(
     path: &Path,
     maximum_bytes: usize,
-) -> Result<(Vec<u8>, Metadata)> {
-    crate::read_custody_sensitive_file_with_metadata(path, maximum_bytes)
+) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    crate::read_custody_file(path, maximum_bytes, crate::CustodyFileAccess::SharedRead)
 }
 
 pub fn read_bounded_json_line<R, T>(reader: &mut R) -> Result<Option<T>>
