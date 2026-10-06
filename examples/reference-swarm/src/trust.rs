@@ -16,15 +16,14 @@ pub struct TrustClient {
 }
 
 impl TrustClient {
-    pub fn new(base_url: &str, service_bearer: &str) -> Self {
-        Self {
+    pub fn new(base_url: &str, service_bearer: &str) -> Result<Self, reqwest::Error> {
+        Ok(Self {
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(15))
-                .build()
-                .unwrap_or_default(),
+                .build()?,
             base_url: base_url.trim_end_matches('/').to_string(),
             bearer: service_bearer.to_string(),
-        }
+        })
     }
 
     pub fn healthy(&self) -> bool {
