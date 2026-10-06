@@ -258,8 +258,8 @@ python3 -I "$inventory_checker" \
   --root "$root" \
   --run-output "$all_targets_output"
 all_targets_passed="$(passed_total "$all_targets_output")"
-if [[ "$all_targets_passed" -ne 99 ]]; then
-  echo "real-Linux all-target cage lane did not execute exactly 99 tests" >&2
+if [[ "$all_targets_passed" -ne 101 ]]; then
+  echo "real-Linux all-target cage lane did not execute exactly 101 tests" >&2
   exit 1
 fi
 
@@ -314,6 +314,8 @@ expected_probes=(
   a_timer_signal_reaches_the_target
   a_stopped_target_stays_stopped_until_it_is_continued
   racing_stops_continues_and_a_kill_end_with_an_observed_exit
+  dropping_a_stopped_target_reaps_it
+  rapid_stop_continue_then_drop_reaps_the_target
 )
 for test_name in "${expected_probes[@]}"; do
   if [[ "$(grep -Fxc "test $test_name ... ok" "$probe_output")" -ne 1 ]]; then

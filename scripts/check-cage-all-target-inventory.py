@@ -19,10 +19,10 @@ EXPECTED_COUNTS = {
     "entrypoint": 1,
     "enforcement_evidence": 8,
     "linux_compile": 26,
-    "linux_enforcement": 36,
+    "linux_enforcement": 38,
 }
-EXPECTED_TOTAL = 99
-EXPECTED_SHA256 = "f919779638825aa0b9b037380fc889aff2e67138e98df2cd109ed5bebf6f1ac1"
+EXPECTED_TOTAL = 101
+EXPECTED_SHA256 = "a3f467c81b095032e9ce1842e0bcebc3142b74a177b86a65f8c87672e08b8da0"
 EXPECTED_INTEGRATION_TARGETS = {
     "enforcement_evidence.rs",
     "linux_compile.rs",
