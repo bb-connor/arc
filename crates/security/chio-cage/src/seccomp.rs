@@ -6,6 +6,13 @@ use super::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+/// The only ioctl requests a target may make on its descriptors: terminal
+/// probes (TCGETS, TIOCGWINSZ), pending input (FIONREAD), nonblocking mode
+/// (FIONBIO) and setting close-on-exec (FIOCLEX). The values are the
+/// asm-generic numbers shared by x86_64 and aarch64. Interface queries
+/// (SIOCGIF*) and clearing close-on-exec (FIONCLEX) kill the target.
+pub(super) const REVIEWED_IOCTL_REQUESTS: [u64; 5] = [0x5401, 0x5413, 0x541B, 0x5421, 0x5451];
+
 pub(super) fn build_seccomp_plan(
     architecture: SandboxArchitecture,
     profile: NativeSyscallProfile,
@@ -192,6 +199,19 @@ pub(super) fn build_seccomp_plan(
         .into_iter()
         .map(|(syscall, constraints)| (syscall, vec![constraints]))
         .collect::<BTreeMap<_, _>>();
+    argument_constraints.insert(
+        Syscall::Ioctl,
+        REVIEWED_IOCTL_REQUESTS
+            .iter()
+            .map(|request| {
+                vec![SyscallArgumentConstraint {
+                    argument_index: 1,
+                    comparison: SeccompArgumentComparison::Equal,
+                    value: *request,
+                }]
+            })
+            .collect(),
+    );
     if profile != NativeSyscallProfile::BrokeredNativeV1 {
         // Inspect an existing descriptor without duplicating it or changing flags.
         // Rust's I/O safety checks use F_GETFD when closing owned files.

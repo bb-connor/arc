@@ -113,7 +113,7 @@ if [[ "$status" -ne 0 ]]; then
   exit "$status"
 fi
 marker="CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=$challenge"
-if [[ "$(grep -Ec "^${marker} all_targets=103 probes=39 mutations=10$" "$output")" -ne 1 ]]; then
+if [[ "$(grep -Ec "^${marker} all_targets=104 probes=40 mutations=10$" "$output")" -ne 1 ]]; then
   echo "real-Linux cage evidence marker is absent, stale, or ambiguous" >&2
   exit 1
 fi

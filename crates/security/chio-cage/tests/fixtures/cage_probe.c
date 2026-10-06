@@ -41,6 +41,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_PRLIMIT64 302
 #define SYS_TGKILL 234
 #define SYS_SETITIMER 38
+#define SYS_IOCTL 16
 __asm__(
     ".global _start\n"
     ".type _start,@function\n"
@@ -95,6 +96,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_PRLIMIT64 261
 #define SYS_TGKILL 131
 #define SYS_SETITIMER 103
+#define SYS_IOCTL 29
 __asm__(
     ".global _start\n"
     ".type _start,%function\n"
@@ -493,6 +495,30 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
             terminate(signal == 13 ? 121 : 122);
         }
     }
+    terminate(0);
+#elif PROBE_MODE == 41
+    // SIOCGIFCONF on a stdio socket enumerates host interfaces without
+    // creating a socket; the profile must kill it.
+    static char buffer[1024];
+    static struct {
+        int length;
+        char *buffer;
+    } configuration = {sizeof(buffer), buffer};
+    invoke(SYS_IOCTL, 0, 0x8912, (long)&configuration, 0);
+    terminate(120);
+#elif PROBE_MODE == 42
+    // FIONCLEX clears close-on-exec; the profile must kill it.
+    invoke(SYS_IOCTL, 1, 0x5450, 0, 0);
+    terminate(120);
+#elif PROBE_MODE == 43
+    // Every reviewed request returns normally, whatever its result.
+    static unsigned long scratch[16];
+    static int mode = 0;
+    invoke(SYS_IOCTL, 1, 0x5401, (long)scratch, 0);
+    invoke(SYS_IOCTL, 1, 0x5413, (long)scratch, 0);
+    invoke(SYS_IOCTL, 0, 0x541B, (long)scratch, 0);
+    invoke(SYS_IOCTL, 1, 0x5421, (long)&mode, 0);
+    invoke(SYS_IOCTL, 1, 0x5451, 0, 0);
     terminate(0);
 #elif PROBE_MODE == 38
     // A synchronous fault must reach its default action. The address is read
