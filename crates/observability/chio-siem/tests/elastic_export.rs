@@ -202,7 +202,7 @@ async fn elastic_bulk_sends_correct_ndjson() {
     // Parse first document line.
     let doc0: serde_json::Value = serde_json::from_str(lines[1]).expect("line 1 is valid JSON");
     assert_eq!(
-        doc0.get("id").and_then(|v| v.as_str()),
+        doc0.get("receipt_id").and_then(|v| v.as_str()),
         Some(receipt1_id.as_str()),
         "document id must match receipt id"
     );
@@ -352,15 +352,14 @@ async fn elastic_financial_metadata_in_payload() {
         serde_json::from_str(lines[1]).expect("document line is valid JSON");
 
     let cost = doc
-        .get("metadata")
-        .and_then(|m| m.get("financial"))
+        .get("financial")
         .and_then(|f| f.get("cost_charged"))
         .and_then(|c| c.as_u64());
 
     assert_eq!(
         cost,
         Some(750),
-        "metadata.financial.cost_charged should be 750 in exported document"
+        "financial.cost_charged should be 750 in exported document"
     );
 }
 

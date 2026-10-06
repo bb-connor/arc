@@ -167,7 +167,7 @@ pub fn derive_event_severity(event: &SiemEvent) -> AlertSeverity {
     }
 }
 
-fn severity_for_guard(guard: &str, evidence: &[GuardEvidence]) -> AlertSeverity {
+pub(crate) fn severity_for_guard(guard: &str, evidence: &[GuardEvidence]) -> AlertSeverity {
     let guard_lower = guard.to_ascii_lowercase();
     let mut tokens: Vec<String> = vec![guard_lower.clone()];
     tokens.extend(evidence.iter().map(|g| g.guard_name.to_ascii_lowercase()));
@@ -215,13 +215,13 @@ pub struct Alert {
     pub summary: String,
     /// Severity derived by [`derive_severity`].
     pub severity: AlertSeverity,
-    /// Stable dedup key for alert grouping (guard + tool + receipt id).
+    /// Stable dedup key for alert grouping (hashed guard/tool + receipt id).
     pub dedup_key: String,
-    /// Guard name that produced the deny decision (or `"chio.kernel"`).
+    /// SHA-256 guard reference (or the fixed `"chio.kernel"` fallback).
     pub guard: String,
-    /// Tool name that was being invoked.
+    /// SHA-256 reference to the tool name that was being invoked.
     pub tool_name: String,
-    /// Tool server that was hosting the tool.
+    /// SHA-256 reference to the tool server that was hosting the tool.
     pub tool_server: String,
     /// Receipt identifier for cross-referencing with the receipt log.
     pub receipt_id: String,
@@ -797,7 +797,11 @@ impl Exporter for AlertingExporter {
                     continue;
                 }
 
-                let alert = projection::build_alert(event);
+                let trusted_pin = self
+                    .trusted_kernel_keys
+                    .iter()
+                    .find(|key| *key == &event.receipt.kernel_key);
+                let alert = projection::build_alert(event, trusted_pin);
                 let mut any_failure = false;
 
                 for backend in &self.backends {

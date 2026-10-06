@@ -301,11 +301,8 @@ impl WebhookExporter {
             WebhookAuth::Header { name, value } => req.header(name.as_str(), value.as_str()),
         };
 
-        let body = serde_json::to_string(event).map_err(|e| {
-            ExportError::SerializationError(format!(
-                "failed to serialize event for receipt {}: {e}",
-                event.receipt.id
-            ))
+        let body = serde_json::to_string(&event.sink_projection()).map_err(|e| {
+            ExportError::SerializationError(format!("failed to serialize receipt projection: {e}"))
         })?;
 
         Ok(req.header("Content-Type", "application/json").body(body))

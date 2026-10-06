@@ -209,7 +209,11 @@ async fn high_severity_deny_dispatches_to_backend() {
     assert_eq!(recorded.len(), 1, "only the deny should be alerted on");
     assert_eq!(recorded[0].receipt_id, expected_receipt_id);
     assert_eq!(recorded[0].severity, AlertSeverity::High);
-    assert_eq!(recorded[0].guard, "ForbiddenPathGuard");
+    assert_eq!(
+        recorded[0].guard,
+        "sha256:02f1334fbed0c44fea2662ed9cb24bce875387ee0402da9519d71c6a8ea58a8e"
+    );
+    assert!(!recorded[0].summary.contains("ForbiddenPathGuard"));
 }
 
 #[tokio::test]

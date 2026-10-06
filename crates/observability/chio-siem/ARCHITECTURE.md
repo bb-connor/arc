@@ -24,7 +24,8 @@ flowchart LR
     end
     subgraph ingest["Ingest and normalize"]
         POLL["Cursor pull poll loop"]
-        SE["SiemEvent normalize and reverify"]
+        SE["Original SiemEvent and owned signer pins"]
+        PROJ["Closed unsigned sink projection"]
         DL["Dead letters (siem_dead_letters)"]
     end
     subgraph dispatch["Manager dispatch"]
@@ -48,7 +49,8 @@ flowchart LR
     RDB -->|"raw_json rows"| POLL
     POLL -->|"parse ok"| SE
     POLL -->|"malformed"| DL
-    SE -->|"batch"| FANOUT
+    SE -->|"reverify original"| PROJ
+    PROJ -->|"ordinary payload"| FANOUT
     FANOUT --> SPLUNK
     FANOUT --> ELASTIC
     FANOUT --> DATADOG
@@ -70,6 +72,7 @@ flowchart LR
 | `src/lib.rs` | Public module declarations and the crate's re-export surface. |
 | `src/manager.rs` | `ExporterManager`: cursor-pull poll loop, per-exporter retry/backoff, cursor persistence, DLQ routing, metric emission. |
 | `src/event.rs` | `SiemEvent`: wraps `ChioReceipt`, recomputes id/signature/parameter-hash validity and signer trust, extracts `financial` metadata. |
+| `src/sink_projection.rs` | Closed, Serialize-only ordinary sink payload with fixed tags, bounded commitments, hashed identifiers, typed source semantics, original verification and numeric-only financial diagnostics. |
 | `src/exporter.rs` | `Exporter` trait, `ExportError`, `ExportFuture`. |
 | `src/cursor_store.rs` | `SiemCursorStore`: RW SQLite store for per-exporter `acked_seq` and durably captured malformed rows (`siem_dead_letters`). |
 | `src/dlq.rs` | `DeadLetterQueue`: bounded, drop-oldest in-memory queue for events that exhaust retry. |
@@ -108,13 +111,15 @@ flowchart LR
    retries it.
 5. Every parsed row becomes a `SiemEvent` via
    `SiemEvent::from_receipt_with_trusted_kernel_keys`, recomputing
-   authorization independently of the embedded `decision`.
+   source verification independently of the embedded `decision`, retaining a
+   private owned signer pin that cannot be supplied by deserialization.
 6. The batch fans out to each registered exporter through
    `export_with_retry` (exponential backoff capped at
    `MAX_RETRY_BACKOFF_MS` = 60s), gated by the optional `ExportRateLimiter`.
 7. A returned `Ok(n)` acks only the delivered prefix (`n` may be less than
    the batch size); a returned `Err` leaves that exporter's high-water mark
-   untouched and pushes every event in the batch onto the `DeadLetterQueue`.
+   untouched and pushes an unsigned sink projection for every event in the
+   batch onto the `DeadLetterQueue`.
    An exporter with `is_soc_export_sink() == false` (the alerting overlay)
    still advances its own cursor but is excluded from SOC export/lag/DLQ
    metrics, so a failed page cannot burn the SOC export SLO.
@@ -130,10 +135,17 @@ flowchart LR
   database.
 - The receipt database connection is opened read-only; the cursor database
   is the only SQLite file this crate writes.
-- `SiemEvent::authorized` requires receipt id, signature, and action
+- `SiemEvent::is_authorized()` and ordinary sink projection authorization require receipt id, signature, and action
   parameter hash to verify AND the signer to be in the caller-supplied
-  trusted-kernel-key set; a self-signed or untrusted receipt is never
-  reported as authorized.
+  privately owned trusted-kernel-key set and a mediated prevent/allow boundary.
+  Public cached annotations are not authority. Mutating the source receipt or
+  deserializing cached flags cannot promote an untrusted allow.
+- All built-in ordinary exporters serialize/render `SiemSinkProjection`; none
+  forwards the source receipt or arbitrary financial metadata. The projection
+  is explicitly unsigned and requires authorized original retrieval for
+  independent authentication. The original signed receipt remains unchanged.
+  Source payload retention and durable malformed-row capture remain separate
+  retention/erasure acceptance, including the stored `raw_json` dead letters.
 - Alerting dispatch owns its own typed kernel signer pins, supplied through
   `AlertingExporterBuilder::with_trusted_kernel_keys`. An empty pin set never
   pages. Before invoking backends it checks the original receipt's canonical ID,

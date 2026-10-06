@@ -199,22 +199,21 @@ async fn splunk_hec_sends_correct_envelope() {
     );
     let event0 = obj0.get("event").expect("event field must exist");
     assert_eq!(
-        event0.get("id").and_then(|v| v.as_str()),
+        event0.get("receipt_id").and_then(|v| v.as_str()),
         Some(receipt1_id.as_str()),
-        "event.id must match receipt id"
+        "event.receipt_id must match receipt id"
     );
 
     // Parse second object: receipt with financial metadata.
     let obj1: serde_json::Value = serde_json::from_str(lines[1]).expect("line 1 is valid JSON");
     let event1 = obj1.get("event").expect("event field must exist");
     assert_eq!(
-        event1.get("id").and_then(|v| v.as_str()),
+        event1.get("receipt_id").and_then(|v| v.as_str()),
         Some(receipt2_id.as_str()),
-        "event.id must match receipt id"
+        "event.receipt_id must match receipt id"
     );
     let cost = event1
-        .get("metadata")
-        .and_then(|m| m.get("financial"))
+        .get("financial")
         .and_then(|f| f.get("cost_charged"))
         .and_then(|c| c.as_u64());
     assert_eq!(cost, Some(500), "financial.cost_charged must be 500");

@@ -160,43 +160,19 @@ impl Exporter for ElasticsearchExporter {
             // Every line (including the last) must end with '\n'.
             let mut body = String::new();
             for ev in events {
+                let projection = ev.sink_projection();
                 let action = serde_json::json!({
                     "index": {
                         "_index": &self.config.index_name,
-                        "_id": &ev.receipt.id,
+                        "_id": projection.event_reference(),
                     }
                 });
                 body.push_str(&action.to_string());
                 body.push('\n');
 
-                let mut document = serde_json::to_value(&ev.receipt).map_err(|e| {
+                let doc = serde_json::to_string(&projection).map_err(|e| {
                     ExportError::SerializationError(format!(
-                        "failed to serialize receipt {}: {e}",
-                        ev.receipt.id
-                    ))
-                })?;
-                if let Some(obj) = document.as_object_mut() {
-                    obj.insert(
-                        "receipt_kind".to_string(),
-                        serde_json::Value::String(ev.receipt_kind.clone()),
-                    );
-                    obj.insert(
-                        "boundary_class".to_string(),
-                        serde_json::Value::String(ev.boundary_class.clone()),
-                    );
-                    obj.insert(
-                        "result".to_string(),
-                        serde_json::Value::String(ev.result.clone()),
-                    );
-                    obj.insert(
-                        "authorized".to_string(),
-                        serde_json::Value::Bool(ev.authorized),
-                    );
-                }
-                let doc = serde_json::to_string(&document).map_err(|e| {
-                    ExportError::SerializationError(format!(
-                        "failed to serialize receipt document {}: {e}",
-                        ev.receipt.id
+                        "failed to serialize receipt projection: {e}"
                     ))
                 })?;
                 body.push_str(&doc);

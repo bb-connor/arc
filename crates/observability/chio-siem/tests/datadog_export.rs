@@ -154,8 +154,9 @@ async fn datadog_posts_log_array_with_api_key_header() {
     assert!(tags1.contains("receipt_kind:mediated_decision"));
     assert!(tags1.contains("boundary_class:prevent"));
     assert!(tags1.contains("severity:high"));
-    assert!(tags1.contains("guard:ForbiddenPathGuard"));
-    assert!(tags1.contains("evidence_guard:ForbiddenPathGuard"));
+    assert!(tags1.contains("guard_sha256:"));
+    assert!(!tags1.contains("ForbiddenPathGuard"));
+    assert!(!tags1.contains("evidence_guard:"));
     assert_eq!(
         arr[1].get("result").and_then(|v| v.as_str()),
         Some("Denied")

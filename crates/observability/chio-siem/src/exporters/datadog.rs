@@ -4,12 +4,12 @@
 //! (`https://http-intake.logs.<site>/api/v2/logs`) as a JSON array of log
 //! entries. Each log entry carries:
 //!
-//! - `message`: the first deny reason, or `"chio.receipt"` on Allow.
+//! - `message`: a fixed semantic result label.
 //! - `ddsource`/`service`: configurable source + service fields.
 //! - `status`: Datadog status derived from [`AlertSeverity`] + decision.
-//! - `ddtags`: comma-separated tags including `tool`, `server`, `outcome`,
-//!   and every guard name from `receipt.evidence`.
-//! - `event`: the full [`ChioReceipt`] payload for analyst drill-down.
+//! - `ddtags`: comma-separated tags including hashed tool/server references and `outcome`,
+//!   with hashed tool/guard references and no evidence names.
+//! - `event`: the closed unsigned sink projection for original retrieval.
 //!
 //! Implemented against the Chio `Exporter` trait (dyn-compatible
 //! `Pin<Box<dyn Future>>`) and Chio receipt shape
@@ -17,11 +17,10 @@
 
 use std::time::Duration;
 
-use crate::alerting::{derive_event_severity, AlertSeverity};
+use crate::alerting::AlertSeverity;
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::redaction::redact_for_operator_log;
-use chio_core::receipt::decision::Decision;
 use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
 
 /// Configuration for the Datadog Logs exporter.
@@ -193,105 +192,49 @@ impl DatadogExporter {
     fn build_payload(&self, events: &[SiemEvent]) -> Result<Vec<serde_json::Value>, ExportError> {
         let hostname = self.hostname();
         let mut logs = Vec::with_capacity(events.len());
-
-        for ev in events {
-            let receipt = &ev.receipt;
-            let authorized = ev.is_authorized();
-            let (allow, guard_label, reason) = match &receipt.decision {
-                Some(Decision::Allow) if authorized => (true, "allow", "chio.receipt".to_string()),
-                Some(Decision::Allow) => (
-                    false,
-                    ev.receipt_kind.as_str(),
-                    format!("{} receipt", ev.receipt_kind),
-                ),
-                Some(Decision::Deny { reason, guard }) => (false, guard.as_str(), reason.clone()),
-                Some(Decision::Cancelled { reason }) => (false, "cancelled", reason.clone()),
-                Some(Decision::Incomplete { reason }) => (false, "incomplete", reason.clone()),
-                None => (
-                    false,
-                    ev.receipt_kind.as_str(),
-                    format!("{} receipt", ev.receipt_kind),
-                ),
-            };
-            let reason = redact_for_operator_log(reason);
-
-            let severity = derive_event_severity(ev);
-
+        for event in events {
+            let projection = event.sink_projection();
+            let severity = projection.alert_severity;
             let mut tags = self.config.tags.clone();
-            tags.push(format!("tool:{}", sanitize_tag_value(&receipt.tool_name)));
             tags.push(format!(
-                "tool_server:{}",
-                sanitize_tag_value(&receipt.tool_server)
-            ));
-            tags.push(format!("guard:{}", sanitize_tag_value(guard_label)));
-            tags.push(format!(
-                "severity:{}",
-                sanitize_tag_value(severity.as_tag())
+                "tool_sha256:{}",
+                projection.tool_name_sha256.as_str()
             ));
             tags.push(format!(
-                "receipt_kind:{}",
-                sanitize_tag_value(&ev.receipt_kind)
+                "tool_server_sha256:{}",
+                projection.tool_server_sha256.as_str()
             ));
+            if let Some(guard) = &projection.guard_sha256 {
+                tags.push(format!("guard_sha256:{}", guard.as_str()));
+            }
+            tags.push(format!("severity:{}", severity.as_tag()));
+            tags.push(format!("receipt_kind:{}", projection.receipt_kind.as_str()));
             tags.push(format!(
                 "boundary_class:{}",
-                sanitize_tag_value(&ev.boundary_class)
+                projection.boundary_class.as_str()
             ));
             tags.push(format!(
                 "outcome:{}",
-                if allow {
+                if projection.authorized {
                     "allow"
                 } else {
-                    ev.receipt_kind.as_str()
+                    projection.receipt_kind.as_str()
                 }
             ));
-
-            for guard in &receipt.evidence {
-                tags.push(format!(
-                    "evidence_guard:{}",
-                    sanitize_tag_value(&guard.guard_name)
-                ));
-            }
-
-            let mut event_json = serde_json::to_value(receipt).map_err(|e| {
-                ExportError::SerializationError(format!(
-                    "failed to serialize receipt {}: {e}",
-                    receipt.id
-                ))
-            })?;
-            if let Some(obj) = event_json.as_object_mut() {
-                obj.insert(
-                    "receipt_kind".to_string(),
-                    serde_json::Value::String(ev.receipt_kind.clone()),
-                );
-                obj.insert(
-                    "boundary_class".to_string(),
-                    serde_json::Value::String(ev.boundary_class.clone()),
-                );
-                obj.insert(
-                    "result".to_string(),
-                    serde_json::Value::String(ev.result.clone()),
-                );
-                obj.insert(
-                    "authorized".to_string(),
-                    serde_json::Value::Bool(ev.authorized),
-                );
-            }
-
             logs.push(serde_json::json!({
-                "message": reason,
+                "message": projection.result_label(),
                 "ddsource": self.config.source,
                 "service": self.config.service,
                 "hostname": hostname,
-                "status": Self::datadog_status(severity, allow),
+                "status": Self::datadog_status(severity, projection.authorized),
                 "ddtags": tags.join(","),
-                "receipt_kind": ev.receipt_kind.clone(),
-                "boundary_class": ev.boundary_class.clone(),
-                "result": ev.result.clone(),
-                "authorized": ev.authorized,
-                "event": event_json,
+                "receipt_kind": projection.receipt_kind,
+                "boundary_class": projection.boundary_class,
+                "result": projection.result_label(),
+                "authorized": projection.authorized,
+                "event": projection,
             }));
         }
-
         Ok(logs)
     }
 }
@@ -348,16 +291,6 @@ impl Exporter for DatadogExporter {
             )))
         })
     }
-}
-
-fn sanitize_tag_value(value: &str) -> String {
-    value
-        .chars()
-        .map(|c| match c {
-            ' ' | ',' | '\n' | '\r' | '\t' => '_',
-            _ => c,
-        })
-        .collect()
 }
 
 #[cfg(test)]
