@@ -39,7 +39,11 @@ Writable directory grants are rejected.
 Read-directory grants are closed over their existing regular-file and
 directory descendants at admission, bounded by the 64-slot read-grant limit.
 Every descendant is retained by descriptor, and any descendant identity that
-aliases an operator-forbidden object rejects admission. Landlock grants
+aliases an operator-forbidden object rejects admission. When any allowed
+regular file has more than one link, admission also walks every forbidden
+directory (bounded at 4096 entries and depth 64, failing closed beyond that)
+and rejects an allowed file that shares an inode with a forbidden descendant.
+Landlock grants
 directories `ReadDir` only and grants `ReadFile` only to the exact retained
 files. A hard link or file created after admission therefore receives no file
 read authority. The default-deny Landlock layer and seccomp profile also deny

@@ -67,6 +67,8 @@ const SO_PEERCRED: c_int = 17;
 
 const DIRECTORY_SCAN_BUFFER_BYTES: usize = 64 * 1024;
 const LINUX_DIRENT64_NAME_OFFSET: usize = 19;
+const MAX_FORBIDDEN_SCAN_ENTRIES: usize = 4096;
+const MAX_FORBIDDEN_SCAN_DEPTH: usize = 64;
 
 #[repr(C)]
 struct OpenHow {
@@ -312,11 +314,13 @@ fn invalid_directory_record(path: &Path, message: &'static str) -> CageError {
     }
 }
 
-fn retain_directory_entry(
+/// Open one directory entry without following it. Entries that vanished or
+/// are symbolic links yield `None`.
+fn open_directory_entry(
     directory: &File,
     path: &Path,
     name: &std::ffi::OsStr,
-) -> Result<Option<RetainedResource>, CageError> {
+) -> Result<Option<(File, std::fs::Metadata)>, CageError> {
     let file = match openat2(
         directory.as_raw_fd(),
         name.as_bytes(),
@@ -349,6 +353,17 @@ fn retain_directory_entry(
     if metadata.file_type().is_symlink() {
         return Ok(None);
     }
+    Ok(Some((file, metadata)))
+}
+
+fn retain_directory_entry(
+    directory: &File,
+    path: &Path,
+    name: &std::ffi::OsStr,
+) -> Result<Option<RetainedResource>, CageError> {
+    let Some((file, metadata)) = open_directory_entry(directory, path, name)? else {
+        return Ok(None);
+    };
     if !(metadata.file_type().is_file() || metadata.file_type().is_dir()) {
         return Err(CageError::UnsupportedResourceKind(path.to_path_buf()));
     }
@@ -360,6 +375,108 @@ fn retain_directory_entry(
         creation_parent: None,
         file,
     }))
+}
+
+/// Landlock grants file authority by inode, so a hard link can carry a file
+/// beneath a forbidden directory into an allowed path. Every allowed regular
+/// file with more than one link must not share an inode with a regular file
+/// anywhere beneath a forbidden directory. The walk is bounded and fails
+/// closed when a forbidden tree exceeds the bound.
+pub(crate) fn reject_forbidden_descendant_aliases(
+    forbidden: &[RetainedResource],
+    read: &[RetainedResource],
+    write: &[RetainedResource],
+) -> Result<(), CageError> {
+    let mut linked = Vec::new();
+    for resource in read.iter().chain(write) {
+        if resource.identity.kind() != ResourceKind::RegularFile {
+            continue;
+        }
+        let metadata =
+            resource
+                .file
+                .metadata()
+                .map_err(|source| CageError::DescriptorMetadata {
+                    path: resource.path.clone(),
+                    source,
+                })?;
+        if metadata.st_nlink() > 1 {
+            linked.push(resource);
+        }
+    }
+    if linked.is_empty() {
+        return Ok(());
+    }
+    let mut scan = ForbiddenTreeScan {
+        linked: &linked,
+        entries: 0,
+        visited_directories: BTreeSet::new(),
+    };
+    for directory in forbidden
+        .iter()
+        .filter(|resource| resource.identity.kind() == ResourceKind::Directory)
+    {
+        let identity = (directory.identity.device(), directory.identity.inode());
+        if scan.visited_directories.insert(identity) {
+            let traversal = open_directory_for_scan(directory)?;
+            scan.directory(&traversal, &directory.path, 0)?;
+        }
+    }
+    Ok(())
+}
+
+struct ForbiddenTreeScan<'a> {
+    linked: &'a [&'a RetainedResource],
+    entries: usize,
+    visited_directories: BTreeSet<(u64, u64)>,
+}
+
+impl ForbiddenTreeScan<'_> {
+    fn directory(&mut self, traversal: &File, path: &Path, depth: usize) -> Result<(), CageError> {
+        if depth > MAX_FORBIDDEN_SCAN_DEPTH {
+            return Err(CageError::ResourceLimitExceeded(
+                "forbidden directory depth",
+            ));
+        }
+        for name in directory_entry_names(traversal, path)? {
+            self.entries = self.entries.saturating_add(1);
+            if self.entries > MAX_FORBIDDEN_SCAN_ENTRIES {
+                return Err(CageError::ResourceLimitExceeded(
+                    "forbidden directory entries",
+                ));
+            }
+            let child_path = path.join(&name);
+            let Some((child, metadata)) = open_directory_entry(traversal, &child_path, &name)?
+            else {
+                continue;
+            };
+            let identity = (metadata.st_dev(), metadata.st_ino());
+            if metadata.file_type().is_file() {
+                if let Some(allowed) = self.linked.iter().find(|allowed| {
+                    (allowed.identity.device(), allowed.identity.inode()) == identity
+                }) {
+                    return Err(CageError::ForbiddenDescriptorAlias {
+                        allowed: allowed.path.clone(),
+                        forbidden: child_path,
+                    });
+                }
+            } else if metadata.file_type().is_dir() && self.visited_directories.insert(identity) {
+                let child_traversal = openat2(
+                    child.as_raw_fd(),
+                    b".",
+                    O_RDONLY | O_DIRECTORY | O_CLOEXEC,
+                    0,
+                    strict_resolution(),
+                )
+                .map_err(|source| CageError::RetainPath {
+                    path: child_path.clone(),
+                    source,
+                })?;
+                self.directory(&child_traversal, &child_path, depth.saturating_add(1))?;
+            }
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn retain_write_grants(
