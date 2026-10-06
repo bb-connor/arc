@@ -1719,3 +1719,77 @@ fn clear_paths_preserve_allow_decisions() {
         Verdict::Allow
     );
 }
+
+/// Matches exactly one planted decoy on one surface, as the registry's keyed
+/// marker lookup does.
+struct PlantedDetector {
+    kind: TripwireKind,
+    presented: &'static [u8],
+}
+
+impl TripwireDetectorPort for PlantedDetector {
+    fn detect(&self, input: &TripwireInput) -> PortResult<TripwireDecision> {
+        if input.kind == self.kind && input.content.as_bytes() == self.presented {
+            Ok(TripwireDecision::Match {
+                artifact_id_hash: Digest32::new([7; 32]),
+                artifact_version_hash: Digest32::new([8; 32]),
+            })
+        } else {
+            Ok(TripwireDecision::Clear)
+        }
+    }
+}
+
+#[test]
+fn decoys_presented_in_tool_arguments_trip_their_surface() {
+    let mut planted_request = request();
+    planted_request.arguments = serde_json::json!({
+        "url": "https://build-cache.corp.internal:8443/artifacts?id=1",
+        "headers": {
+            "Authorization": "Bearer chio-decoy-credential-7f3a",
+            "Cookie": "theme=dark; session=chio-decoy-cookie-91"
+        },
+        "notes": ["CHIO-DECOY-FILE-MARKER-1"]
+    });
+    let security = security_context(&planted_request);
+    let planted: [(TripwireKind, &'static [u8]); 4] = [
+        (
+            TripwireKind::CredentialArtifact,
+            b"chio-decoy-credential-7f3a",
+        ),
+        (TripwireKind::BrowserCookie, b"chio-decoy-cookie-91"),
+        (TripwireKind::InternalHostname, b"build-cache.corp.internal"),
+        (TripwireKind::FileMarker, b"CHIO-DECOY-FILE-MARKER-1"),
+    ];
+    for (kind, presented) in planted {
+        let guard = TripwireGuard::new(
+            Arc::new(PlantedDetector { kind, presented }),
+            tripwire_publisher(Arc::new(FakeEvents::new(false))),
+            MissingContextPolicy::Deny,
+        );
+        let context = GuardContext::new(&planted_request, &planted_request.capability.scope)
+            .with_security_context(Some(&security));
+        assert_eq!(
+            guard.evaluate(&context).test_unwrap().verdict,
+            Verdict::Deny,
+            "{kind:?} decoy in arguments was not detected"
+        );
+    }
+
+    let clean = request();
+    let security = security_context(&clean);
+    let guard = TripwireGuard::new(
+        Arc::new(PlantedDetector {
+            kind: TripwireKind::CredentialArtifact,
+            presented: b"chio-decoy-credential-7f3a",
+        }),
+        tripwire_publisher(Arc::new(FakeEvents::new(false))),
+        MissingContextPolicy::Deny,
+    );
+    let context =
+        GuardContext::new(&clean, &clean.capability.scope).with_security_context(Some(&security));
+    assert_eq!(
+        guard.evaluate(&context).test_unwrap().verdict,
+        Verdict::Allow
+    );
+}

@@ -31,6 +31,8 @@ use serde_json::Value;
 
 use crate::MissingContextPolicy;
 
+mod arguments;
+
 const PRE_INVOCATION_GUARD_NAME: &str = "chio-tripwire-pre-invocation";
 const POST_INVOCATION_HOOK_NAME: &str = "chio-watermark-tripwire";
 
@@ -324,13 +326,37 @@ impl Guard for TripwireGuard {
             TripwireKind::HoneyTool,
             tool_content,
         ) {
-            Ok(Some(decision)) => Ok(decision),
-            Ok(None) => Ok(GuardDecision::allow()),
-            Err(error) => Ok(denial_evidence(
-                PRE_INVOCATION_GUARD_NAME,
-                &format!("tripwire detector failed: {error}"),
-            )),
+            Ok(Some(decision)) => return Ok(decision),
+            Ok(None) => {}
+            Err(error) => {
+                return Ok(denial_evidence(
+                    PRE_INVOCATION_GUARD_NAME,
+                    &format!("tripwire detector failed: {error}"),
+                ));
+            }
         }
+        // Credential, file, cookie and hostname decoys reach a tool through
+        // its arguments.
+        let Some(candidates) = arguments::argument_candidates(&guard_context.request.arguments)
+        else {
+            return Ok(denial_evidence(
+                PRE_INVOCATION_GUARD_NAME,
+                "tool arguments exceed the tripwire scan bound",
+            ));
+        };
+        for (kind, content) in candidates {
+            match self.evaluate_input(security_context, guard_context.request, kind, content) {
+                Ok(Some(decision)) => return Ok(decision),
+                Ok(None) => {}
+                Err(error) => {
+                    return Ok(denial_evidence(
+                        PRE_INVOCATION_GUARD_NAME,
+                        &format!("tripwire detector failed: {error}"),
+                    ));
+                }
+            }
+        }
+        Ok(GuardDecision::allow())
     }
 }
 
