@@ -443,24 +443,59 @@ fn full_queue_listener(
     Err(std::io::Error::other("the accept queue never filled"))
 }
 
+const PROBE_HELPER_SOCKET: &str = "CHIO_KEYRING_TEST_PROBE_SOCKET";
+const PROBE_HELPER_REFUSED: i32 = 0;
+
+/// Runs only in the child process that
+/// `the_stale_socket_check_does_not_wait_on_a_live_listener_with_a_full_queue`
+/// starts: binds the socket the parent names and reports the outcome in its
+/// exit status, so a probe that blocks is killed with its process.
+#[test]
+fn stale_socket_probe_helper() {
+    let Some(socket) = std::env::var_os(PROBE_HELPER_SOCKET) else {
+        return;
+    };
+    let code = match bind(Path::new(&socket)) {
+        Err(KeyringError::StateInvariant(_)) => PROBE_HELPER_REFUSED,
+        Err(_) => 2,
+        Ok(()) => 3,
+    };
+    std::process::exit(code);
+}
+
 #[cfg(any(target_os = "linux", target_os = "android"))]
 #[test]
 fn the_stale_socket_check_does_not_wait_on_a_live_listener_with_a_full_queue() {
     use std::os::unix::fs::MetadataExt as _;
 
+    const PROBE_LIMIT: Duration = Duration::from_secs(10);
+
     let directory = support::private_tempdir().test_unwrap();
     let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
     let (_listener, _queued) = full_queue_listener(&socket).test_unwrap();
     let live = std::fs::symlink_metadata(&socket).test_unwrap().ino();
-    let (sender, receiver) = mpsc::channel();
-    let probed = socket.clone();
-    thread::spawn(move || {
-        let _ = sender.send(bind(&probed));
-    });
-    let result = receiver.recv_timeout(Duration::from_secs(10));
-    assert!(
-        matches!(result, Ok(Err(KeyringError::StateInvariant(_)))),
-        "{result:?}"
+    let mut helper = std::process::Command::new(std::env::current_exe().test_unwrap())
+        .args(["--exact", "stale_socket_probe_helper", "--nocapture"])
+        .env(PROBE_HELPER_SOCKET, &socket)
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .test_unwrap();
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = helper.try_wait().test_unwrap() {
+            break Some(status);
+        }
+        if started.elapsed() > PROBE_LIMIT {
+            helper.kill().test_unwrap();
+            helper.wait().test_unwrap();
+            break None;
+        }
+        thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(
+        status.and_then(|status| status.code()),
+        Some(PROBE_HELPER_REFUSED),
+        "the startup probe was still running after {PROBE_LIMIT:?}, or was not refused"
     );
     assert_eq!(std::fs::symlink_metadata(&socket).test_unwrap().ino(), live);
 }
