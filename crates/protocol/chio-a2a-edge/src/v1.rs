@@ -1,5 +1,7 @@
 use super::*;
 
+mod continuation;
+
 // A2A 1.0 JSON-RPC projection onto the existing kernel task lifecycle.
 // Request metadata remains input, never an execution authority.
 
@@ -28,6 +30,10 @@ struct V1SendConfiguration {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct V1Message {
     message_id: String,
+    #[serde(default)]
+    task_id: Option<String>,
+    #[serde(default)]
+    context_id: Option<String>,
     role: String,
     parts: Vec<V1Part>,
     #[serde(default)]
@@ -57,10 +63,18 @@ struct V1TaskRequest {
     metadata: Option<Value>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum V1OutputMode {
     Json,
     Text,
+}
+
+struct V1Invocation {
+    message_id: String,
+    task_id: Option<String>,
+    context_id: Option<String>,
+    request: SendMessageRequest,
+    output_mode: V1OutputMode,
 }
 
 fn v1_invalid(message: impl Into<String>) -> A2aEdgeError {
@@ -75,7 +89,7 @@ fn v1_object_metadata(metadata: &Option<Value>) -> Result<(), A2aEdgeError> {
 }
 
 impl V1SendRequest {
-    fn into_internal(self) -> Result<(String, SendMessageRequest, V1OutputMode), A2aEdgeError> {
+    fn into_internal(self) -> Result<V1Invocation, A2aEdgeError> {
         let config = self.configuration.unwrap_or_default();
         if config.return_immediately {
             return Err(A2aEdgeError::UnsupportedOperation(
@@ -112,6 +126,19 @@ impl V1SendRequest {
         if message.message_id.len() > 256 {
             return Err(v1_invalid("message.messageId exceeds 256 bytes"));
         }
+        for (name, identifier) in [
+            ("message.taskId", message.task_id.as_deref()),
+            ("message.contextId", message.context_id.as_deref()),
+        ] {
+            if let Some(identifier) = identifier {
+                validate_execution_agent_id(identifier).map_err(|_| {
+                    v1_invalid(format!("{name} must be a nonblank, unpadded identifier"))
+                })?;
+                if identifier.len() > 256 {
+                    return Err(v1_invalid(format!("{name} exceeds 256 bytes")));
+                }
+            }
+        }
         v1_object_metadata(&self.metadata)?;
         v1_object_metadata(&message.metadata)?;
         let parts = message
@@ -140,7 +167,13 @@ impl V1SendRequest {
         };
         // Validate before retaining a task, including duplicate data parts.
         extract_arguments_from_message(&request.message)?;
-        Ok((message.message_id, request, output_mode))
+        Ok(V1Invocation {
+            message_id: message.message_id,
+            task_id: message.task_id,
+            context_id: message.context_id,
+            request,
+            output_mode,
+        })
     }
 }
 
@@ -161,6 +194,14 @@ fn v1_parts(parts: &[A2aPart], mode: V1OutputMode) -> Vec<Value> {
 
 fn v1_task(task: &TaskResponse, mode: V1OutputMode) -> Value {
     let state = match task.status {
+        TaskStatus::Working
+            if task
+                .metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata["chio"]["decision"] == "pending_approval") =>
+        {
+            "TASK_STATE_INPUT_REQUIRED"
+        }
         TaskStatus::Working => "TASK_STATE_WORKING",
         TaskStatus::Completed => "TASK_STATE_COMPLETED",
         TaskStatus::Failed => "TASK_STATE_FAILED",
@@ -201,7 +242,19 @@ impl ChioA2aEdge {
         let skill = self.resolve_jsonrpc_target_skill_id(&params)?;
         let parsed: V1SendRequest = serde_json::from_value(params)
             .map_err(|error| v1_invalid(format!("invalid SendMessage request: {error}")))?;
-        let (message_id, request, output_mode) = parsed.into_internal()?;
+        let invocation = parsed.into_internal()?;
+        if invocation.task_id.is_some() {
+            return self.handle_v1_continuation(id, &skill, invocation, kernel, execution);
+        }
+        if invocation.context_id.is_some() {
+            return Err(v1_invalid("client-created contexts are not supported"));
+        }
+        let V1Invocation {
+            message_id,
+            request,
+            output_mode,
+            ..
+        } = invocation;
         let task = self.handle_stream_message_with_request_id(
             &message_id,
             &skill,

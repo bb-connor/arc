@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 runner="scripts/check-consumer-boundaries.sh"
 test -x "${runner}"
 bash -n "${runner}"
-test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 10
+test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 14
 grep -Fq '  support::a2a_v1::pending_approval_preserves_caller_isolation_and_text_mode_through_cancel \' "${runner}"
 grep -Fq '  support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts \' "${runner}"
 test "$(grep -c '^run_case ' "${runner}")" -eq 23
@@ -33,6 +33,58 @@ for workflow in .github/workflows/sdk-parity.yml .github/workflows/enterprise-ha
   grep -Fq './scripts/check-consumer-sdk-parity.sh' "${workflow}"
 done
 grep -Fq 'npm run build --workspace @chio-protocol/node-http' scripts/check-consumer-sdk-parity.sh
+
+# Exercise the actual producer's expected inventory against an independent
+# execution fixture. Every continuation case must survive omission and
+# same-count substitution controls.
+python3 - <<'PY_CONTINUATION'
+import shlex
+import subprocess
+import tempfile
+from pathlib import Path
+
+producer = Path("scripts/check-consumer-boundaries.sh").read_text()
+invocation = producer[producer.index("./scripts/run-exact-cargo-test-inventory.sh"):]
+invocation = shlex.split(invocation.split("\n\n", 1)[0].replace("\\\n", " "))
+expected = invocation[invocation.index("--expected") + 1:invocation.index("--")]
+legacy = [
+    "a2a_aggregate_capture_survives_consumer_restart",
+    "a2a_threshold_proposal_approval_and_restart_preserve_one_capture",
+    "acp_aggregate_capture_survives_consumer_restart",
+    "acp_threshold_proposal_approval_and_restart_preserve_one_capture",
+    "mcp_aggregate_capture_survives_consumer_restart",
+    "mcp_threshold_proposal_approval_and_restart_preserve_one_capture",
+    "native_aggregate_capture_survives_consumer_restart",
+    "native_threshold_proposal_approval_and_restart_preserve_one_capture",
+    "support::a2a_v1::pending_approval_preserves_caller_isolation_and_text_mode_through_cancel",
+    "support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts",
+]
+continuation = [
+    "support::a2a_v1::continuation_conceals_inaccessible_tasks_and_preserves_the_original_owner",
+    "support::a2a_v1::continuation_refuses_frozen_authority_changes_without_losing_pending_custody",
+    "support::a2a_v1::signed_approval_cannot_resume_a_cancelled_v1_task",
+    "support::a2a_v1::signed_approval_continuation_completes_the_original_v1_task",
+]
+names = legacy + continuation
+with tempfile.TemporaryDirectory(prefix="chio-continuation-inventory-") as directory:
+    listed, executed = Path(directory) / "list", Path(directory) / "run"
+    listed.write_text("".join(f"{name}: test\n" for name in names))
+    executed.write_text("".join(f"test {name} ... ok\n" for name in names)
+        + "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n")
+    command = ["python3", "scripts/check-exact-cargo-test-inventory.py",
+        "--label", "continuation producer", "--list-output", str(listed),
+        "--run-output", str(executed)]
+    subprocess.run(command + expected, check=True, capture_output=True, text=True)
+    for name in continuation:
+        for mutated in [
+            [item for item in expected if item != name],
+            ["substituted_continuation_case" if item == name else item for item in expected],
+        ]:
+            result = subprocess.run(command + mutated, capture_output=True, text=True)
+            if result.returncode != 1 or "exact inventory mismatch" not in result.stderr:
+                raise SystemExit(f"continuation inventory accepted or misdiagnosed {name}: {result}")
+print("Continuation inventory rejects all four omissions and substitutions")
+PY_CONTINUATION
 
 # The shared harness supplies behavioral missing/renamed/ignored/zero-match
 # calibration. Its public peer wrapper also calibrates the single-case pattern.

@@ -151,6 +151,46 @@ impl Fixture {
         Ok(request)
     }
 
+    pub fn approved_request(
+        &self,
+        request: &ToolCallRequest,
+        proposal: chio_core::capability::governance::ThresholdApprovalProposal,
+    ) -> TestResult<ToolCallRequest> {
+        use chio_core::capability::governance::{
+            GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+        };
+        let mut request = request.clone();
+        let proposal_hash = proposal.artifact_digest()?;
+        let intent_hash = request
+            .governed_intent
+            .as_ref()
+            .ok_or("intent")?
+            .binding_hash()?;
+        request.approval_tokens = self
+            .approvers
+            .iter()
+            .enumerate()
+            .map(|(index, approver)| {
+                GovernedApprovalToken::sign(
+                    GovernedApprovalTokenBody {
+                        id: format!("consumer-approval-{index}"),
+                        approver: approver.public_key(),
+                        subject: self.agent.public_key(),
+                        governed_intent_hash: intent_hash.clone(),
+                        request_id: request.request_id.clone(),
+                        threshold_proposal_hash: Some(proposal_hash.clone()),
+                        issued_at: proposal.body.proposal_created_at,
+                        expires_at: proposal.body.proposal_deadline,
+                        decision: GovernedApprovalDecision::Approved,
+                    },
+                    approver,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        request.threshold_approval_proposal = Some(proposal);
+        Ok(request)
+    }
+
     pub fn open(&self, protocol: Protocol) -> TestResult<Consumer> {
         let authority = SqliteAuthorityStore::open_serving(
             self.directory.path().join("authority.db"),

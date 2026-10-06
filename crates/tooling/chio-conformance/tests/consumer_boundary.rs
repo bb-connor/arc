@@ -38,10 +38,7 @@ fn aggregate_restart(protocol: Protocol) -> TestResult {
 }
 
 fn threshold_restart(protocol: Protocol) -> TestResult {
-    use chio_core::capability::governance::{
-        GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-        ThresholdApprovalProposal,
-    };
+    use chio_core::capability::governance::ThresholdApprovalProposal;
     let fixture = Fixture::new()?.with_threshold_approval()?;
     let mut request = fixture.approval_request("threshold-operation")?;
     let mut consumer = fixture.open(protocol)?;
@@ -59,34 +56,7 @@ fn threshold_restart(protocol: Protocol) -> TestResult {
     assert_eq!(proposal.body.request_id, request.request_id);
     assert_eq!(proposal.body.threshold, 2);
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-    let proposal_hash = proposal.artifact_digest()?;
-    let intent_hash = request
-        .governed_intent
-        .as_ref()
-        .ok_or("intent")?
-        .binding_hash()?;
-    request.approval_tokens = fixture
-        .approvers
-        .iter()
-        .enumerate()
-        .map(|(index, approver)| {
-            GovernedApprovalToken::sign(
-                GovernedApprovalTokenBody {
-                    id: format!("consumer-approval-{index}"),
-                    approver: approver.public_key(),
-                    subject: fixture.agent.public_key(),
-                    governed_intent_hash: intent_hash.clone(),
-                    request_id: request.request_id.clone(),
-                    threshold_proposal_hash: Some(proposal_hash.clone()),
-                    issued_at: proposal.body.proposal_created_at,
-                    expires_at: proposal.body.proposal_deadline,
-                    decision: GovernedApprovalDecision::Approved,
-                },
-                approver,
-            )
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    request.threshold_approval_proposal = Some(proposal);
+    request = fixture.approved_request(&request, proposal)?;
     let completed = consumer.invoke(&request)?;
     assert_eq!(completed.decision, "allow", "{:?}", completed.receipt);
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);

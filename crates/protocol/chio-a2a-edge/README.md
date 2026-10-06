@@ -16,14 +16,24 @@ with standard untagged message parts, task states, and result envelopes.
 execution context supplies authority; message metadata cannot supply it.
 The older slash-form methods remain available for existing integrations.
 
-`SendMessage` blocks until the kernel returns a terminal result and releases its
-temporary task custody after projection. Both omitted and explicit `false`
+`SendMessage` blocks until the kernel returns a result. Terminal delivery releases
+its temporary task custody after projection. Both omitted and explicit `false`
 execution modes are supported. `configuration.returnImmediately: true` returns
 `UnsupportedOperationError` (`-32004`) before task creation or kernel dispatch:
 the borrowed-kernel edge has no owned background executor. `GetTask` observes
 stored state and never starts execution. Task lookups return the same
 `TaskNotFoundError` (`-32001`) for inaccessible and absent tasks; cancellation of
 a completed or failed task returns `TaskNotCancelableError` (`-32002`).
+
+Approval-blocked work returns `TASK_STATE_INPUT_REQUIRED` and retains its original
+task. The owner resumes it with `SendMessage`, the original `messageId`, and the
+returned `message.taskId`; an optional `message.contextId` must match the task.
+The authenticated execution context supplies the signed approval artifacts.
+The tool, arguments, capability, intent, other authority and output mode remain
+fixed. Continuation preserves the task deadline and does not allocate another
+slot. Polling with approvals remains observational. Cancellation and expiry
+prevent continuation. A retry of the original stable message without `taskId`
+uses the kernel's durable outcome replay after terminal delivery.
 
 The older slash-form lifecycle retains its explicit execution-on-poll contract,
 capacity limits, result retrieval and cancellation within the in-memory TTL.
@@ -32,7 +42,7 @@ rejects old identifiers rather than resolving them to unrelated work. Provider
 task recovery and repeated-send deduplication require a durable host lifecycle.
 
 The Agent Card advertises `text/plain` and `application/json`, and does not
-advertise SSE streaming. Multi-turn contexts, tenant routing, history, file
+advertise SSE streaming. Arbitrary multi-turn contexts, tenant routing, history, file
 parts and message extensions are rejected by this bounded 1.0 projection.
 The HTTP host remains responsible for authentication, request size limits,
 TLS and protocol-version header enforcement.

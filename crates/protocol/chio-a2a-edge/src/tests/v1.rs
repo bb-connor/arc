@@ -269,7 +269,7 @@ fn v1_rejects_unsupported_or_ambiguous_semantics_before_task_retention() {
         *request.pointer_mut(pointer).test_unwrap() = value;
         cases.push(request);
     }
-    for field in ["taskId", "contextId", "referenceTaskIds", "extensions"] {
+    for field in ["contextId", "referenceTaskIds", "extensions"] {
         let mut request = v1_request();
         request["params"]["message"][field] = json!("unsupported");
         cases.push(request);
@@ -531,4 +531,65 @@ fn v1_blocking_output_negotiation_supports_omitted_and_false_execution_modes() {
         assert!(task["artifacts"][0]["parts"][0].get("data").is_none());
         assert!(edge.tasks.is_empty());
     }
+}
+
+fn assert_inaccessible_continuation(expired: bool) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    let config = test_kernel_config();
+    let owner = v1_execution(&config.keypair);
+    let mut kernel = ChioKernel::new(config);
+    let calls = Arc::new(AtomicU64::new(0));
+    kernel.register_tool_server(Box::new(
+        crate::tests::authorization_projection::CountedToolServer {
+            server: "test-srv".into(),
+            tool: "echo".into(),
+            calls: calls.clone(),
+        },
+    ));
+    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let accepted = legacy_pending(&mut edge, &kernel, &owner, "unavailable-continuation");
+    if expired {
+        use chio_security_types::clock::{ClockReading, MonotonicInstant, UnixMillis};
+        // Stamp the retained fixture with a v1 profile and an already elapsed
+        // deadline. The real clock and request handler run without sleeps.
+        let retained = edge.tasks.get_mut(&accepted.id).test_unwrap();
+        retained.v1_output_mode = Some(V1OutputMode::Json);
+        retained.deadline = AuthorityDeadline::for_timeout_ms(
+            ClockReading::new(UnixMillis::new(1), MonotonicInstant::from_nanos(0)),
+            1,
+        )
+        .test_unwrap();
+    }
+    let request = json!({
+        "jsonrpc": "2.0", "id": "resume", "method": "SendMessage",
+        "params": {"message": {"messageId": "unavailable-continuation",
+            "taskId": accepted.id, "role": "ROLE_USER", "parts": [{"data": {}}]},
+            "metadata": {"chio": {"targetSkillId": "echo"}}}
+    });
+    let refused = edge
+        .handle_jsonrpc(&serde_json::to_vec(&request).test_unwrap(), &kernel, &owner)
+        .test_unwrap();
+    assert_eq!(refused["error"]["code"], -32001, "{refused:?}");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(kernel.receipt_log().receipts().is_empty());
+    assert_eq!(edge.task_counter, 1);
+    if expired {
+        assert!(edge.tasks.is_empty());
+    } else {
+        assert_eq!(
+            edge.tasks[&accepted.id].response.status,
+            TaskStatus::Working
+        );
+    }
+}
+
+#[test]
+fn v1_continuation_rejects_legacy_only_tasks() {
+    assert_inaccessible_continuation(false);
+}
+
+#[test]
+fn v1_continuation_rejects_expired_tasks() {
+    assert_inaccessible_continuation(true);
 }
