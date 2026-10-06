@@ -60,8 +60,8 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 33); do
-  if [[ "$mode" == 10 ]]; then
+for mode in $(seq 1 36); do
+  if [[ "$mode" == 10 || "$mode" == 34 || "$mode" == 35 ]]; then
     continue
   fi
   cc -nostdlib -static -fno-stack-protector -fno-pie -no-pie \
@@ -115,6 +115,23 @@ if [[ "${#dynamic_runtime_paths[@]}" -lt 2 ]]; then
   exit 1
 fi
 
+# Second-exec probes. Each tries to exec a marker that exits 171 if it ever
+# runs: the static mode 36 probe, or a dynamic build for the interpreter path.
+exec_marker="$probe_dir/probe-36"
+dynamic_exec_marker="$probe_dir/dynamic-exec-marker"
+cc -O2 -fno-stack-protector -Wl,--build-id=none -DPROBE_EXIT=171 \
+  "$crate/tests/fixtures/cage_dynamic_probe.c" -o "$dynamic_exec_marker"
+interpreter="$(readlink -e -- "$(awk '/^[[:space:]]*\// { print $1; exit }' <<<"$dynamic_dependencies")")"
+for mode in 34 35; do
+  cc -nostdlib -static -fno-stack-protector -fno-pie -no-pie \
+    -Wl,--build-id=none -DPROBE_MODE="$mode" -DPROBE_PATH="\"$exec_marker\"" \
+    "$crate/tests/fixtures/cage_probe.c" -o "$probe_dir/probe-$mode"
+done
+cc -nostdlib -static -fno-stack-protector -fno-pie -no-pie \
+  -Wl,--build-id=none -DPROBE_MODE=37 -DPROBE_PATH="\"$dynamic_exec_marker\"" \
+  -DPROBE_LDSO="\"$interpreter\"" \
+  "$crate/tests/fixtures/cage_probe.c" -o "$probe_dir/probe-37"
+
 export CHIO_CAGE_TEST_SUCCESS="$probe_dir/probe-1"
 export CHIO_CAGE_TEST_PRLIMIT_SELF="$probe_dir/probe-29"
 export CHIO_CAGE_TEST_PRLIMIT_PEER="$probe_dir/probe-30"
@@ -149,6 +166,11 @@ export CHIO_CAGE_TEST_DIRECTORY_READ="$probe_dir/probe-26"
 export CHIO_CAGE_TEST_DIRECTORY_HARD_LINK="$probe_dir/probe-27"
 export CHIO_CAGE_TEST_BROKER_FCNTL="$probe_dir/probe-28"
 export CHIO_CAGE_TEST_DYNAMIC="$dynamic_probe"
+export CHIO_CAGE_TEST_EXEC_MARKER="$exec_marker"
+export CHIO_CAGE_TEST_EXEC_DYNAMIC_MARKER="$dynamic_exec_marker"
+export CHIO_CAGE_TEST_EXEC_ABSOLUTE="$probe_dir/probe-34"
+export CHIO_CAGE_TEST_EXEC_PROC_FD="$probe_dir/probe-35"
+export CHIO_CAGE_TEST_EXEC_INTERPRETER="$probe_dir/probe-37"
 CHIO_CAGE_TEST_DYNAMIC_RUNTIME="$(printf '%s\n' "${dynamic_runtime_paths[@]}")"
 export CHIO_CAGE_TEST_DYNAMIC_RUNTIME
 export CHIO_CAGE_PARENT_SECRET="must-not-cross"

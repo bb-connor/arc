@@ -425,6 +425,48 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
 #else
 #error foreign architecture probe requires x86_64
 #endif
+#elif PROBE_MODE == 34 || PROBE_MODE == 35 || PROBE_MODE == 37
+#ifndef PROBE_PATH
+#error PROBE_PATH (the marker probe) is required for modes 34, 35 and 37
+#endif
+    // Every later exec, whatever path it names, must kill the target
+    // before the new image runs. The marker image exits 171 if it ever runs.
+    static char marker[] = PROBE_PATH;
+    static char *environment[] = {0};
+#if PROBE_MODE == 34
+    // Absolute pathname: Linux ignores the dirfd seccomp pins to 255.
+    static char *arguments[] = {marker, 0};
+    long result = invoke5(
+        SYS_EXECVEAT, 255, (long)marker, (long)arguments, (long)environment, AT_EMPTY_PATH);
+    terminate(result < 0 ? 110 : 113);
+#elif PROBE_MODE == 35
+    // Procfs magic link to an open descriptor of the marker.
+    static char proc_path[] = "/proc/self/fd/200";
+    static char *arguments[] = {proc_path, 0};
+    long descriptor = invoke(SYS_OPENAT, AT_FDCWD, (long)marker, O_RDONLY, 0);
+    if (descriptor < 0) {
+        terminate(114);
+    }
+    if (invoke(SYS_FCNTL, descriptor, 0, 200, 0) != 200) {
+        terminate(115);
+    }
+    long result = invoke5(
+        SYS_EXECVEAT, 255, (long)proc_path, (long)arguments, (long)environment, AT_EMPTY_PATH);
+    terminate(result < 0 ? 111 : 113);
+#else
+#ifndef PROBE_LDSO
+#error PROBE_LDSO (the ELF interpreter) is required for mode 37
+#endif
+    // The interpreter has an Execute grant for the target's own exec and runs
+    // any readable ELF it is handed. PROBE_PATH names a dynamic marker here.
+    static char loader[] = PROBE_LDSO;
+    static char *arguments[] = {loader, marker, 0};
+    long result = invoke5(
+        SYS_EXECVEAT, 255, (long)loader, (long)arguments, (long)environment, AT_EMPTY_PATH);
+    terminate(result < 0 ? 112 : 113);
+#endif
+#elif PROBE_MODE == 36
+    terminate(171);
 #else
 #error invalid probe mode
 #endif

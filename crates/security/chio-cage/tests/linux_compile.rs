@@ -594,6 +594,97 @@ fn group_writable_runtime_file_without_an_execute_bit_is_rejected() {
     .is_ok());
 }
 
+// Admission creates nothing. Compile creates a missing write grant as the
+// execution identity, after every check.
+
+fn write_grant_manifest(
+    keypair: &Keypair,
+    read: Vec<PathBuf>,
+    write: Vec<PathBuf>,
+    forbidden: BTreeSet<PathBuf>,
+) -> (SignedManifest, OperatorCeilings) {
+    let signed = signed_manifest(
+        keypair,
+        read.clone(),
+        write.clone(),
+        NativeSyscallProfile::NativeMinimalV1,
+        Vec::new(),
+    );
+    let ceilings = OperatorCeilings::new(
+        read.into_iter().collect(),
+        write.into_iter().collect(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        [NativeSyscallProfile::NativeMinimalV1]
+            .into_iter()
+            .collect(),
+    )
+    .with_forbidden_paths(forbidden);
+    (signed, ceilings)
+}
+
+#[test]
+fn admission_with_a_missing_write_grant_creates_nothing() {
+    let tree = TestTree::new();
+    let keypair = Keypair::from_seed(&[50; 32]);
+    let (signed, ceilings) = write_grant_manifest(
+        &keypair,
+        Vec::new(),
+        vec![tree.writable.clone()],
+        BTreeSet::new(),
+    );
+    admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
+    assert!(!tree.writable.exists());
+}
+
+#[test]
+fn a_denied_admission_leaves_no_write_grant_behind() {
+    let tree = TestTree::new();
+    std::fs::remove_file(&tree.forbidden).test_unwrap();
+    std::fs::hard_link(&tree.readable, &tree.forbidden).test_unwrap();
+    let keypair = Keypair::from_seed(&[51; 32]);
+    let (signed, ceilings) = write_grant_manifest(
+        &keypair,
+        vec![tree.readable.clone()],
+        vec![tree.writable.clone()],
+        [tree.forbidden.clone()].into_iter().collect(),
+    );
+    assert!(matches!(
+        admit(&signed, &keypair.public_key(), &ceilings),
+        Err(CageError::ForbiddenDescriptorAlias { .. })
+    ));
+    assert!(!tree.writable.exists());
+}
+
+#[test]
+fn compile_creates_a_pending_write_grant_owned_by_the_execution_identity() {
+    let tree = TestTree::new();
+    let keypair = Keypair::from_seed(&[52; 32]);
+    let (signed, ceilings) = write_grant_manifest(
+        &keypair,
+        Vec::new(),
+        vec![tree.writable.clone()],
+        BTreeSet::new(),
+    );
+    let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
+    assert!(!tree.writable.exists());
+    // SAFETY: these process-identity queries take no pointers.
+    let (uid, gid) = unsafe { (libc::geteuid(), libc::getegid()) };
+    let runtime = retain_runtime_resources(&RuntimeResourcePaths::new(
+        tree.helper.clone(),
+        tree.target.clone(),
+        tree.workdir.clone(),
+        BTreeSet::new(),
+        ExecutionIdentity::new(uid, gid, Vec::new()).test_unwrap(),
+    ))
+    .test_unwrap();
+    compile(admitted, runtime, &BTreeMap::new(), None).test_unwrap();
+    let metadata = std::fs::symlink_metadata(&tree.writable).test_unwrap();
+    assert!(metadata.file_type().is_file());
+    assert_eq!((metadata.uid(), metadata.gid()), (uid, gid));
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+}
+
 #[test]
 fn executable_runtime_file_gets_exact_execute_read_grant() {
     let tree = TestTree::new();
