@@ -3070,11 +3070,20 @@ jobs:
             require_authorizing_attempt "${retry_current}" "${retry_maximum}"
             retry_fingerprint="$(jq -cS '{run_attempt, status, conclusion}' <<< "${retry_current}")"
             retry_complete=true
+            retry_own_in_progress=false
             for ((retry_attempt = 1; retry_attempt <= retry_maximum; retry_attempt++)); do
               retry_exact="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/${retry_attempt}")"
               require_authorizing_attempt "${retry_exact}" "${retry_attempt}"
               if test "$(jq -r '.status' <<< "${retry_exact}")" != completed; then
-                retry_complete=false
+                if test "${authorizing_finalizer_id}" = "${FINALIZER_RUN_ID}" &&
+                   test "${retry_attempt}" = "${FINALIZER_RUN_ATTEMPT}" &&
+                   test "${retry_attempt}" = "${retry_maximum}" &&
+                   test "${retry_attempt}" -gt 1 &&
+                   test "$(jq -r '.status == "in_progress" and .conclusion == null' <<< "${retry_exact}")" = true; then
+                  retry_own_in_progress=true
+                else
+                  retry_complete=false
+                fi
               elif test "$(jq -r '.conclusion // ""' <<< "${retry_exact}")" != success; then
                 bad_authorizing_finalizer_observed=true
               fi
@@ -3083,6 +3092,10 @@ jobs:
               retry_stable="$(retry_api "actions/runs/${authorizing_finalizer_id}")"
               require_authorizing_attempt "${retry_stable}" "${retry_maximum}"
               test "$(jq -cS '{run_attempt, status, conclusion}' <<< "${retry_stable}")" = "${retry_fingerprint}"
+              if test "${retry_own_in_progress}" = true; then
+                retry_own_jobs="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/${FINALIZER_RUN_ATTEMPT}/jobs?filter=all&per_page=100")"
+                test "$(jq -r --arg run_id "${authorizing_finalizer_id}" --arg head "${original_finalizer_sha}" --arg title "${original_finalizer_title}" '.total_count == 4 and (.jobs | length) == 4 and ([.jobs[].name] | sort) == (["validate unsigned enterprise Linux capture", "sign committed enterprise Linux migration evidence", "authorize dedicated Security contract publication", "reconcile exact merge authority contexts"] | sort) and all(.jobs[]; (.run_id | tostring) == $run_id and .head_sha == $head and .workflow_name == $title and (if .name == "reconcile exact merge authority contexts" then .status == "in_progress" and .conclusion == null else .status == "completed" and .conclusion == "success" end))' <<< "${retry_own_jobs}")" = true
+              fi
               test "${retry_complete}" = true
               return 0
             fi
@@ -3217,6 +3230,7 @@ jobs:
               })"
               require_publishable_ci
               revalidate_live_publication_head
+              test "${FINALIZER_RUN_ATTEMPT}" = 1
               mirror_check="$({
                 curl \
                   --proto '=https' \
@@ -3377,6 +3391,7 @@ jobs:
           else
             require_publishable_ci
             revalidate_live_publication_head
+            test "${FINALIZER_RUN_ATTEMPT}" = 1
             check_run="$({
               curl \
                 --proto '=https' \
