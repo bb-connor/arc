@@ -16,7 +16,11 @@ pub struct DeclassificationReceiptDrainReport {
     pub appended: u32,
     pub acknowledged: u32,
     pub deferred: u32,
+    /// Every unacknowledged receipt.
     pub remaining: u64,
+    /// The subset of `remaining` a batch could deliver now. The rest is in
+    /// retry backoff or waiting on its consumption receipt.
+    pub remaining_due: u64,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -265,6 +269,9 @@ impl DeclassificationReceiptOutboxDrainer {
             acknowledged,
             deferred,
             remaining: self.store.count_pending_declassification_evidence()?,
+            remaining_due: self
+                .store
+                .count_due_declassification_evidence(now_unix_ms)?,
         })
     }
 

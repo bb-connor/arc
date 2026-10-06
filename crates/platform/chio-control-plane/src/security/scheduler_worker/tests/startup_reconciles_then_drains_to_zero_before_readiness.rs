@@ -15,12 +15,14 @@ fn startup_reconciles_then_drains_to_zero_before_readiness() {
                 acknowledged: 1,
                 deferred: 0,
                 remaining: 1,
+                remaining_due: 1,
             }),
             Ok(DeclassificationReceiptDrainReport {
                 appended: 1,
                 acknowledged: 1,
                 deferred: 0,
                 remaining: 0,
+                remaining_due: 0,
             }),
         ],
     ));

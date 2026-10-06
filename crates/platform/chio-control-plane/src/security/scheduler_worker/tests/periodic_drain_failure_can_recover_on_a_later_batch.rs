@@ -13,6 +13,7 @@ fn periodic_drain_failure_can_recover_on_a_later_batch() {
                 acknowledged: 1,
                 deferred: 0,
                 remaining: 0,
+                remaining_due: 0,
             }),
         ],
     ));

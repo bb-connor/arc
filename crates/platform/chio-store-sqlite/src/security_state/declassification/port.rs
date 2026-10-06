@@ -171,6 +171,10 @@ impl DeclassificationEvidenceCommitStore for SqliteSecurityStateStore {
         self.declassification_read(|tx| outbox::count_pending(ScopedReader::legacy(tx)))
     }
 
+    fn count_due_declassification_evidence(&self, now_unix_ms: u64) -> PortResult<u64> {
+        self.declassification_read(|tx| outbox::count_due(ScopedReader::legacy(tx), now_unix_ms))
+    }
+
     fn count_stranded_declassification_consumptions(&self) -> PortResult<u64> {
         self.declassification_read(|tx| outbox::count_stranded(ScopedReader::legacy(tx)))
     }

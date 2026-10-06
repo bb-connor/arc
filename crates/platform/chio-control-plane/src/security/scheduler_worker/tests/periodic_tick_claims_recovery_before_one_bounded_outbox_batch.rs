@@ -18,6 +18,7 @@ fn periodic_tick_claims_recovery_before_one_bounded_outbox_batch() {
                 acknowledged: MAX_DECLASSIFICATION_EVIDENCE_BATCH,
                 deferred: 0,
                 remaining: 7,
+                remaining_due: 7,
             })],
         )
         .with_compactions(vec![Ok(DeclassificationCompactionReport {

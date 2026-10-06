@@ -180,6 +180,7 @@ impl ProductionDeclassificationReceiptOutbox {
             acknowledged: 0,
             deferred: 0,
             remaining,
+            remaining_due: remaining,
         };
         for _ in 0..MAX_DECLASSIFICATION_OUTBOX_DRAIN_PASSES {
             let report =
@@ -197,8 +198,17 @@ impl ProductionDeclassificationReceiptOutbox {
                 .checked_add(report.deferred)
                 .ok_or(ResponseWorkerTickError::InvalidConfig)?;
             aggregate.remaining = report.remaining;
+            aggregate.remaining_due = report.remaining_due;
             if report.remaining == 0 {
                 self.set_health(DeclassificationOutboxHealth::Ready);
+                return Ok(aggregate);
+            }
+            if report.remaining_due == 0 {
+                // Every remaining receipt is in retry backoff: durable pending
+                // work, not a failure to make progress.
+                self.set_health(DeclassificationOutboxHealth::Pending {
+                    receipts: report.remaining,
+                });
                 return Ok(aggregate);
             }
             if report.acknowledged == 0 || report.remaining >= remaining {
@@ -225,7 +235,7 @@ impl ProductionDeclassificationReceiptOutbox {
             self.set_health(DeclassificationOutboxHealth::Ready);
             return Ok(report);
         }
-        if report.acknowledged == 0 {
+        if report.acknowledged == 0 && report.remaining_due > 0 {
             let error = ResponseWorkerTickError::DeclassificationOutboxNoProgress(report.remaining);
             self.record_failure(&error, Some(report.remaining));
             return Err(error);

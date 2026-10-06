@@ -377,6 +377,8 @@ mod periodic_compaction_failure_fails_maintenance_and_outbox_health;
 
 mod pending_or_no_progress_outbox_fails_readiness_and_drain;
 
+mod backed_off_outbox_is_pending_work_not_a_stalled_drain;
+
 pub(super) fn tick(action: &str) -> ResponseWorkerTick {
     ResponseWorkerTick {
         tenant_id: tenant(),

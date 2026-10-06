@@ -96,6 +96,35 @@ pub(in crate::security_state) const COUNT_PENDING: ReadQuery = ReadQuery {
     native: r#"SELECT COUNT(*) FROM security_participant_state_declassification_receipt_outbox WHERE security_authority_id = ?1 AND acknowledged = 0"#,
 };
 
+/// Rows the next pending batch can return: unacknowledged, past their retry
+/// deadline and, for an outcome, behind an acknowledged consumption. Mirrors
+/// the `PENDING_BATCH` predicate in `records.rs`.
+pub(in crate::security_state) const COUNT_DUE: ReadQuery = ReadQuery {
+    parameters: 1,
+    legacy: r#"SELECT COUNT(*) FROM security_declassification_receipt_outbox
+    WHERE acknowledged = 0
+      AND next_attempt_at <= ?1
+      AND (phase = 'consumption' OR EXISTS (
+          SELECT 1 FROM security_declassification_receipt_outbox AS predecessor
+          WHERE predecessor.tenant_id = security_declassification_receipt_outbox.tenant_id
+            AND predecessor.grant_id = security_declassification_receipt_outbox.grant_id
+            AND predecessor.phase = 'consumption'
+            AND predecessor.acknowledged = 1
+      ))"#,
+    native: r#"SELECT COUNT(*) FROM security_participant_state_declassification_receipt_outbox
+    WHERE security_authority_id = ?1
+      AND acknowledged = 0
+      AND next_attempt_at <= ?2
+      AND (phase = 'consumption' OR EXISTS (
+          SELECT 1 FROM security_participant_state_declassification_receipt_outbox AS predecessor
+          WHERE predecessor.security_authority_id = security_participant_state_declassification_receipt_outbox.security_authority_id
+            AND predecessor.tenant_id = security_participant_state_declassification_receipt_outbox.tenant_id
+            AND predecessor.grant_id = security_participant_state_declassification_receipt_outbox.grant_id
+            AND predecessor.phase = 'consumption'
+            AND predecessor.acknowledged = 1
+      ))"#,
+};
+
 pub(in crate::security_state) const COUNT_STRANDED: ReadQuery = ReadQuery {
     parameters: 0,
     legacy: r#"SELECT COUNT(*)

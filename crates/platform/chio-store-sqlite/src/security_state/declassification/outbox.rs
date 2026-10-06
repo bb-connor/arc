@@ -146,6 +146,14 @@ pub(super) fn count_pending(connection: ScopedReader<'_>) -> PortResult<u64> {
     from_i64(count)
 }
 
+pub(super) fn count_due(connection: ScopedReader<'_>, now_unix_ms: u64) -> PortResult<u64> {
+    let now = i64::try_from(now_unix_ms).unwrap_or(i64::MAX);
+    let count = connection
+        .query_row(sql::COUNT_DUE, &[&now], |row| row.get::<_, i64>(0))
+        .map_err(sqlite_error)?;
+    from_i64(count)
+}
+
 pub(super) fn count_stranded(connection: ScopedReader<'_>) -> PortResult<u64> {
     let count = connection
         .query_row(sql::COUNT_STRANDED, &[], |row| row.get::<_, i64>(0))
