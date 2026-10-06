@@ -13,6 +13,7 @@ import {
   isAuthorizedHttpReceipt,
   isVerifyReceiptResponse,
 } from "./types.js";
+import { parseWireJson } from "./wire-json.js";
 import type {
   ChioConfig,
   ChioHttpRequest,
@@ -98,7 +99,7 @@ export class ChioSidecarClient {
       const responseBody = await response.text();
       let parsed: unknown;
       try {
-        parsed = JSON.parse(responseBody) as unknown;
+        parsed = parseWireJson(responseBody);
       } catch (error: unknown) {
         throw new SidecarError(
           CHIO_ERROR_CODES.EVALUATION_FAILED,
@@ -181,7 +182,7 @@ export class ChioSidecarClient {
       // closed, while body-read failures keep their transport classification.
       let parsed: unknown;
       try {
-        parsed = JSON.parse(responseBody) as unknown;
+        parsed = parseWireJson(responseBody);
       } catch (error: unknown) {
         throw new SidecarError(
           CHIO_ERROR_CODES.EVALUATION_FAILED,
