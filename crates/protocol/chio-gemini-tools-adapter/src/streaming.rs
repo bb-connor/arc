@@ -11,7 +11,7 @@ use chio_provider_adapter_core::{
 use chio_tool_call_fabric::{ProviderError, ToolInvocation, VerdictResult};
 use serde_json::Value;
 
-use crate::{native::FunctionCallPart, GeminiAdapter};
+use crate::{adapter::CallIdentities, native::FunctionCallPart, GeminiAdapter};
 
 pub type GatedSseStream = GatedStream;
 
@@ -30,6 +30,7 @@ impl GeminiAdapter {
         let mut output: Vec<u8> = Vec::new();
         let mut invocations = Vec::new();
         let mut verdicts = Vec::new();
+        let mut identities = CallIdentities::default();
 
         for frame in frames {
             let Some(data) = frame.data.as_ref() else {
@@ -41,7 +42,7 @@ impl GeminiAdapter {
             let parts = candidate_parts(data);
             for part in parts {
                 if let Some(call) = function_call_from_part(part)? {
-                    let invocation = self.invocation_from_function_call(&call)?;
+                    let invocation = self.invocation_from_function_call(&call, &mut identities)?;
                     if !invocation.bridge_security.as_ref().is_some_and(
                         chio_manifest::BridgeSecurityMetadata::has_registry_coordinates,
                     ) {

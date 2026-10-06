@@ -45,6 +45,8 @@ The crate owns lift/lower and transport only; it has no dependency on
   already-fetched response payload without going through the transport.
 - `GeminiAdapter::lower_function_response` - lower a verdict and tool result
   into a `FunctionResponsePart`.
+- `GeminiAdapter::lower_function_call_response` - the same, echoing the
+  call's `id` so parallel calls to one function stay matched.
 - `GeminiAdapterConfig::new` - builds a config with `api_version` pinned to
   `GEMINI_API_VERSION`; also carries `server_id`, `server_name`,
   `server_version`, `public_key`, and `project_id`.
