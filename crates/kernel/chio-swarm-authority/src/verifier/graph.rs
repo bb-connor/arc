@@ -2,7 +2,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::SwarmAuthorityError;
-use crate::types::{SwarmGraphEdge, SwarmGraphNode, SwarmTaskGraph, CHIO_SWARM_TASK_GRAPH_SCHEMA};
+use crate::types::{
+    SwarmGraphEdge, SwarmGraphNode, SwarmTaskGraph, CHIO_SWARM_TASK_GRAPH_SCHEMA,
+    MAX_SWARM_GRAPH_EDGES, MAX_SWARM_GRAPH_JOINS, MAX_SWARM_GRAPH_TASKS,
+};
 
 use super::util::{rejected, require_non_empty, require_sha256, require_unique_strings};
 
@@ -31,6 +34,15 @@ pub(super) fn validate_task_graph(
     }
     if graph.nodes.is_empty() {
         return Err(rejected("swarm task graph requires at least one task"));
+    }
+    if graph.nodes.len() > MAX_SWARM_GRAPH_TASKS {
+        return Err(rejected("swarm task graph exceeds its task ceiling"));
+    }
+    if graph.edges.len() > MAX_SWARM_GRAPH_EDGES {
+        return Err(rejected("swarm task graph exceeds its edge ceiling"));
+    }
+    if graph.joins.len() > MAX_SWARM_GRAPH_JOINS {
+        return Err(rejected("swarm task graph exceeds its join ceiling"));
     }
     if graph.max_fanout == 0 {
         return Err(rejected("swarm task graph max_fanout must be positive"));
