@@ -481,7 +481,7 @@ fn run_native_delivery_case(
         let rejected = client.execute(&changed);
         assert!(
             matches!(&rejected, Err(crate::BrokerError::AuthorizationDenied(code))
-                if code == "authorization_denied"),
+                if code == "chio.broker.authorization_denied"),
             "{substitution}: {rejected:?}"
         );
     }

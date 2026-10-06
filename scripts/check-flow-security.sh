@@ -760,6 +760,15 @@ run_exact_target --label "security dispatch credential boundaries" --allow-filte
   kernel::tests::security_dispatch::clock::installed_dpop_and_default_approval_follow_the_kernel_clock \
   -- cargo test -p chio-kernel --lib kernel::tests::security_dispatch::
 
+run_exact_target --label "checked-output rejection custody" --allow-filtered --expected \
+  kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_by_later_acceptance \
+  kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_by_later_acceptance \
+  kernel::tests::durable_admission::checked_output::checked_output_first_rejection_survives_terminal_projection_recovery \
+  kernel::tests::durable_admission::checked_output::checked_output_rejection_releases_only_its_hold_and_never_upgrades_on_replay \
+  kernel::tests::durable_admission::checked_output::ordinary_output_rejection_has_no_zero_charge_authority \
+  kernel::tests::durable_admission::checked_output::checked_output_contract_cannot_mix_with_digest_delivery \
+  -- cargo test --locked -p chio-kernel --lib kernel::tests::durable_admission::checked_output::
+
 run_exact_target --label "durable release output binding" --allow-filtered --expected \
   tool_outcome::security_release::context::tests::context_rejects_other_dispatch_and_evaluation_records \
   tool_outcome::security_release::context::tests::context_rejects_substituted_preimages_and_value_or_stream_payloads \

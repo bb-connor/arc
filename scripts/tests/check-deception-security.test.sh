@@ -68,6 +68,22 @@ def rust_tests_with_exact_includes(
 
 materialize = rust_tests("crates/security/chio-decoy/tests/materialize.rs")
 materialize.remove("non_unix_materializer_is_explicitly_unsupported")
+materialize_entry = (ROOT / "crates/security/chio-decoy/tests/materialize.rs").read_text()
+if re.findall(r'#\[path = "([^"]+)"\]\s*pub mod (\w+);', materialize_entry) != [
+    ("../src/materialize.rs", "materialize")
+]:
+    raise SystemExit("materialization production-source module changed")
+materialize_readers = rust_tests("crates/security/chio-decoy/src/materialize.rs")
+if materialize_readers != ["materialized_paths_obey_the_persisted_path_limit"]:
+    raise SystemExit(f"materialization reader boundaries changed: {materialize_readers!r}")
+materialize.extend(
+    "materialize::unix::reader_boundary_tests::" + name for name in materialize_readers
+)
+sealed_registry = rust_tests_with_exact_includes(
+    "crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs",
+    set(),
+    {"sealed_decoy_registry/tenant_isolation.rs": "tenant_isolation"},
+)
 adapters = rust_tests("crates/security/chio-security-kernel/tests/adapters.rs")
 active_defense = rust_tests_with_exact_includes(
     "crates/tooling/chio-conformance/tests/active_defense.rs",
@@ -146,7 +162,7 @@ expected = {
     ),
     "sealed private registry store": (
         False,
-        rust_tests("crates/platform/chio-store-sqlite/tests/sealed_decoy_registry.rs"),
+        sealed_registry,
         [
             "cargo",
             "test",
@@ -230,8 +246,8 @@ for label, (expected_filtered, expected_inventory, expected_command) in expected
         )
 
 total = sum(len(inventory) for _, inventory, _ in calls.values())
-if total != 83:
-    raise SystemExit(f"deception exact inventory total changed: expected=83 observed={total}")
+if total != 85:
+    raise SystemExit(f"deception exact inventory total changed: expected=85 observed={total}")
 PY
 }
 
@@ -340,6 +356,17 @@ mutations = {
         1,
     ),
 }
+for case in [
+    "materialize::unix::reader_boundary_tests::materialized_paths_obey_the_persisted_path_limit",
+    "tenant_isolation::exact_decoy_tokens_never_grant_cross_tenant_reads_after_restart",
+]:
+    line = "  " + case + " \\\n"
+    if source.count(line) != 1:
+        raise SystemExit(f"required deception boundary is absent or ambiguous: {case}")
+    mutations[case + "-missing"] = source.replace(line, "", 1)
+    mutations[case + "-substituted"] = source.replace(
+        line, "  unmandated_deception_boundary \\\n", 1
+    )
 for mode, content in mutations.items():
     (work / f"{mode}.sh").write_text(content, encoding="utf-8")
 PY
@@ -355,4 +382,4 @@ for mutant in "${work}"/*.sh; do
   fi
 done
 
-echo "Deception security gate contract passed (12 exact inventories, 83 tests)"
+echo "Deception security gate contract passed (12 exact inventories, 85 tests)"

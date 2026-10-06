@@ -3,6 +3,7 @@ use serde::Serialize;
 use super::*;
 use crate::finding_denial::{record_finding_denial, FindingDenial};
 use crate::kernel::delivery_contract;
+use crate::kernel::output_guard::OutputGuardPhase;
 
 #[path = "terminal_payment.rs"]
 mod payment;
@@ -162,8 +163,8 @@ impl ChioKernel {
         // An ordinary rejection has no terminal settlement authority. Leave it
         // at DispatchCommitted so recovery can retain unknown exposure without
         // repeatedly attempting to finalize an unreleasable return. Contractual
-        // denials are retained for the checked-output settlement path below.
-        self.check_guarded_output(request, matched_grant_index, output, false, true)?;
+        // checkers run at durable evaluation, which retains their rejection.
+        self.validate_output_before_durable_record(request, matched_grant_index, output)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
         let trusted_now_unix_ms = runtime.refresh_trusted_time(trusted_now_unix_ms)?;
@@ -400,7 +401,7 @@ impl ChioKernel {
                 matched_grant_index,
                 &invocation_output_to_server_output(raw.output()),
                 false,
-                true,
+                OutputGuardPhase::DurableEvaluation,
             )?;
         let materialized = self.apply_stream_limit_snapshot(
             invocation_output_to_server_output(raw.output()),
@@ -445,7 +446,7 @@ impl ChioKernel {
                 matched_grant_index,
                 &handling.output,
                 true,
-                true,
+                OutputGuardPhase::DurableEvaluation,
             )?;
         let (output, transformed_incomplete_reason) =
             Self::terminal_tool_call_output(handling.output);

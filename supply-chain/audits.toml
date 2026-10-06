@@ -490,6 +490,12 @@ criteria = "safe-to-deploy"
 version = "1.0.4"
 notes = "Conditional compilation helper macro; trivial code, no IO or unsafe."
 
+[[audits.cfg_aliases]]
+who = "Codex (inline source review; PR #1173)"
+criteria = "safe-to-deploy"
+delta = "0.2.1 -> 0.2.2"
+notes = "Authenticated complete six-file source delta and surrounding macro parser, configuration lookup and expression emission reviewed in docs/security/audits/cfg-aliases-0.2.1-to-0.2.2.md. Three recursive expansion semicolons are removed; conditions and trusted-token parsing are unchanged. Actual integration test and seven doctests pass; one upstream doctest remains ignored. Conditional on the retained imported base audit chain; no exemption added."
+
 [[audits.chacha20]]
 who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
@@ -809,6 +815,12 @@ who = "Chio supply-chain reviewer"
 criteria = "safe-to-deploy"
 version = "0.1.1"
 notes = "cargo-vet drift closure. Reviewed for current workspace use and required cargo-vet criterion; deeper supplier evidence remains tracked separately."
+
+[[audits.iroh-blobs]]
+who = "Codex (inline source review; PR #1173)"
+criteria = "safe-to-deploy"
+delta = "0.103.0 -> 0.103.1"
+notes = "Authenticated complete twelve-file source delta and surrounding request dispatch, hash sequence construction and filesystem actor reviewed in docs/security/audits/iroh-blobs-0.103.0-to-0.103.1.md. Request modes now select their corresponding typed mask; default/read-only pushes remain disabled. Actual gated peer regressions fail twice before replacement and all three pass after replacement, retaining signed-root reads and explicit permitted push. Conditional on the existing exempted base acceptance; this delta is not a full audit of that base. No new exemption."
 
 [[audits.itertools]]
 who = "Chio supply-chain reviewer"

@@ -114,6 +114,7 @@ expected_counts = {
     "strict manifest v2": 25,
     "operator-owned manifest migration": 8,
     "transport preparation provenance": 10,
+    "checked-output rejection custody": 6,
     "security kernel adapters": 34,
     "durable flow state": 33,
     "native flow custody": 94,
@@ -203,6 +204,10 @@ required_native_commands = {
     "transport preparation provenance": [
         "cargo", "test", "--locked", "-p", "chio-kernel", "--lib",
         "kernel::tests::durable_admission::delivery_revalidation::",
+    ],
+    "checked-output rejection custody": [
+        "cargo", "test", "--locked", "-p", "chio-kernel", "--lib",
+        "kernel::tests::durable_admission::checked_output::",
     ],
     "live admission ownership": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "admission_operation::sequencer::tests::",
@@ -312,6 +317,14 @@ required_native_commands = {
 
 
 required_security_boundary_tests = {
+    "checked-output rejection custody": (
+        "kernel::tests::durable_admission::checked_output::checked_output_first_rejection_is_not_upgraded_by_later_acceptance",
+        "kernel::tests::durable_admission::checked_output::checked_output_first_panic_is_not_upgraded_by_later_acceptance",
+        "kernel::tests::durable_admission::checked_output::checked_output_first_rejection_survives_terminal_projection_recovery",
+        "kernel::tests::durable_admission::checked_output::checked_output_rejection_releases_only_its_hold_and_never_upgrades_on_replay",
+        "kernel::tests::durable_admission::checked_output::ordinary_output_rejection_has_no_zero_charge_authority",
+        "kernel::tests::durable_admission::checked_output::checked_output_contract_cannot_mix_with_digest_delivery",
+    ),
     "security types library": (
         "clock::advancing::tests::overflow_and_regression_cannot_replace_the_anchor",
         "clock::tests::authority_expiry_and_skew_boundaries_are_exact",

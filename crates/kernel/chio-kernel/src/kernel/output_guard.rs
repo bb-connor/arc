@@ -1,5 +1,12 @@
 use super::*;
 
+#[derive(Clone, Copy)]
+pub(super) enum OutputGuardPhase {
+    Release,
+    BeforeDurableRecord,
+    DurableEvaluation,
+}
+
 impl ChioKernel {
     /// Re-run output-aware guard checks over the exact value that is about to
     /// cross the kernel boundary. Any error or panic denies fail-closed.
@@ -15,7 +22,26 @@ impl ChioKernel {
             matched_grant_index,
             output,
             post_invocation_applied,
+            OutputGuardPhase::Release,
+        )
+        .map(|_| ())
+    }
+
+    /// Ordinary guards must accept before raw-return persistence. Contractual
+    /// checkers run at durable evaluation, which retains every rejection before
+    /// settlement and release instead of discarding a preliminary result.
+    pub(super) fn validate_output_before_durable_record(
+        &self,
+        request: &ToolCallRequest,
+        matched_grant_index: usize,
+        output: &ToolServerOutput,
+    ) -> Result<(), KernelError> {
+        self.check_guarded_output(
+            request,
+            matched_grant_index,
+            output,
             false,
+            OutputGuardPhase::BeforeDurableRecord,
         )
         .map(|_| ())
     }
@@ -50,13 +76,13 @@ impl ChioKernel {
 
     /// Return true only for a rejection covered by a trusted zero-charge
     /// contract. Ordinary errors still fail closed without releasing a hold.
-    pub(crate) fn check_guarded_output(
+    pub(super) fn check_guarded_output(
         &self,
         request: &ToolCallRequest,
         matched_grant_index: usize,
         output: &ToolServerOutput,
         post_invocation_applied: bool,
-        allow_contractual_denial: bool,
+        phase: OutputGuardPhase,
     ) -> Result<bool, KernelError> {
         let context = GuardContext {
             request,
@@ -79,10 +105,25 @@ impl ChioKernel {
                 // terminal receipt or response is produced.
                 continue;
             }
+            if matches!(phase, OutputGuardPhase::BeforeDurableRecord) {
+                let zero_charge = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    guard.output_rejection_is_zero_charge(&context)
+                }))
+                .map_err(|_| {
+                    KernelError::GuardDenied(
+                        "checked-output contract panicked (fail-closed)".to_owned(),
+                    )
+                })?;
+                if zero_charge {
+                    continue;
+                }
+            }
             let validation = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 guard.validate_output_before_release(&context, output)
             }));
-            if !matches!(validation, Ok(Ok(()))) && allow_contractual_denial {
+            if !matches!(validation, Ok(Ok(())))
+                && matches!(phase, OutputGuardPhase::DurableEvaluation)
+            {
                 let zero_charge = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     guard.output_rejection_is_zero_charge(&context)
                 }))
