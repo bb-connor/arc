@@ -552,6 +552,26 @@ fn target_argv_is_bounded_and_bound_into_the_plan_digest() {
 }
 
 #[test]
+fn only_connection_oriented_unix_sockets_can_carry_broker_ipc() {
+    let (datagram, _peer) = std::os::unix::net::UnixDatagram::pair().test_unwrap();
+    assert!(matches!(
+        retain_broker_ipc(
+            File::from(OwnedFd::from(datagram)),
+            "11".repeat(32),
+            BrokerPeerIdentity::current_process().test_unwrap(),
+        ),
+        Err(CageError::InvalidBrokerDescriptor)
+    ));
+    let (stream, _peer) = UnixStream::pair().test_unwrap();
+    assert!(retain_broker_ipc(
+        File::from(OwnedFd::from(stream)),
+        "11".repeat(32),
+        BrokerPeerIdentity::current_process().test_unwrap(),
+    )
+    .is_ok());
+}
+
+#[test]
 fn group_writable_runtime_file_without_an_execute_bit_is_rejected() {
     let tree = TestTree::new();
     for mode in [0o664, 0o646, 0o4644] {

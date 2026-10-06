@@ -934,6 +934,7 @@ pub fn retain_broker_ipc(
     if identity.kind() != ResourceKind::UnixSocket {
         return Err(CageError::InvalidBrokerDescriptor);
     }
+    linux::require_connection_oriented_unix_socket(&file)?;
     let peer_identity = linux::broker_peer_identity(&file)?;
     if peer_identity != expected_peer_identity {
         return Err(CageError::BrokerPeerIdentityMismatch);
