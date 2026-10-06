@@ -8,7 +8,7 @@ mod types;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use tokio::sync::Notify;
 
@@ -33,6 +33,8 @@ pub struct MailboxServer {
     arrivals: BTreeMap<String, Arc<Notify>>,
     public_key: String,
     registry: Option<ProcessRegistry>,
+    /// The kernel's fenced authority clock, which also authenticates claimants.
+    clock: Arc<dyn chio_kernel::authority::Clock>,
 }
 
 impl MailboxServer {
@@ -77,6 +79,7 @@ impl MailboxServer {
             store: Mutex::new(store),
             public_key,
             registry: None,
+            clock: kernel.authority_clock(),
         })
     }
 
@@ -182,7 +185,7 @@ impl MailboxServer {
                 channel,
                 serde_json::from_value(arguments)?,
                 &claimant,
-                now_ms()?,
+                || self.authority_now_ms(),
             ),
             ("complete", Some(claimant)) => {
                 store.complete(channel, serde_json::from_value(arguments)?, &claimant)
@@ -191,7 +194,7 @@ impl MailboxServer {
                 channel,
                 serde_json::from_value(arguments)?,
                 &claimant,
-                now_ms,
+                || self.authority_now_ms(),
             ),
             _ => Err(ProcessError::Invalid("unknown mailbox operation")),
         }
@@ -261,6 +264,10 @@ impl MailboxServer {
         Ok(Some((arrivals.clone(), Duration::from_millis(wait_ms))))
     }
 
+    fn authority_now_ms(&self) -> Result<u64, ProcessError> {
+        Ok(self.clock.unix_millis().map_err(KernelError::from)?.get())
+    }
+
     fn tool_error(error: ProcessError) -> KernelError {
         let reason = match error {
             ProcessError::Conflict => {
@@ -274,15 +281,6 @@ impl MailboxServer {
         };
         KernelError::ToolServerError(reason.to_owned())
     }
-}
-
-/// Lease deadlines are measured on the host clock.
-fn now_ms() -> Result<u64, ProcessError> {
-    let elapsed = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| ProcessError::Invalid("host clock precedes the Unix epoch"))?;
-    u64::try_from(elapsed.as_millis())
-        .map_err(|_| ProcessError::Invalid("host clock exceeds the lease range"))
 }
 
 #[async_trait::async_trait]

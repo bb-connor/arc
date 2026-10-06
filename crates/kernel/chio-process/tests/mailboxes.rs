@@ -1131,6 +1131,37 @@ async fn competing_consumers_claim_disjoint_messages_under_fenced_leases() -> Re
 }
 
 #[tokio::test]
+async fn claim_leases_are_measured_on_the_kernel_authority_clock() -> Result {
+    let authority_secs = 1_700_000_000;
+    let _clock = chio_test_support::clock::scope_unix_secs(authority_secs);
+    let directory = tempfile::tempdir()?;
+    let kernel = attesting_kernel(directory.path())?;
+    let runtime = processes(directory.path(), kernel)?;
+    let sent = invoke(
+        &runtime,
+        "sender",
+        "send-authority-clock",
+        "send_jobs",
+        json!({"message_key": "job-authority-clock", "payload": {"job": 1}}),
+    )
+    .await?;
+    assert_eq!(value(&sent)?["sequence"], "1");
+    let claimed = invoke(
+        &runtime,
+        "worker_a",
+        "claim-authority-clock",
+        "claim_jobs",
+        json!({"limit": 1, "lease_ms": 60_000}),
+    )
+    .await?;
+    assert_eq!(
+        value(&claimed)?["messages"][0]["lease_expires_at_ms"].as_u64(),
+        Some(authority_secs * 1_000 + 60_000)
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn claims_require_an_attested_caller() -> Result {
     let directory = tempfile::tempdir()?;
     let kernel = support::kernel(directory.path(), Box::new(Unused))?;
