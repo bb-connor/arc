@@ -313,7 +313,7 @@ EXPECTED_ADVISORY_ENV = {'CARGO_INCREMENTAL': '0',
  'PROPTEST_CASES': '256',
  'CHIO_CI_RUSTFLAGS': '-D warnings -C link-arg=-Wl,--threads=1'}
 EXPECTED_ADVISORY_JOB_SHA256 = "a518a495aecb5d9eca47d6a5aaa3c3d978f524a5a020f312dbc8a0e24e399ff5"
-EXPECTED_LANDING_AUDITOR_SHA256 = "57c30d47cb64bd811d3e072d83f28a7fb9ddc00e85ffc4f3c5d819213b9844d1"
+EXPECTED_LANDING_AUDITOR_SHA256 = "ad85ad8aeaab2fbc871833811374ad9101b843e261e729c14e5d9c6ff65cbbc5"
 EXPECTED_WORKFLOW_SYNTAX_CHECKER_SHA256 = "1777d2df48bff8f3269a1da5451572576cadfbbf3b0784dfc16e28137bd13ada"
 EXPECTED_CI_PERMISSIONS = {"contents": "read"}
 EXPECTED_CONTROLLER_EVENTS = {
@@ -948,11 +948,11 @@ EXPECTED_TRUST_JOB_DIGESTS = {
     (
         "enterprise evidence finalizer",
         "publish-security-contract",
-    ): "56ee2c359d5a8c0918894431baaf5b8aaf2101201101da6e2768c4aab45bca5e",
+    ): "b3211f80ec4a7c81a6e6c29bbfbd414a7033959188dd50d8192122b18a738d3d",
     (
         "security contract revocation",
         "bind-revocation",
-    ): "7636ab4a3aca488a74d0e03eb7e33d323ba7d2df982248f5435ae773c052a312",
+    ): "c011da7bd447b9879d31ab4a03f808edae0b1ddda932a024b812bd1824fd026d",
     (
         "security contract revocation",
         "revoke-security-contract",
@@ -7464,7 +7464,7 @@ def validate(root: Path) -> None:
             "contents/.github/workflows/security-contract-revocation.yml?ref=${SECURITY_DEFINITION_SHA}",
             "contents/.github/workflows/security-contract-revocation.yml?ref=${REVOKER_SHA}",
             'test "${running_revoker_blob_sha}" = "${authorized_revoker_blob_sha}"',
-            "actions/workflows/security-contract-revocation.yml",
+            "actions/runs/${REVOKER_RUN_ID}/attempts/${RUN_ATTEMPT}",
             'test "$(jq -r \'.path\' <<< "${revoker_run}")" = ".github/workflows/security-contract-revocation.yml"',
             'test "$(jq -r \'.event\' <<< "${revoker_run}")" = workflow_dispatch',
             'test "$(jq -r \'.head_sha\' <<< "${revoker_run}")" = "${REVOKER_SHA}"',
@@ -7504,11 +7504,11 @@ def validate(root: Path) -> None:
             "contents/.github/workflows/security-contract-revocation.yml?ref=${SECURITY_DEFINITION_SHA}",
             "contents/.github/workflows/security-contract-revocation.yml?ref=${LISTENER_SHA}",
             'test "${running_listener_blob_sha}" = "${authorized_listener_blob_sha}"',
-            "actions/workflows/security-contract-revocation.yml",
+            "actions/runs/${LISTENER_RUN_ID}/attempts/${LISTENER_RUN_ATTEMPT}",
             'test "$(jq -r \'.path\' <<< "${listener_run}")" = ".github/workflows/security-contract-revocation.yml"',
             'test "$(jq -r \'.event\' <<< "${listener_run}")" = workflow_run',
             'test "$(jq -r \'.head_sha\' <<< "${listener_run}")" = "${LISTENER_SHA}"',
-            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml",
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}",
             "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}",
             'test "$(jq -r \'.path\' <<< "${upstream}")" = ".github/workflows/ci.yml"',
             'test "$(jq -r \'.event\' <<< "${upstream}")" = "pull_request"',
@@ -7605,6 +7605,7 @@ def validate(root: Path) -> None:
         "LISTENER_RUN_ATTEMPT": "${{ github.run_attempt }}",
         "LISTENER_RUN_ID": "${{ github.run_id }}",
         "LISTENER_SHA": "${{ github.sha }}",
+        "REPOSITORY_ID": "${{ github.repository_id }}",
         "SECURITY_APP_ID": "${{ vars.CHIO_SECURITY_APP_ID }}",
         "SECURITY_DEFINITION_SHA": "${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}",
     }:
@@ -7619,11 +7620,11 @@ def validate(root: Path) -> None:
             "contents/.github/workflows/security-contract-revocation.yml?ref=${SECURITY_DEFINITION_SHA}",
             "contents/.github/workflows/security-contract-revocation.yml?ref=${LISTENER_SHA}",
             'test "${running_listener_blob_sha}" = "${authorized_listener_blob_sha}"',
-            "actions/workflows/security-contract-revocation.yml",
+            "actions/runs/${LISTENER_RUN_ID}/attempts/${LISTENER_RUN_ATTEMPT}",
             'test "$(jq -r \'.path\' <<< "${listener_run}")" = .github/workflows/security-contract-revocation.yml',
             'test "$(jq -r \'.event\' <<< "${listener_run}")" = workflow_run',
             'test "$(jq -r \'.head_sha\' <<< "${listener_run}")" = "${LISTENER_SHA}"',
-            "actions/workflows/enterprise-evidence-finalizer.yml",
+            "actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}",
             "actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}",
             'test "$(jq -r \'.path\' <<< "${upstream}")" = .github/workflows/enterprise-evidence-finalizer.yml',
             'test "$(jq -r \'.event\' <<< "${upstream}")" = workflow_dispatch',

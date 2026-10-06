@@ -201,7 +201,21 @@ def snapshot() -> dict[str, dict]:
     for filename in ("ci.yml", "enterprise-evidence-finalizer.yml"):
         record = data[f"{prefix}/actions/workflows/{filename}"]
         data[f"{prefix}/actions/workflows/{record['id']}"] = copy.deepcopy(record)
+    data[f"{prefix}/actions/runs"] = data[f"{prefix}/actions/workflows/ci.yml/runs"]
     return data
+
+
+def retire_current_workflow_registry(data: dict, change: str) -> None:
+    prefix = f'repos/{REPOSITORY}/actions/workflows/'
+    for key in list(data):
+        if not key.startswith(prefix) or key.endswith('/runs'):
+            continue
+        if change == 'deleted':
+            del data[key]
+        elif change == 'renamed':
+            data[key]['path'] = '.github/workflows/renamed.yml'
+        elif change == 'recreated':
+            data[key]['id'] = 999
 
 
 FAKE_GH = r'''#!/usr/bin/env python3
@@ -276,6 +290,41 @@ def run_audit(data: dict[str, dict]) -> tuple[subprocess.CompletedProcess, dict,
 
 
 class RecordedQualificationAuditTests(unittest.TestCase):
+    def test_historical_audit_accepts_disabled_ci_without_current_activity(self) -> None:
+        data = snapshot()
+        data[f'repos/{REPOSITORY}/actions/workflows/ci.yml']['state'] = 'disabled_manually'
+        result, report, _ = run_audit(data)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(report['status'], 'verified')
+
+    def test_historical_audit_survives_renamed_deleted_recreated_registry(self) -> None:
+        for change in ('renamed', 'deleted', 'recreated'):
+            with self.subTest(change=change):
+                data = snapshot()
+                retire_current_workflow_registry(data, change)
+                result, report, _ = run_audit(data)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(report['status'], 'verified')
+
+    def test_historical_run_and_recorded_authorizer_identity_substitutions_fail(self) -> None:
+        for change in ('ci_workflow_id', 'finalizer_workflow_id', 'ci_path', 'ci_head', 'ci_attempt', 'authorizer_check'):
+            with self.subTest(change=change):
+                data = snapshot()
+                prefix = f'repos/{REPOSITORY}'
+                ci = data[f'{prefix}/actions/runs/{CI_RUN}/attempts/1']
+                finalizer = data[f'{prefix}/actions/runs/{FINALIZER_RUN}/attempts/1']
+                if change == 'ci_workflow_id': ci['workflow_id'] = 999
+                elif change == 'finalizer_workflow_id': finalizer['workflow_id'] = 999
+                elif change == 'ci_path': ci['path'] = '.github/workflows/untrusted.yml'
+                elif change == 'ci_head': ci['head_sha'] = SOURCE
+                elif change == 'ci_attempt': ci['run_attempt'] = 2
+                else:
+                    authority = data[f'{prefix}/commits/{MERGE}/check-runs']['check_runs'][-1]
+                    authority['details_url'] = authority['details_url'].replace(f'/runs/{FINALIZER_RUN}/', '/runs/302/')
+                result, report, _ = run_audit(data)
+                self.assertNotEqual(result.returncode, 0, report)
+                self.assertEqual(report['status'], 'unverified')
+
     def test_main_withdrawal_at_final_boundary_cannot_use_old_reachability(self) -> None:
         data = snapshot()
         prefix = f"repos/{REPOSITORY}"
@@ -621,7 +670,7 @@ class RunIdentityLivenessTests(unittest.TestCase):
                                     env=os.environ | {"PATH": str(root) + os.pathsep + os.environ["PATH"],
                                                       "API_FIXTURE": str(fixture), "GITHUB_REPOSITORY": REPOSITORY,
                                                       "EVENT_RUN_ID": str(FINALIZER_RUN), "EVENT_WORKFLOW_ID": str(FINALIZER_WORKFLOW),
-                                                      "EVENT_RUN_ATTEMPT": "2", "EVENT_CONCLUSION": "failure"})
+                                                      "EVENT_RUN_ATTEMPT": "2", "EVENT_CONCLUSION": "failure", "REPOSITORY_ID": "1195888645"})
             self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_disabled_other_producer_does_not_suppress_critical_route(self) -> None:
@@ -634,6 +683,10 @@ class RunIdentityLivenessTests(unittest.TestCase):
             with self.subTest(event_id=event_id):
                 data = snapshot()
                 data[f"repos/{REPOSITORY}/actions/workflows/{unrelated}"]["state"] = "disabled_manually"
+                event_run = CI_RUN if event_id == CI_WORKFLOW else FINALIZER_RUN
+                event_record = data[f"repos/{REPOSITORY}/actions/runs/{event_run}/attempts/1"]
+                event_record['conclusion'] = 'failure'
+
                 with tempfile.TemporaryDirectory(prefix="chio-route-") as raw:
                     root = Path(raw)
                     fixture = root / "api.json"
@@ -645,7 +698,7 @@ class RunIdentityLivenessTests(unittest.TestCase):
                     result = subprocess.run(["bash", "-c", route], capture_output=True, text=True, check=False,
                                             env=os.environ | {"PATH": str(root) + os.pathsep + os.environ["PATH"],
                                                               "API_FIXTURE": str(fixture), "GITHUB_OUTPUT": str(output),
-                                                              "GITHUB_REPOSITORY": REPOSITORY, "EVENT_WORKFLOW_ID": str(event_id)})
+                                                              "GITHUB_REPOSITORY": REPOSITORY, "EVENT_WORKFLOW_ID": str(event_id), "EVENT_RUN_ID": str(event_run), "EVENT_RUN_ATTEMPT": "1", "EVENT_CONCLUSION": "failure", "REPOSITORY_ID": "1195888645"})
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(output.read_text(), f"workflow_path={expected_path}\n")
 
@@ -705,7 +758,7 @@ class RunIdentityLivenessTests(unittest.TestCase):
 
 
 class PlatformShapedFinalizerBinderTests(unittest.TestCase):
-    def bind(self, mutation: str = '', conclusion: str | None = 'failure', workflow_state: str = 'active') -> tuple[subprocess.CompletedProcess, str]:
+    def bind(self, mutation: str = '', conclusion: str | None = 'failure', workflow_state: str = 'active', registry_change: str = '') -> tuple[subprocess.CompletedProcess, str]:
         body = next(step['run'] for step in workflow('security-contract-revocation.yml')['jobs']['bind-revocation']['steps']
                     if step.get('name') == 'Bind failed finalizer to existing authority')
         data = snapshot()
@@ -749,6 +802,10 @@ class PlatformShapedFinalizerBinderTests(unittest.TestCase):
         elif mutation == 'job_head': jobs[0]['head_sha'] = SOURCE
         elif mutation == 'static_job_label': jobs[0]['workflow_name'] = 'Enterprise evidence finalizer'
         elif mutation == 'publisher_static_label': jobs[-1]['workflow_name'] = 'Enterprise evidence finalizer'
+        data[f'{prefix}/actions/runs/901']['repository'] = {'full_name': REPOSITORY, 'id': 42}
+        data[f'{prefix}/actions/runs/901']['head_repository'] = {'full_name': REPOSITORY, 'id': 42}
+        data[f'{prefix}/actions/runs/901/attempts/1'] = data[f'{prefix}/actions/runs/901']
+        if registry_change: retire_current_workflow_registry(data, registry_change)
         with tempfile.TemporaryDirectory(prefix='chio-platform-shaped-binder-') as raw:
             root = Path(raw)
             fixture = root / 'api.json'
@@ -764,6 +821,7 @@ class PlatformShapedFinalizerBinderTests(unittest.TestCase):
                                 'EVENT_RUN_ID': str(FINALIZER_RUN), 'EVENT_WORKFLOW_ID': str(FINALIZER_WORKFLOW),
                                 'LISTENER_REF': 'refs/heads/main', 'LISTENER_RUN_ATTEMPT': '1', 'LISTENER_RUN_ID': '901',
                                 'LISTENER_SHA': DEFINITION, 'SECURITY_APP_ID': str(APP_ID), 'SECURITY_DEFINITION_SHA': DEFINITION,
+                                'REPOSITORY_ID': '1195888645',
                                 'GH_TOKEN': 'offline-fixture-only'}
             result = subprocess.run(['bash', '-c', body], env=env, capture_output=True, text=True, check=False, timeout=30)
             self.assertEqual(fixture.read_text(), json.dumps(data), 'binder unexpectedly mutated the API fixture')
@@ -792,13 +850,21 @@ class PlatformShapedFinalizerBinderTests(unittest.TestCase):
                 self.assertIn('eligible=true', output)
                 self.assertIn('create_missing=false', output)
 
+    def test_finalizer_historical_binding_survives_registry_replacement(self) -> None:
+        for change in ('renamed', 'deleted', 'recreated'):
+            with self.subTest(change=change):
+                result, output = self.bind(registry_change=change)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('eligible=true', output)
+                self.assertIn('create_missing=false', output)
+
 
 class DisabledCriticalCiBinderTests(unittest.TestCase):
     def test_disabled_ci_still_binds_exact_bad_attempt_to_existing_authority(self) -> None:
         body = next(step['run'] for step in workflow('security-contract-revocation.yml')['jobs']['bind-revocation']['steps']
                     if step.get('name') == 'Bind later failed CI rerun to existing authority')
-        for state in ('active', 'disabled_manually', 'disabled_inactivity', 'disabled_fork'):
-            with self.subTest(state=state):
+        for state, registry_change in (('active',''), ('disabled_manually',''), ('disabled_inactivity',''), ('disabled_fork',''), ('active','renamed'), ('active','deleted'), ('active','recreated')):
+            with self.subTest(state=state, registry_change=registry_change):
                 data = snapshot()
                 prefix = f'repos/{REPOSITORY}'
                 data[f'{prefix}/actions/workflows/ci.yml']['state'] = state
@@ -814,6 +880,10 @@ class DisabledCriticalCiBinderTests(unittest.TestCase):
                                                      'event': 'workflow_run', 'status': 'in_progress', 'head_sha': DEFINITION,
                                                      'head_branch': 'main', 'run_attempt': 1}
                 data[f'{prefix}/contents/.github/workflows/security-contract-revocation.yml?ref={DEFINITION}'] = {'sha': '4' * 40}
+                data[f'{prefix}/actions/runs/901']['repository'] = {'full_name': REPOSITORY, 'id': 42}
+                data[f'{prefix}/actions/runs/901']['head_repository'] = {'full_name': REPOSITORY, 'id': 42}
+                data[f'{prefix}/actions/runs/901/attempts/1'] = data[f'{prefix}/actions/runs/901']
+                if registry_change: retire_current_workflow_registry(data, registry_change)
                 with tempfile.TemporaryDirectory(prefix='chio-disabled-ci-binder-') as raw:
                     root = Path(raw)
                     fixture = root / 'api.json'
@@ -830,7 +900,7 @@ class DisabledCriticalCiBinderTests(unittest.TestCase):
                                         'LISTENER_REF': 'refs/heads/main', 'LISTENER_RUN_ATTEMPT': '1', 'LISTENER_RUN_ID': '901',
                                         'LISTENER_SHA': DEFINITION, 'SECURITY_APP_ID': str(APP_ID), 'SECURITY_DEFINITION_SHA': DEFINITION,
                                         'AUTHORIZED_SOURCE_SHA': SOURCE, 'COMMITTED_EVIDENCE_SHA': EVIDENCE,
-                                        'REPOSITORY_ID': '42', 'REPOSITORY_OWNER_ID': '1', 'GH_TOKEN': 'offline-fixture-only'}
+                                        'REPOSITORY_ID': '1195888645', 'REPOSITORY_OWNER_ID': '1', 'GH_TOKEN': 'offline-fixture-only'}
                     result = subprocess.run(['bash', '-c', body], env=env, capture_output=True, text=True, check=False, timeout=30)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertIn('eligible=true', output.read_text() if output.exists() else '')
@@ -866,6 +936,15 @@ print(json.dumps(result))
 
 
 class AuthorizingFinalizerRetryTests(unittest.TestCase):
+    def test_recorded_authorizer_reconciliation_survives_retired_registry(self) -> None:
+        for change in ('renamed', 'deleted', 'recreated'):
+            with self.subTest(change=change):
+                data = snapshot()
+                retire_current_workflow_registry(data, change)
+                result, observed = self.run_publisher_guard(data)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(observed, data)
+
     def run_listener_binding(self, data: dict) -> tuple[subprocess.CompletedProcess, str]:
         body = next(step['run'] for step in workflow('security-contract-revocation.yml')['jobs']['bind-revocation']['steps']
                     if step.get('name') == 'Bind failed finalizer to existing authority')
