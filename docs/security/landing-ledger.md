@@ -7,17 +7,43 @@
 superseded PRs without losing source or review obligations, and retain an exact
 remaining-work ledger.
 
+
+## October 6 current production repair boundary
+
+The current ordered landing queue is #1176 then #1160. #1176 is the independently
+reviewed ten-file trusted runtime prerequisite at `9313433e9e`; its protected
+hosted checks remain pending. No definition or source variable is rotated yet.
+The published foundation head remains `d0496c14d824`; local source repairs and
+component tests are not a qualified replacement candidate.
+
+Critical replay, ordinary prepaid completion, bounded recovery, current finding
+publication and the atomic cancellation race have focused passing evidence.
+The provider core has 51 owning tests passing with strict lint/formatting, the
+Cohere registry has 26 passing controls, ACP has 7+3 focused passes, and the
+certificate/CLI packet has 2+22+13+2 passing controls. Original failed, setup,
+hung and unavailable attempts remain separate. Whole owning/native acceptance
+for each broader parent requirement remains open.
+
+New review triggers remain blocking: NDR001 retains the original native dispatch
+identity across stripped request custody; status-only Refunded does not prove a
+complete debit unwind; OpenAI lifecycle output and raw identity normalization
+need their original regressions and repairs. Native cage F057/F059 have genuine
+X64 original failures, with the proc-FD precondition failure kept distinct.
+Claude-held handoffs, remaining now P2 owners, final K/audit, and exact frozen
+native/cold/trusted/hosted/protected landing still require completion.
+
 ## October 6 incoming review and mailbox scope
 
-The authoritative JSON now contains **1,734 requirements**: all original 1,609
-rows remain unchanged, followed by 115 incoming findings and ten architecture
-follow-up records. The [authored review](../reviews/2026-10-06-pr1160/README.md)
+The authoritative JSON now contains **1,735 requirements**: all original 1,609
+rows remain unchanged, followed by 115 incoming findings, ten architecture
+follow-up records and the separately reproduced native-return blocker NDR001. The [authored review](../reviews/2026-10-06-pr1160/README.md)
 is imported byte for byte from `5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc`. It
 reviews published `d0496c14d824a327f00b98576132834306ff6694` statically; author
 text and estimates remain historical and are not a current-source qualification.
 
 The shared mailbox board owns now/later scope and patch status, superseding the
-earlier preparatory waves. Its current finding scope is **72 now / 43 later**.
+earlier preparatory waves. Its original review finding scope is **72 now / 43 later**; NDR001 adds one
+current foundation blocker.
 All `A01` through `A10` have named later destinations. Now belongs in #1160;
 later remains an explicit security follow-up without an invented PR number.
 Ready means a patch awaits integration. Integrated means source was integrated,
@@ -26,9 +52,10 @@ protected landing still open. No appended record is candidate-qualified or
 main-ancestry verified.
 
 The root-confirmed provider/Hermes integrations below retain both origin and
-integration checkpoints in JSON. `F013` still needs shared SSE Content-Type
-enforcement. `F008` still needs a disposition/repair for Recover new-key proof
-of possession. `F077` disputes the blanket head-only premise while exact
+integration checkpoints in JSON. The shared SSE MIME repair is committed at `0b5f1fd413` with 51 owning tests
+and strict Clippy/formatting passing. Recover proof of possession is included
+in `bb6308e73c` with 22 focused and 112 owning keyring tests; their final native
+and candidate acceptance remains open. `F077` disputes the blanket head-only premise while exact
 test-merge App/ruleset activation acceptance remains open. The existing 21
 readiness records stay historical pending the root final candidate K.
 
@@ -1001,16 +1028,18 @@ retains 62 records, including unsuccessful attempts, with SHA-256
 
 | Order | PR | Responsibility | Acceptance |
 | --- | --- | --- | --- |
-| 1 | [#1160](https://github.com/bb-connor/arc/pull/1160) | Bounded process/security foundation | Final independent review, PostgreSQL native repair, Linux/trusted evidence, exact-candidate CI and protected merge remain |
+| 1 | [#1176](https://github.com/bb-connor/arc/pull/1176) | Ten-file trusted runtime-definition prerequisite | Exact source independently accepted; protected hosted checks and new-definition acceptance pending |
+| 2 | [#1160](https://github.com/bb-connor/arc/pull/1160) | Bounded process/security foundation | Remaining P0/P1 and now P2 repairs, final owning/review and native/cold/trusted/hosted evidence, protected merge remain |
 
-Prerequisites #1168 and #1167 are merged. The second landing slot is unused;
-valuable separate tracks remain open with named destinations.
+Prerequisites #1168, #1167 and #1175 are merged. #1176 then #1160 are the two
+active landing slots. Valuable separate tracks remain open with named destinations.
 
 Later hardening and product-evidence slices receive a PR only when an active
 slot becomes available. Their source remains in the preserved reference.
 
 Both prerequisite merges are now present in the foundation history. The bounded
-cut advances #1160 into the sole active landing slot. The composition preserves
+cut preserves #1160 as the foundation candidate behind its trusted-definition
+prerequisite. The composition preserves
 the audited fork byte for byte and resolves shared manifests by retaining the
 foundation source closure with the repaired dependency floors. The committed
 projection is still awaiting final qualification.
