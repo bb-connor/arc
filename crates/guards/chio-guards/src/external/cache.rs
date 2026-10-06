@@ -19,19 +19,33 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 pub use chio_security_types::clock::Clock;
-use chio_security_types::clock::{
-    ClockError, ClockFence, ClockReading, MonotonicInstant, SystemClock,
-};
+use chio_security_types::clock::{ClockError, ClockReading, MonotonicInstant, SystemClock};
 
 /// Clock backed by Tokio's pausable monotonic timer and native epoch time.
-#[derive(Debug)]
+///
+/// The cache, circuit breaker and token bucket read only the monotonic
+/// component, so only that component is fenced. A wall-clock step changes the
+/// reported epoch time but never fails a read, and so never opens a circuit.
 pub struct TokioClock {
-    state: Mutex<(Instant, ClockFence)>,
+    /// Timer origin and the highest monotonic reading returned.
+    state: Mutex<(Instant, u64)>,
+    wall: Arc<dyn Clock>,
 }
 impl Default for TokioClock {
     fn default() -> Self {
+        Self::with_wall_clock(Arc::new(SystemClock))
+    }
+}
+impl std::fmt::Debug for TokioClock {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("TokioClock").finish_non_exhaustive()
+    }
+}
+impl TokioClock {
+    pub(crate) fn with_wall_clock(wall: Arc<dyn Clock>) -> Self {
         Self {
-            state: Mutex::new((Instant::now(), ClockFence::default())),
+            state: Mutex::new((Instant::now(), 0)),
+            wall,
         }
     }
 }
@@ -42,11 +56,14 @@ impl Clock for TokioClock {
             .checked_duration_since(state.0)
             .ok_or(ClockError::MonotonicRegression)?;
         let nanos = u64::try_from(elapsed.as_nanos()).map_err(|_| ClockError::Overflow)?;
-        let reading = ClockReading::new(
-            SystemClock.unix_millis()?,
+        if nanos < state.1 {
+            return Err(ClockError::MonotonicRegression);
+        }
+        state.1 = nanos;
+        Ok(ClockReading::new(
+            self.wall.unix_millis()?,
             MonotonicInstant::from_nanos(nanos),
-        );
-        state.1.observe(reading)
+        ))
     }
 }
 
