@@ -43,6 +43,113 @@ fn lookup(method: &str, id: &str) -> Value {
     json!({"jsonrpc": "2.0", "id": method, "method": method, "params": {"id": id}})
 }
 
+struct ConsentAfterDispatch(Arc<AtomicU64>);
+
+#[async_trait::async_trait]
+impl ToolServerConnection for ConsentAfterDispatch {
+    fn server_id(&self) -> &str {
+        SERVER
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec![TOOL.into()]
+    }
+
+    async fn invoke(
+        &self,
+        tool: &str,
+        arguments: Value,
+        _: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        assert_eq!(tool, TOOL);
+        assert_eq!(arguments, json!({"record": "consumer-record"}));
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Err(KernelError::UrlElicitationsRequired {
+            message: "private consent endpoint must never appear on the wire".into(),
+            elicitations: vec![],
+        })
+    }
+}
+
+#[test]
+fn continuation_error_does_not_restore_pending_approval_after_terminal_dispatch() -> TestResult {
+    let fixture = Fixture::new()?.with_threshold_approval()?;
+    let request = fixture.approval_request("v1-terminal-continuation-error")?;
+    let mut consumer = fixture.open(Protocol::A2a)?;
+    let pending = call(&mut consumer, &request, send(&request, "application/json"))?;
+    let task = &pending["result"]["task"];
+    assert_eq!(task["status"]["state"], "TASK_STATE_INPUT_REQUIRED");
+    let id = task["id"].as_str().ok_or("pending task id")?;
+    let proposal =
+        serde_json::from_value(task["artifacts"][0]["parts"][0]["data"]["proposal"].clone())?;
+    let approved = fixture.approved_request(&request, proposal)?;
+    let Frontend::A2a(kernel, _) = &mut consumer.frontend else {
+        return Err("expected A2A consumer".into());
+    };
+    kernel.register_tool_server(Box::new(ConsentAfterDispatch(fixture.calls.clone())));
+    let mut wire = send(&approved, "application/json");
+    wire["params"]["message"]["taskId"] = json!(id);
+    let failed = call(&mut consumer, &approved, wire.clone())?;
+    assert!(failed.get("error").is_some(), "{failed}");
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    let database = rusqlite::Connection::open(fixture.directory.path().join("authority.db"))?;
+    let state: String =
+        database.query_row("SELECT state FROM admission_operations", [], |row| {
+            row.get(0)
+        })?;
+    assert_eq!(state, "outcome_unknown_after_dispatch");
+    let Frontend::A2a(kernel, _) = &consumer.frontend else {
+        return Err("expected A2A consumer".into());
+    };
+    let receipts = kernel.receipt_log().receipts();
+    assert_eq!(receipts.len(), 2);
+    let terminal = receipts.last().ok_or("signed terminal cancellation")?;
+    assert!(terminal.verify_signature()?);
+    assert_eq!(terminal.kernel_key, fixture.signer.public_key());
+    assert!(matches!(
+        terminal.decision,
+        Some(chio_core::receipt::decision::Decision::Cancelled { .. })
+    ));
+    let observed = call(&mut consumer, &approved, lookup("GetTask", id))?;
+    assert_eq!(
+        observed["result"]["status"]["state"], "TASK_STATE_FAILED",
+        "a committed cancellation cannot return to approval-required: {observed}"
+    );
+    assert_eq!(observed["result"]["contextId"], task["contextId"]);
+    assert!(observed["result"].get("artifacts").is_none());
+    assert!(observed["result"].get("metadata").is_none());
+    assert!(!observed.to_string().contains("private consent endpoint"));
+    for _ in 0..3 {
+        assert_eq!(
+            call(&mut consumer, &approved, lookup("GetTask", id))?,
+            observed
+        );
+    }
+    let mut inaccessible = approved.clone();
+    inaccessible.agent_id = "another-owner".into();
+    let hidden = call(&mut consumer, &inaccessible, lookup("GetTask", id))?;
+    assert_eq!(hidden["error"]["code"], -32001);
+    let refused = call(&mut consumer, &approved, wire)?;
+    assert_eq!(refused["error"]["code"], -32602);
+    let not_cancelable = call(&mut consumer, &approved, lookup("CancelTask", id))?;
+    assert_eq!(not_cancelable["error"]["code"], -32002);
+    let Frontend::A2a(kernel, _) = &consumer.frontend else {
+        return Err("expected A2A consumer".into());
+    };
+    assert_eq!(kernel.receipt_log().receipts().len(), 2);
+    let retry = call(
+        &mut consumer,
+        &approved,
+        send(&approved, "application/json"),
+    )?;
+    assert_eq!(
+        retry["result"]["task"]["status"]["state"], "TASK_STATE_FAILED",
+        "{retry}"
+    );
+    assert_eq!(fixture.calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
 #[test]
 fn pending_approval_remains_observable_without_dispatch_or_new_receipts() -> TestResult {
     let fixture = Fixture::new()?.with_threshold_approval()?;

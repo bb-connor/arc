@@ -17,7 +17,7 @@
 - Continuation preserves the original messageId, tool target, arguments, capability, governed intent, nonce, proof, supplemental authority and model metadata. Compare the canonical complete kernel request after clearing only the three approval fields; compare bridge and source-envelope bindings separately. This uses the shared request projection instead of inventing an authority hash.
 - A supplied contextId must match the generated context of its task. New client-created contexts remain unsupported. Reject malformed identifiers before any task mutation.
 - Reuse the existing task deadline, quota and output mode. A continuation must not allocate another task, extend the deadline, reset cancellation or replace frozen authority.
-- Reuse complete_task with a temporary approved request. Restore the preceding request and response on protocol/execution/projection errors while retaining the original deadline. An authoritative terminal kernel denial remains terminal. Successful terminal SendMessage results retain the existing direct-delivery retirement behavior.
+- Validate continuation before changing custody. Once execution begins, keep the approved frozen request and never restore an obsolete approval response. An execution or projection error records a failed protocol task without inventing a signed kernel outcome; an already projected terminal kernel response remains intact. Preserve the original deadline. Successful terminal SendMessage results retain the existing direct-delivery retirement behavior.
 - Pending approval projects to TASK_STATE_INPUT_REQUIRED, reflecting that the client must submit the signed approval continuation.
 - Fail closed. No new audit exemptions, authority-variable edits or qualification bypasses. Keep every old source, failure and unavailable case scoped honestly.
 - No em dashes. No unwrap/expect in production. No subagents, merges or publication.
@@ -28,7 +28,7 @@
 - Argument, capability, intent, output-mode, context or message-ID substitution cannot change the retained invocation.
 - Expired, cancelled, legacy-only and missing tasks cannot begin new work.
 - Polling with a fresh approved context still cannot dispatch or mint new receipts.
-- Failed continuation validation or transport execution preserves the original task and a later valid continuation; successful replay produces one durable invocation and capture.
+- Failed continuation validation preserves the pending task and a later valid continuation. Execution errors preserve bounded failed-task custody; retrying the original stable message uses the kernel's durable authority and cannot repeat a committed dispatch.
 
 ### Task 1: Reproduce approval continuation loss
 
@@ -45,10 +45,10 @@
 
 **Files:** Existing `crates/protocol/chio-a2a-edge/src/v1.rs`, private `src/v1/continuation.rs`, edge unit tests in `src/tests/v1.rs`, crate README, consumer producer and its self-test.
 
-**Interfaces:** Parse optional taskId/contextId into the private v1 request. Use existing build_execution_request and chio_cross_protocol::execution::kernel_tool_call_request for complete canonical comparison, with only approval_token, approval_tokens and threshold_approval_proposal removed. Complete the owned retained task using its original IDs and restore the original request if continuation fails.
+**Interfaces:** Parse optional taskId/contextId into the private v1 request. Use existing build_execution_request and chio_cross_protocol::execution::kernel_tool_call_request for complete canonical comparison, with only approval_token, approval_tokens and threshold_approval_proposal removed. Complete the owned retained task using its original IDs. Task 5 supersedes the original error rollback with failed protocol custody.
 
 - [x] Preserve the new-task path; validate owned v1 continuation before changing its request or task slot.
-- [x] Bind the original output mode and context. Distinguish continuation cleanup from initial task cleanup so an error cannot discard earlier pending custody.
+- [x] Bind the original output mode and context. Distinguish continuation cleanup from initial task cleanup. Validation refusals preserve pending custody; execution failures retain the failed custody specified in Task 5.
 - [x] Require red regressions to pass; run complete A2A edge/adapter and consumer-boundary suites, strict all-target edge/adapter Clippy and the consumer test target Clippy, formatting, diff and the actual14-case consumer inventory. Locally execute the consumer producer prefix; its remaining native MCP fixtures require physical Linux x86 and remain mandatory in final-head hosted CI. Preserve any failure separately.
 - [x] Review the complete repair inline against the five focus conditions, then freeze all source/plan edits and commit the tested source checkpoint.
 
@@ -67,7 +67,20 @@
 
 **Files:** Existing derived research qualification and paper evidence package; source is frozen before renewal.
 
-- [ ] Renew the source-bound native21 inventory and fresh verifier. Preserve the completed d187/15d5 source and artifact evidence rather than relabeling it.
-- [ ] Append the actual continuation red/green and preceding hosted/review records without changing any of the existing697 raw records. Rebuild the PDF twice and require byte equality; publication remains gated by the existing four independent research requirements.
-- [ ] Commit only derived outputs, push normally and update the existing PR body. Resolve the continuation thread only after the pushed, verified repair. The actual native lifetime thread still requires unignored final-head x86 acceptance.
+- [x] Renew the source-bound native21 inventory and fresh verifier. Preserve the completed d187/15d5 source and artifact evidence rather than relabeling it.
+- [x] Append the actual continuation red/green and preceding hosted/review records without changing any of the existing697 raw records. Rebuild the PDF twice and require byte equality; publication remains gated by the existing four independent research requirements.
+- [x] Commit only derived outputs, push normally and update the existing PR body. Resolve the continuation thread only after the pushed, verified repair. The actual native lifetime thread still requires unignored final-head x86 acceptance.
 - [ ] Read all final-head CI and automatic-review results. Keep the security-owned source/definition/signed-Linux-package/policy handoff explicit. Do not claim production acceptance while required checks or that handoff remain incomplete.
+
+### Task 5: Preserve terminality after continuation errors
+
+**Trigger:** Fresh candidate19993187da review thread `PRRT_kwDOR0fQBc6plvKD` identifies a P1 rollback. The existing kernel URL-elicitation error path commits `outcome_unknown_after_dispatch`, signs a cancellation and returns an error. Restoring the earlier approval response misrepresents that state.
+
+**Files:** Private `src/v1/continuation.rs`, existing `consumer_boundary/a2a_v1.rs`, the consumer producer/self-test, and the edge README.
+
+**Interfaces:** Reuse `complete_task`, `TaskResponse`, the retained deadline and original request identity. No new kernel API, replay mechanism, persistence schema or authority cache.
+
+- [x] Add `continuation_error_does_not_restore_pending_approval_after_terminal_dispatch`: real signed threshold approvals, counted URL-elicitation tool, SQLite terminal state and verified signed cancellation. Require failed task observation with no obsolete approval artifact, no forged receipt, read-only repeated polling, inaccessible-owner refusal, and stable-message retry without another invocation. Watch the current implementation fail at the failed-state assertion.
+- [x] Replace error rollback with bounded failed-task custody. Clear stale pending metadata and artifacts only when no terminal kernel response has already been projected. Keep the approved request and deadline; use a fixed public status message without leaking the local error. Keep all validation before mutation.
+- [x] Add the new case to the exact15 consumer inventory and its omission/substitution controls. Run the whole edge and consumer suites, strict Clippy for both touched targets, actual producer prefix, formal mirrors, proof coverage, hygiene, format and diff checks. Review error delivery, terminal projection, owner checks and retry semantics inline.
+- [ ] Commit the verified source checkpoint, renew the native21 package and verifier, append immutable evidence while preserving all preceding784 raw entries, rebuild reproducibly, commit derived artifacts and push normally. Renew final-head CI/review; resolve the P1 thread only after the pushed regression is green. Require the native lifetime case on the final candidate and preserve the security-owned external qualification boundary.

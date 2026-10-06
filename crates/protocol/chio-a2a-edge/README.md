@@ -34,6 +34,12 @@ fixed. Continuation preserves the task deadline and does not allocate another
 slot. Polling with approvals remains observational. Cancellation and expiry
 prevent continuation. A retry of the original stable message without `taskId`
 uses the kernel's durable outcome replay after terminal delivery.
+Validation refusals preserve pending custody. Once continuation enters execution,
+an execution or result-projection error retains a failed protocol task until the
+original deadline. It cannot restore the earlier approval response. An already
+projected terminal kernel response remains intact; otherwise failed-task status
+does not carry a kernel receipt or decision. Retrying the original stable message
+without `taskId` remains subject to kernel admission and replay.
 
 The older slash-form lifecycle retains its explicit execution-on-poll contract,
 capacity limits, result retrieval and cancellation within the in-memory TTL.

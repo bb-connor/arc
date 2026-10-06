@@ -75,8 +75,6 @@ impl ChioA2aEdge {
                 "continuation must preserve its original request authority",
             ));
         }
-        let original_request = retained.request.clone();
-        let original_response = retained.response.clone();
         let retained = self
             .tasks
             .get_mut(task_id)
@@ -100,10 +98,18 @@ impl ChioA2aEdge {
                 self.tasks.remove(task_id);
             }
         } else if let Some(retained) = self.tasks.get_mut(task_id) {
-            // Keep earlier recoverable custody after transport/projection errors.
-            // Do not restore a removed expired task or reset its clock deadline.
-            retained.request = original_request;
-            retained.response = original_response;
+            // A raw error can follow a committed dispatch and signed terminal
+            // cancellation. Never restore the obsolete approval response or
+            // invent a kernel receipt. Keep bounded protocol failure custody;
+            // the original message's retry remains subject to kernel replay.
+            // Preserve any terminal kernel response already projected here.
+            if !retained.response.status.is_terminal() {
+                retained.response.status = TaskStatus::Failed;
+                retained.response.status_message =
+                    Some("Continuation failed before its result could be delivered".into());
+                retained.response.message = None;
+                retained.response.metadata = None;
+            }
         }
         projected
     }
