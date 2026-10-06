@@ -573,12 +573,15 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
         }
         return Err(KeyringError::Io(error));
     }
+    // Darwin's acl_get_entry returns 0 when it yields an entry and -1 with
+    // EINVAL once no entry remains; Linux libacl's 1/0 convention does not apply.
+    const ACL_ENTRY_RETURNED: std::os::raw::c_int = 0;
     let mut entry = std::ptr::null_mut();
     // SAFETY: `acl` is a live ACL object and `entry` points to writable storage.
     let mut entry_result = unsafe { acl_get_entry(acl, ACL_FIRST_ENTRY, &mut entry) };
     let mut acl_error = None;
     let mut grants_additional_authority = false;
-    while entry_result == 1 {
+    while entry_result == ACL_ENTRY_RETURNED {
         let mut tag_type = 0;
         // SAFETY: `entry` was returned by `acl_get_entry` for the live ACL.
         if unsafe { acl_get_tag_type(entry, &mut tag_type) } != 0 {
@@ -595,8 +598,15 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
         // SAFETY: `acl` remains live and `entry` points to writable storage.
         entry_result = unsafe { acl_get_entry(acl, ACL_NEXT_ENTRY, &mut entry) };
     }
-    if entry_result < 0 && acl_error.is_none() {
-        acl_error = Some(std::io::Error::last_os_error());
+    if entry_result != ACL_ENTRY_RETURNED && acl_error.is_none() {
+        let error = std::io::Error::last_os_error();
+        // EINVAL marks the end of the entry list (or an empty ACL), which adds
+        // no authority. Any other result is an inspection failure.
+        if entry_result != -1
+            || error.raw_os_error() != Some(rustix::io::Errno::INVAL.raw_os_error())
+        {
+            acl_error = Some(error);
+        }
     }
     // SAFETY: `acl` was allocated by `acl_get_fd_np` and is freed exactly once.
     let free_result = unsafe { acl_free(acl) };
@@ -809,6 +819,54 @@ mod storage_identity_tests {
             .create_new(true)
             .mode(0o600)
             .open(path)?;
+        let grants_additional_authority =
+            super::trusted_file_has_extended_acl(&file).map_err(std::io::Error::other)?;
+        assert!(!grants_additional_authority);
+        Ok(())
+    }
+
+    #[cfg(target_vendor = "apple")]
+    fn file_with_extended_ace(
+        name: &str,
+        ace: &str,
+    ) -> std::io::Result<(tempfile::TempDir, std::fs::File)> {
+        use std::os::unix::fs::OpenOptionsExt;
+
+        let directory = private_tempdir()?;
+        let path = std::fs::canonicalize(directory.path())?.join(name);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)?;
+        let status = std::process::Command::new("/bin/chmod")
+            .arg("+a")
+            .arg(ace)
+            .arg(&path)
+            .status()?;
+        if !status.success() {
+            return Err(std::io::Error::other(format!(
+                "chmod +a {ace:?} failed: {status}"
+            )));
+        }
+        let file = std::fs::File::open(&path)?;
+        Ok((directory, file))
+    }
+
+    #[cfg(target_vendor = "apple")]
+    #[test]
+    fn apple_acl_inspection_rejects_an_allow_entry() -> std::io::Result<()> {
+        let (_directory, file) = file_with_extended_ace("allow.sqlite3", "everyone allow read")?;
+        let grants_additional_authority =
+            super::trusted_file_has_extended_acl(&file).map_err(std::io::Error::other)?;
+        assert!(grants_additional_authority);
+        Ok(())
+    }
+
+    #[cfg(target_vendor = "apple")]
+    #[test]
+    fn apple_acl_inspection_accepts_a_deny_only_entry() -> std::io::Result<()> {
+        let (_directory, file) = file_with_extended_ace("deny.sqlite3", "everyone deny write")?;
         let grants_additional_authority =
             super::trusted_file_has_extended_acl(&file).map_err(std::io::Error::other)?;
         assert!(!grants_additional_authority);
