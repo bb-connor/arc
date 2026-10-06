@@ -30,6 +30,10 @@ pub enum ResponseWorkerTickError {
         "declassification receipt startup reconciliation exceeded its bound with {0} consumptions stranded"
     )]
     DeclassificationReconciliationLimit(u64),
+    #[error(
+        "declassification receipt startup revalidation exceeded its bound after {0} retried receipts"
+    )]
+    DeclassificationRevalidationLimit(u64),
     #[error("production security runtime has {0} live publication leases")]
     RuntimeLeasesActive(u64),
     #[error("production security runtime has {0} live dispatch outcome recorder leases")]

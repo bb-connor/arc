@@ -40,6 +40,7 @@ fn startup_reconciles_then_drains_to_zero_before_readiness() {
         scripted.events(),
         vec![
             "ensure",
+            "revalidate",
             "count_stranded",
             "reconcile",
             "count_pending",

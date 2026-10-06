@@ -3,6 +3,7 @@ mod error;
 use super::adapters::{
     DeclassificationCompactionReport, DeclassificationReceiptDrainReport,
     DeclassificationReceiptOutboxDrainer, DeclassificationReconciliationReport,
+    DeclassificationRevalidationReport,
 };
 use chio_core::{canonical_json_bytes, sha256};
 use chio_quarantine::{
@@ -11,10 +12,10 @@ use chio_quarantine::{
 };
 use chio_security_kernel::Clock;
 use chio_security_types::ports::{
-    ActionId, DeclassificationEvidenceCommitStore, EffectPort, ErrorCode, GrantId, LeaseOwnerId,
-    PortError, PortErrorKind, RecordId, ResponseDispatchStore, ResponseSchedulerStore,
-    ScheduledWork, SchedulerHealthPort, SecurityAlertPort, SecurityReceiptSink, TenantId,
-    MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    ActionId, DeclassificationEvidenceCommitStore, DeclassificationRetriedEvidenceQuery,
+    EffectPort, ErrorCode, GrantId, LeaseOwnerId, PortError, PortErrorKind, RecordId,
+    ResponseDispatchStore, ResponseSchedulerStore, ScheduledWork, SchedulerHealthPort,
+    SecurityAlertPort, SecurityReceiptSink, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 use chio_store_sqlite::security_state::SqliteSecurityStateStore;
 pub use error::ResponseWorkerTickError;
@@ -78,7 +79,7 @@ impl ResponseWorkerLifecycle {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum DeclassificationOutboxHealth {
+pub(in crate::security) enum DeclassificationOutboxHealth {
     Ready,
     Pending {
         receipts: u64,

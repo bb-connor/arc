@@ -5,6 +5,7 @@ pub(super) use super::DeclassificationOutboxHealth;
 pub(super) use super::DeclassificationReceiptDrainReport;
 pub(super) use super::DeclassificationReceiptOutboxPort;
 pub(super) use super::DeclassificationReconciliationReport;
+pub(super) use super::DeclassificationRevalidationReport;
 pub(super) use super::ProductionDeclassificationReceiptOutbox;
 pub(super) use super::ProductionResponseSchedulerConfig;
 pub(super) use super::ProductionResponseWorker;
@@ -24,12 +25,13 @@ pub(super) use chio_quarantine::ResponseTransitionRequest;
 pub(super) use chio_quarantine::SchedulerPolicy;
 pub(super) use chio_security_kernel::Clock;
 pub(super) use chio_security_types::ports::{
-    ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody, EffectExecutionStatus,
-    EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode, GrantId, LeaseOwnerId,
-    OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest, RecordId, ResponsePlanRecord,
-    ResponseSchedulerStore, ResponseStore, ScheduledWork, SchedulerHealthPageRequest,
-    SchedulerHealthPort, SchedulerRetryRequest, SecurityAlert, SecurityAlertPort,
-    SecurityReceiptSink, SessionId, TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
+    ActionId, AlertDeliveryQuery, AlertDeliveryStatus, CanonicalBody,
+    DeclassificationRetriedEvidenceQuery, EffectExecutionStatus, EffectPort, EffectRequest,
+    EffectResult, EffectResultQuery, ErrorCode, GrantId, LeaseOwnerId, OpaqueReceiptRef, PortError,
+    PortResult, ReceiptAppendRequest, RecordId, ResponsePlanRecord, ResponseSchedulerStore,
+    ResponseStore, ScheduledWork, SchedulerHealthPageRequest, SchedulerHealthPort,
+    SchedulerRetryRequest, SecurityAlert, SecurityAlertPort, SecurityReceiptSink, SessionId,
+    TenantId, MAX_DECLASSIFICATION_EVIDENCE_BATCH,
 };
 pub(super) use chio_security_types::{
     OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectSpec,
@@ -51,6 +53,9 @@ pub(super) struct ScriptedDeclassificationOutboxPort {
         Mutex<VecDeque<Result<DeclassificationReconciliationReport, PortError>>>,
     pub(super) drains: Mutex<VecDeque<Result<DeclassificationReceiptDrainReport, PortError>>>,
     pub(super) compactions: Mutex<VecDeque<Result<DeclassificationCompactionReport, PortError>>>,
+    pub(super) revalidations:
+        Mutex<VecDeque<Result<DeclassificationRevalidationReport, PortError>>>,
+    pub(super) requested_revalidations: Mutex<Vec<DeclassificationRetriedEvidenceQuery>>,
     pub(super) requested_batches: Mutex<Vec<u32>>,
     pub(super) requested_compactions: Mutex<Vec<RequestedCompaction>>,
     pub(super) events: Arc<Mutex<Vec<&'static str>>>,
@@ -70,6 +75,8 @@ impl ScriptedDeclassificationOutboxPort {
             reconciliations: Mutex::new(reconciliations.into()),
             drains: Mutex::new(drains.into()),
             compactions: Mutex::new(VecDeque::new()),
+            revalidations: Mutex::new(VecDeque::new()),
+            requested_revalidations: Mutex::new(Vec::new()),
             requested_batches: Mutex::new(Vec::new()),
             requested_compactions: Mutex::new(Vec::new()),
             events: Arc::new(Mutex::new(Vec::new())),
@@ -82,6 +89,16 @@ impl ScriptedDeclassificationOutboxPort {
     ) -> Self {
         if let Ok(mut scripted) = self.compactions.lock() {
             *scripted = compactions.into();
+        }
+        self
+    }
+
+    pub(super) fn with_revalidations(
+        self,
+        revalidations: Vec<Result<DeclassificationRevalidationReport, PortError>>,
+    ) -> Self {
+        if let Ok(mut scripted) = self.revalidations.lock() {
+            *scripted = revalidations.into();
         }
         self
     }
@@ -103,6 +120,12 @@ impl ScriptedDeclassificationOutboxPort {
         self.events
             .lock()
             .map_or_else(|_| Vec::new(), |events| events.clone())
+    }
+
+    pub(super) fn requested_revalidations(&self) -> Vec<DeclassificationRetriedEvidenceQuery> {
+        self.requested_revalidations
+            .lock()
+            .map_or_else(|_| Vec::new(), |requests| requests.clone())
     }
 
     pub(super) fn requested_batches(&self) -> Vec<u32> {
@@ -178,6 +201,22 @@ impl DeclassificationReceiptOutboxPort for ScriptedDeclassificationOutboxPort {
             .ok_or_else(PortError::unavailable)??;
         self.pending.store(report.remaining, Ordering::Release);
         Ok(report)
+    }
+
+    fn revalidate_retried_once(
+        &self,
+        query: &DeclassificationRetriedEvidenceQuery,
+    ) -> Result<DeclassificationRevalidationReport, PortError> {
+        self.record("revalidate")?;
+        self.requested_revalidations
+            .lock()
+            .map_err(|_| PortError::unavailable())?
+            .push(query.clone());
+        self.revalidations
+            .lock()
+            .map_err(|_| PortError::unavailable())?
+            .pop_front()
+            .unwrap_or(Ok(DeclassificationRevalidationReport::default()))
     }
 
     fn compact_once(
@@ -379,6 +418,8 @@ mod pending_outbox_is_ready_and_no_progress_fails_the_drain;
 
 mod a_fatal_delivery_failure_keeps_the_outbox_closed_until_delivery;
 mod backed_off_outbox_is_pending_work_not_a_stalled_drain;
+mod startup_clears_a_latched_failure_only_after_revalidation_passes;
+mod startup_revalidation_pages_retried_receipts_and_fails_closed_at_its_bound;
 
 pub(super) fn tick(action: &str) -> ResponseWorkerTick {
     ResponseWorkerTick {
