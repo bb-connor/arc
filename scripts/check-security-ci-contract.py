@@ -81,19 +81,25 @@ EXPECTED_CARGO_MUTANTS_LOCK_SHA256 = (
     "0810d8fe5d67224340e560656f51619cf8f78925a4bfeedd2e5f22d199ac92a4"
 )
 EXPECTED_SECURITY_ENTRYPOINT_SHA256 = (
-    "3cb6f4edeace2ef29a2cd35f5ac4b736ef3a5a6ed8e98379cbd5abc6c6157e4e"
+    "8926c71c4387410f7513dd7093cec021ddc4c04fc0be855e96a203836b679ead"
 )
 EXPECTED_SECURITY_ENTRYPOINT_FUNCTION_GRAPH_SHA256 = (
-    "d0da4a2df05b9c34922b0c1b47aedfae347ef1d7bf2abff34dab43a1c9a6316f"
+    "93e552d424ec2c27d74ca3cbba0d269b5bb708d5035d6273d8409c4387b43a49"
+)
+EXPECTED_SECURITY_RUNNER_SHA256 = (
+    "9fc6bd07cbc9bd5f318eb0c1dd4e87b9af4a2e2961bfc1fa4505c08f77264f0c"
+)
+EXPECTED_SECURITY_AGGREGATOR_SHA256 = (
+    "cf0de1d240c0d0de30a590674ec27c6937acec2aaef13b491d59ee1c9385f371"
 )
 EXPECTED_SECURITY_COMMAND_CLIENT_SHA256 = (
     "f4002072a4c7be0b2f7e97cf8f196b0947561332dbd27aa1ec9302764f7d2d20"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_SHA256 = (
-    "46ed452d8230e4e9744d3ac538d52eff8483b2fd7efb45ef4e37f2cf4a178008"
+    "c6552d29a356e634f2856669ce29d753da5aad986ed76ffae18b2022a31187fd"
 )
 EXPECTED_SECURITY_ADVERSARIAL_CHECKER_FUNCTION_GRAPH_SHA256 = (
-    "bf6b5b4c022a787673665bd78b466090f0a7830cb1505dc3710abfb641404480"
+    "8266d915f0b54c1eafcdc9db2f31f65be217ed9de87e142c0d9df770570ccf4e"
 )
 EXPECTED_TEMPORAL_GATE_SHA256 = (
     "f91b0a9a91fca90a51fd5c016d09c20828a767f07a0c4f4962adcadd12b3811a"
@@ -2969,7 +2975,7 @@ def validate_security_entrypoint(root: Path, source: str) -> None:
         }
     )
     expected_candidate_values = {
-        "CARGO_BUILD_JOBS": "'1'",
+        "CARGO_BUILD_JOBS": "'4'",
         "CARGO_HOME": "'/cargo-home'",
         "CARGO_INCREMENTAL": "'0'",
         "CARGO_NET_OFFLINE": "'true'",
@@ -3052,7 +3058,8 @@ if forwarded:
                 "CHIO_KEYLOG_AUDIT": "debug/chio-keylog-audit",
                 "CHIO_KEYLOG_WITNESS": "debug/chio-keylog-witness",
             }[key]
-            if value != os.fspath(target / helper):
+            helper_target = Path("/target/artifacts/broker-helper-target")
+            if value != os.fspath(helper_target / helper):
                 raise EntrypointError("candidate helper path differs from its built executable")
             environment[key] = value
         elif key == "RUSTFLAGS":
@@ -3061,10 +3068,13 @@ if forwarded:
             environment[key] = value
         elif key == "CARGO_TARGET_DIR":
             requested = Path(value)
-            persistent_cage_target = Path("/target/artifacts/static-pie-target")
+            persistent_helper_targets = {
+                Path("/target/artifacts/static-pie-target"),
+                Path("/target/artifacts/broker-helper-target"),
+            }
             if not requested.is_absolute() or not (
                 requested.is_relative_to(target)
-                or requested == persistent_cage_target
+                or requested in persistent_helper_targets
             ):
                 raise EntrypointError("candidate target override escapes gate state")
             environment[key] = value
@@ -4342,6 +4352,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "scripts/check-secret-broker-boundary.sh": 0o755,
         "scripts/check-security-adversarial-evidence.py": 0o755,
         "scripts/run-security-execution-container.py": 0o755,
+        "scripts/aggregate-security-evidence-shards.py": 0o644,
         "scripts/security-execution-command-client.py": 0o755,
         "scripts/security-execution-container-entrypoint.py": 0o755,
         "scripts/tests/run-security-execution-container.test.py": 0o755,
@@ -4631,7 +4642,7 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "validate_container_create_arguments(create_arguments)"
     )
     inspect_contract_call = main_body.find("validate_created_container(")
-    start_call = main_body.find('docker_output(docker, ["start", identifier]')
+    start_call = main_body.find("start_attached_container(")
     if (
         create_contract_call < 0
         or inspect_contract_call < create_contract_call
@@ -4647,6 +4658,13 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         raise ContractError(
             "trusted security container runner exposes a host capability"
         )
+    if hashlib.sha256(runner.encode("utf-8")).hexdigest() != EXPECTED_SECURITY_RUNNER_SHA256:
+        raise ContractError("trusted security container runner source commitment changed")
+    aggregator_path = root / "scripts/aggregate-security-evidence-shards.py"
+    require_exact_file_digest(
+        aggregator_path, EXPECTED_SECURITY_AGGREGATOR_SHA256,
+        "trusted evidence aggregation source commitment",
+    )
 
     entrypoint = (
         root / "scripts/security-execution-container-entrypoint.py"
@@ -4665,6 +4683,9 @@ def validate_security_execution_boundary_files(root: Path) -> None:
         "scripts/check-secret-broker-boundary.sh": (
             "/private/candidate",
             "/opt/chio-security/gates/check-exact-cargo-test-inventory.py",
+            "/target/artifacts",
+            'helper_target="$candidate_artifacts/broker-helper-target"',
+            'CARGO_TARGET_DIR="$helper_target" cargo build',
         ),
         "scripts/check-cage-enforcement.sh": (
             "/private/candidate",

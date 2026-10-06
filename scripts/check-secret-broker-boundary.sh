@@ -4,8 +4,10 @@ set -euo pipefail
 if [[ "${CHIO_ENTERPRISE_SECURITY_RUNNER:-0}" == "1" ]]; then
   workspace="${CHIO_SECURITY_WORKSPACE:-}"
   inventory_checker="${CHIO_SECURITY_EXACT_INVENTORY_CHECKER:-}"
+  candidate_artifacts="${CHIO_SECURITY_CANDIDATE_ARTIFACTS:-}"
   if [[ "$workspace" != "/private/candidate" ]] ||
-    [[ "$inventory_checker" != "/opt/chio-security/gates/check-exact-cargo-test-inventory.py" ]]; then
+    [[ "$inventory_checker" != "/opt/chio-security/gates/check-exact-cargo-test-inventory.py" ]] ||
+    [[ "$candidate_artifacts" != "/target/artifacts" ]]; then
     echo "designated broker gate paths do not match the trusted contract" >&2
     exit 1
   fi
@@ -13,9 +15,14 @@ if [[ "${CHIO_ENTERPRISE_SECURITY_RUNNER:-0}" == "1" ]]; then
     echo "designated broker inventory checker is missing or symbolic" >&2
     exit 1
   fi
+  if [[ ! -d "$candidate_artifacts" ]] || [[ -L "$candidate_artifacts" ]]; then
+    echo "designated broker artifact root is missing or symbolic" >&2
+    exit 1
+  fi
 else
   if [[ -n "${CHIO_SECURITY_WORKSPACE:-}" ]] ||
-    [[ -n "${CHIO_SECURITY_EXACT_INVENTORY_CHECKER:-}" ]]; then
+    [[ -n "${CHIO_SECURITY_EXACT_INVENTORY_CHECKER:-}" ]] ||
+    [[ -n "${CHIO_SECURITY_CANDIDATE_ARTIFACTS:-}" ]]; then
     echo "trusted broker gate paths leaked into a portable invocation" >&2
     exit 1
   fi
@@ -150,6 +157,7 @@ EOF
 
   run_tests "broker isolation secret boundary" no "$(cat <<'EOF'
 linux_process::brokerd_process_governed_provisioning_keeps_seeded_secret_inside_broker
+linux_process::brokerd_sigterm_drains_workers_and_restarts_with_its_durable_state
 public_response_and_daemon_diagnostics_do_not_contain_seeded_credential
 EOF
 )" cargo test -p chio-secret-broker --test no_secret_crossing
@@ -294,22 +302,19 @@ else
 fi
 
 if [[ "${mode}" == "--release" ]]; then
-  # Rebuild both executables from this candidate. The standard musl target
-  # supplies static binaries without broadening the tool's filesystem grants.
-  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$workspace/target}"
-  if [[ "$CARGO_TARGET_DIR" != /* ]]; then
-    export CARGO_TARGET_DIR="$workspace/$CARGO_TARGET_DIR"
-  fi
-  cargo build --locked --target x86_64-unknown-linux-musl \
+  # These candidate-owned outputs live only for this gate. The supervisor
+  # still clears ordinary Cargo state before every build and test command.
+  helper_target="$candidate_artifacts/broker-helper-target"
+  CARGO_TARGET_DIR="$helper_target" cargo build --locked --target x86_64-unknown-linux-musl \
     -p chio-cage-init --bin chio-cage-init
-  cargo build --locked --target x86_64-unknown-linux-musl \
+  CARGO_TARGET_DIR="$helper_target" cargo build --locked --target x86_64-unknown-linux-musl \
     -p chio-secret-broker --bin chio-broker-mcp
-  cargo build --locked -p chio-keyring --bins
-  cargo build --locked -p chio-cli --bin chio
-  export CHIO_CAGE_TEST_HELPER="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-cage-init"
-  export CHIO_BROKER_MCP_TOOL="$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
-  export CHIO_KEYLOG_WITNESS="$CARGO_TARGET_DIR/debug/chio-keylog-witness"
-  export CHIO_KEYLOG_AUDIT="$CARGO_TARGET_DIR/debug/chio-keylog-audit"
+  CARGO_TARGET_DIR="$helper_target" cargo build --locked -p chio-keyring --bins
+  CARGO_TARGET_DIR="$helper_target" cargo build --locked -p chio-cli --bin chio
+  export CHIO_CAGE_TEST_HELPER="$helper_target/x86_64-unknown-linux-musl/debug/chio-cage-init"
+  export CHIO_BROKER_MCP_TOOL="$helper_target/x86_64-unknown-linux-musl/debug/chio-broker-mcp"
+  export CHIO_KEYLOG_WITNESS="$helper_target/debug/chio-keylog-witness"
+  export CHIO_KEYLOG_AUDIT="$helper_target/debug/chio-keylog-audit"
   run_tests "confined native broker MCP, process death and terminal cage receipts" yes "$(cat <<'EOF'
 process_boundary_tests::native::confined::native_kernel_confined_broker_mcp_preserves_capture_and_terminal_receipts
 process_boundary_tests::native::confined::confined_broker_mcp_survives_retirement_of_its_preparation_runtime

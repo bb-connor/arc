@@ -12,6 +12,7 @@ import json
 import os
 import posixpath
 import re
+import selectors
 import shutil
 import stat
 import subprocess
@@ -131,6 +132,10 @@ class OutputSpec:
 
 
 OUTPUT_SPECS = {
+    "validate-committed-evidence": OutputSpec(
+        names=("committed-adversarial-evidence.log",),
+        nonempty=("committed-adversarial-evidence.log",),
+    ),
     "adversarial-release": OutputSpec(
         names=("adversarial-evidence.log",),
         nonempty=("adversarial-evidence.log",),
@@ -186,6 +191,10 @@ OUTPUT_SPECS = {
         nonempty=("probe.log",),
     ),
 }
+SHARD_OPERATIONS = tuple(f"refresh-evidence-shard-{index}" for index in range(7))
+OUTPUT_SPECS.update({
+    operation: OUTPUT_SPECS["refresh-all-evidence"] for operation in SHARD_OPERATIONS
+})
 
 
 @dataclasses.dataclass(frozen=True)
@@ -254,6 +263,7 @@ def clean_host_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     environment = {
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
         "HOME": "/nonexistent",
@@ -302,11 +312,30 @@ def git_command(root: Path, arguments: list[str], timeout: int = 60) -> bytes:
         "core.hooksPath=/dev/null",
         "-c",
         "diff.external=",
+        "-c",
+        "log.showSignature=false",
         "-C",
         os.fspath(root),
         *arguments,
     ]
     return run_checked(command, environment=clean_host_env(), timeout=timeout)
+
+
+def require_data_only_git_configuration(root: Path) -> None:
+    # Git status can invoke clean filters; linked checkouts can invoke smudge
+    # filters. Inspect names without expanding includes or exposing values.
+    names = git_command(
+        root,
+        ["config", "--local", "--no-includes", "--name-only", "--null", "--list"],
+    )
+    for name in names.split(b"\0"):
+        key = name.lower()
+        if key.startswith((b"filter.", b"include.", b"includeif.")) or key in {
+            b"core.attributesfile", b"core.worktree", b"extensions.worktreeconfig",
+        }:
+            raise BoundaryError(
+                "security source refuses executable or redirected local Git configuration"
+            )
 
 
 def repository_identity(
@@ -328,6 +357,7 @@ def repository_identity(
         resolved_stat.st_ino,
     ):
         raise BoundaryError("candidate root identity changed during resolution")
+    require_data_only_git_configuration(resolved)
     head = git_command(resolved, ["rev-parse", "HEAD"]).decode("ascii").strip()
     tree = git_command(resolved, ["rev-parse", "HEAD^{tree}"]).decode("ascii").strip()
     if head != expected_head:
@@ -481,6 +511,10 @@ def read_git_blobs(
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             process.wait(timeout=5)
         raise
+    finally:
+        with contextlib.suppress(OSError):
+            process.stdin.close()
+        process.stdout.close()
     return blobs
 
 
@@ -498,13 +532,48 @@ def safe_parent(root: Path, relative: PurePosixPath) -> Path:
                 raise BoundaryError(
                     "candidate copy has a non-directory parent collision"
                 )
+        else:
+            # The isolated copy identity must traverse source directories even
+            # when the trusted host process uses a restrictive umask.
+            current.chmod(0o755)
     return current
 
 
+def candidate_execution_entries(
+    entries: list[tuple[int, str, str]],
+) -> list[tuple[int, str, str]]:
+    """Keep signed publication outputs outside every candidate execution view.
+
+    The committed-evidence gate authenticates the original checkout separately.
+    Its three outputs cannot become build inputs after mutation qualification,
+    including through dynamic paths, proc macros or the isolated Git baseline.
+    Validate the closed namespace before omitting any entry from the copy.
+    """
+    output_root = PurePosixPath("audits/evidence/enterprise-linux")
+    output_files = {
+        output_root / "enterprise-migration-canary.json",
+        output_root / "enterprise-migration-canary.json.sha256",
+        output_root / "enterprise-migration-binding-digest.txt",
+    }
+    projected = []
+    for entry in entries:
+        mode, _object_id, path = entry
+        relative = PurePosixPath(path)
+        if relative in output_root.parents or relative == output_root:
+            raise BoundaryError("derived Linux evidence ancestor is not a directory")
+        if relative.is_relative_to(output_root):
+            if relative not in output_files or mode != 0o100644:
+                raise BoundaryError("derived Linux evidence output inventory is invalid")
+            continue
+        projected.append(entry)
+    return projected
+
+
 def materialize_private_copy(identity: RepositoryIdentity, destination: Path) -> None:
-    destination.mkdir(mode=0o700)
     entries = parse_tree(identity.root, identity.head)
-    blobs = read_git_blobs(identity.root, entries)
+    execution_entries = candidate_execution_entries(entries)
+    blobs = read_git_blobs(identity.root, execution_entries)
+    destination.mkdir(mode=0o700)
     for mode, path, data in blobs:
         relative = PurePosixPath(path)
         parent = safe_parent(destination, relative)
@@ -540,6 +609,7 @@ def materialize_private_copy(identity: RepositoryIdentity, destination: Path) ->
                 if written <= 0:
                     raise BoundaryError("candidate copy write did not make progress")
                 view = view[written:]
+            os.fchmod(descriptor, 0o755 if mode == 0o100755 else 0o644)
         finally:
             os.close(descriptor)
 
@@ -711,6 +781,69 @@ def docker_output(
         .decode("utf-8", "strict")
         .strip()
     )
+
+
+def start_attached_container(
+    docker: str,
+    environment: dict[str, str],
+    identifier: str,
+    *,
+    timeout: int,
+) -> None:
+    """Drain output without stdin or disk logging; retain only an escaped tail.
+
+    Attachment precedes execution, so even immediate failures are observable.
+    This stream is diagnostic data only. The caller still checks Docker's
+    terminal state, validates outputs independently, and owns container cleanup.
+    """
+    tail = bytearray()
+    deadline = time.monotonic() + timeout
+    try:
+        process = subprocess.Popen(
+            [docker, "start", "--attach", identifier],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    except OSError as error:
+        raise BoundaryError("container output attachment could not start") from error
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(process.stdout, selectors.EVENT_READ)
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise BoundaryError(
+                        "candidate container exceeded its execution bound; "
+                        f"untrusted output tail: {bytes(tail)!r}"
+                    )
+                for key, _ in selector.select(min(remaining, 1.0)):
+                    chunk = os.read(key.fd, 65_536)
+                    if not chunk:
+                        selector.unregister(key.fd)
+                        continue
+                    tail.extend(chunk)
+                    del tail[:-8192]
+        try:
+            status = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired as error:
+            raise BoundaryError(
+                "candidate container exceeded its execution bound; "
+                f"untrusted output tail: {bytes(tail)!r}"
+            ) from error
+        if status != 0:
+            raise BoundaryError(
+                f"candidate container attachment failed with status {status}; "
+                f"untrusted output tail: {bytes(tail)!r}"
+            )
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
+        if process.stdout is not None:
+            process.stdout.close()
 
 
 def container_ids_for_state(
@@ -1245,7 +1378,12 @@ def validate_created_container(
             "Propagation": "rprivate",
         },
     )
-    if not isinstance(mounts, list) or tuple(mounts) != expected_mounts:
+    # Docker does not guarantee mount inventory order. Accept exactly the two
+    # complete bind records in either order, without dropping duplicate entries.
+    if not isinstance(mounts, list) or (
+        tuple(mounts) != expected_mounts
+        and tuple(mounts) != expected_mounts[::-1]
+    ):
         raise BoundaryError("Docker changed the created container mount inventory")
 
 
@@ -1345,7 +1483,8 @@ def collect_outputs(
         if total > MAX_TOTAL_OUTPUT_BYTES:
             raise BoundaryError("container output exceeds the aggregate import bound")
         payloads[name] = payload
-    if operation in ("refresh-linux-evidence", "refresh-all-evidence"):
+    shard = SHARD_OPERATIONS.index(operation) if operation in SHARD_OPERATIONS else None
+    if operation in ("refresh-linux-evidence", "refresh-all-evidence") or shard is not None:
         source = payloads["source-sha.txt"].decode("ascii", "strict").strip()
         if source != expected_source_sha:
             raise BoundaryError(
@@ -1353,7 +1492,7 @@ def collect_outputs(
             )
         patch_name = (
             "all-evidence.patch"
-            if operation == "refresh-all-evidence"
+            if operation == "refresh-all-evidence" or shard is not None
             else "linux-evidence.patch"
         )
         checksum_line = (
@@ -1362,7 +1501,7 @@ def collect_outputs(
         expected_checksum = hashlib.sha256(payloads[patch_name]).hexdigest()
         if checksum_line != f"{expected_checksum}  {patch_name}":
             raise BoundaryError("refreshed evidence patch checksum is invalid")
-        if operation == "refresh-all-evidence":
+        if operation == "refresh-all-evidence" or shard is not None:
             try:
                 inventory = json.loads(
                     payloads["all-evidence-inventory.json"].decode("utf-8")
@@ -1376,6 +1515,21 @@ def collect_outputs(
             ).encode("utf-8")
             if not isinstance(inventory, dict):
                 raise BoundaryError("full evidence inventory is not an object")
+            expected_schema = (
+                "chio.security-evidence-refresh.v1" if shard is None
+                else "chio.security-evidence-refresh-shard.v1"
+            )
+            expected_campaign_count = 35 if shard is None else 5
+            case_count = inventory.get("case_count")
+            if shard is not None and (
+                type(inventory.get("shard")) is not int
+                or inventory["shard"] != shard
+                or inventory.get("shard_count") != 7
+                or type(case_count) is not int or not 1 <= case_count <= 5
+            ):
+                raise BoundaryError("partial evidence shard identity is invalid")
+            expected_case_count = 28 if shard is None else case_count
+            expected_path_count = 64 if shard is None else 6 + case_count
             execution_boundary = inventory.get("execution_boundary", {})
             trusted_file_hashes = (
                 execution_boundary.get("trusted_file_sha256")
@@ -1384,16 +1538,16 @@ def collect_outputs(
             )
             if (
                 canonical_inventory != payloads["all-evidence-inventory.json"]
-                or inventory.get("schema") != "chio.security-evidence-refresh.v1"
+                or inventory.get("schema") != expected_schema
                 or inventory.get("source_sha") != expected_source_sha
                 or inventory.get("patch_sha256") != expected_checksum
-                or inventory.get("campaign_count") != 35
-                or inventory.get("outcome_count") != 35
-                or inventory.get("case_count") != 28
+                or inventory.get("campaign_count") != expected_campaign_count
+                or inventory.get("outcome_count") != expected_campaign_count
+                or inventory.get("case_count") != expected_case_count
                 or not isinstance(inventory.get("campaigns"), list)
-                or len(set(inventory["campaigns"])) != 35
+                or len(set(inventory["campaigns"])) != expected_campaign_count
                 or not isinstance(inventory.get("paths"), list)
-                or len(set(inventory["paths"])) != 64
+                or len(set(inventory["paths"])) != expected_path_count
                 or not isinstance(execution_boundary, dict)
                 or set(execution_boundary)
                 != {
@@ -1661,7 +1815,9 @@ def main() -> int:
                 timeout_seconds=args.timeout_seconds,
                 seccomp_profile=parsed_seccomp_profile,
             )
-            docker_output(docker, ["start", identifier], environment, timeout=60)
+            start_attached_container(
+                docker, environment, identifier, timeout=args.timeout_seconds + 30
+            )
             try:
                 status = docker_output(
                     docker,

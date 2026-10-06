@@ -129,6 +129,7 @@ SECURITY_EXECUTION_BOUNDARY_FILES = (
     Path("scripts/check-security-adversarial-evidence.py"),
     Path("scripts/check-temporal-security.sh"),
     Path("scripts/run-security-execution-container.py"),
+    Path("scripts/aggregate-security-evidence-shards.py"),
     Path("scripts/security-execution-command-client.py"),
     Path("scripts/security-execution-container-entrypoint.py"),
     Path("scripts/tests/run-security-execution-container.test.py"),
@@ -1330,7 +1331,7 @@ assert_boundary_file_rejected(
     "security entrypoint rejects unchecked candidate helper paths",
     Path("scripts/security-execution-container-entrypoint.py"),
     replace_once(
-        "if value != os.fspath(target / helper):",
+        "if value != os.fspath(helper_target / helper):",
         "if False:",
     ),
     "candidate environment forwarding changed",

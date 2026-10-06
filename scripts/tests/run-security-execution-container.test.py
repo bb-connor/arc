@@ -94,11 +94,47 @@ def assert_rejected(label: str, callback) -> None:
     )
 
 
+def broker_startup_deadline_tests() -> None:
+    def observe(ready_at: int, timeout: int) -> tuple[bytes | None, float, int]:
+        elapsed = [0.0]
+        broker = mock.Mock()
+        broker.poll.return_value = None
+        broker.wait.return_value = 0
+        verifier = mock.Mock()
+
+        def sleep(_duration: float) -> None:
+            elapsed[0] += 1.0
+
+        with (
+            mock.patch.object(ENTRYPOINT.subprocess, "Popen", side_effect=[broker, verifier]),
+            mock.patch.object(ENTRYPOINT.time, "monotonic", side_effect=lambda: elapsed[0]),
+            mock.patch.object(ENTRYPOINT.time, "sleep", side_effect=sleep),
+            mock.patch.object(ENTRYPOINT.Path, "exists", side_effect=lambda: elapsed[0] >= ready_at),
+            mock.patch.object(ENTRYPOINT, "collect_bounded_process", return_value=(0, b"completed")),
+            mock.patch.object(ENTRYPOINT, "quiesce_verifier_namespace"),
+            mock.patch.object(ENTRYPOINT, "stop_broker"),
+            mock.patch.object(ENTRYPOINT, "abandon_broker") as abandon,
+        ):
+            try:
+                result = ENTRYPOINT.run_trusted_bounded(["/trusted/gate"], timeout)
+                return result, elapsed[0], abandon.call_count
+            except ENTRYPOINT.EntrypointError:
+                return None, elapsed[0], abandon.call_count
+
+    # Cache setup is allowed to take longer than the former 30-second poll.
+    if observe(65, 600) != (b"completed", 65.0, 0):
+        raise AssertionError("broker refused bounded cold-cache startup")
+    if observe(65, 10) != (None, 10.0, 1):
+        raise AssertionError("broker startup exceeded the shorter operation budget")
+    if observe(900, 600) != (None, 420.0, 1):
+        raise AssertionError("broker startup lost its fixed readiness ceiling")
+
+
 def candidate_helper_environment_tests() -> None:
     helpers = {
-        "CHIO_BROKER_MCP_TOOL": "/target/build/x86_64-unknown-linux-musl/debug/chio-broker-mcp",
-        "CHIO_KEYLOG_WITNESS": "/target/build/debug/chio-keylog-witness",
-        "CHIO_KEYLOG_AUDIT": "/target/build/debug/chio-keylog-audit",
+        "CHIO_BROKER_MCP_TOOL": "/target/artifacts/broker-helper-target/x86_64-unknown-linux-musl/debug/chio-broker-mcp",
+        "CHIO_KEYLOG_WITNESS": "/target/artifacts/broker-helper-target/debug/chio-keylog-witness",
+        "CHIO_KEYLOG_AUDIT": "/target/artifacts/broker-helper-target/debug/chio-keylog-audit",
     }
     forbidden = {
         "CHIO_KEYLOG_SEED": "secret",
@@ -106,12 +142,16 @@ def candidate_helper_environment_tests() -> None:
         "LD_PRELOAD": "/tmp/hostile.so",
         "RUSTC_WRAPPER": "/tmp/hostile",
         "SOURCE_SHA": "f" * 40,
+        "CARGO_BUILD_JOBS": "999",
+        "CARGO_MAKEFLAGS": "--jobserver-auth=3,4",
     }
     with mock.patch.dict(os.environ, helpers | forbidden, clear=True):
         forwarded = CLIENT.forwarded_environment()
     if forwarded != helpers:
         raise AssertionError("candidate client did not forward exactly the helper paths")
     candidate = ENTRYPOINT.candidate_environment(forwarded=forwarded)
+    if candidate["CARGO_BUILD_JOBS"] != "4":
+        raise AssertionError("candidate compilation does not use its fixed four-CPU budget")
     if any(candidate.get(key) != value for key, value in helpers.items()):
         raise AssertionError("candidate command lost an authorized helper path")
     for key, authorized in helpers.items():
@@ -119,7 +159,8 @@ def candidate_helper_environment_tests() -> None:
             "",
             "debug/" + Path(authorized).name,
             "/tmp/" + Path(authorized).name,
-            authorized.replace("/build/", "/build/../"),
+            authorized.replace("/broker-helper-target/", "/broker-helper-target/../"),
+            authorized.replace("/artifacts/broker-helper-target/", "/build/"),
             authorized + "-substituted",
             helpers[next(name for name in helpers if name != key)],
         ):
@@ -134,34 +175,44 @@ def candidate_helper_environment_tests() -> None:
         except ENTRYPOINT.EntrypointError:
             continue
         raise AssertionError(f"candidate accepted an unsafe environment key: {key}")
+    helper_target = "/target/artifacts/broker-helper-target"
+    candidate = ENTRYPOINT.candidate_environment(forwarded={"CARGO_TARGET_DIR": helper_target})
+    if candidate["CARGO_TARGET_DIR"] != helper_target:
+        raise AssertionError("candidate helper build lost its gate artifact target")
+    for invalid in (helper_target + "/../escape", helper_target + "/nested", "/target/artifacts"):
+        try:
+            ENTRYPOINT.candidate_environment(forwarded={"CARGO_TARGET_DIR": invalid})
+        except ENTRYPOINT.EntrypointError:
+            continue
+        raise AssertionError(f"candidate accepted an unbound helper target: {invalid}")
 
 
 def static_contract_tests() -> None:
     dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
     expected_base = (
-        "FROM --platform=linux/amd64 rust:1.94.1-alpine3.22@sha256:"
-        "667605141d2be37e8a27b3e5368fa388fcd3065ed2dbc2fe64665bce7254fc67"
+        "FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:"
+        "2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775"
     )
     if expected_base not in dockerfile:
         raise AssertionError(
-            "security image base is not pinned to the reviewed Rust 1.94.1 digest"
+            "security image base is not pinned to the reviewed Rust 1.95.0 digest"
         )
     for marker in (
         "bash=5.2.37-r0",
         "security-evidence-apk.lock",
-        "354d439672c5c992ca20d54a276e30aea1dc431ae719357899885c7282169acd",
-        "637f50a513c887136bfd8c5b8ad946ee8c185f75041a1d9a091db998455efeda",
-        "a1492d1c91d82b8d2101220accedffb1c2af7c97ea0793915c4a97d5c3d7424b",
+        "ea53828c0ee81c614f79cd107fcc7af06b29abb7ecc7484423d094fe70328e8e",
+        "c55a7b5604fe2e0400911c488b320922066fe23646235793cec7c8e5c03e7a61",
+        "688a9ba3b40e9fd360dc083ff28b7ae43c110f2919ee939bb788a46a1e579a84",
         "47040c9cded7996c38b9976af0a9c46c4902ec5eb59369fffec758410dba8028",
         "cargo install \\",
         "--path /tmp/cargo-mutants-25.3.1",
         "chmod 0755 /usr/local/cargo /usr/local/cargo/bin",
         "chmod 0555 /usr/local/cargo/bin/cargo-mutants",
-        'test "$(rustc --version)" = "rustc 1.94.1 (e408947bf 2026-03-25)"',
-        'test "$(cargo clippy --version)" = "clippy 0.1.94 '
-        '(e408947bfd 2026-03-25)"',
-        'test "$(cargo fmt --version)" = "rustfmt 1.8.0-stable '
-        '(e408947bfd 2026-03-25)"',
+        'test "$(rustc --version)" = "rustc 1.95.0 (59807616e 2026-04-14)"',
+        'test "$(cargo clippy --version)" = "clippy 0.1.95 '
+        '(59807616e1 2026-04-14)"',
+        'test "$(cargo fmt --version)" = "rustfmt 1.9.0-stable '
+        '(59807616e1 2026-04-14)"',
         'ENTRYPOINT ["/usr/bin/python3", "-I", "/opt/chio-security/entrypoint.py"]',
         "/opt/chio-security/command-client.py",
         "/opt/chio-security/verifier-bin/cargo",
@@ -429,6 +480,32 @@ def copy_and_output_tests() -> None:
             private_stat.st_ino,
         ):
             raise AssertionError("private candidate copy is hardlinked to authority")
+
+        for mask in (0o000, 0o022, 0o077):
+            masked_copy = temporary / f"private-{mask:o}"
+            previous_mask = os.umask(mask)
+            try:
+                BOUNDARY.materialize_private_copy(identity, masked_copy)
+            finally:
+                os.umask(previous_mask)
+            expected_modes = {
+                masked_copy: 0o700,
+                masked_copy / "bin": 0o755,
+                masked_copy / "bin/tool.sh": 0o755,
+                masked_copy / "plain.txt": 0o644,
+            }
+            for path, expected_mode in expected_modes.items():
+                actual_mode = stat.S_IMODE(path.lstat().st_mode)
+                if actual_mode != expected_mode:
+                    raise AssertionError(
+                        f"umask {mask:o} changed materialized source mode for "
+                        f"{path.relative_to(masked_copy)}: "
+                        f"{actual_mode:o} != {expected_mode:o}"
+                    )
+            if (masked_copy / "plain.txt").read_bytes() != b"authority\n":
+                raise AssertionError("umask-independent copy changed source bytes")
+            if os.readlink(masked_copy / "link.txt") != "plain.txt":
+                raise AssertionError("umask-independent copy changed source symlink")
 
         stage = temporary / "stage"
         stage.mkdir()
@@ -1726,8 +1803,17 @@ def fake_docker_main_tests() -> None:
                     BOUNDARY, "run_checked", side_effect=fake.run_checked
                 ),
                 mock.patch.object(sys, "argv", argv),
+                mock.patch.object(
+                    BOUNDARY,
+                    "start_attached_container",
+                    side_effect=lambda docker, environment, identifier, **kwargs: fake.output(
+                        docker, ["start", identifier], environment
+                    ),
+                ),
             )
-            with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            with contextlib.ExitStack() as stack:
+                for patch in patches:
+                    stack.enter_context(patch)
                 if revalidate is None:
                     BOUNDARY.main()
                 else:
@@ -1743,6 +1829,13 @@ def fake_docker_main_tests() -> None:
             raise AssertionError(
                 "real runner main path did not import fake Docker output"
             )
+
+        reversed_mounts = FakeDocker(image)
+        reversed_mounts.inspect_mutator = lambda document: document["Mounts"].reverse()
+        reversed_output = temporary / "reversed-mount-output"
+        invoke(reversed_mounts, reversed_output, authorized_sha="a" * 40)
+        if (reversed_output / "probe.log").read_bytes() != b"fake isolated output\n":
+            raise AssertionError("valid reversed bind mounts did not execute")
 
         def mutate_network(document: dict[str, object]) -> None:
             document["HostConfig"]["NetworkMode"] = "host"
@@ -1774,6 +1867,33 @@ def fake_docker_main_tests() -> None:
         for label, mutator in (
             ("post-create network override", mutate_network),
             ("post-create extra mount", add_mount),
+            (
+                "post-create duplicate mount",
+                lambda document: document["Mounts"].__setitem__(
+                    1, dict(document["Mounts"][0])
+                ),
+            ),
+            ("post-create missing mount", lambda document: document["Mounts"].pop()),
+            (
+                "post-create writable source mount",
+                lambda document: document["Mounts"][0].update(RW=True),
+            ),
+            (
+                "post-create substituted source mount",
+                lambda document: document["Mounts"][0].update(Source="/"),
+            ),
+            (
+                "post-create redirected output mount",
+                lambda document: document["Mounts"][1].update(Destination="/host"),
+            ),
+            (
+                "post-create shared propagation",
+                lambda document: document["Mounts"][0].update(Propagation="rshared"),
+            ),
+            (
+                "post-create unknown mount option",
+                lambda document: document["Mounts"][0].update(Unknown="option"),
+            ),
             ("post-create relaxed pids", relax_pids),
             ("post-create relaxed memory", relax_memory),
             ("post-create relaxed CPU", relax_cpu),
@@ -2304,10 +2424,73 @@ exec "$real" "$@"
             raise AssertionError(
                 "candidate Cargo, target, temp, Python, or detached poison ran"
             )
-        if "cargo 1.94.1" not in cargo_log:
+        if "cargo 1.95.0" not in cargo_log:
             raise AssertionError("fresh disposable Cargo verification did not run")
         if "detached candidate quiescence verified" not in cargo_log:
             raise AssertionError("detached Cargo process quiescence was not verified")
+
+
+def trusted_failure_diagnostic_tests() -> None:
+    broker = mock.Mock()
+    broker.wait.return_value = 0
+    verifier = mock.Mock()
+    payload = b"DISCARDED-PREFIX" + b"x" * 9000 + b"failure detail\n\x1b[31m\x00"
+    with (
+        mock.patch.object(Path, "exists", return_value=True),
+        mock.patch.object(ENTRYPOINT.subprocess, "Popen", side_effect=[broker, verifier]),
+        mock.patch.object(
+            ENTRYPOINT, "collect_bounded_process", return_value=(17, payload)
+        ),
+        mock.patch.object(ENTRYPOINT, "quiesce_verifier_namespace") as quiesce,
+        mock.patch.object(ENTRYPOINT, "stop_broker") as stop,
+    ):
+        try:
+            ENTRYPOINT.run_trusted_bounded(["/usr/bin/python3", "/trusted/checker"], 60)
+        except ENTRYPOINT.EntrypointError as error:
+            diagnostic = str(error)
+        else:
+            raise AssertionError("failed verifier was accepted")
+        quiesce.assert_called_once_with()
+        stop.assert_called_once()
+        broker.wait.assert_called_once_with(timeout=300)
+    if "failure detail" not in diagnostic or "status 17" not in diagnostic:
+        raise AssertionError("failed verifier lost its bounded diagnostic")
+    if "DISCARDED-PREFIX" in diagnostic or len(diagnostic) > 33_000:
+        raise AssertionError("failed verifier diagnostic exceeds its tail bound")
+    if any(character in diagnostic for character in ("\n", "\x1b", "\x00")):
+        raise AssertionError("failed verifier emitted unescaped terminal controls")
+
+
+def attached_container_diagnostic_tests() -> None:
+    with tempfile.TemporaryDirectory(prefix="chio-container-diagnostic-") as raw:
+        docker = Path(raw) / "docker"
+        programs = {
+            "success": "import sys; assert sys.argv[1:] == ['start','--attach','a'*64]; assert sys.stdin.read() == ''; print('done')",
+            "failure": "import sys; sys.stdout.buffer.write(b'x'*100000 + b'END\\n::error::untrusted\\x1b\\x00'); sys.exit(7)",
+            "timeout": "import sys,time; print('before timeout',flush=True); time.sleep(30)",
+        }
+        for name, program in programs.items():
+            docker.write_text(f"#!{sys.executable}\n{program}\n")
+            docker.chmod(0o700)
+            try:
+                BOUNDARY.start_attached_container(
+                    str(docker), BOUNDARY.clean_host_env(), "a" * 64, timeout=1
+                )
+            except BOUNDARY.BoundaryError as error:
+                if name == "success":
+                    raise
+                diagnostic = str(error)
+                if len(diagnostic) > 33_000 or any(
+                    char in diagnostic for char in ("\n", "\x1b", "\x00")
+                ):
+                    raise AssertionError("container diagnostic is not bounded and escaped")
+                if name == "failure" and ("status 7" not in diagnostic or "END" not in diagnostic):
+                    raise AssertionError("original container error tail was lost")
+                if name == "timeout" and "execution bound" not in diagnostic:
+                    raise AssertionError("hung attachment did not retain timeout failure")
+            else:
+                if name != "success":
+                    raise AssertionError("failed attachment accepted as successful execution")
 
 
 def parse_args() -> argparse.Namespace:
@@ -2319,7 +2502,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    broker_startup_deadline_tests()
     candidate_helper_environment_tests()
+    run([sys.executable, os.fspath(ROOT / "scripts/tests/check-broker-helper-lifetime.test.py")], cwd=ROOT)
+    run([sys.executable, "-W", "error", os.fspath(ROOT / "scripts/tests/check-security-git-source-identity.test.py")], cwd=ROOT)
     static_contract_tests()
     copy_and_output_tests()
     refresh_inventory_tests()
@@ -2328,6 +2514,8 @@ def main() -> int:
     immutable_workspace_tests()
     entrypoint_repository_inventory_tests()
     fake_docker_main_tests()
+    trusted_failure_diagnostic_tests()
+    attached_container_diagnostic_tests()
     if args.docker:
         image = args.image or os.environ.get("CHIO_SECURITY_EXECUTION_IMAGE", "")
         if not BOUNDARY.IMAGE_PATTERN.fullmatch(image):
