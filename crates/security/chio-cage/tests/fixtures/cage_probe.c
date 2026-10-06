@@ -440,16 +440,25 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
         SYS_EXECVEAT, 255, (long)marker, (long)arguments, (long)environment, AT_EMPTY_PATH);
     terminate(result < 0 ? 110 : 113);
 #elif PROBE_MODE == 35
-    // Procfs magic link to an open descriptor of the marker.
-    static char proc_path[] = "/proc/self/fd/200";
+    // Procfs magic link to the descriptor the open returned. The profiles deny
+    // descriptor duplication, so the path names that descriptor directly.
+    static char proc_path[32] = "/proc/self/fd/";
     static char *arguments[] = {proc_path, 0};
     long descriptor = invoke(SYS_OPENAT, AT_FDCWD, (long)marker, O_RDONLY, 0);
     if (descriptor < 0) {
         terminate(114);
     }
-    if (invoke(SYS_FCNTL, descriptor, 0, 200, 0) != 200) {
-        terminate(115);
+    char digits[20];
+    int count = 0;
+    do {
+        digits[count++] = (char)('0' + descriptor % 10);
+        descriptor /= 10;
+    } while (descriptor > 0);
+    int length = 14;
+    while (count > 0) {
+        proc_path[length++] = digits[--count];
     }
+    proc_path[length] = 0;
     long result = invoke5(
         SYS_EXECVEAT, 255, (long)proc_path, (long)arguments, (long)environment, AT_EMPTY_PATH);
     terminate(result < 0 ? 111 : 113);
