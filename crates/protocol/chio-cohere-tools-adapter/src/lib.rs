@@ -208,6 +208,14 @@ impl CohereAdapter {
         F: FnMut(&ToolInvocation) -> Result<VerdictResult, ProviderError>,
     {
         self.ensure_supported_api_version()?;
+        // A body without `stream: true` makes Cohere answer with plain JSON,
+        // which the SSE gate must never be asked to interpret.
+        let request: serde_json::Value = chio_provider_adapter_core::input::json(request_body)?;
+        if request.get("stream").and_then(serde_json::Value::as_bool) != Some(true) {
+            return Err(ProviderError::Malformed(
+                "Cohere chat_stream requires a request body with stream: true".to_string(),
+            ));
+        }
         let body = self.transport.send_chat_stream(request_body).await?;
         self.gate_sse_stream(&body, evaluate)
     }
@@ -570,6 +578,28 @@ mod tests {
             .expect_err("drifted Cohere API version must fail before transport");
 
         assert_api_version_drift(err);
+        assert!(mock.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn chat_stream_requires_a_streaming_request_before_transport_call() {
+        let mock = Arc::new(transport::MockTransport::new());
+        let adapter = CohereAdapter::new(config(), mock.clone());
+        for body in [
+            &b"{\"model\":\"command-r\"}"[..],
+            b"{\"stream\":false}",
+            b"not json",
+        ] {
+            let result = adapter
+                .chat_stream(body, |_invocation| {
+                    Ok(VerdictResult::Allow {
+                        redactions: vec![],
+                        receipt_id: chio_tool_call_fabric::ReceiptId("rcpt_stream".to_string()),
+                    })
+                })
+                .await;
+            assert!(result.is_err(), "non-streaming body must be refused");
+        }
         assert!(mock.calls().is_empty());
     }
 

@@ -199,3 +199,113 @@ fn raw_batch_projection_remains_non_authoritative() {
     assert_eq!(invocations.len(), 1);
     assert!(invocations[0].bridge_security.is_none());
 }
+
+fn gate(raw: &[u8]) -> Result<usize, chio_tool_call_fabric::ProviderError> {
+    let (config, registry, _) = signed_registry();
+    let adapter =
+        CohereAdapter::new_with_registry(config, Arc::new(MockTransport::new()), &registry)
+            .test_unwrap();
+    adapter
+        .gate_sse_stream(raw, |_| Ok(allow()))
+        .map(|gated| gated.invocations.len())
+}
+
+fn frame(event: Option<&str>, data: serde_json::Value) -> String {
+    match event {
+        Some(event) => format!("event: {event}\ndata: {data}\n\n"),
+        None => format!("data: {data}\n\n"),
+    }
+}
+
+fn start_frame(arguments: &str) -> String {
+    frame(
+        Some("tool-call-start"),
+        json!({"type":"tool-call-start","index":0,"delta":{"message":{"tool_calls":{
+            "id":"call-assembled","type":"function",
+            "function":{"name":TOOL_NAME,"arguments":arguments}}}}}),
+    )
+}
+
+fn delta_frame(arguments: &str) -> String {
+    frame(
+        Some("tool-call-delta"),
+        json!({"type":"tool-call-delta","index":0,"delta":{"message":{"tool_calls":{
+            "function":{"arguments":arguments}}}}}),
+    )
+}
+
+#[test]
+fn plain_json_chat_body_with_tool_calls_fails_closed() {
+    let body = serde_json::to_vec(&json!({
+        "id": "chat-1",
+        "message": {"tool_calls": [{"id":"call-json","type":"function",
+            "function":{"name":TOOL_NAME,"arguments":"{}"}}]}
+    }))
+    .test_unwrap();
+    assert!(gate(&body).is_err());
+}
+
+#[test]
+fn data_only_tool_call_end_frame_is_evaluated() {
+    let raw = frame(
+        None,
+        json!({"type":"tool-call-end","tool_call":{"id":"call-data-only","type":"function",
+            "function":{"name":TOOL_NAME,"arguments":"{}"}}}),
+    );
+    assert_eq!(gate(raw.as_bytes()).test_unwrap(), 1);
+}
+
+#[test]
+fn start_and_delta_without_end_fails_closed() {
+    let raw = format!("{}{}", start_frame(""), delta_frame("{}"));
+    assert!(gate(raw.as_bytes()).is_err());
+}
+
+#[test]
+fn start_delta_end_stream_is_assembled_and_evaluated() {
+    let raw = format!(
+        "{}{}{}{}",
+        start_frame(""),
+        delta_frame("{\"city\":"),
+        delta_frame("\"Paris\"}"),
+        frame(
+            Some("tool-call-end"),
+            json!({"type":"tool-call-end","index":0})
+        ),
+    );
+    assert_eq!(gate(raw.as_bytes()).test_unwrap(), 1);
+}
+
+#[test]
+fn unknown_event_fails_closed() {
+    let raw = frame(Some("tool-call-future"), json!({"type":"tool-call-future"}));
+    assert!(gate(raw.as_bytes()).is_err());
+}
+
+#[test]
+fn tool_calls_outside_tool_call_frames_fail_closed() {
+    let raw = frame(
+        Some("content-delta"),
+        json!({"type":"content-delta","delta":{"message":{"tool_calls":{"id":"call-smuggled",
+            "type":"function","function":{"name":TOOL_NAME,"arguments":"{}"}}}}}),
+    );
+    assert!(gate(raw.as_bytes()).is_err());
+}
+
+#[test]
+fn stream_that_opens_with_message_start_must_reach_message_end() {
+    let raw = frame(
+        Some("message-start"),
+        json!({"type":"message-start","id":"msg-1"}),
+    );
+    assert!(gate(raw.as_bytes()).is_err());
+    let complete = format!(
+        "{}{}",
+        raw,
+        frame(
+            Some("message-end"),
+            json!({"type":"message-end","delta":{"finish_reason":"COMPLETE"}})
+        )
+    );
+    assert_eq!(gate(complete.as_bytes()).test_unwrap(), 0);
+}
