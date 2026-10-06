@@ -93,8 +93,8 @@ Other facts that shape the design:
   has an M-series chip with 32 GB RAM or more. Linux-only crates (cage,
   seccomp) are never tested on macOS.
 - **Claude and Codex cloud sessions** run fire-and-forget lanes. The
-  conductor writes a self-contained brief; the session returns a branch; a
-  janitor registers the result on the item. Cloud sessions never write to the
+  conductor writes a self-contained brief; the session returns a branch; the
+  conductor registers the result on the item. Cloud sessions never write to the
   `swarm` branch.
 - **GitHub Actions** is the x86 test farm via a dispatchable `lane-test.yml`.
 
@@ -114,8 +114,12 @@ Agent IDs follow `<vendor>-<machine>-<role><n>`, for example
 `claude-ws2-conductor`, `codex-ws2-integrator`, `hermes-ws2-janitor1`,
 `cursor-air-docs1`.
 
-Every local agent runs in a named `tmux` session `swarm-<role>-<n>`. Claude
-sessions can be supervised from a phone through Remote Control.
+Every local agent runs under a `swarm-agent` runner in a named `tmux` session
+`swarm-<agent-id>`. Workers, reviewers and docs lanes start a fresh headless
+session per item (fresh context per item). The conductor and integrator keep
+one persistent headless session each, resumed with every event, so their
+context survives restarts. Connor can open the conductor's session
+interactively (and attach Remote Control) after halting its runner.
 
 ## 5. Coordination store and `swarm` CLI
 
@@ -184,7 +188,11 @@ never produce merge conflicts.
 | `swarm import-reviews <PR#>` | Converts review bot findings on a train PR into items. |
 | `swarm halt [--all\|--role R\|--agent A]` / `swarm resume` | Kill switch (section 8.5). |
 
-Claims expire 45 minutes after the last heartbeat.
+Claims expire 45 minutes after the last heartbeat, with a two-minute grace for
+clock skew between machines. Every write command renews the caller's claims,
+and `swarm wait` renews them every ten minutes while it blocks. The
+implementation plan adds small helper commands (`next`, `list`, `reassign`,
+`sweep`, `config`, `worktree`, `metrics`, `ci-busy`, `scan`) around this core.
 
 ### 5.5 Secret guard
 
@@ -302,8 +310,10 @@ Workers build only the crates their item touches.
 
 ### 7.3 `lane-test.yml`
 
-A `workflow_dispatch` workflow with inputs `ref`, `item`, `packages`, `filter`
-and `features`. It runs on `ubuntu-24.04` with a Rust cache keyed by packages,
+A `workflow_dispatch` workflow with inputs `target_ref`, `item`, `packages`,
+`filter`, `features` and `nonce`. It is always dispatched on `main` (GitHub runs
+the workflow file from the dispatched ref, and lane branches do not carry it)
+and checks out `target_ref` itself. It runs on `ubuntu-24.04` with a Rust cache keyed by packages,
 executes `cargo nextest run -p ...`, and uploads logs and JUnit results. Its
 concurrency group is per item, so a new run cancels only that item's previous
 run. The CLI keeps at most about ten lane-test runs in flight to leave the
@@ -313,7 +323,9 @@ Connor approves.
 
 ### 7.4 Hosted CI for `beta-next`
 
-Full CI on `beta-next` runs through a standing draft train PR. The
+Full CI on `beta-next` runs through a standing draft train PR targeting
+`main`; `ci.yml`, which carries the required checks, only runs for pull
+requests into `main`. The
 integrator does not push to `beta-next` while a full CI run is in progress,
 except to fix that run's failure.
 
@@ -359,8 +371,11 @@ week preemptible or $170 on demand) joined to the tailnet as `tag:builder`.
 ### 8.3 Branch protection
 
 All agents push as the machine user `bb-chio-swarm` over HTTPS with a token
-that has write but not admin access. A ruleset on `main` requires Connor's
-approval and the machine user cannot bypass it. A pre-push hook in every
+that has write but not admin access. Today the `main` ruleset only requires
+status checks and blocks deletion and force pushes, with no bypass actors. A
+new ruleset adds a restrict-updates rule on `main` with the repository admin
+role as the only bypass actor, so only Connor can merge to `main` and the
+machine user cannot. A pre-push hook in every
 swarm worktree enforces roles: only the integrator pushes `beta-next`, only
 the security pair pushes the #1160 branch, and workers force-push only their
 own `lane/*` branches. This also resolves workstation-2's missing GitHub
@@ -458,10 +473,19 @@ starts with W1.1 under a single owner, then fans out.
 
 ## 12. Planning-time checks
 
-These do not change the design; the implementation plan resolves them first.
+These do not change the design. Resolved while writing the plan (2026-10-06):
 
-- Which branches the CI workflows' `pull_request` filters accept, which
-  decides whether the standing train PR targets `main` or the #1160 branch.
+- `ci.yml` (required checks) runs `pull_request` only for base `main`; 45 other
+  workflows accept any base. The train PR therefore targets `main`.
+- The `main` ruleset has no approval rule; section 8.3 adds one.
+- The repository uses Git LFS (Swift xcframework only), so the swarm pre-push
+  hook chains to `git lfs pre-push`.
+- workstation-2 supports `systemd-run --user` scopes with cpu and memory
+  controllers, already has `extensions.worktreeConfig`, and needs node on PATH
+  for Codex in non-interactive shells.
+
+Still open, resolved during execution:
+
 - Whether Claude and Codex cloud sessions can push arbitrary branch names, or
   only tool-prefixed ones; the janitor's registration step adapts either way.
 - MacBook Pro hardware and whether it holds the recovery implementation.
