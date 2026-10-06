@@ -927,7 +927,9 @@ func errorsIs(err, target error) bool {
 	return false
 }
 
-// Caller identities are public keys provisioned by the workload operator.
+// Caller identities are public keys provisioned by the workload operator. An
+// invalid one is a permanent input error: it is reported as a Warning event
+// and not requeued, since editing the annotation triggers a new reconcile.
 func TestReconcile_RejectsInvalidSubjectBeforeMintAndJobMutation(t *testing.T) {
 	for _, subject := range []string{"", "job/default/demo", "bb", "not-a-public-key", " d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"} {
 		t.Run(subject, func(t *testing.T) {
@@ -936,9 +938,21 @@ func TestReconcile_RejectsInvalidSubjectBeforeMintAndJobMutation(t *testing.T) {
 			job.Annotations["chio.world/subject-public-key"] = subject
 			r, c := buildReconciler(t, chio, job)
 			key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-			_, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
-			if err == nil {
-				t.Fatal("invalid subject must reject before mutation")
+			result, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+			if err != nil || !result.IsZero() {
+				t.Fatalf("invalid subject must not requeue: result %+v, err %v", result, err)
+			}
+			recorder, ok := r.Recorder.(*record.FakeRecorder)
+			if !ok {
+				t.Fatal("test reconciler must use a fake recorder")
+			}
+			select {
+			case event := <-recorder.Events:
+				if !strings.HasPrefix(event, "Warning ChioInvalidSubjectPublicKey") {
+					t.Fatalf("unexpected event %q", event)
+				}
+			default:
+				t.Fatal("invalid subject must record a Warning event")
 			}
 			mint, _, _ := chio.counts()
 			if mint != 0 {

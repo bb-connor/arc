@@ -82,6 +82,9 @@ func run() error {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 	logger := ctrl.Log.WithName("chio-controller")
+	if chioSidecarControlToken == "" {
+		return fmt.Errorf("--chio-sidecar-control-token or CHIO_SIDECAR_CONTROL_TOKEN is required")
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
