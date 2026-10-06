@@ -154,10 +154,16 @@ impl MerkleTree {
 
     /// Generate a self-describing consistency proof to the complete tree.
     pub fn consistency_proof_record(&self, old_size: usize) -> Result<MerkleConsistencyProof> {
+        let audit_path = self.consistency_proof(old_size)?;
+        let leaves = self.leaf_count();
+        let size_error = || Error::InvalidProofIndex {
+            index: old_size,
+            leaves,
+        };
         Ok(MerkleConsistencyProof {
-            old_size,
-            new_size: self.leaf_count(),
-            audit_path: self.consistency_proof(old_size)?,
+            old_size: u64::try_from(old_size).map_err(|_| size_error())?,
+            new_size: u64::try_from(leaves).map_err(|_| size_error())?,
+            audit_path,
         })
     }
 
@@ -366,20 +372,29 @@ pub fn verify_consistency_proof(
     old_reconstructed == *old_root && new_reconstructed == *new_root && snode == 0
 }
 
+/// Maximum consistency audit-path length: one node for each of the 64 levels of
+/// a tree with at most `u64::MAX` leaves, plus the base subtree root. The bound
+/// is part of the wire contract and does not depend on the platform pointer
+/// width.
+pub const MAX_CONSISTENCY_PROOF_PATH_LEN: usize = 65;
+
 /// Self-describing RFC 6962 consistency proof between two tree sizes.
+///
+/// Sizes are fixed-width 64-bit integers on every platform. A verifier whose
+/// `usize` cannot represent a size rejects the proof at verification.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MerkleConsistencyProof {
-    pub old_size: usize,
-    pub new_size: usize,
+    pub old_size: u64,
+    pub new_size: u64,
     pub audit_path: Vec<Hash>,
 }
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct MerkleConsistencyProofWire {
-    old_size: usize,
-    new_size: usize,
+    old_size: u64,
+    new_size: u64,
     #[serde(deserialize_with = "deserialize_consistency_path")]
     audit_path: Vec<Hash>,
 }
@@ -417,17 +432,17 @@ where
         where
             A: SeqAccess<'de>,
         {
-            let maximum = (core::mem::size_of::<usize>() * 8) + 1;
+            let maximum = MAX_CONSISTENCY_PROOF_PATH_LEN;
             if sequence.size_hint().is_some_and(|size| size > maximum) {
                 return Err(serde::de::Error::custom(
-                    "consistency path exceeds platform tree depth",
+                    "consistency path exceeds the 64-bit tree depth",
                 ));
             }
             let mut path = Vec::with_capacity(sequence.size_hint().unwrap_or(0).min(maximum));
             while let Some(hash) = sequence.next_element()? {
                 if path.len() == maximum {
                     return Err(serde::de::Error::custom(
-                        "consistency path exceeds platform tree depth",
+                        "consistency path exceeds the 64-bit tree depth",
                     ));
                 }
                 path.push(hash);
@@ -442,14 +457,14 @@ where
 impl MerkleConsistencyProof {
     /// Verify the bounded audit path against both advertised roots.
     pub fn verify(&self, old_root: &Hash, new_root: &Hash) -> Result<()> {
-        if self.audit_path.len() > (core::mem::size_of::<usize>() * 8) + 1
-            || !verify_consistency_proof(
-                self.old_size,
-                self.new_size,
-                old_root,
-                new_root,
-                &self.audit_path,
-            )
+        let (Ok(old_size), Ok(new_size)) = (
+            usize::try_from(self.old_size),
+            usize::try_from(self.new_size),
+        ) else {
+            return Err(Error::MerkleProofFailed);
+        };
+        if self.audit_path.len() > MAX_CONSISTENCY_PROOF_PATH_LEN
+            || !verify_consistency_proof(old_size, new_size, old_root, new_root, &self.audit_path)
         {
             return Err(Error::MerkleProofFailed);
         }
@@ -822,8 +837,8 @@ mod tests {
             .is_err());
 
         let overflow_boundary = MerkleConsistencyProof {
-            old_size: usize::MAX - 1,
-            new_size: usize::MAX,
+            old_size: u64::MAX - 1,
+            new_size: u64::MAX,
             audit_path: Vec::new(),
         };
         assert!(overflow_boundary
@@ -833,14 +848,36 @@ mod tests {
         let overlong = MerkleConsistencyProof {
             old_size: 3,
             new_size: 7,
-            audit_path: vec![Hash::zero(); (core::mem::size_of::<usize>() * 8) + 2],
+            audit_path: vec![Hash::zero(); MAX_CONSISTENCY_PROOF_PATH_LEN + 1],
         };
         assert!(overlong.verify(&old_tree.root(), &new_tree.root()).is_err());
     }
 
     #[test]
+    fn consistency_proof_wire_shape_is_platform_independent() {
+        let beyond_u32: u64 = u64::from(u32::MAX) + 1;
+        let json = serde_json::json!({
+            "old_size": beyond_u32,
+            "new_size": beyond_u32 + 1,
+            "audit_path": vec![Hash::zero(); MAX_CONSISTENCY_PROOF_PATH_LEN],
+        });
+        let proof: MerkleConsistencyProof = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(proof.old_size, beyond_u32);
+        assert_eq!(proof.new_size, beyond_u32 + 1);
+        assert_eq!(serde_json::to_value(&proof).unwrap(), json);
+
+        assert_eq!(MAX_CONSISTENCY_PROOF_PATH_LEN, 65);
+        let overlong = serde_json::json!({
+            "old_size": 1,
+            "new_size": 2,
+            "audit_path": vec![Hash::zero(); MAX_CONSISTENCY_PROOF_PATH_LEN + 1],
+        });
+        assert!(serde_json::from_value::<MerkleConsistencyProof>(overlong).is_err());
+    }
+
+    #[test]
     fn consistency_deserialization_rejects_overlong_paths_before_growth() {
-        let hashes = vec![Hash::zero(); (core::mem::size_of::<usize>() * 8) + 2];
+        let hashes = vec![Hash::zero(); MAX_CONSISTENCY_PROOF_PATH_LEN + 1];
         let json = serde_json::json!({
             "old_size": 1,
             "new_size": 2,

@@ -278,12 +278,7 @@ fn verify_sync_update_inner(verification: SyncVerification<'_>) -> Result<Verifi
                     .ok_or(KeyringError::InvalidCheckpoint(
                         "growing synchronization omitted consistency proof",
                     ))?;
-            if proof.old_size
-                != usize::try_from(base.body.tree_size).map_err(|_| KeyringError::NumericRange)?
-                || proof.new_size
-                    != usize::try_from(candidate.body.tree_size)
-                        .map_err(|_| KeyringError::NumericRange)?
-            {
+            if proof.old_size != base.body.tree_size || proof.new_size != candidate.body.tree_size {
                 return Err(KeyringError::InvalidCheckpoint(
                     "consistency proof size mismatch",
                 ));
