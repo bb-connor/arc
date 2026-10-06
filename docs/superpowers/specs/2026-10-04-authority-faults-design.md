@@ -1,6 +1,6 @@
 # Design: authority fault classification for the recovery lane
 
-- Status: PROPOSED (revision 5, 2026-10-05, after independent review pass 5 (R-2-02); revision 4 after PR #1174 review round 1; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
+- Status: PROPOSED (revision 6, 2026-10-06, after independent review pass 6 (R-2-03); revision 5 after independent review pass 5 (R-2-02); revision 4 after PR #1174 review round 1; revision 3 re-baselined 2026-10-04 on #1160 + #1173 + #1172 + uncommitted recovery P0-P5 (W:))
 - Date: 2026-10-04
 - Scope:
   - Classify recoverable authority denials (missing scope, exhausted budget, expired capability, required approval) into a closed, kernel-signed fault class with anti-oracle rules.
@@ -28,6 +28,10 @@
   - Recovery doc features with no code in W: are marked "doc-only". V: W1-W4 work APIs remain contract anchors.
 - Origin: lessons from the FTL (nuta/ftl) review
 - Siblings: `2026-10-04-ftl-lessons-program-design.md` (umbrella), `2026-10-04-closed-kernel-abi-design.md`, `2026-10-04-typed-reservations-design.md`, `2026-10-04-authority-space-teardown-design.md`, `2026-10-04-unified-event-queue-design.md`, `2026-10-04-opaque-adapter-context-design.md`, `2026-10-04-microkernel-isolation-backend-design.md`
+
+## Revision 6 changes
+
+From the sixth independent review and PR round 28 (R-2-03): `reserve_successor_ordinal` is now a stop-gated `RecoveryControl` entry point with disposition `deny`, checked in the claim's own writer transaction before any mutation, with an identical replay answered by readback. Root supersession moves from the reservation to the first `Reserved -> Open` transition inside the already stop-gated `CreateWorkflow`, so a stopped or failed creation never disables the root (section 6.10 O3, O4). Spec 8's `RecoveryControl` table and spec 1 R5b list the new entry point.
 
 ## Revision 5 changes
 
@@ -220,7 +224,7 @@ pub struct AuthorityFaultV2 {
 - When a recovery deployment covers the denied request's scope, the kernel also exposes the class through the recovery observation as the existing `ExplanationFactKind::Capability`, with value `false`. The fact gains an optional typed annotation `{ class, resolver_classes, security_binding_digest?, origin_retained }` carrying the same values as the block. `security_binding_digest` is the opaque digest of the trusted selection, computed by the native evaluation that produced the denial and recorded in native flow state, so the planner never needs the receipt for it. `origin_retained` is true only when the denial left a native operation that `origins::resolve` can verify (section 6.10 O8). It is a planner input, never a block field, so A5 is unaffected.
 - The fact is derived from native flow state, not from the receipt, which keeps W:'s rule that facts never come from receipt verdicts.
 - The planner never reads the receipt.
-- `FaultKind::Integrity` projects to the new `ExplanationFactKind::Integrity`, with value `false` (spec 11 I20). Only spec 11 I20's two remedy paths may address it. The `Authority` remedy kind never addresses an `Integrity` fact, and no integrity remedy addresses a `Capability` fact.
+- `FaultKind::Integrity` projects to the new `ExplanationFactKind::Integrity`, with value `false` (spec 11 I20). It carries the same `origin_retained` planner input as the `Capability` fact, derived the same way from native flow state (section 6.10 O8), and never written to the block. Only spec 11 I20's two remedy paths may address it, and both require `origin_retained` (spec 11 I20a). The `Authority` remedy kind never addresses an `Integrity` fact, and no integrity remedy addresses a `Capability` fact.
 
 **Anti-oracle rules for the block:**
 1. **A1. Caller-held fields only.** Every field is supplied by the caller, held by the caller (its own capability, subject and chain principals), or an opaque digest of the caller's own security selection. The block never contains a policy id, guard name, grant index, remaining balance, family or sibling usage, required scope, or resolver availability.
@@ -327,7 +331,7 @@ Any information-flow obligations the continuation needs are approved as today.
 - **Why not the action intent.** `ActionIntentV1` carries `capability_body`, the hash of the capability's signing body (W: `chio-security-types/src/recovery/authorization.rs:69-90`), and the store checks that hash against the seed capability (W: `chio-store-sqlite/src/admission_operation_store/recovery/issuance.rs:76-83`). The signing body includes the grant scope and so the constraint (W: `chio-core-types/src/capability/token.rs:219-242`). Naming the action-intent digest inside the capability would require `x = H(ActionIntent(capability_body = H(Capability(.. x ..))))`, which has no constructible solution.
 - **The identity chain.** Each value is computed from the previous ones and from deployment facts, never from the capability:
   1. `successor_creation_key = "authority-successor:" + hex(SHA-256("chio.recovery.authority-successor.v1" || predecessor_workflow || successor_ordinal))`. `predecessor_workflow` is written by host setup (above).
-     - **The ordinal is stable across retries.** It is allocated once, durably, by `reserve_successor_ordinal(predecessor_workflow, resolution_attempt_id)`, which appends a `Reserved` link to the original's origin claim (section 6.10 O4). `resolution_attempt_id` is caller-held and stable across retries of one resolution, for example `H(fault receipt id, resolver principal, resolver nonce)`.
+     - **The ordinal is stable across retries.** It is allocated once, durably, by `reserve_successor_ordinal(predecessor_workflow, resolution_attempt_id)`, which appends a `Reserved` link to the original's origin claim (section 6.10 O4). The reservation is stop-gated and does not supersede the root; creation does (O3). `resolution_attempt_id` is caller-held and stable across retries of one resolution, for example `H(fault receipt id, resolver principal, resolver nonce)`.
      - A repeat call with the same pair returns the ordinal it allocated before. A new attempt id first checks for the one reserved or open link of the predecessor and reuses its ordinal; it allocates the next unused ordinal only if none exists.
      - So a resolver whose `CreateWorkflow` committed but whose response was lost rebuilds the same creation key and capability binding, and the store replays the committed workflow instead of refusing a second open successor.
   2. `workflow_id = "workflow:" + sha256_hex(scope, successor_creation_key)`, W:'s existing rule (W: `recovery/commands.rs:73-77`).
@@ -461,13 +465,19 @@ A successor's seed carries a new capability, and for a sibling process a new sco
    `MAX_SUCCESSORS` is `max_successors_per_predecessor`. A claim with an empty chain encodes exactly as today, so existing claims keep version 1 and need no migration. `verify`'s fixed version-1 check becomes `version == 1 + chain_revision`, with the root fields compared as today. Every chain mutation checks the expected row version, so concurrent mutations from different process scopes serialize and the loser gets `Conflict`.
 3. **O3. Root exclusivity.** At most one continuation per original captures: the root's own, or one link's.
    - The root fields never change. Another workflow claiming the same origin as a root is still `Conflict`, as today.
-   - The first chain mutation (a reservation) requires the predecessor to be `Active` and uncaptured, and permanently supersedes the root continuation. From then on `origins::verify` refuses the root workflow's issuance, fresh basis and capture with `superseded`. That only adds a refusal: `resolve` and `verify` are not relaxed for any record.
-4. **O4. Reservation, creation and replay.** `reserve_successor_ordinal` (section 6.2 identity step 1) is a mutation of this claim:
-   - the same `resolution_attempt_id` returns its link's ordinal;
-   - a new attempt id reuses the ordinal of the one link in `Reserved` or `Open`, if there is one, and otherwise appends a `Reserved` link at the next ordinal, refusing beyond `MAX_SUCCESSORS`;
-   - at most one link is `Reserved` or `Open` at any time.
+   - Supersession happens at creation, not at reservation. The first `Reserved -> Open` transition (O4), inside the stop-gated `CreateWorkflow` transaction, requires the predecessor to be `Active` and uncaptured, and permanently supersedes the root continuation. From then on `origins::verify` refuses the root workflow's issuance, fresh basis and capture with `superseded`. That only adds a refusal: `resolve` and `verify` are not relaxed for any record.
+   - A `Reserved` link never changes root eligibility. A reservation whose creation is refused, abandoned or stopped therefore leaves the root exactly as eligible as before. The root's own capture and a successor's creation serialize in the serving writer: whichever commits first wins, and the other is refused (`superseded` for the root, `cancelled` for the creation).
+4. **O4. Reservation, creation and replay.** `reserve_successor_ordinal` (section 6.2 identity step 1) is a mutation of this claim, and a `RecoveryControl` entry point in its own right:
+   - **Stop gate.** Its stop disposition is `deny` (spec 8 section 7, spec 1 R5b). The serving writer runs the same scoped `StopEpoch` check as `CreateWorkflow`, for the predecessor's and the successor's scopes, in the transaction that would mutate the claim and before any mutation. While either scope is stopped, it changes no claim version, link or root eligibility, and it returns `KernelStopped { scope, epoch }`, which the resolver treats as a pause (spec 8 S35). A stop and a reservation serialize in the writer, so the one that commits first wins.
+   - **Replay is a read.** A call whose `(predecessor_workflow, resolution_attempt_id)` already holds a link returns that link's ordinal by readback, with no mutation, so it is allowed during a stop and never re-supersedes anything.
+   - **Authorization.** It is authorized exactly as the `CreateWorkflow` it precedes: an actor authenticated through `authenticate_recovery_actor` with `RecoveryPermission::Create` for the successor's deployment scope (W: `chio-kernel/src/recovery/records.rs:52-69`).
+   - **Anchoring.** Every chain mutation (reservation, creation, retirement, capture) commits on the existing serving writer and is anchored before acknowledgement, as a restrictive commit (spec 10 section 5), because the resolver mints a capability bound to the returned ordinal. Anchoring supplies durability only; it never stands in for the stop gate.
+   - Its rules:
+     - the same `resolution_attempt_id` returns its link's ordinal;
+     - a new attempt id reuses the ordinal of the one link in `Reserved` or `Open`, if there is one, and otherwise appends a `Reserved` link at the next ordinal, refusing beyond `MAX_SUCCESSORS`;
+     - at most one link is `Reserved` or `Open` at any time.
 
-   `CreateWorkflow` for `AuthorityContinuation` moves the link for its ordinal from `Reserved` to `Open` and sets `owner`, in the transaction that saves the successor record. A replay with the same key, seed and origin finds the link `Open` with the identical owner and returns the existing workflow (W: `commands.rs:95-101`). Any other owner for that ordinal, or a link that is not `Reserved` or identically `Open`, refuses as `Conflict`.
+   `CreateWorkflow` for `AuthorityContinuation`, already `deny` during a stop (spec 8 section 7.2), moves the link for its ordinal from `Reserved` to `Open` and sets `owner`, in the transaction that saves the successor record. The first such transition supersedes the root (O3). A replay with the same key, seed and origin finds the link `Open` with the identical owner and returns the existing workflow (W: `commands.rs:95-101`). Any other owner for that ordinal, or a link that is not `Reserved` or identically `Open`, refuses as `Conflict`.
 5. **O5. Retirement and cancellation keep history.** `CancelWorkflow` on a successor that holds no capture moves its link from `Open` to `RetiredWithoutCapture` in the cancel transaction.
    - The link, its ordinal, owner and attempt id stay in the claim permanently. Ordinals are never reused, matching W:'s rule that closed identities are retained (W: `commands.rs:109-110`).
    - Cancellation never removes a link, never rewrites the root fields, never deletes the claim and never returns the root continuation to capture.
@@ -503,6 +513,8 @@ A successor's seed carries a new capability, and for a sibling process a new sco
 | Successor record whose `origin` differs from the claim's, or whose link names another owner | `CreateWorkflow` refused (`Conflict`), or `...-REJECTED` (`origin`) |
 | Denial with no native row (scope, expiry, or a tombstone without retained request material) | `origin_retained` false; planner returns `BlockedByCapability`; a forced `CreateWorkflow` is refused by `resolve` (O8) |
 | Two successors in different process scopes created concurrently | one link wins under the claim's version check; the other is `Conflict` (O2, O4) |
+| Successor reservation while the predecessor's or successor's scope is stopped | `KernelStopped`; no claim mutation; an identical replay reads back its existing ordinal (O4) |
+| Successor creation refused, abandoned or stopped after its reservation | the root keeps its eligibility; only creation supersedes it (O3) |
 | New authority wrong shape, not a subset, or from a non-active issuer key | `CHIO-KERNEL-AUTHORITY-REMEDY-REJECTED` (`shape`, `subset`) |
 | Predecessor capability or its chain revoked, suspended, frozen, or predecessor cancelled at capture | `...-REJECTED` (`revoked`, `suspended`, `frozen`, `cancelled`) |
 | `RecoveryContinuationBinding` presented outside its bound continuation | deny at admission |
@@ -580,7 +592,8 @@ A successor's seed carries a new capability, and for a sibling process a new sco
   - **Fabricated seed:** a successor naming a predecessor without a verified origin, an `origin` not equal to the predecessor's claim, or a request id with no original row, is refused at creation.
   - **Mismatched native or process origin:** the predecessor's retained request, native context or native authority no longer matches, or the process origin port refuses the original request. Creation is refused, and an already created successor's capture refuses with `origin`.
   - **Early denial with no native row:** a scope or expiry denial yields the block with `origin_retained` false, the planner returns `BlockedByCapability`, and a forced `CreateWorkflow` for it is refused by `resolve`.
-  - **Root supersession:** after the first reservation, the predecessor's own continuation refuses issuance and capture with `superseded`, even after every link is retired.
+  - **Root supersession:** after the first successful successor creation, the predecessor's own continuation refuses issuance and capture with `superseded`, even after every link is retired. A reservation alone, including one whose creation is then refused or abandoned, leaves the root eligible.
+  - **Reservation under a stop (R-2-03):** with a stop already committed on the predecessor's or the successor's scope, `reserve_successor_ordinal` returns `KernelStopped` and changes no claim version, link or root eligibility. Race a stop against a reservation: the writer's committed order decides, and a reservation that lost is absent. Cover a lost reservation acknowledgement (the retry with the same attempt id reads back the same ordinal, also during a stop), resume, a creation refused by a stop after its reservation committed (the root stays eligible, and the root may still capture), and an identical replay after creation, which supersedes nothing again.
 - **Proptest.** For random chains and resolver scopes, a linked workflow accepted at capture:
   - is a subset of the resolver's grant;
   - authorizes one invocation of the faulted tool with the faulted arguments;
@@ -676,6 +689,19 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-2-02 | Linked authority successors do not compose with W's new exclusive origin ownership | Fixed. Verified in W: that creation resolves the seed to one original (`origins.rs:61-92`, exact retained request at `retained_request.rs:379-393`), verifies the original process request (`commands.rs:87-94`, `ports.rs:52-62`), claims it exclusively across scopes (`origins.rs:14-24`, `:94-129`), and re-verifies at issuance and fresh basis (`issuance.rs:37-40`, `validation.rs:293`). New section 6.10 extends that one owner: the predecessor keeps the original request and its evidence (O1); the original's claim gains a bounded successor chain with version-checked mutations (O2); the first reservation permanently supersedes the root continuation (O3); reservation, creation and replay are chain mutations with at most one reserved or open link (O4); cancellation retires a link without erasing it or the claim (O5); `verify_linked` revalidates the original, including the process port on the original scope, plus chain ownership and fresh successor authority at every recheck point (O6); capture moves the link to `Captured` in the same transaction (O7). The partial unique index and `successor_captures` row are removed. Denials with no native row get no remedy until a retained-denial profile exists in the admission owner (O8, open decision 8). `resolve` and `verify` are not relaxed. Spec 11's quarantined continuation carries the same prerequisite | Revision 5 changes; sections 1, 2, 4, 5, 6.2, 6.3 step 6, 6.4, 6.5, 6.7, 6.9, 6.10; sections 7-11; spec 11 I22 |
+
+### PR #1174 review round 28 (Codex)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4190476138 | Put successor reservation behind the stop gate | Fixed now. `reserve_successor_ordinal` is a `RecoveryControl` entry point with disposition `deny`. The serving writer checks the predecessor's and successor's scoped stop heads in the claim's transaction before any mutation, and an identical replay is answered by readback with no mutation. Root supersession moves to the first `Reserved -> Open` transition inside the already stop-gated `CreateWorkflow`, so a reservation never disables the root on its own. Spec 8 and spec 1 register the entry point | section 6.2 identity step 1; section 6.10 O3, O4; section 7; section 10 tests; spec 8 section 7; spec 1 R5b |
+
+### Independent review pass 6 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-2-03 | Reserving a successor can permanently supersede the root while recovery creation is stopped | Fixed with round 28's comment 4190476138 (above). Acceptance cases cover a committed stop, a stop racing a reservation, a lost reservation acknowledgement, resume, a creation refused after reservation, and identical replay | section 6.10 O3, O4; section 10 |
+| R-11-09 (spec 2 side) | Exact integrity approval still lacks the retained-origin prerequisite applied to quarantine | Applied here. The `Integrity` planner fact carries the same `origin_retained` input as `Capability`, and every recovery-backed integrity remedy requires it (spec 11 I20a) | section 5 planner fact |
 
 ## Appendix A. FTL reference
 

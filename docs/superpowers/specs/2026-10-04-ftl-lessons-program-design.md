@@ -95,6 +95,12 @@ The pass audited 40 defect rows: 37 confirmed, and 3 correctly reclassified as n
 - spec 8 keeps every incident stopper on the anchored stop chain. Bypass proofs carry the subsumed contributors, an unread entry retires only through an anchored `Reconcile` record, and resume waits for it (S19, S19a, S25a). Spec 10 adds `Reconcile` to the priority lane (R-8-03);
 - spec 5 removes the last restore exception and states the journal-write limit once (R-5-02).
 
+**Revision 4h, independent review pass 6 and PR round 28 (2026-10-06, head `0118c31a6`).** Three Major findings, each also raised by a bot comment, and one Minor, all applied through the existing owners:
+- spec 2 makes `reserve_successor_ordinal` a stop-gated `deny` `RecoveryControl` entry point, checked before any claim mutation. It moves root supersession from the reservation to the stop-gated `CreateWorkflow`, so a stopped or failed creation never disables the root. Specs 8, 1 and 10 register it (R-2-03);
+- spec 4's closure no longer waits for a rail and no longer drops an unresolved payment. `stranded_final.delivery_obligations` lists every `DeliveryRefused` payment not confirmed `Final` by readback, as `Open` or `InFlight` (including `ReconcileFailed`) with its original intent (R-4-04);
+- spec 5 Part A restores standard resource subscriptions by URI with no client-visible id. A failed re-authorization ends through one standard `resources/updated` and a failing re-read, held durably until flushed. Negotiated ids and `SubscriptionEnded` stay in Part B, which extends the same record (R-5-03);
+- spec 11 I20a applies native-origin eligibility to both recovery-backed integrity remedies, and spec 2 adds `origin_retained` to the `Integrity` fact (R-11-09).
+
 The review's architecture judgment and recommended order are in section 9.
 
 
@@ -239,7 +245,7 @@ Items were verified on the M:/V: heads, or in W:'s working tree where marked.
 4. **Reservation classes.**
    - Recovery call slots, provider lookups, grant issuance, D1 seals, F1 backing and process slots are `Commitment` entries with no compensator.
    - The machine's own releases are `PreDispatchNoEffect`, `TransportNotAccepted` and `ContractualZeroCharge` (spec 9 `MachineRelease`). The drain uses only the first two.
-   - `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. A delivery refusal alone is never pricing authority, and it never re-decides a payment the journal already records: a settled capture, authorized release or resolved waiver stands, and an in-flight intent completes under its original identity. Only a refused return whose positive hold is still `Open` keeps it until the payment owner's own successor settles it (spec 9 M11a).
+   - `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. A delivery refusal alone is never pricing authority, and it never re-decides a payment the journal already records: a settled capture, authorized release or resolved waiver stands, and an in-flight intent completes under its original identity. Only a refused return whose positive hold is still `Open` keeps it until the payment owner's own successor settles it (spec 9 M11a). Closure records every refused payment not confirmed `Final`, `Open` or `InFlight`, and never waits for a rail (spec 4 section 8).
    - After an unknown outcome, only `MutuallyAgreedUnknown` releases a hold (spec 9 M7a). `ContractualCaptureWaiver` resolves only a known return's positive pending capture in `Finalizing` (spec 9 M7b).
 5. **Durability for work.** Every work profile requires durable admission.
 6. **One escape-hatch gate.** It is the Mechanism D gate, and it includes W:'s `Drop`-quarantine sites.

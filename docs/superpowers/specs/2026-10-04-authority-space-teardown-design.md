@@ -275,7 +275,7 @@ Rules:
    | `DispatchCommitted`, owned by the drain | Halt the operation (spec 9 `HaltOperation`) and cancel the transport cooperatively where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`). Then follow spec 9 section 6.1's `X` row: with a `NotAccepted` proof, `NotAcceptedAfterDispatchCommit`; with a recoverable durable return, `Finalizing`, whose release then meets the fence (below); otherwise `OutcomeUnknownAfterDispatch` with holds frozen. Exactly one terminal; never redispatch, release or compensate |
    | `DispatchCommitted`, still owned by a live coordinator | Halt and defer: the drain never steals the lease. The coordinator either terminalizes it under the same `X` row or reaches `Finalizing`, and then follows the next row |
    | `Finalizing` | The release meets the fence (section 4.1 rule 3a), and the output is withheld for good (spec 9 M11, M11a). The operation terminalizes as `DeniedAfterDelivery` when no obligation is outstanding, including a payment already `Final`. Otherwise it is recorded as `DeliveryRefused`: an in-flight settlement intent completes and then terminalizes, and an `Open` hold is retained for the payment owner. It is never terminalized as outcome-unknown, because its return is recorded |
-   | `Finalizing(DeliveryRefused)` | Drained. An in-flight settlement intent still completes and the operation then terminalizes (spec 9 M11a). Only an `Open` retained hold is listed in `stranded_final` |
+   | `Finalizing(DeliveryRefused)` | Drained. An in-flight settlement intent keeps completing under its original identity, and the operation then terminalizes (spec 9 M11a). `stranded_final.delivery_obligations` lists it as `InFlight` until a readback confirms `Final`, and an untouched hold as `Open` (section 8) |
    | `AwaitingCallerReport` | `HaltOperation { UnsettledCallerCustody }` plus the fault (spec 9 section 6.1). A later authenticated report records the return and moves the operation to `Finalizing`, so its release meets the fence and follows the `Finalizing` row |
    | Recovery workflow bound to the space | `CancelWorkflow` by the closure actor (section 6.5); the same-writer tombstone fences begin and capture |
    | Confined child in the space | `NativeConfinedRuntime::cancel`: native disposition first, then process cancel and pidfd termination (W: `crates/platform/chio-control-plane/src/confinement.rs:258-274`). A plain `ProcessRuntime::cancel` alone would leave the native confined record unterminated |
@@ -376,7 +376,7 @@ Rules:
 3. CAS the record to `Fenced`.
 4. CAS to `Draining` and run the drain.
 5. Withdraw (section 6.5).
-6. When every ledger entry is terminal, delivery-refused (spec 9 M11a) or incident-bound, recompute `stranded_final` (section 8), sign the artifact, CAS to `Closed`, and emit exit hints. A delivery-refused entry needs no financial settlement before `Closed`: its output can never be released, an in-flight intent completes on its own, and an open hold stays with the payment owner.
+6. When every ledger entry is terminal, delivery-refused (spec 9 M11a) or incident-bound, recompute `stranded_final` (section 8), sign the artifact, CAS to `Closed`, and emit exit hints. A delivery-refused entry needs no financial settlement before `Closed`: its output can never be released, and its payment, whether `Open` or `InFlight`, is recorded in `stranded_final.delivery_obligations` with its stage (section 8). Closure never waits for a payment rail.
 
 ```text
 fenced(c) and binds(op, space(c)) and durable(op) and fence_in_admission_store(c)
@@ -444,12 +444,27 @@ pub struct StrandedCapacity {
     pub s1_unissued_allocations: Vec<PoolAllocationRef>,
     pub process_retained_shares: Vec<ProcessShareRef>,
     pub frozen_holds: Vec<OperationHoldRef>,          // outcome-unknown; released only per 7.2
-    pub retained_delivery_obligations: Vec<OperationHoldRef>, // delivery-refused known returns whose hold is still Open (spec 9 M11a); settled only by the payment owner
+    pub delivery_obligations: Vec<DeliveryObligationRef>, // delivery-refused known returns whose payment is not confirmed Final (spec 9 M11a)
     pub confined_reservations: Vec<ConfinedChildRef>, // P5: at most 16 per scope, never refunded
     pub pinned_artifacts: u64,                        // P4 pins retained by the space (count only)
     pub completeness: EnumerationCompleteness,
 }
+
+pub struct DeliveryObligationRef {                   // read back from the native payment journal at stranded_final
+    pub operation_id: OperationId,
+    pub hold_id: HoldId,
+    pub journal_state: JournalState,                 // as read back: HoldPlaced, Authorized, Settling, ReconcileFailed or Resolving
+    pub stage: DeliveryObligationStage,              // Open | InFlight
+    pub intent: Option<SettlementIntentRef>,         // InFlight only: the original settle action, amount and journal digest
+}
 ```
+
+- **Delivery obligations.** Closure never waits for a payment rail. `stranded_final` lists every `DeliveryRefused` operation whose payment is not confirmed `Final`, so the `Closed` artifact states at its cut exactly which payments were outstanding:
+  - `Open`: an untouched positive hold, waiting for the payment owner (spec 9 M11a and open decision 8);
+  - `InFlight`: a recorded capture, release or waiver intent that has not completed. This includes `ReconcileFailed` and rail unavailability, and it records the original intent so later evidence can show that the same intent completed;
+  - an operation is omitted only when the store read back its journal as `Final` in the transaction that computes `stranded_final`. A lost acknowledgement, or a completion not yet read back, is never presumed final, and that operation is listed as `InFlight`.
+
+  Closure executes no settlement. The payment owner keeps driving an in-flight intent under its original identity after `Closed`, and records its completion in the native payment evidence. That evidence, not an amended artifact, shows the later outcome (spec 9 M11a).
 
 The accounting has two snapshots. Both are evidence only.
 - **`stranded_at_fence`** is computed from the owning stores at `Fenced`. It records what the fence cut off, and it is carried in the `Fenced` artifact.
@@ -457,7 +472,7 @@ The accounting has two snapshots. Both are evidence only.
   - an operation observed as `DispatchCommitted` at the fence can complete and settle under its live lease, or become outcome-unknown and freeze its hold;
   - an in-flight knowledge operation can add a pin after the fence.
 
-  The snapshot at the fence cannot report these, so only `stranded_final` lists the final `frozen_holds`, `retained_delivery_obligations` and `pinned_artifacts`.
+  The snapshot at the fence cannot report these, so only `stranded_final` lists the final `frozen_holds`, `delivery_obligations` and `pinned_artifacts`.
 - **After closure.** Changes after `Closed`, such as a frozen hold later released under section 7.2, are recorded by their own evidence, not by amending the artifact.
 - **Reclamation.** A future reclamation design may take a `Closed` artifact's `stranded_final` as a precondition. This spec defines no reclamation.
 
@@ -583,8 +598,9 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
     Every new prohibited authority stays refused. Historical reads and already sealed permits keep their documented semantics. Further cases cover interruption mid-migration (the migration resumes or rejects, and never yields empty closure state), a stale legacy owner that writes after retirement (refused by the continuity checks), and both landing orders.
   - AP8 partial progress keeps the record in `Fencing`.
   - A closure committed after `DispatchCommitted` and before release withholds the output, for caller-executed, native and ordinary durable returns. With no payment, a zero amount or a prepaid settlement, the operation terminalizes as `DeniedAfterDelivery`. A restart between the refusal and the terminal completes the terminal.
-  - **Closure recognizes a settled payment (R-9-05).** A positive-cost call whose ordinary capture is already `Settled`, then refused at release by a closure, terminalizes once as `DeniedAfterDelivery` with the charge as recorded and no refund. One whose capture is `Settling` at the refusal completes that capture under its original identity, then terminalizes. Neither appears in `retained_delivery_obligations`.
-  - **Closure is not pricing authority (R-9-03).** A positive-cost return on a reversible hold that is still `Open`, refused at release by a closure, is recorded as `DeliveryRefused` once. Across restart and closure completion, its hold and journal are unchanged, it is never re-dispatched, and it appears in `stranded_final.retained_delivery_obligations`. The record still reaches `Closed`. A later settlement by the payment owner's own successor terminalizes it once, and that is recorded by the payment evidence, not by amending the artifact.
+  - **Closure recognizes a settled payment (R-9-05).** A positive-cost call whose ordinary capture is already `Settled`, then refused at release by a closure, terminalizes once as `DeniedAfterDelivery` with the charge as recorded and no refund. One whose capture is `Settling` at the refusal completes that capture under its original identity, then terminalizes. The settled one never appears in `delivery_obligations`; the settling one appears as `InFlight` if the record closes before a readback confirms `Final`.
+  - **Closure is not pricing authority (R-9-03).** A positive-cost return on a reversible hold that is still `Open`, refused at release by a closure, is recorded as `DeliveryRefused` once. Across restart and closure completion, its hold and journal are unchanged, it is never re-dispatched, and it appears in `stranded_final.delivery_obligations` as `Open`. The record still reaches `Closed`. A later settlement by the payment owner's own successor terminalizes it once, and that is recorded by the payment evidence, not by amending the artifact.
+  - **Closure records unresolved in-flight payments (R-4-04).** Close a space while a refused operation's capture is `ReconcileFailed` and the rail keeps failing; separately while the rail is unavailable; after a lost capture acknowledgement; and across a restart before `stranded_final`. Each time the record reaches `Closed` without waiting, and the artifact lists the operation as `InFlight` with its original intent. A capture confirmed `Final` by readback is omitted, and a lost acknowledgement is not presumed final. A later retry completes the same intent, charges once, and is recorded by the payment evidence, not by amending the artifact.
   - Migration backfill: indexed operations re-derive equal refs. A `legacy_unindexed` operation whose coordinator holds the lease fails its dispatch CAS once any closure fence exists.
   - Stranded accounting: an operation that settles, or becomes outcome-unknown, during the drain, and a pin added after the fence, appear in `stranded_final` and not in `stranded_at_fence`.
 - **Conformance.**
@@ -675,3 +691,15 @@ Where the analogy breaks:
 |---|---|---|---|
 | R-9-03 (spec 4 side) | A withheld result is incorrectly sufficient authority for zero-charge settlement | Fixed with spec 9 M11a. A closure refusal at release decides delivery only. With no positive reversible-hold obligation, the operation terminalizes as `DeniedAfterDelivery`. Otherwise `RefuseDelivery` records `Finalizing(DeliveryRefused)`, and the hold and journal stay with the payment owner. The drain treats that operation as drained, `Closed` admits it, and `stranded_final` lists it as a retained delivery obligation. Closure never releases, waives or captures it, and an outcome-unknown hold is released only by `MutuallyAgreedUnknown` | section 4.1 rule 3a and lemma; section 5 drain table and release rule 2; section 6.3 step 6 and predicate; section 7 item 2; section 8; section 16 test |
 | R-9-05 (spec 4 side) | Delivery refusal strands a payment whose ordinary capture already completed | Fixed with spec 9 M11a. A closure refusal over a payment journal already `Final` terminalizes at once with the recorded charge or release. An in-flight intent completes under its original identity and passes the fence, then the operation terminalizes. Only an `Open` positive reversible hold is retained and listed in `stranded_final` | section 4.1 rule 3a; section 5 drain table; section 6.3 step 6; section 8; section 16 test |
+
+### PR #1174 review round 28 (Codex)
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4190476130 | Account for in-flight settlements before closing | Fixed now. Closure still does not wait for a payment rail, but `stranded_final.delivery_obligations` now lists every `DeliveryRefused` payment that a readback in the same transaction has not confirmed `Final`. Each entry carries its stage (`Open`, or `InFlight` including `ReconcileFailed`) and, for `InFlight`, the original settlement intent. A lost acknowledgement is never presumed final. Later completion is recorded by the payment evidence, not by amending the artifact | section 5 drain table; section 6.3 step 6; section 8; section 16 tests |
+
+### Independent review pass 6 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-4-04 | Closed evidence omits an unresolved in-flight delivery payment | Fixed with round 28's comment 4190476130 (above). Acceptance cases cover persistent `ReconcileFailed`, rail unavailability, a lost capture acknowledgement and a restart before `stranded_final` | section 8; section 16 tests |

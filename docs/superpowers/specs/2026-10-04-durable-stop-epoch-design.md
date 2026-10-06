@@ -474,7 +474,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | per entry point (S13) | `CallerExecution` | `reserve_` and `start_` deny; the authenticated report is a progress-only return record and is allowed (S27); release is `OutputRelease` (`Withhold`); `reconcile_caller_execution*` allow. `reconcile_caller_execution*` is an entry point of `CallerExecution` only, never of `Reconcile` (spec 1 R1, R5b) |
 | per entry point (S13, R5a) | `RecoveryControl` | see the next table |
 
-`RecoveryControl` entry points (spec 1 section 5 lists seven):
+`RecoveryControl` entry points (spec 1 section 5 lists seven in W:, and spec 2 section 6.10 adds an eighth):
 
 | Entry point | Disposition | Rationale |
 |---|---|---|
@@ -485,6 +485,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | `observe_recovery_capability_liveness` | `allow` | observation |
 | `reserve_recovery_review` (W: `recovery_runtime.rs:267`) | `deny` | it advances a workflow toward an effect |
 | `acknowledge_recovery_reservation` (W: `recovery_runtime.rs:91`) | `deny` | it binds a process reservation to a workflow |
+| `reserve_successor_ordinal` (spec 2 section 6.10 O4, proposed) | `deny` | it mutates the original's origin claim toward a linked continuation. Checked for the predecessor's and successor's scopes in the claim's writer transaction, before any mutation. An identical replay is a readback and is allowed. Root supersession happens only in the stop-gated `CreateWorkflow` (spec 2 O3) |
 
 P6 component operations (control plane and store, not `KernelOp`). Spec 1 section 6 holds the full classification:
 
@@ -1293,6 +1294,12 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-8-03 | Unread-journal bypass drops a stopper from the two-person resume predicate | Fixed. Confirmed against the round 24-26 text: the `subsumes_unread` retirement wrote the entry's contributors only to a progress-only note, and `SubsumedIntent` held only a digest, so S19's set lost the stopper on both bypass paths. Now `SubsumedIntent` carries the entry's contributors, bound by an `entry_digest` that verifiers recompute, and they join S19's set. A `subsumes_unread` record satisfies no entry by itself: S25a retires each covered entry only after a new state-preserving `Reconcile` record, a restrictive anchored commit on the same chain, carries its snapshot. A narrower entry is still a `Restrict`. S19a takes exclusions only from chain records, never from notes. Resume refuses with `StopIntentPending` until reconciliation is anchored, and while the journal is unreadable. One chain and one writer; no separate stopper roster | record fields; S2; S6; S19; S19a; S25; S25a; S36; S38; section 14; section 17 |
+
+### Independent review pass 6 and PR round 28
+
+| Comment or finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-2-03 / 4190476138 (spec 8 side) | Reserving a successor can permanently supersede the root while recovery creation is stopped | Applied here. The `RecoveryControl` table gains spec 2's `reserve_successor_ordinal` with disposition `deny`, checked for the predecessor's and successor's scopes in the claim's writer transaction before any mutation. An identical replay is a readback and is allowed. Root supersession happens only in the stop-gated `CreateWorkflow` | section 7 `RecoveryControl` table |
 
 ## Appendix A. FTL reference
 
