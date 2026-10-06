@@ -226,7 +226,7 @@ impl MailboxStore {
         channel: &MailboxConfig,
         args: Claim,
         claimant: &str,
-        now_ms: u64,
+        clock_ms: impl FnOnce() -> Result<u64, ProcessError>,
     ) -> Result<Value, ProcessError> {
         if args.limit == 0 || args.limit > 16 {
             return Err(ProcessError::Invalid("mailbox claim limit must be 1-16"));
@@ -236,14 +236,17 @@ impl MailboxStore {
                 "mailbox lease must be 1000-300000 milliseconds",
             ));
         }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // Sample inside the write transaction so lock contention cannot judge
+        // lease expiry with a time captured before the lock.
+        let now_ms = clock_ms()?;
         let clock = || ProcessError::Invalid("mailbox lease exceeds the clock");
         let expires = now_ms.checked_add(args.lease_ms).ok_or_else(clock)?;
         // Lease instants are stored as SQLite integers.
         let now = i64::try_from(now_ms).map_err(|_| clock())?;
         let expires = i64::try_from(expires).map_err(|_| clock())?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let candidates = tx
             .prepare(
                 "SELECT sequence, payload, sender, claim_generation FROM mailbox_messages
@@ -280,8 +283,8 @@ impl MailboxStore {
         Ok(json!({"status": "claimed", "messages": messages}))
     }
 
-    /// Extend a live claim from the host clock, never by adding to its existing
-    /// deadline. An expired, consumed or superseded claim cannot be revived.
+    /// Extend a live claim from the supplied clock, never by adding to its
+    /// existing deadline. An expired, consumed or superseded claim cannot be revived.
     pub fn renew(
         &mut self,
         channel: &MailboxConfig,
@@ -407,7 +410,7 @@ mod tests {
             claim: "1".into(),
             lease_ms,
         };
-        store.claim(&channel, claim(), "a", 10_000)?;
+        store.claim(&channel, claim(), "a", || Ok(10_000))?;
         assert!(matches!(
             store.renew(&channel, renew(1000), "b", || Ok(10_500)),
             Err(ProcessError::Conflict)
@@ -430,7 +433,7 @@ mod tests {
         drop(store);
         let mut store = open()?;
         assert_eq!(
-            store.claim(&channel, claim(), "b", 11_000)?["messages"],
+            store.claim(&channel, claim(), "b", || Ok(11_000))?["messages"],
             json!([])
         );
         for lease in [0, 999, 300_001, u64::MAX] {
@@ -442,14 +445,14 @@ mod tests {
             assert!(store.renew(&channel, renew(1000), "a", || Ok(now)).is_err());
         }
         assert_eq!(
-            store.claim(&channel, claim(), "b", 12_499)?["messages"],
+            store.claim(&channel, claim(), "b", || Ok(12_499))?["messages"],
             json!([])
         );
         assert!(matches!(
             store.renew(&channel, renew(1000), "a", || Ok(12_500)),
             Err(ProcessError::Conflict)
         ));
-        let next = store.claim(&channel, claim(), "b", 12_500)?;
+        let next = store.claim(&channel, claim(), "b", || Ok(12_500))?;
         assert_eq!(next["messages"][0]["claim"], "2");
         assert!(store
             .renew(&channel, renew(1000), "a", || Ok(12_501))
@@ -482,7 +485,7 @@ mod tests {
             .renew(&channel, current(), "b", || Ok(12_502))
             .is_err());
         assert_eq!(
-            store.claim(&channel, claim(), "a", 20_000)?["messages"],
+            store.claim(&channel, claim(), "a", || Ok(20_000))?["messages"],
             json!([])
         );
         let mut disabled = channel.clone();
@@ -526,11 +529,11 @@ mod tests {
             limit: 1,
             lease_ms: 1000,
         };
-        let first = store.claim(&channel, lease(), "worker-a", 10_000)?;
+        let first = store.claim(&channel, lease(), "worker-a", || Ok(10_000))?;
         assert_eq!(first["messages"][0]["claim"], "1");
-        let before = store.claim(&channel, lease(), "worker-b", 10_999)?;
+        let before = store.claim(&channel, lease(), "worker-b", || Ok(10_999))?;
         assert_eq!(before["messages"], json!([]));
-        let expired = store.claim(&channel, lease(), "worker-b", 11_000)?;
+        let expired = store.claim(&channel, lease(), "worker-b", || Ok(11_000))?;
         assert_eq!(expired["messages"][0]["claim"], "2");
         assert!(matches!(
             store.complete(
@@ -552,7 +555,7 @@ mod tests {
             "worker-b",
         )?;
         assert_eq!(
-            store.claim(&channel, lease(), "worker-c", 12_000)?["messages"],
+            store.claim(&channel, lease(), "worker-c", || Ok(12_000))?["messages"],
             json!([])
         );
         Ok(())
