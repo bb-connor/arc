@@ -227,6 +227,7 @@ impl MobileChallengeStore for SqliteMobileChallengeStore {
         challenge.validate()?;
         let challenge_json = canonical_challenge_json(challenge)?;
         let expires_at = sqlite_i64(challenge.expires_at_unix_seconds, "challenge expiry")?;
+        let issued_at = sqlite_i64(challenge.issued_at_unix_seconds, "challenge issuance")?;
         self.execute(|connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -244,6 +245,15 @@ impl MobileChallengeStore for SqliteMobileChallengeStore {
             if exists != 0 {
                 return Ok(false);
             }
+            // Reclaim rows already expired at issuance so they cannot hold
+            // capacity forever when no caller runs gc_expired.
+            transaction
+                .execute(
+                    "DELETE FROM chio_mobile_attestation_challenges
+                     WHERE expires_at_unix_seconds <= ?1",
+                    [issued_at],
+                )
+                .map_err(|error| unavailable("reclaim expired mobile challenges", error))?;
             let retained: i64 = transaction
                 .query_row(
                     "SELECT COUNT(*) FROM chio_mobile_attestation_challenges",

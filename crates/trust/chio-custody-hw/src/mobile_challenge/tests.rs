@@ -37,7 +37,10 @@ fn challenge(
 fn secure_sqlite_tempdir() -> tempfile::TempDir {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let directory = tempfile::tempdir()
+    // The store refuses a parent that traverses a symlink, such as macOS's /var.
+    let root = std::fs::canonicalize(std::env::temp_dir())
+        .unwrap_or_else(|error| panic!("temporary root must resolve: {error}"));
+    let directory = tempfile::tempdir_in(root)
         .unwrap_or_else(|error| panic!("mobile challenge directory must construct: {error}"));
     std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
         .unwrap_or_else(|error| panic!("mobile challenge directory must harden: {error}"));
@@ -155,7 +158,7 @@ fn concurrent_app_attest_challenges_compare_and_swap_counter_state() {
 }
 
 #[test]
-fn expired_challenges_fail_closed_and_gc_reopens_capacity() {
+fn expired_challenges_fail_closed_and_registration_reclaims_their_capacity() {
     let store = match InMemoryMobileChallengeStore::with_limits(1, 1) {
         Ok(store) => store,
         Err(error) => panic!("bounded store must construct: {error}"),
@@ -170,13 +173,35 @@ fn expired_challenges_fail_closed_and_gc_reopens_capacity() {
         store.load_active(&expired.challenge_id, 5_300),
         Err(MobileChallengeError::Invalid(_))
     ));
-    let blocked = challenge(play_binding(), 7, 5_300);
+    assert_registration_reclaims_only_expired_capacity(&store);
+}
+
+/// The store holds one challenge issued at 5_000 and has capacity one.
+fn assert_registration_reclaims_only_expired_capacity(store: &dyn MobileChallengeStore) {
+    let next = challenge(play_binding(), 7, 5_300);
+    assert!(matches!(store.register_if_absent(&next), Ok(true)));
+    let live = challenge(play_binding(), 8, 5_300);
     assert!(matches!(
-        store.register_if_absent(&blocked),
+        store.register_if_absent(&live),
         Err(MobileChallengeError::StoreUnavailable(_))
     ));
-    assert!(matches!(store.gc_expired(5_300), Ok(1)));
-    assert!(matches!(store.register_if_absent(&blocked), Ok(true)));
+}
+
+#[cfg(all(feature = "sqlite-store", unix))]
+#[test]
+fn sqlite_registration_reclaims_expired_challenges_before_the_capacity_check() {
+    let directory = secure_sqlite_tempdir();
+    let store = match SqliteMobileChallengeStore::open_with_limits(
+        &directory.path().join("mobile-challenges.sqlite3"),
+        1,
+        1,
+    ) {
+        Ok(store) => store,
+        Err(error) => panic!("bounded SQLite store must open: {error}"),
+    };
+    let expired = challenge(play_binding(), 6, 5_000);
+    assert!(matches!(store.register_if_absent(&expired), Ok(true)));
+    assert_registration_reclaims_only_expired_capacity(&store);
 }
 
 #[test]
