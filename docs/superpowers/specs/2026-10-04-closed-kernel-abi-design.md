@@ -161,7 +161,7 @@ Normative rules (R1-R10 from revision 1 are retained and now apply per layer):
    - Each L0 op declares `emergency_stop = "deny" | "allow"` with a rationale. A generated test asserts refusal while stopped for every entry point of a `deny` op.
    - L1-L3 ops inherit the disposition of the L0 ops they drive (R12).
    - The persistence gap is tracked as ledger EV11/AC6. This rule records the dispositions; it does not make the stop durable.
-   - **R5a. Multiplexed entry points.** An L0 entry point that dispatches an L3 enum (`execute_recovery_command`) declares its disposition per L3 variant, and the generated test asserts per variant. For `RecoveryControl`: `InspectWorkflow`, `CancelWorkflow` and proposed `RetireSuccessorReservation` (spec 2 O5) are `allow` (observation and closure must work during a stop), and every other variant is `deny`. Retirement uses this existing entry point and adds no L0 method. It is restricted to an exact uncreated reservation under predecessor-scope `Cancel` authority; new reservation and creation still deny while stopped.
+   - **R5a. Multiplexed entry points.** An L0 entry point that dispatches L3 commands (`execute_recovery_command`) declares its disposition for every variant in every supported wire profile, including both `RecoveryCommandBodyV1` and `RecoveryCommandBodyV1_1`. Both codecs map exhaustively to one disposition table in the existing owner. The generated test exercises every profile/variant pair through its decoder and both stop tiers (spec 8 sections 7.2 and 17), with identical dispositions for the seven shared kinds. For `RecoveryControl`: `InspectWorkflow`, `CancelWorkflow` and proposed `RetireSuccessorReservation` (spec 2 O5) are `allow` (observation and closure must work during a stop), and every other variant is `deny`. Retirement uses this existing entry point and adds no L0 method. It is restricted to an exact uncreated reservation under predecessor-scope `Cancel` authority; new reservation and creation still deny while stopped.
    - **R5b. Per-entry-point dispositions.** An op whose entry points differ in direction (begin versus observe), or in authority profile (agent versus control), declares a disposition per entry point. Three ops use it:
      - `CallerExecution`: `reserve_` and `start_` are `deny`, and `reconcile_caller_execution*` plus authenticated reports are `allow`, because the effect already happened. `reconcile_caller_execution*` is an entry point of `CallerExecution` only; the `Reconcile` op does not list it (R1).
      - `IssueCapability`: ordinary issuance is `deny`; control-profile issuance (direct tokens whose subject is a roster principal, never an agent scope) is `allow` once spec 8's identity prerequisite (S28) lands.
@@ -512,3 +512,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4197555199 | Version the new recovery command variant | Fixed. The seven-command V1 schema stays frozen; recovery-command profile 1.1 has explicit request/result schemas, an advertised registry and protected deployment pin. Spec 2 defines dual-profile migration and exact-identity replay in the existing owner. L3 versioning is independent of L0 | L3 row; R3; sections 9-11; spec 2 section 8.1 |
+
+### PR #1174 review round 32
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4197876467 (spec 1 side) | Cover both recovery command profiles in the census | Fixed. R5a requires exhaustive codec mappings into the shared disposition table and actual decoder-to-writer tests for every profile/variant pair, including the eighth 1.1 command | R5a; spec 8 sections 7.2, 17 |

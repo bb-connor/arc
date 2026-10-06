@@ -127,6 +127,13 @@ The review's architecture judgment and recommended order are in section 9.
 - spec 5 defines one `TerminalReason` vocabulary, including `subscription_not_restored` and `subscription_authority_lost`. The same cause is authenticated by versioned native terminal records, retained in the shared journal and used by Part B's unsigned terminal hint. Part A adds no client notification (4197555214).
 
 
+**Revision 4l, PR round 32 (2026-10-06, reviewed head `45f19d48a`).** Three comments corrected remaining cross-contract gaps:
+
+- specs 1 and 8 require exhaustive stop coverage for both recovery-command profiles, with one disposition table, every wire profile/variant pair tested through the decoder and writer, and identical dispositions for shared kinds (4197876467);
+- spec 5 keeps each resync cursor and follow-up in its consumer's attachment record. A later consumer starts at the catalog prefix, while shared emission remains bounded by one session-wide chunk budget (4197876482);
+- spec 10's check-only release now explicitly rechecks `KnowledgeIntegrity` against current release policy and committed state. Failed integrity withholds output with a signed reason and terminal retry advice; a policy or tracking change cannot reuse the dispatch-time decision to release (4197876499).
+
+
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.
 - **Spec 2 (faults)** now plugs in as a recovery planner fact. W: maps an unsatisfied capability fact to the terminal `BlockedByCapability`, and the new `Authority` remedy kind is the upcall tier for exactly that case. W: pins one capability per workflow, so a resolution runs as a linked `AuthorityContinuation` workflow. Because recovery refuses delegated control tokens, an operator-assigned actor drives it.
 - **Spec 7 (isolation)** recognizes that P5 already cage-confines a zero-authority `confined_reader` child. It adds that profile, an exporter requirement (P5 emits no receipt), and an `output_channels` surface.

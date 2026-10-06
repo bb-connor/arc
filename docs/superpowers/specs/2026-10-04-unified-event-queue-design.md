@@ -260,20 +260,20 @@ Rules:
 After A1 and A1d, lag can skip only notifications. Correlated responses and server requests ride POST slots, and uncorrelated server requests ride the GET server-request queue; neither depends on the broadcast. Notifications are re-read hints (list changed, resource updated) plus advisory progress and log messages. Revision 4 answers lag with a resync in standard MCP vocabulary instead of terminating streams, because termination with a 64-notification window almost always yields `409` and a reconnect loop against the per-IP rate limiter (S5-12).
 
 1. **A7. Resync request.** On `RecvError::Lagged(n)` at `:517`, `:702`, `:817` or `:860`, the consumer increments `chio_mcp_remote_stream_lag_total`, calls `session.request_resync(consumer_id, n)`, and keeps going.
-   - **Resync state is per consumer.** Each attached broadcast consumer, such as a GET stream or a POST stream's notification channel, has its own `consumer_id` and its own resync record: a pending flag, a skipped count, a pass counter and a pass cursor. At most one request is pending per consumer, and further lags add to that consumer's skipped count.
-   - **Shared emission.** The session emits a pass while any consumer has a pending request, and a pass's events reach every consumer. Each consumer's record advances and clears independently. Clearing or terminating one consumer never discards another consumer's pending resync, and a detached consumer's record is dropped with it.
+   - **Resync state is per consumer.** Each attached broadcast consumer, such as a GET stream or a POST stream's notification channel, has its own `consumer_id` and its own resync record: a pending flag, a skipped count, a pass counter and a `resync_cursor`. At most one request is pending per consumer, and further lags add to that consumer's skipped count.
+   - **Shared emission, independent progress.** The session fairly services pending consumers' passes through its one writer, and emitted events reach every consumer. Only the record whose pass generated those events advances; receiving another consumer's burst does not copy its cursor or clear one's own pending pass. Clearing or terminating one consumer never discards another consumer's pending resync, and a detached consumer's record is dropped with it.
 2. **A8. Resync burst.** The edge runtime, which owns the kernel session, services a pending resync on its next loop iteration by emitting through the normal writer:
    - one `notifications/{tools,resources,prompts}/list_changed` for each catalog whose `listChanged` capability the server declared;
    - one `notifications/resources/updated` for each subscribed URI;
    - when the peer enabled logging, one `notifications/message` at level `warning` naming the skipped count.
 
    The burst events take ordinary ids and are retained like any notification, so GET replay covers them.
-   - **Bounded chunks.** A burst never emits more than `resync_chunk = broadcast_capacity / 4` events (64 at the default capacity of 256) in one loop iteration.
-     - The first chunk carries the catalog `list_changed` notifications and the logging warning (at most 4 events), then resource updates.
-     - Further subscribed URIs continue in later chunks from a persisted per-session `resync_cursor` over the subscription set in a stable order.
+   - **Bounded chunks.** The session emits at most `resync_chunk = broadcast_capacity / 4` resync events (64 at the default capacity of 256) in one loop iteration, in total across all pending consumers, not one allowance per consumer.
+     - Each pass starts with the catalog `list_changed` notifications and its logging warning (at most 4 events), then resource updates. The prefix also counts against the chunk limit and may span chunks when that limit is smaller than the prefix.
+     - Further subscribed URIs continue in later chunks from `resync_cursor` in that `consumer_id`'s resync record, over the subscription set in a stable order. Retain the cursor in memory across loop iterations; it is attachment state, not a field of the durable session resume record. A consumer starting resync begins at its own catalog prefix even if another consumer is halfway through the URI set. Detach drops only that consumer's cursor, and a new attachment cannot inherit it.
    - **Convergence.** A `Lagged` during a burst means the consumer missed part of a chunk that was already emitted, so the current pass can no longer cover everything.
-     - The current pass runs to completion from `resync_cursor`, and one full follow-up pass is queued, starting again from the catalog events. Coalescing keeps at most one follow-up pending, however many lags occur during the pass. Every hint a lag skipped is therefore re-sent by the follow-up.
-     - Each chunk is smaller than the broadcast capacity, so a pass cannot itself cause the lag that queues the next one. A consumer that keeps pace with one chunk per iteration completes a pass with no lag, and resync then stops.
+     - The affected consumer's current pass runs to completion from its own `resync_cursor`, and one full follow-up pass is queued in that same record, resetting its cursor to the catalog prefix. Coalescing keeps at most one follow-up pending per consumer, however many lags occur during its pass. Every hint that consumer's lag skipped is therefore re-sent by its follow-up; another consumer's progress cannot satisfy that obligation.
+     - The session-wide chunk bound also applies when several consumers have pending passes. A consumer that keeps pace with the total notification stream, including ordinary traffic and other consumers' resync events, completes its own pass and any queued follow-up without another lag, and its resync record then clears.
      - **Perpetual lag ends the stream.** If one stream lags during `resync_max_passes` consecutive passes (default 3), the server terminates that stream. A GET stream ends with a final `event: chio-resync-required` frame and is closed. A POST stream's notification channel is closed, while its terminal response still arrives through the non-lossy slot (A1).
        - That consumer's own resync record is dropped with the stream. The session keeps emitting passes only while some other consumer still has a pending request, and no other consumer's pending resync is cleared.
        - The client reconnects, and A10 and A11 take over: `Last-Event-ID` gets replay, or a `409` with a full client re-read.
@@ -444,6 +444,7 @@ Rollout order, each an independent change: (1) A5, A6 and A12 (ordering and canc
 ## 10. Tests (Part A)
 
 - **`chio-mcp-remote`:**
+  - **staggered resync consumers (A7/A8):** attach one GET consumer and a POST notification consumer, with enough URIs for several chunks. Start GET resync and advance it into the URI suffix, then trigger POST lag. The POST pass still emits every eligible catalog hint and subscribed URI from its own beginning. Finishing or detaching GET changes no POST cursor, pending flag or follow-up. Reverse the order; lag one consumer during a chunk and assert only its follow-up resets; reattach with a fresh identity and assert no cursor inheritance. Count emissions across both records: the total per iteration stays within one `resync_chunk`. Also cover a chunk smaller than the catalog/logging prefix; it spans chunks without skipping or exceeding the bound;
   - **terminal reason conformance (A32):** round-trip every declared reason and its permitted terminal state through the intent journal, signed v3 fence and signed v3 tombstone. Pre-activation failure preserves `subscription_not_restored`; expiry/revocation after activation preserves `subscription_authority_lost`, including a quiet session. Crash before signing, after fence preparation and after tombstone finalization; replay keeps the exact cause and signed bytes. Tamper only with the reason, remove it, supply an unknown value, change the state/reason pair or relabel as v2: verification refuses without restoring the session. Legacy v2 fixtures still verify without a reason. With Part B negotiated, the retained and replayed `Terminal` carries exactly the committed reason; a standard client receives no new notification;
   - broadcast capacity 8 with a streaming tool and no `chioRequestId`: the terminal response is delivered, the tool is dispatched exactly once, and a resync burst follows the lag;
   - the same on a credential session: the call ends `completed_unacknowledged`, never `pending`, and a retry with the same `chioRequestId` replays;
@@ -1006,7 +1007,7 @@ Open decisions:
 |---|---|---|---|
 | 4187050279 | Fail closed when persisting an end marker fails | Fixed now. A failed `Ended` persist durably invalidates the resume record through the store's terminal session transition (higher `resume_generation`) and ends the session. If that also fails, the session store is not ready. After that double failure only, restore re-authorizes from scratch: permanent causes end, a transient cause that cleared yields a validly re-authorized subscription, and H7 still checks every delivery | H5a |
 | 4187050292 | Trigger a pending hint for cross-process revocations | Fixed now. The cross-process revocation poller posts a lineage-matched `Changed` on `Capability(id)` for each affected subscription. That triggers a drain, and H7 revalidation ends the subscription with `SubscriptionEnded { Revoked }`, even when the subscription is otherwise quiet | section 12.5 |
-| 4187050296 | Bound resync bursts below the broadcast capacity | Fixed now. A resync burst emits at most `broadcast_capacity / 4` events per iteration, catalog and logging events first, and continues from a persisted `resync_cursor`. A lag during a burst resumes it instead of restarting it, so the burst converges and cannot re-trigger itself | A8 |
+| 4187050296 | Bound resync bursts below the broadcast capacity | Fixed now. A resync burst emits at most `broadcast_capacity / 4` events per iteration, catalog and logging events first, and continues from a `resync_cursor` retained in each consumer's record (clarified in round 32). A lag finishes the current pass and queues one full follow-up under A8; repeated lag is bounded by resync_max_passes | A8 |
 
 ### Codex review (PR #1174, round 18)
 
@@ -1110,6 +1111,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4197555214 | Declare the live authority-loss terminal reason | Fixed. A32 defines the shared closed TerminalReason enum, including both subscription failure reasons and their lifecycle-state mapping. Native v3 terminal fence/tombstone MACs, the intent journal and Part B Terminal use the same value; legacy verification, unknown-value refusal, crash replay and downgrade boundaries are explicit | A28, A31, A32; sections 9-11, 16; terminal-reason conformance cases |
+
+### PR #1174 review round 32
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4197876482 | Keep the resync cursor per consumer | Fixed. A7/A8 retain and advance resync_cursor only in its consumer_id record. A later consumer starts at the catalog prefix, follow-ups reset only that consumer, and detach cannot clear another pass. Shared emission keeps one session-wide chunk budget and fair service | A7, A8; section 10 staggered-consumer cases |
 
 ## Appendix A. FTL reference
 

@@ -517,14 +517,18 @@ P6 component operations (control plane and store, not `KernelOp`). Spec 1 sectio
   - `inspect`, `checkpoint`, `blob_put`, `blob_read` and `cancel` allow. They are local, credential-scoped state and cross no custody boundary.
   - Native tools behind `invoke` deny with `invoke`. These include mailbox send, spawn, `wait_children` and `settle_children` (W: `crates/products/chio-cli/PROCESS_RUNNER.md:211-218`). Workers observe child state through `inspect`.
 - **L2 work (contract anchors).** `Delegate`, `Select`, `Seal`, `Extend` and `Submit` deny. `Reconcile`, `Cancel` and every `WorkQueryV1` allow.
-- **L3 recovery.**
+- **L3 recovery.** Both supported recovery-command profiles are covered: legacy 1.0 (`RecoveryCommandBodyV1`, seven variants) and proposed 1.1 (`RecoveryCommandBodyV1_1`, eight variants; spec 2 section 8.1). They use one disposition table in the existing command owner. Each codec maps exhaustively into that table, without a wildcard or default disposition; the seven shared kinds have identical dispositions in both profiles.
   - `CreateWorkflow`, `SelectOffer`, `SubmitApproval`, `ResumeWorkflow`, `ReportDecision` and `/v1/recovery/review` deny.
   - `InspectWorkflow`, `CancelWorkflow`, proposed `RetireSuccessorReservation` (spec 2 O5), `/v1/recovery/settle` (`attach_provider_finality`) and `/v1/recovery/explain` allow. Explain is pure advisory, and settle records provider finality for effects that already happened.
 
 ```text
 forall kind in CrossingKind: stop_disposition(kind) defined     (exhaustive match, spec 1 R2)
 forall op in KernelOp, entry in entries(op): disposition(op, entry) defined (spec 1 census)
-forall v in RecoveryCommandBodyV1: disposition(v) defined       (exhaustive match)
+commands(1.0) = variants(RecoveryCommandBodyV1)
+commands(1.1) = variants(RecoveryCommandBodyV1_1)
+forall profile in supported_recovery_profiles, v in commands(profile):
+    disposition(profile, v) defined                            (exhaustive codec mapping and match)
+forall v in commands(1.0): disposition(1.0, v) = disposition(1.1, v)
 disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
 ```
 
@@ -1061,7 +1065,7 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - Constant-time credential comparison.
   - Host latch independence and its containment implication (S20).
   - Tenant attribution, including the `LOCAL_SYSTEM_TENANT_ID` refusal (S33).
-- **Disposition coverage.** Totality over `CrossingKind`, `KernelOp`, `RecoveryCommandBodyV1` and `GovernedResponseEffect` is enforced by exhaustive matches under spec 1 R2 (no wildcards), so it needs no proof tool. The real gap is the mapping from entry point to op, which is spec 1's generated census test.
+- **Disposition coverage.** Totality over `CrossingKind`, `KernelOp`, every supported recovery command body (`RecoveryCommandBodyV1` and `RecoveryCommandBodyV1_1`) and `GovernedResponseEffect` is enforced by exhaustive mappings and matches under spec 1 R2 (no wildcards or default disposition). The generated census covers each profile/variant pair through the actual wire decoder, `execute_recovery_command` and serving-writer gate, not only a disposition helper. With both profiles enabled, all seven legacy variants and all eight 1.1 variants must be covered: the five kinds listed as `deny` above refuse while stopped; `InspectWorkflow` and `CancelWorkflow` allow in both; 1.1 `RetireSuccessorReservation` allows under its exact-target `Cancel` checks. Compare the shared kinds' dispositions across profiles, and assert that adding an unmapped variant fails the census. Test a stop already present at tier 1 and a stop committed between tier 1 and the writer transaction for every denying kind; each refuses before mutation. Unknown or disabled profiles refuse before execution. The entry-point-to-op mapping remains spec 1's generated census responsibility.
 - **Conformance** (`chio-conformance`, EV11 evidence).
   - An operator stop through the mounted route and through the process-host socket.
   - A process restart with in-flight work comes up `ready_stopped`.
@@ -1300,6 +1304,12 @@ Open decisions:
 | Comment or finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-2-03 / 4190476138 (spec 8 side) | Reserving a successor can permanently supersede the root while recovery creation is stopped | Applied here. The `RecoveryControl` table gains spec 2's `reserve_successor_ordinal` with disposition `deny`, checked for the predecessor's and successor's scopes in the claim's writer transaction before any mutation. An identical replay is a readback and is allowed. Root supersession happens only in the stop-gated `CreateWorkflow` | section 7 `RecoveryControl` table |
+
+### PR #1174 review round 32
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4197876467 | Cover recovery-command profile 1.1 in stop checks | Fixed. One disposition table covers both closed wire enums through exhaustive codec mappings. The invariant and census quantify every supported profile/variant pair; wire-to-writer cases exercise both stop tiers, shared-kind equivalence and 1.1 retirement | Section 7.2; section 17 disposition coverage; spec 1 R5a |
 
 ## Appendix A. FTL reference
 
