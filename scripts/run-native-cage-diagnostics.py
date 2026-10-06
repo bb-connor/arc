@@ -20,8 +20,8 @@ import time
 import tomllib
 
 
-SOURCE_SHA = "aa6087bdd091f3b66c6ca57ac1550cdda23fbcbc"
-SETUP_SCRIPT_SHA256 = "c1d300380837d2b6ddcf0cebdeb7dbd79c7c4e66d2e6003741d328db3404293d"
+SOURCE_SHA = "09a3e50f43be444c69c93ddc841ac7d816d02349"
+SETUP_SCRIPT_SHA256 = "b76f943d6f99b69fc2b67459d529658a2c710ca28ce41714d758ab52d8440543"
 NATIVE_TARGET = "x86_64-unknown-linux-gnu"
 PACKAGES = ("chio-cage", "chio-cage-plan", "chio-cage-init")
 SUMMARY = re.compile(r"^test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out;", re.M)
