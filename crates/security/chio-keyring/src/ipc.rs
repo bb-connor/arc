@@ -1474,72 +1474,150 @@ impl std::ops::Deref for PrivateUnixListener {
 
 /// Bind a service socket in a directory only the service user can enter, so
 /// no other user can connect, even before the socket's own mode is set, or
-/// replace the socket. A lifecycle lock serializes instances, so one cannot
-/// unlink another's live socket.
+/// replace the socket. The directory is opened through the keyring's trusted
+/// directory chain, so no other user can swap it or any ancestor, and its
+/// descriptor is held for the lock, stale-socket and bind steps. bind(2) has
+/// no descriptor-relative form, so after binding the path must still resolve
+/// to the held directory and name a socket owned by the service user in it. A
+/// lifecycle lock serializes instances, so one cannot unlink another's live
+/// socket.
 #[cfg(unix)]
 pub fn bind_private_unix_listener(path: &Path) -> Result<PrivateUnixListener> {
-    use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
+    bind_private_unix_listener_with(path, || Ok(()))
+}
+
+#[cfg(unix)]
+fn bind_private_unix_listener_with(
+    path: &Path,
+    before_bind: impl FnOnce() -> std::io::Result<()>,
+) -> Result<PrivateUnixListener> {
     use std::os::unix::net::{UnixListener, UnixStream};
+
+    use rustix::fs::{AtFlags, FileType, FlockOperation, Mode, OFlags};
 
     if !path.is_absolute() {
         return Err(KeyringError::StateInvariant(
             "service socket path must be absolute",
         ));
     }
-    let parent = path.parent().ok_or(KeyringError::StateInvariant(
-        "service socket path has no parent directory",
-    ))?;
-    let parent_metadata = std::fs::symlink_metadata(parent)?;
-    if !parent_metadata.file_type().is_dir()
-        || parent_metadata.uid() != rustix::process::geteuid().as_raw()
-        || parent_metadata.mode() & 0o077 != 0
-    {
-        return Err(KeyringError::StateInvariant(
-            "service socket directory must be private to the service user",
-        ));
-    }
-    let mut lock_name = path
-        .file_name()
+    let parent_path = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
         .ok_or(KeyringError::StateInvariant(
-            "service socket path has no file name",
-        ))?
-        .to_os_string();
+            "service socket path has no parent directory",
+        ))?;
+    let socket_name = path.file_name().ok_or(KeyringError::StateInvariant(
+        "service socket path has no file name",
+    ))?;
+    let parent = open_private_socket_directory(parent_path)?;
+    let mut lock_name = socket_name.to_os_string();
     lock_name.push(".lock");
     let lifecycle_lock = std::fs::File::from(
-        rustix::fs::open(
-            path.with_file_name(lock_name),
-            rustix::fs::OFlags::RDWR
-                | rustix::fs::OFlags::CREATE
-                | rustix::fs::OFlags::NOFOLLOW
-                | rustix::fs::OFlags::CLOEXEC,
-            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        rustix::fs::openat(
+            &parent,
+            lock_name.as_os_str(),
+            OFlags::RDWR | OFlags::CREATE | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR,
         )
         .map_err(std::io::Error::from)?,
     );
-    rustix::fs::flock(
-        &lifecycle_lock,
-        rustix::fs::FlockOperation::NonBlockingLockExclusive,
-    )
-    .map_err(|_| KeyringError::StateInvariant("another service instance holds this socket"))?;
-    if let Ok(metadata) = std::fs::symlink_metadata(path) {
-        if !metadata.file_type().is_socket() || metadata.file_type().is_symlink() {
-            return Err(KeyringError::StateInvariant(
-                "service socket path is occupied by a non-socket",
-            ));
-        }
-        if UnixStream::connect(path).is_ok() {
-            return Err(KeyringError::StateInvariant(
-                "service socket already has a live listener",
-            ));
-        }
-        std::fs::remove_file(path)?;
+    if !lifecycle_lock.metadata()?.file_type().is_file() {
+        return Err(KeyringError::StateInvariant(
+            "service socket lock must be a regular file",
+        ));
     }
+    match rustix::fs::flock(&lifecycle_lock, FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => {}
+        Err(rustix::io::Errno::WOULDBLOCK) => {
+            return Err(KeyringError::StateInvariant(
+                "another service instance holds this socket",
+            ));
+        }
+        Err(error) => return Err(KeyringError::Io(error.into())),
+    }
+    match rustix::fs::statat(&parent, socket_name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(existing) => {
+            if FileType::from_raw_mode(existing.st_mode) != FileType::Socket {
+                return Err(KeyringError::StateInvariant(
+                    "service socket path is occupied by a non-socket",
+                ));
+            }
+            if UnixStream::connect(path).is_ok() {
+                return Err(KeyringError::StateInvariant(
+                    "service socket already has a live listener",
+                ));
+            }
+            rustix::fs::unlinkat(&parent, socket_name, AtFlags::empty())
+                .map_err(std::io::Error::from)?;
+        }
+        Err(rustix::io::Errno::NOENT) => {}
+        Err(error) => return Err(KeyringError::Io(error.into())),
+    }
+    before_bind()?;
     let listener = UnixListener::bind(path)?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    validate_bound_socket(&parent, parent_path, socket_name)?;
+    rustix::fs::chmodat(
+        &parent,
+        socket_name,
+        Mode::RUSR | Mode::WUSR,
+        AtFlags::empty(),
+    )
+    .map_err(std::io::Error::from)?;
     Ok(PrivateUnixListener {
         listener,
         _lifecycle_lock: lifecycle_lock,
     })
+}
+
+/// Open a socket directory through the keyring's trusted directory chain,
+/// which refuses symlinked components, foreign owners, untrusted write bits
+/// and extended ACL grants on every component. The directory itself must also
+/// be owned by the service user with no group or other access, because
+/// connecting needs only search permission on it.
+#[cfg(unix)]
+fn open_private_socket_directory(parent_path: &Path) -> Result<std::fs::File> {
+    use std::os::unix::fs::MetadataExt;
+
+    let directory =
+        crate::open_trusted_unix_directory_chain(parent_path).map_err(|error| match error {
+            KeyringError::StateInvariant(_) => KeyringError::StateInvariant(
+                "service socket directory path must consist of directories owned by the service or root that grant no untrusted write access or extended ACL",
+            ),
+            other => other,
+        })?;
+    let metadata = directory.metadata()?;
+    if metadata.uid() != rustix::process::geteuid().as_raw() || metadata.mode() & 0o077 != 0 {
+        return Err(KeyringError::StateInvariant(
+            "service socket directory must be private to the service user",
+        ));
+    }
+    Ok(directory)
+}
+
+/// Require the socket path to still resolve to the held directory and the
+/// bound name in it to be a socket owned by the service user.
+#[cfg(unix)]
+fn validate_bound_socket(
+    parent: &std::fs::File,
+    parent_path: &Path,
+    socket_name: &std::ffi::OsStr,
+) -> Result<()> {
+    let current = open_private_socket_directory(parent_path)?;
+    if !crate::unix_metadata_identity_matches(&parent.metadata()?, &current.metadata()?) {
+        return Err(KeyringError::StateInvariant(
+            "service socket directory changed while the socket was bound",
+        ));
+    }
+    let bound = rustix::fs::statat(parent, socket_name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
+        .map_err(std::io::Error::from)?;
+    if rustix::fs::FileType::from_raw_mode(bound.st_mode) != rustix::fs::FileType::Socket
+        || bound.st_uid != rustix::process::geteuid().as_raw()
+    {
+        return Err(KeyringError::StateInvariant(
+            "service socket path does not name the bound socket",
+        ));
+    }
+    Ok(())
 }
 
 /// A service connection with one absolute deadline for its request and
@@ -1593,3 +1671,6 @@ impl Write for DeadlineUnixStream {
         self.stream.flush()
     }
 }
+
+#[cfg(all(test, unix))]
+mod listener_tests;

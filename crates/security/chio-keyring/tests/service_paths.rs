@@ -1,7 +1,7 @@
 #![cfg(unix)]
 
 use std::fs::Permissions;
-use std::os::unix::fs::PermissionsExt as _;
+use std::os::unix::fs::{FileTypeExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -228,4 +228,84 @@ fn a_provisioning_record_reached_through_a_symlinked_directory_is_refused() {
     std::os::unix::fs::symlink(&real, &link).test_unwrap();
     let result = reopen(&link.join("witness.sqlite"));
     assert!(matches!(result, Err(KeyringError::Io(_))), "{result:?}");
+}
+
+fn bind(socket: &Path) -> chio_keyring::Result<()> {
+    chio_keyring::bind_private_unix_listener(socket).map(drop)
+}
+
+#[test]
+fn a_service_socket_in_a_private_trusted_directory_binds_privately_and_exclusively() {
+    let directory = support::private_tempdir().test_unwrap();
+    let run = private_directory(&directory, "run", 0o700);
+    let socket = run.join("witness.sock");
+    let listener = chio_keyring::bind_private_unix_listener(&socket).test_unwrap();
+    let metadata = std::fs::symlink_metadata(&socket).test_unwrap();
+    assert!(metadata.file_type().is_socket());
+    assert_eq!(metadata.permissions().mode() & 0o777, 0o600);
+    std::os::unix::net::UnixStream::connect(&socket).test_unwrap();
+    assert_refused_by_policy(bind(&socket));
+    drop(listener);
+    bind(&socket).test_unwrap();
+}
+
+#[test]
+fn a_service_socket_directory_other_users_can_search_is_refused() {
+    let directory = support::private_tempdir().test_unwrap();
+    let run = private_directory(&directory, "run", 0o711);
+    assert_refused_by_policy(bind(&run.join("witness.sock")));
+}
+
+#[test]
+fn a_service_socket_below_a_symlinked_ancestor_is_refused() {
+    let directory = support::private_tempdir().test_unwrap();
+    let real_run = private_directory(&directory, "real/run", 0o700);
+    let link = support::trusted_temp_path(&directory, "link");
+    std::os::unix::fs::symlink(support::trusted_temp_path(&directory, "real"), &link).test_unwrap();
+    let result = bind(&link.join("run").join("witness.sock"));
+    assert!(matches!(result, Err(KeyringError::Io(_))), "{result:?}");
+    assert!(!real_run.join("witness.sock").exists());
+}
+
+#[test]
+fn a_service_socket_below_a_group_or_world_writable_ancestor_is_refused() {
+    let directory = support::private_tempdir().test_unwrap();
+    let shared = private_directory(&directory, "shared", 0o700);
+    let run = private_directory(&directory, "shared/run", 0o700);
+    for mode in [0o770, 0o707] {
+        std::fs::set_permissions(&shared, Permissions::from_mode(mode)).test_unwrap();
+        let result = bind(&run.join("witness.sock"));
+        assert!(
+            matches!(result, Err(KeyringError::StateInvariant(_))),
+            "ancestor mode {mode:o}: {result:?}"
+        );
+    }
+}
+
+#[test]
+fn a_service_socket_directory_with_an_acl_grant_is_refused() {
+    let directory = support::private_tempdir().test_unwrap();
+    let run = private_directory(&directory, "run", 0o700);
+    if !support::grant_foreign_acl(&run).test_unwrap() {
+        eprintln!("skipped: this host has no ACL tool");
+        return;
+    }
+    let mode = std::fs::symlink_metadata(&run)
+        .test_unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o077, 0);
+    assert_refused_by_policy(bind(&run.join("witness.sock")));
+}
+
+#[test]
+fn a_service_socket_below_an_ancestor_with_an_acl_grant_is_refused() {
+    let directory = support::private_tempdir().test_unwrap();
+    let outer = private_directory(&directory, "outer", 0o755);
+    let run = private_directory(&directory, "outer/run", 0o700);
+    if !support::grant_foreign_acl(&outer).test_unwrap() {
+        eprintln!("skipped: this host has no ACL tool");
+        return;
+    }
+    assert_refused_by_policy(bind(&run.join("witness.sock")));
 }
