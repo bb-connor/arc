@@ -2,6 +2,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNegotiation};
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
@@ -276,6 +277,11 @@ pub fn verify_capability_pure(
 /// envelope, runs the embedded-key signature check, optionally pins the
 /// signer to a trusted-issuer set, and returns a structured outcome.
 ///
+/// The envelope is decoded with the signed-wire contract: a duplicate
+/// object key at any depth, or a number token that would change
+/// representation, rejects as `invalid_receipt_envelope` before any field
+/// is read.
+///
 /// `trusted_issuers` must contain the signer before `ok` can be true.
 /// An empty slice means "signature-only verification": the signature
 /// and parameter hash fields still report their mathematical status,
@@ -284,12 +290,13 @@ pub fn verify_receipt_pure(
     envelope: &[u8],
     trusted_issuers: &[PublicKey],
 ) -> Result<VerifyReceiptResultJson, BindingError> {
-    let receipt: ChioReceipt = serde_json::from_slice(envelope).map_err(|error| {
-        BindingError::new(
-            "invalid_receipt_envelope",
-            format!("could not parse receipt envelope as JSON: {error}"),
-        )
-    })?;
+    let receipt: ChioReceipt = core::str::from_utf8(envelope)
+        .map_err(|error| invalid_receipt_envelope(&error))
+        .and_then(|text| {
+            UntrustedJsonText::new(text)
+                .decode_signed()
+                .map_err(|error| invalid_receipt_envelope(&error))
+        })?;
 
     let signer_key_hex = receipt.kernel_key.to_hex();
     let receipt_id = receipt.id.clone();
@@ -353,6 +360,13 @@ pub fn verify_receipt_pure(
         signature_valid,
         signer_trusted,
     })
+}
+
+fn invalid_receipt_envelope(error: &dyn core::fmt::Display) -> BindingError {
+    BindingError::new(
+        "invalid_receipt_envelope",
+        format!("could not parse receipt envelope as JSON: {error}"),
+    )
 }
 
 fn capability_error_message(error: &chio_kernel_core::CapabilityError) -> String {
