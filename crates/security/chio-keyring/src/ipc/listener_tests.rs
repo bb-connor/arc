@@ -21,8 +21,25 @@ fn private_root() -> (tempfile::TempDir, PathBuf) {
     (directory, root)
 }
 
+/// Bind with no hooks. A child process another test spawns holds a copy of
+/// every descriptor until it execs, so a lock this test just released can
+/// still be held for a moment; only that refusal is retried.
+fn bind_listener(socket: &Path) -> crate::Result<super::PrivateUnixListener> {
+    let started = std::time::Instant::now();
+    loop {
+        match bind_private_unix_listener_with(socket, ListenerHooks::default()) {
+            Err(KeyringError::StateInvariant("another service instance holds this socket"))
+                if started.elapsed() < std::time::Duration::from_secs(5) =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            result => return result,
+        }
+    }
+}
+
 fn bind(socket: &Path) -> crate::Result<()> {
-    bind_private_unix_listener_with(socket, ListenerHooks::default()).map(drop)
+    bind_listener(socket).map(drop)
 }
 
 fn inode(path: &Path) -> u64 {
@@ -35,9 +52,22 @@ fn lock_path(socket: &Path) -> PathBuf {
     socket.with_file_name(name)
 }
 
-/// A socket file with no listener, as a crashed holder leaves it.
+/// A socket file with no listener, as a crashed holder leaves it. The socket
+/// is bound but never listens, so a child process another test spawns cannot
+/// keep it listening by holding a copy of its descriptor.
 fn stale_socket(socket: &Path) -> u64 {
-    drop(std::os::unix::net::UnixListener::bind(socket).test_unwrap());
+    let unbound = rustix::net::socket(
+        rustix::net::AddressFamily::UNIX,
+        rustix::net::SocketType::STREAM,
+        None,
+    )
+    .test_unwrap();
+    rustix::net::bind(
+        &unbound,
+        &rustix::net::SocketAddrUnix::new(socket).test_unwrap(),
+    )
+    .test_unwrap();
+    drop(unbound);
     std::fs::set_permissions(socket, Permissions::from_mode(0o600)).test_unwrap();
     inode(socket)
 }
@@ -115,7 +145,7 @@ fn a_recorded_stale_generation_is_removed_and_rebound() {
     record_current_generation(&socket);
     let recorded = std::fs::read(lock_path(&socket)).test_unwrap();
 
-    let listener = bind_private_unix_listener_with(&socket, ListenerHooks::default()).test_unwrap();
+    let listener = bind_listener(&socket).test_unwrap();
     assert_ne!(inode(&socket), stale);
     let published = std::fs::read(lock_path(&socket)).test_unwrap();
     assert_eq!(published.len(), 65);
@@ -304,7 +334,7 @@ fn dropping_a_listener_leaves_a_name_it_no_longer_holds() {
     let (_directory, root) = private_root();
     let socket = root.join("witness.sock");
 
-    let listener = bind_private_unix_listener_with(&socket, ListenerHooks::default()).test_unwrap();
+    let listener = bind_listener(&socket).test_unwrap();
     let beside = root.join("replacement.sock");
     drop(std::os::unix::net::UnixListener::bind(&beside).test_unwrap());
     std::fs::rename(&beside, &socket).test_unwrap();
@@ -313,7 +343,7 @@ fn dropping_a_listener_leaves_a_name_it_no_longer_holds() {
     assert_eq!(inode(&socket), replacement);
     std::fs::remove_file(&socket).test_unwrap();
 
-    let listener = bind_private_unix_listener_with(&socket, ListenerHooks::default()).test_unwrap();
+    let listener = bind_listener(&socket).test_unwrap();
     std::fs::remove_file(&socket).test_unwrap();
     std::os::unix::fs::symlink(&beside, &socket).test_unwrap();
     drop(listener);
@@ -326,9 +356,7 @@ fn dropping_a_listener_leaves_a_name_it_no_longer_holds() {
 #[test]
 fn the_listener_directory_and_lock_close_on_exec() {
     let (_directory, root) = private_root();
-    let listener =
-        bind_private_unix_listener_with(&root.join("witness.sock"), ListenerHooks::default())
-            .test_unwrap();
+    let listener = bind_listener(&root.join("witness.sock")).test_unwrap();
     assert_eq!(
         listener.descriptors_close_on_exec().test_unwrap(),
         [true; 3]
