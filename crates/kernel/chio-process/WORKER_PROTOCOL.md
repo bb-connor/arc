@@ -98,6 +98,11 @@ encode large application integers as strings for portable JS handling. The
 clients return receipts without independently verifying their signatures.
 The Rust qualification test verifies every returned tool receipt.
 
+An invoke result whose output would exceed the 8 MiB response frame returns
+`ok: true` with its `request_id`, `verdict`, `terminal_state` and `receipt_json`,
+`output: null` and `output_withheld: "too_large"`. A retry replays the same
+outcome, so the output itself cannot be recovered through this protocol.
+
 Retry a failed invocation with the same operation key, identical arguments and
 identical governed intent. Changing or removing a bound intent returns `conflict`.
 Neither client automatically retries. Timeouts, disconnects, response-size
