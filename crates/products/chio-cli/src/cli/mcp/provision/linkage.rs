@@ -23,6 +23,7 @@ const DT_NULL: u64 = 0;
 const DT_NEEDED: u64 = 1;
 const DT_STRTAB: u64 = 5;
 const DT_STRSZ: u64 = 10;
+const DT_SONAME: u64 = 14;
 
 /// How an executable expects to be loaded.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,6 +121,70 @@ fn range(content: &[u8], offset: u64, size: u64) -> Option<&[u8]> {
 pub(crate) fn inspect_executable_linkage(
     content: &[u8],
 ) -> Result<ExecutableLinkage, LinkageError> {
+    let (position_independent, segments) = program_segments(content)?;
+
+    let mut interpreter = None;
+    for segment in segments.iter().filter(|segment| segment.kind == PT_INTERP) {
+        if interpreter.is_some() {
+            return Err(LinkageError::Malformed("interpreter segment"));
+        }
+        let bytes = range(content, segment.offset, segment.file_size)
+            .ok_or(LinkageError::Truncated("interpreter segment"))?;
+        let path =
+            terminated_string(bytes).ok_or(LinkageError::Malformed("interpreter segment"))?;
+        if !path.starts_with('/') {
+            return Err(LinkageError::Malformed("interpreter path"));
+        }
+        interpreter = Some(PathBuf::from(path));
+    }
+
+    let mut needed = Vec::new();
+    for segment in segments.iter().filter(|segment| segment.kind == PT_DYNAMIC) {
+        let dynamic = dynamic_entries(content, segment)?;
+        if dynamic.needed.is_empty() {
+            continue;
+        }
+        let strings = dynamic_strings(content, &segments, &dynamic)?;
+        for offset in dynamic.needed {
+            needed.push(string_at(strings, offset)?.to_string());
+        }
+    }
+
+    if interpreter.is_none() && needed.is_empty() {
+        Ok(ExecutableLinkage::Static {
+            position_independent,
+        })
+    } else {
+        Ok(ExecutableLinkage::Dynamic {
+            interpreter,
+            needed,
+        })
+    }
+}
+
+/// The DT_SONAME a shared object answers to, if it declares one.
+pub(crate) fn shared_object_name(content: &[u8]) -> Result<Option<String>, LinkageError> {
+    let (_, segments) = program_segments(content)?;
+    let mut soname = None;
+    for segment in segments.iter().filter(|segment| segment.kind == PT_DYNAMIC) {
+        let dynamic = dynamic_entries(content, segment)?;
+        let offset = match dynamic.soname.as_slice() {
+            [] => continue,
+            [offset] => *offset,
+            _ => return Err(LinkageError::Malformed("shared object name")),
+        };
+        let strings = dynamic_strings(content, &segments, &dynamic)?;
+        if soname
+            .replace(string_at(strings, offset)?.to_string())
+            .is_some()
+        {
+            return Err(LinkageError::Malformed("shared object name"));
+        }
+    }
+    Ok(soname)
+}
+
+fn program_segments(content: &[u8]) -> Result<(bool, Vec<Segment>), LinkageError> {
     let header = content
         .get(..ELF_HEADER_BYTES)
         .ok_or(LinkageError::Truncated("header"))?;
@@ -155,80 +220,70 @@ pub(crate) fn inspect_executable_linkage(
             file_size: u64_at(entry, 32).ok_or(LinkageError::Truncated("program header"))?,
         });
     }
+    Ok((position_independent, segments))
+}
 
-    let mut interpreter = None;
-    for segment in segments.iter().filter(|segment| segment.kind == PT_INTERP) {
-        if interpreter.is_some() {
-            return Err(LinkageError::Malformed("interpreter segment"));
-        }
-        let bytes = range(content, segment.offset, segment.file_size)
-            .ok_or(LinkageError::Truncated("interpreter segment"))?;
-        let path =
-            terminated_string(bytes).ok_or(LinkageError::Malformed("interpreter segment"))?;
-        if !path.starts_with('/') {
-            return Err(LinkageError::Malformed("interpreter path"));
-        }
-        interpreter = Some(PathBuf::from(path));
-    }
+/// The name-bearing entries of one dynamic table, read up to DT_NULL.
+struct DynamicEntries {
+    needed: Vec<u64>,
+    soname: Vec<u64>,
+    string_table: Option<u64>,
+    string_table_size: Option<u64>,
+}
 
-    let mut needed = Vec::new();
-    for segment in segments.iter().filter(|segment| segment.kind == PT_DYNAMIC) {
-        let table = range(content, segment.offset, segment.file_size)
-            .ok_or(LinkageError::Truncated("dynamic segment"))?;
-        let mut needed_offsets = Vec::new();
-        let mut string_table = None;
-        let mut string_table_size = None;
-        for (index, entry) in table.chunks_exact(16).enumerate() {
-            if index >= MAX_DYNAMIC_ENTRIES {
-                return Err(LinkageError::Malformed("dynamic table"));
-            }
-            let tag = u64_at(entry, 0).ok_or(LinkageError::Truncated("dynamic entry"))?;
-            let value = u64_at(entry, 8).ok_or(LinkageError::Truncated("dynamic entry"))?;
-            match tag {
-                DT_NULL => break,
-                DT_NEEDED => needed_offsets.push(value),
-                DT_STRTAB => string_table = Some(value),
-                DT_STRSZ => string_table_size = Some(value),
-                _ => {}
-            }
+fn dynamic_entries(content: &[u8], segment: &Segment) -> Result<DynamicEntries, LinkageError> {
+    let table = range(content, segment.offset, segment.file_size)
+        .ok_or(LinkageError::Truncated("dynamic segment"))?;
+    let mut entries = DynamicEntries {
+        needed: Vec::new(),
+        soname: Vec::new(),
+        string_table: None,
+        string_table_size: None,
+    };
+    for (index, entry) in table.chunks_exact(16).enumerate() {
+        if index >= MAX_DYNAMIC_ENTRIES {
+            return Err(LinkageError::Malformed("dynamic table"));
         }
-        if needed_offsets.is_empty() {
-            continue;
-        }
-        let (Some(address), Some(size)) = (string_table, string_table_size) else {
-            return Err(LinkageError::Malformed("dynamic string table"));
-        };
-        let file_offset = segments
-            .iter()
-            .filter(|segment| segment.kind == PT_LOAD)
-            .find_map(|segment| {
-                let relative = address.checked_sub(segment.address)?;
-                (relative < segment.file_size).then(|| segment.offset.checked_add(relative))?
-            })
-            .ok_or(LinkageError::Malformed("dynamic string table"))?;
-        let strings = range(content, file_offset, size)
-            .ok_or(LinkageError::Truncated("dynamic string table"))?;
-        for offset in needed_offsets {
-            let start = usize::try_from(offset)
-                .ok()
-                .filter(|start| *start < strings.len());
-            let name = start
-                .and_then(|start| terminated_string(&strings[start..]))
-                .ok_or(LinkageError::Malformed("shared object name"))?;
-            needed.push(name.to_string());
+        let tag = u64_at(entry, 0).ok_or(LinkageError::Truncated("dynamic entry"))?;
+        let value = u64_at(entry, 8).ok_or(LinkageError::Truncated("dynamic entry"))?;
+        match tag {
+            DT_NULL => break,
+            DT_NEEDED => entries.needed.push(value),
+            DT_SONAME => entries.soname.push(value),
+            DT_STRTAB => entries.string_table = Some(value),
+            DT_STRSZ => entries.string_table_size = Some(value),
+            _ => {}
         }
     }
+    Ok(entries)
+}
 
-    if interpreter.is_none() && needed.is_empty() {
-        Ok(ExecutableLinkage::Static {
-            position_independent,
+/// The dynamic string table, located through the PT_LOAD that maps it.
+fn dynamic_strings<'a>(
+    content: &'a [u8],
+    segments: &[Segment],
+    dynamic: &DynamicEntries,
+) -> Result<&'a [u8], LinkageError> {
+    let (Some(address), Some(size)) = (dynamic.string_table, dynamic.string_table_size) else {
+        return Err(LinkageError::Malformed("dynamic string table"));
+    };
+    let file_offset = segments
+        .iter()
+        .filter(|segment| segment.kind == PT_LOAD)
+        .find_map(|segment| {
+            let relative = address.checked_sub(segment.address)?;
+            (relative < segment.file_size).then(|| segment.offset.checked_add(relative))?
         })
-    } else {
-        Ok(ExecutableLinkage::Dynamic {
-            interpreter,
-            needed,
-        })
-    }
+        .ok_or(LinkageError::Malformed("dynamic string table"))?;
+    range(content, file_offset, size).ok_or(LinkageError::Truncated("dynamic string table"))
+}
+
+fn string_at(strings: &[u8], offset: u64) -> Result<&str, LinkageError> {
+    usize::try_from(offset)
+        .ok()
+        .filter(|start| *start < strings.len())
+        .and_then(|start| terminated_string(&strings[start..]))
+        .ok_or(LinkageError::Malformed("shared object name"))
 }
 
 fn terminated_string(bytes: &[u8]) -> Option<&str> {
@@ -286,6 +341,65 @@ pub(crate) mod tests {
 
     fn body_offset(segment_count: usize) -> u64 {
         (ELF_HEADER_BYTES + segment_count * PROGRAM_HEADER_BYTES) as u64
+    }
+
+    /// A position-independent image with an optional interpreter, the
+    /// named DT_NEEDED entries and an optional DT_SONAME.
+    pub(crate) fn synthetic_dynamic_elf(
+        interpreter: Option<&str>,
+        needed: &[&str],
+        soname: Option<&str>,
+    ) -> Vec<u8> {
+        const BASE: u64 = 0x2000;
+        let interpreter_bytes = interpreter
+            .map(|path| format!("{path}\0").into_bytes())
+            .unwrap_or_default();
+        let mut strings = vec![0_u8];
+        let mut entries = Vec::new();
+        for (tag, name) in needed
+            .iter()
+            .map(|name| (DT_NEEDED, *name))
+            .chain(soname.map(|name| (DT_SONAME, name)))
+        {
+            entries.push((tag, strings.len() as u64));
+            strings.extend_from_slice(name.as_bytes());
+            strings.push(0);
+        }
+        entries.push((DT_STRTAB, BASE + interpreter_bytes.len() as u64));
+        entries.push((DT_STRSZ, strings.len() as u64));
+        entries.push((DT_NULL, 0));
+        let mut dynamic = Vec::new();
+        for (tag, value) in entries {
+            dynamic.extend_from_slice(&tag.to_le_bytes());
+            dynamic.extend_from_slice(&value.to_le_bytes());
+        }
+        let start = body_offset(if interpreter.is_some() { 3 } else { 2 });
+        let dynamic_offset = (interpreter_bytes.len() + strings.len()) as u64;
+        let mut segments = Vec::new();
+        if interpreter.is_some() {
+            segments.push(SyntheticSegment {
+                kind: PT_INTERP,
+                offset: start,
+                address: BASE,
+                file_size: interpreter_bytes.len() as u64,
+            });
+        }
+        segments.push(SyntheticSegment {
+            kind: PT_LOAD,
+            offset: start,
+            address: BASE,
+            file_size: dynamic_offset + dynamic.len() as u64,
+        });
+        segments.push(SyntheticSegment {
+            kind: PT_DYNAMIC,
+            offset: start + dynamic_offset,
+            address: BASE + dynamic_offset,
+            file_size: dynamic.len() as u64,
+        });
+        let mut body = interpreter_bytes;
+        body.extend_from_slice(&strings);
+        body.extend_from_slice(&dynamic);
+        synthetic_elf(ELF_TYPE_SHARED_OBJECT, &segments, &body)
     }
 
     #[test]
@@ -371,6 +485,28 @@ pub(crate) mod tests {
         assert_eq!(
             linkage.to_string(),
             "dynamically linked through /lib/ld-linux-aarch64.so.1 needing libc.so.6, libm.so.6"
+        );
+    }
+
+    #[test]
+    fn shared_objects_report_their_soname() {
+        let library = synthetic_dynamic_elf(None, &["libc.so.6"], Some("libchio.so.1"));
+        assert_eq!(
+            shared_object_name(&library),
+            Ok(Some("libchio.so.1".to_string()))
+        );
+        assert_eq!(
+            inspect_executable_linkage(&library),
+            Ok(ExecutableLinkage::Dynamic {
+                interpreter: None,
+                needed: vec!["libc.so.6".to_string()],
+            })
+        );
+        let unnamed = synthetic_dynamic_elf(Some("/lib/ld.so"), &["libc.so.6"], None);
+        assert_eq!(shared_object_name(&unnamed), Ok(None));
+        assert_eq!(
+            shared_object_name(b"!<arch>\n"),
+            Err(LinkageError::Truncated("header"))
         );
     }
 
