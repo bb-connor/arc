@@ -25,6 +25,8 @@ mod discovery;
 mod linkage;
 #[path = "provision/reference_runtime.rs"]
 mod reference_runtime;
+#[path = "provision/shared_objects.rs"]
+mod shared_objects;
 
 pub(crate) use reference_runtime::{
     cmd_provision_reference_runtime, ProvisionReferenceRuntimeArgs,
@@ -541,37 +543,37 @@ fn require_static_position_independent(path: &Path, label: &str) -> Result<(), C
     }
 }
 
-/// A target the cage launches is static, or declares its interpreter and
-/// every shared object it needs as runtime files.
+/// A target the cage launches is static, or declares as runtime files its
+/// interpreter and a provider for every DT_NEEDED entry.
 fn require_target_linkage_declared(
     target: &Path,
     runtime_files: &BTreeSet<PathBuf>,
 ) -> Result<(), CliError> {
     let image =
         read_bounded_regular_file(target, MAX_EXECUTABLE_BYTES, false, "target executable")?;
-    match linkage::inspect_executable_linkage(&image) {
-        Ok(linkage::ExecutableLinkage::Static { .. }) => Ok(()),
-        Ok(linkage::ExecutableLinkage::Dynamic {
-            interpreter,
-            needed,
-        }) => {
-            let declared_interpreter = interpreter
-                .as_ref()
-                .map(|path| declared_runtime_interpreter(path, runtime_files))
-                .transpose()?
-                .unwrap_or(true);
-            if runtime_files.is_empty() || !declared_interpreter {
-                return Err(CliError::cli_other_error(format!(
-                    "target executable is {}; declare its interpreter and shared objects with --runtime-file, or build it static",
-                    linkage::ExecutableLinkage::Dynamic { interpreter, needed }
-                )));
-            }
-            Ok(())
+    let linkage = linkage::inspect_executable_linkage(&image)
+        .map_err(|error| CliError::cli_other_error(format!("target executable: {error}")))?;
+    let linkage::ExecutableLinkage::Dynamic {
+        interpreter,
+        needed,
+    } = &linkage
+    else {
+        return Ok(());
+    };
+    let mut missing = Vec::new();
+    if let Some(interpreter) = interpreter {
+        if !declared_runtime_interpreter(interpreter, runtime_files)? {
+            missing.push(interpreter.display().to_string());
         }
-        Err(error) => Err(CliError::cli_other_error(format!(
-            "target executable: {error}"
-        ))),
     }
+    missing.extend(shared_objects::undeclared(needed, runtime_files)?);
+    if missing.is_empty() {
+        return Ok(());
+    }
+    Err(CliError::cli_other_error(format!(
+        "target executable is {linkage}; no --runtime-file provides {}; declare its interpreter and shared objects with --runtime-file, or build it static",
+        missing.join(", ")
+    )))
 }
 
 fn declared_runtime_interpreter(
@@ -588,30 +590,8 @@ fn declared_runtime_interpreter(
 }
 
 #[cfg(all(test, unix))]
-mod runtime_linkage_tests {
-    use super::*;
-
-    #[test]
-    fn elf_loader_alias_requires_the_exact_declared_file() -> Result<(), Box<dyn std::error::Error>>
-    {
-        let root = tempfile::tempdir()?;
-        let loader = root.path().join("loader");
-        let other = root.path().join("other");
-        let alias = root.path().join("interpreter");
-        std::fs::write(&loader, b"loader")?;
-        std::fs::write(&other, b"other")?;
-        std::os::unix::fs::symlink(&loader, &alias)?;
-        let declared = BTreeSet::from([loader.canonicalize()?]);
-        assert!(declared_runtime_interpreter(&alias, &declared)?);
-        assert!(!declared_runtime_interpreter(&alias, &BTreeSet::new())?);
-        std::fs::remove_file(&alias)?;
-        std::os::unix::fs::symlink(&other, &alias)?;
-        assert!(!declared_runtime_interpreter(&alias, &declared)?);
-        std::fs::remove_file(&alias)?;
-        assert!(declared_runtime_interpreter(&alias, &declared).is_err());
-        Ok(())
-    }
-}
+#[path = "provision/runtime_linkage_tests.rs"]
+mod runtime_linkage_tests;
 
 fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
     let parent = inputs.output_directory.parent().ok_or_else(|| {
