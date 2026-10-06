@@ -4182,6 +4182,528 @@
       "observed_result": "Actual repaired-source offline ARM receipt verifier build and binary hash; no physical x86 claim.",
       "bytes": 566,
       "sha256": "1114af2d4889aee1ba93011ba24587dd6982c024cbd81b48e5969fbf223bedf5"
+    },
+    {
+      "log": "15d5b373a8-adversarial-evidence-job.log.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 264919,
+      "sha256": "2bdeecf1b586cfc1bbde94ade2f17b2831cba5b437a0b7220c131aa14127acbe"
+    },
+    {
+      "log": "15d5b373a8-advisories-job.log.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 79805,
+      "sha256": "dbdfa9e0f346f3d1d5965960de5e57ff377b0797a0f1cf736d8b25c42a13262a"
+    },
+    {
+      "log": "15d5b373a8-checked-output-thread-resolution.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 535,
+      "sha256": "c5acab85190c2c2ddc88aa9283a6d7150e8478e517f8f86a7702c574136e64a5"
+    },
+    {
+      "log": "15d5b373a8-ci-before-continuation-freeze.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 47913,
+      "sha256": "ba623ed1935d1e4659838ffefe0c6e23f62170d4381361c23c47e4d95e64c31b"
+    },
+    {
+      "log": "15d5b373a8-cve-artifact-metadata.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 705,
+      "sha256": "3e774fd6371e221e9075899025391afe03c64a4b9525d814df02b53aa457f793"
+    },
+    {
+      "log": "15d5b373a8-cve-artifact.zip.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 16500,
+      "sha256": "d4530326cc0f6361cc86012b78b9cc865839a80a114f35274c5317fe5834796e"
+    },
+    {
+      "log": "15d5b373a8-osv-scanner-unfiltered.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 13520,
+      "sha256": "9b36eabb5f6c3454d243fbb1d5cfdef2daee76616360be333d4601a360ebc29b"
+    },
+    {
+      "log": "15d5b373a8-osv-scanner.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 13520,
+      "sha256": "9b36eabb5f6c3454d243fbb1d5cfdef2daee76616360be333d4601a360ebc29b"
+    },
+    {
+      "log": "15d5b373a8-portable-security-contract-job.log.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 164746,
+      "sha256": "71f90a0dd07e3a59b41a62b09ffb5c1a757b5059952b5bc5fd923b7f613cf5a5"
+    },
+    {
+      "log": "15d5b373a8-real-linux-enforcement-job.log.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 261360,
+      "sha256": "f8602bd6aa456aaedc2abbdb89b20dc6611a7bf478c70ba14968ce2beca5eba9"
+    },
+    {
+      "log": "15d5b373a8-review-continuation-checkpoint.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 98654,
+      "sha256": "19771fb08390b43eb83a342e9e1fe6037522519ced608a75ce080c61a9a95422"
+    },
+    {
+      "log": "15d5b373a8-review-continuation-checkpoint.log.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 65580,
+      "sha256": "79218dbebc61a4be6ab7c5cc4d89a4205575e3554d529c6f984f80d6a7c3bdbc"
+    },
+    {
+      "log": "15d5b373a8-reviews-after-greptile.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 98654,
+      "sha256": "19771fb08390b43eb83a342e9e1fe6037522519ced608a75ce080c61a9a95422"
+    },
+    {
+      "log": "15d5b373a8-reviews-after-greptile.log.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 65580,
+      "sha256": "79218dbebc61a4be6ab7c5cc4d89a4205575e3554d529c6f984f80d6a7c3bdbc"
+    },
+    {
+      "log": "15d5b373a8-reviews-initial.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 96296,
+      "sha256": "44eeb7a471f9e8c4c4269ba1f259d27af63a647fc8e9ea1ed048d3c3b979a8f4"
+    },
+    {
+      "log": "15d5b373a8-workflows-initial.json.gz",
+      "observed_result": "Authenticated preceding 15d5 hosted/review evidence; OSV findings and any pending/failed native checks retain historical candidate scope, not final-head acceptance.",
+      "bytes": 588820,
+      "sha256": "b4454fcd4712c012acb9a8111bd82fa9893e44ca497b698cb60e947f5a1c2204"
+    },
+    {
+      "log": "a2a-continuation-confirmed-red-continuation.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2692,
+      "sha256": "675567e10d6e6efad4f217fd6b23ddfe566ac3bd00528062d9a69f35ee7c57e5"
+    },
+    {
+      "log": "a2a-continuation-confirmed-red-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 17,
+      "sha256": "8118fe5a727f3c8b2be061ba6ff206d56f258e58274e293fa3ccbed3be2d204d"
+    },
+    {
+      "log": "a2a-continuation-confirmed-red.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 823489,
+      "sha256": "9c17b5e28812fce57750ea85ca09124dd8f47cf0096837dbf7d19e409f4cea54"
+    },
+    {
+      "log": "a2a-continuation-consumer-contract-first.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 197,
+      "sha256": "71b4687b438718adbd0f2be9bc67d353e9fc03e5d8084d7d53ff46d3057b66ec"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green-diff.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green-format.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green-hygiene.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 52024,
+      "sha256": "52d77640b283aeec0cd0edd3646c27dc44b2b8d3ae62bf73dbc5e66c571053a4"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green-proof-check.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green-proof-refresh.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 56,
+      "sha256": "badfba535b4d3abc71c578ca41a8ac9b4ad83381b99a94851ada33e3635bb4f4"
+    },
+    {
+      "log": "a2a-continuation-coverage-final-green.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 825859,
+      "sha256": "bc2201f1a0763ea174d2aae732a546a0b469c58bcd14213681a028dfb23e7094"
+    },
+    {
+      "log": "a2a-continuation-family-red-continuation-family.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 4272,
+      "sha256": "f69e47872b628e02dd5b2d832b0e850ce8a494036dbbf1e014694c1bbf52aa11"
+    },
+    {
+      "log": "a2a-continuation-family-red-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 24,
+      "sha256": "740c09c28766dee7d1a2ef8dbabb6f29f7c568eed68cd8ab58131db6a827f49e"
+    },
+    {
+      "log": "a2a-continuation-family-red.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 823429,
+      "sha256": "0165175a32a0a67ec42a8d5775a94279827121a8fba9cef1956f803b4207811a"
+    },
+    {
+      "log": "a2a-continuation-final-green-adapter-clippy.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 1906,
+      "sha256": "14470a8a6a754170546efe11845572cec5ecb41556b20f0c53f36557a09011a9"
+    },
+    {
+      "log": "a2a-continuation-final-green-adapter.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 13056,
+      "sha256": "48d237547b499ad8ef12ca7777a12e15ec87d6ae7823d0fdce753cf9923e63cc"
+    },
+    {
+      "log": "a2a-continuation-final-green-advisory-gate-controls.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 100,
+      "sha256": "d14568f6b53073a1ed349beec1ae1c5484e5f724b0d5ee619921bc9329553e95"
+    },
+    {
+      "log": "a2a-continuation-final-green-consumer-clippy.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 6491,
+      "sha256": "4470a81eba2e72a95fcdb4a77cf00c89ef279767c90720b74c0ac1b0243ff650"
+    },
+    {
+      "log": "a2a-continuation-final-green-consumer-contract.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 197,
+      "sha256": "71b4687b438718adbd0f2be9bc67d353e9fc03e5d8084d7d53ff46d3057b66ec"
+    },
+    {
+      "log": "a2a-continuation-final-green-consumer-prefix.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 5932,
+      "sha256": "5e21d65c8da7db8175d43b95d06fdf4cec7720a3d8fdc9be76a2838dab71ad7c"
+    },
+    {
+      "log": "a2a-continuation-final-green-consumer.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 3028,
+      "sha256": "c7860e983cac37d16bbd12648a75f830fd404d684d75d18a8fe7b1ac9435997b"
+    },
+    {
+      "log": "a2a-continuation-final-green-edge-clippy.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2220,
+      "sha256": "50d09a2ef27cd270f250dc133de89ece4922e503a73ef31b2b77f9274d9e4abe"
+    },
+    {
+      "log": "a2a-continuation-final-green-edge.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 10564,
+      "sha256": "886463d89ccab4a073248600900c76810e0459530fcdc69a5e06d5282edaaf1c"
+    },
+    {
+      "log": "a2a-continuation-final-green-mirrors.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "a2a-continuation-final-green-npm-advisory-regressions.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 743,
+      "sha256": "709a9a45ca5cf56e67e7820815e504dc5442a10d7e99b82333edac56221fe5eb"
+    },
+    {
+      "log": "a2a-continuation-final-green-npm-fork-regressions.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 1298,
+      "sha256": "f0f7663670cd28cc1ac7cb4e75b4ff4d307506a191a76ad0fc13670c96e359e8"
+    },
+    {
+      "log": "a2a-continuation-final-green-npm-source-controls.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 102,
+      "sha256": "a405de326cbba434c19b13cd859da280fa16936eeb0d3bbc5a7bc0ebf0b86865"
+    },
+    {
+      "log": "a2a-continuation-final-green-npm-sources.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 246,
+      "sha256": "89e155510efdbf828a36a1938a3008b59d766273b7ae7a52f97eef5f4b98a71b"
+    },
+    {
+      "log": "a2a-continuation-final-green-osv-unfiltered.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 124,
+      "sha256": "54345d5194d238b6017d0f3181f392109ce35023cc6b4bdfa8c134943dcb578e"
+    },
+    {
+      "log": "a2a-continuation-final-green-osv-unfiltered.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2284,
+      "sha256": "616abb849a5ee0666856135ee906fdae3f01c096915742b6589d6ae31f514866"
+    },
+    {
+      "log": "a2a-continuation-final-green-osv.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 124,
+      "sha256": "54345d5194d238b6017d0f3181f392109ce35023cc6b4bdfa8c134943dcb578e"
+    },
+    {
+      "log": "a2a-continuation-final-green-osv.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2364,
+      "sha256": "058294c6a29c056c2049105f7b3b9f60b2095df7bb66d74ace50f0bfabb0594b"
+    },
+    {
+      "log": "a2a-continuation-final-green-proof-check.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 317,
+      "sha256": "53b1bec9309e5fec6280322eddd8498d10e9508f90dc2cb4c1925dee88ad9f2d"
+    },
+    {
+      "log": "a2a-continuation-final-green-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 273,
+      "sha256": "32655728036ef17182615b483e8aaab6c98eda495c644dc69a2c49fb0612b2a8"
+    },
+    {
+      "log": "a2a-continuation-final-green.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 834147,
+      "sha256": "6d2529feebd2c4d64d8287eb7f4118bf9d0dc962472d5217302ba94788119c8f"
+    },
+    {
+      "log": "a2a-continuation-inline-review-372552646f.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2444,
+      "sha256": "19f82cbe7a786f8d0737e7b4054a97c54320738dde478b46f6b94830abbe1405"
+    },
+    {
+      "log": "a2a-continuation-native-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-continuation-osv-unfiltered.toml.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-continuation-red-continuation.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2807,
+      "sha256": "3e1a4215f1d3c7ab13e001bebd7e7b414aa4282e82bd488ff62d85c051ada29f"
+    },
+    {
+      "log": "a2a-continuation-red-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 17,
+      "sha256": "8118fe5a727f3c8b2be061ba6ff206d56f258e58274e293fa3ccbed3be2d204d"
+    },
+    {
+      "log": "a2a-continuation-red.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 823481,
+      "sha256": "187d552deaa20a041c736438bb7581971747d3a0af3d3d449e5fd13d6972e74d"
+    },
+    {
+      "log": "a2a-continuation-regression-green-consumer-regressions.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 3252,
+      "sha256": "4c9a449069f0ae0561cbf70f63f69fdbcc8488a257397c2a2ddc8e2ac9ad8aa0"
+    },
+    {
+      "log": "a2a-continuation-regression-green-edge-regressions.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 2120,
+      "sha256": "3e8e60326291077e300a3caf58ad67b4bb5793083f033e77884b85200d4e4b27"
+    },
+    {
+      "log": "a2a-continuation-regression-green-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 42,
+      "sha256": "3ff3b2278f2b1fdd3844655105322d78fc3dca93dcfdcf7e20756de9acf44ac2"
+    },
+    {
+      "log": "a2a-continuation-regression-green.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 823981,
+      "sha256": "a42f6d8ff5a0710e38b505f528a51de3f921e62d278aa14734822d2bdf506adc"
+    },
+    {
+      "log": "a2a-continuation-tested-source.diff.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 92635,
+      "sha256": "44ff1b2d1f082522b56e361002245c0e587029ee3d5261bf03fcd0f5eb21df97"
+    },
+    {
+      "log": "a2a-continuation-unit-confirmed-red-continuation-unit.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 3645,
+      "sha256": "590bd1dccf4755d99550152f147f237f52836042187f6c9607027dfa6090b33a"
+    },
+    {
+      "log": "a2a-continuation-unit-confirmed-red-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 22,
+      "sha256": "1d7a7f0e88bf8feef4e0ca334ed83ae46fa1184f51bfbf5302cc258304da674a"
+    },
+    {
+      "log": "a2a-continuation-unit-confirmed-red.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 823405,
+      "sha256": "344ba1a592f5274c7f2f65f74e011ebaf5e0c6753c87caa673d137d7921a0c78"
+    },
+    {
+      "log": "a2a-continuation-unit-red-continuation-unit.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 3497,
+      "sha256": "b9667655dba861ea5a1ecaae03b257cab9a3974f66970a5c29042239f9c2c160"
+    },
+    {
+      "log": "a2a-continuation-unit-red-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 22,
+      "sha256": "1d7a7f0e88bf8feef4e0ca334ed83ae46fa1184f51bfbf5302cc258304da674a"
+    },
+    {
+      "log": "a2a-continuation-unit-red.status.json.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 823397,
+      "sha256": "2b158c3e1b40b6f47120ce631fff16516238cce193dfdcc1b00ac6b81d5afa98"
+    },
+    {
+      "log": "a2a-continuation-verifier-supervisor.log.gz",
+      "observed_result": "Actual approval-continuation red, green, inventory campaigns and author inline review; initial diagnostic/fixture failures remain unaccepted, with no independent approval claim. All results retain original captured inputs and outcome.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "bun-new-advisories-final-lock-refresh.log.gz",
+      "observed_result": "Actual generated root Bun dependency-lock refresh; fixed upstream registry resolution, no exemption.",
+      "bytes": 87,
+      "sha256": "a0c468be681a8195ae3fedfc1babcc9ff39509f115bb013d2d054859cc24b82d"
+    },
+    {
+      "log": "bun-new-advisories-lock-refresh.log.gz",
+      "observed_result": "Actual generated root Bun dependency-lock refresh; fixed upstream registry resolution, no exemption.",
+      "bytes": 151,
+      "sha256": "b6cd6aa6a9a7b8b4f11cd914955fc7a3a2289f58e8c4f05cb7f99f9afe10a245"
+    },
+    {
+      "log": "npm-new-advisories-authenticated-lock-delta.json.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 67947,
+      "sha256": "82236b01b21755610b4b777444b7c4053f9338cf26234227dcdd5819f6aeb796"
+    },
+    {
+      "log": "npm-new-advisories-ci.log.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 27,
+      "sha256": "0babebc86757c92e8162e40a0679196b69b153e1d2f00680fee902695af0d26d"
+    },
+    {
+      "log": "npm-new-advisories-confirmed-red.log.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 2136,
+      "sha256": "515a7ae93670b9a26eff822b3356b8a1c653a99e94b280a787b878d6034dfb67"
+    },
+    {
+      "log": "npm-new-advisories-confirmed-red.status.json.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 1079,
+      "sha256": "e44c59bc750dfe7a70649c320fca6cd023d6e6e3336cca337cb780a062468a61"
+    },
+    {
+      "log": "npm-new-advisories-loaded-runtime.log.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 60,
+      "sha256": "a555fd9a8ad7676b33de463cf6c5b8628c038253804699d5316007635ee8d782"
+    },
+    {
+      "log": "npm-new-advisories-lock-refresh.log.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 18,
+      "sha256": "4c2a0edc189edd72682ff8adda87e72f27972256071a3d6d6047b99e6aa11b40"
+    },
+    {
+      "log": "npm-new-advisories-red.log.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 1983,
+      "sha256": "05bfa6ffe82cdc4dc608fe1480feb146f4db7da596614556220145f47fdff483"
+    },
+    {
+      "log": "npm-new-advisories-red.status.json.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 890,
+      "sha256": "2ebf38e3746336c766716b5e5877d5f9d55ee7cf5d7429b8088e8716f6afb12a"
+    },
+    {
+      "log": "npm-new-advisories-shell-quote-refresh.log.gz",
+      "observed_result": "Actual new-advisory reproduction, package-manager resolution and installed-package qualification. Initial reporter and lock-refresh failures remain distinct from the confirmed controls.",
+      "bytes": 18,
+      "sha256": "ce7bf91f54adc7390cff6bf1c2572fd00ce9cfbd0611637e273059c4710a80c9"
+    },
+    {
+      "log": "qualification-372552646f.status.json.gz",
+      "observed_result": "Actual current-source21-command native qualification, with canonical source/output inventory authoritative.",
+      "bytes": 268,
+      "sha256": "5563768499b135c6202d9409dc6d81a217dddb2b43ddceef8a377f2bc2a61f8b"
+    },
+    {
+      "log": "receipt-verifier-372552646f-build.log.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and binary hash on ARM; no physical x86 acceptance.",
+      "bytes": 1660,
+      "sha256": "f823f22fb94653f47289f5087af3064004b0a83e7f4b904512fceb60d560ed98"
+    },
+    {
+      "log": "receipt-verifier-372552646f.status.json.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and binary hash on ARM; no physical x86 acceptance.",
+      "bytes": 566,
+      "sha256": "d2cffdc70e93f02ea9a70c2023a3a19037599cd68880f73930aeb11546380da6"
+    },
+    {
+      "log": "review-native-qualification-372552646f.log.gz",
+      "observed_result": "Actual terminal current-source21-command native output; no hosted or physical x86 claim.",
+      "bytes": 539,
+      "sha256": "165399492b8a7f8a2c7de37ee2f0f456ebc954c371ba1425c508050281ed06ee"
+    },
+    {
+      "log": "security-authorities-a2a-continuation-review.json.gz",
+      "observed_result": "Read-only security-owned source, definition and signed-evidence/policy presence observation; no authority mutation.",
+      "bytes": 517,
+      "sha256": "ecf1e2ae7a93acdbbcf1eb48f74f39caaf3c6f5dfceadcfad1382c118fffd8b8"
+    },
+    {
+      "log": "sharp-0.35.5-registry.json.gz",
+      "observed_result": "Fixed Sharp upstream registry metadata and tarball integrity.",
+      "bytes": 145,
+      "sha256": "37b190f642d091b46fbcf99d08dc4628b6df5a106de71b79f00728f1c68e6143"
+    },
+    {
+      "log": "shell-quote-1.11.0-registry.json.gz",
+      "observed_result": "Fixed shell-quote upstream registry metadata and tarball integrity.",
+      "bytes": 145,
+      "sha256": "861bdeed95fe0fcb74ed6dac4536caf3f563738b0b222e3a5c96c55ec381b3e1"
     }
   ]
 }
