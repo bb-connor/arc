@@ -694,7 +694,7 @@ fn real_adapter_fixture_with_options(
     governed: bool,
     options: RealAdapterFixtureOptions<'_>,
 ) -> RealAdapterFixture {
-    let directory = tempfile::tempdir()
+    let directory = chio_test_support::private_tempdir()
         .unwrap_or_else(|error| panic!("create real adapter directory: {error}"));
     let paths = RealAdapterPaths::in_directory(directory.path());
     let now_unix_seconds = real_adapter_now_unix_seconds();

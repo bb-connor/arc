@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn active_defense_builder_installs_exact_boundary_order() {
-        let directory = tempfile::tempdir().expect("create tempdir");
+        let directory = chio_test_support::private_tempdir().expect("create tempdir");
         let kernel = crate::build_kernel_with_active_defense(
             loaded_policy(),
             &Keypair::generate(),
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn active_defense_builder_refuses_unready_runtime() {
-        let directory = tempfile::tempdir().expect("create tempdir");
+        let directory = chio_test_support::private_tempdir().expect("create tempdir");
         let result = crate::build_kernel_with_active_defense(
             loaded_policy(),
             &Keypair::generate(),
