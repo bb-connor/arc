@@ -485,7 +485,7 @@ allow_if_containment(x) crossed while stopped -> head.allow_containment and no h
 | `observe_recovery_capability_liveness` | `allow` | observation |
 | `reserve_recovery_review` (W: `recovery_runtime.rs:267`) | `deny` | it advances a workflow toward an effect |
 | `acknowledge_recovery_reservation` (W: `recovery_runtime.rs:91`) | `deny` | it binds a process reservation to a workflow |
-| `reserve_successor_ordinal` (spec 2 section 6.10 O4, proposed) | `deny` | it mutates the original's origin claim toward a linked continuation. Checked for the predecessor's and successor's scopes in the claim's writer transaction, before any mutation. An identical replay is a readback and is allowed. Root supersession happens only in the stop-gated `CreateWorkflow` (spec 2 O3) |
+| `reserve_successor_ordinal` (spec 2 section 6.10 O4, proposed) | `deny` | it mutates the original's origin claim toward a linked continuation. Checked for the verified predecessor scope and the authenticated successor scope persisted in the link, in the claim's writer transaction before any mutation. An authenticated replay matching the stored successor scope is a readback and is allowed; a scope change conflicts. `CreateWorkflow` must use that stored scope. Root supersession happens only in the stop-gated `CreateWorkflow` (spec 2 O3) |
 
 P6 component operations (control plane and store, not `KernelOp`). Spec 1 section 6 holds the full classification:
 

@@ -575,7 +575,8 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
 ## 16. Tests and conformance evidence
 
 - **Apalache.** `formal/apalache/AuthoritySpaceClosure.tla` composes `RevocationCutCompleteness.tla` with `PostAdmissionDropGuard.tla` and a fence variable.
-  - Invariants: no dispatch commit after a co-located fence; no output release after a co-located fence (rule 3a); no dispatch or release of a `legacy_unindexed` operation once a fence exists (rule 1a); no compensation after dispatch commit or committed capture; no hold release outside {`PreDispatchNoEffect`, `TransportNotAccepted`}; `Closed` implies a terminal ledger.
+  - Invariants: no dispatch commit after a co-located fence; no output release after a co-located fence (rule 3a); no dispatch or release of a `legacy_unindexed` operation once a fence exists (rule 1a); no compensation after dispatch commit or committed capture; no hold release outside {`PreDispatchNoEffect`, `TransportNotAccepted`}; `Closed` implies every ledger entry is terminal, delivery-refused or incident-bound, exactly as section 6.3's predicate specifies.
+  - Closure cases: reach `Closed` with a delivery-refused entry whose payment is `Open`, and separately `InFlight` (including `ReconcileFailed` or a lost acknowledgement), retaining the obligation and original intent in `stranded_final.delivery_obligations` under section 8. Include terminal and incident-bound entries in the same ledger. Closure neither starts settlement nor waits for the rail, and the refused output stays unavailable. An entry satisfying none of the three predicates must prevent `Closed`; a mutant that omits that entry from the closure predicate must fail.
   - Mutants: drop the `NOT EXISTS` clause; drop it from the release check; drop the legacy predicate; compensate a `DispatchCommitted` operation.
   - Negative example for property 4 under an `early_only` fence: guard check reads the remote fence store, the remote fence commits, then the local dispatch CAS commits. The model must report property 4 violated and property 4' satisfied, with the operation flagged `dispatched_after_fence_unlinearized`.
 - **Loom.** Race fence commit against the `DispatchCommitted` CAS, and against the release-bearing finalization commit; exactly one order wins and the loser reclassifies.
@@ -639,6 +640,12 @@ Open decisions and pushback:
 | 4180389987 | Fence ordinary output release during closure | Fixed now. Caller-executed, native and ordinary durable releases run the closure-fence predicate in the finalization commit. A refused release terminalizes as `DeniedAfterDelivery` with output withheld | Section 4.1 rules 3a and 4; section 4.3 table; section 5 drain row; section 16 |
 | 4180389999 | Recompute stranded capacity after the drain | Fixed now. `stranded_at_fence` goes in the `Fenced` artifact, and `stranded_final`, recomputed after the ledger is terminal, goes in the `Closed` artifact and is the reclamation precondition | Sections 6.1, 6.3 step 6, 8 and 9; section 16 |
 | 4180435346 | Backfill authority refs before enabling closure fences | Fixed now. The migration backfills and verifies refs. Operations it cannot index are `legacy_unindexed`, and a legacy predicate in the dispatch CAS and release check refuses them once any fence exists. The predicate is removed only when none remain | Section 4.1 rule 1a; section 5 enumeration; section 16 |
+
+### PR #1174 review round 29
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4190699727 | Match the Closed conformance invariant to the lifecycle | Fixed. The model requires every entry to be terminal, delivery-refused or incident-bound. Cases cover Open and InFlight refused payments, including ReconcileFailed and lost acknowledgement, without initiating settlement or waiting for the rail | section 16; normative predicate in section 6.3 |
 
 ## Appendix A. FTL reference
 

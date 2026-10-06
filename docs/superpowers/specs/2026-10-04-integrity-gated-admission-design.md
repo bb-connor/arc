@@ -314,7 +314,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
      - the confined-return record, which binds the child's influence `commitment` (I8), for confined returns;
      - for each bootstrap contribution under `source_kind = bootstrap` (I7a), the context-creation record digest plus the contribution kind and the contribution digest;
      - for each inherited parent observation under `source_kind = inherited` (I7a), the parent observation's own `observation_id`. The child's `destination_digest` completes the id, so the inherited row never collides with the parent's row under the `(tenant, isolation_epoch, observation_id)` key, and it passes the destination check below;
-     - the context-creation record under `source_kind = initial`, for the initial-influence observation (I7). It is the knowledge-scope creation row written in the same transaction: scope id, context key values, creation attempt, and the worker-profile outcome, which is the verified launch record digest when `Verified`, or the `Unverified` reason (absent, mismatched, unverifiable, lookup failed, predicate false) otherwise. Every context therefore has a stable initial id, including when verification fails, and the fail-closed `unknown` start commits idempotently.
+     - the context-creation record under `source_kind = initial`, for the initial-influence observation (I7). It is the knowledge-scope creation row written in the same transaction: scope id, context key values, creation attempt, and the worker-profile outcome, which is the verified launch record digest when `Verified`, or the `Unverified` reason allowed by spec 7 rule 6.3.5 (absent or unavailable evidence, lookup failed, qualification unavailable with no mismatch) otherwise. Every created context therefore has a stable initial id, including on an allowed unverified fallback, and the fail-closed `unknown` start commits idempotently. A profile mismatch or mandatory-claim rejection refuses context creation instead (I7).
    - **Distinct destinations are distinct observations.** Two contexts that read the same artifact version produce two observations, one per destination. Each context's heads therefore receive the artifact's influence, and neither context can stay trusted because another context read the version first.
    - **Retries are stable.** A retry, replay or rebuild of one delivery (same record, same destination) yields the same id and changes nothing. Two deliveries of identical bytes yield two ids.
    - **A retry that cannot reuse its record over-taints and never under-taints.** If a host cannot reuse the delivery record when it retries, the retry adds a second observation. That only adds influence (I2). It never double-counts bits, because `ExternalBounded` observations are keyed by the confined-return record, which is unique per return.
@@ -336,7 +336,7 @@ Today the influence of a context reflects only P4 artifact traffic. The main inj
    - Without sender attestation, its origin is `External`.
 7. **I7. Initial influence of a context.** It comes from the **verified** worker-profile fact (`2026-10-04-microkernel-isolation-backend-design.md` rule 6.3.5), never from the raw attribution.
    - **Qualification.** The fact is `Verified(kind)` only when the host attribution equals the runner's per-attempt record, the referenced launch record verifies (pinned signer, digest, enforcement state), the record's attempt equals spec 7's runner-bound `worker_profile.launch_attempt` for this context (spec 7 rule 5.2.8), and the kind's own predicate holds (spec 7 rule 6.3.5).
-   - **Failure behavior.** Any failure (absent, mismatched, unverifiable, lookup failed, predicate false) is `Unverified` and is treated as `direct` below. A failure can only make the start less trusted.
+   - **Failure behavior.** Apply spec 7 rule 6.3.5 in its stated order. Attribution or available-record mismatches and mandatory-claim failures deny before context creation, even for calls without an integrity requirement; they never produce a `direct` fallback. Only evidence unavailable or unqualified without such a rejection yields `Unverified`, treated as `direct` below. The knowledge owner consumes this result from spec 7's verifier rather than implementing another qualification path.
    - **Committed once.** The host verifies the fact when the context's knowledge scope is created. In the same writer transaction, it writes the context-creation record and inserts the initial observation keyed by it (`source_kind = initial`, I4a), whether the outcome is `Verified` or `Unverified`. A scope cannot exist without its initial observation. Crossings read the committed state and never re-derive it, and a later attribution can only add influence (I2).
 
    Launch qualification and input influence are two separate facts. The verified profile decides only whether the worker has channels outside mediation. It never decides that the worker's inputs are trusted. The initial observation by verified kind:
@@ -720,7 +720,8 @@ pub enum ConfinedReturnTypeV1 {
 | Two contexts read the same artifact version | One observation per destination; both contexts gain the artifact's influence (I4a) |
 | A flow row's key values disagree with its id's destination | Join refused; the delivery is withheld (I4a) |
 | Gated grant in a context without integrity tracking | Deny (I4b) |
-| Worker-profile fact unverified | Context starts at `unknown`; gated calls deny (I7) |
+| Worker-profile attribution or available-record mismatch, or mandatory-claim rejection | Context creation refused, including for ordinary calls; no `Unverified` fallback (I7, spec 7 rule 6.3.5) |
+| Worker-profile fact unverified with no mismatch or mandatory-claim rejection | Context starts at `unknown`; gated calls deny (I7) |
 | Unbound route output | Joins `External` (I5) |
 | Manifest digest changed under an operator binding | The binding is void; output joins `External` |
 | Join commits before the intent commit, and no valid current endorsement applies | Intent commit fails `InsufficientIntegrity` (I15) |
@@ -804,7 +805,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
   - Unbound routes join `External`.
   - The operator binding is voided by a manifest change.
   - Attested mailbox inheritance.
-  - Initial influence per verified worker profile. Each qualification failure starts at `unknown`.
+  - Initial influence per verified worker profile. Each permitted unverified fallback starts at `unknown`. A worker attribution or available-record mismatch refuses context creation without inserting an initial observation, even when the first action has no integrity requirement (spec 7 rule 6.3.5).
   - Bootstrap classification (I7a): inherited, asserted, pinned without assertion (`External`), and unclassified (`unknown`). Assertions that are expired, for another run plan or deployment, or carry a mismatched digest are ignored.
   - **Lossless inheritance (I7a).** A parent holds `External`, `ModelProvider { p1 }`, `ModelProvider { p2 }`, and two distinct `ExternalBounded` observations of 3 and 5 bits. A child with disjoint keys and no other bootstrap contributions inherits re-keyed observations, and its `origins`, `bounded_bits_total = 8` and `unknown` equal the parent's. Each requirement the parent fails, the child fails too: `Trusted`, `ProviderOnly({p1})` and `BoundedExternal { 7 }`. A child sharing the parent's lineage does not re-key reachable rows, and its bit total stays 8. Re-running creation changes nothing. A parent above 4,096 rows refuses child creation.
   - Typed return capacity and projection rejection. Capacity unit tests (I23): `Boolean` gives 1; `Enum` with 3 variants gives 2; `Integer { 0, 255 }` gives 8; a single-value type gives 0; `Identifier { 1, 44, 65 chars }` gives 266, and `Identifier { 44, 44, 65 chars }` gives 265. Each is computed by `bit_length(N - 1)` and compared with a big-integer reference. `Integer { i64::MIN, i64::MAX }` gives 64 without overflow.
@@ -859,7 +860,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
 ## 19. Residual risks and open decisions
 
 Residual risks:
-- Channels outside mediation (a `direct` worker reading the network) are the reason such contexts start at `unknown`. A misdeclared worker profile would break the premise, so I7 consumes only the verified fact, and an unverified profile starts at `unknown` (spec 7 rule 6.3.5).
+- Channels outside mediation (a `direct` worker reading the network) are the reason such contexts start at `unknown`. A misdeclared worker profile would break the premise, so I7 applies spec 7 rule 6.3.5: mismatches deny, and only its allowed unverified fallback starts at `unknown`.
 - Operator-bound `Trusted` routes are a trust decision. A wrong binding admits injection through that route.
 - Bootstrap trust assertions are a trust decision of the same kind. A wrong assertion admits injection through the asserted contribution (I7a).
 - Bounded returns still carry information, up to `max_bits`, and that information can select the action (section 11). `Identifier` returns of 64 characters can encode short strings, so grants choose `n`. Only an action contract limits which actions can be selected (I22a), and attenuation preserves it (I3).
@@ -987,6 +988,12 @@ Open decisions:
 | Finding | Title | Disposition | Where |
 |---|---|---|---|
 | R-11-09 | Exact integrity approval still lacks the retained-origin prerequisite applied to quarantine | Fixed. New I20a applies native-origin eligibility to both recovery-backed integrity remedies. The `Integrity` fact carries spec 2's `origin_retained` input, derived from native flow state. Ineligible denials (for example a fused refusal whose X15 tombstone retains no request material, or a stale origin) get `NoRegisteredRemedy`, and the resolver learns `origin_unavailable` before any approval is solicited. The recovery adapter and the P3 fallback are qualified only for origin-eligible denials until spec 2 O8 ships. `remedy_classes` stays configuration-blind. No second approval path or weaker origin check is added | I15b; I20a; I21; section 17 phase 3; section 18; spec 2 section 5 |
+
+### PR #1174 review round 29
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4190699733 (spec 11 side) | Keep initial influence consistent with worker mismatch denial | Applied here. Spec 7 mismatch and mandatory-claim rejection refuse context creation; only its permitted Unverified fallback commits an unknown initial observation. The knowledge owner consumes the existing verifier result | I4a, I7; failure table; unit cases; residual risks |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 

@@ -98,10 +98,18 @@ The pass audited 40 defect rows: 37 confirmed, and 3 correctly reclassified as n
 **Revision 4h, independent review pass 6 and PR round 28 (2026-10-06, head `0118c31a6`).** Three Major findings, each also raised by a bot comment, and one Minor, all applied through the existing owners:
 - spec 2 makes `reserve_successor_ordinal` a stop-gated `deny` `RecoveryControl` entry point, checked before any claim mutation. It moves root supersession from the reservation to the stop-gated `CreateWorkflow`, so a stopped or failed creation never disables the root. Specs 8, 1 and 10 register it (R-2-03);
 - spec 4's closure no longer waits for a rail and no longer drops an unresolved payment. `stranded_final.delivery_obligations` lists every `DeliveryRefused` payment not confirmed `Final` by readback, as `Open` or `InFlight` (including `ReconcileFailed`) with its original intent (R-4-04);
-- spec 5 Part A restores standard resource subscriptions by URI with no client-visible id. A failed re-authorization ends through one standard `resources/updated` and a failing re-read, held durably until flushed. Negotiated ids and `SubscriptionEnded` stay in Part B, which extends the same record (R-5-03);
+- spec 5 Part A restores standard resource subscriptions by URI with no client-visible id. A failed re-authorization durably terminalizes the session with `subscription_not_restored` before it can be served; reconnect receives the terminal-state response and the client initializes a new session. `resources/updated` and a read cannot signal subscription termination, because read and subscribe grants are independent. Negotiated ids and `SubscriptionEnded` stay in Part B, which extends the same record (R-5-03, corrected by R-5-04);
 - spec 11 I20a applies native-origin eligibility to both recovery-backed integrity remedies, and spec 2 adds `origin_retained` to the `Integrity` fact (R-11-09).
 
 The review's architecture judgment and recommended order are in section 9.
+
+**Revision 4i, PR round 29 (2026-10-06, reviewed head `0dddc9aa3`).** Six unresolved comments covered five issues, corrected in the existing owners:
+
+- spec 5 performs subscription restore without per-subscribe persistence, before the generation bump. A failure can therefore persist terminal epoch `g` over stored generation `g - 1`; no terminal-store rule is weakened (4190686691, 4190699721);
+- spec 2 binds and persists the authenticated successor scope at reservation, checks it on every replay and at `CreateWorkflow`, and checks that scope's stop head before mutation. Specs 1 and 8 carry the binding into their entry-point rules (4190699723);
+- this umbrella now describes the terminal-session subscription behavior (4190699724);
+- spec 4's conformance invariant matches the normative closure predicate: every entry is terminal, delivery-refused or incident-bound. Open and in-flight refused payments remain recorded without forcing settlement (4190699727);
+- spec 7 rejects mismatched worker attribution or launch evidence even on an ordinary call; unavailable evidence may still yield an unverified claim, subject to the existing mandatory-claim checks (4190699733).
 
 
 **Revision 3, recovery implementation.** Recovery P0-P5 exists as code in W:, and much of it was assumed rather than read in revision 2.

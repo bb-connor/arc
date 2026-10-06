@@ -389,7 +389,7 @@ Rules:
      - the kind's own boundary predicate holds: for `container`, the launch record's image digest equals the run plan's; for `split_domain`, S1-S5.
    - **What qualification means.** A `Verified` profile attests only that the worker has no channel outside mediation. It never makes the worker's inputs trusted. The context's initial input influence is spec 11 rule I7a: every bootstrap contribution is joined before readiness, and a pinned contribution is `External` unless an operator-signed `BootstrapTrustAssertionV1` covers it. A content digest proves which bytes were supplied, not their provenance.
    - **Where it is checked.** The host verifies the fact once, when the process's knowledge scope is created. It commits the resulting initial influence in the serving writer in the same transaction (spec 11 rule I7). Crossings read the committed state and never re-derive it from attribution.
-   - **Failure behavior.** Any of these yields `Unverified`, which is treated exactly as `direct`: an absent field, an unverifiable or mismatched record, a record lookup that fails, or a kind predicate that does not hold. The context then starts at `unknown = true`, which no integrity requirement satisfies. A failure can only make the starting state less trusted, never more.
+   - **Failure behavior, in precedence order.** First enforce rule 2's required fields and attribution binding, and rule 4's plan binding. A host attribution or available launch record that conflicts with the runner's per-attempt record denies; it is never downgraded to `direct`. A contradictory launch identity, attempt, canonical digest, image digest or pinned profile is a mismatch, regardless of whether the call has an integrity requirement. The existing rejection of an invalid `split_domain` claim also stands. Only after these rejection checks may unavailable evidence yield `Unverified`: an absent profile, an unavailable record or failed lookup, or a record whose qualification cannot be established and for which no mismatch is demonstrated. This fallback renders as `direct` and starts the context at `unknown = true`, which no integrity requirement satisfies. It cannot satisfy a required worker lane. Neither fallback nor ordinary-call policy can override a mismatch denial.
    - **Never upgraded later.** A later attribution can only add influence (spec 11 rule I2).
 
 ```text
@@ -514,11 +514,13 @@ Output: `docs/research/2026-10-ftl-isolation-spike.md`.
 | A receipt in a scope that requires the worker lane has no `worker_profile`, or its profile has no launch reference, or the profile differs from the run plan's expected worker | Facet fails. The lane is required by the agreement and run plan, not by the receipt (rule 7.3) |
 | A `container` or `split_domain` context with pinned bootstrap input and no trust assertion | Profile still `Verified`. Pinned contributions join `External` (spec 11 I7a), so a `Trusted` requirement denies |
 | The verifier's appraisal layer does not know the confinement attestation schema | `UnsupportedSchema`. Facet fails |
-| The `worker_profile` fact is unverified (absent, mismatched, unverifiable, lookup failed) | The context starts at `unknown` (spec 11 rule I7). Integrity-gated calls deny |
+| The `worker_profile` attribution or available launch record conflicts with the runner, launch attempt, digest or pinned profile | Deny even without an integrity requirement. No `Unverified` or `direct` fallback (section 6.3 rule 5) |
+| The `worker_profile` fact is unverified because evidence is absent, unavailable or cannot be qualified, with no mismatch or mandatory-claim rejection | The context starts at `unknown` (spec 11 rule I7). Integrity-gated calls deny, and a required worker-lane facet fails |
 | Projection error (unknown schema, missing surface) | No record. A facet requiring it is `Unavailable`, which denies |
 | A future backend reports a `SameDomain` surface | Cannot be `FullyEnforced`. Admission denies |
 | `split_domain` claimed without a plan binding | Attribution rejected. Attempt does not start |
-| `confined_reader` claimed without an exportable boundary, or the export's evidence does not match the pinned profile | Attribution rejected. The claim renders as `direct` |
+| `confined_reader` evidence is unavailable, with no demonstrated mismatch | No verified claim. Renders as `direct`, with `unknown` initial influence |
+| A `confined_reader` export's evidence does not match the pinned profile | Attribution rejected. Deny; no `direct` fallback |
 | Confined export requested for a boundary in `Failed`, `Cancelled`, or `Quarantined` | Export carries the terminal state. It never claims an admitted return |
 
 ## 11. Protocol, schema, and wire impact
@@ -544,8 +546,8 @@ Rollback of steps 1-5 stops emitting the new evidence. It never relaxes cage-onl
 - **Unit:**
   - the adapted server returns its spawn receipt while alive, and preparation errors after `Exited`;
   - the disclosure table is rendered for every `ToolOrigin`;
-  - `worker_profile` mismatch denies;
-  - each `worker_profile` qualification failure (absent, mismatched, unverifiable record, failed lookup, image digest differing from the run plan) yields `Unverified` and an `unknown` initial influence;
+  - `worker_profile` attribution and available-record mismatches deny, including wrong launch identity, attempt, canonical digest, image digest and pinned `confined_reader` evidence. Each case also denies an ordinary call with no integrity requirement and no agreement requiring the worker lane; none falls through to `Unverified` or `direct`;
+  - absent or unavailable `worker_profile` evidence, a failed lookup, and qualification that cannot be established with no demonstrated mismatch yield `Unverified` and an `unknown` initial influence. Missing required claim fields or an invalid `split_domain` plan binding still reject. A negative control that turns a demonstrated mismatch into `Unverified` must fail the ordinary-call case;
   - a `Verified` `container` profile with a pinned external task input and no `BootstrapTrustAssertionV1` starts with that contribution as `External`, not trusted (spec 11 I7a).
 - **Proptest:** projection determinism; `FullyEnforced` is rejected with any `NotEnforced` or `SameDomain` isolation surface, and with any withheld-by-contract channel that is not `Enforced`; native digest mismatch is rejected.
 - **Container:** the inspection comparator rejects each single-field deviation from the fixed profile (capabilities, seccomp, network, mounts, read-only root, limits). A start failure yields a signed `BootstrapFailed` record and no success record. A worker call before the success record is committed is refused.
@@ -638,6 +640,12 @@ Refinements to the review directives, recorded with evidence:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4186364937 | Qualify absence on both launch reference forms | Fixed now. Rule 2 classifies a receipt as unconfined only when it has neither `native_launch` nor a verified `confinement_launch`, matching the table and the formal predicate | section 5.1 rule 2 |
+
+### PR #1174 review round 29
+
+| Comment | Title | Disposition | Where |
+|---|---|---|---|
+| 4190699733 | Deny mismatched worker evidence before fallback | Fixed. Attribution and available-record mismatches deny, including on ordinary calls. The permitted unavailable-evidence fallback cannot override that denial. The failure table, unit cases and spec 11 initial-influence rules use the same precedence | section 6.3 rule 5; sections 10, 13; spec 11 I4a, I7 |
 
 ## Appendix A. FTL reference
 
