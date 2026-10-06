@@ -1581,7 +1581,7 @@ fn bind_private_unix_listener_with(
     path: &Path,
     before_bind: impl FnOnce() -> std::io::Result<()>,
 ) -> Result<PrivateUnixListener> {
-    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::os::unix::net::UnixListener;
 
     use rustix::fs::{AtFlags, FileType, FlockOperation, Mode, OFlags};
 
@@ -1632,7 +1632,18 @@ fn bind_private_unix_listener_with(
                     "service socket path is occupied by a non-socket",
                 ));
             }
-            if UnixStream::connect(path).is_ok() {
+            let live = match connect_unix_without_waiting(path) {
+                Ok(_) => true,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => true,
+                Err(error)
+                    if error.raw_os_error()
+                        == Some(rustix::io::Errno::CONNREFUSED.raw_os_error()) =>
+                {
+                    false
+                }
+                Err(error) => return Err(KeyringError::Io(error)),
+            };
+            if live {
                 return Err(KeyringError::StateInvariant(
                     "service socket already has a live listener",
                 ));
@@ -1657,6 +1668,31 @@ fn bind_private_unix_listener_with(
         listener,
         _lifecycle_lock: lifecycle_lock,
     })
+}
+
+/// Connect once without waiting for room in the listen queue. Only a refused
+/// connection shows that no listener is bound, so only it marks an existing
+/// socket stale. Linux reports a live listener's full queue as `EAGAIN`.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn connect_unix_without_waiting(path: &Path) -> std::io::Result<std::os::unix::net::UnixStream> {
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketFlags, SocketType};
+
+    let socket = rustix::net::socket_with(
+        AddressFamily::UNIX,
+        SocketType::STREAM,
+        SocketFlags::CLOEXEC | SocketFlags::NONBLOCK,
+        None,
+    )?;
+    rustix::net::connect(&socket, &SocketAddrUnix::new(path)?)?;
+    Ok(std::os::unix::net::UnixStream::from(socket))
+}
+
+/// BSD-derived kernels refuse a connection to a full listen queue instead of
+/// waiting, so a blocking connect returns at once. They report that refusal as
+/// `ECONNREFUSED`, the same as a socket with no listener.
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "android"))))]
+fn connect_unix_without_waiting(path: &Path) -> std::io::Result<std::os::unix::net::UnixStream> {
+    std::os::unix::net::UnixStream::connect(path)
 }
 
 /// Open a socket directory through the keyring's trusted directory chain,
