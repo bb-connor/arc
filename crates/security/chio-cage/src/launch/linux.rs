@@ -268,24 +268,34 @@ fn prepare_bound(
 /// Launch on a dedicated supervisor thread. That thread spawns and seizes the
 /// helper, so it is the tracer and the thread the helper's parent-death signal
 /// is bound to; it stays alive and traces the target until the target exits.
+///
+/// The child-custody permit is reserved here, before the supervisor starts,
+/// and moves into it. A failed spawn drops the closure, and the permit with
+/// it, on this thread before returning. Every launch failure on the
+/// supervisor releases the permit, or hands it to child custody with the
+/// spawned helper, before the failure is sent back.
 pub(super) fn launch_prepared(
     prepared: PreparedLaunchContract,
     options: CageLaunchOptions,
 ) -> Result<EnforcedChild, CageLaunchError> {
     let receipt_bindings = CageReceiptBindings::from_compiled(&prepared.compiled);
+    let custody_permit = reserve_child_custody()
+        .map_err(|error| error.with_receipt_bindings_if_missing(receipt_bindings.clone()))?;
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let supervisor = std::thread::Builder::new()
         .name("chio-cage-supervisor".to_string())
-        .spawn(move || match launch_bound(prepared, options) {
-            Ok((child, traced)) => {
-                if sender.send(Ok(child)).is_ok() {
-                    supervise_traced_target(&traced);
+        .spawn(
+            move || match launch_bound(prepared, options, custody_permit) {
+                Ok((child, traced)) => {
+                    if sender.send(Ok(child)).is_ok() {
+                        supervise_traced_target(&traced);
+                    }
                 }
-            }
-            Err(error) => {
-                let _ = sender.send(Err(error));
-            }
-        })
+                Err(error) => {
+                    let _ = sender.send(Err(error));
+                }
+            },
+        )
         .map_err(|_| {
             CageLaunchError::bootstrap_failed(
                 CageEnforcementFailureCode::TraceHandshakeFailed,
@@ -322,6 +332,7 @@ struct TracedTarget {
 fn launch_bound(
     prepared: PreparedLaunchContract,
     options: CageLaunchOptions,
+    custody_permit: ChildCustodyPermit,
 ) -> Result<(EnforcedChild, TracedTarget), CageLaunchError> {
     let PreparedLaunchContract {
         mut compiled,
@@ -380,7 +391,6 @@ fn launch_bound(
     if let Some(mutation) = options.enforcement_mutation() {
         command.env(ENFORCEMENT_MUTATION_ENV, mutation.as_env_value());
     }
-    let custody_permit = reserve_child_custody()?;
     let child = command.spawn().map_err(|_| {
         CageLaunchError::bootstrap_failed(
             CageEnforcementFailureCode::HelperIdentityMismatch,
@@ -604,15 +614,25 @@ enum TraceEvent {
 
 const SUPERVISOR_KILL_SETTLE: Duration = Duration::from_secs(5);
 
+/// Delays before each retry of a failed pidfd kill. The attempt after the
+/// last delay is final.
+const SUPERVISOR_KILL_RETRY_DELAYS: [Duration; 3] = [
+    Duration::from_millis(1),
+    Duration::from_millis(10),
+    Duration::from_millis(50),
+];
+
 /// Trace the target until it exits. The launch already consumed and verified
 /// the one permitted exec, so a later exec event is killed at the stop,
 /// before the new image runs an instruction. A signal-delivery stop resumes
 /// with exactly its signal. A group stop is held with `PTRACE_LISTEN`, so
-/// SIGSTOP and SIGCONT keep their ordinary meaning, and the
-/// `PTRACE_EVENT_STOP` that follows SIGCONT resumes with no signal. Any other
+/// SIGSTOP and SIGCONT keep their ordinary meaning, and a `PTRACE_EVENT_STOP`
+/// reporting SIGTRAP, which follows SIGCONT, resumes with no signal. Any other
 /// event, or a failed ptrace request, is resolved by killing the target
 /// through its pidfd; the exit is then observed, never assumed. Every wait
-/// uses `WNOWAIT`, so reaping stays with the child handle.
+/// uses `WNOWAIT`, so reaping stays with the child handle. If the kill cannot
+/// be delivered, the supervisor returns and its exit leaves the target to
+/// `PTRACE_O_EXITKILL` and the parent-death signal.
 fn supervise_traced_target(traced: &TracedTarget) {
     let mut killed_at: Option<Instant> = None;
     loop {
@@ -620,7 +640,7 @@ fn supervise_traced_target(traced: &TracedTarget) {
             TraceEvent::Stopped(status) => status,
             TraceEvent::Exited | TraceEvent::Gone => return,
             TraceEvent::WaitFailed => {
-                let _ = kill_pidfd(&traced.pidfd);
+                let _ = kill_traced_target(&traced.pidfd);
                 return;
             }
         };
@@ -646,12 +666,27 @@ fn supervise_traced_target(traced: &TracedTarget) {
             )),
         };
         if handled.is_err() {
-            if kill_pidfd(&traced.pidfd).is_err() {
+            if !kill_traced_target(&traced.pidfd) {
                 return;
             }
             killed_at = Some(Instant::now());
         }
     }
+}
+
+/// Deliver SIGKILL through the pidfd, retrying a failed request after each
+/// bounded delay. Returns whether a request was accepted.
+fn kill_traced_target(pidfd: &OwnedFd) -> bool {
+    if kill_pidfd(pidfd).is_ok() {
+        return true;
+    }
+    for delay in SUPERVISOR_KILL_RETRY_DELAYS {
+        std::thread::sleep(delay);
+        if kill_pidfd(pidfd).is_ok() {
+            return true;
+        }
+    }
+    false
 }
 
 const fn is_job_control_stop(signal: i32) -> bool {
