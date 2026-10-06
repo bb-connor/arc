@@ -1,11 +1,8 @@
 package chio
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"strings"
+	"reflect"
 	"testing"
 )
 
@@ -37,38 +34,29 @@ func TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue(t *testing.
 }
 
 func TestReceiptRecordRejectsUnknownFieldsAndDuplicateKeys(t *testing.T) {
-	corpusBytes, err := os.ReadFile(filepath.Join("..", "..", "..", "tests", "bindings", "fixtures", "protocol-primitives-v1.json"))
-	if err != nil {
-		t.Fatalf("read protocol-primitives fixture corpus: %v", err)
-	}
-	var corpus struct {
-		Cases []protocolPrimitiveFixtureCase `json:"cases"`
-	}
-	if err := json.Unmarshal(corpusBytes, &corpus); err != nil {
-		t.Fatalf("parse protocol-primitives fixture corpus: %v", err)
-	}
-	var valid []byte
+	corpus := loadProtocolPrimitiveCorpus(t)
+	payloads := make(map[string][]byte)
 	for _, fixture := range corpus.Cases {
-		if fixture.SchemaFile == "receipt/record.schema.json" && fixture.Valid {
-			valid = bytes.TrimSpace(fixture.Instance)
-			break
-		}
+		payloads[fixture.Name] = fixture.Instance
 	}
-	if len(valid) < 2 || valid[0] != '{' {
-		t.Fatal("corpus has no valid receipt object")
+	for _, fixture := range corpus.RawCases {
+		payloads[fixture.Name] = []byte(fixture.InstanceText)
 	}
-	var accepted ReceiptRecord
-	if err := json.Unmarshal(valid, &accepted); err != nil {
+	var decoded ReceiptRecord
+	if err := json.Unmarshal(payloads["receipt-internal-origin"], &decoded); err != nil {
 		t.Fatalf("valid corpus receipt rejected: %v", err)
 	}
-	for name, mutated := range map[string][]byte{
-		"unknown field": append([]byte(`{"unexpected":true,`), valid[1:]...),
-		// The duplicate comes first, so last-wins parsing would keep the original id.
-		"duplicate key": append([]byte(`{"id":"`+strings.Repeat("0", 64)+`",`), valid[1:]...),
-	} {
-		var decoded ReceiptRecord
-		if err := json.Unmarshal(mutated, &decoded); err == nil {
+	accepted := decoded
+	for _, name := range []string{"receipt-unknown-field", "receipt-duplicate-id", "receipt-duplicate-parameter"} {
+		payload, ok := payloads[name]
+		if !ok {
+			t.Fatalf("corpus is missing receipt fixture %s", name)
+		}
+		if err := json.Unmarshal(payload, &decoded); err == nil {
 			t.Fatalf("%s receipt accepted", name)
+		}
+		if !reflect.DeepEqual(decoded, accepted) {
+			t.Fatalf("%s replaced the previously decoded receipt", name)
 		}
 	}
 }

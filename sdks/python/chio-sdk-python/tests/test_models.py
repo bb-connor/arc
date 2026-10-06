@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
@@ -43,6 +44,8 @@ from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
     ChioSignedCallerDispatchAuthorization,
 )
 from chio_sdk._generated.result.pending_approval_schema import ChioToolcallresultPendingApproval
+from chio_sdk.client import ChioClient
+from chio_sdk.errors import ChioError
 from chio_sdk.models import (
     ChioReceipt,
     ChioScope,
@@ -64,6 +67,52 @@ from chio_sdk.models import (
     ToolGrant,
     Verdict,
 )
+
+
+_PROTOCOL_PRIMITIVES = json.loads(
+    (
+        Path(__file__).resolve().parents[4]
+        / "tests/bindings/fixtures/protocol-primitives-v1.json"
+    ).read_text(encoding="utf-8")
+)
+
+_PROTOCOL_PRIMITIVE_MODELS: dict[str, type[Any]] = {
+    "receipt/record.schema.json": ChioReceipt,
+    "kernel/caller_dispatch_authorization.schema.json": ChioSignedCallerDispatchAuthorization,
+    "kernel/caller_delivery_report.schema.json": ChioSignedCallerDeliveryReport,
+    "kernel/execution_nonce.schema.json": ChioSignedExecutionNonce,
+    "capability/token.schema.json": ChioCapabilitytoken,
+    "capability/aggregate-invocation-budget.schema.json": ChioAggregateInvocationBudget,
+    "capability/threshold-approval-proposal.schema.json": ChioThresholdApprovalProposal,
+    "result/pending_approval.schema.json": ChioToolcallresultPendingApproval,
+    "capability/governed-approval-token.schema.json": ChioGovernedApprovalToken,
+    "agent/active-response-governed-intent.schema.json": ChioGovernedActiveResponseIntentBody,
+    "kernel/combined-capture-metadata.schema.json": ChioCombinedAdmissionCaptureMetadata,
+    "capability/supplemental-authorization.schema.json": ChioOpaqueSupplementalAuthorization,
+}
+
+# Raw cases the SDK accepts. ChioClient decodes sidecar bytes with
+# httpx Response.json (json.loads), which keeps the last of each duplicate key,
+# and the collapsed object validates. Strict xfail turns red once these reject.
+_LAST_WINS_RAW_CASES = {"receipt-duplicate-id", "receipt-duplicate-parameter"}
+
+
+def _raw_case_params() -> list[Any]:
+    return [
+        pytest.param(
+            case,
+            id=case["name"],
+            marks=pytest.mark.xfail(
+                strict=True,
+                raises=pytest.fail.Exception,
+                reason="ChioClient decodes wire JSON with json.loads, which keeps "
+                "the last duplicate key; the SDK has no duplicate-rejecting decoder",
+            )
+            if case["name"] in _LAST_WINS_RAW_CASES
+            else (),
+        )
+        for case in _PROTOCOL_PRIMITIVES["raw_cases"]
+    ]
 
 
 def _generated_v1_token() -> dict[str, object]:
@@ -133,29 +182,8 @@ class TestGeneratedWireModels:
     def test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip(
         self,
     ) -> None:
-        models: dict[str, type[Any]] = {
-            "receipt/record.schema.json": ChioReceipt,
-            "kernel/caller_dispatch_authorization.schema.json": ChioSignedCallerDispatchAuthorization,
-            "kernel/caller_delivery_report.schema.json": ChioSignedCallerDeliveryReport,
-            "kernel/execution_nonce.schema.json": ChioSignedExecutionNonce,
-            "capability/token.schema.json": ChioCapabilitytoken,
-            "capability/aggregate-invocation-budget.schema.json": ChioAggregateInvocationBudget,
-            "capability/threshold-approval-proposal.schema.json": ChioThresholdApprovalProposal,
-            "result/pending_approval.schema.json": ChioToolcallresultPendingApproval,
-            "capability/governed-approval-token.schema.json": ChioGovernedApprovalToken,
-            "agent/active-response-governed-intent.schema.json": ChioGovernedActiveResponseIntentBody,
-            "kernel/combined-capture-metadata.schema.json": ChioCombinedAdmissionCaptureMetadata,
-            "capability/supplemental-authorization.schema.json": ChioOpaqueSupplementalAuthorization,
-        }
-        corpus = json.loads(
-            (
-                Path(__file__).resolve().parents[4]
-                / "tests/bindings/fixtures/protocol-primitives-v1.json"
-            ).read_text(encoding="utf-8")
-        )
-
-        for case in corpus["cases"]:
-            model = models[case["schema_file"]]
+        for case in _PROTOCOL_PRIMITIVES["cases"]:
+            model = _PROTOCOL_PRIMITIVE_MODELS[case["schema_file"]]
             if case["valid"]:
                 parsed = model.model_validate(case["instance"])
                 assert parsed.model_dump(mode="json", by_alias=True, exclude_unset=True) == case[
@@ -173,6 +201,19 @@ class TestGeneratedWireModels:
             else:
                 with pytest.raises(ValidationError):
                     model.model_validate(case["instance"])
+
+    @pytest.mark.parametrize("case", _raw_case_params())
+    def test_protocol_primitives_raw_cases_reject_duplicate_keys(
+        self, case: dict[str, Any]
+    ) -> None:
+        model = _PROTOCOL_PRIMITIVE_MODELS[case["schema_file"]]
+        text = case["instance_text"]
+        assert case["valid"] is False
+        # The case is valid once a last-wins parser collapses its duplicate keys.
+        model.model_validate(json.loads(text))
+        with pytest.raises((ChioError, ValidationError)):
+            wire = ChioClient._handle_response(httpx.Response(200, content=text.encode()))
+            model.model_validate(wire)
 
     def test_top_level_capability_token_alias_is_canonical(self) -> None:
         token = GeneratedCapabilityToken.model_validate(_generated_v1_token())

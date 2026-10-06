@@ -19,11 +19,16 @@ SPEC.loader.exec_module(MODULE)
 class SdkInventoryCalibration(unittest.TestCase):
     def test_terminal_inventory_mutations(self):
         manifest = json.loads((ROOT / "tests/bindings/fixtures/manifest-v2-consumers.json").read_text())["cases"]
-        primitives = json.loads((ROOT / "tests/bindings/fixtures/protocol-primitives-v1.json").read_text())["cases"]
+        corpus = json.loads((ROOT / "tests/bindings/fixtures/protocol-primitives-v1.json").read_text())
+        primitives, raw = corpus["cases"], corpus["raw_cases"]
         python = ET.Element("testsuites")
         suite = ET.SubElement(python, "testsuite")
         for name in [f"test_manifest_v2_runtime_corpus[{case['name']}]" for case in manifest] + ["test_protocol_primitives_shared_fixtures_parse_reject_and_round_trip"]:
             ET.SubElement(suite, "testcase", name=name)
+        for name, status in MODULE.RAW_CASE_STATUS.items():
+            raw_case = ET.SubElement(suite, "testcase", name=f"test_protocol_primitives_raw_cases_reject_duplicate_keys[{name}]")
+            if status["python"] == "last-wins":
+                ET.SubElement(raw_case, "skipped", type="pytest.xfail")
         go = [{"Action": "pass", "Test": name} for name in [
             "TestGeneratedProtocolPrimitivesConsumeSharedFixtures",
             "TestGeneratedManifestV2RuntimeCorpus",
@@ -34,16 +39,19 @@ class SdkInventoryCalibration(unittest.TestCase):
             "TestProtocolWireBoundsAndOpaqueDuplicatesReject",
             "TestReceiptOriginRejectsInvalidValuesWithoutReplacingPriorValue",
         ]]
-        for test, corpus in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives), ("TestGeneratedManifestV2RuntimeCorpus", manifest)]:
-            go.extend({"Action": "pass", "Test": f"{test}/{case['name']}"} for case in corpus)
+        for test, fixtures in [("TestGeneratedProtocolPrimitivesConsumeSharedFixtures", primitives + raw), ("TestGeneratedManifestV2RuntimeCorpus", manifest)]:
+            go.extend({"Action": "pass", "Test": f"{test}/{case['name']}"} for case in fixtures)
         titles = [case["name"] for case in manifest] + [
             "retains the complete shared inventory",
             "compile and validate the shared positive and negative fixtures",
             "accepts representable bounds without modifying input",
             "rejects unsafe numbers, unknown authority, coercion and unknown domains",
             "compiles references at setup and rejects cycles in input",
+        ] + [
+            f"raw {name} rejects duplicate keys" + (MODULE.TYPESCRIPT_GAP_SUFFIX if status["typescript"] == "last-wins" else "")
+            for name, status in MODULE.RAW_CASE_STATUS.items()
         ]
-        typescript = {"success": True, "numTotalTests": 19, "numPassedTests": 19,
+        typescript = {"success": True, "numTotalTests": 21, "numPassedTests": 21,
                       "testResults": [{"assertionResults": [{"title": title, "status": "passed"} for title in titles]}]}
         with tempfile.TemporaryDirectory(prefix="chio-sdk-inventory-calibration-") as directory:
             evidence = Path(directory)
@@ -100,6 +108,19 @@ class SdkInventoryCalibration(unittest.TestCase):
                         assertions.append(copy.deepcopy(assertions[0]))
                     with self.assertRaises(ValueError):
                         check(ts=altered)
+            with self.subTest(language="python", mutation="raw-status"):
+                altered = copy.deepcopy(python)
+                for raw_case in altered[0]:
+                    for child in list(raw_case):
+                        raw_case.remove(child)
+                with self.assertRaises(ValueError):
+                    check(py=altered)
+            with self.subTest(language="typescript", mutation="raw-status"):
+                altered = copy.deepcopy(typescript)
+                for item in altered["testResults"][0]["assertionResults"]:
+                    item["title"] = item["title"].removesuffix(MODULE.TYPESCRIPT_GAP_SUFFIX)
+                with self.assertRaises(ValueError):
+                    check(ts=altered)
 
 
 if __name__ == "__main__":
