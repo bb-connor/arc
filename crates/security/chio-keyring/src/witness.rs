@@ -248,6 +248,13 @@ impl SqliteKeyLogWitness {
                         now,
                         false,
                     )?;
+                    // The pin may only rest on a decided checkpoint. A replay of
+                    // this candidate that carries newer checkpoints returns the
+                    // existing signature without retaining them.
+                    if verified.pin.checkpoint_sequence != candidate.body.checkpoint_sequence {
+                        transaction.rollback()?;
+                        return Ok(signature);
+                    }
                     persist_verified_log(&transaction, &verified)?;
                     persist_pin(&transaction, &verified.pin)?;
                     transaction.commit()?;

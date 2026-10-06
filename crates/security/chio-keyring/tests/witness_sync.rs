@@ -696,3 +696,43 @@ fn witness_refuses_to_sign_a_candidate_that_conflicts_with_retained_gossip() {
     ));
     assert_eq!(witness.conflicts().test_unwrap().len(), 1);
 }
+
+#[test]
+fn replaying_a_decided_candidate_with_newer_checkpoints_keeps_the_witness_restartable() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(&directory, "operator.sqlite"));
+    let genesis = fixture.genesis();
+    let decided = store
+        .append_event(&genesis, &fixture.operator)
+        .test_unwrap();
+    let witness_path = trusted_temp_path(&directory, "decided-witness.sqlite");
+    let witness = fixture.witness(&witness_path, 0);
+    let first = witness
+        .sign_candidate(
+            &decided,
+            &store.synchronization_response(None).test_unwrap(),
+        )
+        .test_unwrap();
+
+    store
+        .append_event(&fixture.rotation(&genesis), &fixture.operator)
+        .test_unwrap();
+    let newer = store
+        .synchronization_response(witness.pin().test_unwrap().as_ref())
+        .test_unwrap();
+    assert!(!newer.checkpoints.is_empty());
+    let replay = witness.sign_candidate(&decided, &newer).test_unwrap();
+    assert_eq!(replay, first);
+    drop(witness);
+
+    let reopened = fixture.witness(&witness_path, 0);
+    assert_eq!(
+        reopened
+            .pin()
+            .test_unwrap()
+            .test_unwrap()
+            .checkpoint_sequence,
+        0
+    );
+}
