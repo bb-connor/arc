@@ -4980,6 +4980,246 @@
       "observed_result": "Read-only security-owned authority/package/policy presence observations; a mistaken variable-name query is explicitly diagnostic and corrected independently without authority mutation.",
       "bytes": 568,
       "sha256": "353adbecc80249bde3e8eab1113e6b5817f51c03460243979680b555415858ad"
+    },
+    {
+      "log": "37bd5dc434-ci-before-clock-artifacts.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 34216,
+      "sha256": "0346537f750195b586da6ec4e06a9eb434444745b482905ebd5eafb4028b39e7"
+    },
+    {
+      "log": "37bd5dc434-cve-artifact-metadata.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 788,
+      "sha256": "db3e99e8ef85ba4b5828290581ca77569d192194490f95b342b8103914675973"
+    },
+    {
+      "log": "37bd5dc434-cve-artifact.zip.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 12061,
+      "sha256": "dcf8ae9bac96619cc4a940db01f7cfc17725d2da307f08d5d4517fd960db7f17"
+    },
+    {
+      "log": "37bd5dc434-cve-job.log.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 81143,
+      "sha256": "f5d64fd4d94c9f59cb205d50dc28ae0e7242d8d965a937aa4ffbe996e4b12e97"
+    },
+    {
+      "log": "37bd5dc434-cve-verification.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 20909,
+      "sha256": "bc929c0f45b654663d6d97014f2bda65c75d59c86e136bbef6e0bd0dcae60cc1"
+    },
+    {
+      "log": "37bd5dc434-reviews-after-greptile.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 103120,
+      "sha256": "0539023b43d62ad5588686fe9bd809a721281a3d17e304c44a9cec91116cc0e6"
+    },
+    {
+      "log": "37bd5dc434-reviews-after-greptile.log.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 68098,
+      "sha256": "f4c9cd8b917d87ad20e5d6459f11393f85d328e8ead85f7a5d36fffe072e3e40"
+    },
+    {
+      "log": "37bd5dc434-reviews-after-push.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 101349,
+      "sha256": "8e9a0c1b812689853a40a26cf5dd3c592411aa6412980b487b5e56916f725ac1"
+    },
+    {
+      "log": "37bd5dc434-reviews-after-push.log.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 66787,
+      "sha256": "d9ddf846c091f998f41db2e53a880cf4d4f2395f08d78c3e1711ba5aa5c422bd"
+    },
+    {
+      "log": "37bd5dc434-security-authority-snapshot.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 756,
+      "sha256": "27d1387b1b86d82953945f18b6913bed85d5c3c06fb03e647b63e53a5235f2ef"
+    },
+    {
+      "log": "37bd5dc434-terminal-error-thread-resolution.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 376,
+      "sha256": "aa4b5be00ab90cfc180f4c70acaf0cdcf15bf10784761dbce794b5ac65c0445a"
+    },
+    {
+      "log": "37bd5dc434-vet-job-112435117804.json.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 3342,
+      "sha256": "39362cb3abdd887a4006c9d7c755883f41e70bd326fceae34360896318a993ca"
+    },
+    {
+      "log": "37bd5dc434-vet-job-112435117804.log.gz",
+      "observed_result": "Authenticated preceding37 hosted/review and thread-state observations. Pending, failed or passing checks remain historical and cannot establish final-head acceptance.",
+      "bytes": 61086,
+      "sha256": "f7790e59024144861c0d20c6413e4922cdb0a7b590745b1eb673d4d7f81eec15"
+    },
+    {
+      "log": "a2a-clock-error-coverage-final-green-diff.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-clock-error-coverage-final-green-format.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "a2a-clock-error-coverage-final-green-hygiene.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 52024,
+      "sha256": "3e644c33241bbec07be9bccc55346dfa3fffcfd7b5b842ec47c84154fbd4aa41"
+    },
+    {
+      "log": "a2a-clock-error-coverage-final-green-proof-check.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "a2a-clock-error-coverage-final-green-proof-refresh.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "a2a-clock-error-coverage-final-green.status.json.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 826139,
+      "sha256": "0d8ff0cfaf1a0a4ccc97fd8c81c1999516ede82893c09bdfc8318df4620a2a04"
+    },
+    {
+      "log": "a2a-clock-error-final-green-consumer-clippy.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 1883,
+      "sha256": "9c5224f8008d175523fd3769b378ebe55f5259c8db61b9de18efbde7d964da01"
+    },
+    {
+      "log": "a2a-clock-error-final-green-consumer-contract.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 196,
+      "sha256": "8dfb53dbd36657af7304c2bb2a758e41ab8e174a2c50743c3fa424ce792a1c40"
+    },
+    {
+      "log": "a2a-clock-error-final-green-consumer-prefix.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 6364,
+      "sha256": "54405ebcc81a00d729d90e40372e2aed4945ca93cbe8920ec0971af7183da751"
+    },
+    {
+      "log": "a2a-clock-error-final-green-consumer.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 3474,
+      "sha256": "05e647d425b3e67b5a81b60b54e3c1c1967688f083598729fe245f2a23ffcf11"
+    },
+    {
+      "log": "a2a-clock-error-final-green-edge-clippy.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 1769,
+      "sha256": "5796316f97d9c906a0960187dce8521225ff750ac864008a9fdac5ca6e25c995"
+    },
+    {
+      "log": "a2a-clock-error-final-green-edge.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 10513,
+      "sha256": "fe4e3c4ee3fab3c053e16a2c9988c56c90a51978a792f03dc93700bd577b34e5"
+    },
+    {
+      "log": "a2a-clock-error-final-green-mirrors.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "a2a-clock-error-final-green-proof-check.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 317,
+      "sha256": "b93f2f25cb31b366d333f51a87e90cb88273d0a11a49bb34ed9f8090fc70ad26"
+    },
+    {
+      "log": "a2a-clock-error-final-green.status.json.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 829341,
+      "sha256": "d9a771b7622a7f2a41edd8a08754b718ae2685e1a659cd02a2828d78aa7a6198"
+    },
+    {
+      "log": "a2a-clock-error-inline-review.json.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 2931,
+      "sha256": "2e45f6e11dfbc1edae4d63736f717bd4f9143fa4ce03d4ce59103c0052968c4e"
+    },
+    {
+      "log": "a2a-clock-error-red-continuation.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 12888,
+      "sha256": "07da1aa8aba1798449985a600b95884942438f2c3890d9d4450cc615b2e11aa6"
+    },
+    {
+      "log": "a2a-clock-error-red.status.json.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 824523,
+      "sha256": "747c4249123be68df74a4151f76477506bd4e6ad6dc8331205adc1b612499994"
+    },
+    {
+      "log": "a2a-clock-error-regression-green-consumer-regressions.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 3474,
+      "sha256": "ea71ce66f79a162ebb86daa4b75ca0b1f539da0ec8a985ccdf6c46db9d517b8b"
+    },
+    {
+      "log": "a2a-clock-error-regression-green-edge-regressions.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 2120,
+      "sha256": "81e42062c28dc4de7a653468fa967188a814534e84c0aa4bd2ce9494b3a35f39"
+    },
+    {
+      "log": "a2a-clock-error-regression-green.status.json.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 824997,
+      "sha256": "a9e98f36302ced8bf5c7d623f6f8b9b94c67e37ddf89e422965ee429774aab17"
+    },
+    {
+      "log": "a2a-clock-error-reviewed-source.diff.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 28011,
+      "sha256": "c4b71741b7b261250e2f8ff451dcee0924448de3d87c269c8fa71f1b55267255"
+    },
+    {
+      "log": "a2a-clock-error-source-commit.log.gz",
+      "observed_result": "Actual pre-evaluation clock RED/GREEN, exact consumer inventory and inline author review; physical-dispatch state is never inferred from a response error. All results retain original source inputs and terminal status.",
+      "bytes": 340,
+      "sha256": "19d0db294b76107313a13d40dd8ef207db5fe4c97e556bd9e2b98ea3f3befe27"
+    },
+    {
+      "log": "qualification-76a052c5b8.status.json.gz",
+      "observed_result": "Actual current-source21-command native qualification; canonical source/output inventory authoritative.",
+      "bytes": 268,
+      "sha256": "dba49e66b6f053d77fcf1684639aa0fd95607952bd0fb3ef98c77e07e7e13d01"
+    },
+    {
+      "log": "receipt-verifier-76a052c5b8-build.log.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated binary on ARM; no physical x86 acceptance.",
+      "bytes": 1660,
+      "sha256": "7a25fc9c6cc320be11f1e586116484285d76f095adeef81c272a435349ca8626"
+    },
+    {
+      "log": "receipt-verifier-76a052c5b8.status.json.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated binary on ARM; no physical x86 acceptance.",
+      "bytes": 566,
+      "sha256": "ab486c9dc2c98c6a6a518123bdc612e70cc27893b22b583f4c45074426664bf8"
+    },
+    {
+      "log": "review-native-qualification-76a052c5b8.log.gz",
+      "observed_result": "Actual terminal current-source21-command native output; no hosted or physical x86 claim.",
+      "bytes": 539,
+      "sha256": "e82bb9877f4c5a75624498329b72fec52e05e5306c0b09a37bbf6b481732dfb5"
     }
   ]
 }
