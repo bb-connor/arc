@@ -417,6 +417,107 @@ fn a_client_refuses_an_endpoint_served_by_another_user_before_sending_its_reques
     );
 }
 
+/// A listener bound at `socket` with a zero backlog, plus the queued
+/// connections that fill its accept queue. Nothing ever accepts them.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn full_queue_listener(
+    socket: &Path,
+) -> std::io::Result<(rustix::fd::OwnedFd, Vec<rustix::fd::OwnedFd>)> {
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketFlags, SocketType};
+
+    let unix_socket =
+        |flags| rustix::net::socket_with(AddressFamily::UNIX, SocketType::STREAM, flags, None);
+    let address = SocketAddrUnix::new(socket)?;
+    let listener = unix_socket(SocketFlags::CLOEXEC)?;
+    rustix::net::bind(&listener, &address)?;
+    rustix::net::listen(&listener, 0)?;
+    let mut queued = Vec::new();
+    for _ in 0..64 {
+        let client = unix_socket(SocketFlags::CLOEXEC | SocketFlags::NONBLOCK)?;
+        match rustix::net::connect(&client, &address) {
+            Ok(()) => queued.push(client),
+            Err(rustix::io::Errno::AGAIN) => return Ok((listener, queued)),
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Err(std::io::Error::other("the accept queue never filled"))
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test]
+fn the_stale_socket_check_does_not_wait_on_a_live_listener_with_a_full_queue() {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let (_listener, _queued) = full_queue_listener(&socket).test_unwrap();
+    let live = std::fs::symlink_metadata(&socket).test_unwrap().ino();
+    let (sender, receiver) = mpsc::channel();
+    let probed = socket.clone();
+    thread::spawn(move || {
+        let _ = sender.send(bind(&probed));
+    });
+    let result = receiver.recv_timeout(Duration::from_secs(10));
+    assert!(
+        matches!(result, Ok(Err(KeyringError::StateInvariant(_)))),
+        "{result:?}"
+    );
+    assert_eq!(std::fs::symlink_metadata(&socket).test_unwrap().ino(), live);
+}
+
+#[test]
+fn a_live_listener_outside_the_lifecycle_lock_keeps_its_socket() {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let _listener = UnixListener::bind(&socket).test_unwrap();
+    let live = std::fs::symlink_metadata(&socket).test_unwrap().ino();
+    assert_refused_by_policy(bind(&socket));
+    assert_eq!(std::fs::symlink_metadata(&socket).test_unwrap().ino(), live);
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test]
+fn a_client_queued_behind_a_full_accept_queue_gives_up_at_its_exchange_deadline() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let (_listener, _queued) = full_queue_listener(&socket).test_unwrap();
+    let client = unreachable_witness_client(&socket);
+    let (sender, receiver) = mpsc::channel();
+    let started = Instant::now();
+    thread::spawn(move || {
+        let _ = sender.send(client.readiness("full-queue"));
+    });
+    let result = receiver.recv_timeout(KEY_LOG_IPC_REQUEST_DEADLINE + Duration::from_secs(5));
+    let elapsed = started.elapsed();
+    assert!(matches!(result, Ok(Err(KeyringError::Io(_)))), "{result:?}");
+    assert!(
+        elapsed < KEY_LOG_IPC_REQUEST_DEADLINE + Duration::from_secs(2),
+        "a full accept queue held the client for {elapsed:?}"
+    );
+}
+
+#[test]
+fn a_client_whose_connection_is_never_accepted_gives_up_at_its_exchange_deadline() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let _listener = UnixListener::bind(&socket).test_unwrap();
+    let client = unreachable_witness_client(&socket);
+    let (sender, receiver) = mpsc::channel();
+    let started = Instant::now();
+    thread::spawn(move || {
+        let _ = sender.send(client.readiness("never-accepted"));
+    });
+    let result = receiver.recv_timeout(KEY_LOG_IPC_REQUEST_DEADLINE + Duration::from_secs(5));
+    let elapsed = started.elapsed();
+    assert!(matches!(result, Ok(Err(KeyringError::Io(_)))), "{result:?}");
+    assert!(
+        elapsed < KEY_LOG_IPC_REQUEST_DEADLINE + Duration::from_secs(2),
+        "an unaccepted connection held the client for {elapsed:?}"
+    );
+}
+
 #[test]
 fn a_store_without_its_record_is_not_adopted_without_provisioning_authorization() {
     let directory = support::private_tempdir().test_unwrap();
