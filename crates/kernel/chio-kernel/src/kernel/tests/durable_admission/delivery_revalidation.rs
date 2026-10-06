@@ -6,6 +6,9 @@ use std::task::{Context, Waker};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+#[path = "delivery_revalidation/launch_receipt.rs"]
+mod launch_receipt;
+
 #[derive(Clone, Copy)]
 enum OwnedOutcome {
     Complete,

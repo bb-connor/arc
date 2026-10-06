@@ -1463,3 +1463,202 @@ fn view_sink_stamps_the_locally_materialised_leaf_set() {
     assert!(snapshot.is_revoked(&RevocationViewSubject::new("cap-revoked")));
     assert!(!snapshot.is_revoked(&RevocationViewSubject::new("cap-live")));
 }
+
+#[test]
+fn view_sink_epoch_contract_rejects_conflicting_installed_root() {
+    let origin = signer("oracle-a", SEED_A);
+    let original = signed_root(&origin, 7);
+    for change_time in [false, true] {
+        let sink = RevocationViewSink::new(origin.verifier())
+            .with_subject_source(Arc::new(FixedSubjects("cap-revoked")));
+        sink.merge_root(&original).expect("install original root");
+        let before = sink.view().load();
+        let mut root = original.root.clone();
+        if change_time {
+            root.issued_at_unix_ms += 1;
+        } else {
+            root.root_hash[0] ^= 1;
+        }
+        let conflict = SignedEpochRoot::sign(root, &origin).expect("sign conflict");
+        conflict
+            .verify(&origin.verifier())
+            .expect("authentic conflict");
+        let result = sink.merge_root(&conflict);
+        assert!(
+            matches!(result, Err(RevocationLaneError::SinkRejected(_))),
+            "{result:?}"
+        );
+        assert!(Arc::ptr_eq(&before, &sink.view().load()));
+        assert!(before.is_revoked(&RevocationViewSubject::new("cap-revoked")));
+    }
+}
+
+#[derive(Debug, Default)]
+struct ChangingSubjects(Mutex<BTreeSet<RevocationViewSubject>>);
+
+impl RevokedSubjectSource for ChangingSubjects {
+    fn revoked_at(&self, _: &EpochRoot) -> BTreeSet<RevocationViewSubject> {
+        self.0.lock().expect("test subject source").clone()
+    }
+}
+
+#[test]
+fn view_sink_epoch_contract_compares_locally_materialized_subjects() {
+    let origin = signer("oracle-a", SEED_A);
+    let root = signed_root(&origin, 7);
+    let subjects = Arc::new(ChangingSubjects::default());
+    let sink = RevocationViewSink::new(origin.verifier()).with_subject_source(subjects.clone());
+    sink.merge_root(&root).expect("install original root");
+    let before = sink.view().load();
+    subjects
+        .0
+        .lock()
+        .expect("test subject source")
+        .insert(RevocationViewSubject::new("cap-newly-revoked"));
+    let result = sink.merge_root(&root);
+    assert!(
+        matches!(result, Err(RevocationLaneError::SinkRejected(_))),
+        "{result:?}"
+    );
+    assert!(Arc::ptr_eq(&before, &sink.view().load()));
+    assert!(!before.is_revoked(&RevocationViewSubject::new("cap-newly-revoked")));
+}
+
+#[test]
+fn view_sink_epoch_contract_accepts_identical_replay_and_stale_roots() {
+    let origin = signer("oracle-a", SEED_A);
+    let root = signed_root(&origin, 7);
+    let sink = RevocationViewSink::new(origin.verifier())
+        .with_subject_source(Arc::new(FixedSubjects("cap-revoked")));
+    sink.merge_root(&root).expect("install original root");
+    let before = sink.view().load();
+    for replay in [&root, &signed_root(&origin, 3), &root] {
+        sink.merge_root(replay)
+            .expect("idempotent or stale delivery");
+        assert!(Arc::ptr_eq(&before, &sink.view().load()));
+    }
+    sink.merge_root(&signed_root(&origin, 8))
+        .expect("advance epoch");
+    assert_eq!(sink.view().current_epoch(), 8);
+    assert!(sink
+        .view()
+        .is_revoked(&RevocationViewSubject::new("cap-revoked")));
+}
+
+#[test]
+fn view_sink_epoch_contract_rejects_internal_batch_forks_atomically() {
+    let origin = signer("oracle-a", SEED_A);
+    let original = signed_root(&origin, 7);
+    for changed_field in 0..3 {
+        let mut changed = original.root.clone();
+        match changed_field {
+            0 => changed.root_hash[0] ^= 1,
+            1 => changed.issued_at_unix_ms += 1,
+            _ => changed.leaf_count += 1,
+        }
+        let conflict = SignedEpochRoot::sign(changed, &origin).expect("sign conflict");
+        conflict
+            .verify(&origin.verifier())
+            .expect("authentic conflict");
+        for roots in [
+            vec![original.clone(), conflict.clone()],
+            vec![original.clone(), signed_root(&origin, 9), conflict.clone()],
+            vec![conflict.clone(), signed_root(&origin, 9), original.clone()],
+        ] {
+            let sink = RevocationViewSink::new(origin.verifier());
+            sink.merge_root(&signed_root(&origin, 4))
+                .expect("install original epoch");
+            let before = sink.view().load();
+            let result = sink.merge_batch(&roots);
+            assert!(
+                matches!(result, Err(RevocationLaneError::SinkRejected(_))),
+                "{result:?}"
+            );
+            assert!(Arc::ptr_eq(&before, &sink.view().load()));
+        }
+    }
+}
+
+#[test]
+fn view_sink_epoch_contract_rejects_conflicts_through_the_handler() {
+    let transport = endpoint_from_seed(10);
+    let origin = signer("oracle-a", SEED_A);
+    let directory = directory_with_signer("did:chio:peer", 10, "oracle-a", SEED_A);
+    let sink = Arc::new(RevocationViewSink::new(origin.verifier()));
+    let handler = RevocationHandler::new(
+        directory,
+        Arc::new(EmptyHistory),
+        sink.clone(),
+        "did:chio:responder",
+    );
+    let original = signed_root(&origin, 7);
+    let response = handler.handle_request(
+        transport,
+        RevocationLaneRequest::Push(batch(vec![RevocationRootGossip::from_signed(
+            original.clone(),
+            NOW,
+        )])),
+        NOW,
+    );
+    assert!(
+        matches!(response, RevocationLaneResponse::PushAccepted { merged_epochs } if merged_epochs == [7])
+    );
+    let before = sink.view().load();
+    let mut changed = original.root.clone();
+    changed.root_hash[0] ^= 1;
+    let conflict = SignedEpochRoot::sign(changed, &origin).expect("sign conflict");
+    let response = handler.handle_request(
+        transport,
+        RevocationLaneRequest::Push(batch(vec![RevocationRootGossip::from_signed(
+            conflict, NOW,
+        )])),
+        NOW,
+    );
+    assert!(
+        matches!(response, RevocationLaneResponse::Rejected { code, .. } if code == "sink-rejected")
+    );
+    assert!(Arc::ptr_eq(&before, &sink.view().load()));
+}
+
+#[test]
+fn view_sink_epoch_contract_linearizes_concurrent_replays_and_conflicts() {
+    let origin = signer("oracle-a", SEED_A);
+    for same_root in [true, false] {
+        let first = signed_root(&origin, 7);
+        let mut root = first.root.clone();
+        if !same_root {
+            root.root_hash[0] ^= 1;
+        }
+        let second = SignedEpochRoot::sign(root, &origin).expect("sign second root");
+        let sink = Arc::new(RevocationViewSink::new(origin.verifier()));
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let workers: Vec<_> = [first, second]
+            .into_iter()
+            .map(|root| {
+                let sink = sink.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    sink.merge_root(&root)
+                })
+            })
+            .collect();
+        barrier.wait();
+        let results: Vec<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().expect("test writer"))
+            .collect();
+        assert_eq!(
+            results.iter().filter(|result| result.is_ok()).count(),
+            if same_root { 2 } else { 1 }
+        );
+        assert_eq!(
+            results
+                .iter()
+                .filter(|result| matches!(result, Err(RevocationLaneError::SinkRejected(_))))
+                .count(),
+            usize::from(!same_root)
+        );
+        assert_eq!(sink.view().current_epoch(), 7);
+    }
+}

@@ -150,11 +150,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "existing oversized MCP edge runtime test suite; capped to current size until split",
         max_lines=4_496,
     ),
-    "crates/products/chio-cli/tests/certify.rs": allow(
-        "2027-01-31",
-        "existing oversized CLI certify integration suite; capped to current size until split",
-        max_lines=3_645,
-    ),
     "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs": allow(
         "2027-01-31",
         "launch proof fixture dispatch surface; capped to current size until split",

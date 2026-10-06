@@ -1,5 +1,6 @@
 #[path = "../examples/dynamic_delegation_support/mod.rs"]
 mod support;
+use chio_core::capability::scope::MonetaryAmount;
 use chio_kernel::*;
 use chio_workflow::delegation::*;
 use serde_json::json;
@@ -377,6 +378,76 @@ fn governed_delegation_preserves_tool_arguments_and_denies_binding_substitution(
             response.reason
         );
         assert_eq!(calls.load(Ordering::SeqCst), usize::from(mutation == 0));
+    }
+    Ok(())
+}
+
+#[test]
+fn delegated_dispatch_uses_both_signed_cost_ceilings() -> Result {
+    for (per_call, total, expected) in [
+        (20, 100, Verdict::Allow),
+        (20, 20, Verdict::Allow),
+        (100, 20, Verdict::Deny),
+    ] {
+        let dir = tempfile::tempdir()?;
+        let store = DelegationStore::open(dir.path().join("allocation.db"))?;
+        store.create_root(slot("leaf", 2, 60, 2)?)?;
+        let (kernel, calls) = open(dir.path(), 3, false)?;
+        let mut call = request(&kernel, "leaf", 2, "independent-ceilings", 20)?;
+        let mut scope = call.capability.scope.clone();
+        let [grant] = scope.grants.as_mut_slice() else {
+            return Err("fixture requires one exact grant".into());
+        };
+        grant.max_cost_per_invocation = Some(MonetaryAmount {
+            units: per_call,
+            currency: "USD".into(),
+        });
+        grant.max_total_cost = Some(MonetaryAmount {
+            units: total,
+            currency: "USD".into(),
+        });
+        call.capability = kernel.issue_capability(&call.capability.subject, scope, 1800)?;
+        choose(&store, &call, 2, 3, 0, 20)?;
+        seal(&store, &mut call, 20)?;
+
+        let response = kernel.evaluate_tool_call_blocking(&call)?;
+        assert_eq!(
+            response.verdict, expected,
+            "{per_call}/{total}: {:?}",
+            response.reason
+        );
+        assert!(response.receipt.verify_signature()?);
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            usize::from(expected == Verdict::Allow)
+        );
+        let rail = rusqlite::Connection::open(dir.path().join("bank.db"))?;
+        if expected == Verdict::Allow {
+            let hold: (i64, String, i64) =
+                rail.query_row("SELECT COUNT(*),state,charged FROM holds", [], |row| {
+                    Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+                })?;
+            assert_eq!(hold, (1, "captured".to_owned(), 20));
+            let replay = kernel.evaluate_tool_call_blocking(&call)?;
+            assert_eq!(replay.verdict, Verdict::Allow);
+            assert_eq!(
+                serde_json::to_value(&replay.receipt)?,
+                serde_json::to_value(&response.receipt)?
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            let count: i64 = rail.query_row("SELECT COUNT(*) FROM holds", [], |row| row.get(0))?;
+            assert_eq!(count, 1);
+        } else {
+            assert_eq!(
+                response.reason,
+                Some(KernelError::BudgetExhausted(call.capability.id.clone()).to_string())
+            );
+            let count: i64 = rail.query_row("SELECT COUNT(*) FROM holds", [], |row| row.get(0))?;
+            assert_eq!(
+                count, 0,
+                "the ordinary worst-case budget refusal cannot authorize payment"
+            );
+        }
     }
     Ok(())
 }

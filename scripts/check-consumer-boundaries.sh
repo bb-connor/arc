@@ -19,6 +19,8 @@ umask 022
   mcp_threshold_proposal_approval_and_restart_preserve_one_capture \
   native_aggregate_capture_survives_consumer_restart \
   native_threshold_proposal_approval_and_restart_preserve_one_capture \
+  support::a2a_v1::pending_approval_preserves_caller_isolation_and_text_mode_through_cancel \
+  support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts \
   -- cargo test -p chio-conformance --test consumer_boundary --locked
 
 run_case() {

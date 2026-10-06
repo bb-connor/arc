@@ -5,7 +5,9 @@ cd "$(dirname "$0")/../.."
 runner="scripts/check-consumer-boundaries.sh"
 test -x "${runner}"
 bash -n "${runner}"
-test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 8
+test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 10
+grep -Fq '  support::a2a_v1::pending_approval_preserves_caller_isolation_and_text_mode_through_cancel \' "${runner}"
+grep -Fq '  support::a2a_v1::pending_approval_remains_observable_without_dispatch_or_new_receipts \' "${runner}"
 test "$(grep -c '^run_case ' "${runner}")" -eq 23
 test "$(grep -c '^run_target ' "${runner}")" -eq 2
 grep -Fq 'run_target "stdio MCP early profile rejection" mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading cargo test -p chio-cli --test mcp_startup_security' "${runner}"

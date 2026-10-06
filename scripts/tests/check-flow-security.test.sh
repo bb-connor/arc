@@ -90,47 +90,49 @@ expected_counts = {
     "frozen dispatch participant context": 41,
     "durable caller participant persistence": 3,
     "native compiled catalog identity": 2,
-    "native post-join policy": 136,
+    "native post-join policy": 142,
     "native declassification row semantics": 1,
     "native declassification issuer window": 1,
-    "public nested credential custody": 5,
+    "public nested credential custody": 6,
     "native capture accounting deltas": 2,
     "native runtime validity contract": 1,
-    "native runtime signed freshness": 3,
+    "native runtime signed freshness": 5,
     "native input intent contracts": 6,
     "native global journal migration": 4,
     "native nonce issuance custody": 1,
     "native policy clock bounds": 1,
-    "security types library": 20,
+    "security types library": 26,
     "security capability-set suspension types": 4,
     "security egress-restriction types": 2,
     "security event types": 3,
     "security issuance-freeze types": 4,
     "security port contracts": 7,
     "security response-dispatch types": 4,
-    "security response types": 9,
+    "security response types": 16,
     "security session-throttle types": 3,
-    "flow lattice and enforcement engine": 46,
-    "strict manifest v2": 24,
+    "flow lattice and enforcement engine": 47,
+    "strict manifest v2": 25,
+    "operator-owned manifest migration": 8,
+    "transport preparation provenance": 10,
     "security kernel adapters": 34,
     "durable flow state": 33,
-    "native flow custody": 93,
+    "native flow custody": 94,
     "native dispatch participant snapshots": 3,
     "native dispatch ledger callbacks": 3,
     "native dispatch attachment contracts": 4,
     "native flow observation contracts": 3,
     "original security authority selection": 22,
-    "original operation authority profile": 8,
+    "original operation authority profile": 10,
     "runtime profile non-upgrade": 1,
     "native authority admission integration": 12,
-    "physical dispatch hold ownership": 3,
+    "physical dispatch hold ownership": 9,
     "kernel-owned native preparation": 11,
     "kernel-owned native egress": 8,
     "qualified recovery lease boundary": 5,
     "runtime recovery lease containment": 1,
     "prepared flow dispatch binding": 13,
     "security runtime composition": 2,
-    "security dispatch credential boundaries": 8,
+    "security dispatch credential boundaries": 10,
     "durable security release recovery": 25,
     "durable release output binding": 2,
     "frozen durable receipt signing": 9,
@@ -194,6 +196,14 @@ required_adapter_commands = {
     "Cohere canonical stream": "chio-cohere-tools-adapter",
 }
 required_native_commands = {
+    "operator-owned manifest migration": [
+        "cargo", "test", "--locked", "-p", "chio-cli", "--bin", "chio",
+        "active_defense_migration::tests::",
+    ],
+    "transport preparation provenance": [
+        "cargo", "test", "--locked", "-p", "chio-kernel", "--lib",
+        "kernel::tests::durable_admission::delivery_revalidation::",
+    ],
     "live admission ownership": [
         "cargo", "test", "-p", "chio-kernel", "--lib", "admission_operation::sequencer::tests::",
     ],
@@ -276,7 +286,7 @@ required_native_commands = {
     ],
     "runtime profile non-upgrade": [
         "cargo", "test", "-p", "chio-store-sqlite", "--lib",
-        "admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_absent_or_historical_authority_profile",
+        "admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_original_absent_runtime_selection",
     ],
     "native flow custody": [
         "cargo", "test", "-p", "chio-store-sqlite", "--lib",
@@ -301,6 +311,27 @@ required_native_commands = {
 }
 
 
+required_security_boundary_tests = {
+    "security types library": (
+        "clock::advancing::tests::overflow_and_regression_cannot_replace_the_anchor",
+        "clock::tests::authority_expiry_and_skew_boundaries_are_exact",
+        "clock::tests::clock_fence_refuses_regression_without_replacing_the_high_water",
+        "clock::tests::conversions_never_wrap_or_substitute_epoch_zero",
+        "clock::tests::retries_cannot_extend_authority_when_wall_time_stops",
+        "ports::bounded::reader_boundary_tests::collection_limit_does_not_construct_overflow_elements",
+    ),
+    "security response types": (
+        "execution_binding_preserves_its_closed_wire_shape",
+        "execution_binding_rejection_carries_the_compared_versions",
+        "execution_binding_rejects_unsupported_wire_versions",
+        "fresh_live_admission_refuses_simulated_plans",
+        "live_execution_rules_name_the_binding_that_refused",
+        "response_execution_binding_is_preserved_in_authorization",
+        "response_plans_and_authorization_require_explicit_execution",
+    ),
+}
+
+
 def validate(calls: dict[str, tuple[bool, list[str], list[str]]]) -> None:
     observed_counts = {label: len(value[1]) for label, value in calls.items()}
     if observed_counts != expected_counts:
@@ -318,6 +349,12 @@ def validate(calls: dict[str, tuple[bool, list[str], list[str]]]) -> None:
     for label, expected_command in required_native_commands.items():
         if calls[label][2] != expected_command:
             raise SystemExit(f"{label}: native authority target is not exact")
+    _, expected, command = calls["security types library"]
+    if command != ["cargo", "test", "-p", "chio-security-types", "--lib"]:
+        raise SystemExit("security types library: default library target is not exact")
+    for label, required in required_security_boundary_tests.items():
+        if not set(required).issubset(calls[label][1]):
+            raise SystemExit(f"{label}: required security boundary coverage is missing")
 
 
 source = Path(sys.argv[1]).read_text(encoding="utf-8")
@@ -364,6 +401,21 @@ def rejects(name: str, source: str, expected_error: str) -> None:
 
 # Run mutations through the same parser and validator as the actual script.
 # Do not replace the validator with a separate missing-label predicate.
+for label, required in required_security_boundary_tests.items():
+    for name in required:
+        rejects(
+            f"replaced required security boundary {label}/{name}",
+            source.replace(name, "mutated_security_boundary::required_case"),
+            "required security boundary coverage is missing",
+        )
+rejects(
+    "changed security types library target",
+    source.replace(
+        "-- cargo test -p chio-security-types --lib",
+        "-- cargo test -p chio-security-types --features std --lib",
+    ),
+    "default library target is not exact",
+)
 rejects(
     "premature flow success",
     'echo "Flow security gate passed"\n' + source.replace('echo "Flow security gate passed"', ""),

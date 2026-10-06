@@ -15,6 +15,11 @@ the implementation actually qualified. Historical failures remain historical.
 subagents, force pushes, merge, or deployment. One Cargo owner per target. Record
 a reproduction or an evidence-backed disposition for every review finding.
 
+**Tracking:** This plan belongs to the native source inventory. After the source
+checkpoint is committed, record subsequent artifact and hosted acceptance in the
+execution ledger, retained evidence and PR status. Keep the qualified source
+immutable rather than changing plan checkboxes underneath its recorded hashes.
+
 ## Newly published JavaScript advisory follow-up
 
 The `79d0c8a977` advisory job reports three newly reviewed advisories after
@@ -52,6 +57,29 @@ registry packages. This is a bounded dependency repair under task 3.
   charge; retain the signed waiver authority and align replay/store validation.
 - [x] Run the affected kernel, workflow and SQLite suites and strict Clippy.
 
+### Effective delegated invocation ceiling follow-up
+
+Review 5423554232 finds that the installed work guard constructs its dispatch
+binding from the larger of two signed limits. An exact one-invocation grant is
+bounded by both the per-call and total ceilings, so its effective ceiling is
+their minimum. Keep both required and preserve exact currency, capability,
+request, receiver and payload binding.
+
+- [x] Add `delegated_dispatch_uses_both_signed_cost_ceilings` to the existing
+  `crates/kernel/chio-kernel/tests/dynamic_delegation.rs` target. Exercise signed
+  20/100 and 20/20 ceilings against the same 20-unit receiver offer through
+  actual SQLite admission; require successful one-dispatch execution, signed
+  receipt, one captured 20-unit hold and observational replay. A 100/20 grant
+  must retain the ordinary worst-case budget refusal and never dispatch. Watch
+  the original maximum reject the admissible 20/100 case.
+- [x] Change only the ceiling selection in
+  `crates/kernel/chio-kernel/src/delegated_work.rs::DelegatedWorkGuard::admit` to
+  the smaller signed cap. Preserve existing excess-ceiling refusal tests and
+  live versus historical output-contract checks.
+- [x] Run all fourteen dynamic-delegation cases and strict kernel all-target
+  Clippy. Retain the actual behavioral red run separately from setup failures.
+- [ ] Renew workspace compilation, native artifacts and final hosted acceptance.
+
 ## 2. Protocol and transport boundaries
 
 - [x] Verify and fix the byte-input A2A conformance target and the obsolete
@@ -67,6 +95,34 @@ registry packages. This is a bounded dependency repair under task 3.
   lifetime, retaining the actual confinement qualification on x86.
 - [x] Resolve adjacent consistency vocabulary, journal codec and error-code
   precedence findings with narrow compatibility tests where warranted.
+
+### Same-epoch revocation conflict follow-up
+
+Review 5423554232 finds that the single-signer sink converts every non-advancing
+epoch error into success. The existing kernel-core view intentionally requires
+strict epoch advancement. Preserve that primitive and its atomic compare and
+swap; a different projected snapshot at the installed epoch is a typed sink
+rejection, while an identical snapshot is idempotent and older roots are no-ops.
+Reject conflicting same-epoch root bodies within a batch before its one install.
+Do not introduce a second revocation registry or a same-epoch update protocol.
+
+- [x] Add real correctly signed conflict/replay controls beside the existing
+  view-sink cases in
+  `crates/trust/chio-federation-transport-iroh/src/lanes/revocation/tests.rs`.
+  Cover changed root hash, issue time and materialized subject set; exact replay,
+  stale input and higher-epoch advancement must retain their intended behavior.
+  Exercise the real handler's typed rejection and unchanged installed Arc.
+- [x] Add a conflicting-root batch control, including a conflict below a valid
+  highest epoch. Require signature validation and rejection before any snapshot
+  changes, in either input order.
+- [x] Repair `RevocationViewSink::install` and `merge_batch` at their existing
+  boundary in `src/lanes/revocation.rs`. Preserve the pinned verifier, fresh-view
+  construction, all-or-nothing merge and current kernel-core monotonicity API.
+- [x] Run the complete federation and Iroh transport targets with `typestate`
+  owned by `chio-federation`: 407 tests pass, including all six new controls.
+  Both strict all-target Clippy commands and seven structural checks pass.
+- [ ] Renew workspace and final hosted qualification. Earlier complete
+  information-flow results keep their earlier source scope.
 
 ### Nonterminal v1 custody follow-up
 
@@ -90,6 +146,23 @@ approval engine is required.
   successful capture and restart assertions must pass with production approval
   validation unchanged; retain the first four-failure run separately.
 
+### Legacy preparation receipt binding follow-up
+
+The hosted retirement regression completes its confined TLS call but fails the
+original kernel receipt's native-launch assertion. The legacy preparation
+callback prepares the registered connection and returns no replacement. The
+kernel consequently omits that connection when binding its launch receipt.
+
+- [x] Reproduce the missing binding through the actual portable kernel for both
+  ordinary and nested calls. Verify signed outcomes, exact receipt digest,
+  one preparation and correct dispatch/refusal accounting.
+- [x] Retain the effective prepared connection when the callback has no
+  replacement. Reuse the existing launch binding and conflict rejection. Keep
+  factory identity checks, readiness revalidation and cancellation unchanged.
+- [x] Require the complete delivery-revalidation tests and strict kernel Clippy.
+- [ ] Renew the actual x86 retirement regression without changing its assertion,
+  nonroot caller, host prerequisites or confinement requirements.
+
 ## 3. CI and supply-chain coverage
 
 - [x] Select the main CI workflow for packet/integration PR bases and require its
@@ -104,6 +177,90 @@ approval engine is required.
 - [x] Protect fork, advisory, Kani and audit trust anchors with CODEOWNERS; inspect
   repository enforcement separately. Detect policy-criteria weakening in the
   exemption gate while preserving the reviewed AWS-LC composite gate.
+
+### Information-flow compiled inventory follow-up
+
+The preceding hosted candidate passes all 26 default security-type library tests,
+then fails its stale 20-name inventory. The six additional cases enforce clock
+bounds, non-extending authority, overflow rejection and bounded reader allocation.
+The complete compiled preflight finds eleven further mismatches. Retain every
+current test, follow the checked runtime-selection and nonce renames, and replace
+three references to the removed public v1 converter with the existing eight-case
+operator migration suite. Its authenticated-v1 refusal is mandatory. Add the
+complete transport revalidation suite and the two actual nonterminal consumer
+cases to their existing gates. The composed flow gate has 71 exact inventories.
+
+- [x] Reproduce the inventory failure against the actual compiled tests. Preserve
+  the hosted failure and run the updated contract before correcting the inventory.
+- [x] Include all current compiled identities, preserving the exact default library
+  target and unfiltered execution. Calibrate omission and substitution controls
+  through the existing contract validator.
+- [ ] Verify every composed flow target against its compiled inventory and run
+  the full information-flow gate. Commit the repair before renewing source-bound
+  native qualification, reproducible paper artifacts and final hosted acceptance.
+
+### Hosted hygiene and installed-consumer follow-up
+
+The preceding main CI fails the stub scanner before workspace Clippy/build/test.
+It mistakes `clippy::todo` lint declarations for incomplete implementations and
+retains three stale comment exceptions. Its remaining new hits are the exact
+Miri interpreter limitation, a local simulated fence and SQL parameter binding
+terminology. The installed-consumer job separately fails its first repository
+operator run. Its public diagnostic records a request timeout and one exited
+worker, without identifying the affected transport deadline.
+
+- [x] Reproduce the complete scanner failure. Add real checker controls that
+  admit lint declarations but refuse executable TODOs and unfinished comments
+  beside them. Review the three domain comments, allow only their exact lines
+  and remove stale exceptions. Require the entire checker and calibration suite.
+- [ ] Identify the installed repository trial's failing boundary. Extend its
+  existing bounded public diagnostic with fixed worker error classes and MCP
+  method/deadline records, never private stderr, credentials or request bodies.
+  Require secret-seeded and truncation controls before a fresh hosted diagnosis.
+- [x] Qualify the public diagnostic parser with real secret-seeded and bounded
+  input tests. Run the full Python SDK/recovery suite with an interpreter that
+  supplies both Linux pidfd APIs. Preserve the failed interpreter campaign;
+  no process-identity assertions or cleanup tests may be skipped.
+- [x] Check the queued workspace interpreter as well. Its standalone CPython
+  also lacks both APIs. Prepare a separate system-CPython environment from the
+  existing LangGraph lockfile with the current development/process extras;
+  verify both APIs and keep the lockfile unchanged. Use it for subsequent
+  workspace and native qualification, leaving active campaigns untouched.
+- [x] Complete the investigative x86 campaign at `4b7480c686`: all five selected
+  native jobs pass, including both installed operators and the original
+  repository 65-second command; the conditional optimized comparison is skipped.
+  Authenticate the successful archive without retaining private worker files.
+  The earlier request timeout does not reproduce and retains its failed scope.
+- [ ] Investigate any recurrence and require the original installed-consumer
+  trial, including its 65-second command, native confinement and original
+  deadlines. No installed-consumer acceptance follows from diagnostic changes.
+
+### MSRV certification fixture custody follow-up
+
+The preceding MSRV job reaches `chio-cli --test certify`: nine cases pass,
+four fail, and one existing timing-sensitive case is ignored. The four failures create
+the authority database directly under shared `/tmp`. Production correctly
+requires its parent to be privately owned with mode 0700.
+
+- [x] Preserve the exact MSRV failure and compare the original fixture bytes
+  with the hosted source before editing. Reuse `chio_test_support::private_tempdir`
+  for all five generic-registry fixtures, retaining the directory through each
+  test and keeping the existing assertions, deadlines and ignore condition.
+- [x] Move the five cohesive generic-registry cases into the normal private
+  `crates/products/chio-cli/tests/certify/generic_registry.rs` module. Keep parent
+  and child below 2,000 lines and remove the obsolete 3,645-line exception from
+  `scripts/check-rust-file-hygiene.py`. No size allowance is increased.
+- [x] Run the complete fourteen-case certification target and its strict Clippy.
+  Thirteen tests pass and the one existing timing-sensitive case remains ignored.
+- [x] On the local ARM host, compile all workspace test targets and run strict
+  workspace Clippy. All 966 executable targets compile; library, binary and
+  example Clippy passes with warnings denied against 5,960 unchanged Rust/build
+  inputs.
+  Execute the complete workspace and consumer gates on the qualified Linux
+  x86_64 host; their native MCP integrations deliberately refuse this machine.
+  Retain the local consumer gate's six passing inventories, fifteen tests and
+  subsequent actual host-prerequisite failure without relaxing any assertion.
+  Final hosted MSRV and full consumer acceptance remain independently required.
 
 ## 4. Research implementation and evidence validity
 

@@ -39,6 +39,7 @@
 //! key (authenticity). All three are mandatory and independent (ADAPTER-SPEC 5
 //! "feeds the verifier, not replaces it"; blueprint B.4).
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -352,14 +353,12 @@ impl RevokedSubjectSource for NoLocalRevokedSubjects {
 ///
 /// ## All-or-nothing merge
 ///
-/// [`RevocationRootSink::merge_batch`] forbids a partial advance. This sink
-/// therefore performs exactly ONE `install_if_newer` per batch, for the
-/// highest-epoch root the lane verified: a single monotone compare-and-swap either
-/// happens or does not. Lower-epoch roots in the same batch carry no information
-/// the highest does not (the view is a monotone snapshot, not a log), and the lane
-/// has already verified every frame before calling in. A batch whose highest epoch
-/// does not advance the installed snapshot merges nothing and reports success: a
-/// duplicate or reordered push must not reset a lane, and nothing was applied.
+/// After verifying every signature and rejecting conflicting root bodies at
+/// the same epoch, this sink installs only the highest-epoch root in a batch.
+/// One monotone compare-and-swap commits the snapshot atomically; lower epochs
+/// are never installed. Older roots and identical projected snapshots are
+/// successful no-ops. A different projected snapshot at the installed epoch is
+/// rejected without changing the view.
 #[derive(Debug)]
 pub struct RevocationViewSink {
     view: Arc<RevocationView>,
@@ -396,20 +395,29 @@ impl RevocationViewSink {
         &self.view
     }
 
-    /// Install one verified root, or leave the view untouched when it does not
-    /// advance the installed epoch.
+    /// Install one verified root. Older or identical snapshots are no-ops;
+    /// conflicting snapshots at the installed epoch are rejected.
     fn install(&self, root: &EpochRoot) -> Result<(), RevocationLaneError> {
-        let snapshot = RevocationSnapshot {
+        let candidate = RevocationSnapshot {
             epoch: root.epoch,
             root_hash: root.root_hash,
             issued_at_unix_ms: root.issued_at_unix_ms,
             revoked: self.subjects.revoked_at(root),
         };
-        match self.view.install_if_newer(snapshot) {
+        match self.view.install_if_newer(candidate.clone()) {
             Ok(_previous) => Ok(()),
-            // A root that does not advance the monotone epoch merges nothing. The
-            // view is unchanged, so there is no partial application to roll back.
-            Err(chio_kernel_core::RevocationViewError::NonMonotoneEpoch { .. }) => Ok(()),
+            Err(chio_kernel_core::RevocationViewError::NonMonotoneEpoch { .. }) => {
+                // A concurrent writer can have advanced the epoch since the
+                // rejected swap. Classify against one current snapshot.
+                let current = self.view.load();
+                if candidate.epoch < current.epoch || candidate == *current {
+                    Ok(())
+                } else {
+                    Err(RevocationLaneError::SinkRejected(
+                        "conflicting revocation snapshot at installed epoch".to_owned(),
+                    ))
+                }
+            }
         }
     }
 }
@@ -425,16 +433,20 @@ impl RevocationRootSink for RevocationViewSink {
     fn merge_batch(&self, roots: &[SignedEpochRoot]) -> Result<(), RevocationLaneError> {
         // Check the whole batch before choosing an epoch. A foreign lower
         // epoch is still a domain mismatch and cannot hide behind a valid max.
+        let mut epochs = BTreeMap::new();
         for signed in roots {
             signed.verify(&self.verifier).map_err(|_| {
                 RevocationLaneError::BadSignature(self.verifier.signer_id().to_owned())
             })?;
+            if let Some(previous) = epochs.insert(signed.root.epoch, &signed.root) {
+                if previous != &signed.root {
+                    return Err(RevocationLaneError::SinkRejected(
+                        "conflicting revocation root bodies within batch".to_owned(),
+                    ));
+                }
+            }
         }
-        let Some(highest) = roots
-            .iter()
-            .map(|signed| &signed.root)
-            .max_by_key(|root| root.epoch)
-        else {
+        let Some((_, highest)) = epochs.last_key_value() else {
             return Ok(());
         };
         self.install(highest)

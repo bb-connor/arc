@@ -154,7 +154,7 @@ impl DelegatedWorkGuard {
                     server: request.server_id.clone(),
                     tool: request.tool_name.clone(),
                 },
-                max_units: per_call.units.max(total.units),
+                max_units: per_call.units.min(total.units),
                 currency: total.currency.clone(),
             },
             now,

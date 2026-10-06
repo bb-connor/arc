@@ -47,6 +47,11 @@ cargo check -p chio-security-types --no-default-features --target wasm32-unknown
 cargo check -p chio-flow --no-default-features --target wasm32-unknown-unknown
 
 run_exact_target --label "security types library" --expected \
+  clock::advancing::tests::overflow_and_regression_cannot_replace_the_anchor \
+  clock::tests::authority_expiry_and_skew_boundaries_are_exact \
+  clock::tests::clock_fence_refuses_regression_without_replacing_the_high_water \
+  clock::tests::conversions_never_wrap_or_substitute_epoch_zero \
+  clock::tests::retries_cannot_extend_authority_when_wall_time_stops \
   declassification::tests::invalid_time_and_top_target_reject_before_signing \
   declassification::tests::validated_body_round_trips_strictly \
   flow::tests::blank_principal_and_compartment_are_rejected \
@@ -67,6 +72,7 @@ run_exact_target --label "security types library" --expected \
   flow::tests::tool_flow_declaration_is_strict_and_canonical \
   flow::tests::unknown_and_variant_payload_fields_are_rejected \
   flow::tests::utf8_identifier_limit_is_normative_in_bytes \
+  ports::bounded::reader_boundary_tests::collection_limit_does_not_construct_overflow_elements \
   -- cargo test -p chio-security-types --lib
 
 run_exact_target --label "security capability-set suspension types" --expected \
@@ -115,6 +121,13 @@ run_exact_target --label "security response types" --expected \
   response_plan_rejects_zero_cryptographic_commitments \
   response_targets_and_mutation_records_reject_unknown_fields \
   response_transition_matrix_contains_only_the_specified_edges \
+  execution_binding_preserves_its_closed_wire_shape \
+  execution_binding_rejection_carries_the_compared_versions \
+  execution_binding_rejects_unsupported_wire_versions \
+  fresh_live_admission_refuses_simulated_plans \
+  live_execution_rules_name_the_binding_that_refused \
+  response_execution_binding_is_preserved_in_authorization \
+  response_plans_and_authorization_require_explicit_execution \
   -- cargo test -p chio-security-types --test response
 run_exact_target --label "security session-throttle types" --expected \
   limits_are_nonzero_and_bounded \
@@ -169,6 +182,7 @@ run_exact_target --label "flow lattice and enforcement engine" --expected \
   lattice::tests::narrowing_readers_is_upward_in_the_order \
   lattice::tests::redundant_same_owner_policies_cannot_create_unequal_equivalent_labels \
   lattice::tests::top_is_mathematical_top_but_operationally_denied_on_egress \
+  engine::tests::input_join_overflow_retains_top_taint_and_denies_admission \
   -- cargo test -p chio-flow --features std --lib
 
 run_exact_target --label "strict manifest v2" --expected \
@@ -182,9 +196,6 @@ run_exact_target --label "strict manifest v2" --expected \
   existing_signed_manifest_loader_rejects_symlinks \
   existing_signed_manifest_loader_requires_out_of_band_key_and_server_identity \
   flow_rejects_null_and_explicit_empty_aliases \
-  legacy_duration_thresholds_and_dual_latency_rejection_are_exact \
-  legacy_permissions_require_operator_profile_and_port_amendment \
-  legacy_v1_migration_is_deterministic_and_unsigned \
   required_permissions_reject_implicit_ports_and_loader_environment \
   v2_manifest_signs_and_verifies_with_normalized_permissions \
   v2_rejects_alternate_json_spellings_of_signed_fields \
@@ -196,7 +207,35 @@ run_exact_target --label "strict manifest v2" --expected \
   verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance \
   verified_registry_requires_an_exact_live_bridge_security_value \
   verified_registry_runtime_requirement_includes_derived_remote_topology \
+  json_boundary::signed_file_preserves_existing_numeric_schema_contract \
+  json_boundary::signed_file_rejects_fractional_precision_aliases \
+  json_boundary::signed_file_rejects_shadowed_nested_schema_keywords \
+  verified_registry_merge_preserves_security_and_rejects_duplicates_atomically \
   -- cargo test -p chio-manifest --test manifest_v2
+
+run_exact_target --label "operator-owned manifest migration" --allow-filtered --expected \
+  active_defense_migration::tests::absent_legacy_session_evidence_assigns_top_and_preserves_principal_knowledge \
+  active_defense_migration::tests::backfill_requires_pinned_receipts_and_verified_v2_manifest_evidence \
+  active_defense_migration::tests::emits_all_shadow_metrics_without_embedding_promotion_thresholds \
+  active_defense_migration::tests::migration_command_writes_one_canonical_report_after_full_verification \
+  active_defense_migration::tests::rejects_manifest_v1_even_with_an_authentic_signature \
+  active_defense_migration::tests::reports_egress_adapter_purpose_credential_and_cage_findings \
+  active_defense_migration::tests::strict_input_rejects_unknown_fields_and_atomic_failure_preserves_output \
+  active_defense_migration::tests::verifies_v2_against_the_registered_key_and_rejects_a_tampered_body \
+  -- cargo test --locked -p chio-cli --bin chio active_defense_migration::tests::
+
+run_exact_target --label "transport preparation provenance" --allow-filtered --expected \
+  kernel::tests::durable_admission::delivery_revalidation::delivery_wait_samples_expiry_after_readiness \
+  kernel::tests::durable_admission::delivery_revalidation::dropped_delivery_preparation_compensates_before_dispatch \
+  kernel::tests::durable_admission::delivery_revalidation::immediately_ready_delivery_still_revalidates_runtime_admission \
+  kernel::tests::durable_admission::delivery_revalidation::invocation_owned_connections_close_on_completion_denial_and_cancellation \
+  kernel::tests::durable_admission::delivery_revalidation::kernel_revocation_during_delivery_wait_prevents_tool_execution \
+  kernel::tests::durable_admission::delivery_revalidation::launch_receipt::legacy_preparation_preserves_signed_launch_binding_on_allow_and_revoke \
+  kernel::tests::durable_admission::delivery_revalidation::nested_remote_delivery_rechecks_revocation_after_preparation \
+  kernel::tests::durable_admission::delivery_revalidation::prepared_delivery_with_unchanged_authority_dispatches_once \
+  kernel::tests::durable_admission::delivery_revalidation::refused_delivery_preparation_compensates_before_dispatch \
+  kernel::tests::durable_admission::delivery_revalidation::remote_delivery_rechecks_revocation_after_preparation \
+  -- cargo test --locked -p chio-kernel --lib kernel::tests::durable_admission::delivery_revalidation::
 
 run_exact_target --label "security kernel adapters" --expected \
   atomic_post_evidence_remains_bound_to_each_concurrent_response \
@@ -370,6 +409,7 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::observation::inherited_labels_do_not_forge_an_exact_context_generation \
   admission_operation_store::tests::security_participant_state::observation::observation_rejects_wrong_initialization_fence_and_time_without_writes \
   admission_operation_store::tests::security_participant_state::observation::unanchored_current_row_changes_cannot_be_observed_as_valid_state \
+  admission_operation_store::tests::security_participant_state::egress::integrity::ordered_history_checks_every_global_reference_field_in_the_same_snapshot \
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::security_participant_state::
 
 run_exact_target --label "native dispatch ledger callbacks" --allow-filtered --expected \
@@ -384,6 +424,7 @@ run_exact_target --label "public nested credential custody" --allow-filtered --e
   admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_missing_and_substituted_proofs_deny_before_claim_or_effect \
   admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_nonce_retry_preserves_original_session_and_dpop_custody \
   admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_proofs_claim_exact_dpop_and_reject_cross_request_replay \
+  admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::public_nested_wire_proof_preserves_required_dpop_without_an_explicit_bundle \
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::dpop_replay::claims::kernel_routes::nested_session::
 
 run_exact_target --label "native dispatch participant snapshots" --allow-filtered --expected \
@@ -432,10 +473,12 @@ run_exact_target --label "original operation authority profile" --allow-filtered
   kernel::tests::durable_admission::authority_profile::changed_runtime_generation_cannot_reuse_original_admission \
   kernel::tests::durable_admission::authority_profile::immutable_request_commits_to_every_original_profile_selection \
   kernel::tests::durable_admission::authority_profile::prepared_credentials_cannot_rebind_the_original_authority_profile \
+  admission_operation::authority_profile::tests::profile_pins_supplemental_participant_and_verifier_selection \
+  kernel::tests::durable_admission::authority_profile::retained_current_profile_rejects_downgrades_duplicates_and_aliases \
   -- cargo test -p chio-kernel --lib authority_profile
 run_exact_target --label "runtime profile non-upgrade" --allow-filtered --expected \
-  admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_absent_or_historical_authority_profile \
-  -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_absent_or_historical_authority_profile
+  admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_original_absent_runtime_selection \
+  -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::runtime_replay::claims::runtime_claim_cannot_upgrade_original_absent_runtime_selection
 run_exact_target --label "native authority admission integration" --expected \
   capture::native_combined_capture_requires_supported_security_dispatch_custody \
   capture::native_generic_dispatch_commit_cannot_bypass_security_dispatch_custody \
@@ -455,6 +498,12 @@ run_exact_target --label "physical dispatch hold ownership" --allow-filtered --e
   admission_operation_store::tests::budget_atomicity::capture_owner::budget_only_references_preserve_split_capture_and_exact_replay \
   admission_operation_store::tests::budget_atomicity::capture_owner::combined_capture_rejects_another_operations_hold_before_and_after_owner_capture \
   admission_operation_store::tests::budget_atomicity::capture_owner::missing_committed_admission_cannot_be_reclassified_as_a_budget_only_reference \
+  admission_operation_store::tests::budget_atomicity::capture_owner::combined_capture_rechecks_all_original_revocation_members_before_any_mutation \
+  admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::budget_custody_readback_distinguishes_absent_unheld_and_reversed_operations \
+  admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::budget_custody_readback_rejects_deleted_and_substituted_physical_quota_members \
+  admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::native_capture_readback_authenticates_physical_members_inside_its_snapshot \
+  admission_operation_store::tests::budget_atomicity::capture_owner::custody_readback::original_budget_custody_readback_binds_hold_owner_and_preserves_accounting \
+  admission_operation_store::tests::budget_atomicity::capture_owner::later_revocation_does_not_rewrite_an_original_capture_on_exact_replay \
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::tests::budget_atomicity::capture_owner::
 
 run_exact_target --label "qualified recovery lease boundary" --allow-filtered --expected \
@@ -575,7 +624,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::declassification::rejection::native_declassification_refuses_unselected_lifecycle_without_activation \
   security::adapters::tests::native_flow::support::declassification::faults::native_declassification_expiry_at_final_commit_retains_consumption_without_capture \
   security::adapters::tests::native_flow::support::declassification::faults::native_declassification_output_fault_rolls_back_outcome_without_refunding_use \
-  security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_issues_without_dispatch_or_legacy_nonce_custody \
+  security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_issues_without_dispatch_or_standalone_nonce_custody \
   security::adapters::tests::native_flow::support::nonce::native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_taint \
   security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_invokes_once_and_replays_the_released_receipt \
   security::adapters::tests::native_flow::support::lifecycle::native_captured_lifecycle_requires_one_successful_live_handoff \
@@ -645,6 +694,12 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::native_policy_rejects_unrecorded_operator_floor_without_rejoining \
   security::adapters::tests::native_flow::native_policy_requires_admitted_manifest_before_classification \
   security::adapters::tests::native_flow::native_policy_requires_taint_propagation_in_each_recorded_label \
+  security::adapters::tests::native_flow::support::capture::broker::authority::native_broker_authority_observes_original_lifecycle_without_mutating_custody \
+  security::adapters::tests::native_flow::support::capture::broker::connection::native_broker_connection_prepares_original_and_refuses_misbound_acknowledgement \
+  security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rechecks_original_parent_and_signs_actual_revocation_cut \
+  security::adapters::tests::native_flow::support::capture::broker::live_authority::native_broker_live_authority_rejects_a_kernel_from_another_authority \
+  security::adapters::tests::native_flow::support::capture::clock::native_capture_policy_deadline_is_exclusive_with_shared_clock \
+  security::adapters::tests::native_flow::support::native_fixture_clock_uses_a_stable_authority_epoch \
   -- cargo test -p chio-control-plane --lib security::adapters::tests::native_flow::
 
 run_exact_target --label "native declassification row semantics" --allow-filtered --expected \
@@ -668,6 +723,8 @@ run_exact_target --label "native runtime signed freshness" --allow-filtered --ex
   operation_owned::combined::native_validity::native_runtime_deadline_includes_every_selected_signed_time_bound \
   operation_owned::combined::native_validity::native_runtime_deadline_includes_the_verified_bilateral_capability_lease \
   operation_owned::combined::native_validity::native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_plan \
+  operation_owned::combined::native_validity::native_runtime_deadline_includes_other_participants_governance \
+  operation_owned::combined::native_validity::native_swarm_evolution_preserves_treaty_and_original_physical_claim \
   -- cargo test -p chio-runtime-core --test runtime_admission operation_owned::combined::native_validity::
 
 run_exact_target --label "native policy clock bounds" --allow-filtered --expected \
@@ -699,6 +756,8 @@ run_exact_target --label "security dispatch credential boundaries" --allow-filte
   kernel::tests::security_dispatch::credentials::security_rejection_reports_unconfirmed_credential_rollback \
   kernel::tests::security_dispatch::nested_security_callbacks_preserve_the_effect_boundary \
   kernel::tests::security_dispatch::rejection_with_warning_logging_does_not_call_hook_name \
+  kernel::tests::security_dispatch::clock::dropped_dispatch_retains_dpop_without_rollback_ownership \
+  kernel::tests::security_dispatch::clock::installed_dpop_and_default_approval_follow_the_kernel_clock \
   -- cargo test -p chio-kernel --lib kernel::tests::security_dispatch::
 
 run_exact_target --label "durable release output binding" --allow-filtered --expected \
