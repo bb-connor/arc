@@ -11,5 +11,5 @@ help: Check that the patched package version and available features are compatib
       with the dependency requirements. If the patch has a different version from
       what is locked in the Cargo.lock file, run `cargo update` to use the new
       version. This may also occur with an optional dependency that is not enabled.
-    Finished `test` profile [unoptimized] target(s) in 0.90s
+    Finished `test` profile [unoptimized] target(s) in 0.87s
      Running unittests src/lib.rs (/home/connor/chio-pr1173-target/debug/deps/chio_kernel-277b4283d05b53bc)

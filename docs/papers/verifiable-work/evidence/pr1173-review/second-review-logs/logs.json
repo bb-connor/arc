@@ -6186,6 +6186,342 @@
       "observed_result": "Actual source-boundary RED/GREEN, prerequisite controls, exact producer inventories, environment setup and failed-attempt provenance. Fixture controls do not waive stale native outcomes or the security-owned source/package handoff.",
       "bytes": 450,
       "sha256": "44e02377df5b4e1a4594d6d1e591f44986afcfe6322b22af27474231148ef48e"
+    },
+    {
+      "log": "9f281f87e7-cve-artifact-metadata.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 788,
+      "sha256": "c15e01cdc129325cd88ea3e08505071057334374b6abedb40ffa3de86c5bb3d0"
+    },
+    {
+      "log": "9f281f87e7-cve-artifact.zip.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 12055,
+      "sha256": "337c7f25486446a1041094ae0edbf1a02faaeaea25381b1d8bf5ccf0399ef078"
+    },
+    {
+      "log": "9f281f87e7-failed-job-112516005671.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 47841,
+      "sha256": "edc035286e6c6770fea8d3ededa6f2466282555b0ef6a0415dfb21dcdaea8af4"
+    },
+    {
+      "log": "9f281f87e7-hosted-job-112516005122.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 81012,
+      "sha256": "f7104f34773f0ec1ab417d0e29db83263a222bc633ee9824bdd53d04996a3c75"
+    },
+    {
+      "log": "9f281f87e7-locked-vet-success.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 3803,
+      "sha256": "075567911e865f700597804840e9ab6970d14d5ebf916da4f67e882d4ec12a19"
+    },
+    {
+      "log": "9f281f87e7-locked-vet-success.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 61403,
+      "sha256": "da0fc9ab31d92d1b3de08e23357f03947f5434e3c0ea123aeac7e3db8de4280d"
+    },
+    {
+      "log": "9f281f87e7-native-postgres-hosted.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 21730,
+      "sha256": "28084ddcee9bb67085db9ba1eb7b295e11f0ea827347be678b70ee7eed526221"
+    },
+    {
+      "log": "9f281f87e7-native-postgres-hosted.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 418215,
+      "sha256": "add1525cc7eeb9eaa4bfbd0c653dc0f845fc13cc24ffa36f35671da75e97e72e"
+    },
+    {
+      "log": "9f281f87e7-postgres-artifact-index.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 2699,
+      "sha256": "7276a3c576fa852f69fdf4c0c6d1f8a54b40cf629a30b0ac7d8f7f5de7daba70"
+    },
+    {
+      "log": "9f281f87e7-postgres-download.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 362,
+      "sha256": "86ceedfcc006e587748c457749c8c159e876650c87da2e43f643cd487ead5cd3"
+    },
+    {
+      "log": "9f281f87e7-postgres-download.status.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 235,
+      "sha256": "ff0cd48233dc7802883d1264c4106db28dfb05f7a99ddc5f1e98fc4a5a6b9229"
+    },
+    {
+      "log": "9f281f87e7-postgres-verification-a7e63ee93c.log.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 321,
+      "sha256": "00a1e17f86be87c1140bd5404a882cfd82aec4438bdfb813eb8d3429a34ebf4f"
+    },
+    {
+      "log": "9f281f87e7-postgres-verification-a7e63ee93c.status.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 713,
+      "sha256": "fc6ae10faddd4c3b2c0d5ef3bcea050973b8c40afccc0db2c6c891d27b4b7c6f"
+    },
+    {
+      "log": "9f281f87e7-pushed-candidate-verification.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 31003,
+      "sha256": "b7105f68f5d8d49dd724cbbfd62c3f14def0d8539ba1f78d3c0b7dba90b5bdfe"
+    },
+    {
+      "log": "9f281f87e7-review-state-20261006T223745Z.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 75263,
+      "sha256": "38afa057c743e87d57dc5748c9a3270b52b2f3382e58ffdcb80005d5ea35d199"
+    },
+    {
+      "log": "9f281f87e7-review-state-initial.json.gz",
+      "observed_result": "Actual preceding-candidate hosted evidence and snapshots. Source identities and failures remain in their original scope; pending checks are not promoted.",
+      "bytes": 63822,
+      "sha256": "b7cd2bcd880594ee1c55d32b45e65656c31bed8c2ebdd5c8cd3d5b5ab95d3aab"
+    },
+    {
+      "log": "postgres-broker-preparation-lifetime-9f281f87e7.zip.gz",
+      "observed_result": "Authenticated preceding-candidate actual runtime-retirement inventory and execution archive; no new-head acceptance.",
+      "bytes": 564,
+      "sha256": "6996d94413b462616baf9f5a2f5d73227aedd83fc23e1a1e57b5d3982ab01ff8"
+    },
+    {
+      "log": "postgres-job-claim-loss-qualification-9f281f87e7.zip.gz",
+      "observed_result": "Authenticated preceding-candidate PostgreSQL artifact archive; original GitHub digest and signed receipts retained.",
+      "bytes": 30277,
+      "sha256": "c1895244ab68f5aba87985328a335c3caeaa967bedc7d20f192cf9c7ea59f8b5"
+    },
+    {
+      "log": "postgres-job-process-qualification-9f281f87e7.zip.gz",
+      "observed_result": "Authenticated preceding-candidate PostgreSQL artifact archive; original GitHub digest and signed receipts retained.",
+      "bytes": 44216,
+      "sha256": "effd8a316cd059870302059c60947ea594824ff6aaff482c976ac23ec2abfaf5"
+    },
+    {
+      "log": "qualification-a7e63ee93c.status.json.gz",
+      "observed_result": "Actual current-source 21-command native qualification; canonical inventory authoritative.",
+      "bytes": 268,
+      "sha256": "01b192de38355097f34822ecd01992fd5bd1c4d8eea0fbc871d17bc99be64fbe"
+    },
+    {
+      "log": "receipt-verifier-a7e63ee93c-build.log.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated ARM binary; no physical x86 acceptance.",
+      "bytes": 1660,
+      "sha256": "821ee4c53dee51fa2d0d62117a898bf17fded7923fc3c6411af75b8fa3878d3e"
+    },
+    {
+      "log": "receipt-verifier-a7e63ee93c.status.json.gz",
+      "observed_result": "Actual current-source offline receipt verifier build and authenticated ARM binary; no physical x86 acceptance.",
+      "bytes": 566,
+      "sha256": "459c87cb29d237386da07e6fe5b3c5f1cc23ba99c9c49da4bf6656d2e530cd6a"
+    },
+    {
+      "log": "review-native-qualification-a7e63ee93c.log.gz",
+      "observed_result": "Actual terminal current-source native output; no physical x86 claim.",
+      "bytes": 539,
+      "sha256": "19e8f4e863a7ce4a3d3d5497710c7e0cc1a225b5bf3b60a92939b27f254c4a6b"
+    },
+    {
+      "log": "security-apk-closure-authority-20261006T221700Z.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 560,
+      "sha256": "13e2a1cdb4ba97c8b8dc37f98c82cede0b8b899e14c6291344114369c2674bf4"
+    },
+    {
+      "log": "security-apk-closure-base-authentication-pull.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 424,
+      "sha256": "9829e3cae09ccfb25bdf7f3c7d684167ea07fa51e68a641e5154d27368474136"
+    },
+    {
+      "log": "security-apk-closure-base-authentication.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 1788,
+      "sha256": "27f711e45fed5a2f73a3af2b67dce76ef691c35eb26961de74c1bcaff8dab77a"
+    },
+    {
+      "log": "security-apk-closure-boundary-green.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 101,
+      "sha256": "7f5ad5c8c8f5001d874a0b5a1dff3d704e516d339a0393db3502076a14f76047"
+    },
+    {
+      "log": "security-apk-closure-boundary-green.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 119,
+      "sha256": "54944c99cfb0e8c0bbab03ae5fc37aa2420aea66a3c264e5b1d5c7503b04c6d9"
+    },
+    {
+      "log": "security-apk-closure-boundary-red.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 1320,
+      "sha256": "7d3ffdc76622623d19b76056b57ac27846e9b7377893305765226b824b051f1d"
+    },
+    {
+      "log": "security-apk-closure-boundary-red.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 255,
+      "sha256": "0f0c5d096b240e084e9bdd201d16ede810de768cf534014169c144d270eb4cb4"
+    },
+    {
+      "log": "security-apk-closure-complete-ci-contract.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 168,
+      "sha256": "06a7ea7285358b99b6236282d5d0b9d8cf1b1a2263e934b576a9ac3ac9f54b5e"
+    },
+    {
+      "log": "security-apk-closure-complete-ci-contract.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 1319,
+      "sha256": "eac5917cb9ec9c8eac99044a2b0341bd599f2263645295f38633821561b7c8c7"
+    },
+    {
+      "log": "security-apk-closure-constrained-resolution.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 11200,
+      "sha256": "cf40728ad294f77c3686f1068c186f4511ac6f303f1fe98fc1b5002028704cc6"
+    },
+    {
+      "log": "security-apk-closure-constrained-resolution.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 4054,
+      "sha256": "997049a9d3b26cdb7250eb413df3193b987d8f8716dba06e87cd496af314f33e"
+    },
+    {
+      "log": "security-apk-closure-final-inline-review.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 2333,
+      "sha256": "122c271088d5315e722c45e4b388bbcf510f1c6fa820413ff1dbc0e4b832d512"
+    },
+    {
+      "log": "security-apk-closure-hosted-collector-stop.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 508,
+      "sha256": "a004ecba5e020ec084fc9221c6f1111e00afe9ca44efd4e6992de88ba1b18e27"
+    },
+    {
+      "log": "security-apk-closure-inline-review.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 1287,
+      "sha256": "4a08d54fbf447558e3a2d50ca310f42065e72aa1b2a656acbaf8bb1572088b40"
+    },
+    {
+      "log": "security-apk-closure-live-ci-contract.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 49,
+      "sha256": "42e0bda87f001b3984f23ebc31c9b16dec657cc2e0a06bcf46b613e8b026fd92"
+    },
+    {
+      "log": "security-apk-closure-live-ci-contract.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 101,
+      "sha256": "f6c7956acebb1c2fbe160558724369300c983ef697afb9709e9e67406a33d2a6"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v2.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 403,
+      "sha256": "0a038726d6002ffda50aaa68b60f1839451a8a189d9faa211ac914382291077e"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v2.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 3098,
+      "sha256": "bf3c177b1b38e7ce94a8ba9b51e76bce17edd0aa492be6c9cebd224e00497f71"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v3.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 227,
+      "sha256": "11f1df78f8a0f5c75bbc73bf6a16a956b27c32c2b941c2e645f5ffdd06894bd3"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v3.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 3255,
+      "sha256": "14c3e9fbb4eef48450e8a6ad60d4c0cd366f4e56e89b5b48f4c0cf10ef9b2fec"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v4.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 11200,
+      "sha256": "23a02484f2467027ca2a8197895d3f0c65d1953255755880b3d2d18158b9caf4"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v4.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 3282,
+      "sha256": "0fa31e5119cbae78590fc74372c2edd0acd1b9e15d6ec8ebd1435a4ae96d2175"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v5.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 11247,
+      "sha256": "0b0ef0148789d7ddfe5fad07b7005b52fdb450bb4b252f8cdb0d9fb3538d4451"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v5.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 3517,
+      "sha256": "7d99c97098a45760a5b5ac2c40fb9adb5969654f02fd623729be8dc51b66d1b0"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v6-delta.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 339,
+      "sha256": "93757266dab6ab21cfcc7f0799a6257d8ca31e0174001d10c632d3000da9e0b8"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v6.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 11164,
+      "sha256": "551009e9d79885af58dd98899f1b9793a2ca4be43ace0a5dcbb34be699c0035a"
+    },
+    {
+      "log": "security-apk-closure-original-resolution-v6.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 3597,
+      "sha256": "3772b6c750c7af7942c7d2fac9c51fc8ea57e6f9879013887b31810928e9d345"
+    },
+    {
+      "log": "security-apk-closure-original-resolution.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 1846,
+      "sha256": "d3af553ff11bb2f97600beba80bc90d6a9ee067214ac580d55bc1d3cca57a20d"
+    },
+    {
+      "log": "security-apk-closure-original-resolution.status.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 2913,
+      "sha256": "6ed06fdd84e8c6dae8f82532258ae74fd1946973bba53428ee37034e13fa079b"
+    },
+    {
+      "log": "security-apk-closure-production-delta.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 555,
+      "sha256": "73cd282fae6fc68e55b52e9623c316497d3b41716a7de6d646504b1c02d68832"
+    },
+    {
+      "log": "security-apk-closure-resolver-identity.json.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 1890,
+      "sha256": "4c56aee92c0102b904c6509c30fe2b57de42dea6b9aa637e56c9e1a948c1556e"
+    },
+    {
+      "log": "security-apk-closure-source-commit.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 308,
+      "sha256": "54d9d7a0b782fd58dff29801b5705d69abce5f1e71008ad9d8366fb27ab23d63"
+    },
+    {
+      "log": "security-apk-resolver-image-pull.log.gz",
+      "observed_result": "Actual package-instruction RED/GREEN, signed APK graph resolution, immutable base authentication, complete CI contract, reviewed security update and retained setup failures. ARM resolution is not physical x86 qualification.",
+      "bytes": 346,
+      "sha256": "8433b2ccd9212a88fc6dabfc63dad0ee5f8564afe6584654c58c28e583e24e4b"
     }
   ]
 }
