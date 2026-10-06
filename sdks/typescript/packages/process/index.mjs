@@ -38,15 +38,27 @@ export class ProcessClient {
 
   inspect() { return this.#call({ op: "inspect" }); }
 
-  async invoke(operationKey, serverId, toolName, args, { governedIntent } = {}) {
+  async invoke(operationKey, serverId, toolName, args, { governedIntent, knownOutcomeOnly = false } = {}) {
     if (governedIntent !== undefined && (governedIntent === null ||
         typeof governedIntent !== "object" || Array.isArray(governedIntent) ||
         typeof governedIntent.toJSON === "function")) {
       throw new TypeError("governedIntent must be a JSON object without a serialization override");
     }
+    if (typeof knownOutcomeOnly !== "boolean") {
+      throw new TypeError("knownOutcomeOnly must be a boolean");
+    }
     return this.#call({ op: "invoke", operation_key: operationKey,
       server_id: serverId, tool_name: toolName, arguments: args,
+      ...(knownOutcomeOnly ? { known_outcome_only: true } : {}),
       ...(governedIntent === undefined ? {} : { governed_intent: governedIntent }) });
+  }
+
+  /** Retain one host-prepared envelope without dispatching an effect. Repeating
+   * the same key and input returns the original envelope; changed input or host
+   * policy fails closed. */
+  prepareInvocation(operationKey, serverId, toolName, args) {
+    return this.#call({ op: "prepare_invocation", operation_key: operationKey,
+      server_id: serverId, tool_name: toolName, arguments: args });
   }
 
   checkpoint(expectedRevision, value) {
