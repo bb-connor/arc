@@ -552,6 +552,29 @@ fn target_argv_is_bounded_and_bound_into_the_plan_digest() {
 }
 
 #[test]
+fn group_writable_runtime_file_without_an_execute_bit_is_rejected() {
+    let tree = TestTree::new();
+    for mode in [0o664, 0o646, 0o4644] {
+        std::fs::set_permissions(&tree.runtime, std::fs::Permissions::from_mode(mode))
+            .test_unwrap();
+        assert!(
+            matches!(
+                retain_runtime_resources(
+                    &tree.runtime_paths_with([tree.runtime.clone()].into_iter().collect()),
+                ),
+                Err(CageError::UnsafeRuntimeFile(path)) if path == tree.runtime
+            ),
+            "mode {mode:o}"
+        );
+    }
+    std::fs::set_permissions(&tree.runtime, std::fs::Permissions::from_mode(0o644)).test_unwrap();
+    assert!(retain_runtime_resources(
+        &tree.runtime_paths_with([tree.runtime.clone()].into_iter().collect()),
+    )
+    .is_ok());
+}
+
+#[test]
 fn executable_runtime_file_gets_exact_execute_read_grant() {
     let tree = TestTree::new();
     std::fs::set_permissions(&tree.runtime, std::fs::Permissions::from_mode(0o700)).test_unwrap();
