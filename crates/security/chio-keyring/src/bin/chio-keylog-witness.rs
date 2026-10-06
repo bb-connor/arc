@@ -39,25 +39,30 @@ fn run() -> chio_keyring::Result<()> {
     let started_at = clock
         .unix_millis()
         .map(chio_security_types::clock::UnixMillis::get)?;
-    // Provisioning is first-start permission. A supervisor restart must reopen
-    // the original store and validate its policy instead of recreating it.
-    let witness = if config.provision && !config.database_path.try_exists()? {
-        SqliteKeyLogWitness::provision(
-            &config.database_path,
-            policy,
-            witness_id,
-            Box::new(backend),
-            clock,
-        )?
-    } else {
-        SqliteKeyLogWitness::open(
-            &config.database_path,
-            policy,
-            witness_id,
-            Box::new(backend),
-            clock,
-        )?
-    };
+    let witness = chio_keyring::open_or_provision_once(
+        &config.database_path,
+        config.provision,
+        |provision| {
+            if provision {
+                SqliteKeyLogWitness::provision(
+                    &config.database_path,
+                    policy,
+                    witness_id,
+                    Box::new(backend),
+                    clock,
+                )
+            } else {
+                SqliteKeyLogWitness::open(
+                    &config.database_path,
+                    policy,
+                    witness_id,
+                    Box::new(backend),
+                    clock,
+                )
+            }
+        },
+        SqliteKeyLogWitness::storage_identity,
+    )?;
     let storage_identity = witness.storage_identity();
     let listener = bind_private_unix_listener(&config.socket_path)?;
     let _socket_guard = SocketPathGuard(config.socket_path);

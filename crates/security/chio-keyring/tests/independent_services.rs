@@ -825,3 +825,58 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         rotated.public_key()
     );
 }
+
+#[test]
+fn a_provisioned_witness_whose_store_vanished_refuses_to_reprovision() {
+    let fixture = Fixture::new();
+    let mut children = Children(vec![fixture.spawn_witness(0, true)]);
+    wait_for_witness(&fixture.witness_client(0), "provisioned");
+    children.0[0].kill().test_unwrap();
+    children.0[0].wait().test_unwrap();
+    let database = fixture.path("witness-0.sqlite");
+    for suffix in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{suffix}", database.display()));
+    }
+
+    children.0[0] = fixture.spawn_witness(0, true);
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = children.0[0].try_wait().test_unwrap() {
+            break status;
+        }
+        assert!(
+            started.elapsed() < WAIT_LIMIT,
+            "witness re-provisioned an empty store and kept serving"
+        );
+        thread::sleep(Duration::from_millis(20));
+    };
+    assert!(!status.success());
+    assert!(!database.exists());
+}
+
+#[test]
+fn a_witness_store_replaced_by_a_copy_is_refused() {
+    let fixture = Fixture::new();
+    let mut children = Children(vec![fixture.spawn_witness(0, true)]);
+    wait_for_witness(&fixture.witness_client(0), "provisioned");
+    children.0[0].kill().test_unwrap();
+    children.0[0].wait().test_unwrap();
+    let database = fixture.path("witness-0.sqlite");
+    let copy = fixture.path("witness-0.copy.sqlite");
+    std::fs::copy(&database, &copy).test_unwrap();
+    std::fs::rename(&copy, &database).test_unwrap();
+
+    children.0[0] = fixture.spawn_witness(0, true);
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = children.0[0].try_wait().test_unwrap() {
+            break status;
+        }
+        assert!(
+            started.elapsed() < WAIT_LIMIT,
+            "witness served a store that differs from its provisioning record"
+        );
+        thread::sleep(Duration::from_millis(20));
+    };
+    assert!(!status.success());
+}
