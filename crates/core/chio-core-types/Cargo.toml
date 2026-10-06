@@ -3,7 +3,6 @@ name = "chio-core-types"
 description = "Shared Chio substrate types for capability, receipt, manifest, and session boundaries"
 version.workspace = true
 edition.workspace = true
-# Kani 0.67 uses Rust 1.93; this formal-proof crate remains compatible.
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
