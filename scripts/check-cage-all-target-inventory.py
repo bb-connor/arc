@@ -18,11 +18,11 @@ EXPECTED_COUNTS = {
     "lib_chio_cage_init": 1,
     "entrypoint": 1,
     "enforcement_evidence": 8,
-    "linux_compile": 17,
+    "linux_compile": 21,
     "linux_enforcement": 29,
 }
-EXPECTED_TOTAL = 82
-EXPECTED_SHA256 = "50dd7cdac4d95d19aabb1e52b0e43a4da4136a726b1ac05df008f0da5b43fdd7"
+EXPECTED_TOTAL = 86
+EXPECTED_SHA256 = "cbb3e75d610a86e63093aa4ad614ee0ac04dcb341417bd3a41443d7fc7882314"
 EXPECTED_INTEGRATION_TARGETS = {
     "enforcement_evidence.rs",
     "linux_compile.rs",

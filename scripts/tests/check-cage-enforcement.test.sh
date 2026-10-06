@@ -308,6 +308,10 @@ if [[ "$args" == *" --all-targets "* ]] ||
       script_target_is_rejected_before_launch
       target_argv_is_bounded_and_bound_into_the_plan_digest
       zero_initialized_tls_does_not_bind_an_unused_file_offset
+      hard_link_into_a_forbidden_directory_is_rejected
+      forbidden_directory_scan_admits_an_unrelated_hard_link_beside_a_socket
+      only_connection_oriented_unix_sockets_can_carry_broker_ipc
+      group_writable_runtime_file_without_an_execute_bit_is_rejected
     )
     print_target "Running unittests src/lib.rs (/tmp/chio_cage-lib)" "${lib_tests[@]}"
     print_target "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)" "${plan_tests[@]}"
@@ -399,7 +403,7 @@ if [[ "$status" -ne 0 ]]; then
   cat "$work/1-success.out" >&2
   exit "$status"
 fi
-grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=82 probes=29 mutations=10$' \
+grep -Eq '^CHIO_CAGE_REAL_LINUX_EVIDENCE challenge=[a-f0-9]{64} all_targets=86 probes=29 mutations=10$' \
   "$work/1-success.out"
 
 python3 scripts/tests/check-cage-all-target-inventory.test.py
