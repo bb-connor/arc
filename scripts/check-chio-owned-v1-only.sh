@@ -84,6 +84,24 @@ while IFS= read -r line; do
   rest="${line#*:}"
   text="${rest#*:}"
 
+  # The trusted qualification auditor consumes internal App metadata v2.
+  # Exempt only this exact quoted identifier in its exact producer path;
+  # an adjacent future core-wire or normative claim must still fail.
+  if [[ "$path" == "scripts/audit-security-merge-qualification.py" ]]; then
+    authority_text="${text//\"chio.security-check-authority.v2\"/}"
+    if [[ "$authority_text" != "$text" ]]; then
+      authority_scan_status=0
+      rg -q "$pattern|$normative_claim_pattern" <<<"$authority_text" || authority_scan_status=$?
+      if ((authority_scan_status > 1)); then
+        echo "ripgrep failed while rechecking the trusted auditor schema line" >&2
+        exit "$authority_scan_status"
+      fi
+      if ((authority_scan_status == 1)); then
+        continue
+      fi
+    fi
+  fi
+
   # Future-version negative fixtures intentionally use .v9-style schema IDs.
   if [[ "$text" =~ chio\.[A-Za-z0-9_.-]+\.v9[0-9]* ]]; then
     continue
