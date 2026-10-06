@@ -10,9 +10,9 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    CallerExecutionReport, ChioKernel, KernelConfig, KernelError, ToolCallRequest,
-    ToolInvocationCost, ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    CallerExecutionReport, ChioKernel, KernelConfig, ToolCallRequest, ToolInvocationCost,
+    ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
 #[path = "mediated/authenticated.rs"]
@@ -809,7 +809,7 @@ pub(crate) async fn sidecar_reconcile_handler(
 pub(crate) async fn reap_expired_reserved_holds_once(
     state: &Arc<ProxyState>,
     now_unix_secs: i64,
-) -> Result<usize, KernelError> {
+) -> Result<usize, chio_kernel::KernelError> {
     let Some(mediation_kernel) = state.mediation_kernel.as_ref() else {
         return Ok(0);
     };

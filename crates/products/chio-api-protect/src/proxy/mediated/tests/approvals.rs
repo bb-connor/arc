@@ -174,7 +174,7 @@ impl ApprovalHarness {
         let mutable = Arc::get_mut(&mut state).ok_or("unexpected shared fixture state")?;
         mutable.receipt_store = Some(Mutex::new(SqliteReceiptStore::from_shared(evidence)));
         mutable.clock = self.clock.clone();
-        mutable.mediation_kernel = Some(Mutex::new(kernel));
+        mutable.mediation_kernel = Some(Arc::new(Mutex::new(kernel)));
         mutable.approval_admin = ApprovalAdmin::new(Arc::new(SqliteApprovalStore::open(
             self.directory.path().join("approvals.db"),
         )?));
