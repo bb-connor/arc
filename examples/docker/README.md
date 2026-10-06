@@ -31,11 +31,15 @@ and session keys are retained on process restart. Disabled and Shadow policies
 cannot launch tools. The example signers stay in the private container storage;
 operator-managed persistent storage is required for custody across replacement.
 
-The stack runs with three distinct demo credentials: `demo-token` for clients
-of the hosted edge, `demo-admin-token` for the edge's admin routes, and
-`demo-control-token` for the trust service. Override them with
-`CHIO_AUTH_TOKEN`, `CHIO_ADMIN_TOKEN`, and `CHIO_SERVICE_TOKEN`; the edge
-refuses to start when any two share a value.
+The stack runs with four distinct demo credentials: `demo-token` for clients
+of the hosted edge, `demo-admin-token` for the edge's admin routes,
+`demo-control-token` for the trust service, and `demo-workload-token` for the
+edge's calls to the trust service's authority. Override them with
+`CHIO_AUTH_TOKEN`, `CHIO_ADMIN_TOKEN`, `CHIO_SERVICE_TOKEN`, and
+`CHIO_WORKLOAD_TOKEN`; the edge refuses to start when any two share a value.
+
+These defaults are public strings, so every port is published on 127.0.0.1
+only. Set your own tokens before changing that binding.
 
 Then open:
 
