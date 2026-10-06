@@ -716,8 +716,9 @@ impl ProviderHttpTransport for HttpTransport {
 ///
 /// Adapters call this so they do not each re-derive the classification:
 ///
-/// - `429` -> [`ProviderError::RateLimited`] (honoring `Retry-After` when the
-///   adapter supplies it through `retry_after_ms`).
+/// - `429` -> [`ProviderError::RateLimited`] with `retry_after_ms: 0`. The
+///   status code carries no `Retry-After` value, so an adapter that has the
+///   header must set `retry_after_ms` itself.
 /// - `403` -> [`ProviderError::ContentPolicy`] (upstream refused the request).
 /// - other `4xx` -> [`ProviderError::BadToolArgs`] (the request was rejected as
 ///   malformed by the upstream).
