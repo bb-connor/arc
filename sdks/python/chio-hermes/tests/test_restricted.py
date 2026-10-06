@@ -172,3 +172,28 @@ def test_subscription_auth_cannot_be_selected_as_guest_query(launch_args: argpar
     launch_args.codex_auth_file = launch_args.query_file
     with pytest.raises(ValueError, match="outside host-readable"):
         restricted.prepare(launch_args)
+
+
+def test_launcher_evidence_write_replaces_a_planted_symlink(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    state.mkdir(mode=0o700)
+    victim = tmp_path / "authorized_keys"
+    victim.write_text("original\n")
+    (state / "terminal.json").symlink_to(victim)
+
+    restricted._write_state_file(state, "terminal.json", '{"outcome":"completed"}\n')
+
+    assert victim.read_text() == "original\n"
+    written = state / "terminal.json"
+    assert not written.is_symlink()
+    assert written.read_text() == '{"outcome":"completed"}\n'
+    assert written.stat().st_mode & 0o077 == 0
+
+
+def test_launcher_evidence_write_refuses_a_planted_directory(tmp_path: Path) -> None:
+    state = tmp_path / "state"
+    state.mkdir(mode=0o700)
+    (state / "model-relay.json").mkdir()
+
+    with pytest.raises(OSError):
+        restricted._write_state_file(state, "model-relay.json", "[]\n")

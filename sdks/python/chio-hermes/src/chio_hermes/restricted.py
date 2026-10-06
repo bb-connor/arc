@@ -9,10 +9,12 @@ profile and an operator-owned model relay.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
 import re
+import secrets
 import signal
 import stat
 import subprocess
@@ -49,6 +51,40 @@ HOST_CONTRACT_HASHES = {
     "tools/mcp_tool.py": "1ed7ba9edd353ff6c1351efd8d766bf814cb1e6505926c01d50ef029008e04f8",
     "tools/tirith_security.py": "c05699cb7bad7347f0370cc7838a44c2a3b0229f23e73120ab1c70812722fb64",
 }
+
+
+def _write_state_file(state_dir: Path, name: str, text: str) -> None:
+    """Write launcher evidence into the host-writable state directory.
+
+    The sandboxed host may create entries in ``state_dir`` (only hard links are
+    denied), so a path-based write after the host exits could follow a planted
+    symlink to any file the operator can write. The text goes to a fresh
+    exclusive no-follow file that is renamed over ``name``; the rename replaces
+    a planted symlink instead of following it, and fails on a planted directory.
+    """
+    if not name or "/" in name or name in {".", ".."}:
+        raise ValueError("state file name must be a single path component")
+    directory = os.open(state_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        temporary = f".{name}.{secrets.token_hex(8)}.tmp"
+        descriptor = os.open(
+            temporary,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=directory,
+        )
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                stream.write(text)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, name, src_dir_fd=directory, dst_dir_fd=directory)
+        except BaseException:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temporary, dir_fd=directory)
+            raise
+    finally:
+        os.close(directory)
 
 
 def _private_json(path: Path) -> dict[str, Any]:
@@ -427,11 +463,11 @@ def main() -> int:
                     unsuccessful |= any(value in ["denied", "not_dispatched"] for value in gateway.outcomes.values())
                     outcome = "unresolved" if unresolved else "awaiting_approval" if pending else "protected_work_incomplete" if unsuccessful else "cancelled" if interrupted else "completed" if host_code == 0 else "host_failed"
                     exit_code = 2 if unresolved else 4 if pending else 3 if unsuccessful else 128 + interrupted if interrupted else host_code
-                    (args.state_dir / "terminal.json").write_text(json.dumps({"hostExitCode": host_code, "exitCode": exit_code, "outcome": outcome, "operatorInterrupt": signal.Signals(interrupted).name if interrupted else None, "confirmedDeliveries": len(gateway.events)}) + "\n")
+                    _write_state_file(args.state_dir, "terminal.json", json.dumps({"hostExitCode": host_code, "exitCode": exit_code, "outcome": outcome, "operatorInterrupt": signal.Signals(interrupted).name if interrupted else None, "confirmedDeliveries": len(gateway.events)}) + "\n")
                     return exit_code
                 finally:
-                    (args.state_dir / "model-relay.json").write_text(json.dumps(relay.events, indent=2) + "\n")
-                    (args.state_dir / "host-delivery.json").write_text(json.dumps(gateway.events, indent=2) + "\n")
+                    _write_state_file(args.state_dir, "model-relay.json", json.dumps(relay.events, indent=2) + "\n")
+                    _write_state_file(args.state_dir, "host-delivery.json", json.dumps(gateway.events, indent=2) + "\n")
     except (ValueError, OSError, json.JSONDecodeError) as exc:
         parser.exit(2, f"Hermes restricted launch refused: {exc}\n")
 
