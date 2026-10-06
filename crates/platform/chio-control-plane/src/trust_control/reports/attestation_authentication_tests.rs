@@ -98,7 +98,7 @@ fn assert_report_is_observation(report: &RuntimeAttestationAppraisalReport) {
 
 #[test]
 fn raw_attestation_export_without_policy_is_only_observation() {
-    let directory = tempfile::tempdir().test_expect("private export fixture");
+    let directory = chio_test_support::private_tempdir().test_expect("private export fixture");
     let seed = directory.path().join("authority.seed");
     let authority =
         load_behavioral_feed_signing_keypair(Some(&seed), None).test_expect("local authority");
@@ -117,7 +117,7 @@ fn raw_attestation_export_without_policy_is_only_observation() {
 
 #[test]
 fn raw_attestation_export_matching_policy_is_only_observation() {
-    let directory = tempfile::tempdir().test_expect("private export fixture");
+    let directory = chio_test_support::private_tempdir().test_expect("private export fixture");
     let seed = directory.path().join("authority.seed");
     let evidence = unsigned_evidence();
     let policy = matching_policy();
@@ -143,7 +143,7 @@ fn raw_attestation_export_matching_policy_is_only_observation() {
 #[test]
 fn raw_attestation_export_import_cannot_restore_authority() {
     for configured in [false, true] {
-        let directory = tempfile::tempdir().test_expect("private result fixture");
+        let directory = chio_test_support::private_tempdir().test_expect("private result fixture");
         let seed = directory.path().join("authority.seed");
         let authority =
             load_behavioral_feed_signing_keypair(Some(&seed), None).test_expect("local authority");

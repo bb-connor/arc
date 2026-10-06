@@ -82,7 +82,7 @@ mod tests {
 
     #[test]
     fn production_tls_errors_never_render_private_pem_input() -> TestResult {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
         let cert = directory.path().join("cert.pem");
         let key = directory.path().join("key.pem");
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn private_tls_custody_is_required_and_loads_a_matching_identity() -> TestResult {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
         let cert = directory.path().join("cert.pem");
         let key = directory.path().join("key.pem");

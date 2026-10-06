@@ -4,7 +4,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn signed_policy_registry_rejects_exact_record_under_wrong_key() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("policies.json");
     let key = chio_core::Keypair::from_seed(&[41; 32]);
     let document = chio_credentials::create_signed_passport_verifier_policy(
@@ -36,7 +36,7 @@ fn signed_policy_registry_rejects_exact_record_under_wrong_key() -> TestResult {
 
 #[test]
 fn signed_registry_rejects_duplicate_map_entries_before_verification() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("policies.json");
     fs::write(
         &path,
@@ -55,7 +55,7 @@ fn signed_registry_rejects_duplicate_map_entries_before_verification() -> TestRe
 
 #[test]
 fn stored_challenge_cannot_substitute_another_valid_identifier_after_reopen() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("challenges.sqlite");
     let challenge = chio_credentials::create_passport_presentation_challenge(
         "https://rp.example.com",

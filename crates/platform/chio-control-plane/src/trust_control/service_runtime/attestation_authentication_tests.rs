@@ -11,7 +11,7 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn authenticated_issuance_route_rejects_unsigned_matching_attestation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let mut state = metrics_state("service-secret");
     state.config.authority_seed_path = Some(directory.path().join("authority.seed"));
     state.config.authority_workload_token = Some("workload-secret".to_owned());

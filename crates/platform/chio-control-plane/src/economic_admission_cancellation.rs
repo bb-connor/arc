@@ -775,7 +775,7 @@ mod tests {
 
     #[test]
     fn paid_cancellation_fails_before_staging_or_external_cas() -> TestResult {
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
@@ -821,7 +821,7 @@ mod tests {
 
     #[test]
     fn cancellation_coordinator_commits_the_external_and_local_terminal_lifecycle() -> TestResult {
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
@@ -888,7 +888,7 @@ mod tests {
 
     #[test]
     fn recovery_replays_a_staged_cancellation_through_the_typed_cas() -> TestResult {
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
@@ -942,7 +942,7 @@ mod tests {
 
     #[test]
     fn recovery_finishes_a_cancellation_committed_before_local_finalization() -> TestResult {
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");
@@ -997,7 +997,7 @@ mod tests {
 
     #[test]
     fn terminal_replay_rejects_a_sibling_effect_cancellation() -> TestResult {
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");

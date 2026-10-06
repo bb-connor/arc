@@ -1620,7 +1620,7 @@ fn provision_stack(
     audit_epoch_length_secs: u64,
     admission_expires_at: u64,
 ) -> Result<MarketStack, AnyError> {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     secure_directory(temp.path())?;
     let database = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");

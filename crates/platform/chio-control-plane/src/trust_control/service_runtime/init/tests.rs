@@ -12,7 +12,7 @@ use std::time::Duration;
 #[tokio::test]
 async fn trust_transport_denies_public_plaintext_before_store_creation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let database = directory.path().join("must-not-exist.db");
     let mut config = test_config(database.clone());
     config.listen = "0.0.0.0:0".parse()?;
@@ -28,7 +28,7 @@ async fn trust_transport_denies_public_plaintext_before_store_creation(
 #[tokio::test]
 async fn trust_transport_serves_authenticated_requests_over_tls(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
     let cert = directory.path().join("cert.pem");
     let key = directory.path().join("key.pem");
@@ -173,7 +173,7 @@ fn purchase_runtime_requires_rail_and_authority_status_resolution() {
 #[test]
 fn injected_challenge_authority_must_match_configured_database(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     secure_directory(temp.path())?;
     let configured_database = temp.path().join("configured.db");
     let configured_locks = temp.path().join("configured-locks");
@@ -205,7 +205,7 @@ fn configured_joint_authority_hardens_an_existing_lock_root(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use std::os::unix::fs::PermissionsExt;
 
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     secure_directory(temp.path())?;
     let database = temp.path().join("joint-authority.db");
     let lock_root = crate::durable_admission_lock_root(&database)?;

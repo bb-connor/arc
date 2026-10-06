@@ -181,7 +181,7 @@ fn matrix(name: &str, cut: Cut, combined_disclosure: bool) -> TestResult {
     if std::env::var_os(CHILD).is_some() {
         return execute_child(cut, combined_disclosure);
     }
-    let root = tempfile::tempdir()?;
+    let root = chio_test_support::private_tempdir()?;
     let output = std::fs::File::create(root.path().join("child.log"))?;
     let module = module_path!()
         .split_once("::")

@@ -900,7 +900,7 @@ fn deployment_publishing_terms_and_rounds(
     extra_terms: &[SignedFindingMarketTerms],
     extra_rounds: &[FindingAuditRound],
 ) -> Result<Deployment, AnyError> {
-    let temp = tempfile::tempdir()?;
+    let temp = chio_test_support::private_tempdir()?;
     secure_directory(temp.path())?;
     let database: PathBuf = temp.path().join("authority.db");
     let lock_root = temp.path().join("locks");

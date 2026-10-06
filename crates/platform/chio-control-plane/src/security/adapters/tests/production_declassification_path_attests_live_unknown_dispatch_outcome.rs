@@ -5,7 +5,8 @@ fn production_declassification_path_attests_live_unknown_dispatch_outcome() {
     let authority = Keypair::from_seed(&[80; 32]);
     let purpose =
         DeclassificationPurpose::new("support").unwrap_or_else(|error| panic!("purpose: {error}"));
-    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let directory =
+        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let store = Arc::new(
         open_declassification_test_store(directory.path().join("unknown-dispatch.sqlite"))
             .unwrap_or_else(|error| panic!("declassification store: {error:?}")),

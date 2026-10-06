@@ -94,8 +94,8 @@ mod tests {
     fn open_store(
         signer: &Keypair,
     ) -> (tempfile::TempDir, Arc<SqliteEnterpriseMigrationStateStore>) {
-        let directory =
-            tempfile::tempdir().unwrap_or_else(|error| panic!("migration directory: {error}"));
+        let directory = chio_test_support::private_tempdir()
+            .unwrap_or_else(|error| panic!("migration directory: {error}"));
         let policy =
             SqliteEnterpriseMigrationOpenPolicy::new(vec![signer.public_key()], Vec::new())
                 .unwrap_or_else(|error| panic!("migration policy: {error}"));

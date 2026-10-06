@@ -155,7 +155,7 @@ mod tests {
                 &checkpoint,
                 FiscalBootstrapState::CharterPinned,
             )?;
-            let temp = tempfile::tempdir()?;
+            let temp = chio_test_support::private_tempdir()?;
             crate::create_private_directory(temp.path())?;
             let database = temp.path().join("authority.db");
             let lock_root = temp.path().join("locks");
@@ -252,7 +252,7 @@ mod tests {
             &checkpoint,
             FiscalBootstrapState::CharterPinned,
         )?;
-        let temp = tempfile::tempdir()?;
+        let temp = chio_test_support::private_tempdir()?;
         crate::create_private_directory(temp.path())?;
         let database = temp.path().join("authority.db");
         let lock_root = temp.path().join("locks");

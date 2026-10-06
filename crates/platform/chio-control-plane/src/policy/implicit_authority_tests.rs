@@ -51,7 +51,7 @@ struct Fixture {
 
 impl Fixture {
     fn load(yaml: &str, parent: Option<&str>) -> TestResult<Self> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("policy.yaml");
         std::fs::write(&path, yaml)?;
         if let Some(parent) = parent {

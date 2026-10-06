@@ -1366,8 +1366,8 @@ mod tests {
                 .unwrap_or_else(|error| panic!("prior receipt: {error}")),
         )
         .unwrap_or_else(|error| panic!("scheduler health body: {error}"));
-        let directory =
-            tempfile::tempdir().unwrap_or_else(|error| panic!("receipt directory: {error}"));
+        let directory = chio_test_support::private_tempdir()
+            .unwrap_or_else(|error| panic!("receipt directory: {error}"));
         let store = Arc::new(
             chio_store_sqlite::SqliteReceiptStore::open(directory.path().join("receipts.db"))
                 .unwrap_or_else(|error| panic!("receipt store: {error}")),
