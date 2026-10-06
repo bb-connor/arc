@@ -68,6 +68,7 @@ fn run() -> chio_keyring::Result<()> {
         match connection {
             Ok(stream) => {
                 let result = (|| {
+                    chio_keyring::require_service_peer(&stream)?;
                     let mut stream = chio_keyring::DeadlineUnixStream::new(
                         stream,
                         chio_keyring::KEY_LOG_IPC_REQUEST_DEADLINE,

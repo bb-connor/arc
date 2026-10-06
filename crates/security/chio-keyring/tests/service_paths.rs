@@ -6,8 +6,16 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
 
-use chio_core_types::Hash;
-use chio_keyring::{open_or_provision_once, KeyringError};
+use std::io::{Read as _, Write as _};
+use std::os::unix::net::UnixListener;
+use std::thread;
+use std::time::Instant;
+
+use chio_core_types::{Ed25519Backend, Hash, Keypair, SigningBackend};
+use chio_keyring::{
+    open_or_provision_once, KeyringError, UnixKeyLogWitnessClient, WitnessId,
+    KEY_LOG_IPC_REQUEST_DEADLINE,
+};
 use chio_test_support::prelude::*;
 
 mod support;
@@ -308,4 +316,103 @@ fn a_service_socket_below_an_ancestor_with_an_acl_grant_is_refused() {
         return;
     }
     assert_refused_by_policy(bind(&run.join("witness.sock")));
+}
+
+/// Accept one connection, or give up after `limit` so a client that never
+/// connects fails its test instead of hanging it.
+fn accept_within(
+    listener: &UnixListener,
+    limit: Duration,
+) -> Option<std::os::unix::net::UnixStream> {
+    listener.set_nonblocking(true).ok()?;
+    let started = Instant::now();
+    while started.elapsed() < limit {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                stream.set_nonblocking(false).ok()?;
+                return Some(stream);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => return None,
+        }
+    }
+    None
+}
+
+fn unreachable_witness_client(socket: &Path) -> UnixKeyLogWitnessClient {
+    UnixKeyLogWitnessClient::new(
+        socket.to_path_buf(),
+        WitnessId::new("witness.fake").test_unwrap(),
+        Ed25519Backend::new(Keypair::from_seed(&[7; 32])).public_key(),
+        chio_core_types::sha256(b"chio.key-log.fake-service.binding"),
+    )
+    .test_unwrap()
+}
+
+#[test]
+fn a_trickling_service_cannot_hold_a_client_past_its_exchange_deadline() {
+    const TRICKLE_LIMIT: Duration = Duration::from_secs(12);
+
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let listener = UnixListener::bind(&socket).test_unwrap();
+    let service = thread::spawn(move || {
+        let Some(mut stream) = accept_within(&listener, TRICKLE_LIMIT) else {
+            return;
+        };
+        let _ = stream.set_read_timeout(Some(TRICKLE_LIMIT));
+        let mut request = Vec::new();
+        let _ = stream.read_to_end(&mut request);
+        if stream.write_all(&65_536_u32.to_be_bytes()).is_err() {
+            return;
+        }
+        let started = Instant::now();
+        while started.elapsed() < TRICKLE_LIMIT {
+            if stream.write_all(b" ").is_err() {
+                return;
+            }
+            thread::sleep(Duration::from_millis(250));
+        }
+    });
+
+    let started = Instant::now();
+    let result = unreachable_witness_client(&socket).readiness("trickling-service");
+    let elapsed = started.elapsed();
+    let _ = service.join();
+    assert!(result.is_err());
+    assert!(
+        elapsed < KEY_LOG_IPC_REQUEST_DEADLINE + Duration::from_secs(2),
+        "a trickling service held the client for {elapsed:?}"
+    );
+}
+
+#[test]
+fn a_client_refuses_an_endpoint_served_by_another_user_before_sending_its_request() {
+    let directory = support::private_tempdir().test_unwrap();
+    let socket = private_directory(&directory, "run", 0o700).join("witness.sock");
+    let listener = UnixListener::bind(&socket).test_unwrap();
+    let service = thread::spawn(move || {
+        let mut stream = accept_within(&listener, Duration::from_secs(10))?;
+        let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+        let mut request = Vec::new();
+        stream.read_to_end(&mut request).ok()?;
+        Some(request.len())
+    });
+
+    let other_user = rustix::process::geteuid().as_raw().wrapping_add(1);
+    let result = unreachable_witness_client(&socket)
+        .with_service_uid(other_user)
+        .readiness("foreign-service");
+    let received = service.join().test_unwrap();
+    assert_eq!(
+        received,
+        Some(0),
+        "the client must connect, check the peer and send nothing"
+    );
+    assert!(
+        matches!(result, Err(KeyringError::StateInvariant(_))),
+        "{result:?}"
+    );
 }

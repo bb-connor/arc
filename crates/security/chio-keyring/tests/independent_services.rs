@@ -946,3 +946,23 @@ fn a_witness_socket_in_a_group_writable_directory_is_refused() {
     };
     assert!(!status.success());
 }
+
+#[test]
+fn a_same_user_client_completes_a_witness_exchange_and_a_foreign_expectation_is_refused() {
+    let fixture = Fixture::new();
+    let _children = Children(vec![fixture.spawn_witness(0, true)]);
+    let client = fixture.witness_client(0);
+    let proof = wait_for_witness(&client, "same-user-exchange");
+    assert_eq!(proof.body.nonce, "same-user-exchange");
+
+    let other_user = rustix::process::geteuid().as_raw().wrapping_add(1);
+    let result = fixture
+        .witness_client(0)
+        .with_service_uid(other_user)
+        .readiness("foreign-expectation");
+    assert!(
+        matches!(result, Err(chio_keyring::KeyringError::StateInvariant(_))),
+        "{result:?}"
+    );
+    wait_for_witness(&client, "after-foreign-expectation");
+}

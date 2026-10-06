@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
 
 use chio_core_types::{
     canonical_json_bytes, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
@@ -26,7 +25,6 @@ pub const KEY_LOG_AUDIT_READINESS_SCHEMA: &str = "chio.key-log.audit-readiness.v
 
 const WITNESS_READINESS_DOMAIN: &[u8] = b"chio.key-log.witness-readiness.v1\0";
 const AUDIT_READINESS_DOMAIN: &[u8] = b"chio.key-log.audit-readiness.v1\0";
-const IPC_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_NONCE_BYTES: usize = 256;
 pub const MAX_KEY_LOG_IPC_FRAME_BYTES: usize = 4_194_304;
 const MAX_GOSSIP_PAGE_ITEMS: usize = 2;
@@ -581,6 +579,7 @@ pub struct UnixKeyLogWitnessClient {
     witness_id: WitnessId,
     public_key: PublicKey,
     configuration_binding: Hash,
+    service_uid: u32,
 }
 
 impl UnixKeyLogWitnessClient {
@@ -600,7 +599,16 @@ impl UnixKeyLogWitnessClient {
             witness_id,
             public_key,
             configuration_binding,
+            service_uid: current_effective_uid(),
         })
+    }
+
+    /// Expect the service at this endpoint to run as `service_uid` instead of
+    /// this process's effective user.
+    #[must_use]
+    pub fn with_service_uid(mut self, service_uid: u32) -> Self {
+        self.service_uid = service_uid;
+        self
     }
 
     #[must_use]
@@ -749,7 +757,8 @@ impl UnixKeyLogWitnessClient {
             schema: KEY_LOG_WITNESS_IPC_REQUEST_SCHEMA.to_string(),
             operation,
         };
-        let response: WitnessServiceResponse = exchange_unix(&self.socket_path, &request)?;
+        let response: WitnessServiceResponse =
+            exchange_unix(&self.socket_path, self.service_uid, &request)?;
         if response.schema != KEY_LOG_WITNESS_IPC_RESPONSE_SCHEMA {
             return Err(KeyringError::UnsupportedSchema(response.schema));
         }
@@ -813,6 +822,7 @@ pub struct UnixKeyLogAuditClient {
     monitor_id: String,
     public_key: PublicKey,
     configuration_binding: Hash,
+    service_uid: u32,
 }
 
 impl UnixKeyLogAuditClient {
@@ -833,7 +843,16 @@ impl UnixKeyLogAuditClient {
             monitor_id,
             public_key,
             configuration_binding,
+            service_uid: current_effective_uid(),
         })
+    }
+
+    /// Expect the service at this endpoint to run as `service_uid` instead of
+    /// this process's effective user.
+    #[must_use]
+    pub fn with_service_uid(mut self, service_uid: u32) -> Self {
+        self.service_uid = service_uid;
+        self
     }
 
     #[must_use]
@@ -854,7 +873,8 @@ impl UnixKeyLogAuditClient {
                 nonce: nonce.to_string(),
             },
         };
-        let response: AuditServiceResponse = exchange_unix(&self.socket_path, &request)?;
+        let response: AuditServiceResponse =
+            exchange_unix(&self.socket_path, self.service_uid, &request)?;
         if response.schema != KEY_LOG_AUDIT_IPC_RESPONSE_SCHEMA {
             return Err(KeyringError::UnsupportedSchema(response.schema));
         }
@@ -882,7 +902,8 @@ impl UnixKeyLogAuditClient {
             schema: KEY_LOG_AUDIT_IPC_REQUEST_SCHEMA.to_string(),
             operation: AuditServiceOperation::PollNow,
         };
-        let response: AuditServiceResponse = exchange_unix(&self.socket_path, &request)?;
+        let response: AuditServiceResponse =
+            exchange_unix(&self.socket_path, self.service_uid, &request)?;
         if response.schema != KEY_LOG_AUDIT_IPC_RESPONSE_SCHEMA {
             return Err(KeyringError::UnsupportedSchema(response.schema));
         }
@@ -896,23 +917,91 @@ impl UnixKeyLogAuditClient {
 }
 
 #[cfg(unix)]
-fn exchange_unix<T, U>(socket_path: &Path, request: &T) -> Result<U>
+fn current_effective_uid() -> u32 {
+    rustix::process::geteuid().as_raw()
+}
+
+#[cfg(not(unix))]
+fn current_effective_uid() -> u32 {
+    0
+}
+
+/// Refuse a connection unless its peer runs as this service's effective user.
+/// The private socket directory already keeps other users from reaching the
+/// socket; this check authenticates each accepted connection from the
+/// kernel's record of the connecting process before any request is read.
+#[cfg(unix)]
+pub fn require_service_peer(stream: &std::os::unix::net::UnixStream) -> Result<()> {
+    require_peer_uid(stream, current_effective_uid())
+}
+
+#[cfg(unix)]
+fn require_peer_uid(stream: &std::os::unix::net::UnixStream, service_uid: u32) -> Result<()> {
+    if unix_peer_uid(stream)? != service_uid {
+        return Err(KeyringError::StateInvariant(
+            "key-log service peer runs as a different user",
+        ));
+    }
+    Ok(())
+}
+
+/// The effective user the kernel recorded for the process at the other end of
+/// a connected Unix socket when the connection was made.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn unix_peer_uid(stream: &std::os::unix::net::UnixStream) -> Result<u32> {
+    rustix::net::sockopt::socket_peercred(stream)
+        .map(|credentials| credentials.uid.as_raw())
+        .map_err(|error| KeyringError::Io(error.into()))
+}
+
+#[cfg(target_vendor = "apple")]
+fn unix_peer_uid(stream: &std::os::unix::net::UnixStream) -> Result<u32> {
+    use std::os::fd::AsRawFd;
+    use std::os::raw::c_int;
+
+    unsafe extern "C" {
+        fn getpeereid(socket: c_int, euid: *mut u32, egid: *mut u32) -> c_int;
+    }
+    let mut euid = u32::MAX;
+    let mut egid = u32::MAX;
+    // SAFETY: `stream` owns a live socket descriptor for the whole call, and
+    // both out-pointers name writable storage of Darwin's 32-bit `uid_t` and
+    // `gid_t`. The call does not retain either pointer.
+    let result = unsafe { getpeereid(stream.as_raw_fd(), &raw mut euid, &raw mut egid) };
+    if result != 0 {
+        return Err(KeyringError::Io(std::io::Error::last_os_error()));
+    }
+    Ok(euid)
+}
+
+#[cfg(all(
+    unix,
+    not(any(target_os = "linux", target_os = "android", target_vendor = "apple"))
+))]
+fn unix_peer_uid(_stream: &std::os::unix::net::UnixStream) -> Result<u32> {
+    Err(KeyringError::StateInvariant(
+        "key-log service peer credentials are unavailable on this platform",
+    ))
+}
+
+/// One request and its response over a fresh connection, bounded by a single
+/// deadline from connect to the end of the response. The request is sent only
+/// after the kernel reports that the endpoint is served by `service_uid`.
+#[cfg(unix)]
+fn exchange_unix<T, U>(socket_path: &Path, service_uid: u32, request: &T) -> Result<U>
 where
     T: Serialize,
     U: serde::de::DeserializeOwned + Serialize,
 {
-    use std::os::unix::net::UnixStream;
-
-    let mut stream = UnixStream::connect(socket_path)?;
-    stream.set_read_timeout(Some(IPC_TIMEOUT))?;
-    stream.set_write_timeout(Some(IPC_TIMEOUT))?;
+    let mut stream = DeadlineUnixStream::connect(socket_path, KEY_LOG_IPC_REQUEST_DEADLINE)?;
+    require_peer_uid(&stream.stream, service_uid)?;
     write_canonical_frame(&mut stream, request)?;
-    stream.shutdown(std::net::Shutdown::Write)?;
+    stream.stream.shutdown(std::net::Shutdown::Write)?;
     read_single_canonical_frame(&mut stream)
 }
 
 #[cfg(not(unix))]
-fn exchange_unix<T, U>(_socket_path: &Path, _request: &T) -> Result<U>
+fn exchange_unix<T, U>(_socket_path: &Path, _service_uid: u32, _request: &T) -> Result<U>
 where
     T: Serialize,
     U: serde::de::DeserializeOwned + Serialize,
@@ -1452,7 +1541,8 @@ pub fn durable_storage_identity(path: &Path) -> Result<Hash> {
     Ok(storage_file.identity())
 }
 
-/// Total time a service connection has for its request and response.
+/// Total time a service exchange has for its request and response, on both
+/// the client and the service side.
 pub const KEY_LOG_IPC_REQUEST_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// A bound service socket and the lifecycle lock that keeps another instance
@@ -1635,26 +1725,88 @@ impl DeadlineUnixStream {
         stream: std::os::unix::net::UnixStream,
         budget: std::time::Duration,
     ) -> std::io::Result<Self> {
-        let deadline = std::time::Instant::now()
-            .checked_add(budget)
-            .ok_or_else(|| std::io::Error::other("request deadline overflows"))?;
+        Ok(Self {
+            stream,
+            deadline: deadline_after(budget)?,
+        })
+    }
+
+    /// Connect to a service socket under one deadline that also bounds the
+    /// request and the full response.
+    pub fn connect(path: &Path, budget: std::time::Duration) -> std::io::Result<Self> {
+        let deadline = deadline_after(budget)?;
+        let stream = connect_unix_within(path, remaining_until(deadline)?)?;
         Ok(Self { stream, deadline })
     }
 
     fn remaining(&self) -> std::io::Result<std::time::Duration> {
-        self.deadline
-            .checked_duration_since(std::time::Instant::now())
-            .filter(|remaining| !remaining.is_zero())
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::TimedOut, "request deadline elapsed")
-            })
+        remaining_until(self.deadline)
     }
+}
+
+#[cfg(unix)]
+fn deadline_after(budget: std::time::Duration) -> std::io::Result<std::time::Instant> {
+    std::time::Instant::now()
+        .checked_add(budget)
+        .ok_or_else(|| std::io::Error::other("request deadline overflows"))
+}
+
+#[cfg(unix)]
+fn remaining_until(deadline: std::time::Instant) -> std::io::Result<std::time::Duration> {
+    deadline
+        .checked_duration_since(std::time::Instant::now())
+        .filter(|remaining| !remaining.is_zero())
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::TimedOut, "request deadline elapsed")
+        })
+}
+
+/// Linux waits for room in a full listen queue for up to the socket's send
+/// timeout, so the timeout is set before connecting.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+fn connect_unix_within(
+    path: &Path,
+    timeout: std::time::Duration,
+) -> std::io::Result<std::os::unix::net::UnixStream> {
+    use rustix::net::{AddressFamily, SocketAddrUnix, SocketFlags, SocketType};
+
+    let socket = rustix::net::socket_with(
+        AddressFamily::UNIX,
+        SocketType::STREAM,
+        SocketFlags::CLOEXEC,
+        None,
+    )?;
+    // The kernel rejects a microsecond field of one million, which rounding a
+    // sub-microsecond remainder up produces, so only whole microseconds pass.
+    let timeout =
+        std::time::Duration::from_micros(u64::try_from(timeout.as_micros()).unwrap_or(u64::MAX))
+            .max(std::time::Duration::from_micros(1));
+    rustix::net::sockopt::set_socket_timeout(
+        &socket,
+        rustix::net::sockopt::Timeout::Send,
+        Some(timeout),
+    )?;
+    rustix::net::connect(&socket, &SocketAddrUnix::new(path)?)?;
+    Ok(std::os::unix::net::UnixStream::from(socket))
+}
+
+/// BSD-derived kernels refuse a connection to a full listen queue instead of
+/// waiting, so connecting cannot outlast the deadline.
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "android"))))]
+fn connect_unix_within(
+    path: &Path,
+    _timeout: std::time::Duration,
+) -> std::io::Result<std::os::unix::net::UnixStream> {
+    std::os::unix::net::UnixStream::connect(path)
 }
 
 #[cfg(unix)]
 impl Read for DeadlineUnixStream {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
-        self.stream.set_read_timeout(Some(self.remaining()?))?;
+        bound_operation(
+            &self.stream,
+            self.stream.set_read_timeout(Some(self.remaining()?)),
+        )?;
         self.stream.read(buffer)
     }
 }
@@ -1662,13 +1814,39 @@ impl Read for DeadlineUnixStream {
 #[cfg(unix)]
 impl Write for DeadlineUnixStream {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        self.stream.set_write_timeout(Some(self.remaining()?))?;
+        bound_operation(
+            &self.stream,
+            self.stream.set_write_timeout(Some(self.remaining()?)),
+        )?;
         self.stream.write(buffer)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        self.stream.set_write_timeout(Some(self.remaining()?))?;
+        bound_operation(
+            &self.stream,
+            self.stream.set_write_timeout(Some(self.remaining()?)),
+        )?;
         self.stream.flush()
+    }
+}
+
+/// Darwin refuses socket options once both directions of a socket are shut
+/// down, which happens when a peer closes after a half-closed request. Such a
+/// socket is made non-blocking instead, so the next operation returns buffered
+/// data, end of stream or an error without waiting past the deadline.
+#[cfg(unix)]
+fn bound_operation(
+    stream: &std::os::unix::net::UnixStream,
+    timeout_set: std::io::Result<()>,
+) -> std::io::Result<()> {
+    match timeout_set {
+        Err(error)
+            if cfg!(target_vendor = "apple")
+                && error.raw_os_error() == Some(rustix::io::Errno::INVAL.raw_os_error()) =>
+        {
+            stream.set_nonblocking(true)
+        }
+        other => other,
     }
 }
 
