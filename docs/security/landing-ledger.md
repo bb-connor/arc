@@ -7,6 +7,175 @@
 superseded PRs without losing source or review obligations, and retain an exact
 remaining-work ledger.
 
+## October 6 incoming review and mailbox scope
+
+The authoritative JSON now contains **1,734 requirements**: all original 1,609
+rows remain unchanged, followed by 115 incoming findings and ten architecture
+follow-up records. The [authored review](../reviews/2026-10-06-pr1160/README.md)
+is imported byte for byte from `5696c4cf04a1a8368ef36dd51618ea1bd5f7fbfc`. It
+reviews published `d0496c14d824a327f00b98576132834306ff6694` statically; author
+text and estimates remain historical and are not a current-source qualification.
+
+The shared mailbox board owns now/later scope and patch status, superseding the
+earlier preparatory waves. Its current finding scope is **72 now / 43 later**.
+All `A01` through `A10` have named later destinations. Now belongs in #1160;
+later remains an explicit security follow-up without an invented PR number.
+Ready means a patch awaits integration. Integrated means source was integrated,
+with final review, owning checks, native/cold/trusted/hosted acceptance and
+protected landing still open. No appended record is candidate-qualified or
+main-ancestry verified.
+
+The root-confirmed provider/Hermes integrations below retain both origin and
+integration checkpoints in JSON. `F013` still needs shared SSE Content-Type
+enforcement. `F008` still needs a disposition/repair for Recover new-key proof
+of possession. `F077` disputes the blanket head-only premise while exact
+test-merge App/ruleset activation acceptance remains open. The existing 21
+readiness records stay historical pending the root final candidate K.
+
+| ID | Priority | Owner | Scope | Work status | Exact repair / integration |
+| --- | --- | --- | --- | --- | --- |
+| F001 | P0 | claude | now | ready | `518f79e26ba1` (ready patch) |
+| F002 | P1 | codex | now | in-progress | not established |
+| F003 | P1 | codex | now | in-progress | not established |
+| F004 | P1 | codex | now | in-progress | not established |
+| F005 | P1 | codex | now | in-progress | not established |
+| F006 | P1 | claude | now | in-progress | `041b3072b810` (ready patch) |
+| F007 | P1 | claude | now | in-progress | not established |
+| F008 | P1 | claude | now | ready | `0b7c318db3f9` (ready patch); residual open |
+| F009 | P1 | claude | now | ready | `15c5ca5729df` (ready patch) |
+| F010 | P1 | claude | now | ready | `5842b4bd9671` (ready patch) |
+| F011 | P1 | codex | now | in-progress | not established |
+| F012 | P1 | claude | now | in-progress | not established |
+| F013 | P1 | claude | now | integrated | `ca4c4f440107` (source integrated); residual open |
+| F014 | P1 | claude | now | integrated | `680c9b1782d0` (source integrated) |
+| F015 | P1 | claude | now | integrated | `e52bfd4b0751` (source integrated) |
+| F016 | P2 | codex | now | in-progress | not established |
+| F017 | P2 | codex | now | in-progress | not established |
+| F018 | P2 | codex | now | in-progress | not established |
+| F019 | P2 | codex | now | in-progress | not established |
+| F020 | P2 | codex | later | open | not established |
+| F021 | P2 | codex | now | in-progress | not established |
+| F022 | P2 | codex | now | in-progress | not established |
+| F023 | P2 | codex | now | in-progress | not established |
+| F024 | P2 | codex | now | in-progress | not established |
+| F025 | P2 | codex | now | in-progress | not established |
+| F026 | P2 | codex | now | in-progress | not established |
+| F027 | P2 | codex | now | in-progress | not established |
+| F028 | P2 | codex | now | in-progress | not established |
+| F029 | P2 | codex | now | in-progress | not established |
+| F030 | P2 | codex | now | in-progress | not established |
+| F031 | P2 | codex | now | in-progress | not established |
+| F032 | P2 | claude | now | open | not established |
+| F033 | P2 | claude | now | open | not established |
+| F034 | P2 | claude | now | open | not established |
+| F035 | P2 | claude | now | open | not established |
+| F036 | P2 | claude | now | open | not established |
+| F037 | P2 | claude | now | open | not established |
+| F038 | P2 | codex | later | open | not established |
+| F039 | P2 | codex | now | open | not established |
+| F040 | P2 | codex | later | open | not established |
+| F041 | P2 | codex | later | open | not established |
+| F042 | P2 | codex | later | open | not established |
+| F043 | P2 | codex | later | open | not established |
+| F044 | P2 | codex | later | open | not established |
+| F045 | P2 | codex | later | open | not established |
+| F046 | P2 | claude | now | open | not established |
+| F047 | P2 | codex | now | open | not established |
+| F048 | P2 | codex | now | open | not established |
+| F049 | P2 | claude | now | open | not established |
+| F050 | P2 | claude | now | open | not established |
+| F051 | P2 | claude | now | open | not established |
+| F052 | P2 | claude | now | ready | `1d01aaaff81e` (ready patch) |
+| F053 | P2 | claude | now | open | not established |
+| F054 | P2 | claude | now | open | not established |
+| F055 | P2 | claude | now | open | not established |
+| F056 | P2 | claude | now | open | not established |
+| F057 | P2 | claude | now | open | not established |
+| F058 | P2 | claude | now | open | not established |
+| F059 | P2 | claude | now | open | not established |
+| F060 | P2 | claude | later | open | not established |
+| F061 | P2 | claude | now | open | not established |
+| F062 | P2 | codex | now | open | not established |
+| F063 | P2 | claude | now | open | not established |
+| F064 | P2 | claude | now | open | not established |
+| F065 | P2 | codex | now | open | not established |
+| F066 | P2 | codex | now | open | not established |
+| F067 | P2 | codex | now | open | not established |
+| F068 | P2 | claude | now | integrated | `680c9b1782d0` (source integrated) |
+| F069 | P2 | claude | now | open | not established |
+| F070 | P2 | claude | later | open | not established |
+| F071 | P2 | claude | later | open | not established |
+| F072 | P2 | codex | now | open | not established |
+| F073 | P2 | codex | now | open | not established |
+| F074 | P2 | codex | now | open | not established |
+| F075 | P2 | codex | later | open | not established |
+| F076 | P2 | codex | now | open | not established |
+| F077 | P2 | codex | now | open | disputed premise; platform acceptance open |
+| F078 | P2 | codex | now | open | not established |
+| F079 | P2 | codex | now | open | not established |
+| F080 | P2 | codex | later | open | not established |
+| F081 | P2 | codex | now | open | not established |
+| F082 | P2 | claude | now | open | not established |
+| F083 | P2 | claude | now | open | not established |
+| F084 | P2 | claude | now | open | not established |
+| F085 | P2 | claude | now | integrated | `f1cbd18059b6` (source integrated) |
+| F086 | P2 | claude | later | open | not established |
+| F087 | P3 | codex | later | open | not established |
+| F088 | P3 | codex | later | open | not established |
+| F089 | P3 | codex | later | open | not established |
+| F090 | P3 | codex | later | open | not established |
+| F091 | P3 | claude | later | open | not established |
+| F092 | P3 | codex | later | open | not established |
+| F093 | P3 | codex | later | open | not established |
+| F094 | P3 | codex | later | open | not established |
+| F095 | P3 | codex | later | open | not established |
+| F096 | P3 | codex | later | open | not established |
+| F097 | P3 | codex | later | open | not established |
+| F098 | P3 | codex | later | open | not established |
+| F099 | P3 | codex | later | open | not established |
+| F100 | P3 | claude | later | open | not established |
+| F101 | P3 | claude | later | open | not established |
+| F102 | P3 | claude | later | open | not established |
+| F103 | P3 | claude | later | open | not established |
+| F104 | P3 | claude | later | open | not established |
+| F105 | P3 | codex | later | open | not established |
+| F106 | P3 | claude | later | open | not established |
+| F107 | P3 | claude | later | open | not established |
+| F108 | P3 | codex | later | open | not established |
+| F109 | P3 | codex | later | open | not established |
+| F110 | P3 | codex | later | open | not established |
+| F111 | P3 | codex | later | open | not established |
+| F112 | P3 | codex | later | open | not established |
+| F113 | P3 | codex | later | open | not established |
+| F114 | P3 | claude | later | open | not established |
+| F115 | P3 | claude | later | open | not established |
+
+| Architecture ID | Later destination | Status |
+| --- | --- | --- |
+| A01 | The error model discards causes and cannot tell a denial from an outage | open follow-up |
+| A02 | Fail-closed is implemented as stop-the-world | open follow-up |
+| A03 | Security invariants are enforced by call-site convention instead of by type | open follow-up |
+| A04 | God crates | open follow-up |
+| A05 | `include!` fragments, duplicate names and module plumbing | open follow-up |
+| A06 | Functions too large to review, with hand-placed cleanup | open follow-up |
+| A07 | Blocking work and locks in async code | open follow-up |
+| A08 | Unwired and dead code shipped as production surface | open follow-up |
+| A09 | Contracts without a single source of truth | open follow-up |
+| A10 | Gate and landing machinery that costs more than it protects | open follow-up |
+
+All 163 transferred economy obligations and inherited original records remain.
+Bounded EV2 TTL support, SR3 diagnostic limits, pre-invocation API guard scope
+and unexecuted M11 operational days are unchanged. Research, workbench, funded
+work and Mercury remain separate tracks. Source inspection, ready patches and
+earlier component passes do not close those acceptance obligations.
+
+The JSON source entries authenticate all 115 finding headings and ten
+architecture headings. README and slices remain unchanged review context.
+The external provenance/evidence record retains all four blob hashes, the
+mailbox snapshot and the exact pre-append ledger.
+
+Historical checkpoints below retain their original observations and scope.
+
 ## PR consolidation execution (October 4)
 
 The user authorized duplicate-container retirement before the replacement merge.
@@ -27,7 +196,7 @@ and the protected landing of trusted workflow prerequisite #1175;
 #1164 targets main and retains the complete seven-PR, 141-file workbench scope.
 All original source branches and archive tags remain published. The
 [outcome snapshot](audits/pr-consolidation-outcomes-20261004.json.gz) records the
-actual closures, surviving candidates and source-ref verification. The active landing queue now contains only #1160. There are now
+actual closures, surviving candidates and source-ref verification. The active landing queue now contains only #1160. Before the October 6 review import, there were
 1609 ledger requirements, including 201 carried review records, the October 5
 independent findings and subsequent qualification repair obligations.
 The original 1,382 identities and source records remain preserved. Later repairs
