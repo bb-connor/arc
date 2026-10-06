@@ -567,3 +567,45 @@ fn overflowing_retention_duration_refuses_before_archiving_or_deleting() -> Test
     assert_eq!(store.rotate_if_needed(&valid)?, 0);
     Ok(())
 }
+
+/// Returns the scripted readings in order, then repeats the last one.
+struct SteppedClock(std::sync::Mutex<Vec<u64>>);
+
+impl chio_security_types::clock::Clock for SteppedClock {
+    fn read(
+        &self,
+    ) -> Result<chio_security_types::clock::ClockReading, chio_security_types::clock::ClockError>
+    {
+        let mut readings = self
+            .0
+            .lock()
+            .map_err(|_| chio_security_types::clock::ClockError::Unavailable)?;
+        let millis = if readings.len() > 1 {
+            readings.remove(0)
+        } else {
+            readings
+                .first()
+                .copied()
+                .ok_or(chio_security_types::clock::ClockError::Unavailable)?
+        };
+        chio_security_types::clock::Clock::read(
+            &chio_security_types::clock::FixedClock::from_millis(millis),
+        )
+    }
+}
+
+#[test]
+fn backward_clock_step_at_commit_does_not_close_the_writer() -> TestResult {
+    let clock =
+        crate::store_clock::StoreClock::new(Arc::new(SteppedClock(std::sync::Mutex::new(vec![
+            1_000, 999, 1_001,
+        ]))));
+    let (sender, receiver) = receipt_commit_channel_with_clock(clock);
+    sender.try_send(append_command("reserved-at-1000")?)?;
+    let (_command, mut permit) = receiver.recv()?.dequeue();
+    permit.finish(true);
+    assert!(!sender.health.accounting_poisoned.load(Ordering::SeqCst));
+    assert_eq!(sender.health.committed_total.load(Ordering::SeqCst), 1);
+    sender.try_send(append_command("after-the-step")?)?;
+    Ok(())
+}

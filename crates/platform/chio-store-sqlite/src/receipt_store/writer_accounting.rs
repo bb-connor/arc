@@ -168,11 +168,15 @@ impl WriterCommandPermit {
             };
             let _ = self.health.add_counter(counter, 1, name);
             if committed {
+                // The commit already happened; this timestamp only feeds health
+                // reporting. A clock fault (for example a fenced backward step)
+                // keeps the previous value instead of closing the writer.
                 match self.health.clock.unix_millis().map(|time| time.get()) {
                     Ok(now) => self.health.last_commit_unix_ms.store(now, Ordering::SeqCst),
-                    Err(error) => {
-                        self.health.accounting_error(error.code());
-                    }
+                    Err(error) => tracing::warn!(
+                        code = error.code(),
+                        "receipt writer could not timestamp a committed write"
+                    ),
                 }
                 self.health.clear_timeout_error_if_drained();
             }
