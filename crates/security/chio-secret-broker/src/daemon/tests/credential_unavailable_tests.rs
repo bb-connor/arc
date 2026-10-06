@@ -7,6 +7,8 @@ use crate::service::{
 use crate::store::AttemptStore;
 use std::{os::unix::net::UnixStream, path::PathBuf, time::Duration};
 
+#[path = "duplicate_credential_tests.rs"]
+mod duplicate_credential_tests;
 #[path = "execute_cause_tests.rs"]
 mod execute_cause_tests;
 

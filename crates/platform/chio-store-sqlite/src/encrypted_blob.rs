@@ -221,6 +221,8 @@ pub enum BlobStoreError {
     NotFound,
     /// A durable mutation id was reused for different mutation content.
     MutationConflict,
+    /// The reference already binds a blob, enabled or disabled.
+    ReferenceExists,
     /// AEAD authentication failed.
     Decrypt(DecryptError),
 }
@@ -244,6 +246,7 @@ impl std::fmt::Display for BlobStoreError {
             Self::MutationConflict => {
                 f.write_str("encrypted blob mutation id conflicts with durable content")
             }
+            Self::ReferenceExists => f.write_str("encrypted blob reference already exists"),
             Self::Decrypt(error) => write!(f, "encrypted blob decrypt error: {error}"),
         }
     }
@@ -528,6 +531,8 @@ impl SqliteEncryptedBlobStore {
     }
 
     /// Atomically write encrypted bytes and bind an opaque service reference.
+    /// A reference that already exists, enabled or disabled, returns
+    /// [`BlobStoreError::ReferenceExists`] without writing.
     pub fn write_encrypted_blob_with_reference(
         &self,
         reference: &BlobReference,
@@ -543,6 +548,9 @@ impl SqliteEncryptedBlobStore {
             .map_err(|_| BlobStoreError::Decrypt(DecryptError::AuthenticationFailed))?;
         let mut conn = self.pool.get()?;
         let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if reference_exists(&transaction, reference)? {
+            return Err(BlobStoreError::ReferenceExists);
+        }
         transaction.execute(
             r#"
             INSERT INTO chio_encrypted_blobs
@@ -579,6 +587,8 @@ impl SqliteEncryptedBlobStore {
     /// Atomically apply an encrypted reference write once for an exact
     /// operation and mutation digest. Exact retries return the original
     /// handle. Reuse of an operation id for different content fails closed.
+    /// A new operation for a reference that already exists, enabled or
+    /// disabled, returns [`BlobStoreError::ReferenceExists`] without writing.
     pub fn write_encrypted_blob_with_reference_once(
         &self,
         reference: &BlobReference,
@@ -605,6 +615,9 @@ impl SqliteEncryptedBlobStore {
                 BlobHandle::new(blob_id, reference.tenant_id().clone()),
                 BlobReferenceMutationOutcome::Replayed,
             ));
+        }
+        if reference_exists(&transaction, reference)? {
+            return Err(BlobStoreError::ReferenceExists);
         }
 
         let blob_id = format!("blob-{}", Uuid::now_v7());
@@ -1037,6 +1050,30 @@ fn exact_reference_mutation(
     Ok(Some(blob_id))
 }
 
+/// Reads the reference's primary-key row inside the caller's immediate write
+/// transaction, so no other writer can bind the same key before the insert.
+fn reference_exists(
+    transaction: &rusqlite::Transaction<'_>,
+    reference: &BlobReference,
+) -> Result<bool, BlobStoreError> {
+    let existing = transaction
+        .query_row(
+            r#"
+            SELECT 1
+            FROM chio_encrypted_blob_references
+            WHERE namespace = ?1 AND tenant_id = ?2 AND reference_key = ?3
+            "#,
+            params![
+                reference.namespace(),
+                reference.tenant_id().as_str(),
+                reference.reference_key().as_slice(),
+            ],
+            |_| Ok(()),
+        )
+        .optional()?;
+    Ok(existing.is_some())
+}
+
 struct ReferenceMutation<'a> {
     operation_id: &'a str,
     mutation_digest: &'a str,
@@ -1285,9 +1322,10 @@ mod tests {
             )
             .is_err());
 
-        assert!(store
-            .write_encrypted_blob_with_reference(&reference_a, &key, b"orphan")
-            .is_err());
+        assert!(matches!(
+            store.write_encrypted_blob_with_reference(&reference_a, &key, b"orphan"),
+            Err(BlobStoreError::ReferenceExists)
+        ));
         let count: i64 = store
             .pool
             .get()
@@ -1415,5 +1453,150 @@ mod tests {
                 .unwrap(),
             BlobReferenceMutationOutcome::Replayed
         );
+    }
+
+    fn blob_and_mutation_rows(store: &SqliteEncryptedBlobStore) -> (i64, i64) {
+        let conn = store.pool.get().unwrap();
+        let blobs = conn
+            .query_row("SELECT COUNT(*) FROM chio_encrypted_blobs", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        let mutations = conn
+            .query_row(
+                "SELECT COUNT(*) FROM chio_encrypted_blob_reference_mutations",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        (blobs, mutations)
+    }
+
+    #[test]
+    fn a_new_operation_for_an_existing_reference_is_refused_without_writing() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let key = TenantKey::from_bytes([9; 32]);
+        let reference = BlobReference::new(
+            "chio.secret-broker.credentials.v1",
+            TenantId::new("tenant-a"),
+            [5; 32],
+        )
+        .unwrap();
+        let (operation, digest) = ("11".repeat(32), "22".repeat(32));
+        let (handle, _) = store
+            .write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"original",
+                &operation,
+                &digest,
+            )
+            .unwrap();
+
+        assert!(matches!(
+            store.write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"replacement",
+                &"33".repeat(32),
+                &"44".repeat(32),
+            ),
+            Err(BlobStoreError::ReferenceExists)
+        ));
+        assert_eq!(blob_and_mutation_rows(&store), (1, 1));
+        assert_eq!(
+            store
+                .write_encrypted_blob_with_reference_once(
+                    &reference,
+                    &key,
+                    b"original",
+                    &operation,
+                    &digest,
+                )
+                .unwrap(),
+            (handle.clone(), BlobReferenceMutationOutcome::Replayed)
+        );
+
+        store
+            .disable_blob_reference_once(&reference, &"55".repeat(32), &"66".repeat(32))
+            .unwrap();
+        assert!(matches!(
+            store.write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"replacement",
+                &"77".repeat(32),
+                &"88".repeat(32),
+            ),
+            Err(BlobStoreError::ReferenceExists)
+        ));
+        assert_eq!(blob_and_mutation_rows(&store), (1, 2));
+        assert!(matches!(
+            store.resolve_blob_reference(&reference),
+            Err(BlobStoreError::NotFound)
+        ));
+        assert_eq!(
+            store.read_encrypted_blob(&handle, &key).unwrap(),
+            b"original"
+        );
+    }
+
+    #[test]
+    fn reference_storage_faults_are_never_reported_as_existing_references() {
+        let store = SqliteEncryptedBlobStore::open_in_memory().unwrap();
+        let key = TenantKey::from_bytes([9; 32]);
+        let reference = BlobReference::new(
+            "chio.secret-broker.credentials.v1",
+            TenantId::new("tenant-a"),
+            [6; 32],
+        )
+        .unwrap();
+        // The abort text mimics a primary-key failure on the reference row.
+        store
+            .pool
+            .get()
+            .unwrap()
+            .execute_batch(
+                r#"
+                CREATE TRIGGER reject_reference_insert
+                BEFORE INSERT ON chio_encrypted_blob_references
+                BEGIN
+                    SELECT RAISE(ABORT, 'UNIQUE constraint failed: chio_encrypted_blob_references.namespace, chio_encrypted_blob_references.tenant_id, chio_encrypted_blob_references.reference_key');
+                END;
+                "#,
+            )
+            .unwrap();
+        let error = store
+            .write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"payload",
+                &"11".repeat(32),
+                &"22".repeat(32),
+            )
+            .unwrap_err();
+        assert!(matches!(error, BlobStoreError::Sqlite(_)), "{error}");
+        assert_eq!(blob_and_mutation_rows(&store), (0, 0));
+
+        store
+            .pool
+            .get()
+            .unwrap()
+            .execute_batch("DROP TABLE chio_encrypted_blob_references;")
+            .unwrap();
+        assert!(matches!(
+            store.write_encrypted_blob_with_reference_once(
+                &reference,
+                &key,
+                b"payload",
+                &"33".repeat(32),
+                &"44".repeat(32),
+            ),
+            Err(BlobStoreError::Sqlite(_))
+        ));
+        assert!(matches!(
+            store.write_encrypted_blob_with_reference(&reference, &key, b"payload"),
+            Err(BlobStoreError::Sqlite(_))
+        ));
     }
 }

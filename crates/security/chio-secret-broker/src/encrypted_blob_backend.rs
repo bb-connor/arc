@@ -417,6 +417,11 @@ fn blob_storage(error: chio_store_sqlite::BlobStoreError) -> BrokerError {
         BlobStoreError::NotFound => {
             BrokerError::CredentialUnavailable(CredentialStoreError::new(BlobStoreError::NotFound))
         }
+        // A credential version is immutable once written; disabled versions
+        // keep their reference, so re-provisioning one is the same refusal.
+        BlobStoreError::ReferenceExists => {
+            BrokerError::Conflict("credential version already exists".to_string())
+        }
         error @ (BlobStoreError::Clock(_)
         | BlobStoreError::Pool(_)
         | BlobStoreError::Sqlite(_)
