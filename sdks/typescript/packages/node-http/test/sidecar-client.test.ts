@@ -755,3 +755,103 @@ describe("ChioSidecarClient.verifyReceipt", () => {
     }
   });
 });
+
+async function startEvaluateTextSidecar(
+  evaluateBody: string,
+  verifyBody: string,
+  onVerify: () => void,
+): Promise<{ server: http.Server; url: string }> {
+  const server = http.createServer((req, res) => {
+    void (async () => {
+      await discardRequestBody(req);
+      if (req.method === "POST" && (req.url === "/chio/evaluate" || req.url === "/chio/verify")) {
+        if (req.url === "/chio/verify") onVerify();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(req.url === "/chio/evaluate" ? evaluateBody : verifyBody);
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    })().catch((error: unknown) => {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end(error instanceof Error ? error.message : String(error));
+    });
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const address = server.address();
+  if (address == null || typeof address === "string") {
+    throw new Error("server not listening");
+  }
+  return { server, url: `http://127.0.0.1:${address.port}` };
+}
+
+describe("ChioSidecarClient duplicate-key responses", () => {
+  const result: EvaluateResponse = {
+    verdict: { verdict: "allow" },
+    receipt: authoritativeAllowReceipt(),
+    evidence: [],
+  };
+  const receiptText = JSON.stringify(result.receipt);
+  const verifyText = JSON.stringify(verifyResponse(true));
+  const evaluateText = (receipt: string) =>
+    `{"verdict":{"verdict":"allow"},"receipt":${receipt},"evidence":[]}`;
+
+  async function evaluateWith(evaluateBody: string, verifyBody: string) {
+    let verifyCalls = 0;
+    const { server, url } = await startEvaluateTextSidecar(evaluateBody, verifyBody, () => {
+      verifyCalls += 1;
+    });
+    try {
+      const client = new ChioSidecarClient({ sidecarUrl: url });
+      const outcome = await client.evaluate(testRequest()).then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      return { outcome, verifyCalls };
+    } finally {
+      await closeServer(server);
+    }
+  }
+
+  it("accepts the unforged signed receipt after verification", async () => {
+    const { outcome, verifyCalls } = await evaluateWith(evaluateText(receiptText), verifyText);
+    expect(outcome).toEqual({ value: result });
+    expect(verifyCalls).toBe(1);
+  });
+
+  it.each([
+    [
+      "nested receipt verdict",
+      evaluateText(receiptText.replace('"verdict":{', '"verdict":{"verdict":"deny",')),
+      verifyText,
+    ],
+    [
+      "receipt top-level route_pattern",
+      evaluateText(receiptText.replace("{", '{"route_pattern":"/admin",')),
+      verifyText,
+    ],
+    [
+      "response top-level verdict",
+      evaluateText(receiptText).replace("{", '{"verdict":{"verdict":"deny"},'),
+      verifyText,
+    ],
+    [
+      "verifier report authorized",
+      evaluateText(receiptText),
+      verifyText.replace("{", '{"authorized":false,'),
+    ],
+  ])("rejects duplicate keys in the %s before projection", async (label, evaluateBody, verifyBody) => {
+    expect(JSON.parse(evaluateBody)).toEqual(result);
+    expect(JSON.parse(verifyBody)).toEqual(verifyResponse(true));
+    const { outcome, verifyCalls } = await evaluateWith(evaluateBody, verifyBody);
+    if ("value" in outcome) {
+      expect.fail(
+        `duplicate keys in ${label} were accepted after ${verifyCalls} verification call(s)`,
+      );
+    }
+    expect(outcome.error).toBeInstanceOf(SidecarError);
+    expect((outcome.error as SidecarError).code).toBe("chio_evaluation_failed");
+    expect(verifyCalls).toBe(label === "verifier report authorized" ? 1 : 0);
+  });
+});

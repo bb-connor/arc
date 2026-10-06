@@ -6,7 +6,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
  * Schema compilation fails at construction; unknown schema IDs reject at use.
  *
  * Values must already be parsed JSON. Duplicate keys cannot be recovered after
- * JSON.parse and require a duplicate-rejecting ingress parser. This portable
+ * JSON.parse, so wire text goes through `parseWireJson` first. This portable
  * number profile rejects integers outside JavaScript's safe-integer domain,
  * rather than signing or forwarding a potentially rounded authorization value.
  */
