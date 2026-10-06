@@ -2388,6 +2388,918 @@
       "observed_result": "terminal repaired-source structural check passes",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "checked-output-stateful-red.status.json.gz",
+      "observed_result": "Actual three-failure kernel reproduction on the original checked-output implementation; captured inputs and hashes remain historical.",
+      "bytes": 822804,
+      "sha256": "55387405a3c91c16ba8482c56e57a47f6e795519931d23397202533cd0f50881"
+    },
+    {
+      "log": "checked-output-stateful-red-checked-output-red.log.gz",
+      "observed_result": "Actual three-failure kernel reproduction on the original checked-output implementation; captured inputs and hashes remain historical.",
+      "bytes": 10502,
+      "sha256": "b2aec9ba79a3f072107fe6c83220b303a1b9fc3a9d8f698a3e55a9b4f9ffecc6"
+    },
+    {
+      "log": "checked-output-stateful-green-kernel.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 168569,
+      "sha256": "8a6e1c1079174772452f3fc5ecd74f118ff4fa315d3f67c3026d7802ec5ae21e"
+    },
+    {
+      "log": "checked-output-stateful-green-format.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "checked-output-stateful-green-flow.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 563696,
+      "sha256": "fb44f8a2611b840fe0b25670e4015f2c90dc9eef0e7c58df5800e89de66140f7"
+    },
+    {
+      "log": "checked-output-stateful-green-proof-refresh.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "checked-output-stateful-green.status.json.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 826208,
+      "sha256": "3abff0e6122b32c26bd2a25ae0dbfb241442959907d9548c7a27798b0466633a"
+    },
+    {
+      "log": "checked-output-stateful-green-proof-check.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "checked-output-stateful-green-hygiene.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 52024,
+      "sha256": "ca9dfa8076a6b891cd3bf76b28e4d0aed132948bdf3a9bb837568925aa858dcb"
+    },
+    {
+      "log": "checked-output-stateful-green-kernel-clippy.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 2509,
+      "sha256": "f4b705585c28e8dd66568170897f87443f0b0e9641dbb676c9bf67639636f94d"
+    },
+    {
+      "log": "checked-output-stateful-green-diff.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "checked-output-stateful-green-flow-contract.log.gz",
+      "observed_result": "Actual nine-command repaired-kernel campaign, 1538 kernel tests and 72/741 flow inventories; captured pre-dependency input scope is retained.",
+      "bytes": 58,
+      "sha256": "e3f5c0e94f3809efb913817dcc0856be7f259530a6d770cba8009dbb9254ca38"
+    },
+    {
+      "log": "checked-output-flow-contract-red.log.gz",
+      "observed_result": "Actual missing-identity contract failure before the checked-output inventory repair.",
+      "bytes": 5273,
+      "sha256": "c2c5304c5a795fb9db95544ff8cfd88bef867575efbe5cd3e03466854caccf1b"
+    },
+    {
+      "log": "checked-output-flow-contract-red.status.json.gz",
+      "observed_result": "Actual missing-identity contract failure before the checked-output inventory repair.",
+      "bytes": 633,
+      "sha256": "ce8ead4fd6e9dd9d26ed4d8fcf225e0119547c96a63a3cad05167821feca2fac"
+    },
+    {
+      "log": "checked-output-historical-evidence-preflight.json.gz",
+      "observed_result": "Read-only verification of all 398 preceding compressed records; no current-source qualification claim.",
+      "bytes": 321,
+      "sha256": "aec557d974810cfb0aefc04aa589656ef63650d74d95db183c08f5ef173d5400"
+    },
+    {
+      "log": "checked-output-source-checkpoint.json.gz",
+      "observed_result": "Clean committed source checkpoint after all 21 owned follow-up commands pass; native and hosted qualification remain separate.",
+      "bytes": 232,
+      "sha256": "8922519dcb3b121cd7ce73cd2f34cae6499cbe5dc753f14df106d44201caacca"
+    },
+    {
+      "log": "blob-request-modes-red-peer-modes.log.gz",
+      "observed_result": "Initial real peer fixture run fails redundant receiver shutdown; no behavioral aggregate acceptance or reproduction is claimed.",
+      "bytes": 6680,
+      "sha256": "30d0cd5a508c149347f2a7579f2321c059b9e68419d99b9e21274ca38d76db57"
+    },
+    {
+      "log": "blob-request-modes-red.status.json.gz",
+      "observed_result": "Initial real peer fixture run fails redundant receiver shutdown; no behavioral aggregate acceptance or reproduction is claimed.",
+      "bytes": 823327,
+      "sha256": "9353b82c70f312ff9a85800b201c6e08425cf748eb811642057ef698b0abc623"
+    },
+    {
+      "log": "blob-request-modes-behavior-red-peer-modes.log.gz",
+      "observed_result": "Actual old-dependency peer behavior: one permitted transfer passes, both prohibited-push cases fail.",
+      "bytes": 3325,
+      "sha256": "4f1606f8fd7856ba3cb601cb619857f02ee5e69aea589aa3afc4aa6cc13115b0"
+    },
+    {
+      "log": "blob-request-modes-behavior-red.status.json.gz",
+      "observed_result": "Actual old-dependency peer behavior: one permitted transfer passes, both prohibited-push cases fail.",
+      "bytes": 823334,
+      "sha256": "b0ad9c7dd23f2fcc167dc39868041753739f7861f27fada167f3db3a33628907"
+    },
+    {
+      "log": "blob-request-modes-green.status.json.gz",
+      "observed_result": "Actual replacement-dependency peer behavior: all three cases pass, including signed-root reads and permitted-push control.",
+      "bytes": 823232,
+      "sha256": "d4757dbf08a59edc9e03d9e499bfd594b44affdd1753b5f5aac4da1e861d34b4"
+    },
+    {
+      "log": "blob-request-modes-green-peer-modes.log.gz",
+      "observed_result": "Actual replacement-dependency peer behavior: all three cases pass, including signed-root reads and permitted-push control.",
+      "bytes": 2846,
+      "sha256": "46e97a53026f9ffba64c5e8a7ff73c8c232d4c8dfabc3e0bbff2c2eef48d3291"
+    },
+    {
+      "log": "delivery-mirrors-red-tool-custody.json.gz",
+      "observed_result": "Live checker reproduces three reviewed mirror drifts; direct-tool post-campaign custody is explicitly identified.",
+      "bytes": 344,
+      "sha256": "95551faedd48294a2d75083050adcd6b3450a373ce9d194b364aa301b9582621"
+    },
+    {
+      "log": "delivery-mirrors-red.status.json.gz",
+      "observed_result": "Live checker reproduces three reviewed mirror drifts; direct-tool post-campaign custody is explicitly identified.",
+      "bytes": 823055,
+      "sha256": "d263f879abee39d6230b6d1a9fbce2e5aff2eecdeb7a2d396f4a2394ff5c875c"
+    },
+    {
+      "log": "delivery-mirrors-red-mirrors.log.gz",
+      "observed_result": "Live checker reproduces three reviewed mirror drifts; direct-tool post-campaign custody is explicitly identified.",
+      "bytes": 1839,
+      "sha256": "b538cc8780f9bad1e933f48a9e8f8caa9428f1e2459f2d79563e623b836b540e"
+    },
+    {
+      "log": "delivery-mirrors-reviewed-bless.log.gz",
+      "observed_result": "Exactly three of 230 reviewed manifest records change; only function/aggregate hashes change, all model actions and other anchors remain.",
+      "bytes": 48,
+      "sha256": "a98ba285df13284f1b76ff090f2d7a233b380ecfdd4f35ce7d5df00350b89357"
+    },
+    {
+      "log": "delivery-mirrors-reviewed-bless.status.json.gz",
+      "observed_result": "Exactly three of 230 reviewed manifest records change; only function/aggregate hashes change, all model actions and other anchors remain.",
+      "bytes": 560,
+      "sha256": "e9f4d10b6ddd238ffc5fae8a55f4451dc3b6ab2a717fdcc7ee7a8dffc5d57b2a"
+    },
+    {
+      "log": "deception-inventory-contract-red.log.gz",
+      "observed_result": "Strengthened source-closure contract rejects the original stale materialization inventory.",
+      "bytes": 1971,
+      "sha256": "548695148cbd7978df183b723229b774e2ed6d619a04d7b583d3e86bc3bbc526"
+    },
+    {
+      "log": "deception-inventory-contract-red.status.json.gz",
+      "observed_result": "Strengthened source-closure contract rejects the original stale materialization inventory.",
+      "bytes": 496,
+      "sha256": "a0f0e5f3a02b78be5bde443d050058fe02d980bb5ccdfb85fe936d7ff5d8edb3"
+    },
+    {
+      "log": "deception-inventory-contract-green.status.json.gz",
+      "observed_result": "Repaired 12-inventory/85-case contract passes all original controls and both new omission/substitution controls.",
+      "bytes": 498,
+      "sha256": "f7f1f26b2c82ecbcdffe47f91f0197d20bdd3f5f33657425bacf9a27b667c9fd"
+    },
+    {
+      "log": "deception-inventory-contract-green.log.gz",
+      "observed_result": "Repaired 12-inventory/85-case contract passes all original controls and both new omission/substitution controls.",
+      "bytes": 1499,
+      "sha256": "7f6591b386516b68dbfe7b9bec11a1429d1598bd6503731aa9b5ba568143f1d0"
+    },
+    {
+      "log": "cfg-aliases-registry-20261006.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta and actual upstream test results; retained imported base acceptance and one upstream ignored doctest are explicit.",
+      "bytes": 18867,
+      "sha256": "550292c7da9e0c7d19d8214e3e1141d4d8372387528f299444c5ea2859a90017"
+    },
+    {
+      "log": "cfg-aliases-0.2.1-0.2.2.diff.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta and actual upstream test results; retained imported base acceptance and one upstream ignored doctest are explicit.",
+      "bytes": 3236,
+      "sha256": "1676d46afb08fb5534accf1c72a75b56ce55b02cdaf6369ef7834f7bfeaf93f1"
+    },
+    {
+      "log": "cfg-aliases-0.2.2-audit-tests.status.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta and actual upstream test results; retained imported base acceptance and one upstream ignored doctest are explicit.",
+      "bytes": 2151,
+      "sha256": "e242b961696e77f7a688594e7e75061eb4866489f7510227f646649ad482900c"
+    },
+    {
+      "log": "cfg-aliases-0.2.2-audit-doctests.log.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta and actual upstream test results; retained imported base acceptance and one upstream ignored doctest are explicit.",
+      "bytes": 535,
+      "sha256": "7fc781e6c63c57edb52dc126115df77dd33fefda60852152011e15e0db372feb"
+    },
+    {
+      "log": "cfg-aliases-0.2.2-audit-integration.log.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta and actual upstream test results; retained imported base acceptance and one upstream ignored doctest are explicit.",
+      "bytes": 658,
+      "sha256": "9e51deda13e57cc5e8f909763c75c9c43dfcb162730863a79aa79cf510ea04fa"
+    },
+    {
+      "log": "cfg-aliases-review-source-custody.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta and actual upstream test results; retained imported base acceptance and one upstream ignored doctest are explicit.",
+      "bytes": 819,
+      "sha256": "e6a920c30c6d20fbf7bd8cb22a38d9ca128125c4a06cbcdec6a582c37b94359c"
+    },
+    {
+      "log": "iroh-blobs-locked-upgrade.status.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 424,
+      "sha256": "20360d8178881e3bdcefa6d462f92685ef2f48a4d32f6ceb49fa346d27cd76c4"
+    },
+    {
+      "log": "iroh-blobs-review-source-custody.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 942,
+      "sha256": "76140d9df3a1fb4cbbfdee87b5e505da6ae4b09525a11867422e2d7eb2556861"
+    },
+    {
+      "log": "iroh-blobs-locked-upgrade.log.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 1787,
+      "sha256": "2d70de261ebf9183af5ee176175af36e592383744ce134573c30c2a671438361"
+    },
+    {
+      "log": "iroh-blobs-deployment-docker.log.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 3095,
+      "sha256": "b40ec1634bda6d73701b387dc360da6f191ea15d32bca50f7c9b52b53101321d"
+    },
+    {
+      "log": "iroh-blobs-0.103.1-upstream-commit.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 155,
+      "sha256": "f875acfd5dca1d11831ccfb5f02753b882a60dc572cb24502439e10711fc60d1"
+    },
+    {
+      "log": "iroh-blobs-0.103.0-0.103.1.diff.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 18949,
+      "sha256": "c4c33d86d6d6741bbf52520de7bb0632b172c3d5f8b3c787001cdeea6aab6d6d"
+    },
+    {
+      "log": "iroh-blobs-deployment-regeneration.status.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 851,
+      "sha256": "4156233853efa0b95a88ede9f91ef468103c0d08b8fade651885a487b746f821"
+    },
+    {
+      "log": "iroh-blobs-registry-20261006.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 83278,
+      "sha256": "f4029767d38a6310f2915e55a86ba0e4d7d435251a7022b6e80e312b9b8eb8f2"
+    },
+    {
+      "log": "iroh-blobs-0.103.0-0.103.1-delta-inventory.json.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 2812,
+      "sha256": "6e87e5fbfad80bad3e764b9857e9fcd67fb9ab99d952a3a0ff287b4ba43bf185"
+    },
+    {
+      "log": "iroh-blobs-deployment-proof-room.log.gz",
+      "observed_result": "Authenticated dependency source custody, complete delta, precise two-package update or generated deployment graph result; base exemption is retained, no full base audit is claimed.",
+      "bytes": 3596,
+      "sha256": "b7a50ac6a3555bca0c6f8df182a81bfc531baac1b73336bedbae11674bda2171"
+    },
+    {
+      "log": "readiness-followups-green-federation-clippy.log.gz",
+      "observed_result": "Initial owned follow-up campaign passes broker and federation suites and strict Clippy, then fails canonical audit ordering; the failed campaign and immutable source map remain historical.",
+      "bytes": 3250,
+      "sha256": "afb7bfec6877a4328fc4d4db67796dec5d4c57da8ea58c01158d8b51ae43efba"
+    },
+    {
+      "log": "readiness-followups-green-broker.log.gz",
+      "observed_result": "Initial owned follow-up campaign passes broker and federation suites and strict Clippy, then fails canonical audit ordering; the failed campaign and immutable source map remain historical.",
+      "bytes": 28256,
+      "sha256": "b9b59e225d979f546a91d5a91ede61f886791667d26f2d513c898a2504b36234"
+    },
+    {
+      "log": "readiness-followups-green-federation.log.gz",
+      "observed_result": "Initial owned follow-up campaign passes broker and federation suites and strict Clippy, then fails canonical audit ordering; the failed campaign and immutable source map remain historical.",
+      "bytes": 40059,
+      "sha256": "6995ed15954fcf76ae27cfbfc510efaf5adfb5905531fffa239ca1da59305425"
+    },
+    {
+      "log": "readiness-followups-green-broker-clippy.log.gz",
+      "observed_result": "Initial owned follow-up campaign passes broker and federation suites and strict Clippy, then fails canonical audit ordering; the failed campaign and immutable source map remain historical.",
+      "bytes": 10388,
+      "sha256": "ae2382c9f9cff5ac98c446e6d916c7cb33c99c9938253137c25c5a8a345801de"
+    },
+    {
+      "log": "readiness-followups-green.status.json.gz",
+      "observed_result": "Initial owned follow-up campaign passes broker and federation suites and strict Clippy, then fails canonical audit ordering; the failed campaign and immutable source map remain historical.",
+      "bytes": 825311,
+      "sha256": "65af713cf79055c9353c86810e2e06149d2e0eee7525dbbc3277c7357dddba55"
+    },
+    {
+      "log": "readiness-followups-green-supply-chain.log.gz",
+      "observed_result": "Initial owned follow-up campaign passes broker and federation suites and strict Clippy, then fails canonical audit ordering; the failed campaign and immutable source map remain historical.",
+      "bytes": 6026,
+      "sha256": "9be6429b1efd2f9bc4b056a6879cc3885de9f2055fff21ff3deb9b5767673904"
+    },
+    {
+      "log": "readiness-followups-canonical-green-supply-chain.log.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 3797,
+      "sha256": "b37a0f2a2a01a99c8b08023356c4c8a8e9248ffd9ffa2b855872647273936136"
+    },
+    {
+      "log": "readiness-followups-canonical-green-broker.log.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 25026,
+      "sha256": "c5a2b1ffe355e13f1462702224a64e3d81874351b81819ce354dfabc73e7aa50"
+    },
+    {
+      "log": "readiness-followups-canonical-green-federation.log.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 38845,
+      "sha256": "2a94c04e019c512a1f9f38078fb0f997bb04afb905c68fc5a87fa824a499292e"
+    },
+    {
+      "log": "readiness-followups-canonical-green-federation-cli.log.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 6691,
+      "sha256": "2d16da8e560df6b66678aa606041474c6c308ff837af0108f9d7d3b1333dcff0"
+    },
+    {
+      "log": "readiness-followups-canonical-green.status.json.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 825927,
+      "sha256": "b7ace1fc3e08828797ffad88a9d7c6ded46143aadee6ead96314d89bd6482ba5"
+    },
+    {
+      "log": "readiness-followups-canonical-green-federation-clippy.log.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 1660,
+      "sha256": "db94c4934e22dc66f48b5e7c6d5ac0a3ee24ecc742daae3fc444bbe704cd33ea"
+    },
+    {
+      "log": "readiness-followups-canonical-green-broker-clippy.log.gz",
+      "observed_result": "Canonicalized audit campaign passes five earlier commands and all 14 evidence-export tests, then the multi-hop fixture correctly fails local verification of its random receipt signer; no aggregate success is claimed.",
+      "bytes": 1660,
+      "sha256": "8ed7e6bdeaa8303ea426fbfc620e13bcb373dbe2e746416dc15a7d39dfd5b281"
+    },
+    {
+      "log": "audit-store-canonicalization.status.json.gz",
+      "observed_result": "Standard cargo-vet formatting preserves parsed audit contents, exemption configuration and imported policy exactly; formatting does not add acceptance authority.",
+      "bytes": 345,
+      "sha256": "24be89ec0f2db9d0e300d3951610c05c0e5c7a0aab394147bc7790852cceffa9"
+    },
+    {
+      "log": "audit-store-canonicalization.log.gz",
+      "observed_result": "Standard cargo-vet formatting preserves parsed audit contents, exemption configuration and imported policy exactly; formatting does not add acceptance authority.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "readiness-followups-signer-green-format.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "readiness-followups-signer-green-proof-check.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 48,
+      "sha256": "453cdc0e326d12f3b70d93342052b075f91c48fe59667185f5c9915c053517fd"
+    },
+    {
+      "log": "readiness-followups-signer-green-proof-refresh.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 103,
+      "sha256": "d71a133df755df1d55802f07f23de2b0db9894ebc51506b4d8d0b3ec6863c781"
+    },
+    {
+      "log": "readiness-followups-signer-green-deny-advisories.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 14,
+      "sha256": "799fc05e6513bf365cc7565ea51cc5cb9ca6690b1cd1fe7777339be83437131b"
+    },
+    {
+      "log": "readiness-followups-signer-green-mirrors.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 41,
+      "sha256": "2d0569f01dbf7fdcd88a8971344e0eff73e212d3ff518e10c341c64fbd40589a"
+    },
+    {
+      "log": "readiness-followups-signer-green-supply-chain.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 3797,
+      "sha256": "3afb55837cd5dde21b3314ca6d687a8099bac09720d9526f54821f02929d1db0"
+    },
+    {
+      "log": "readiness-followups-signer-green-federation.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 38845,
+      "sha256": "89f8529f4750a1b6ef94a9c3757c2fdf7f4867ca2ae5fbea132c3b7d83cc6467"
+    },
+    {
+      "log": "readiness-followups-signer-green-diff.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "log": "readiness-followups-signer-green-docker-proof-room.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 3596,
+      "sha256": "29a20ef621ff29151d26cc91af3cebf5306fa8d809ad5b6248292a76ffb5f4f1"
+    },
+    {
+      "log": "readiness-followups-signer-green-deny-bans.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 8,
+      "sha256": "eba7f3001f2423b5c5fcdd45d2e210ba11daa9c0e73bba8072de1c60f30b5878"
+    },
+    {
+      "log": "readiness-followups-signer-green-deny-licenses.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 12,
+      "sha256": "71dadc8c8978da797b94dc581b666330c737551839c8fc820d7647130930c4b7"
+    },
+    {
+      "log": "readiness-followups-signer-green-deception.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 59883,
+      "sha256": "c459d925d48cf173d0a1d839422e9c3fa243a6bb81d0a90c54dde176b182b67c"
+    },
+    {
+      "log": "readiness-followups-signer-green-federation-cli-clippy.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 7004,
+      "sha256": "013c9bb318baa3e3577e757335340cab0fcab65851f95271c5f1a07f456220e8"
+    },
+    {
+      "log": "readiness-followups-signer-green-federation-cli.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 4288,
+      "sha256": "6e76c4c462a4ec9d1e375eebc4dd85f0c65501ba04516ec4d331fa0778ba672e"
+    },
+    {
+      "log": "readiness-followups-signer-green-deception-contract.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 1499,
+      "sha256": "7f6591b386516b68dbfe7b9bec11a1429d1598bd6503731aa9b5ba568143f1d0"
+    },
+    {
+      "log": "readiness-followups-signer-green-broker-clippy.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 1660,
+      "sha256": "faeeea2e797dc0d1680e9bfd0125fc14872bee930e84060bdce7c032db823fc8"
+    },
+    {
+      "log": "readiness-followups-signer-green-broker.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 25026,
+      "sha256": "986f4dc0c386915f2a8d508a688d48f7c6aa37f7293f440ff55e6cf35ffe6123"
+    },
+    {
+      "log": "readiness-followups-signer-green-hygiene.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 52024,
+      "sha256": "f4d4ecfd62844acf60a60675b63abcad6a369f1979e602862169945700e83e37"
+    },
+    {
+      "log": "readiness-followups-signer-green.status.json.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 832899,
+      "sha256": "b31fe58277fd1cd2f1d6ad92cc0c2f661ab4e7694abd90388595811c3be50432"
+    },
+    {
+      "log": "readiness-followups-signer-green-federation-clippy.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 1660,
+      "sha256": "5c5f908b87eab0f205f29fd7ff2171b92f5e9e0237b1f71ba4c34d7d3c692df5"
+    },
+    {
+      "log": "readiness-followups-signer-green-deny-sources.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 11,
+      "sha256": "5cba1c1c8bf7b4f0398abfd62fa5e0d2d8f72d9f59aa1ab0ec4c54d3a2cd2f90"
+    },
+    {
+      "log": "readiness-followups-signer-green-docker.log.gz",
+      "observed_result": "Actual final owned follow-up campaign; current input agreement and every command result are checked before artifact renewal.",
+      "bytes": 3038,
+      "sha256": "c8df52ad87cc159c47fd2d1280c8424c4767e53aab79147b2f326dcfa2d4898c"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-linux-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 261029,
+      "sha256": "0c6201c2836c34b8825431c19a03364da6bf9f91fd05fa8649bb3d1c2508965e"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-portable-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 6038,
+      "sha256": "9e82c8399a086e55f88eb9827f40a77096f41bf8f4de8c5d2ca337c5a5391d7e"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-budget-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 29712,
+      "sha256": "b3f0f45bbc58e18dda878c5660f12024260d36009e99647886248077a579761e"
+    },
+    {
+      "log": "9c152fbdfa-postgres-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 5344,
+      "sha256": "721dc0f86ff14cf179d5db42caa3dec9bbe927e67064ef0dbb1e6789f87edcd1"
+    },
+    {
+      "log": "9c152fbdfa-vet-tested-commit.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 1112359,
+      "sha256": "ec8e45b9a745d34d644411968882d5c32c27c40f7280cd3d7882fd85c726915b"
+    },
+    {
+      "log": "9c152fbdfa-reviews-before-closure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 61371,
+      "sha256": "4943c44bbcf7bd52b36c0d3320ce29674d0b67d6dd31e6921859d3e028c75d63"
+    },
+    {
+      "log": "9c152fbdfa-reviews-before-closure.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 93525,
+      "sha256": "9cd8527de9c54846cbf87d71d691f49dedd2633082286fe16055227f93e7c838"
+    },
+    {
+      "log": "9c152fbdfa-msrv-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 681895,
+      "sha256": "b4c1a64c3f3b472f7c3d3cacc6ee87c7cafda27790aab2e4d321b3a9959289d2"
+    },
+    {
+      "log": "9c152fbdfa-head-commit.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 692590,
+      "sha256": "2d38a196db5ee324756eb8020baf907573866b743aa61572de69d847a4c2af03"
+    },
+    {
+      "log": "9c152fbdfa-native-public-custody.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 734,
+      "sha256": "ea01ef0f71310b46c650f9c3aa7c1295c99ad3dafedac642ad734c3d0c6c3f2f"
+    },
+    {
+      "log": "9c152fbdfa-vet-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 126315,
+      "sha256": "759bfb0d8e1f071227ad270b9f8bc5a889c6bcf8b1e56b644b61e10f399033cd"
+    },
+    {
+      "log": "9c152fbdfa-advisory.zip.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 11613,
+      "sha256": "a94e5b72ee6abc588de79190f8cafe799ad3b0fdae5032962902a9cadd60699c"
+    },
+    {
+      "log": "9c152fbdfa-msrv-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 4503,
+      "sha256": "4ae63fd160bbb11b592bd6ef0e05da7156400387723c354fa98d27818806b936"
+    },
+    {
+      "log": "9c152fbdfa-postgres-artifact-index.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 3580,
+      "sha256": "38a6d5a68c29dbe74fc6053bc80f14ddf7be6527f73f6d8112da7e23cd7a19ea"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-linux-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2753,
+      "sha256": "566b5b2edbb52a22cc724bc170b0a2801ae9e3fa799c83a8b80cfdf2978aa070"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-adversarial-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 265048,
+      "sha256": "b4accaa27a2e54333bea37c5a60f668f8c23a5330630252f0621e7131784b97b"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-success.verification.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2399,
+      "sha256": "2bb6e4c2098e53561e6bf0cbca02b71b435d419ca5a558ead936485891ca2c2f"
+    },
+    {
+      "log": "9c152fbdfa-native-112199740065-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2439,
+      "sha256": "07b09873d6304bae21f85d4a446e583da9b2a444c3070d15ab9f327ba2ca51f1"
+    },
+    {
+      "log": "9c152fbdfa-reviews-current.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 63453,
+      "sha256": "6e07fbc0344bad2a03bea2c60f8528eacd41cb915cc09a361a03dbbccfbacb69"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-active-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 1140499,
+      "sha256": "7a5bedc00427c7b8e71330dbf94e8f7862ee5ec81d2b29c0e43ed3ec4d1ece25"
+    },
+    {
+      "log": "9c152fbdfa-reviews-after-closure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 61307,
+      "sha256": "f271cd31c132e5fa5c931e4ed90a85593c152402f62e92bb53732ba3f01ed74d"
+    },
+    {
+      "log": "9c152fbdfa-advisory-verifier-initial-failure.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 442,
+      "sha256": "a988a9f6e6c2a8da117a8e7329a386542d8eb489b1655c5b05f2261d088077ae"
+    },
+    {
+      "log": "9c152fbdfa-postgres-trajectories-verification.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 222,
+      "sha256": "30b1eab47e023d8e909ce86500260b65bb206cbccea3ac8799d0e1c268657760"
+    },
+    {
+      "log": "9c152fbdfa-advisory-run.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 13656,
+      "sha256": "8002fad62539868aff26292fd5ff8a73a1ab91eea03dad3a585d654e7e505832"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-budget-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2168,
+      "sha256": "9087f60759cdfd9f77e5257db3733c608b5cf1a956939823a96f7b39ffd58b53"
+    },
+    {
+      "log": "9c152fbdfa-deny-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 43504,
+      "sha256": "20579d5de43303a1583955a5578b3167388b45fc1b5fadb6422b79dede63d40e"
+    },
+    {
+      "log": "9c152fbdfa-build-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 10290,
+      "sha256": "be4769803df2f3e86ba4c4d02db80d2324ca3107c84b7dcf553a027f09dc79b4"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-active-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 6326,
+      "sha256": "b352fe4c1c878949801a77b96bf8787cf2973689de8306e2c1ea475881736575"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-budget-retry-verification.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 450,
+      "sha256": "051497c1abab4b10df5bdfa7ac7d38af0e27d6362be0be52bac0ae2b6f0cbad7"
+    },
+    {
+      "log": "9c152fbdfa-advisory-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 146502,
+      "sha256": "dcbd1034d831648876278239c7fd5455a01f5f1d40b5f1a2585d16d59e653354"
+    },
+    {
+      "log": "9c152fbdfa-reviews-after-closure.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 93375,
+      "sha256": "47c367872677fe1b65a52384f79a97c6d9c8fe490aca609fd57b66d569e5b899"
+    },
+    {
+      "log": "9c152fbdfa-vet-run.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 12106,
+      "sha256": "8348927aa4433f3df2aba4d461825dfbef5862a5debeceddf680358b44f7373e"
+    },
+    {
+      "log": "9c152fbdfa-deny-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 3108,
+      "sha256": "1a98cbf1aa59ac0d855da8f13876d710975f44b9811b7eebf87298619261dd98"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-budget-retry-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 16384,
+      "sha256": "335d25c1339442af5b7b8fd663a9d453b1c4a91927a5dcb19085b5159aa2e32f"
+    },
+    {
+      "log": "9c152fbdfa-native-112182538872-success-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 9501,
+      "sha256": "138fc5982a4ac9db089516e86dbf964f30e2291c7490bd8a4cd1abbdea2aaadd"
+    },
+    {
+      "log": "9c152fbdfa-native-success-jobs.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 33723,
+      "sha256": "fee31b373a933088f80e5e2f977f4aadb8b950d2af09e7e1cdaf56cf42326f71"
+    },
+    {
+      "log": "9c152fbdfa-build-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 639434,
+      "sha256": "6cbaa74ff46c0dfdf43e18463c720a67cd1f0c0a99cc2b94da37c57c483caca0"
+    },
+    {
+      "log": "9c152fbdfa-kani-public-success.verification.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 5430,
+      "sha256": "59aef9dc0e66360f20ea144900f000fe1632fa921b9ff310dc5642e4aef65c65"
+    },
+    {
+      "log": "9c152fbdfa-advisory-verification.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2198,
+      "sha256": "ab0073888f007aecd0d467aabdbc5bd547a04700043a9cded2dcb1a4eea09032"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-budget-retry-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 1773,
+      "sha256": "94aeca1dd27074f2748d92f2739c9cd8fcd26a214dec2d7d4b3fd6f0282e86c9"
+    },
+    {
+      "log": "9c152fbdfa-native-112199740065-success-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 1704,
+      "sha256": "b30fb1936edebd99b49c7239bf2f26435e82eb7e3ebb4c8959dd38d34b3b2695"
+    },
+    {
+      "log": "9c152fbdfa-advisory-artifact.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 788,
+      "sha256": "830e6326cb9a4b8fc3f7c9033f3be322ec4cc65ac714e378c7c4d201d304c5a7"
+    },
+    {
+      "log": "9c152fbdfa-postgres-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 400756,
+      "sha256": "97cff510c583a9afadf69ad1d9c08b06363fcaed31ed13f3a7db44c56e718947"
+    },
+    {
+      "log": "9c152fbdfa-reviews-current.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 95981,
+      "sha256": "f2acea498d360d14e1613fa60e03de4d026930caa355f5dd25214d2dd0e148d7"
+    },
+    {
+      "log": "9c152fbdfa-postgres-partial-verification.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 509,
+      "sha256": "fd75c427704a76deb046d9686d7645b06ca083c2853f7581ee0598f8b6be1645"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-budget-infrastructure-retry.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 424,
+      "sha256": "ddc6eb8ca58a9b6d377b3b7a600c6b69feb35190d46b0c3931ba91c9f15ac56b"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-adversarial-failure-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2934,
+      "sha256": "9cc1056dc2cab378d2bac43e3f79450c74ed30fb3b10a53d7e01087bff76df6a"
+    },
+    {
+      "log": "9c152fbdfa-enterprise-portable-failure.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 163459,
+      "sha256": "e8fc35a3ef6efcab55a1ab912466114b878f3210cdc1221493c1690ce28d51ed"
+    },
+    {
+      "log": "9c152fbdfa-native-112182538872-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 416765,
+      "sha256": "f1ae96271529e968ef6de9b9895e999ef54024266c22abee72b3aacd6b0626c5"
+    },
+    {
+      "log": "9c152fbdfa-advisory-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 5281,
+      "sha256": "ebdc45040519d8cde5200401e5711480e1bc31995150893ad6e4d9b85c18280f"
+    },
+    {
+      "log": "9c152fbdfa-vet-verification.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 1669,
+      "sha256": "bd9c296a2737f616696c041376529ba2b4aafae28929bc177d8018ad63adedbc"
+    },
+    {
+      "log": "9c152fbdfa-vet-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2334,
+      "sha256": "cb2a8c56255c167d3b31b09f8501d40414684d0fe1734cf337259564a22ce5c3"
+    },
+    {
+      "log": "9c152fbdfa-native-success-run.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 13668,
+      "sha256": "3e20719fd7317241966abbe14e13803da3d2ab39001129f911f0dc974ff83031"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 2699155,
+      "sha256": "849d90bbea95de635bc42e117267d651db4eef1eea663cf28488ca9f35aaa1b5"
+    },
+    {
+      "log": "9c152fbdfa-fuzz-success-job.json.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 4374,
+      "sha256": "63a51e730b2ec3e137bc69913882e017c174aad771fd0bb17ffcf07217436841"
+    },
+    {
+      "log": "9c152fbdfa-kani-public-success.log.gz",
+      "observed_result": "Preceding committed candidate 9c152fbdfa hosted metadata, public logs or authenticated public archive; its original terminal success/failure and scope are retained, not final repaired-source acceptance.",
+      "bytes": 108252308,
+      "sha256": "c0b2f0ef37e0a1c5018f25a38529961e172f64d6571aa5fd72132dfdf8604719"
+    },
+    {
+      "log": "preceding-native-9c152fbdfa-artifact.json.gz",
+      "observed_result": "Authenticated successful preceding-candidate native archive metadata; archive/private worker files are not retained.",
+      "bytes": 940,
+      "sha256": "ca8718815bc0a883c8630000099367fbd5bcf5a861c8dfc4393a185140438b3d"
+    },
+    {
+      "log": "ci-watch-9c152fbdfa.status.json.gz",
+      "observed_result": "Terminal preceding-candidate CI rollup; observer completion does not mean acceptance and every failed/skipped check retains its state.",
+      "bytes": 409,
+      "sha256": "80c82efe9a3337cac8955e0d3770cb21b96b6c41030e5dd6761768258fda35cf"
+    },
+    {
+      "log": "ci-watch-9c152fbdfa.latest.json.gz",
+      "observed_result": "Terminal preceding-candidate CI rollup; observer completion does not mean acceptance and every failed/skipped check retains its state.",
+      "bytes": 38108,
+      "sha256": "ae1bd1f9fc52d889492f9324f6d826246a97da5c8877334e9d86c55c35892188"
+    },
+    {
+      "log": "ci-watch-9c152fbdfa.log.gz",
+      "observed_result": "Terminal preceding-candidate CI rollup; observer completion does not mean acceptance and every failed/skipped check retains its state.",
+      "bytes": 14594,
+      "sha256": "eb3780566d266c60bd5407a0e390c44e46bf72ad0a867326f95f0a33ae156439"
+    },
+    {
+      "log": "security-authorities-checked-output-review-post-qualification.json.gz",
+      "observed_result": "Read-only repository authority observation; security owner owns coherent source, signed Linux evidence and policy.",
+      "bytes": 671,
+      "sha256": "961367fe797315fa7067ebca1e255c837c7456aa90c8dace8b43ecd937da401e"
+    },
+    {
+      "log": "security-authorities-checked-output-review-20261006-corrected-refresh.json.gz",
+      "observed_result": "Read-only repository authority observation; security owner owns coherent source, signed Linux evidence and policy.",
+      "bytes": 605,
+      "sha256": "2b4f1cfe52fe12e6b242de5a69c80374457dfd6e5595f8193dd3a669ee07eaf7"
+    },
+    {
+      "log": "security-authorities-checked-output-review.json.gz",
+      "observed_result": "Read-only repository authority observation; security owner owns coherent source, signed Linux evidence and policy.",
+      "bytes": 643,
+      "sha256": "fa7ad3f560267379a9d93a129e427fc3594a3341c655a8733052089f89b65059"
+    },
+    {
+      "log": "security-authorities-checked-output-review-20261006-refresh.json.gz",
+      "observed_result": "Read-only repository authority observation; security owner owns coherent source, signed Linux evidence and policy.",
+      "bytes": 720,
+      "sha256": "038e77aa56690c56fa032d3812f5bc47db30b63b11100fe6a45bb826ef3695db"
+    },
+    {
+      "log": "qualification-199c9cd8a7.status.json.gz",
+      "observed_result": "Actual source-checkpoint supervisor; canonical qualification and raw outputs authenticate all 21 terminal native commands.",
+      "bytes": 268,
+      "sha256": "12880389dc5be07f6bc631846575a81849e83987d810e4272dd193db44bf8684"
+    },
+    {
+      "log": "review-native-qualification-199c9cd8a7.log.gz",
+      "observed_result": "Actual source-bound native qualification public output, independently checked against canonical output/input inventory.",
+      "bytes": 539,
+      "sha256": "f577d5812219f4486dd73ef7cdb252f570cbf9d15ac1709fbf0088f35ef877e9"
+    },
+    {
+      "log": "receipt-verifier-199c9cd8a7-build.log.gz",
+      "observed_result": "Actual final-source receipt verifier build metadata and public compiler log; binary hash is retained without claiming native enforcement on ARM.",
+      "bytes": 6979,
+      "sha256": "ee18ca443a4a17fea46f4d3300c343fe172b357c1de837be2448d14572d377d6"
+    },
+    {
+      "log": "receipt-verifier-199c9cd8a7.status.json.gz",
+      "observed_result": "Actual final-source receipt verifier build metadata and public compiler log; binary hash is retained without claiming native enforcement on ARM.",
+      "bytes": 566,
+      "sha256": "5aa76ceb0f034c759a455c63dfab301e836063fccc3b62512f6a0fc016be51ce"
     }
   ]
 }

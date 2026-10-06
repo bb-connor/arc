@@ -20,7 +20,7 @@
         "results.tex",
         "ARTIFACT.md"
       ],
-      "result": "All 21 terminal native commands pass against 37,314 unchanged inputs and 48 outputs, including all 20 artifact-tool tests. Actual nonterminal v1 custody, all ten consumer cases, 116 edge tests and three live HTTP scenarios pass with strict Clippy. The preceding local campaign completes all 71 actual composed flow inventories, including every default security-type case, with formal and mutation controls; final-head hosted flow remains required after the last review repairs. Original failures and preceding hosted qualification retain their original scope. Derived results, reproducible PDF and source/evidence inventory agree. Hosted production and independent publication gates remain separate."
+      "result": "All 21 terminal native commands pass against 37,318 unchanged inputs and 48 outputs, including all 20 artifact-tool tests. Checked-output denial and replacement-graph regressions retain actual red and green evidence; earlier failures and hosted results retain their original candidate scope. Derived results, reproducible PDF and source/evidence inventory agree. Hosted production and independent publication gates remain separate."
     },
     {
       "id": "funded-security-integration",
