@@ -60,8 +60,8 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 36); do
-  if [[ "$mode" == 10 || "$mode" == 34 || "$mode" == 35 ]]; then
+for mode in $(seq 1 39); do
+  if [[ "$mode" == 10 || "$mode" == 34 || "$mode" == 35 || "$mode" == 37 ]]; then
     continue
   fi
   cc -nostdlib -static -fno-stack-protector -fno-pie -no-pie \
@@ -171,6 +171,8 @@ export CHIO_CAGE_TEST_EXEC_DYNAMIC_MARKER="$dynamic_exec_marker"
 export CHIO_CAGE_TEST_EXEC_ABSOLUTE="$probe_dir/probe-34"
 export CHIO_CAGE_TEST_EXEC_PROC_FD="$probe_dir/probe-35"
 export CHIO_CAGE_TEST_EXEC_INTERPRETER="$probe_dir/probe-37"
+export CHIO_CAGE_TEST_FAULT="$probe_dir/probe-38"
+export CHIO_CAGE_TEST_TIMER_SIGNAL="$probe_dir/probe-39"
 CHIO_CAGE_TEST_DYNAMIC_RUNTIME="$(printf '%s\n' "${dynamic_runtime_paths[@]}")"
 export CHIO_CAGE_TEST_DYNAMIC_RUNTIME
 export CHIO_CAGE_PARENT_SECRET="must-not-cross"

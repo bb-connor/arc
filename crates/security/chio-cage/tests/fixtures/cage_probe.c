@@ -40,6 +40,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_READLINK 89
 #define SYS_PRLIMIT64 302
 #define SYS_TGKILL 234
+#define SYS_SETITIMER 38
 __asm__(
     ".global _start\n"
     ".type _start,@function\n"
@@ -93,6 +94,7 @@ static long invoke5(long number, long first, long second, long third, long fourt
 #define SYS_READLINKAT 78
 #define SYS_PRLIMIT64 261
 #define SYS_TGKILL 131
+#define SYS_SETITIMER 103
 __asm__(
     ".global _start\n"
     ".type _start,%function\n"
@@ -476,6 +478,22 @@ __attribute__((noreturn, used)) void probe_start(long *initial_stack) {
 #endif
 #elif PROBE_MODE == 36
     terminate(171);
+#elif PROBE_MODE == 38
+    // A synchronous fault must reach its default action. The address is read
+    // at run time so the store is not folded into a trap instruction.
+    static volatile long null_address;
+    *(volatile int *)null_address = 1;
+    terminate(118);
+#elif PROBE_MODE == 39
+    // ITIMER_REAL raises SIGALRM during the bounded wait; its default action
+    // ends the process. Exit 0 means the signal never arrived.
+    static long timer[4] = {0, 0, 0, 10000};
+    static long timeout[2] = {2, 0};
+    if (invoke(SYS_SETITIMER, 0, (long)timer, 0, 0) != 0) {
+        terminate(119);
+    }
+    invoke5(SYS_PPOLL, 0, 0, (long)timeout, 0, 0);
+    terminate(0);
 #else
 #error invalid probe mode
 #endif
