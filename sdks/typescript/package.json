@@ -54,7 +54,10 @@
     "js-yaml": "4.3.2",
     "vite": "7.3.6",
     "braces": "$braces",
-    "node-forge": "$node-forge"
+    "node-forge": "$node-forge",
+    "compression": "1.8.2",
+    "proxy-addr": "2.0.8",
+    "source-map-js": "1.2.2"
   },
   "devDependencies": {
     "next": "15.5.26",

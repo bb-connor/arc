@@ -30,7 +30,7 @@ dependencies and lifecycle scripts are omitted from these private artifacts.
 The npm overrides reference direct, integrity-locked fixture dependencies, so
 every transitive peer-tooling consumer uses the same repair.
 
-The three security controls fail against the original registry packages and
+The three source-fork security controls fail against the original registry packages and
 pass against the installed repaired packages: bounded walkers, cyclic ASTs and
 extra nested RSA digest fields. Valid RSA signatures and ordinary brace
 expansions continue to pass. The pinned upstream RSA suite passes 101 tests
@@ -59,6 +59,32 @@ This repairs the repository's build and qualification tooling. A consumer who
 independently installs upstream Expo tooling still selects that upstream
 dependency graph. Repository overrides are not propagated into a published
 SDK's peers, and this record does not qualify arbitrary mobile deployments.
+
+## Published fixes reviewed on 2026-10-05
+
+The fresh `79d0c8a977` unfiltered scan reported three additional advisories.
+Their fixed registry releases are available:
+
+- `compression` 1.8.2 releases native compression streams after premature
+  response close ([upstream advisory](https://github.com/expressjs/compression/security/advisories/GHSA-vc2v-76pw-4v95)).
+- `proxy-addr` 2.0.8 prevents short IPv6 trust prefixes from trusting unrelated
+  IPv4 peers ([upstream advisory](https://github.com/jshttp/proxy-addr/security/advisories/GHSA-jqcg-44mw-7w3h)).
+- `source-map-js` 1.2.2 validates indexed section offsets and bounds cumulative
+  nested offsets ([upstream repair](https://github.com/7rulnik/source-map-js/pull/79)).
+
+Exact overrides select these releases in all eight affected installation
+graphs: the root Bun lock, TypeScript workspace, and standalone AI SDK,
+conformance, Elysia, Express, Fastify and Node HTTP locks. Package managers
+regenerate the locks with registry integrity metadata. The diff changes only
+these packages and compression's required dependency edge.
+
+The installed-package gate exercises a real aborted compressed HTTP response,
+forged forwarded addresses across single and multiple trust subnets, and
+malformed or amplifying source-map offsets. All three regressions fail against
+the originals and pass against the fixed releases. Ordinary proxy subnets and
+source mappings remain covered. Existing source-fork authentication, upstream
+monitoring and the unfiltered scanner remain mandatory. The failed hosted
+campaign retains its original result; replacement acceptance needs a fresh run.
 
 ## Historical prerequisite disposition (superseded)
 

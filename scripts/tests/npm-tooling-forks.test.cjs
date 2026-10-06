@@ -1,16 +1,22 @@
-// Run against the installed peer-tooling packages. The same tests must fail
-// against the original registry packages before accepting a source repair.
+// Run against the installed peer-tooling packages. Each regression must fail
+// against its vulnerable registry package before accepting a repair or release.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const { once } = require('node:events');
+const http = require('node:http');
 const path = require('node:path');
 const { createRequire } = require('node:module');
 const test = require('node:test');
 const vm = require('node:vm');
+const zlib = require('node:zlib');
 
 const requireTooling = createRequire(path.resolve(
   process.env.CHIO_TOOLING_TEST_ROOT || 'sdks/typescript', 'package.json'));
 const braces = requireTooling('braces');
 const forge = requireTooling('node-forge');
+const compression = requireTooling('compression');
+const proxyaddr = requireTooling('proxy-addr');
+const { SourceMapConsumer } = requireTooling('source-map-js');
 
 test('braces bounds strings and every public AST walker', () => {
   assert.deepEqual(braces.expand('src/{a,b}.js'), ['src/a.js', 'src/b.js']);
@@ -63,4 +69,93 @@ test('RSA rejects extra nested DigestAlgorithm fields and accepts valid signatur
       () => publicForge.verify(digest.toString('binary'), malformed.toString('binary')),
       /does not contain a valid RSASSA-PKCS1-v1_5 DigestInfo/);
   }
+});
+
+test('compression releases its native stream after a client aborts', { timeout: 10000 }, async (t) => {
+  const descriptor = Object.getOwnPropertyDescriptor(zlib, 'createGzip');
+  let stream;
+  Object.defineProperty(zlib, 'createGzip', {
+    ...descriptor,
+    value(...args) {
+      stream = descriptor.value(...args);
+      return stream;
+    },
+  });
+  t.after(() => {
+    Object.defineProperty(zlib, 'createGzip', descriptor);
+    stream?.destroy();
+  });
+
+  let responseClosed;
+  const closed = new Promise((resolve) => { responseClosed = resolve; });
+  const middleware = compression({ threshold: 0 });
+  const server = http.createServer((req, res) => {
+    middleware(req, res, () => {
+      res.once('close', responseClosed);
+      res.setHeader('Content-Type', 'text/plain');
+      res.write('Chio compressed response\n'.repeat(1024));
+      res.flush();
+    });
+  });
+  t.after(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  const listening = once(server, 'listening');
+  server.listen(0, '127.0.0.1');
+  await listening;
+  const request = http.get({
+    host: '127.0.0.1', port: server.address().port,
+    headers: { 'Accept-Encoding': 'gzip' },
+  }, (response) => {
+    response.once('data', () => response.destroy());
+    response.on('error', () => {});
+  });
+  request.on('error', () => {});
+  t.after(() => request.destroy());
+  await closed;
+  await new Promise(setImmediate);
+  assert.ok(stream, 'the real response must create a native compression stream');
+  assert.equal(stream.destroyed, true);
+  assert.equal(stream.closed, true);
+});
+
+test('proxy trust cannot cross address families through short IPv6 prefixes', () => {
+  for (const subnets of [
+    ['::ffff:10.0.0.0/8'], ['::/1'],
+    ['::ffff:10.0.0.0/8', '10.0.0.0/8'],
+  ]) {
+    const trust = proxyaddr.compile(subnets);
+    for (const address of ['203.0.113.9', '::ffff:203.0.113.9']) {
+      assert.equal(trust(address), false, `${subnets}: ${address}`);
+    }
+    const request = {
+      socket: { remoteAddress: '203.0.113.9' },
+      headers: { 'x-forwarded-for': '10.0.0.8' },
+    };
+    assert.equal(proxyaddr(request, subnets), '203.0.113.9');
+  }
+  for (const subnet of ['10.0.0.0/8', '::ffff:10.0.0.0/104']) {
+    const trust = proxyaddr.compile(subnet);
+    assert.equal(trust('10.0.0.8'), true);
+    assert.equal(trust('::ffff:10.0.0.8'), true);
+    assert.equal(trust('203.0.113.9'), false);
+  }
+  assert.equal(proxyaddr.compile('2001:db8::/32')('2001:db8::1'), true);
+});
+
+test('indexed source maps reject invalid and amplifying section offsets', () => {
+  const flat = { version: 3, sources: ['a.js'], names: [], mappings: 'AAAA' };
+  const indexed = (map, line, column = 0) => ({
+    version: 3, sections: [{ offset: { line, column }, map }],
+  });
+  const ordinary = new SourceMapConsumer(indexed(flat, 1));
+  assert.equal(ordinary.originalPositionFor({ line: 2, column: 1 }).source, 'a.js');
+  for (const value of [-1, 1.5, NaN, Infinity, '1']) {
+    assert.throws(() => new SourceMapConsumer(indexed(flat, value)));
+    assert.throws(() => new SourceMapConsumer(indexed(flat, 0, value)));
+  }
+  assert.throws(() => new SourceMapConsumer(indexed(flat, 1e15)));
+  const nested = indexed(indexed(indexed(flat, 5e6), 5e6), 5e6);
+  assert.throws(() => new SourceMapConsumer(nested));
 });

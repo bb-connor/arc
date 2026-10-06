@@ -15,6 +15,23 @@ the implementation actually qualified. Historical failures remain historical.
 subagents, force pushes, merge, or deployment. One Cargo owner per target. Record
 a reproduction or an evidence-backed disposition for every review finding.
 
+## Newly published JavaScript advisory follow-up
+
+The `79d0c8a977` advisory job reports three newly reviewed advisories after
+the preceding campaign: compression stream leakage, proxy-address spoofing,
+and indexed source-map denial of service. All three have published fixed
+registry packages. This is a bounded dependency repair under task 3.
+
+- Retain the failed job, authenticated scanner archive and original graph.
+- Exercise actual premature HTTP response close, forwarded-address trust and
+  hostile indexed offsets against the installed vulnerable packages first.
+- Pin compression 1.8.2, proxy-addr 2.0.8 and source-map-js 1.2.2 in every
+  affected installation graph. Regenerate locks with their package managers;
+  preserve the existing source forks and advisory policy.
+- Require all behavioral regressions, affected SDK tests/builds and the
+  recursive unfiltered scanner. Renew source-bound native qualification and
+  paper artifacts before replacement-candidate hosted acceptance.
+
 ## 1. Admission lifecycle and allocation atomicity
 
 - [x] Reproduce expiry during execution and replay of an accepted delegated call.
