@@ -2,31 +2,16 @@ FROM --platform=linux/amd64 rust:1.95.0-alpine3.22@sha256:2805e96db5234c9cfaf7ec
 
 COPY deploy/docker/security-evidence-apk.lock /tmp/security-evidence-apk.lock
 
-RUN wget -q -O /tmp/ca-certificates-20260909-r0.apk \
+RUN echo 'f8fa718f8397f84a221ea28f87d69c46e4532ff72fd3c3ff691bd6d69586b651  /tmp/security-evidence-apk.lock' | sha256sum -c - \
+ && sed -E 's/^(.+)-([0-9][^-]*(-r[0-9]+)?)$/\1=\2/' /tmp/security-evidence-apk.lock > /tmp/security-evidence-apk.constraints \
+ && test "$(wc -l < /tmp/security-evidence-apk.constraints)" -eq 225 \
+ && wget -q -O /tmp/ca-certificates-20260909-r0.apk \
       https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/ca-certificates-20260909-r0.apk \
  && echo 'a1258993a229d2fdcc6d9665af75c9305184e4f5e5755c50b9ef0564b35138c4  /tmp/ca-certificates-20260909-r0.apk' | sha256sum -c - \
- && apk add --no-cache \
-      /tmp/ca-certificates-20260909-r0.apk \
-      ca-certificates-bundle=20260909-r0 \
-      bash=5.2.37-r0 \
-      build-base=0.5-r3 \
-      cmake=3.31.7-r1 \
-      coreutils=9.7-r1 \
-      curl=8.14.1-r3 \
-      git=2.49.1-r0 \
-      jq=1.8.2-r0 \
-      linux-headers=6.14.2-r0 \
-      libexpat=2.8.5-r0 \
-      openssl-dev=3.5.9-r0 \
-      pkgconf=2.4.3-r0 \
-      protobuf=29.4-r0 \
-      protobuf-dev=29.4-r0 \
-      python3=3.12.15-r0 \
-      util-linux=2.41.6-r1 \
+ && xargs -r apk add --no-cache /tmp/ca-certificates-20260909-r0.apk < /tmp/security-evidence-apk.constraints \
  && apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual \
  && cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual \
- && echo '429a81dbf41fc8ffd14be10418985b9423d5fbfb1098735e7c9ce0d5fe36cbc6  /tmp/security-evidence-apk.lock' | sha256sum -c - \
- && rm /tmp/ca-certificates-20260909-r0.apk /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual
+ && rm /tmp/ca-certificates-20260909-r0.apk /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual /tmp/security-evidence-apk.constraints
 
 RUN curl --proto '=https' --tlsv1.2 --fail --location \
       --output /tmp/clippy.tar.gz \

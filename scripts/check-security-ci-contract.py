@@ -60,7 +60,7 @@ EXPECTED_SECURITY_IMAGE_FROM = (
     "2805e96db5234c9cfaf7ecb50f488693dab84d28ad30b6290cc1b707a18bf775"
 )
 EXPECTED_APK_LOCK_SHA256 = (
-    "429a81dbf41fc8ffd14be10418985b9423d5fbfb1098735e7c9ce0d5fe36cbc6"
+    "f8fa718f8397f84a221ea28f87d69c46e4532ff72fd3c3ff691bd6d69586b651"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
     "ea53828c0ee81c614f79cd107fcc7af06b29abb7ecc7484423d094fe70328e8e"
@@ -124,25 +124,6 @@ printf '%s  %s\n' '{EXPECTED_TEMPORAL_SELF_TEST_SHA256}' "${{temporal_self_test}
 printf '%s  %s\n' '{EXPECTED_TEMPORAL_GATE_SHA256}' "${{temporal_runner}}" | /usr/bin/sha256sum --check --strict
 /bin/bash -p "${{temporal_runner}}"
 """.strip()
-EXPECTED_DIRECT_APK_PACKAGES = (
-    "/tmp/ca-certificates-20260909-r0.apk",
-    "ca-certificates-bundle=20260909-r0",
-    "bash=5.2.37-r0",
-    "build-base=0.5-r3",
-    "cmake=3.31.7-r1",
-    "coreutils=9.7-r1",
-    "curl=8.14.1-r3",
-    "git=2.49.1-r0",
-    "jq=1.8.2-r0",
-    "linux-headers=6.14.2-r0",
-    "libexpat=2.8.5-r0",
-    "openssl-dev=3.5.9-r0",
-    "pkgconf=2.4.3-r0",
-    "protobuf=29.4-r0",
-    "protobuf-dev=29.4-r0",
-    "python3=3.12.15-r0",
-    "util-linux=2.41.6-r1",
-)
 EXPECTED_TRUSTED_BOUNDARY_FILES = frozenset(
     {
         "cargo-mutants",
@@ -2014,17 +1995,22 @@ def validate_security_dockerfile(root: Path, document: str) -> None:
         raise ContractError("security execution image APK inventory copy changed")
 
     expected_apk = (
+        f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
+        "sed -E 's/^(.+)-([0-9][^-]*(-r[0-9]+)?)$/\\1=\\2/' "
+        "/tmp/security-evidence-apk.lock > /tmp/security-evidence-apk.constraints",
+        'test "$(wc -l < /tmp/security-evidence-apk.constraints)" -eq 225',
         "wget -q -O /tmp/ca-certificates-20260909-r0.apk "
         "https://dl-cdn.alpinelinux.org/alpine/v3.22/main/x86_64/"
         "ca-certificates-20260909-r0.apk",
         "echo 'a1258993a229d2fdcc6d9665af75c9305184e4f5e5755c50b9ef0564b35138c4 "
         "/tmp/ca-certificates-20260909-r0.apk' | sha256sum -c -",
-        "apk add --no-cache " + " ".join(EXPECTED_DIRECT_APK_PACKAGES),
+        "xargs -r apk add --no-cache /tmp/ca-certificates-20260909-r0.apk "
+        "< /tmp/security-evidence-apk.constraints",
         "apk info -v | LC_ALL=C sort > /tmp/security-evidence-apk.actual",
         "cmp /tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
-        f"echo '{apk_digest} /tmp/security-evidence-apk.lock' | sha256sum -c -",
         "rm /tmp/ca-certificates-20260909-r0.apk "
-        "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual",
+        "/tmp/security-evidence-apk.lock /tmp/security-evidence-apk.actual "
+        "/tmp/security-evidence-apk.constraints",
     )
     if shell_clauses(instructions[2][1]) != expected_apk:
         raise ContractError("security execution image APK closure changed")

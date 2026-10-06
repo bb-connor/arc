@@ -28,6 +28,11 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = CHECKER
 SPEC.loader.exec_module(CHECKER)
 
+subprocess.run(
+    [sys.executable, str(ROOT / "scripts/tests/check-security-apk-closure.test.py")],
+    check=True,
+)
+
 
 stable_dump_fixture = ast.parse("def fixture(value=None):\n    return value\n").body[0]
 stable_dump = CHECKER.stable_ast_dump(stable_dump_fixture)
@@ -1071,11 +1076,22 @@ assert_boundary_file_rejected(
     "image has an unpinned build stage",
 )
 assert_boundary_file_rejected(
-    "security image rejects reordered APK closure",
+    "security image rejects floating transitive package installation",
     Path("deploy/docker/Dockerfile.security-evidence-runner"),
     replace_once(
-        "      bash=5.2.37-r0 \\\n      build-base=0.5-r3 \\\n",
-        "      build-base=0.5-r3 \\\n      bash=5.2.37-r0 \\\n",
+        "xargs -r apk add --no-cache /tmp/ca-certificates-20260909-r0.apk "
+        "< /tmp/security-evidence-apk.constraints",
+        "apk add --no-cache /tmp/ca-certificates-20260909-r0.apk bash=5.2.37-r0",
+    ),
+    "image APK closure changed",
+)
+assert_boundary_file_rejected(
+    "security image rejects unauthenticated inventory consumption",
+    Path("deploy/docker/Dockerfile.security-evidence-runner"),
+    replace_once(
+        f"RUN echo '{CHECKER.EXPECTED_APK_LOCK_SHA256}  "
+        "/tmp/security-evidence-apk.lock' | sha256sum -c -",
+        "RUN true",
     ),
     "image APK closure changed",
 )
