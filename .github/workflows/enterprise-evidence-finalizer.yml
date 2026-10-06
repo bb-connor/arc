@@ -3028,11 +3028,9 @@ jobs:
             retry_api() {
               curl --proto '=https' --tlsv1.2 --fail --silent --show-error -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2026-03-10" "https://api.github.com/repos/${GITHUB_REPOSITORY}/$1"
             }
-            retry_workflow="$(retry_api actions/workflows/enterprise-evidence-finalizer.yml)"
-            retry_workflow_id="$(jq -r '.id' <<< "${retry_workflow}")"
-            [[ "${retry_workflow_id}" =~ ^[1-9][0-9]*$ ]]
-            test "$(jq -r '.path' <<< "${retry_workflow}")" = .github/workflows/enterprise-evidence-finalizer.yml
             original_finalizer="$(retry_api "actions/runs/${authorizing_finalizer_id}/attempts/1")"
+            retry_workflow_id="$(jq -r '.workflow_id' <<< "${original_finalizer}")"
+            [[ "${retry_workflow_id}" =~ ^[1-9][0-9]*$ ]]
             original_finalizer_sha="$(jq -r '.head_sha' <<< "${original_finalizer}")"
             original_finalizer_title="$(jq -r '.display_title' <<< "${original_finalizer}")"
             [[ "${original_finalizer_sha}" =~ ^[0-9a-f]{40}$ ]]

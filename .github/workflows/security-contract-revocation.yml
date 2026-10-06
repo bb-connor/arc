@@ -112,10 +112,9 @@ jobs:
           })"
           [[ "${authorized_revoker_blob_sha}" =~ ^[0-9a-f]{40}$ ]]
           test "${running_revoker_blob_sha}" = "${authorized_revoker_blob_sha}"
-          revocation_workflow_id="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/security-contract-revocation.yml" --jq '.id')"
-          revoker_run="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs/${REVOKER_RUN_ID}")"
-          [[ "${revocation_workflow_id}" =~ ^[1-9][0-9]*$ ]]
-          test "$(jq -r '.workflow_id' <<< "${revoker_run}")" = "${revocation_workflow_id}"
+          revoker_run="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs/${REVOKER_RUN_ID}/attempts/${RUN_ATTEMPT}")"
+          [[ "$(jq -r '.workflow_id' <<< "${revoker_run}")" =~ ^[1-9][0-9]*$ ]]
+          test "$(jq -r '.id' <<< "${revoker_run}")" = "${REVOKER_RUN_ID}"
           test "$(jq -r '.path' <<< "${revoker_run}")" = ".github/workflows/security-contract-revocation.yml"
           test "$(jq -r '.event' <<< "${revoker_run}")" = workflow_dispatch
           test "$(jq -r '.status' <<< "${revoker_run}")" = in_progress
@@ -176,23 +175,37 @@ jobs:
         id: route
         if: ${{ github.event_name == 'workflow_run' }}
         env:
+          EVENT_CONCLUSION: ${{ github.event.workflow_run.conclusion || '' }}
+          EVENT_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          EVENT_RUN_ID: ${{ github.event.workflow_run.id }}
           EVENT_WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY_ID: ${{ github.repository_id }}
         run: |
           set -euo pipefail
           shopt -s inherit_errexit
           [[ "${EVENT_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]
-          workflow="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/${EVENT_WORKFLOW_ID}")"
-          test "$(jq -r '.id' <<< "${workflow}")" = "${EVENT_WORKFLOW_ID}"
-          workflow_path="$(jq -r '.path' <<< "${workflow}")"
+          [[ "${EVENT_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${EVENT_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${REPOSITORY_ID}" =~ ^[1-9][0-9]*$ ]]
+          test "${EVENT_CONCLUSION}" != success
+          historical_run="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}")"
+          test "$(jq -r '.id' <<< "${historical_run}")" = "${EVENT_RUN_ID}"
+          test "$(jq -r '.workflow_id' <<< "${historical_run}")" = "${EVENT_WORKFLOW_ID}"
+          test "$(jq -r '.run_attempt' <<< "${historical_run}")" = "${EVENT_RUN_ATTEMPT}"
+          test "$(jq -r '.status' <<< "${historical_run}")" = completed
+          test "$(jq -r '.conclusion // ""' <<< "${historical_run}")" = "${EVENT_CONCLUSION}"
+          test "$(jq -r '.repository.full_name' <<< "${historical_run}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.head_repository.full_name' <<< "${historical_run}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.repository.id' <<< "${historical_run}")" = "${REPOSITORY_ID}"
+          test "$(jq -r '.head_repository.id' <<< "${historical_run}")" = "${REPOSITORY_ID}"
+          [[ "$(jq -r '.head_sha' <<< "${historical_run}")" =~ ^[0-9a-f]{40}$ ]]
+          workflow_path="$(jq -r '.path' <<< "${historical_run}")"
           case "${workflow_path}" in
-            .github/workflows/ci.yml|.github/workflows/enterprise-evidence-finalizer.yml) ;;
+            .github/workflows/ci.yml) test "$(jq -r '.event' <<< "${historical_run}")" = pull_request ;;
+            .github/workflows/enterprise-evidence-finalizer.yml) test "$(jq -r '.event' <<< "${historical_run}")" = workflow_dispatch ;;
             *) exit 1 ;;
           esac
-          workflow_file="${workflow_path##*/}"
-          registered="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow_file}")"
-          test "$(jq -r '.id' <<< "${registered}")" = "${EVENT_WORKFLOW_ID}"
-          test "$(jq -r '.path' <<< "${registered}")" = "${workflow_path}"
           echo "workflow_path=${workflow_path}" >> "${GITHUB_OUTPUT}"
 
       - name: Bind later failed CI rerun to existing authority
@@ -247,10 +260,9 @@ jobs:
           })"
           [[ "${authorized_listener_blob_sha}" =~ ^[0-9a-f]{40}$ ]]
           test "${running_listener_blob_sha}" = "${authorized_listener_blob_sha}"
-          revocation_workflow_id="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/security-contract-revocation.yml" --jq '.id')"
-          listener_run="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs/${LISTENER_RUN_ID}")"
-          [[ "${revocation_workflow_id}" =~ ^[1-9][0-9]*$ ]]
-          test "$(jq -r '.workflow_id' <<< "${listener_run}")" = "${revocation_workflow_id}"
+          listener_run="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs/${LISTENER_RUN_ID}/attempts/${LISTENER_RUN_ATTEMPT}")"
+          [[ "$(jq -r '.workflow_id' <<< "${listener_run}")" =~ ^[1-9][0-9]*$ ]]
+          test "$(jq -r '.id' <<< "${listener_run}")" = "${LISTENER_RUN_ID}"
           test "$(jq -r '.path' <<< "${listener_run}")" = ".github/workflows/security-contract-revocation.yml"
           test "$(jq -r '.event' <<< "${listener_run}")" = workflow_run
           test "$(jq -r '.status' <<< "${listener_run}")" = in_progress
@@ -263,14 +275,6 @@ jobs:
           [[ "${EVENT_WORKFLOW_ID}" =~ ^[1-9][0-9]*$ ]]
           test "${EVENT_CONCLUSION}" != success
 
-          ci_workflow="$({
-            gh api \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml"
-          })"
-          test "$(jq -r '.id' <<< "${ci_workflow}")" = "${EVENT_WORKFLOW_ID}"
-          test "$(jq -r '.path' <<< "${ci_workflow}")" = ".github/workflows/ci.yml"
           upstream="$({
             gh api \
               -H "Accept: application/vnd.github+json" \
@@ -596,6 +600,7 @@ jobs:
           LISTENER_RUN_ATTEMPT: ${{ github.run_attempt }}
           LISTENER_RUN_ID: ${{ github.run_id }}
           LISTENER_SHA: ${{ github.sha }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           SECURITY_APP_ID: ${{ vars.CHIO_SECURITY_APP_ID }}
           SECURITY_DEFINITION_SHA: ${{ vars.CHIO_ENTERPRISE_SECURITY_DEFINITION_SHA }}
         run: |
@@ -621,10 +626,9 @@ jobs:
           [[ "${authorized_listener_blob_sha}" =~ ^[0-9a-f]{40}$ ]]
           test "${running_listener_blob_sha}" = "${authorized_listener_blob_sha}"
 
-          revocation_workflow_id="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/workflows/security-contract-revocation.yml" --jq '.id')"
-          listener_run="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs/${LISTENER_RUN_ID}")"
-          [[ "${revocation_workflow_id}" =~ ^[1-9][0-9]*$ ]]
-          test "$(jq -r '.workflow_id' <<< "${listener_run}")" = "${revocation_workflow_id}"
+          listener_run="$(gh api -H "Accept: application/vnd.github+json" "repos/${GITHUB_REPOSITORY}/actions/runs/${LISTENER_RUN_ID}/attempts/${LISTENER_RUN_ATTEMPT}")"
+          [[ "$(jq -r '.workflow_id' <<< "${listener_run}")" =~ ^[1-9][0-9]*$ ]]
+          test "$(jq -r '.id' <<< "${listener_run}")" = "${LISTENER_RUN_ID}"
           test "$(jq -r '.path' <<< "${listener_run}")" = .github/workflows/security-contract-revocation.yml
           test "$(jq -r '.event' <<< "${listener_run}")" = workflow_run
           test "$(jq -r '.status' <<< "${listener_run}")" = in_progress
@@ -632,13 +636,14 @@ jobs:
           test "$(jq -r '.head_branch' <<< "${listener_run}")" = main
           test "$(jq -r '.run_attempt' <<< "${listener_run}")" = "${LISTENER_RUN_ATTEMPT}"
 
-          finalizer_workflow="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/workflows/enterprise-evidence-finalizer.yml")"
-          test "$(jq -r '.id' <<< "${finalizer_workflow}")" = "${EVENT_WORKFLOW_ID}"
-          test "$(jq -r '.path' <<< "${finalizer_workflow}")" = .github/workflows/enterprise-evidence-finalizer.yml
           upstream="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${EVENT_RUN_ID}/attempts/${EVENT_RUN_ATTEMPT}")"
           test "$(jq -r '.id' <<< "${upstream}")" = "${EVENT_RUN_ID}"
           test "$(jq -r '.workflow_id' <<< "${upstream}")" = "${EVENT_WORKFLOW_ID}"
           test "$(jq -r '.path' <<< "${upstream}")" = .github/workflows/enterprise-evidence-finalizer.yml
+          test "$(jq -r '.repository.full_name' <<< "${upstream}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.head_repository.full_name' <<< "${upstream}")" = "${GITHUB_REPOSITORY}"
+          test "$(jq -r '.repository.id' <<< "${upstream}")" = "${REPOSITORY_ID}"
+          test "$(jq -r '.head_repository.id' <<< "${upstream}")" = "${REPOSITORY_ID}"
           test "$(jq -r '.event' <<< "${upstream}")" = workflow_dispatch
           test "$(jq -r '.status' <<< "${upstream}")" = completed
           test "$(jq -r '.conclusion // ""' <<< "${upstream}")" = "${EVENT_CONCLUSION}"
@@ -656,6 +661,10 @@ jobs:
             test "$(jq -r '.id' <<< "${upstream}")" = "${EVENT_RUN_ID}"
             test "$(jq -r '.workflow_id' <<< "${upstream}")" = "${EVENT_WORKFLOW_ID}"
             test "$(jq -r '.path' <<< "${upstream}")" = .github/workflows/enterprise-evidence-finalizer.yml
+            test "$(jq -r '.repository.full_name' <<< "${upstream}")" = "${GITHUB_REPOSITORY}"
+            test "$(jq -r '.head_repository.full_name' <<< "${upstream}")" = "${GITHUB_REPOSITORY}"
+            test "$(jq -r '.repository.id' <<< "${upstream}")" = "${REPOSITORY_ID}"
+            test "$(jq -r '.head_repository.id' <<< "${upstream}")" = "${REPOSITORY_ID}"
             test "$(jq -r '.event' <<< "${upstream}")" = workflow_dispatch
             test "$(jq -r '.status' <<< "${upstream}")" = completed
             test "$(jq -r '.conclusion' <<< "${upstream}")" = success
@@ -888,9 +897,6 @@ jobs:
             test "$(jq -r --argjson identity "${recorded_identity}" '.schema == "chio.security-check-authority.v2" and .identity == $identity and (.publication_binding_digest | test("^[0-9a-f]{64}$")) and (.source_ci | keys) == ["run_attempt", "run_id", "workflow_id"] and all(.source_ci[]; type == "string" and test("^[1-9][0-9]*$"))' <<< "${recorded_metadata}")" = true
             recorded_ci_id="$(jq -r '.source_ci.run_id' <<< "${recorded_metadata}")"
             recorded_ci_attempt="$(jq -r '.source_ci.run_attempt' <<< "${recorded_metadata}")"
-            recorded_ci_workflow="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml")"
-            test "$(jq -r '.path' <<< "${recorded_ci_workflow}")" = .github/workflows/ci.yml
-            test "$(jq -r '.id' <<< "${recorded_ci_workflow}")" = "$(jq -r '.source_ci.workflow_id' <<< "${recorded_metadata}")"
             recorded_ci="$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2026-03-10" "repos/${GITHUB_REPOSITORY}/actions/runs/${recorded_ci_id}/attempts/${recorded_ci_attempt}")"
             test "$(jq -r --argjson source_ci "$(jq -cS '.source_ci' <<< "${recorded_metadata}")" --arg evidence "${evidence_sha}" --arg repository "${GITHUB_REPOSITORY}" --arg title "CI N=${pr_number} E=${evidence_sha} B=${base_sha} M=${merge_commit_sha}" '(.id | tostring) == $source_ci.run_id and (.run_attempt | tostring) == $source_ci.run_attempt and (.workflow_id | tostring) == $source_ci.workflow_id and .path == ".github/workflows/ci.yml" and .event == "pull_request" and .head_sha == $evidence and .display_title == $title and .repository.full_name == $repository and .head_repository.full_name == $repository and .status == "completed" and .conclusion == "success"' <<< "${recorded_ci}")" = true
             recorded_source_blob=""

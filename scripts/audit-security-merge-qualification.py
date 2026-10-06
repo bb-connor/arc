@@ -178,16 +178,16 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
             "protected merge is not retained on main")
 
     ci_path = ".github/workflows/ci.yml"
-    ci_workflow = api.get("actions/workflows/ci.yml")
-    require(ci_workflow.get("path") == ci_path and ci_workflow.get("state") == "active", "CI workflow identity mismatch")
-    ci_workflow_id = positive_id(ci_workflow.get("id"))
-    run_query = f"actions/workflows/ci.yml/runs?event=pull_request&head_sha={evidence}"
+    # Repository-wide discovery retains historical runs across workflow rename,
+    # deletion and re-registration. The run path/source and recorded App tuple
+    # authenticate the qualification, not the current workflow registry.
+    run_query = f"actions/runs?event=pull_request&head_sha={evidence}"
     runs = api.pages(run_query, "workflow_runs")
     candidates: dict[str, list[dict]] = {}
     for run in runs:
         title = CI_TITLE.fullmatch(str(run.get("display_title", "")))
         if title and title.group(1, 2, 3) == (str(pr_number), evidence, base):
-            require(positive_id(run.get("workflow_id")) == ci_workflow_id and run.get("path") == ci_path
+            require(positive_id(run.get("workflow_id")) > 0 and run.get("path") == ci_path
                     and run.get("event") == "pull_request" and run.get("head_sha") == evidence
                     and run.get("head_repository", {}).get("full_name") == repository
                     and positive_id(run.get("head_repository", {}).get("id")) == repository_id
@@ -218,8 +218,8 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
         require(isinstance(source_ci, dict) and set(source_ci) == {"run_id", "run_attempt", "workflow_id"},
                 "missing exact source CI identity")
         ci_run_id, ci_attempt = positive_id(source_ci["run_id"]), positive_id(source_ci["run_attempt"])
-        require(positive_id(source_ci["workflow_id"]) == ci_workflow_id
-                and all(isinstance(value, str) for value in source_ci.values()), "source CI identity mismatch")
+        ci_workflow_id = positive_id(source_ci["workflow_id"])
+        require(all(isinstance(value, str) for value in source_ci.values()), "source CI identity mismatch")
         require(sum(run.get("id") == ci_run_id for run in matching_runs) == 1, "source CI is absent from the exact tuple")
         merge_commit = api.get(f"git/commits/{merge}")
         require(merge_commit.get("sha") == merge
@@ -238,13 +238,14 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
         for listed in matching_runs:
             run_id = positive_id(listed.get("id"))
             current = api.get(f"actions/runs/{run_id}")
+            historical_workflow_id = positive_id(listed.get("workflow_id"))
             maximum = positive_id(current.get("run_attempt"))
             require(maximum <= 100, "unbounded CI attempt history")
-            require_attempt(current, run_id, maximum, ci_workflow_id, ci_path, title, evidence, repository, repository_id)
+            require_attempt(current, run_id, maximum, historical_workflow_id, ci_path, title, evidence, repository, repository_id)
             fingerprints[run_id] = (maximum, current.get("status"), current.get("conclusion"))
             for attempt in range(1, maximum + 1):
                 exact = api.get(f"actions/runs/{run_id}/attempts/{attempt}")
-                require_attempt(exact, run_id, attempt, ci_workflow_id, ci_path, title, evidence, repository, repository_id)
+                require_attempt(exact, run_id, attempt, historical_workflow_id, ci_path, title, evidence, repository, repository_id)
                 require(exact.get("event") == "pull_request", "CI historical event mismatch")
         ci = api.get(f"actions/runs/{ci_run_id}/attempts/{ci_attempt}")
         require_attempt(ci, ci_run_id, ci_attempt, ci_workflow_id, ci_path, title, evidence, repository, repository_id)
@@ -297,14 +298,13 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
         finalizer_id, finalizer_attempt = int(details.group(1)), int(details.group(2))
         require(finalizer_attempt == 1, "positive finalizer authority must be first-attempt-only")
         finalizer = api.get(f"actions/runs/{finalizer_id}/attempts/{finalizer_attempt}")
-        finalizer_workflow = api.get("actions/workflows/enterprise-evidence-finalizer.yml")
         finalizer_path = ".github/workflows/enterprise-evidence-finalizer.yml"
-        require(finalizer_workflow.get("path") == finalizer_path, "finalizer workflow identity mismatch")
+        finalizer_workflow_id = positive_id(finalizer.get("workflow_id"))
         finalizer_title = str(finalizer.get("display_title", ""))
         require(re.fullmatch(re.escape(f"Enterprise evidence finalizer N={pr_number} E={evidence} M={merge} S={source} K=")
                              + r"[0-9a-f]{64}", finalizer_title) is not None, "finalizer does not bind the exact qualification")
         finalizer_head = sha(finalizer.get("head_sha"))
-        require_attempt(finalizer, finalizer_id, finalizer_attempt, positive_id(finalizer_workflow.get("id")),
+        require_attempt(finalizer, finalizer_id, finalizer_attempt, finalizer_workflow_id,
                         finalizer_path, finalizer_title, finalizer_head, repository, repository_id)
         require(finalizer.get("event") == "workflow_dispatch" and finalizer.get("head_branch") == "main"
                 and finalizer.get("actor", {}).get("login") == "github-actions[bot]"
@@ -324,13 +324,13 @@ def audit_qualification(api: GitHub, repository: str, pr_number: int,
         current_finalizer = api.get(f"actions/runs/{finalizer_id}")
         maximum = positive_id(current_finalizer.get("run_attempt"))
         require(maximum <= 100, "unbounded finalizer attempt history")
-        require_attempt(current_finalizer, finalizer_id, maximum, positive_id(finalizer_workflow.get("id")),
+        require_attempt(current_finalizer, finalizer_id, maximum, finalizer_workflow_id,
                         finalizer_path, finalizer_title, finalizer_head, repository, repository_id)
         finalizer_fingerprint = current_finalizer
         finalizer_attempts = []
         for attempt in range(1, maximum + 1):
             exact = api.get(f"actions/runs/{finalizer_id}/attempts/{attempt}")
-            require_attempt(exact, finalizer_id, attempt, positive_id(finalizer_workflow.get("id")),
+            require_attempt(exact, finalizer_id, attempt, finalizer_workflow_id,
                             finalizer_path, finalizer_title, finalizer_head, repository, repository_id,
                             successful=False)
             require(exact.get("event") == "workflow_dispatch" and exact.get("head_branch") == "main"
