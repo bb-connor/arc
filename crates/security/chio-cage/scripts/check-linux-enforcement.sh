@@ -60,7 +60,7 @@ else
 fi
 crate="$root/crates/security/chio-cage"
 
-for mode in $(seq 1 39); do
+for mode in $(seq 1 40); do
   if [[ "$mode" == 10 || "$mode" == 34 || "$mode" == 35 || "$mode" == 37 ]]; then
     continue
   fi
@@ -172,6 +172,7 @@ export CHIO_CAGE_TEST_EXEC_ABSOLUTE="$probe_dir/probe-34"
 export CHIO_CAGE_TEST_EXEC_PROC_FD="$probe_dir/probe-35"
 export CHIO_CAGE_TEST_EXEC_INTERPRETER="$probe_dir/probe-37"
 export CHIO_CAGE_TEST_FAULT="$probe_dir/probe-38"
+export CHIO_CAGE_TEST_SIGNAL_DEFAULTS="$probe_dir/probe-40"
 export CHIO_CAGE_TEST_TIMER_SIGNAL="$probe_dir/probe-39"
 CHIO_CAGE_TEST_DYNAMIC_RUNTIME="$(printf '%s\n' "${dynamic_runtime_paths[@]}")"
 export CHIO_CAGE_TEST_DYNAMIC_RUNTIME

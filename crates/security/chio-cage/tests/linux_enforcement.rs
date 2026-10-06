@@ -1195,6 +1195,11 @@ fn racing_stops_continues_and_a_kill_end_with_an_observed_exit() {
 }
 
 #[test]
+fn the_target_starts_with_every_signal_at_its_default_disposition() {
+    assert_probe_exit("CHIO_CAGE_TEST_SIGNAL_DEFAULTS", 0);
+}
+
+#[test]
 fn a_fault_in_the_target_reaches_its_default_action() {
     let record = launch(
         compiled(&required_path("CHIO_CAGE_TEST_FAULT")),
