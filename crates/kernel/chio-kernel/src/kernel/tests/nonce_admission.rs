@@ -137,11 +137,30 @@ fn nonce_admission_strict_reservation_requires_a_presented_nonce() -> TestResult
         kernel.validate_required_execution_nonce(&request, &request.capability),
         kernel.require_presented_execution_nonce(&request, &request.capability),
         kernel.reserve_presented_execution_nonce(&request, &request.capability),
+        kernel
+            .validate_execution_nonce_non_consuming(
+                &request,
+                &request.capability,
+                current_unix_timestamp(),
+            )
+            .map(|_| ()),
     ] {
         let error = result.expect_err("strict reservation accepted missing authority");
         assert!(
             error.to_string().contains("required but not presented"),
             "{error}"
+        );
+        assert!(
+            matches!(
+                &error,
+                KernelError::ExecutionNonce(cause)
+                    if cause.code() == "urn:chio:error:kernel:execution-nonce-missing"
+            ),
+            "{error:?}"
+        );
+        assert_eq!(
+            error.report().code,
+            "urn:chio:error:kernel:execution-nonce-missing"
         );
     }
     Ok(())

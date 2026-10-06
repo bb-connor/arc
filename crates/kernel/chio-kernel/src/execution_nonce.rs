@@ -166,6 +166,8 @@ pub fn mint_execution_nonce_with_reservation(
 /// execute on every presented nonce and any failure short-circuits.
 #[derive(Debug)]
 pub enum ExecutionNonceError {
+    /// Strict mode requires a nonce and the tool call presented none.
+    Missing,
     /// Schema did not equal `EXECUTION_NONCE_SCHEMA`.
     BadSchema { got: String },
     /// Signed epoch window is empty, reversed or negative.
@@ -191,6 +193,7 @@ pub enum ExecutionNonceError {
 impl std::fmt::Display for ExecutionNonceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Missing => write!(f, "execution nonce required but not presented on tool call"),
             Self::BadSchema { got } => write!(
                 f,
                 "execution nonce has unsupported schema: expected {EXECUTION_NONCE_SCHEMA}, got {got}"
@@ -226,6 +229,7 @@ impl ExecutionNonceError {
     /// Stable, input-independent rejection reason for receipts and operator logs.
     pub fn code(&self) -> std::borrow::Cow<'static, str> {
         let code = match self {
+            Self::Missing => "urn:chio:error:kernel:execution-nonce-missing",
             Self::BadSchema { .. } => "urn:chio:error:kernel:execution-nonce-schema",
             Self::InvalidWindow => "urn:chio:error:kernel:execution-nonce-window",
             Self::NotYetValid => "urn:chio:error:kernel:execution-nonce-not-yet-valid",
