@@ -363,6 +363,42 @@ fn deterministic_boundary_rollover_and_invocation_replay_are_exact() {
 }
 
 #[test]
+fn a_regressed_clock_cannot_reopen_a_deleted_window() {
+    let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
+    let path = directory.path().join("session-throttle-regression.db");
+    let action_id = action("throttle-action-regression");
+    let (store, work) = open_claimed_store(&path, &[action_id.as_str()]);
+    let empty = empty_session_throttle_snapshot(key())
+        .unwrap_or_else(|error| panic!("empty throttle snapshot: {error}"));
+    let apply = apply_request(
+        action_id.clone(),
+        effect("throttle-effect-regression"),
+        &empty,
+        work_for(&work, &action_id).fencing_token,
+        SessionThrottleLimits {
+            window_ms: 1_000,
+            max_invocations: 1,
+        },
+        "throttle-apply-regression",
+    );
+    store
+        .apply_session_throttle(&apply)
+        .unwrap_or_else(|error| panic!("apply regression throttle: {error}"));
+
+    assert!(consume(&store, "invocation-regression-earlier", 10_100).allowed);
+    assert!(consume(&store, "invocation-regression-later", 11_100).allowed);
+    let regressed = require_error(store.consume_session_invocation(
+        &SessionThrottleConsumeRequest {
+            key: key(),
+            invocation_id: record("invocation-regression-reopened"),
+            observed_at_unix_ms: 10_200,
+        },
+    ));
+    assert_eq!(regressed.kind(), PortErrorKind::Conflict);
+    assert!(!consume(&store, "invocation-regression-current", 11_200).allowed);
+}
+
+#[test]
 fn last_unit_race_allows_exactly_one_invocation() {
     let directory = tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("session-throttle-race.db");

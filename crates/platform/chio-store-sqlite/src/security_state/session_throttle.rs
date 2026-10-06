@@ -883,6 +883,28 @@ impl SessionThrottleStore for SqliteSecurityStateStore {
                 contribution.limits,
                 request.observed_at_unix_ms,
             )?;
+            // An allowed call deletes every older window, so the newest stored
+            // window is the high-water mark. A time below it would reopen a
+            // deleted window with a fresh budget.
+            let newest_window_start: Option<i64> = transaction
+                .query_row(
+                    r#"
+                    SELECT MAX(window_start) FROM security_session_throttle_windows
+                    WHERE tenant_id = ?1 AND session_id = ?2 AND effect_id = ?3
+                    "#,
+                    params![
+                        request.key.tenant_id.as_str(),
+                        request.key.session_id.as_str(),
+                        contribution.effect_id.as_str()
+                    ],
+                    |row| row.get(0),
+                )
+                .map_err(sqlite_error)?;
+            if let Some(newest_window_start) = newest_window_start {
+                if identity.window_start_unix_ms < from_i64(newest_window_start)? {
+                    return Err(PortError::conflict());
+                }
+            }
             let stored: Option<(i64, i64, String, i64)> = transaction
                 .query_row(
                     r#"
