@@ -741,6 +741,122 @@ fn privileged_audit_socket_propagates_terminal_persistence_failure() {
     assert!(matches!(error, BrokerError::Storage(_)));
 }
 
+#[cfg(target_os = "linux")]
+struct AuthorityOutageAuditHandler;
+
+#[cfg(target_os = "linux")]
+impl crate::privileged_audit::BrokerPrivilegedAuditHandler for AuthorityOutageAuditHandler {
+    fn now_unix_seconds(&self) -> Result<u64> {
+        Ok(20)
+    }
+
+    fn compare(
+        &self,
+        _request: &BrokerExecuteRequest,
+        _reference: crate::audit::BrokerAuditReferenceRequest,
+        _runner_authorization: &crate::audit::SignedBrokerAuditRunnerAuthorization,
+        _admin_authorization: &AdminAuthorization,
+    ) -> Result<crate::audit::CompletedBrokerAuditComparison> {
+        Err(BrokerError::AuthorityUnavailable(
+            "injected authority outage during audit".to_string(),
+        ))
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn an_authority_outage_fails_only_its_audit_session() {
+    use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    use crate::privileged_audit::{
+        read_privileged_audit_challenge_frame, write_privileged_audit_commit_frame,
+        write_privileged_audit_open_frame, BrokerPrivilegedAuditCommitRequest,
+        BrokerPrivilegedAuditEndpoint, BrokerPrivilegedAuditEndpointConfig,
+        BrokerPrivilegedAuditOpenRequest, BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA,
+    };
+
+    let fixture = fixture(1, false, false);
+    let (request, _trusted) = execution(&fixture, 146, 1);
+    let (reference_head, reference_body) = audit_reference_parts(&fixture, &request, true);
+    let reference_precommitment =
+        crate::audit::BrokerAuditReferencePrecommitment::generate(&reference_head, &reference_body)
+            .test_expect("runner reference precommitment");
+    let directory = crate::private_tempdir().test_expect("privileged audit socket directory");
+    let socket_path = directory.path().join("privileged-audit").join("audit.sock");
+    let service_uid = rustix::process::geteuid().as_raw();
+    let runner_gid = rustix::process::getegid().as_raw();
+    let broker_signer: Arc<dyn SigningBackend> =
+        Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
+    let trusted_broker = broker_signer.public_key();
+    let endpoint = BrokerPrivilegedAuditEndpoint::bind(
+        BrokerPrivilegedAuditEndpointConfig {
+            socket_path: socket_path.clone(),
+            trusted_service_uid: service_uid,
+            authorized_runner_uid: service_uid,
+            authorized_runner_gid: runner_gid,
+            read_timeout_ms: 2_000,
+            write_timeout_ms: 2_000,
+            authorization_lifetime_seconds: 60,
+            deployment_id: "test-deployment".to_string(),
+            broker_instance_id: "test-broker-instance".to_string(),
+            tenant_scope: "tenant-a".to_string(),
+            runner_id: "test-enterprise-runner".to_string(),
+        },
+        broker_signer,
+        Arc::new(AuthorityOutageAuditHandler),
+    )
+    .test_expect("bind privileged audit endpoint");
+    let server = thread::spawn(move || endpoint.try_serve_one());
+
+    let mut stream = UnixStream::connect(&socket_path).test_expect("connect privileged audit");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .test_expect("privileged audit client read timeout");
+    let open = BrokerPrivilegedAuditOpenRequest::new(
+        "audit-socket-authority-outage-146".to_string(),
+        "legacy-provider-observation".to_string(),
+        "combined-authority".to_string(),
+        request,
+        reference_head,
+        reference_body,
+        &reference_precommitment,
+    )
+    .test_expect("construct privileged audit open request");
+    write_privileged_audit_open_frame(&mut stream, &open)
+        .test_expect("write privileged audit open request");
+    let challenge = read_privileged_audit_challenge_frame(
+        &mut stream,
+        &trusted_broker,
+        &reference_precommitment,
+    )
+    .test_expect("read runner-bound privileged audit challenge");
+    let runner_authorization = crate::audit::SignedBrokerAuditRunnerAuthorization::sign(
+        challenge.body.runner_authorization_body.clone(),
+        fixture.audit_runner.as_ref(),
+    )
+    .test_expect("sign privileged audit runner authorization");
+    let commit = BrokerPrivilegedAuditCommitRequest {
+        schema: BROKER_PRIVILEGED_AUDIT_COMMIT_SCHEMA.to_string(),
+        session_nonce: challenge.body.session_nonce.clone(),
+        session_commitment_sha256: challenge.body.session_commitment_sha256.clone(),
+        runner_authorization,
+        governed_admin_authorization: vec![1],
+    };
+    write_privileged_audit_commit_frame(&mut stream, &commit, &challenge)
+        .test_expect("write privileged audit commit");
+    let outcome = server
+        .join()
+        .test_expect("join privileged audit server")
+        .test_expect("an authority outage must not end the audit endpoint");
+    assert_eq!(
+        outcome,
+        Some(BrokerPrivilegedAuditServeOutcome::SessionFailed {
+            diagnostic_code: "authority_unavailable"
+        })
+    );
+}
+
 #[test]
 fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
     let fixture = fixture(1, false, false);
