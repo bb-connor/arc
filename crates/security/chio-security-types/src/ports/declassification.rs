@@ -673,6 +673,10 @@ pub trait DeclassificationEvidenceCommitStore: Send + Sync {
         request: &DeclassificationEvidenceRetryRequest,
     ) -> PortResult<DeclassificationEvidenceRecord>;
     fn count_pending_declassification_evidence(&self) -> PortResult<u64>;
+    /// Unacknowledged evidence the next pending batch at `now_unix_ms` can
+    /// return. Rows in retry backoff, and outcomes still waiting on their
+    /// consumption, are pending but not due.
+    fn count_due_declassification_evidence(&self, now_unix_ms: u64) -> PortResult<u64>;
     fn count_stranded_declassification_consumptions(&self) -> PortResult<u64>;
     fn load_declassification_compaction_candidates(
         &self,

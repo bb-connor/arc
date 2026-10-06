@@ -101,6 +101,10 @@ impl DeclassificationEvidenceCommitStore for DelayedEvidence {
         self.store.count_pending_declassification_evidence()
     }
 
+    fn count_due_declassification_evidence(&self, now_unix_ms: u64) -> PortResult<u64> {
+        self.store.count_due_declassification_evidence(now_unix_ms)
+    }
+
     fn count_stranded_declassification_consumptions(&self) -> PortResult<u64> {
         self.store.count_stranded_declassification_consumptions()
     }

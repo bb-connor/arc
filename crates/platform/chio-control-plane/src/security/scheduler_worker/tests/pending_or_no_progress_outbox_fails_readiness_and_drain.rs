@@ -11,6 +11,7 @@ fn pending_or_no_progress_outbox_fails_readiness_and_drain() {
             acknowledged: 0,
             deferred: 0,
             remaining: 3,
+            remaining_due: 3,
         })],
     ));
     let port: Arc<dyn DeclassificationReceiptOutboxPort> = scripted.clone();
