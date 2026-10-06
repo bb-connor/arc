@@ -815,6 +815,11 @@ fn admit_with_architecture(
         let read_resources = linux::retain_read_grants(&read_only_paths)?;
         let write_resources = linux::retain_write_grants(&write_paths)?;
         reject_descriptor_aliases(&forbidden_resources, &read_resources, &write_resources)?;
+        linux::reject_forbidden_descendant_aliases(
+            &forbidden_resources,
+            &read_resources,
+            &write_resources,
+        )?;
         Ok(AdmittedManifest {
             manifest_digest,
             signed_manifest_digest,

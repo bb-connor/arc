@@ -854,6 +854,75 @@ fn forbidden_hard_link_alias_is_rejected_before_compilation() {
 }
 
 #[test]
+fn hard_link_into_a_forbidden_directory_is_rejected() {
+    let tree = TestTree::new();
+    let secrets = tree.root.join("secrets");
+    let key = secrets.join("id_ed25519");
+    let backups = tree.root.join("backups");
+    let alias = backups.join("id_ed25519");
+    std::fs::create_dir(&secrets).test_unwrap();
+    std::fs::write(&key, b"private key").test_unwrap();
+    std::fs::create_dir(&backups).test_unwrap();
+    std::fs::hard_link(&key, &alias).test_unwrap();
+    let keypair = Keypair::from_seed(&[44; 32]);
+    let signed = signed_manifest(
+        &keypair,
+        vec![backups.clone()],
+        Vec::new(),
+        NativeSyscallProfile::NativeMinimalV1,
+        Vec::new(),
+    );
+    let ceilings = OperatorCeilings::new(
+        [backups].into_iter().collect(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        [NativeSyscallProfile::NativeMinimalV1]
+            .into_iter()
+            .collect(),
+    )
+    .with_forbidden_paths([secrets.clone()].into_iter().collect());
+    assert!(matches!(
+        admit(&signed, &keypair.public_key(), &ceilings),
+        Err(CageError::ForbiddenDescriptorAlias { allowed, forbidden })
+            if allowed == alias && forbidden == key
+    ));
+}
+
+#[test]
+fn forbidden_directory_scan_admits_an_unrelated_hard_link_beside_a_socket() {
+    let tree = TestTree::new();
+    let secrets = tree.root.join("secrets");
+    std::fs::create_dir(&secrets).test_unwrap();
+    std::fs::write(secrets.join("id_ed25519"), b"private key").test_unwrap();
+    let _control_socket =
+        std::os::unix::net::UnixListener::bind(secrets.join("control.sock")).test_unwrap();
+    let original = tree.root.join("notes-original");
+    let linked = tree.root.join("notes");
+    std::fs::write(&original, b"notes").test_unwrap();
+    std::fs::hard_link(&original, &linked).test_unwrap();
+    let keypair = Keypair::from_seed(&[45; 32]);
+    let signed = signed_manifest(
+        &keypair,
+        vec![linked.clone()],
+        Vec::new(),
+        NativeSyscallProfile::NativeMinimalV1,
+        Vec::new(),
+    );
+    let ceilings = OperatorCeilings::new(
+        [linked].into_iter().collect(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        BTreeSet::new(),
+        [NativeSyscallProfile::NativeMinimalV1]
+            .into_iter()
+            .collect(),
+    )
+    .with_forbidden_paths([secrets].into_iter().collect());
+    assert!(admit(&signed, &keypair.public_key(), &ceilings).is_ok());
+}
+
+#[test]
 fn overlapping_read_grants_retain_each_path_once_and_reject_hardlink_aliases() {
     let tree = TestTree::new();
     let directory = tree.root.join("extensions");
