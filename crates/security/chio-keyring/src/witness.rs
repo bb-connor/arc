@@ -186,6 +186,7 @@ impl SqliteKeyLogWitness {
         candidate: &SignedKeyLogCheckpoint,
         response: &KeyLogSyncResponse,
     ) -> Result<WitnessSignature> {
+        crate::gossip::ensure_local_checkpoint(candidate, &self.policy)?;
         candidate.verify_operator(&self.policy.operator_key)?;
         let now = self
             .clock
@@ -197,6 +198,7 @@ impl SqliteKeyLogWitness {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         response.validate_bounds()?;
+        crate::gossip::ensure_local_sync(response, &self.policy)?;
         for checkpoint in &response.checkpoints {
             checkpoint.verify_operator(&self.policy.operator_key)?;
             self.policy
@@ -206,6 +208,21 @@ impl SqliteKeyLogWitness {
             persist_conflict(&transaction, &first, &conflicting, kind, now)?;
             transaction.commit()?;
             return Err(KeyringError::EquivocationDetected);
+        }
+        let retained_gossip = match validate_retained_gossip(&transaction, &self.policy, now) {
+            Ok(gossip) => gossip,
+            Err(KeyringError::EquivocationDetected) => {
+                transaction.commit()?;
+                return Err(KeyringError::EquivocationDetected);
+            }
+            Err(error) => return Err(error),
+        };
+        for checkpoint in std::iter::once(candidate).chain(&response.checkpoints) {
+            if let Some((retained, kind)) = gossip_conflict(&retained_gossip, checkpoint)? {
+                persist_conflict(&transaction, &retained, checkpoint, kind, now)?;
+                transaction.commit()?;
+                return Err(KeyringError::EquivocationDetected);
+            }
         }
 
         if let Some(existing) =
@@ -241,6 +258,13 @@ impl SqliteKeyLogWitness {
                         now,
                         false,
                     )?;
+                    // The pin may only rest on a decided checkpoint. A replay of
+                    // this candidate that carries newer checkpoints returns the
+                    // existing signature without retaining them.
+                    if verified.pin.checkpoint_sequence != candidate.body.checkpoint_sequence {
+                        transaction.rollback()?;
+                        return Ok(signature);
+                    }
                     persist_verified_log(&transaction, &verified)?;
                     persist_pin(&transaction, &verified.pin)?;
                     transaction.commit()?;
@@ -331,6 +355,7 @@ impl SqliteKeyLogWitness {
     }
 
     pub fn import_gossip(&self, gossip: &CheckpointGossip) -> Result<()> {
+        crate::gossip::ensure_local_checkpoint(&gossip.checkpoint, &self.policy)?;
         gossip
             .checkpoint
             .verify_operator(&self.policy.operator_key)?;
@@ -350,79 +375,36 @@ impl SqliteKeyLogWitness {
             .validate_checkpoint_time(gossip.checkpoint.body.issued_at, now)?;
         let mut connection = self.connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if let Some(existing) =
-            checkpoint_for_sequence(&transaction, gossip.checkpoint.body.checkpoint_sequence)?
-        {
-            if existing.checkpoint_hash()? != gossip.checkpoint.checkpoint_hash()? {
-                persist_conflict(
-                    &transaction,
-                    &existing,
-                    &gossip.checkpoint,
-                    CheckpointConflictKind::CheckpointSequence,
-                    now,
-                )?;
-                transaction.commit()?;
-                return Err(KeyringError::EquivocationDetected);
-            }
-        }
-        if let Some(existing) = gossip_checkpoint_for_sequence(
-            &transaction,
-            gossip.checkpoint.body.checkpoint_sequence,
-        )? {
-            if existing.checkpoint_hash()? != gossip.checkpoint.checkpoint_hash()? {
-                persist_conflict(
-                    &transaction,
-                    &existing,
-                    &gossip.checkpoint,
-                    CheckpointConflictKind::CheckpointSequence,
-                    now,
-                )?;
-                transaction.commit()?;
-                return Err(KeyringError::EquivocationDetected);
-            }
-        }
-        if let Some(existing) =
-            checkpoint_for_tree_size(&transaction, gossip.checkpoint.body.tree_size)?
-        {
-            if existing.checkpoint_hash()? != gossip.checkpoint.checkpoint_hash()? {
-                persist_conflict(
-                    &transaction,
-                    &existing,
-                    &gossip.checkpoint,
-                    CheckpointConflictKind::TreeSize,
-                    now,
-                )?;
-                transaction.commit()?;
-                return Err(KeyringError::EquivocationDetected);
-            }
-        }
-        if let Some(existing) =
-            gossip_checkpoint_for_tree_size(&transaction, gossip.checkpoint.body.tree_size)?
-        {
-            if existing.checkpoint_hash()? != gossip.checkpoint.checkpoint_hash()? {
-                persist_conflict(
-                    &transaction,
-                    &existing,
-                    &gossip.checkpoint,
-                    CheckpointConflictKind::TreeSize,
-                    now,
-                )?;
-                transaction.commit()?;
-                return Err(KeyringError::EquivocationDetected);
-            }
-        }
+        // Authentication precedes retention. Authentic disagreement is retained
+        // with the refusal so a restart cannot erase a known signed split view.
         persist_gossip(&transaction, gossip)?;
+        match validate_retained_gossip(&transaction, &self.policy, now) {
+            Ok(_) => {}
+            Err(KeyringError::EquivocationDetected) => {
+                transaction.commit()?;
+                return Err(KeyringError::EquivocationDetected);
+            }
+            Err(error) => return Err(error),
+        }
         transaction.commit()?;
         Ok(())
     }
 
     pub fn gossip_observations(&self) -> Result<Vec<CheckpointGossip>> {
-        load_gossip(&*self.connection()?)
+        crate::gossip::scoped_gossip(
+            load_gossip(&*self.connection()?)?,
+            &self.policy,
+            self.clock.unix_millis()?.get(),
+        )
     }
 
     pub fn service_gossip_observations(&self) -> Result<Vec<CheckpointGossip>> {
         let connection = self.connection()?;
-        let mut observations = load_gossip(&connection)?;
+        let mut observations = crate::gossip::scoped_gossip(
+            load_gossip(&connection)?,
+            &self.policy,
+            self.clock.unix_millis()?.get(),
+        )?;
         for sequence in load_decision_sequences(&connection)? {
             if let Some((checkpoint, witness_signature)) =
                 decision_for_sequence(&connection, sequence)?
@@ -455,7 +437,7 @@ impl SqliteKeyLogWitness {
     }
 
     pub fn conflicts(&self) -> Result<Vec<CheckpointEquivocationEvidence>> {
-        load_conflicts(&*self.connection()?)
+        crate::gossip::scoped_conflicts(load_conflicts(&*self.connection()?)?, &self.policy)
     }
 
     pub fn gossip_for_sequence(&self, sequence: u64) -> Result<Option<CheckpointGossip>> {
@@ -759,41 +741,33 @@ fn checkpoint_for_tree_size(
     )
 }
 
-fn gossip_checkpoint_for_sequence(
-    connection: &Connection,
-    sequence: u64,
-) -> Result<Option<SignedKeyLogCheckpoint>> {
-    gossip_checkpoint_query(
-        connection,
-        "SELECT CASE WHEN length(canonical_gossip) <= 1048576 THEN canonical_gossip END FROM witness_gossip WHERE checkpoint_sequence = ?1 ORDER BY checkpoint_hash, witness_id LIMIT 1",
-        to_i64(sequence)?,
-    )
-}
-
-fn gossip_checkpoint_for_tree_size(
-    connection: &Connection,
-    tree_size: u64,
-) -> Result<Option<SignedKeyLogCheckpoint>> {
-    gossip_checkpoint_query(
-        connection,
-        "SELECT CASE WHEN length(canonical_gossip) <= 1048576 THEN canonical_gossip END FROM witness_gossip WHERE tree_size = ?1 ORDER BY checkpoint_hash, witness_id LIMIT 1",
-        to_i64(tree_size)?,
-    )
-}
-
-fn gossip_checkpoint_query(
-    connection: &Connection,
-    sql: &str,
-    value: i64,
-) -> Result<Option<SignedKeyLogCheckpoint>> {
-    connection
-        .query_row(sql, [value], |row| row.get::<_, Option<Vec<u8>>>(0))
-        .optional()?
-        .flatten()
-        .map(|bytes| {
-            crate::from_bounded_json::<CheckpointGossip>(&bytes).map(|gossip| gossip.checkpoint)
-        })
-        .transpose()
+/// Retained gossip that names a different checkpoint at the same sequence or
+/// tree size is signed evidence of a split view.
+fn gossip_conflict(
+    observations: &[CheckpointGossip],
+    checkpoint: &SignedKeyLogCheckpoint,
+) -> Result<Option<(SignedKeyLogCheckpoint, CheckpointConflictKind)>> {
+    let hash = checkpoint.checkpoint_hash()?;
+    for gossip in observations {
+        let retained = &gossip.checkpoint;
+        if retained.body.checkpoint_sequence == checkpoint.body.checkpoint_sequence
+            && retained.checkpoint_hash()? != hash
+        {
+            return Ok(Some((
+                retained.clone(),
+                CheckpointConflictKind::CheckpointSequence,
+            )));
+        }
+    }
+    for gossip in observations {
+        let retained = &gossip.checkpoint;
+        if retained.body.tree_size == checkpoint.body.tree_size
+            && retained.checkpoint_hash()? != hash
+        {
+            return Ok(Some((retained.clone(), CheckpointConflictKind::TreeSize)));
+        }
+    }
+    Ok(None)
 }
 
 fn persist_gossip(connection: &Connection, gossip: &CheckpointGossip) -> Result<()> {
@@ -829,31 +803,50 @@ fn validate_retained_gossip(
     connection: &Connection,
     policy: &KeyLogPolicy,
     now: u64,
-) -> Result<()> {
-    let mut sequences = BTreeMap::new();
-    let mut tree_sizes = BTreeMap::new();
-    for gossip in load_gossip(connection)? {
-        gossip.checkpoint.verify_operator(&policy.operator_key)?;
-        policy.validate_checkpoint_time(gossip.checkpoint.body.issued_at, now)?;
-        let witness_key = policy
-            .witness_keys
-            .get(&gossip.witness_signature.witness_id)
-            .ok_or(KeyringError::InvalidSignature)?;
-        gossip
-            .witness_signature
-            .verify(&gossip.checkpoint, witness_key)?;
-        let hash = gossip.checkpoint.checkpoint_hash()?;
-        if sequences
-            .insert(gossip.checkpoint.body.checkpoint_sequence, hash)
-            .is_some_and(|existing| existing != hash)
-            || tree_sizes
-                .insert(gossip.checkpoint.body.tree_size, hash)
-                .is_some_and(|existing| existing != hash)
-        {
-            return Err(KeyringError::EquivocationDetected);
-        }
+) -> Result<Vec<CheckpointGossip>> {
+    let observations = crate::gossip::scoped_gossip(load_gossip(connection)?, policy, now)?;
+    crate::gossip::scoped_conflicts(load_conflicts(connection)?, policy)?;
+    let checkpoints = load_checkpoints(connection)?;
+    for checkpoint in &checkpoints {
+        crate::gossip::ensure_local_checkpoint(checkpoint, policy)?;
+        checkpoint.verify_operator(&policy.operator_key)?;
+        policy.validate_checkpoint_time(checkpoint.body.issued_at, now)?;
     }
-    Ok(())
+    let mut sequences = BTreeMap::<u64, &SignedKeyLogCheckpoint>::new();
+    let mut tree_sizes = BTreeMap::<u64, &SignedKeyLogCheckpoint>::new();
+    for checkpoint in checkpoints
+        .iter()
+        .chain(observations.iter().map(|gossip| &gossip.checkpoint))
+    {
+        let hash = checkpoint.checkpoint_hash()?;
+        if let Some(first) = sequences.get(&checkpoint.body.checkpoint_sequence) {
+            if first.checkpoint_hash()? != hash {
+                persist_conflict(
+                    connection,
+                    first,
+                    checkpoint,
+                    CheckpointConflictKind::CheckpointSequence,
+                    now,
+                )?;
+                return Err(KeyringError::EquivocationDetected);
+            }
+        }
+        if let Some(first) = tree_sizes.get(&checkpoint.body.tree_size) {
+            if first.checkpoint_hash()? != hash {
+                persist_conflict(
+                    connection,
+                    first,
+                    checkpoint,
+                    CheckpointConflictKind::TreeSize,
+                    now,
+                )?;
+                return Err(KeyringError::EquivocationDetected);
+            }
+        }
+        sequences.insert(checkpoint.body.checkpoint_sequence, checkpoint);
+        tree_sizes.insert(checkpoint.body.tree_size, checkpoint);
+    }
+    Ok(observations)
 }
 
 fn bounded_checkpoint_query(

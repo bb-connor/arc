@@ -247,7 +247,7 @@ impl SignedKeyLogCheckpoint {
         {
             return Err(KeyringError::AlgorithmMismatch);
         }
-        if !operator_key.verify(
+        if !operator_key.verify_strict(
             &checkpoint_signing_bytes(&self.body)?,
             &self.operator_signature,
         ) {
@@ -294,7 +294,7 @@ impl SignedKeyLogCheckpoint {
                 .ok_or(KeyringError::InvalidSignature)?;
             if key.algorithm() != witness.algorithm
                 || witness.signature.algorithm() != witness.algorithm
-                || !key.verify(&statement, &witness.signature)
+                || !key.verify_strict(&statement, &witness.signature)
             {
                 return Err(KeyringError::InvalidSignature);
             }
@@ -362,7 +362,7 @@ impl SignedKeyActivationCommit {
             || operator_key.algorithm() != self.operator_algorithm
             || self.operator_signature.algorithm() != self.operator_algorithm
             || derive_key_id(operator_key.algorithm(), operator_key)? != self.operator_key_id
-            || !operator_key.verify(
+            || !operator_key.verify_strict(
                 &activation_commit_signing_bytes(&self.body)?,
                 &self.operator_signature,
             )
@@ -403,7 +403,7 @@ impl WitnessSignature {
     ) -> Result<()> {
         if witness_key.algorithm() != self.algorithm
             || self.signature.algorithm() != self.algorithm
-            || !witness_key.verify(&witness_signing_bytes(checkpoint)?, &self.signature)
+            || !witness_key.verify_strict(&witness_signing_bytes(checkpoint)?, &self.signature)
         {
             return Err(KeyringError::InvalidSignature);
         }

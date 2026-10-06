@@ -136,7 +136,7 @@ impl KeyEnterpriseReceiptBody {
             _ => {
                 return Err(KeyringError::StateInvariant(
                     "key receipt stage and outcome disagree",
-                ))
+                ));
             }
         }
         Ok(())
@@ -178,7 +178,7 @@ impl SignedKeyEnterpriseReceipt {
             || operator_key.algorithm() != self.operator_algorithm
             || self.operator_signature.algorithm() != self.operator_algorithm
             || derive_key_id(operator_key.algorithm(), operator_key)? != self.operator_key_id
-            || !operator_key.verify(
+            || !operator_key.verify_strict(
                 &domain_canonical_bytes(RECEIPT_SIGNATURE_DOMAIN, &self.body)?,
                 &self.operator_signature,
             )
@@ -252,7 +252,7 @@ impl SignedKeyEnterpriseReceipt {
             _ => {
                 return Err(KeyringError::StateInvariant(
                     "key receipt stage lacks its required activation artifact",
-                ))
+                ));
             }
         }
         Ok(())

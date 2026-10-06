@@ -45,7 +45,9 @@ The operator SQLite store acquires an operating-system file lock beside the data
 
 ## Key recovery
 
-Normal rotation requires authorization by the active key plus proof of possession by the new key. Recovery events require the configured recovery threshold and remain subject to the same operator checkpoint, witness quorum, activation-commit, auditor, and replay checks. Recovery changes authority-key state; it does not replace the operator, witness, auditor, or artifact-time roots in the loaded policy.
+Witness and verifier gossip, conflict, and readiness views belong to the configured log. Incoming evidence from another log is rejected before retention or conflict decisions. Authentic foreign gossip and cross-log conflicts retained by older implementations remain in the SQLite archive, with their original bytes. Every archived row is bounded and authenticated before it can be excluded from the active view; foreign timestamps use no local-log authority. Local-log evidence retains the configured time checks, and foreign authoritative history never becomes local state.
+
+Normal rotation requires authorization by the active key plus proof of possession by the new key. Recovery events require the configured recovery threshold and proof of possession by the recovered key in the existing `new_key` authorization field. Historical envelopes remain decodable, but recovery without possession cannot authorize a fresh append or replay. Recovery remains subject to the same operator checkpoint, witness quorum, activation-commit, auditor, and replay checks. Recovery changes authority-key state; it does not replace the operator, witness, auditor, or artifact-time roots in the loaded policy.
 
 ## Residual risks
 

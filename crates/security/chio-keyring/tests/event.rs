@@ -1,6 +1,8 @@
 use chio_test_support::prelude::*;
 
-use chio_core_types::{Ed25519Backend, Hash, Keypair, SigningAlgorithm, SigningBackend};
+use chio_core_types::{
+    Ed25519Backend, Hash, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
 use chio_keyring::{
     derive_key_id, AuthorityId, BootstrapAuthorization, EventId, EventReason, KeyLogAuthorizations,
     KeyLogEventBody, KeyLogOperation, LogId, NewKeyProofOfPossession, OldKeyAuthorization,
@@ -10,6 +12,64 @@ use chio_keyring::{
 
 fn backend(seed: u8) -> Ed25519Backend {
     Ed25519Backend::new(Keypair::from_seed(&[seed; 32]))
+}
+
+fn identity_key_and_universal_signature() -> (PublicKey, Signature) {
+    let mut public_key = [0_u8; 32];
+    public_key[0] = 1;
+    // R is the compressed Ed25519 base point and s = 1. For A = identity,
+    // [s]B = R + [k]A holds for every message without a private key.
+    let mut signature = [0x66_u8; 64];
+    signature[0] = 0x58;
+    signature[32..].fill(0);
+    signature[32] = 1;
+    (
+        PublicKey::from_bytes(&public_key).test_unwrap(),
+        Signature::from_bytes(&signature),
+    )
+}
+
+#[test]
+fn review_rotation_rejects_identity_key_and_universal_proof() {
+    let bootstrap = backend(1);
+    let old = backend(2);
+    let previous = genesis(&bootstrap, &old);
+    let mut event = rotation(&previous, &old, &backend(3));
+    let (key, signature) = identity_key_and_universal_signature();
+    event.body.key_id = derive_key_id(key.algorithm(), &key).test_unwrap();
+    event.body.public_key = key.clone();
+    event.authorizations.old_key = Some(OldKeyAuthorization::sign(&event.body, &old).test_unwrap());
+    event.authorizations.new_key = Some(NewKeyProofOfPossession {
+        key_id: event.body.key_id,
+        algorithm: key.algorithm(),
+        signature: signature.clone(),
+    });
+    assert!(key.verify(&event.body.signing_bytes().test_unwrap(), &signature));
+    let common = event.validate_common(
+        1,
+        Some(&previous.envelope_hash().test_unwrap()),
+        &previous.body.log_id,
+        &previous.body.authority_id,
+        Some(1_000),
+    );
+    let possession = event.verify_rotation(&old.public_key());
+    assert!(
+        common.is_err(),
+        "weak lifecycle key passed common validation"
+    );
+    assert!(possession.is_err(), "universal proof was accepted");
+}
+
+#[test]
+fn review_genesis_rejects_universal_bootstrap_authorization() {
+    let mut event = genesis(&backend(1), &backend(2));
+    let (key, signature) = identity_key_and_universal_signature();
+    event.authorizations.bootstrap = Some(BootstrapAuthorization {
+        key_id: derive_key_id(key.algorithm(), &key).test_unwrap(),
+        algorithm: key.algorithm(),
+        signature,
+    });
+    assert!(event.verify_genesis(&key).is_err());
 }
 
 #[test]
@@ -302,6 +362,54 @@ fn common_validation_rejects_schema_sequence_predecessor_and_time_errors() {
             &reversed.body.log_id,
             &reversed.body.authority_id,
             None,
+        )
+        .is_err());
+}
+
+const IDENTITY_POINT_HEX: &str = "0100000000000000000000000000000000000000000000000000000000000000";
+
+fn identity_point_rotation(genesis: &SignedKeyLogEvent, old: &Ed25519Backend) -> SignedKeyLogEvent {
+    let identity = PublicKey::from_hex(IDENTITY_POINT_HEX).test_unwrap();
+    let mut body = rotation(genesis, old, &backend(3)).body;
+    body.key_id = derive_key_id(SigningAlgorithm::Ed25519, &identity).test_unwrap();
+    body.public_key = identity;
+    // R = identity point, s = 0 verifies for every message under the identity key
+    // unless the verifier rejects small-order points.
+    let universal =
+        Signature::from_hex(&format!("{IDENTITY_POINT_HEX}{}", "0".repeat(64))).test_unwrap();
+    SignedKeyLogEvent {
+        authorizations: KeyLogAuthorizations::rotation(
+            OldKeyAuthorization::sign(&body, old).test_unwrap(),
+            NewKeyProofOfPossession {
+                key_id: body.key_id,
+                algorithm: SigningAlgorithm::Ed25519,
+                signature: universal,
+            },
+        ),
+        body,
+    }
+}
+
+#[test]
+fn rotation_to_the_identity_point_fails_proof_of_possession() {
+    let old = backend(2);
+    let genesis = genesis(&backend(1), &old);
+    let rotation = identity_point_rotation(&genesis, &old);
+    assert!(rotation.verify_rotation(&old.public_key()).is_err());
+}
+
+#[test]
+fn common_validation_rejects_a_small_order_event_key() {
+    let old = backend(2);
+    let genesis = genesis(&backend(1), &old);
+    let rotation = identity_point_rotation(&genesis, &old);
+    assert!(rotation
+        .validate_common(
+            1,
+            Some(&genesis.envelope_hash().test_unwrap()),
+            &genesis.body.log_id,
+            &genesis.body.authority_id,
+            Some(genesis.body.issued_at),
         )
         .is_err());
 }

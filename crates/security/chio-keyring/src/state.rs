@@ -71,6 +71,9 @@ impl KeyLogPolicy {
             .chain(witness_keys.values())
             .chain(recovery_keys.values())
         {
+            if key.is_weak_ed25519() {
+                return Err(KeyringError::WeakKey);
+            }
             if !role_key_ids.insert(derive_key_id(key.algorithm(), key)?) {
                 return Err(KeyringError::DuplicateIdentifier);
             }
@@ -209,6 +212,9 @@ impl KeyLogPolicy {
             return Err(KeyringError::InvalidArtifactTimeEvidence);
         }
         for key in artifact_time_keys.values() {
+            if key.is_weak_ed25519() {
+                return Err(KeyringError::WeakKey);
+            }
             let key_id = derive_key_id(key.algorithm(), key)?;
             if !self.independent_role_key_ids.insert(key_id) {
                 return Err(KeyringError::DuplicateIdentifier);
@@ -226,6 +232,9 @@ impl KeyLogPolicy {
         }
         for (monitor_id, key) in &auditor_keys {
             crate::ipc::validate_service_identifier(monitor_id, "audit monitor identifier")?;
+            if key.is_weak_ed25519() {
+                return Err(KeyringError::WeakKey);
+            }
             let key_id = derive_key_id(key.algorithm(), key)?;
             if !self.independent_role_key_ids.insert(key_id) {
                 return Err(KeyringError::DuplicateIdentifier);

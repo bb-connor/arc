@@ -50,13 +50,17 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
+        Self::with_log_id("log.witness.test")
+    }
+
+    fn with_log_id(log_id: &str) -> Self {
         let bootstrap = backend(1);
         let operator = backend(10);
         let old = backend(2);
         let new = backend(3);
         let witnesses = [backend(20), backend(21), backend(22)];
         let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
-            log_id: LogId::new("log.witness.test").test_unwrap(),
+            log_id: LogId::new(log_id).test_unwrap(),
             authority_id: AuthorityId::new("authority.witness.test").test_unwrap(),
             bootstrap_key: bootstrap.public_key(),
             operator_key: operator.public_key(),
@@ -309,6 +313,303 @@ fn authenticated_unseen_gossip_is_durable_for_witness_and_verifier() {
         .test_unwrap(),
         vec![gossip]
     );
+}
+
+#[test]
+fn review_witness_refuses_candidate_conflicting_with_retained_gossip() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(
+        &directory,
+        "gossip-first-operator.sqlite",
+    ));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let mut fork_body = checkpoint.body.clone();
+    fork_body.issued_at += 1;
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+        checkpoint: fork.clone(),
+    };
+    let path = trusted_temp_path(&directory, "gossip-first-witness.sqlite");
+    let witness = fixture.witness(&path, 0);
+    witness.import_gossip(&gossip).test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&checkpoint, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert!(witness.pin().test_unwrap().is_none());
+    assert!(witness.gossip_for_sequence(0).test_unwrap().is_none());
+    assert_eq!(
+        witness.gossip_observations().test_unwrap(),
+        vec![gossip.clone()]
+    );
+    let conflicts = witness.conflicts().test_unwrap();
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(
+        conflicts[0].first.checkpoint_hash().test_unwrap(),
+        fork.checkpoint_hash().test_unwrap()
+    );
+    assert_eq!(
+        conflicts[0].conflicting.checkpoint_hash().test_unwrap(),
+        checkpoint.checkpoint_hash().test_unwrap()
+    );
+    assert_eq!(conflicts[0].detected_at, 5_000);
+    drop(witness);
+    let reopened = fixture.witness(&path, 0);
+    assert!(matches!(
+        reopened.sign_candidate(&checkpoint, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert_eq!(reopened.conflicts().test_unwrap(), conflicts);
+    assert_eq!(reopened.gossip_observations().test_unwrap(), vec![gossip]);
+}
+
+#[test]
+fn review_witness_refuses_response_history_conflicting_with_retained_gossip() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(
+        &directory,
+        "gossip-range-operator.sqlite",
+    ));
+    let genesis = fixture.genesis();
+    let first = store
+        .append_event(&genesis, &fixture.operator)
+        .test_unwrap();
+    let candidate = store
+        .append_event(&fixture.rotation(&genesis), &fixture.operator)
+        .test_unwrap();
+    let mut fork_body = first.body.clone();
+    fork_body.issued_at += 1;
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+        checkpoint: fork,
+    };
+    let witness = fixture.witness(
+        &trusted_temp_path(&directory, "gossip-range-witness.sqlite"),
+        0,
+    );
+    witness.import_gossip(&gossip).test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&candidate, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert!(witness.pin().test_unwrap().is_none());
+    assert!(witness.gossip_for_sequence(1).test_unwrap().is_none());
+    let conflicts = witness.conflicts().test_unwrap();
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(
+        conflicts[0].conflicting.checkpoint_hash().test_unwrap(),
+        first.checkpoint_hash().test_unwrap()
+    );
+    assert_eq!(witness.gossip_observations().test_unwrap(), vec![gossip]);
+}
+
+#[test]
+fn review_witness_refuses_tree_size_fork_in_retained_gossip() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(
+        &directory,
+        "gossip-size-operator.sqlite",
+    ));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let mut fork_body = checkpoint.body.clone();
+    fork_body.checkpoint_sequence = 9;
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+        checkpoint: fork,
+    };
+    let witness = fixture.witness(
+        &trusted_temp_path(&directory, "gossip-size-witness.sqlite"),
+        0,
+    );
+    witness.import_gossip(&gossip).test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&checkpoint, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert!(witness.pin().test_unwrap().is_none());
+    assert_eq!(
+        witness.conflicts().test_unwrap()[0].kind,
+        chio_keyring::CheckpointConflictKind::TreeSize
+    );
+}
+
+#[test]
+fn review_witness_startup_rejects_gossip_conflicting_with_own_checkpoint() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(
+        &directory,
+        "gossip-startup-operator.sqlite",
+    ));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+    let path = trusted_temp_path(&directory, "gossip-startup-witness.sqlite");
+    let witness = fixture.witness(&path, 0);
+    witness.sign_candidate(&checkpoint, &response).test_unwrap();
+    drop(witness);
+    let mut fork_body = checkpoint.body.clone();
+    fork_body.issued_at += 1;
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+        checkpoint: fork,
+    };
+    // Simulate an older store retaining authentic gossip alongside its own
+    // conflicting decision. Both signatures are real deterministic fixtures.
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    connection.execute(
+        "INSERT INTO witness_gossip (checkpoint_hash, witness_id, checkpoint_sequence, tree_size, canonical_gossip) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![gossip.checkpoint.checkpoint_hash().test_unwrap().to_string(), "witness.b", 0, 1, chio_core_types::canonical_json_bytes(&gossip).test_unwrap()],
+    ).test_unwrap();
+    drop(connection);
+    assert!(matches!(
+        SqliteKeyLogWitness::open(
+            &path,
+            fixture.policy,
+            WitnessId::new("witness.a").test_unwrap(),
+            Box::new(fixture.witnesses[0].clone()),
+            Arc::new(FixedClock(5_000)),
+        ),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    let gossip_count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM witness_gossip", [], |row| row.get(0))
+        .test_unwrap();
+    let conflict_count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM witness_conflicts", [], |row| {
+            row.get(0)
+        })
+        .test_unwrap();
+    assert_eq!(gossip_count, 1);
+    assert_eq!(conflict_count, 1);
+}
+
+#[test]
+fn review_witness_checks_all_retained_signed_gossip_before_replaying_decision() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(&directory, "gossip-all-operator.sqlite"));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+    let path = trusted_temp_path(&directory, "gossip-all-witness.sqlite");
+    let witness = fixture.witness(&path, 0);
+    witness.sign_candidate(&checkpoint, &response).test_unwrap();
+    let accepted_pin = witness.pin().test_unwrap();
+    let checkpoint_hash = checkpoint.checkpoint_hash().test_unwrap().to_string();
+    // Make the first indexed observation agree with the decided checkpoint.
+    // A SELECT ... LIMIT 1 must not hide a later authentic disagreement.
+    let fork = (1..=100)
+        .map(|offset| {
+            let mut body = checkpoint.body.clone();
+            body.issued_at += offset;
+            SignedKeyLogCheckpoint::sign(body, &fixture.operator).test_unwrap()
+        })
+        .find(|candidate| candidate.checkpoint_hash().test_unwrap().to_string() > checkpoint_hash)
+        .test_unwrap();
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    let mut observations = Vec::new();
+    for (signed, id, backend) in [
+        (&checkpoint, "witness.b", &fixture.witnesses[1]),
+        (&fork, "witness.c", &fixture.witnesses[2]),
+    ] {
+        let gossip = CheckpointGossip {
+            checkpoint: signed.clone(),
+            witness_signature: WitnessSignature::sign(
+                signed,
+                WitnessId::new(id).test_unwrap(),
+                backend,
+            )
+            .test_unwrap(),
+        };
+        connection.execute(
+            "INSERT INTO witness_gossip (checkpoint_hash, witness_id, checkpoint_sequence, tree_size, canonical_gossip) VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![signed.checkpoint_hash().test_unwrap().to_string(), id, 0, 1, chio_core_types::canonical_json_bytes(&gossip).test_unwrap()],
+        ).test_unwrap();
+        observations.push(gossip);
+    }
+    drop(connection);
+    assert!(matches!(
+        witness.sign_candidate(&checkpoint, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert_eq!(witness.pin().test_unwrap(), accepted_pin);
+    assert_eq!(witness.gossip_observations().test_unwrap(), observations);
+    assert_eq!(witness.conflicts().test_unwrap().len(), 1);
+}
+
+#[test]
+fn review_witness_retains_conflicting_authenticated_gossip() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(
+        &directory,
+        "gossip-conflict-operator.sqlite",
+    ));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+    let witness = fixture.witness(
+        &trusted_temp_path(&directory, "gossip-conflict-witness.sqlite"),
+        0,
+    );
+    witness.sign_candidate(&checkpoint, &response).test_unwrap();
+    let mut fork_body = checkpoint.body.clone();
+    fork_body.issued_at += 1;
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+        checkpoint: fork,
+    };
+    assert!(matches!(
+        witness.import_gossip(&gossip),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert_eq!(witness.gossip_observations().test_unwrap(), vec![gossip]);
+    assert_eq!(witness.conflicts().test_unwrap().len(), 1);
 }
 
 #[test]
@@ -663,4 +964,474 @@ fn witness_and_audit_storage_identities_survive_database_path_swap() {
         durable_storage_identity(&verifier_path).test_unwrap(),
         verifier_identity
     );
+}
+
+#[test]
+fn witness_refuses_to_sign_a_candidate_that_conflicts_with_retained_gossip() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(&directory, "operator.sqlite"));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+
+    let mut fork_body = checkpoint.body.clone();
+    fork_body.root_hash = chio_core_types::sha256(b"fork");
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        checkpoint: fork.clone(),
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+    };
+
+    let witness = fixture.witness(&trusted_temp_path(&directory, "lagging-witness.sqlite"), 0);
+    witness.import_gossip(&gossip).test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&checkpoint, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert_eq!(witness.conflicts().test_unwrap().len(), 1);
+}
+
+#[test]
+fn replaying_a_decided_candidate_with_newer_checkpoints_keeps_the_witness_restartable() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(&directory, "operator.sqlite"));
+    let genesis = fixture.genesis();
+    let decided = store
+        .append_event(&genesis, &fixture.operator)
+        .test_unwrap();
+    let witness_path = trusted_temp_path(&directory, "decided-witness.sqlite");
+    let witness = fixture.witness(&witness_path, 0);
+    let first = witness
+        .sign_candidate(
+            &decided,
+            &store.synchronization_response(None).test_unwrap(),
+        )
+        .test_unwrap();
+
+    store
+        .append_event(&fixture.rotation(&genesis), &fixture.operator)
+        .test_unwrap();
+    let newer = store
+        .synchronization_response(witness.pin().test_unwrap().as_ref())
+        .test_unwrap();
+    assert!(!newer.checkpoints.is_empty());
+    let replay = witness.sign_candidate(&decided, &newer).test_unwrap();
+    assert_eq!(replay, first);
+    drop(witness);
+
+    let reopened = fixture.witness(&witness_path, 0);
+    assert_eq!(
+        reopened
+            .pin()
+            .test_unwrap()
+            .test_unwrap()
+            .checkpoint_sequence,
+        0
+    );
+}
+
+struct NamespaceFixture {
+    a: Fixture,
+    a_store: Arc<SqliteKeyLogStore>,
+    a_head: SignedKeyLogCheckpoint,
+    b_head: SignedKeyLogCheckpoint,
+    b_response: KeyLogSyncResponse,
+    b_gossip: CheckpointGossip,
+}
+
+impl NamespaceFixture {
+    fn new(directory: &tempfile::TempDir) -> Self {
+        let a = Fixture::with_log_id("log.namespace.a");
+        let b = Fixture::with_log_id("log.namespace.b");
+        assert_eq!(
+            a.policy.operator_public_key(),
+            b.policy.operator_public_key()
+        );
+        assert_eq!(
+            a.policy.witness_public_keys(),
+            b.policy.witness_public_keys()
+        );
+        let a_store = a.store(&trusted_temp_path(directory, "namespace-a-operator.sqlite"));
+        let b_store = b.store(&trusted_temp_path(directory, "namespace-b-operator.sqlite"));
+        let a_checkpoint = a_store
+            .append_event(&a.genesis(), &a.operator)
+            .test_unwrap();
+        let b_checkpoint = b_store
+            .append_event(&b.genesis(), &b.operator)
+            .test_unwrap();
+        let a_witnesses = [
+            a.witness(&trusted_temp_path(directory, "namespace-a-peer1.sqlite"), 0),
+            a.witness(&trusted_temp_path(directory, "namespace-a-peer2.sqlite"), 1),
+        ];
+        let b_witnesses = [
+            b.witness(&trusted_temp_path(directory, "namespace-b-peer1.sqlite"), 0),
+            b.witness(&trusted_temp_path(directory, "namespace-b-peer2.sqlite"), 1),
+        ];
+        witness_checkpoint(&a_store, &a_checkpoint, &[&a_witnesses[0], &a_witnesses[1]]);
+        witness_checkpoint(&b_store, &b_checkpoint, &[&b_witnesses[0], &b_witnesses[1]]);
+        Self {
+            a,
+            a_head: a_store
+                .load_checkpoints()
+                .test_unwrap()
+                .pop()
+                .test_unwrap()
+                .checkpoint,
+            b_head: b_store
+                .load_checkpoints()
+                .test_unwrap()
+                .pop()
+                .test_unwrap()
+                .checkpoint,
+            b_response: b_store.synchronization_response(None).test_unwrap(),
+            b_gossip: b_witnesses[1]
+                .gossip_for_sequence(0)
+                .test_unwrap()
+                .test_unwrap(),
+            a_store,
+        }
+    }
+
+    fn witness(&self, directory: &tempfile::TempDir) -> SqliteKeyLogWitness {
+        let witness = self.a.witness(
+            &trusted_temp_path(directory, "namespace-target-witness.sqlite"),
+            0,
+        );
+        witness
+            .sign_candidate(
+                &self.a_head,
+                &self.a_store.synchronization_response(None).test_unwrap(),
+            )
+            .test_unwrap();
+        witness
+    }
+
+    fn verifier(&self, directory: &tempfile::TempDir) -> SqlitePinnedKeyLogVerifier {
+        let verifier = SqlitePinnedKeyLogVerifier::provision(
+            trusted_temp_path(directory, "namespace-target-verifier.sqlite"),
+            self.a.policy.clone(),
+            Arc::new(FixedClock(5_000)),
+        )
+        .test_unwrap();
+        verifier
+            .apply_sync(&self.a_store.synchronization_response(None).test_unwrap())
+            .test_unwrap();
+        verifier
+    }
+
+    fn retain_foreign_archive(&self, path: &Path, gossip_table: &str, conflict_table: &str) {
+        let connection = rusqlite::Connection::open(path).test_unwrap();
+        connection.execute(
+            &format!("INSERT INTO {gossip_table} (checkpoint_hash, witness_id, checkpoint_sequence, tree_size, canonical_gossip) VALUES (?1, ?2, 0, 1, ?3)"),
+            rusqlite::params![self.b_gossip.checkpoint.checkpoint_hash().test_unwrap().to_string(), self.b_gossip.witness_signature.witness_id.as_str(), chio_core_types::canonical_json_bytes(&self.b_gossip).test_unwrap()],
+        ).test_unwrap();
+        let false_conflict = chio_keyring::CheckpointEquivocationEvidence {
+            schema: chio_keyring::CHECKPOINT_EQUIVOCATION_SCHEMA.to_string(),
+            kind: chio_keyring::CheckpointConflictKind::CheckpointSequence,
+            first: self.a_head.clone(),
+            conflicting: self.b_head.clone(),
+            detected_at: 5_000,
+        };
+        connection.execute(
+            &format!("INSERT INTO {conflict_table} (conflict_hash, canonical_evidence) VALUES (?1, ?2)"),
+            rusqlite::params![false_conflict.evidence_hash().test_unwrap().to_string(), chio_core_types::canonical_json_bytes(&false_conflict).test_unwrap()],
+        ).test_unwrap();
+    }
+
+    fn assert_foreign_archive_preserved(
+        &self,
+        path: &Path,
+        gossip_table: &str,
+        conflict_table: &str,
+    ) {
+        let connection = rusqlite::Connection::open(path).test_unwrap();
+        let canonical: Vec<u8> = connection
+            .query_row(
+                &format!("SELECT canonical_gossip FROM {gossip_table}"),
+                [],
+                |row| row.get(0),
+            )
+            .test_unwrap();
+        assert_eq!(
+            canonical,
+            chio_core_types::canonical_json_bytes(&self.b_gossip).test_unwrap()
+        );
+        let count: i64 = connection
+            .query_row(
+                &format!("SELECT COUNT(*) FROM {conflict_table}"),
+                [],
+                |row| row.get(0),
+            )
+            .test_unwrap();
+        assert_eq!(count, 1);
+    }
+}
+
+#[test]
+fn review_namespace_witness_rejects_foreign_gossip_before_retention() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let witness = fixture.witness(&directory);
+    let pin = witness.pin().test_unwrap();
+    assert!(matches!(
+        witness.import_gossip(&fixture.b_gossip),
+        Err(KeyringError::IdentityMismatch)
+    ));
+    assert!(witness.gossip_observations().test_unwrap().is_empty());
+    assert!(witness.conflicts().test_unwrap().is_empty());
+    assert_eq!(witness.pin().test_unwrap(), pin);
+    witness
+        .sign_candidate(
+            &fixture.a_head,
+            &fixture.a_store.synchronization_response(None).test_unwrap(),
+        )
+        .test_unwrap();
+}
+
+#[test]
+fn review_namespace_witness_rejects_foreign_candidate_before_conflict() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let witness = fixture.witness(&directory);
+    let pin = witness.pin().test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&fixture.b_head, &fixture.b_response),
+        Err(KeyringError::IdentityMismatch)
+    ));
+    assert!(witness.conflicts().test_unwrap().is_empty());
+    assert_eq!(witness.pin().test_unwrap(), pin);
+}
+
+#[test]
+fn review_namespace_witness_rejects_foreign_response_before_conflict() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let witness = fixture.witness(&directory);
+    let pin = witness.pin().test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&fixture.a_head, &fixture.b_response),
+        Err(KeyringError::IdentityMismatch)
+    ));
+    assert!(witness.conflicts().test_unwrap().is_empty());
+    assert_eq!(witness.pin().test_unwrap(), pin);
+}
+
+#[test]
+fn review_namespace_witness_reopens_with_foreign_archive_without_poison() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let witness = fixture.witness(&directory);
+    let pin = witness.pin().test_unwrap();
+    drop(witness);
+    let path = trusted_temp_path(&directory, "namespace-target-witness.sqlite");
+    fixture.retain_foreign_archive(&path, "witness_gossip", "witness_conflicts");
+    let reopened = SqliteKeyLogWitness::open(
+        &path,
+        fixture.a.policy.clone(),
+        WitnessId::new("witness.a").test_unwrap(),
+        Box::new(fixture.a.witnesses[0].clone()),
+        Arc::new(FixedClock(5_000)),
+    );
+    assert!(
+        reopened.is_ok(),
+        "foreign archive prevented the local log from reopening"
+    );
+    let reopened = reopened.test_unwrap();
+    assert_eq!(reopened.pin().test_unwrap(), pin);
+    assert!(reopened.gossip_observations().test_unwrap().is_empty());
+    assert!(reopened
+        .service_gossip_observations()
+        .test_unwrap()
+        .iter()
+        .all(|g| g.checkpoint.body.log_id == *fixture.a.policy.log_id()));
+    assert!(reopened.conflicts().test_unwrap().is_empty());
+    reopened
+        .sign_candidate(
+            &fixture.a_head,
+            &fixture.a_store.synchronization_response(None).test_unwrap(),
+        )
+        .test_unwrap();
+    fixture.assert_foreign_archive_preserved(&path, "witness_gossip", "witness_conflicts");
+}
+
+#[test]
+fn review_namespace_verifier_rejects_foreign_gossip_before_retention() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let verifier = fixture.verifier(&directory);
+    let pin = verifier.pin().test_unwrap();
+    assert!(matches!(
+        verifier.import_gossip(&fixture.b_gossip),
+        Err(KeyringError::IdentityMismatch)
+    ));
+    assert!(verifier.gossip_observations().test_unwrap().is_empty());
+    assert!(verifier.conflicts().test_unwrap().is_empty());
+    assert_eq!(verifier.pin().test_unwrap(), pin);
+}
+
+#[test]
+fn review_namespace_verifier_rejects_foreign_response_before_conflict() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let verifier = fixture.verifier(&directory);
+    let pin = verifier.pin().test_unwrap();
+    assert!(matches!(
+        verifier.apply_sync(&fixture.b_response),
+        Err(KeyringError::IdentityMismatch)
+    ));
+    assert!(verifier.conflicts().test_unwrap().is_empty());
+    assert_eq!(verifier.pin().test_unwrap(), pin);
+}
+
+#[test]
+fn review_namespace_verifier_reopens_with_foreign_archive_without_poison() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let verifier = fixture.verifier(&directory);
+    let pin = verifier.pin().test_unwrap();
+    drop(verifier);
+    let path = trusted_temp_path(&directory, "namespace-target-verifier.sqlite");
+    fixture.retain_foreign_archive(&path, "verifier_gossip", "verifier_conflicts");
+    let reopened = SqlitePinnedKeyLogVerifier::open(
+        &path,
+        fixture.a.policy.clone(),
+        Arc::new(FixedClock(5_000)),
+    )
+    .test_unwrap();
+    assert_eq!(reopened.pin().test_unwrap(), pin);
+    assert!(reopened.gossip_observations().test_unwrap().is_empty());
+    assert!(reopened.conflicts().test_unwrap().is_empty());
+    fixture.assert_foreign_archive_preserved(&path, "verifier_gossip", "verifier_conflicts");
+}
+
+#[test]
+fn review_namespace_verifier_foreign_first_row_does_not_hide_local_fork() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let verifier = fixture.verifier(&directory);
+    let pin = verifier.pin().test_unwrap();
+    let local_fork = (1..=100)
+        .map(|offset| {
+            let mut body = fixture.a_head.body.clone();
+            body.issued_at += offset;
+            SignedKeyLogCheckpoint::sign(body, &fixture.a.operator).test_unwrap()
+        })
+        .max_by_key(|checkpoint| checkpoint.checkpoint_hash().test_unwrap().to_string())
+        .test_unwrap();
+    let foreign = (1..=100)
+        .map(|offset| {
+            let mut body = fixture.b_head.body.clone();
+            body.issued_at += offset;
+            SignedKeyLogCheckpoint::sign(body, &fixture.a.operator).test_unwrap()
+        })
+        .min_by_key(|checkpoint| checkpoint.checkpoint_hash().test_unwrap().to_string())
+        .test_unwrap();
+    assert!(
+        foreign.checkpoint_hash().test_unwrap().to_string()
+            < local_fork.checkpoint_hash().test_unwrap().to_string()
+    );
+    let path = trusted_temp_path(&directory, "namespace-target-verifier.sqlite");
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    for checkpoint in [&foreign, &local_fork] {
+        let gossip = CheckpointGossip {
+            checkpoint: checkpoint.clone(),
+            witness_signature: WitnessSignature::sign(
+                checkpoint,
+                WitnessId::new("witness.b").test_unwrap(),
+                &fixture.a.witnesses[1],
+            )
+            .test_unwrap(),
+        };
+        connection.execute(
+            "INSERT INTO verifier_gossip (checkpoint_hash, witness_id, checkpoint_sequence, tree_size, canonical_gossip) VALUES (?1, 'witness.b', 0, 1, ?2)",
+            rusqlite::params![checkpoint.checkpoint_hash().test_unwrap().to_string(), chio_core_types::canonical_json_bytes(&gossip).test_unwrap()],
+        ).test_unwrap();
+    }
+    drop(connection);
+    let response = fixture.a_store.synchronization_response(None).test_unwrap();
+    assert!(matches!(
+        verifier.apply_sync(&response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    let conflicts = verifier.conflicts().test_unwrap();
+    assert_eq!(conflicts.len(), 1);
+    assert_eq!(conflicts[0].first.body.log_id, *fixture.a.policy.log_id());
+    assert_eq!(
+        conflicts[0].conflicting.body.log_id,
+        *fixture.a.policy.log_id()
+    );
+    let evidence_pair = std::collections::BTreeSet::from([
+        conflicts[0]
+            .first
+            .checkpoint_hash()
+            .test_unwrap()
+            .to_string(),
+        conflicts[0]
+            .conflicting
+            .checkpoint_hash()
+            .test_unwrap()
+            .to_string(),
+    ]);
+    assert_eq!(
+        evidence_pair,
+        std::collections::BTreeSet::from([
+            fixture.a_head.checkpoint_hash().test_unwrap().to_string(),
+            local_fork.checkpoint_hash().test_unwrap().to_string(),
+        ])
+    );
+    assert_eq!(verifier.pin().test_unwrap(), pin);
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    let retained: i64 = connection
+        .query_row("SELECT COUNT(*) FROM verifier_gossip", [], |row| row.get(0))
+        .test_unwrap();
+    assert_eq!(retained, 2);
+}
+
+#[test]
+fn review_namespace_verifier_reopen_refuses_retained_local_fork() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = NamespaceFixture::new(&directory);
+    let verifier = fixture.verifier(&directory);
+    drop(verifier);
+    let path = trusted_temp_path(&directory, "namespace-target-verifier.sqlite");
+    let mut body = fixture.a_head.body.clone();
+    body.issued_at += 1;
+    let fork = SignedKeyLogCheckpoint::sign(body, &fixture.a.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.a.witnesses[1],
+        )
+        .test_unwrap(),
+        checkpoint: fork,
+    };
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    connection.execute(
+        "INSERT INTO verifier_gossip (checkpoint_hash, witness_id, checkpoint_sequence, tree_size, canonical_gossip) VALUES (?1, 'witness.b', 0, 1, ?2)",
+        rusqlite::params![gossip.checkpoint.checkpoint_hash().test_unwrap().to_string(), chio_core_types::canonical_json_bytes(&gossip).test_unwrap()],
+    ).test_unwrap();
+    drop(connection);
+    let reopened = SqlitePinnedKeyLogVerifier::open(
+        &path,
+        fixture.a.policy.clone(),
+        Arc::new(FixedClock(5_000)),
+    );
+    assert!(
+        matches!(reopened, Err(KeyringError::EquivocationDetected)),
+        "retained local split view was ignored at startup"
+    );
+    let connection = rusqlite::Connection::open(&path).test_unwrap();
+    let retained: i64 = connection
+        .query_row("SELECT COUNT(*) FROM verifier_gossip", [], |row| row.get(0))
+        .test_unwrap();
+    assert_eq!(retained, 1);
 }

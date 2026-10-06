@@ -264,6 +264,99 @@ fn production_store_emits_pending_and_active_enterprise_receipts_atomically() {
 }
 
 #[test]
+fn review_activated_checkpoint_preserves_committed_witness_set_after_late_signature() {
+    let directory = private_tempdir().test_unwrap();
+    let path = trusted_temp_path(&directory, "late-enterprise-witness.sqlite");
+    let fixture = Fixture::new();
+    let policy = fixture.policy();
+    let store = SqliteKeyLogStore::open_with_clock(
+        &path,
+        policy.clone(),
+        SigningTopology::LocalSingleWriter,
+        Arc::new(FixedClock(3_000)),
+    )
+    .test_unwrap();
+    let genesis = fixture.genesis();
+    store
+        .append_event(&genesis, &fixture.operator)
+        .test_unwrap();
+    let rotation = fixture.rotation(&genesis, &backend(3));
+    let checkpoint = store
+        .append_event(&rotation, &fixture.operator)
+        .test_unwrap();
+    let hash = checkpoint.checkpoint_hash().test_unwrap();
+    for (id, backend) in [
+        ("witness.a", &fixture.witness_a),
+        ("witness.b", &fixture.witness_b),
+    ] {
+        let signature =
+            WitnessSignature::sign(&checkpoint, WitnessId::new(id).test_unwrap(), backend)
+                .test_unwrap();
+        store
+            .store_witness_signature(&hash, &signature)
+            .test_unwrap();
+    }
+    store
+        .activate_rotation(&rotation.body.event_id, &hash, &fixture.operator)
+        .test_unwrap();
+    let committed = store
+        .synchronization_response(None)
+        .test_unwrap()
+        .activation_commits;
+    let receipts = store.load_enterprise_receipts().test_unwrap();
+    let late = WitnessSignature::sign(
+        &checkpoint,
+        WitnessId::new("witness.c").test_unwrap(),
+        &fixture.witness_c,
+    )
+    .test_unwrap();
+    let stored = store.store_witness_signature(&hash, &late).test_unwrap();
+    assert_eq!(
+        stored.checkpoint.witness_signatures,
+        committed[0].body.witness_signatures
+    );
+
+    let mut forged = late;
+    forged.signature = fixture
+        .witness_a
+        .sign_bytes(b"not a witness statement")
+        .test_unwrap();
+    assert!(store.store_witness_signature(&hash, &forged).is_err());
+    assert_eq!(store.load_enterprise_receipts().test_unwrap(), receipts);
+    assert_eq!(
+        store
+            .synchronization_response(None)
+            .test_unwrap()
+            .activation_commits,
+        committed
+    );
+    assert_eq!(
+        store
+            .activate_rotation(&rotation.body.event_id, &hash, &fixture.operator)
+            .test_unwrap()
+            .signing_epoch(),
+        1
+    );
+    drop(store);
+
+    let reopened = SqliteKeyLogStore::open_with_clock(
+        &path,
+        policy,
+        SigningTopology::LocalSingleWriter,
+        Arc::new(FixedClock(3_000)),
+    )
+    .test_unwrap();
+    assert_eq!(reopened.load_enterprise_receipts().test_unwrap(), receipts);
+    assert_eq!(
+        reopened
+            .synchronization_response(None)
+            .test_unwrap()
+            .activation_commits,
+        committed
+    );
+}
+
+#[test]
 fn enterprise_receipt_is_canonical_secret_free_and_rejects_every_leaf_tamper() {
     let directory = private_tempdir().test_unwrap();
     let path = trusted_temp_path(&directory, "enterprise-receipt-tamper.sqlite");
@@ -403,4 +496,58 @@ fn mutate_scalar(value: &Value) -> Value {
             Value::Bool(true),
         )])),
     }
+}
+
+#[test]
+fn late_witness_signature_on_an_activated_checkpoint_keeps_the_store_openable() {
+    let directory = private_tempdir().test_unwrap();
+    let path = trusted_temp_path(&directory, "late-witness.sqlite");
+    let fixture = Fixture::new();
+    let policy = fixture.policy();
+    let store = SqliteKeyLogStore::open_with_clock(
+        &path,
+        policy.clone(),
+        SigningTopology::LocalSingleWriter,
+        Arc::new(FixedClock(3_000)),
+    )
+    .test_unwrap();
+    let genesis = fixture.genesis();
+    let rotation = fixture.rotation(&genesis, &backend(3));
+    store
+        .append_event(&genesis, &fixture.operator)
+        .test_unwrap();
+    let rotation_checkpoint = store
+        .append_event(&rotation, &fixture.operator)
+        .test_unwrap();
+    let checkpoint_hash = rotation_checkpoint.checkpoint_hash().test_unwrap();
+    let sign = |witness_id: &str, witness: &Ed25519Backend| {
+        WitnessSignature::sign(
+            &rotation_checkpoint,
+            WitnessId::new(witness_id).test_unwrap(),
+            witness,
+        )
+        .test_unwrap()
+    };
+    for (witness_id, witness) in [
+        ("witness.a", &fixture.witness_a),
+        ("witness.b", &fixture.witness_b),
+    ] {
+        store
+            .store_witness_signature(&checkpoint_hash, &sign(witness_id, witness))
+            .test_unwrap();
+    }
+    store
+        .activate_rotation(&rotation.body.event_id, &checkpoint_hash, &fixture.operator)
+        .test_unwrap();
+    let receipts = store.load_enterprise_receipts().test_unwrap();
+
+    let late = store
+        .store_witness_signature(&checkpoint_hash, &sign("witness.c", &fixture.witness_c))
+        .test_unwrap();
+    assert_eq!(late.checkpoint.witness_signatures.len(), 2);
+    assert_eq!(store.load_enterprise_receipts().test_unwrap(), receipts);
+
+    drop(store);
+    let reopened = SqliteKeyLogStore::open(&path, policy).test_unwrap();
+    assert_eq!(reopened.load_enterprise_receipts().test_unwrap(), receipts);
 }

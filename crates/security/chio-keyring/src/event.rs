@@ -400,10 +400,10 @@ impl KeyLogAuthorizations {
             && self.recovery.is_empty()
     }
 
-    fn is_recovery_only(&self) -> bool {
+    fn is_recovery_authorized(&self, requires_new_key_proof: bool) -> bool {
         self.bootstrap.is_none()
             && self.old_key.is_none()
-            && self.new_key.is_none()
+            && self.new_key.is_some() == requires_new_key_proof
             && !self.recovery.is_empty()
     }
 }
@@ -555,6 +555,9 @@ impl SignedKeyLogEvent {
         if self.body.public_key.algorithm() != self.body.algorithm {
             return Err(KeyringError::AlgorithmMismatch);
         }
+        if self.body.public_key.is_weak_ed25519() {
+            return Err(KeyringError::WeakKey);
+        }
         if derive_key_id(self.body.algorithm, &self.body.public_key)? != self.body.key_id {
             return Err(KeyringError::KeyIdMismatch);
         }
@@ -678,7 +681,11 @@ impl SignedKeyLogEvent {
         recovery_keys: &BTreeMap<RecoveryAuthorizerId, PublicKey>,
         threshold: usize,
     ) -> Result<()> {
-        if !self.authorizations.is_recovery_only()
+        let requires_new_key_proof =
+            matches!(&self.body.operation, KeyLogOperation::Recover { .. });
+        if !self
+            .authorizations
+            .is_recovery_authorized(requires_new_key_proof)
             || threshold == 0
             || threshold > recovery_keys.len()
             || self.authorizations.recovery.len() > recovery_keys.len()
@@ -710,6 +717,20 @@ impl SignedKeyLogEvent {
         if verified.len() < threshold {
             return Err(KeyringError::InvalidSignature);
         }
+        if requires_new_key_proof {
+            let proof = self
+                .authorizations
+                .new_key
+                .as_ref()
+                .ok_or(KeyringError::InvalidAuthorizationSet)?;
+            verify_key_authorization(
+                &self.body.public_key,
+                proof.key_id,
+                proof.algorithm,
+                &proof.signature,
+                &bytes,
+            )?;
+        }
         Ok(())
     }
 }
@@ -736,7 +757,7 @@ fn verify_signature(
     if key.algorithm() != algorithm || signature.algorithm() != algorithm {
         return Err(KeyringError::AlgorithmMismatch);
     }
-    if !key.verify(bytes, signature) {
+    if !key.verify_strict(bytes, signature) {
         return Err(KeyringError::InvalidSignature);
     }
     Ok(())

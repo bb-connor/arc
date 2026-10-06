@@ -3,7 +3,7 @@ use chio_test_support::prelude::*;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chio_core_types::{sha256, Ed25519Backend, Keypair, MerkleTree, SigningBackend};
+use chio_core_types::{sha256, Ed25519Backend, Keypair, MerkleTree, PublicKey, SigningBackend};
 use chio_keyring::{
     derive_key_id, AnchorId, ArtifactTimeAnchorBody, ArtifactTimeAnchorKind, ArtifactTimeEvidence,
     AuthorityId, BootstrapAuthorization, EventId, EventReason, KeyActivationCommitBody,
@@ -19,6 +19,8 @@ use chio_keyring::{
 fn backend(seed: u8) -> Ed25519Backend {
     Ed25519Backend::new(Keypair::from_seed(&[seed; 32]))
 }
+
+mod support;
 
 struct FixedClock(u64);
 
@@ -63,8 +65,8 @@ impl Fixture {
         }
     }
 
-    fn policy_without_auditors(&self) -> KeyLogPolicy {
-        KeyLogPolicy::new(KeyLogPolicyConfig {
+    fn policy_config(&self) -> KeyLogPolicyConfig {
+        KeyLogPolicyConfig {
             log_id: LogId::new("log.enterprise.test").test_unwrap(),
             authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
             bootstrap_key: self.bootstrap.public_key(),
@@ -97,13 +99,17 @@ impl Fixture {
             ]),
             recovery_threshold: 2,
             max_checkpoint_future_skew: 100,
-        })
-        .test_unwrap()
-        .with_artifact_time_roots(BTreeMap::from([(
-            AnchorId::new("timestamp.service.v1").test_unwrap(),
-            backend(70).public_key(),
-        )]))
-        .test_unwrap()
+        }
+    }
+
+    fn policy_without_auditors(&self) -> KeyLogPolicy {
+        KeyLogPolicy::new(self.policy_config())
+            .test_unwrap()
+            .with_artifact_time_roots(BTreeMap::from([(
+                AnchorId::new("timestamp.service.v1").test_unwrap(),
+                backend(70).public_key(),
+            )]))
+            .test_unwrap()
     }
 
     fn auditor_public_keys(&self) -> BTreeMap<String, chio_core_types::PublicKey> {
@@ -761,7 +767,7 @@ fn abort_retire_and_revoke_are_immutable_events() {
 }
 
 #[test]
-fn recovery_requires_distinct_threshold_authorizers_and_witnessed_activation() {
+fn review_recovery_requires_new_key_proof_and_distinct_threshold_authorizers() {
     let fixture = Fixture::new();
     let policy = fixture.policy();
     let genesis = fixture.genesis();
@@ -788,7 +794,7 @@ fn recovery_requires_distinct_threshold_authorizers_and_witnessed_activation() {
         reason: Some(EventReason::new("threshold recovery").test_unwrap()),
         issued_at: 2_000,
     };
-    let recovery = SignedKeyLogEvent {
+    let mut recovery = SignedKeyLogEvent {
         authorizations: KeyLogAuthorizations::recovery(vec![
             RecoveryAuthorization::sign(
                 &body,
@@ -805,6 +811,39 @@ fn recovery_requires_distinct_threshold_authorizers_and_witnessed_activation() {
         ]),
         body,
     };
+    // Historical envelopes keep their existing wire shape and remain
+    // decodable. Decoding cannot grant fresh key authority without possession.
+    let decoded = SignedKeyLogEvent::from_canonical_envelope_bytes(
+        &recovery.canonical_envelope_bytes().test_unwrap(),
+    )
+    .test_unwrap();
+    assert_eq!(decoded, recovery);
+    let directory = support::private_tempdir().test_unwrap();
+    let store = chio_keyring::SqliteKeyLogStore::open_with_clock(
+        support::trusted_temp_path(&directory, "recovery-possession.sqlite"),
+        policy.clone(),
+        chio_keyring::SigningTopology::LocalSingleWriter,
+        Arc::new(FixedClock(5_000)),
+    )
+    .test_unwrap();
+    store
+        .append_event(&genesis, &fixture.operator)
+        .test_unwrap();
+    let fresh_rejected = store.append_event(&decoded, &fixture.operator).is_err();
+    let unproven_history = fixture.history(&[&genesis, &recovery], None);
+    assert!(
+        fresh_rejected,
+        "fresh append accepted recovery without possession"
+    );
+    assert!(
+        KeyLogState::replay([&genesis, &recovery], &unproven_history, &policy).is_err(),
+        "recovery quorum activated a key without proof of possession"
+    );
+    recovery.authorizations.new_key =
+        Some(NewKeyProofOfPossession::sign(&recovery.body, &recovered).test_unwrap());
+    store
+        .append_event(&recovery, &fixture.operator)
+        .test_unwrap();
     let history = fixture.history(&[&genesis, &recovery], Some(1));
     let state = KeyLogState::replay([&genesis, &recovery], &history, &policy).test_unwrap();
     assert_eq!(
@@ -816,11 +855,70 @@ fn recovery_requires_distinct_threshold_authorizers_and_witnessed_activation() {
         KeyStatus::Revoked
     );
 
+    let mut wrong_proof = recovery.clone();
+    wrong_proof.authorizations.new_key =
+        Some(NewKeyProofOfPossession::sign(&wrong_proof.body, &fixture.new).test_unwrap());
+    let wrong_proof_history = fixture.history(&[&genesis, &wrong_proof], None);
+    assert!(KeyLogState::replay([&genesis, &wrong_proof], &wrong_proof_history, &policy).is_err());
+
     let mut oversized = recovery;
     oversized.authorizations.recovery =
         vec![oversized.authorizations.recovery[0].clone(); MAX_RECOVERY_AUTHORIZATIONS + 1];
     let oversized_history = fixture.history(&[&genesis, &oversized], None);
     assert!(KeyLogState::replay([&genesis, &oversized], &oversized_history, &policy).is_err());
+}
+
+#[test]
+fn review_policy_rejects_weak_identity_keys_in_every_primary_role() {
+    let fixture = Fixture::new();
+    let mut bytes = [0_u8; 32];
+    bytes[0] = 1;
+    let weak = PublicKey::from_bytes(&bytes).test_unwrap();
+    let mut configurations = std::array::from_fn::<_, 4, _>(|_| fixture.policy_config());
+    configurations[0].bootstrap_key = weak.clone();
+    configurations[1].operator_key = weak.clone();
+    configurations[2]
+        .witness_keys
+        .insert(WitnessId::new("witness.a").test_unwrap(), weak.clone());
+    configurations[3]
+        .recovery_keys
+        .insert(RecoveryAuthorizerId::new("recovery.a").test_unwrap(), weak);
+    let outcomes = ["bootstrap", "operator", "witness", "recovery"]
+        .into_iter()
+        .zip(configurations)
+        .map(|(role, config)| (role, KeyLogPolicy::new(config).is_err()))
+        .collect::<Vec<_>>();
+    assert!(
+        outcomes.iter().all(|(_, rejected)| *rejected),
+        "{outcomes:?}"
+    );
+}
+
+#[test]
+fn review_policy_rejects_weak_artifact_time_and_auditor_roots() {
+    let fixture = Fixture::new();
+    let mut bytes = [0_u8; 32];
+    bytes[0] = 1;
+    let weak = PublicKey::from_bytes(&bytes).test_unwrap();
+    let policy = KeyLogPolicy::new(fixture.policy_config()).test_unwrap();
+    let artifact_time_rejected = policy
+        .clone()
+        .with_artifact_time_roots(BTreeMap::from([(
+            AnchorId::new("timestamp.weak").test_unwrap(),
+            weak.clone(),
+        )]))
+        .is_err();
+    let auditor_rejected = policy
+        .with_auditor_roots(BTreeMap::from([
+            ("audit.a".to_string(), weak),
+            ("audit.b".to_string(), backend(81).public_key()),
+        ]))
+        .is_err();
+    assert!(
+        artifact_time_rejected,
+        "weak artifact time root was accepted"
+    );
+    assert!(auditor_rejected, "weak auditor root was accepted");
 }
 
 #[test]
@@ -924,4 +1022,32 @@ fn complete_history_and_replay_reject_malformed_sequences_and_role_key_overlap()
     assert!(first
         .key(&derive_key_id(backend(99).algorithm(), &backend(99).public_key()).test_unwrap())
         .is_err());
+}
+
+#[test]
+fn policy_rejects_a_small_order_role_key() {
+    let fixture = Fixture::new();
+    let identity = chio_core_types::PublicKey::from_hex(
+        "0100000000000000000000000000000000000000000000000000000000000000",
+    )
+    .test_unwrap();
+    let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
+        log_id: LogId::new("log.enterprise.test").test_unwrap(),
+        authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
+        bootstrap_key: fixture.bootstrap.public_key(),
+        operator_key: fixture.operator.public_key(),
+        witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
+        witness_keys: BTreeMap::from([
+            (
+                WitnessId::new("witness.a").test_unwrap(),
+                fixture.witness_a.public_key(),
+            ),
+            (WitnessId::new("witness.weak").test_unwrap(), identity),
+        ]),
+        recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.v1").test_unwrap(),
+        recovery_keys: BTreeMap::new(),
+        recovery_threshold: 0,
+        max_checkpoint_future_skew: 100,
+    });
+    assert!(matches!(policy, Err(chio_keyring::KeyringError::WeakKey)));
 }

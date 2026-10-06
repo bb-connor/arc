@@ -2,14 +2,49 @@ use chio_test_support::prelude::*;
 
 use std::collections::BTreeMap;
 
-use chio_core_types::{sha256, Ed25519Backend, Keypair, SigningBackend};
+use chio_core_types::{sha256, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use chio_keyring::{
-    KeyLogCheckpointExpectation, LogId, SignedKeyLogCheckpoint, WitnessId, WitnessSignature,
-    KEY_LOG_CHECKPOINT_SCHEMA, MAX_WITNESS_SIGNATURES,
+    derive_key_id, KeyLogCheckpointExpectation, LogId, SignedKeyLogCheckpoint, WitnessId,
+    WitnessSignature, KEY_LOG_CHECKPOINT_SCHEMA, MAX_WITNESS_SIGNATURES,
 };
 
 fn backend(seed: u8) -> Ed25519Backend {
     Ed25519Backend::new(Keypair::from_seed(&[seed; 32]))
+}
+
+#[test]
+fn review_checkpoint_rejects_universal_operator_and_witness_signatures() {
+    let mut bytes = [0_u8; 32];
+    bytes[0] = 1;
+    let weak = PublicKey::from_bytes(&bytes).test_unwrap();
+    let mut signature_bytes = [0x66_u8; 64];
+    signature_bytes[0] = 0x58;
+    signature_bytes[32..].fill(0);
+    signature_bytes[32] = 1;
+    let signature = Signature::from_bytes(&signature_bytes);
+    let mut signed = checkpoint(&backend(10));
+    signed.operator_key_id = derive_key_id(weak.algorithm(), &weak).test_unwrap();
+    signed.operator_signature = signature.clone();
+    let operator_rejected = signed.verify_operator(&weak).is_err();
+    let witness = WitnessSignature {
+        witness_id: WitnessId::new("witness.weak").test_unwrap(),
+        algorithm: weak.algorithm(),
+        signature,
+    };
+    let witness_rejected = witness.verify(&signed, &weak).is_err();
+    signed.witness_signatures = vec![witness];
+    let quorum_rejected = signed
+        .verify_witnesses(&BTreeMap::from([(
+            WitnessId::new("witness.weak").test_unwrap(),
+            weak,
+        )]))
+        .is_err();
+    assert!(
+        operator_rejected,
+        "universal operator signature was accepted"
+    );
+    assert!(witness_rejected, "universal witness signature was accepted");
+    assert!(quorum_rejected, "weak witness reached quorum");
 }
 
 #[test]

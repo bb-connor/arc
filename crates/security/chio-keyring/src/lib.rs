@@ -15,9 +15,12 @@
 //! Authority key transparency with immutable events and transactional replay.
 
 mod checkpoint;
+#[cfg(any(target_vendor = "apple", test))]
+mod darwin_acl;
 mod enterprise_receipt;
 mod error;
 mod event;
+mod gossip;
 mod ipc;
 mod router;
 mod runtime;
@@ -539,74 +542,7 @@ fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
 
 #[cfg(target_vendor = "apple")]
 fn trusted_file_has_extended_acl(file: &std::fs::File) -> Result<bool> {
-    use std::os::fd::AsRawFd;
-
-    type Acl = *mut std::ffi::c_void;
-    unsafe extern "C" {
-        fn acl_get_fd_np(fd: std::os::raw::c_int, acl_type: std::os::raw::c_int) -> Acl;
-        fn acl_get_entry(
-            acl: Acl,
-            entry_id: std::os::raw::c_int,
-            entry: *mut *mut std::ffi::c_void,
-        ) -> std::os::raw::c_int;
-        fn acl_get_tag_type(
-            entry: *mut std::ffi::c_void,
-            tag_type: *mut std::os::raw::c_int,
-        ) -> std::os::raw::c_int;
-        fn acl_free(value: *mut std::ffi::c_void) -> std::os::raw::c_int;
-    }
-
-    const ACL_TYPE_EXTENDED: std::os::raw::c_int = 0x100;
-    const ACL_FIRST_ENTRY: std::os::raw::c_int = 0;
-    const ACL_NEXT_ENTRY: std::os::raw::c_int = -1;
-    // SAFETY: `file` owns a valid descriptor and ACL_TYPE_EXTENDED is the
-    // platform-defined ACL type. The returned allocation is released below.
-    let acl = unsafe { acl_get_fd_np(file.as_raw_fd(), ACL_TYPE_EXTENDED) };
-    if acl.is_null() {
-        let error = std::io::Error::last_os_error();
-        // Darwin reports ENOENT when a valid descriptor has no extended ACL
-        // object. Descriptor metadata was already read successfully, so this
-        // means that no additional ACL authority exists rather than that the
-        // file disappeared.
-        if error.kind() == std::io::ErrorKind::NotFound {
-            return Ok(false);
-        }
-        return Err(KeyringError::Io(error));
-    }
-    let mut entry = std::ptr::null_mut();
-    // SAFETY: `acl` is a live ACL object and `entry` points to writable storage.
-    let mut entry_result = unsafe { acl_get_entry(acl, ACL_FIRST_ENTRY, &mut entry) };
-    let mut acl_error = None;
-    let mut grants_additional_authority = false;
-    while entry_result == 1 {
-        let mut tag_type = 0;
-        // SAFETY: `entry` was returned by `acl_get_entry` for the live ACL.
-        if unsafe { acl_get_tag_type(entry, &mut tag_type) } != 0 {
-            acl_error = Some(std::io::Error::last_os_error());
-            break;
-        }
-        // A deny-only entry cannot add authority. Any allow or unknown tag is
-        // rejected conservatively without trying to reproduce Darwin's ACL
-        // precedence rules.
-        if apple_acl_tag_grants_additional_authority(tag_type) {
-            grants_additional_authority = true;
-            break;
-        }
-        // SAFETY: `acl` remains live and `entry` points to writable storage.
-        entry_result = unsafe { acl_get_entry(acl, ACL_NEXT_ENTRY, &mut entry) };
-    }
-    if entry_result < 0 && acl_error.is_none() {
-        acl_error = Some(std::io::Error::last_os_error());
-    }
-    // SAFETY: `acl` was allocated by `acl_get_fd_np` and is freed exactly once.
-    let free_result = unsafe { acl_free(acl) };
-    if let Some(error) = acl_error {
-        return Err(KeyringError::Io(error));
-    }
-    if free_result != 0 {
-        return Err(KeyringError::Io(std::io::Error::last_os_error()));
-    }
-    Ok(grants_additional_authority)
+    darwin_acl::trusted_file_has_extended_acl(file)
 }
 
 /// Inspect a Darwin file descriptor's extended ACL without exposing the FFI

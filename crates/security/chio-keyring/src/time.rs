@@ -113,7 +113,7 @@ impl ArtifactTimeVerifier {
         if key.algorithm() != signed.algorithm
             || signed.signature.algorithm() != signed.algorithm
             || derive_key_id(key.algorithm(), key)? != signed.anchor_key_id
-            || !key.verify(
+            || !key.verify_strict(
                 &artifact_time_signing_bytes(&signed.body)?,
                 &signed.signature,
             )
