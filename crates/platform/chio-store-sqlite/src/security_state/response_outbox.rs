@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     attested_finding_response_outbox_is_one_to_one, body_hash, canonical_json_bytes, decode_digest,
     from_i64, load_attested_finding_batch_record, params, schema_object_definition_is_exact,

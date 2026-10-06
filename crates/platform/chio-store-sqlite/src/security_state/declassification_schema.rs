@@ -2,8 +2,6 @@
 // tenant-read-contract: security_declassification_receipt_outbox; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_declassification_evidence_identity; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_declassification_uses; class=tenant-predicate; principal=security-runtime
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     declassification, normalize_sql, params, sha256, sqlite_error, Connection, OptionalExtension,
     PortError, PortResult,

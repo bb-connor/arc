@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     append_verified_in_transaction, body_hash, canonical_json_bytes, canonical_request_hash,
     decode_digest, from_i64, load_event_identity, params, parse_trust_class, record_transition,

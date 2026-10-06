@@ -2,8 +2,6 @@
 // tenant-read-contract: security_correlation_outcomes; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_correlation_ingress; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_attested_finding_batches; class=tenant-predicate; principal=security-runtime
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     load_attested_finding_batch_record, params, schema_object_definition_is_exact, sqlite_error,
     table_definition_is_exact, AttestedFindingBatchKey, Connection, PortError, PortResult,

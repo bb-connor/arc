@@ -1,7 +1,5 @@
 #[cfg(test)]
 use super::declassification;
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     canonical_json_bytes, decode_digest, derive_declassification_event_id,
     derive_declassification_transition_id, from_i64, ActiveDefenseReceiptBody, CanonicalBody,

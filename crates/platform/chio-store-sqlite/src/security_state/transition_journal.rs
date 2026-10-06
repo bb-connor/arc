@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{params, sqlite_error, Connection, OptionalExtension, PortError, PortResult};
 
 pub(super) fn transition_status(

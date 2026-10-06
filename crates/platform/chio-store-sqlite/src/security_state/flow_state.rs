@@ -5,8 +5,6 @@
 //! imported participant or establish admission-operation custody. The native
 //! admission command currently exposes only monotone label joins.
 
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     canonical_request_hash, check_transition_replay, decode_label, encode_label, from_i64, params,
     participant_source, sqlite_error, to_i64, trusted_time_in_transaction, Clock,

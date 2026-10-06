@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     decode_digest, from_i64, params, sqlite_error, to_i64, ActionId, Connection, LeaseOwnerId,
     LineageFence, LineageFenceRelease, LineageFenceRenewal, LineageFenceRequest, LineageFenceStore,

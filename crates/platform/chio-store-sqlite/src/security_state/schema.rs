@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     ensure_attested_finding_batch_tenant_keys, ensure_attested_finding_response_outbox_schema,
     ensure_lineage_fence_binding_columns, ensure_response_dispatch_commit_mode_column,

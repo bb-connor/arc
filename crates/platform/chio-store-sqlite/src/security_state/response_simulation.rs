@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     capability_set_suspension, empty_egress_restriction_snapshot, issuance_freeze,
     load_egress_restriction_snapshot, load_overlay_snapshot, load_session_throttle_snapshot,

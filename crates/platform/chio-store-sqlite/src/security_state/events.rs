@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     canonical_request_hash, compare_and_swap_correlation_in_transaction, decode_digest, from_i64,
     index_partition_event_in_transaction, insert_correlation_outcome_record,

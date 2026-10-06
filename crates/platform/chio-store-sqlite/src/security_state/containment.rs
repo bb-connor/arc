@@ -1,5 +1,3 @@
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     body_hash, canonical_json_bytes, containment_installed_version_hash,
     containment_overlay_version_hash, containment_session_target, decode_digest,

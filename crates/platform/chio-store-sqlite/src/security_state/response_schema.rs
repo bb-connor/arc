@@ -1,6 +1,4 @@
 // tenant-read-contract: security_attested_finding_response_outbox; class=tenant-predicate; principal=security-runtime
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     from_i64, params, scheduler_lease_body_hash, schema_object_definition_is_exact, sqlite_error,
     table_definition_is_exact, table_has_foreign_key_violation, ActionId, BTreeSet, Connection,

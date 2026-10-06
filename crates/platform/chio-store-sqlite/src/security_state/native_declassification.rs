@@ -1,8 +1,6 @@
 //! Exact one-shot row images for declassification inside an owned egress commit.
 //! These are historical data checks, not permission to enable a SQLite writer.
 
-#[cfg(target_os = "macos")]
-use super::security_state_lifecycle_lock_path;
 use super::{
     declassification_retain_until_unix_ms, declassification_state_name,
     decode_declassification_receipt, derive_declassification_event_id,
