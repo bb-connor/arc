@@ -43,6 +43,30 @@ pub(crate) struct PreparedProviderRequest {
     pub(crate) secret_headers: Vec<SecretHeader>,
 }
 
+impl Drop for PreparedProviderRequest {
+    fn drop(&mut self) {
+        #[cfg(test)]
+        let populated = !self.caller.body.is_empty()
+            || self
+                .caller
+                .headers
+                .iter()
+                .any(|header| !header.value.is_empty());
+        crate::private_request_wire::zeroize_request_bytes(&mut self.caller);
+        #[cfg(test)]
+        crate::private_request_wire::observe_caller_drop(
+            crate::private_request_wire::CallerOwner::Provider,
+            populated,
+            self.caller.body.is_empty()
+                && self
+                    .caller
+                    .headers
+                    .iter()
+                    .all(|header| header.value.is_empty()),
+        );
+    }
+}
+
 impl fmt::Debug for PreparedProviderRequest {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter

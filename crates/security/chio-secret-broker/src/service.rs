@@ -242,8 +242,8 @@ pub use wire::{
 pub(crate) use wire::{
     canonical_json_byte_array_length, canonical_json_string_length, canonical_json_u64_length,
     checked_canonical_length, decode_canonical_ipc_request, read_frame_with_limit,
-    response_payload_limit, response_wire_limit, BoundedZeroizingByteArray, SensitiveJsonParser,
-    ZeroizingCanonicalJsonWriter,
+    response_payload_limit, response_wire_limit, BoundedZeroizingByteArray, BoundedZeroizingString,
+    SensitiveJsonParser, ZeroizingCanonicalJsonWriter,
 };
 #[cfg(test)]
 pub(crate) use wire::{reset_sensitive_drop_observer, sensitive_drop_observation};

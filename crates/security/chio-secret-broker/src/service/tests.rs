@@ -1558,3 +1558,10 @@ mod execute_cause_cases;
 mod execution_cases;
 mod ipc_audit_cases;
 mod recovery_cases;
+
+#[cfg(unix)]
+#[path = "tests/f053_legacy_custody_cases.rs"]
+mod f053_legacy_custody_cases;
+
+#[cfg(unix)]
+mod f053_codec_contract_cases;

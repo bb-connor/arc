@@ -49,6 +49,28 @@ pub(crate) struct PinnedHttpsRequest {
     redirects_allowed: bool,
 }
 
+impl Drop for PinnedHttpsRequest {
+    fn drop(&mut self) {
+        #[cfg(test)]
+        let populated = !self.body.is_empty()
+            || self
+                .caller_headers
+                .iter()
+                .any(|header| !header.value.is_empty());
+        crate::private_request_wire::zeroize_caller_bytes(&mut self.caller_headers, &mut self.body);
+        #[cfg(test)]
+        crate::private_request_wire::observe_caller_drop(
+            crate::private_request_wire::CallerOwner::Pinned,
+            populated,
+            self.body.is_empty()
+                && self
+                    .caller_headers
+                    .iter()
+                    .all(|header| header.value.is_empty()),
+        );
+    }
+}
+
 /// Secret-bearing, DNS-pinned request retained only inside brokerd between
 /// pre-dispatch preparation and the post-capture network boundary.
 pub(crate) struct PreparedHttpsDispatch {
@@ -224,7 +246,7 @@ impl GenericHttpsExecutor {
         credential: &SecretMaterial,
     ) -> Result<PreparedHttpsDispatch> {
         validate_request_before_secret_use(request, constraints)?;
-        let prepared = provider.prepare(request, constraints, credential)?;
+        let mut prepared = provider.prepare(request, constraints, credential)?;
         let pinned_address = self.resolve_and_pin(&prepared.caller.destination)?;
         let destination = &prepared.caller.destination;
         Ok(PreparedHttpsDispatch {
@@ -235,9 +257,9 @@ impl GenericHttpsExecutor {
                 port: destination.explicit_port,
                 method: destination.method.clone(),
                 path_and_query: destination.exact_path_and_query.clone(),
-                caller_headers: prepared.caller.headers.clone(),
-                secret_headers: prepared.secret_headers,
-                body: prepared.caller.body.clone(),
+                caller_headers: std::mem::take(&mut prepared.caller.headers),
+                secret_headers: std::mem::take(&mut prepared.secret_headers),
+                body: std::mem::take(&mut prepared.caller.body),
                 timeout_ms: prepared.caller.options.timeout_ms,
                 response_limit_bytes: prepared.caller.options.response_limit_bytes,
                 redirects_allowed: false,
@@ -255,7 +277,7 @@ impl GenericHttpsExecutor {
         reference: BrokerAuditReferenceRequest,
     ) -> Result<BrokerAuditWireComparison> {
         validate_request_before_secret_use(request, constraints)?;
-        let prepared = provider.prepare(request, constraints, credential)?;
+        let mut prepared = provider.prepare(request, constraints, credential)?;
         let destination = &prepared.caller.destination;
         let outbound = PinnedHttpsRequest {
             scheme: destination.scheme,
@@ -264,9 +286,9 @@ impl GenericHttpsExecutor {
             port: destination.explicit_port,
             method: destination.method.clone(),
             path_and_query: destination.exact_path_and_query.clone(),
-            caller_headers: prepared.caller.headers.clone(),
-            secret_headers: prepared.secret_headers,
-            body: prepared.caller.body.clone(),
+            caller_headers: std::mem::take(&mut prepared.caller.headers),
+            secret_headers: std::mem::take(&mut prepared.secret_headers),
+            body: std::mem::take(&mut prepared.caller.body),
             timeout_ms: prepared.caller.options.timeout_ms,
             response_limit_bytes: prepared.caller.options.response_limit_bytes,
             redirects_allowed: false,

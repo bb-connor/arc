@@ -148,6 +148,7 @@ fn main() -> ExitCode {
 fn error_code(error: &BrokerError) -> &'static str {
     match error {
         BrokerError::UntrustedInput(error) => error.code(),
+        BrokerError::AuditInput(_) => "urn:chio:error:attest:signed-json-invalid-shape",
         BrokerError::Clock(error) => error.code(),
         BrokerError::InvalidRequest(_) => "invalid_configuration",
         BrokerError::AuthorizationDenied(_)

@@ -55,6 +55,7 @@ mod adapter_cause_tests;
 mod adapter_error;
 mod backend;
 mod encrypted_blob_backend;
+mod private_request_wire;
 #[cfg(all(test, target_os = "linux"))]
 mod process_boundary_tests;
 
@@ -67,6 +68,8 @@ pub use encrypted_blob_backend::{
 pub enum BrokerError {
     #[error(transparent)]
     UntrustedInput(#[from] chio_core_types::canonical::UntrustedJsonError),
+    #[error("{0}")]
+    AuditInput(#[from] crate::privileged_audit::AuditInputError),
     #[error(transparent)]
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("broker request is invalid: {0}")]
@@ -124,6 +127,7 @@ impl BrokerError {
                 UntrustedJsonError::Canonicalization(_) => "signed_json_canonicalization",
                 UntrustedJsonError::NonCanonical => "signed_json_noncanonical",
             },
+            Self::AuditInput(_) => "signed_json_invalid_shape",
             Self::Clock(error) => match error {
                 ClockError::Unavailable => "clock_unavailable",
                 ClockError::BeforeEpoch => "clock_before_epoch",
@@ -152,6 +156,7 @@ impl BrokerError {
         let code = self.diagnostic_code().to_string();
         match self {
             Self::UntrustedInput(error) => Self::UntrustedInput(error),
+            Self::AuditInput(error) => Self::AuditInput(error),
             Self::Clock(error) => Self::Clock(error),
             Self::AdapterAuthorizationDenied(source) => Self::AdapterAuthorizationDenied(source),
             Self::AdapterUpstream(source) => Self::AdapterUpstream(source),

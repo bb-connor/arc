@@ -115,14 +115,19 @@ pub fn broker_execute_request_registration_digest(
     request: &BrokerExecuteRequest,
 ) -> Result<String> {
     request.validate_bounds()?;
-    let canonical = canonical_json_bytes(request).map_err(|error| {
-        BrokerError::Invariant(format!(
-            "broker execute registration encoding failed: {error}"
-        ))
-    })?;
+    let canonical = crate::private_request_wire::canonical_execute_bytes(request).map_err(
+        |error| match error {
+            BrokerError::UntrustedInput(
+                chio_core_types::canonical::UntrustedJsonError::Canonicalization(source),
+            ) => BrokerError::Invariant(format!(
+                "broker execute registration encoding failed: {source}"
+            )),
+            other => other,
+        },
+    )?;
     let mut hasher = Sha256::new();
     hasher.update(BROKER_EXECUTE_REQUEST_DIGEST_DOMAIN);
-    hasher.update(canonical);
+    hasher.update(canonical.as_slice());
     Ok(hex::encode(hasher.finalize()))
 }
 

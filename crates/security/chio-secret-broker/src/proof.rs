@@ -166,9 +166,8 @@ pub fn body_digest(body: &[u8]) -> String {
 }
 
 pub fn caller_header_digest(headers: &[HeaderField]) -> Result<String> {
-    let canonical = canonical_json_bytes(&headers)
-        .map_err(|error| BrokerError::Invariant(format!("header digest failed: {error}")))?;
-    Ok(domain_digest(HEADER_DIGEST_DOMAIN, &canonical))
+    let canonical = crate::private_request_wire::canonical_header_bytes(headers)?;
+    Ok(domain_digest(HEADER_DIGEST_DOMAIN, canonical.as_slice()))
 }
 
 pub fn caller_option_digest(options: &CallerOptions) -> Result<String> {

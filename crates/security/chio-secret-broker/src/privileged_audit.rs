@@ -51,6 +51,10 @@ use crate::protocol::{BrokerExecuteRequest, MAX_BODY_BYTES, MAX_WIRE_BYTES};
 use crate::provision::AdminAuthorization;
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
 
+#[path = "privileged_audit/audit_input_error.rs"]
+mod audit_input_error;
+pub use audit_input_error::AuditInputError;
+
 pub const BROKER_PRIVILEGED_AUDIT_OPEN_SCHEMA: &str = "chio.broker-privileged-audit-open.v1";
 pub const BROKER_PRIVILEGED_AUDIT_CHALLENGE_SCHEMA: &str =
     "chio.broker-privileged-audit-challenge.v1";
@@ -163,6 +167,27 @@ impl BrokerPrivilegedAuditOpenRequest {
 
 impl Drop for BrokerPrivilegedAuditOpenRequest {
     fn drop(&mut self) {
+        #[cfg(test)]
+        let populated = !self.request.request.body.is_empty()
+            || self
+                .request
+                .request
+                .headers
+                .iter()
+                .any(|header| !header.value.is_empty());
+        crate::private_request_wire::zeroize_request_bytes(&mut self.request.request);
+        #[cfg(test)]
+        crate::private_request_wire::observe_caller_drop(
+            crate::private_request_wire::CallerOwner::Open,
+            populated,
+            self.request.request.body.is_empty()
+                && self
+                    .request
+                    .request
+                    .headers
+                    .iter()
+                    .all(|header| header.value.is_empty()),
+        );
         self.reference_commitment_salt.zeroize();
         self.reference_request_head.zeroize();
         self.reference_request_body.zeroize();
@@ -758,6 +783,7 @@ impl BrokerPrivilegedAuditEndpoint {
                 if matches!(
                     &error,
                     BrokerError::UntrustedInput(_)
+                        | BrokerError::AuditInput(_)
                         | BrokerError::InvalidRequest(_)
                         | BrokerError::AuthorizationDenied(_)
                         | BrokerError::Conflict(_)
@@ -785,8 +811,7 @@ impl BrokerPrivilegedAuditEndpoint {
             self.config.authorized_runner_uid,
             self.config.authorized_runner_gid,
         )?;
-        let mut open: BrokerPrivilegedAuditOpenRequest =
-            read_canonical_frame(&mut stream, MAX_AUDIT_OPEN_FRAME_BYTES)?;
+        let mut open = read_privileged_audit_open_frame(&mut stream)?;
         let reference = open.take_reference()?;
         let issued_at_unix_seconds = self.handler.now_unix_seconds()?;
         let expires_at_unix_seconds = issued_at_unix_seconds
@@ -986,11 +1011,22 @@ impl Write for AuditDeadlineIo {
 }
 
 #[cfg(unix)]
-fn read_canonical_frame<T: DeserializeOwned + Serialize>(
+#[path = "privileged_audit/open_custody.rs"]
+mod open_custody;
+
+#[cfg(unix)]
+pub(crate) use open_custody::{decode_open_wire, encode_open_wire};
+#[cfg(all(unix, test))]
+pub(crate) use open_custody::{
+    private_byte_serialization_observation, reset_private_byte_serialization_observer,
+};
+
+#[cfg(unix)]
+fn read_canonical_frame_bytes(
     reader: &mut AuditDeadlineIo,
     maximum: usize,
-) -> Result<T> {
-    let bytes = Zeroizing::new(read_frame(reader, maximum).map_err(|error| {
+) -> Result<Zeroizing<Vec<u8>>> {
+    let bytes = read_frame(reader, maximum).map_err(|error| {
         if reader.read_deadline_setup_failed {
             BrokerError::Storage(format!(
                 "privileged audit read deadline maintenance failed: {error}"
@@ -998,7 +1034,24 @@ fn read_canonical_frame<T: DeserializeOwned + Serialize>(
         } else {
             error
         }
-    })?);
+    })?;
+    Ok(bytes)
+}
+
+#[cfg(unix)]
+fn read_privileged_audit_open_frame(
+    reader: &mut AuditDeadlineIo,
+) -> Result<BrokerPrivilegedAuditOpenRequest> {
+    let bytes = read_canonical_frame_bytes(reader, MAX_AUDIT_OPEN_FRAME_BYTES)?;
+    decode_open_wire(bytes.as_slice())
+}
+
+#[cfg(unix)]
+fn read_canonical_frame<T: DeserializeOwned + Serialize>(
+    reader: &mut AuditDeadlineIo,
+    maximum: usize,
+) -> Result<T> {
+    let bytes = read_canonical_frame_bytes(reader, maximum)?;
     let decoded: T = chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, maximum)
         .and_then(|text| text.decode_canonical())
         .map_err(BrokerError::UntrustedInput)?;
@@ -1013,9 +1066,9 @@ fn write_canonical_frame<T: Serialize>(
     maximum: usize,
     phase: &str,
 ) -> Result<()> {
-    let encoded = Zeroizing::new(canonical_json_bytes(value).map_err(|error| {
+    let encoded = encode_audit_frame(value).map_err(|error| {
         BrokerError::Invariant(format!("privileged audit {phase} encoding failed: {error}"))
-    })?);
+    })?;
     write_frame(writer, encoded.as_slice(), maximum).map_err(|error| {
         if writer.write_deadline_setup_failed {
             BrokerError::Storage(format!(
@@ -1028,7 +1081,23 @@ fn write_canonical_frame<T: Serialize>(
 }
 
 #[cfg(unix)]
-fn read_frame(reader: &mut impl Read, maximum: usize) -> Result<Vec<u8>> {
+fn encode_audit_frame<T: Serialize>(value: &T) -> chio_core_types::Result<Zeroizing<Vec<u8>>> {
+    chio_core_types::canonical::canonical_json_bytes_zeroizing(value)
+}
+
+#[cfg(unix)]
+fn read_audit_frame_body(reader: &mut impl Read, bytes: &mut Zeroizing<Vec<u8>>) -> Result<()> {
+    if let Err(error) = reader.read_exact(bytes.as_mut_slice()) {
+        bytes.zeroize();
+        return Err(BrokerError::InvalidRequest(format!(
+            "privileged audit frame body failed: {error}"
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn read_frame(reader: &mut impl Read, maximum: usize) -> Result<Zeroizing<Vec<u8>>> {
     let mut prefix = [0_u8; 4];
     reader.read_exact(&mut prefix).map_err(|error| {
         BrokerError::InvalidRequest(format!("privileged audit frame prefix failed: {error}"))
@@ -1041,10 +1110,8 @@ fn read_frame(reader: &mut impl Read, maximum: usize) -> Result<Vec<u8>> {
             "privileged audit frame is empty or oversized".to_string(),
         ));
     }
-    let mut bytes = vec![0_u8; length];
-    reader.read_exact(&mut bytes).map_err(|error| {
-        BrokerError::InvalidRequest(format!("privileged audit frame body failed: {error}"))
-    })?;
+    let mut bytes = Zeroizing::new(vec![0_u8; length]);
+    read_audit_frame_body(reader, &mut bytes)?;
     Ok(bytes)
 }
 
@@ -1087,9 +1154,9 @@ pub fn write_privileged_audit_open_frame(
     open: &BrokerPrivilegedAuditOpenRequest,
 ) -> Result<()> {
     open.validate()?;
-    let encoded = Zeroizing::new(canonical_json_bytes(open).map_err(|error| {
+    let encoded = encode_open_wire(open).map_err(|error| {
         BrokerError::InvalidRequest(format!("privileged audit open encoding failed: {error}"))
-    })?);
+    })?;
     write_frame(writer, encoded.as_slice(), MAX_AUDIT_OPEN_FRAME_BYTES)
 }
 
@@ -1099,7 +1166,7 @@ pub fn read_privileged_audit_challenge_frame(
     trusted_broker: &PublicKey,
     reference_precommitment: &BrokerAuditReferencePrecommitment,
 ) -> Result<SignedBrokerPrivilegedAuditChallenge> {
-    let encoded = Zeroizing::new(read_frame(reader, MAX_AUDIT_CONTROL_FRAME_BYTES)?);
+    let encoded = read_frame(reader, MAX_AUDIT_CONTROL_FRAME_BYTES)?;
     let challenge = SignedBrokerPrivilegedAuditChallenge::from_canonical_bytes(
         encoded.as_slice(),
         trusted_broker,
@@ -1119,9 +1186,9 @@ pub fn write_privileged_audit_commit_frame(
     challenge: &SignedBrokerPrivilegedAuditChallenge,
 ) -> Result<()> {
     commit.validate_for(challenge)?;
-    let encoded = Zeroizing::new(canonical_json_bytes(commit).map_err(|error| {
+    let encoded = encode_audit_frame(commit).map_err(|error| {
         BrokerError::InvalidRequest(format!("privileged audit commit encoding failed: {error}"))
-    })?);
+    })?;
     write_frame(writer, encoded.as_slice(), MAX_AUDIT_CONTROL_FRAME_BYTES)
 }
 
@@ -1130,7 +1197,7 @@ pub fn read_privileged_audit_evidence_frame(
     reader: &mut impl Read,
     trusted_broker: &PublicKey,
 ) -> Result<BrokerPrivilegedAuditEvidenceBundle> {
-    let encoded = Zeroizing::new(read_frame(reader, MAX_AUDIT_EVIDENCE_FRAME_BYTES)?);
+    let encoded = read_frame(reader, MAX_AUDIT_EVIDENCE_FRAME_BYTES)?;
     BrokerPrivilegedAuditEvidenceBundle::from_canonical_bytes(encoded.as_slice(), trusted_broker)
 }
 
@@ -1574,3 +1641,7 @@ mod tests {
         assert_ne!(nonce, "0".repeat(64));
     }
 }
+
+#[cfg(all(test, unix))]
+#[path = "privileged_audit/frame_custody_tests.rs"]
+mod frame_custody_tests;

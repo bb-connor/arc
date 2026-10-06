@@ -146,6 +146,18 @@ impl<const MAXIMUM: usize> BoundedZeroizingByteArray<MAXIMUM> {
         self.0.as_slice()
     }
 
+    pub(crate) fn push_bounded(&mut self, byte: u8) -> bool {
+        if self.0.len() == MAXIMUM {
+            return false;
+        }
+        self.0.push(byte);
+        true
+    }
+
+    pub(crate) fn into_vec(mut self) -> Vec<u8> {
+        std::mem::take(&mut *self.0)
+    }
+
     fn into_sensitive(mut self) -> SensitiveIpcBytes {
         SensitiveIpcBytes(std::mem::replace(&mut self.0, Zeroizing::new(Vec::new())))
     }
@@ -176,15 +188,18 @@ impl<const MAXIMUM: usize> Drop for BoundedZeroizingByteArray<MAXIMUM> {
     }
 }
 
-pub(crate) struct BoundedZeroizingString<const MAXIMUM: usize>(Zeroizing<String>);
+pub(crate) struct BoundedZeroizingString<const MAXIMUM: usize>(Zeroizing<String>, usize);
 
 impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
-    fn with_capacity() -> Result<Self> {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        if capacity > MAXIMUM {
+            return Err(sensitive_json_invalid());
+        }
         let mut storage = String::new();
-        storage.try_reserve_exact(MAXIMUM).map_err(|_| {
+        storage.try_reserve_exact(capacity).map_err(|_| {
             BrokerError::Storage("sensitive JSON string allocation failed".to_string())
         })?;
-        Ok(Self(Zeroizing::new(storage)))
+        Ok(Self(Zeroizing::new(storage), capacity))
     }
 
     pub(crate) fn as_str(&self) -> &str {
@@ -201,7 +216,7 @@ impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
             .len()
             .checked_add(character.len_utf8())
             .ok_or_else(sensitive_json_invalid)?;
-        if length > MAXIMUM {
+        if length > MAXIMUM || length > self.1 {
             return Err(sensitive_json_invalid());
         }
         self.0.push(character);
@@ -246,8 +261,15 @@ impl<'a> SensitiveJsonParser<'a> {
     pub(crate) fn parse_string<const MAXIMUM: usize>(
         &mut self,
     ) -> Result<BoundedZeroizingString<MAXIMUM>> {
+        self.parse_string_with_capacity::<MAXIMUM>(MAXIMUM)
+    }
+
+    pub(crate) fn parse_string_with_capacity<const MAXIMUM: usize>(
+        &mut self,
+        capacity: usize,
+    ) -> Result<BoundedZeroizingString<MAXIMUM>> {
         self.expect_literal(b"\"")?;
-        let mut value = BoundedZeroizingString::with_capacity()?;
+        let mut value = BoundedZeroizingString::with_capacity(capacity)?;
         loop {
             let byte = *self
                 .input

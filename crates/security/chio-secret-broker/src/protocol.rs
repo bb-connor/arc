@@ -232,6 +232,14 @@ pub struct HeaderField {
 
 impl HeaderField {
     pub fn normalized(name: &str, value: &[u8]) -> Result<Self> {
+        Self::validate_input(name, value)?;
+        Ok(Self {
+            name: name.to_ascii_lowercase(),
+            value: value.to_vec(),
+        })
+    }
+
+    fn validate_input(name: &str, value: &[u8]) -> Result<()> {
         if name.is_empty()
             || name.len() > MAX_HEADER_NAME_BYTES
             || !name
@@ -251,10 +259,7 @@ impl HeaderField {
                 "header value is invalid or oversized".to_string(),
             ));
         }
-        Ok(Self {
-            name: name.to_ascii_lowercase(),
-            value: value.to_vec(),
-        })
+        Ok(())
     }
 }
 
@@ -481,8 +486,8 @@ impl BrokerRequest {
         }
         let mut previous: Option<&str> = None;
         for header in &self.headers {
-            let normalized = HeaderField::normalized(&header.name, &header.value)?;
-            if normalized != *header {
+            HeaderField::validate_input(&header.name, &header.value)?;
+            if header.name.bytes().any(|byte| byte.is_ascii_uppercase()) {
                 return Err(BrokerError::InvalidRequest(
                     "caller headers must use normalized comparison form".to_string(),
                 ));
