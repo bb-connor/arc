@@ -77,8 +77,10 @@ fn foreign_acl_command(path: &Path) -> std::io::Result<Option<std::process::Comm
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
 fn foreign_acl_command(path: &Path) -> std::io::Result<Option<std::process::Command>> {
+    // An explicit empty mask keeps the group mode bits at zero, so only the
+    // presence of the extended ACL can refuse the path.
     let mut command = std::process::Command::new("setfacl");
-    command.args(["-m", "u:65534:rwx"]).arg(path);
+    command.args(["-m", "u:65534:rwx,m::---"]).arg(path);
     Ok(Some(command))
 }
 
