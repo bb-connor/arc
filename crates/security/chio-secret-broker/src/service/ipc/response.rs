@@ -15,17 +15,7 @@ pub(in crate::service) fn classify_broker_ipc_handler_result(
 ) -> std::result::Result<IpcResponse, BrokerIpcServeFailure> {
     match handled {
         Ok(response) => Ok(response),
-        Err(error)
-            if matches!(
-                &error,
-                BrokerError::Invariant(_)
-                    | BrokerError::Storage(_)
-                    | BrokerError::CredentialStorage(_)
-                    | BrokerError::Custody(_)
-            ) =>
-        {
-            Err(BrokerIpcServeFailure::Internal(error))
-        }
+        Err(error) if error.is_service_fault() => Err(BrokerIpcServeFailure::Internal(error)),
         Err(error) if operation == IpcOperation::Execute => {
             Err(BrokerIpcServeFailure::Client(error))
         }

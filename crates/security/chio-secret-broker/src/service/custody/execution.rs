@@ -137,17 +137,7 @@ impl BrokerService {
                 Ok(BrokerExecuteOutcome::Success(response))
             }
             ProjectedExecuteOutcome::Failure { failure, error } => match error {
-                Some(error)
-                    if matches!(
-                        &error,
-                        BrokerError::Invariant(_)
-                            | BrokerError::Storage(_)
-                            | BrokerError::CredentialStorage(_)
-                            | BrokerError::Custody(_)
-                    ) =>
-                {
-                    Err(error.redacted())
-                }
+                Some(error) if error.is_service_fault() => Err(error.redacted()),
                 _ => Ok(BrokerExecuteOutcome::Failure(failure)),
             },
         }

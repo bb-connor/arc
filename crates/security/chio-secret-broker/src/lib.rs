@@ -98,6 +98,17 @@ pub enum BrokerError {
 }
 
 impl BrokerError {
+    /// Faults that end a serving endpoint because the broker can no longer
+    /// trust its own state. Every other error is contained to its request or
+    /// session.
+    #[must_use]
+    pub(crate) const fn is_service_fault(&self) -> bool {
+        matches!(
+            self,
+            Self::Invariant(_) | Self::Storage(_) | Self::CredentialStorage(_) | Self::Custody(_)
+        )
+    }
+
     /// Bounded broker wire reason. Typed error sources retain their registered
     /// URNs; each one has a distinct wire spelling accepted by the IPC grammar.
     #[must_use]

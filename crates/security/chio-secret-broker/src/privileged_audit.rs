@@ -753,14 +753,7 @@ impl BrokerPrivilegedAuditEndpoint {
         // must never take down normal tool traffic.
         let outcome = match self.serve_stream(stream) {
             Ok(()) => BrokerPrivilegedAuditServeOutcome::EvidenceWritten,
-            Err(error)
-                if matches!(
-                    &error,
-                    BrokerError::Invariant(_) | BrokerError::Storage(_) | BrokerError::Custody(_)
-                ) =>
-            {
-                return Err(error);
-            }
+            Err(error) if error.is_service_fault() => return Err(error),
             Err(error)
                 if matches!(
                     &error,
