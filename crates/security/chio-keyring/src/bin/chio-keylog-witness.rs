@@ -62,11 +62,10 @@ fn run() -> chio_keyring::Result<()> {
     )?;
     let storage_identity = witness.storage_identity();
     let listener = bind_private_unix_listener(&config.socket_path)?;
-    let _socket_guard = SocketPathGuard(config.socket_path);
 
-    for connection in listener.incoming() {
-        match connection {
-            Ok(stream) => {
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
                 let result = (|| {
                     chio_keyring::require_service_peer(&stream)?;
                     let mut stream = chio_keyring::DeadlineUnixStream::new(
@@ -94,7 +93,6 @@ fn run() -> chio_keyring::Result<()> {
             Err(error) => return Err(KeyringError::Io(error)),
         }
     }
-    Ok(())
 }
 
 #[cfg(not(unix))]
@@ -214,12 +212,4 @@ fn parse_config_argument() -> Result<PathBuf, String> {
         return Err("unexpected extra witness service argument".to_string());
     }
     Ok(PathBuf::from(path))
-}
-
-struct SocketPathGuard(PathBuf);
-
-impl Drop for SocketPathGuard {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
-    }
 }

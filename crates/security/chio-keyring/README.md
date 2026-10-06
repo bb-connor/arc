@@ -23,6 +23,8 @@ The versioned key-log policy owns exactly two auditor roots and commits their id
 
 Provision the operator database once, then run three `chio-keylog-witness` services and two `chio-keylog-audit` services under separate operating-system identities. Keep every seed, database, and socket on a distinct absolute path. Socket parent directories and seed files must be private. Auditors open the operator database read-only and poll all three witnesses.
 
+Each service records the generation of the socket it binds in the `<socket>.lock` file beside it. A service that finds an existing socket removes it only when nothing is listening and the lock records exactly that socket, which is the state a crashed service leaves. Any other existing socket refuses startup and is left in place: one bound by another holder, one from a release that kept no record, or one a service bound but crashed before recording. To recover, stop every service that may hold that socket, then remove the socket and its `.lock` file. Keep the databases, provisioning records and seeds.
+
 The control-plane runtime configuration supplies the operator database and seed paths, active authority seed, all witness and auditor roots, all five service endpoints, recovery policy, and artifact-time roots. Startup requires signed readiness from all five services. A normal Chio receipt store is also required; signed key-enterprise receipts are forwarded into that store as signed trace-observation receipts.
 
 Activate the composition on `chio trust serve` with

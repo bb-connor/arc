@@ -164,7 +164,6 @@ fn run() -> chio_keyring::Result<()> {
 
     let listener = bind_private_unix_listener(&config.socket_path)?;
     listener.set_nonblocking(true)?;
-    let _socket_guard = SocketPathGuard(config.socket_path);
     loop {
         if let Some(error) = health_lock(&health)?.fatal_error.clone() {
             return Err(KeyringError::Storage(error));
@@ -563,12 +562,4 @@ fn parse_config_argument() -> Result<PathBuf, String> {
         return Err("unexpected extra audit service argument".to_string());
     }
     Ok(PathBuf::from(path))
-}
-
-struct SocketPathGuard(PathBuf);
-
-impl Drop for SocketPathGuard {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
-    }
 }
