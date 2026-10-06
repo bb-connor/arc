@@ -76,6 +76,11 @@ The adversarial review (1 Blocker, 15 Major, 11 Minor, 3 Nit) found that revisio
 
 **Codex review (PR #1174, round 7).** Records carry a signed `chain_generation`, and positions compare as `StopEpochId = (chain_generation, epoch)` everywhere: heads, `expected_epoch`, replicas, floors and observed epochs. A `Rollover` record starts each new generation and restates the head, so a rollover never changes `Stopped` or `Running` (S2, S6, S37).
 
+**Independent review pass 5 (R-8-03).** A stopper whose pending intent is retired by an offline bypass now stays in the incident's stopper set.
+- A `SubsumedIntent` snapshot carries the entry's contributors, bound to the entry by a recomputable `entry_digest`.
+- An entry that an unreadable-journal bypass covered is retired only after a new state-preserving `Reconcile` record carries its snapshot on the same chain. A progress-only note no longer does it.
+- S19's stopper set includes every snapshot's contributors. New S19a takes exclusions only from chain records, and resume waits for the reconciliation (S19, S19a, S25, S25a).
+
 ## 1. Decision summary
 
 Today's kernel stop is a fail-closed latch with good ordering, but it is not an operational kill switch:
@@ -184,6 +189,7 @@ pub enum StopTransition {
     Resume,    // Stopped -> Running
     Rollover,  // first record of a new chain generation; restates the head's state and allow_containment, changes nothing (S6)
     Migration, // S5 only: (generation 1, epoch 1) of a Recovery scope with a legacy stopped value; yields Stopped
+    Reconcile, // Stopped -> Stopped; restates the head and changes nothing; records the contributors of an entry an unread-journal bypass covered (S25a)
 }
 
 pub enum StopState { Stopped, Running }      // derived from the transition
@@ -204,11 +210,12 @@ pub struct StopEpochV1 {
     pub previous: Sha256Digest,              // digest of this scope's prior record, or zero
     pub allow_containment: bool,             // section 7.1, S12
     pub requested_via: StopRequestPath,
-    pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover and Migration
+    pub satisfies_intent: Option<StopIntentRef>, // Stop and Restrict: the journal entry this record applies (S25); None for Resume, Relax, Rollover, Migration and Reconcile
     pub offline_bypass: bool,                    // true only for an offline-CLI Stop or Restrict appended without a journal entry (S2, S25); then satisfies_intent is None
-    pub subsumes_intents: Vec<SubsumedIntent>,   // offline_bypass only: a signed snapshot of each pending journal entry the CLI read and folded in (S25); empty otherwise
-    pub subsumes_unread: bool,                   // offline_bypass only: the journal was unreadable, so boot reconciles the unread entries against this record (S25)
-    pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover and Migration: empty (S2 field rules)
+    pub subsumes_intents: Vec<SubsumedIntent>,   // offline_bypass only: a signed snapshot of the pending journal entry the CLI read and folded in, at most one (S25); empty otherwise
+    pub subsumes_unread: bool,                   // offline_bypass only: the journal was unreadable; this record retires no entry, and S25a reconciles the unread ones
+    pub reconciles: Option<ReconciledIntent>,    // Reconcile only: the unread entry and the subsumes_unread record it is reconciled against (S25a); None otherwise
+    pub contributors: Vec<StopRequestRecord>,    // Stop, Restrict, Relax, Resume: every applied request, 1..=2 (S25), and authorizer and reason_commitment above are contributors[0]; Rollover, Migration and Reconcile: empty (S2 field rules)
 }
 
 pub enum StopRequestPath {
@@ -217,6 +224,7 @@ pub enum StopRequestPath {
     OfflineCli,
     Migration,                               // S5 only
     SystemRollover,                          // S6: the writer's automatic Rollover; no request exists
+    SystemReconcile,                         // S25a: the writer's Reconcile of an unread entry; no new request exists
 }
 
 /// A position in a scope's chain. Ordered lexicographically: chain_generation first, then epoch.
@@ -228,6 +236,18 @@ pub struct StopRequestRecord {
     pub authorizer: StopAuthorizer,
     pub reason_commitment: Sha256Digest,
     pub decided_at: DecisionTime,
+}
+
+pub struct SubsumedIntent {                  // a signed snapshot of one stop-intent journal entry (S2, S25)
+    pub intent_ref: StopIntentRef,
+    pub allow_containment: bool,
+    pub contributors: Vec<StopRequestRecord>, // 1..=2: the entry's contributors, copied unchanged; they join S19's stopper set
+    pub entry_digest: Sha256Digest,           // SHA-256 of the entry's canonical encoding; recomputed from these fields plus the record's authority_id and scope
+}
+
+pub struct ReconciledIntent {                // Reconcile only (S25a)
+    pub bypass: StopEpochId,                  // the subsumes_unread bypass record of the current incident
+    pub intent: SubsumedIntent,               // the entry as read once the journal became readable
 }
 
 pub enum DecisionTime {
@@ -246,6 +266,7 @@ pub enum StopAuthorizer {
     RecoveryActor { subject: PublicKeyHex },                                       // S32, Stop and Restrict only
     LegacySemanticStop,                                                            // S5 migration only
     ChainRollover { serving_owner: ServingOwnerId, writer_epoch: u64 },            // S6: Rollover records only; the owner and serving epoch that appended it; changes no state
+    ChainReconcile { serving_owner: ServingOwnerId, writer_epoch: u64 },           // S25a: Reconcile records only; the owner and serving epoch that appended it; changes no state
 }
 ```
 
@@ -260,20 +281,32 @@ Normative rules:
    - **Identity.** A record's identity is `(authority_id, scope, chain_generation, epoch)`, and every field of it is in the signed body. Every comparison of positions in a scope's chain (heads, `expected_epoch`, replicas, floors, observed epochs) compares `StopEpochId` lexicographically, never `epoch` alone.
    - Within a chain generation, `epoch` increases by exactly 1, and `previous` equals the digest of the prior record.
    - A `Rollover` record is epoch 1 of generation `g + 1`. Its `previous` is the digest of generation `g`'s final record, its `expected_epoch` is that record's id, and its `state` and `allow_containment` equal that record's. The chain of digests is therefore unbroken across generations.
-   - `state` follows the transition. `Restrict` and `Relax` require a `Stopped` head, and `Resume` requires a `Stopped` head.
+   - `state` follows the transition. `Restrict`, `Relax` and `Reconcile` require a `Stopped` head, and `Resume` requires a `Stopped` head.
    - A `Stop` over a stopped head is an idempotent no-op that returns the current head, unless it asks for narrower containment, in which case it is recorded as `Restrict`.
    - A `Resume` over a running head is a no-op that returns the current head.
    - **Field rules per transition.** The writer constructs, and every verifier checks, the rule for the record's transition. A record that breaks its rule is invalid. A verifier refuses it, and the writer never appends it:
-     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` or `Restrict` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`. It never retires a journal entry through `satisfies_intent`. It retires entries only through its two proof fields, which S25's satisfaction rule validates:
-       - each `SubsumedIntent { intent_ref, allow_containment, entry_digest }` in `subsumes_intents` is a signed snapshot of an entry the CLI read. `entry_digest` is the SHA-256 of the entry's canonical journal bytes as read, and `allow_containment` is that entry's value. The record's own `allow_containment` must be no wider than any snapshot's.
+     - **`Stop`, `Restrict`, `Relax`, `Resume`.** `contributors` holds 1 or 2 requests. `authorizer` and `reason_commitment` equal `contributors[0]`'s. `requested_via` is `Route`, `ControlSocket` or `OfflineCli`. `satisfies_intent` is set for every `Stop` and `Restrict` (S25), with one exception: an offline `Stop` or `Restrict` appended by the journal-bypass path (S25 "Offline CLI") has `requested_via: OfflineCli`, `satisfies_intent: None` and `offline_bypass: true`. Verifiers accept that form only with `requested_via = OfflineCli`. It never retires a journal entry through `satisfies_intent`. It retires entries only through its `subsumes_intents` snapshots, which S25's satisfaction rule validates:
+       - each `SubsumedIntent { intent_ref, allow_containment, contributors, entry_digest }` in `subsumes_intents` is a signed snapshot of an entry the CLI read. There is at most one, because the journal holds one entry per scope.
+         - `allow_containment` is that entry's value, and `contributors` copies the entry's contributors unchanged (1 or 2).
+         - `entry_digest` is the SHA-256 of the entry's canonical encoding. A verifier recomputes it from the snapshot's fields plus the record's `authority_id` and `scope`, and refuses a snapshot whose digest does not recompute. The contributors are therefore bound to the entry the CLI read, and they are signed into the chain to the same standard as S25's normal application, which copies the same requests into `contributors`.
+         - The record's own `allow_containment` must be no wider than any snapshot's.
          - Verification uses the snapshot in the signed record, never the journal, because S25 removes the entries afterward. A later boot or replica can therefore re-verify the proof after journal cleanup.
          - At the time of removal, boot also checks each live entry's bytes against its `entry_digest`; a mismatch is refused;
-       - with `subsumes_unread: true`, boot reconciles the then-unread entries against the record (S25), satisfying only entries no narrower than the head.
-       - A non-bypass record must have an empty `subsumes_intents` and `subsumes_unread: false`. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover` or `LegacySemanticStop`.
+       - with `subsumes_unread: true`, the record retires no entry by itself. Once the journal is readable, each entry it covered is applied by a `Reconcile` record or a narrowing `Restrict` (S25a).
+       - A non-bypass record must have an empty `subsumes_intents` and `subsumes_unread: false`. A note row exists for each contributor (S1). `authorizer` is never `ChainRollover`, `ChainReconcile` or `LegacySemanticStop`.
+       - `reconciles` is `None` for every transition except `Reconcile`.
      - **`Rollover`.** No request exists, so `contributors` is empty and `satisfies_intent` is `None`. `authorizer` is `ChainRollover { serving_owner, writer_epoch }`, naming the serving owner and serving epoch that appended it. `requested_via` is `SystemRollover`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
        - `state`, `allow_containment` and `expected_epoch` restate the previous generation's final record (its state, its containment flag, and its id).
        - `reason_commitment = SHA-256("chio.stop-epoch.rollover.v1\0" || canonical(expected_epoch) || previous)`. That is a fixed domain string plus the restated head id and digest, with no salt and no note row, because there is no operator text to protect. A verifier recomputes it.
        - `decided_at` is `Observed` when authority time is available, else `Unavailable`. A rollover never waits on the clock.
+     - **`Reconcile`** (S25a). No new request exists, so `contributors` is empty and `satisfies_intent` is `None`. The recovered entry's requests travel in `reconciles.intent.contributors` (1 or 2), so they are signed into the chain without being presented as a new decision. `authorizer` is `ChainReconcile { serving_owner, writer_epoch }`. `requested_via` is `SystemReconcile`, or `OfflineCli` when the offline CLI appends it under the serving-owner lock (S30).
+       - It requires a `Stopped` head. `state` is `Stopped`, and `allow_containment` equals the head's, so it neither narrows nor widens anything.
+       - `reconciles.bypass` names an `offline_bypass` record with `subsumes_unread: true` in the head's ancestry within the current incident, and no `Relax` or `Resume` follows that record.
+       - `reconciles.intent.allow_containment` is no narrower than the head's. A narrower entry is applied as a narrowing `Restrict` instead (S25a).
+       - `reconciles.intent.entry_digest` recomputes from the snapshot, as for `subsumes_intents`.
+       - `reason_commitment = SHA-256("chio.stop-epoch.reconcile.v1\0" || canonical(expected_epoch) || canonical(reconciles))`. It has no salt and no note row, because no operator text is new, and a verifier recomputes it.
+       - `decided_at` is `Observed` when authority time is available, else `Unavailable`. A reconciliation never waits on the clock.
+       - No other transition may carry `ChainReconcile`, `SystemReconcile` or `reconciles`.
      - **`Migration`** (S5). The transition is `Migration`, never `Stop`, because no request exists. It is valid only as `(chain_generation 1, epoch 1)` of a `Recovery` scope with no earlier record, written by the S5 startup migration. A verifier refuses a `Migration` record at any other position, in any other scope kind, or after any other record.
        - `state = Stopped`. `allow_containment` is the deployment's default for new stops (S12), recorded explicitly.
        - `contributors` is empty, `satisfies_intent` is `None`, `authorizer` is `LegacySemanticStop`, and `requested_via` is `Migration`.
@@ -299,7 +332,7 @@ Normative rules:
    - Stopping a recovery scope never depends on whether a semantic registry is installed. The `installation(&tx, scope)` precondition (W: `semantic.rs:375-376`) applies only to the legacy write path, which migration retires.
 - **S6. Bounds and headroom.**
    - A record is at most 4 KiB, and a chain generation holds at most 65,536 records (`bound`).
-   - `Resume` and `Relax` refuse once the current generation holds `bound - 1` records. `Stop` and `Restrict` may append up to `bound`, because both leave the head `Stopped`.
+   - `Resume` and `Relax` refuse once the current generation holds `bound - 1` records. `Stop`, `Restrict` and `Reconcile` may append up to `bound`, because each leaves the head `Stopped`.
    - Only `Resume` produces a `Running` head, and it never takes the last slot, so a running head always has room for one durable `Stop`. Exhaustion therefore always ends `Stopped`. It can never leave a `Running` durable head with a stop that only tier 1 holds.
    - **Rollover.** When a commit leaves the current generation holding `bound - rollover_margin` records or more (`rollover_margin` default 8, at least 4), the writer appends a `Rollover` record as the scope's next commit, in the priority lane (S36).
      - It is a restrictive commit, anchored before acknowledgement, built under S2's `Rollover` field rules: authorizer `ChainRollover { serving_owner, writer_epoch }`, `requested_via: SystemRollover`, no contributors, the fixed reason commitment. It restates the head's `state` and `allow_containment` and satisfies no intent (`satisfies_intent: None`), so a rollover never changes `Stopped` or `Running` and never relaxes anything. It therefore needs no resume authority and invents no request.
@@ -560,12 +593,16 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - Stop never calls `current_unix_timestamp_ms()` or its `unwrap_or(0)` fallback (W: `kernel/mod.rs:1798-1805`). Accepting a token that expired between the floor and true time is an accepted risk, because a stop only restricts.
 - **S19. Resume.** Resume is deliberate. It always carries `expected_epoch` (S31), and it depends explicitly on S28. Before S28, resume uses the shared credential and is recorded as `SharedCredential`. The phase 1 claim limit states "no two-person resume".
     - **Default, `OperatorPair`.** A roster principal different from every principal in the incident's stopper set.
-      - **The incident.** It begins at the first `Stop` after the scope's last `Resume`, or at a `Migration` record, which opens the incident of a migrated legacy stop. It covers every later `Restrict` and `Rollover` until the resume.
+      - **The incident.** It begins at the first `Stop` after the scope's last `Resume`, or at a `Migration` record, which opens the incident of a migrated legacy stop. It covers every later `Restrict`, `Reconcile` and `Rollover` until the resume.
       - **Migrated incidents.** A `Migration` opener records no principal, because the legacy toggle had none (S5). Its stopper set starts empty, and later `Restrict` contributors join it as usual.
         - `OperatorPair.stopper_epoch` names the `Migration` record, so any roster principal outside the set may resume.
         - `SamePrincipalAfter` measures from the `Migration` record's first authority-time observation, which the supervised task writes as for a stop.
         - That is stricter than the legacy toggle, which required no actor at all. Once S28 retires the shared credential, a migrated scope still has a defined resume basis.
-      - **The stopper set** is the union of the authorizers and contributors of every `Stop` and `Restrict` in that incident, across chain generations. `Rollover` and `Migration` records contribute no principal, and they never hide one, because the set is collected through them.
+      - **The stopper set** is the union, across chain generations, of:
+        - the authorizers and contributors of every `Stop` and `Restrict` in that incident;
+        - the contributors of every `SubsumedIntent` that a record of the incident carries, in an offline bypass record's `subsumes_intents` or in a `Reconcile` record's `reconciles` (S25, S25a).
+
+        A request that a bypass folded in, or that S25a recovered from a journal the bypass could not read, therefore excludes its principal exactly as if its own record had committed. `Rollover`, `Migration` and `Reconcile` records add no authorizer of their own, and they never hide a principal, because the set is collected through them.
       - `OperatorPair.stopper_epoch` names the incident's opening `Stop`, not the head. The resumer must differ from every principal in the set.
       - `SamePrincipalAfter` measures its cooldown from the opening `Stop`'s observation.
     - **Quorum.** When configured, a `chio.stop-control-quorum.v1` artifact (S29), recorded as `Quorum`.
@@ -581,6 +618,11 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - Break-glass never moves the trusted-time floor.
       - It prevents an attacker who can perturb time from keeping the kernel stopped indefinitely.
     - **Unavailable roster.** If the roster or configuration is unavailable, the scope stays stopped.
+- **S19a. Exclusions come only from the chain.** The stopper set is computed only from anchored `StopEpochV1` records of the scope's chain (S19).
+    - Progress-only rows (notes, observation rows, signing obligations), trace events, SIEM exports and journal entries never add a principal to the set or remove one. Losing any of them therefore never makes a stopper eligible to resume.
+    - A request recorded only in the journal is not yet in the set. Its unsatisfied entry instead refuses `Resume` and `Relax` with `StopIntentPending` (S25, S31) until a chain record carrying its contributors is anchored: the applying `Stop` or `Restrict`, a bypass snapshot, or a `Reconcile` record (S25a).
+    - Every record that satisfies an entry names that entry's contributors, and S25 removes an entry only after such a record is anchored. Retiring an entry therefore never precedes recording its contributors.
+    - The set lives in the one stop chain, under the one serving writer. There is no separate roster of historical stoppers to drift from it.
 - **S20. Host latch.**
     - Programmatic `emergency_stop(reason)` from trusted host code, such as the broker authority failure at M: `native_broker/authority.rs:114`, remains a process-local latch in `StopHeads`. It applies to every kernel of the process and to every tier-2 check (S23).
     - It needs no operator to resume. A fresh process either re-establishes the failed component or fails readiness.
@@ -669,10 +711,10 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
 - **S38. Signing obligation.** `SigningBackend::sign_bytes` is fallible (M: `crates/core/chio-core-types/src/crypto.rs:869`). A stop therefore never waits on the signer, and a resume never commits without its evidence.
     - `record_digest` and `previous` cover the canonical `StopEpochV1` body without the signature. Attaching the signature later changes no chain digest.
     - **Running rollovers sign inside the transaction.** A `Rollover` that restates `Running` signs its body inside the appending transaction, like `Resume`. If signing fails, the transaction rolls back and the writer retries with backoff. The previous generation's `rollover_margin` keeps appends possible meanwhile, and a stop can always take the last slot (S6). A running head is therefore never left with an unsigned record in its chain, and S38's claim that a running head's whole chain is signed holds.
-    - **Stop, Restrict, Migration and stopped rollovers commit first.** A `Rollover` that restates `Stopped` follows this path, because the scope stays stopped while its evidence is pending.
-      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, chain_generation, epoch, state = pending)`. A `Rollover` or `Migration` record, appended by the writer with no request, gets the same obligation as an operator's stop.
+    - **Stop, Restrict, Reconcile, Migration and stopped rollovers commit first.** A `Rollover` that restates `Stopped` follows this path, because the scope stays stopped while its evidence is pending. So does a `Reconcile`, which always restates `Stopped`.
+      - The restrictive commit that appends the record also inserts `admission_operation_stop_signing(scope_key, chain_generation, epoch, state = pending)`. A `Rollover`, `Reconcile` or `Migration` record, appended by the writer with no new request, gets the same obligation as an operator's stop.
       - After the commit and anchor sync, the writer signs the body. It stores the artifact, and marks the obligation `signed`, in a progress-only commit.
-      - A signing failure leaves the record committed and enforced. For a stop or restrict, the route still returns `stop_durable`, with `evidence: pending`. A rollover or migration has no route caller, so the status route reports `evidence_pending` for the scope.
+      - A signing failure leaves the record committed and enforced. For a stop or restrict, the route still returns `stop_durable`, with `evidence: pending`. A rollover, reconcile or migration has no route caller, so the status route reports `evidence_pending` for the scope.
     - **Reconciliation.**
       - A supervised task retries pending obligations with backoff, and boot re-drives them after S9 step 3.
       - The trace event and the SIEM export fire only for signed artifacts.
@@ -682,7 +724,7 @@ disposition = deny and stopped(scope) -> refused at tier 1 and tier 2
       - A signing failure or timeout rolls the transaction back. The head stays `Stopped`, and the route returns `ResumeRefused { reason: EvidenceUnavailable }`.
       - Holding the writer for at most `stop_sign_timeout` is acceptable for a rare, operator-driven transition that runs in the priority lane (S36).
     - **No resume over missing evidence.**
-      - `Resume` and `Relax` refuse with `StopEvidencePending` while any record of the scope's chain, in any chain generation and of any transition (`Stop`, `Restrict`, `Rollover`, `Migration`), has a pending obligation. They refuse with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25).
+      - `Resume` and `Relax` refuse with `StopEvidencePending` while any record of the scope's chain, in any chain generation and of any transition (`Stop`, `Restrict`, `Rollover`, `Reconcile`, `Migration`), has a pending obligation. They refuse with `StopIntentPending` while the scope has an unsatisfied stop-intent entry (S25).
       - A scope whose stop evidence is unsigned therefore stays `Stopped`, and the kernel never returns to `ready` for that scope until reconciliation signs the stop.
       - Only a signed resume can make a head `Running`, and it can commit only when every earlier record is signed. A running head's whole chain, across every generation, is therefore backed by signed artifacts.
 - **Trace.** `RuntimeTraceEvent::StopEpochTransition { scope, id: StopEpochId, transition, state }` joins the existing trace events. The SIEM exporter emits the artifact.
@@ -732,7 +774,7 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - The writer loop runs in-process and reads the latches from the same `ArcSwap` in `StopHeads`.
     - So a host latch, or a stop whose write failed (`process_only` or `latch_only`), refuses store-only crossings with no tier-1 site, such as P4 artifact release, P5 `admit_confined_return`, and the recovery and semantic store checks.
 - **S36. Priority lane.**
-    - `Stop`, `Restrict`, `Relax`, `Resume` and `Rollover` commits run in a priority lane of spec 10's writer loop, exempt from `Overloaded`, `max_batch` and per-tenant caps (spec 10 X17, X20). Overload and full disks are incident conditions.
+    - `Stop`, `Restrict`, `Relax`, `Resume`, `Rollover` and `Reconcile` commits run in a priority lane of spec 10's writer loop, exempt from `Overloaded`, `max_batch` and per-tenant caps (spec 10 X17, X20). Overload and full disks are incident conditions.
     - **Narrowing transitions.** Under `SQLITE_FULL` or `IOERR` retry (spec 10 X21), a `Stop` or `Restrict` waits at most `stop_commit_wait` (default 2 s). It then returns `stop_not_durable` with the intent latch in force, and keeps the write queued. A late commit can only narrow.
     - **Widening transitions are never left queued.** A `Resume` or `Relax` that reaches `stop_commit_wait` is withdrawn from the queue if it has not started executing, and the route returns `resume_not_committed`. If it is already inside a batch transaction, the route returns `resume_outcome_unknown`, and the operator reads the scope's status before retrying. Its `expected_epoch` makes a retry safe: a commit that did land moved the head, so the retry refuses. A widening write never commits after the operator was told it failed.
 - **S37. Sharding** (only together with spec 10 section 10).
@@ -783,22 +825,23 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
     - **One entry per scope: the scope's single pending transition.** The journal is a keyed set: `scope_key -> { intent_id, generation, authority_id, scope, allow_containment, contributors: [PendingStopRequest; 1..=2] }`. Each entry is that scope's intent latch, and it represents exactly one future transition: the next one.
       - The entry stores no transition kind and no epoch. The writer computes both when it applies the entry, from the durable head at that moment: over a `Running` head it appends a `Stop` at the head's successor `(head.chain_generation, head.epoch + 1)`; over a `Stopped` head it appends a narrowing `Restrict` at that successor. The intended epoch is therefore always the next one, and an entry can never name an epoch the chain cannot reach.
       - `intent_id` is 128 random bits chosen when the entry is created. `generation` is the number of contributing requests.
+      - Each `PendingStopRequest` carries the fields of a `StopRequestRecord` (request id, authorizer, reason commitment and decision time), recorded after S18 authenticates the request. The applying record, a bypass snapshot and a `Reconcile` record copy them unchanged, so a contributor's identity reaches the chain on every path that retires its entry (S19a).
       - **Contributors.** A request that would change the scope's state relative to its durable head plus the pending entry becomes a contributor. Only two states are reachable through stops (`Stopped` with containment allowed, then `Stopped` with containment refused), so an entry has at most two contributors: the request that created it, and at most one later request that narrows `allow_containment` to `false`, which raises `generation` to 2.
       - A request that would change nothing is an idempotent no-op, as in S2. It returns the pending entry's status (`stop_not_durable` with `latch_only` until the entry applies), and its authorizer and reason go to the trace and to `admission_operation_stop_notes`, not to the journal.
       - **Applying.** The appended record carries the entry's final, most restrictive state: the entry's `allow_containment`, `satisfies_intent = { intent_id, generation }` for the generation it was built from, and `contributors` listing every request of that generation, with each request's authorizer and reason commitment.
-      - **Why the application is always a valid S2 transition.** Every `Stop` and `Restrict` record of a scope applies that scope's entry, and `Resume` and `Relax` are refused while an entry is pending (below). So the head cannot reach the entry's state by any other record, and the application is either a `Stop` over `Running` or a narrowing `Restrict` over `Stopped`.
+      - **Why the application is always a valid S2 transition.** Every `Stop` and `Restrict` record of a scope applies that scope's entry, except an offline bypass record, which proves the entry it read through `subsumes_intents` and leaves an unread one to S25a. `Resume` and `Relax` are refused while an entry is pending (below). So the head reaches an unsatisfied entry's state without applying it only under a `subsumes_unread` bypass, where S25a applies the entry as a state-preserving `Reconcile` record. Otherwise the application is either a `Stop` over `Running` or a narrowing `Restrict` over `Stopped`.
       - An intent for one scope never overwrites another scope's entry. With tenant A's stop pending as `latch_only` under `SQLITE_FULL`, a stop for tenant B adds a second entry, and a crash restores both.
     - **Satisfaction.** An entry is satisfied only by proof, never by an epoch number. `satisfied(entry, head)` holds when the scope's anchored head is `Stopped`, and some record `r` in the head's ancestry within the current incident:
-      - carries `satisfies_intent = { intent_id: entry.intent_id, generation: g }` with `g >= entry.generation`, so its `contributors` cover the entry's merged set, or is an `offline_bypass` record whose `subsumes_intents` lists `{ entry.intent_id, g }` with `g >= entry.generation`;
+      - carries `satisfies_intent = { intent_id: entry.intent_id, generation: g }` with `g >= entry.generation`, so its `contributors` cover the entry's merged set; or is an `offline_bypass` record whose `subsumes_intents` lists `{ entry.intent_id, g }` with `g >= entry.generation`; or is a `Reconcile` record whose `reconciles.intent.intent_ref` is `{ entry.intent_id, g }` with `g >= entry.generation`. A snapshot's `contributors` cover the entry's set, and the live entry's bytes must match its `entry_digest` at removal. A `subsumes_unread` bypass record alone satisfies no entry;
       - has `allow_containment` no wider than the entry's (`false` when the entry says `false`);
-      - is followed only by records that preserve a state at least as narrow: `Restrict`, or a `Rollover` that restates the head. No `Relax` or `Resume` follows `r`.
+      - is followed only by records that preserve a state at least as narrow: `Restrict`, or a `Rollover` or `Reconcile` that restates the head. No `Relax` or `Resume` follows `r`.
 
       A rollover after the applying record therefore never hides the proof, and a fulfilled entry is removed at boot rather than re-applied or left blocking resume.
 
       A record built from an older generation does not satisfy the entry. The writer then applies the entry again, which over the now-`Stopped` head is a narrowing `Restrict` built from the current generation.
     - **Removal.** An entry is removed only after an anchored head satisfies it. A crash between that anchor and the removal leaves a satisfied entry, which boot verifies against the head and then removes. An unrelated same-scope record never retires an entry.
-    - **Boot.** Every entry that the anchored head does not satisfy is honored, whatever the head's epoch: the scope is `Stopped` with the narrower of the head's and the entry's `allow_containment`, and `durability: latch_only`. The first write after verification applies each such entry as above.
-    - **Resume and relax wait for pending intents.** `Resume` and `Relax` refuse with `StopIntentPending { scope }` while the scope has any unsatisfied entry. Under the same journal mutex, and before the widening transition commits, the writer also removes every satisfied entry for the scope and fsyncs the journal slot. If that removal fails, the widening transition is refused (`StopIntentPending { scope, reason: removal_failed }`). The journal therefore never holds an entry that a later `Resume` or `Relax` would turn from satisfied into unsatisfied, and boot can never reapply a stale intent over a validly resumed scope. The check runs under the journal mutex, which the writer holds from the check through the commit and anchor sync of the resume or relax. A stop or restrict intent that arrives meanwhile waits for the mutex, then records its entry and applies over the resulting head. A resume can therefore never commit between an intent's fsync and that intent's own record.
+    - **Boot.** Every entry that the anchored head does not satisfy is honored, whatever the head's epoch: the scope is `Stopped` with the narrower of the head's and the entry's `allow_containment`, and `durability: latch_only`. The first write after verification applies each such entry as above, or as a `Reconcile` record when S25a applies.
+    - **Resume and relax wait for pending intents.** `Resume` and `Relax` refuse with `StopIntentPending { scope }` while the scope has any unsatisfied entry. Under the same journal mutex, and before the widening transition commits, the writer also removes every satisfied entry for the scope and fsyncs the journal slot. If that removal fails, the widening transition is refused (`StopIntentPending { scope, reason: removal_failed }`). An unreadable journal also refuses it (`StopIntentPending { scope, reason: journal_unreadable }`), because the writer cannot then prove that no unsatisfied entry exists. The journal therefore never holds an entry that a later `Resume` or `Relax` would turn from satisfied into unsatisfied, and boot can never reapply a stale intent over a validly resumed scope. The check runs under the journal mutex, which the writer holds from the check through the commit and anchor sync of the resume or relax. A stop or restrict intent that arrives meanwhile waits for the mutex, then records its entry and applies over the resulting head. A resume can therefore never commit between an intent's fsync and that intent's own record.
     - **Bound.** The journal holds at most `stop_intent_max_entries` entries (default 4096). Each entry is at most 512 bytes, so a slot stays under 2 MiB.
       - When the journal is full, a new scope's intent is not recorded. The route returns `stop_not_durable` with `durability: process_only` and reason `stop_intent_journal_full`, and readiness reports it.
       - Existing entries are never evicted to make room.
@@ -808,17 +851,27 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
       - when the journal is full or the intent write fails, it skips the journal and appends the transition directly: a `Stop` over a running head, or a narrowing `Restrict` over a stopped head. A down host has no queue to overload.
       - **Pending entries are folded in first.** Before a bypass append, the CLI reads the scope's existing journal entries. Reading still works when a write does not. The bypass record folds them in:
         - its `allow_containment` is the narrowest of the request and every pending entry;
-        - `subsumes_intents` holds a signed snapshot of each entry: `{ intent_ref: { intent_id, generation }, allow_containment, entry_digest }`.
+        - `subsumes_intents` holds a signed snapshot of the entry: `{ intent_ref: { intent_id, generation }, allow_containment, contributors, entry_digest }` (S2). Its contributors join S19's stopper set once the bypass record is anchored.
 
         Satisfaction (below) treats a listed entry as satisfied, so a stale entry can neither be re-applied over an already narrow head nor block `Resume` or `Relax`. If the journal cannot even be read, the CLI still appends the bypass record, with an empty list and the signed flag `subsumes_unread: true`, and reports `stop_durable` with `journal_unreadable`. Boot then refuses readiness until the journal is readable (S9).
-        - **Recoverable proof.** Once the journal is readable, boot reconciles each entry for that scope against the `subsumes_unread` record.
-          - Any entry present then was recorded in the current incident, because a `Resume` or `Relax` cannot commit while an unsatisfied entry exists and removes every satisfied one first (S25).
-          - So an entry whose `allow_containment` is no narrower than the head's is satisfied by the `subsumes_unread` record. That requires no `Relax` or `Resume` to follow the record. Boot appends a progress-only note recording the entry's contributors for audit, then removes the entry.
-          - An entry narrower than the head is applied as a narrowing `Restrict`, as usual.
-          - No unread entry can block readiness or a later `Resume` or `Relax`. That record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
+        - **Recoverable proof.** Once the journal is readable, each entry for that scope is reconciled through S25a. No unread entry leaves the journal before its contributors are in an anchored chain record. An unread entry blocks `Resume` and `Relax` only until its `Reconcile` or `Restrict` is anchored, which happens on the first write while the store is writable.
+        - **Record form.** The bypass record uses S2's verifiable no-intent offline form: `requested_via: OfflineCli`, `satisfies_intent: None`, `offline_bypass: true`, with its contributor and note as usual. No `StopIntentRef` is fabricated;
       - success requires the record committed and anchored, and the CLI reports `stop_durable`;
       - if that append also fails, the CLI exits non-zero and reports `stop_not_in_force`. It states that no stop is recorded and that the operator must keep the host down or retry. It never claims a stop is in force.
     - This extends AC6's "publish first" rule from memory to durability.
+- **S25a. Reconciling entries an unreadable-journal bypass covered.** Once the journal is readable (at boot, or when a host not ready for `journal_unreadable` reads it again), the writer reconciles every entry of a scope whose current incident holds an `offline_bypass` record with `subsumes_unread: true` (the bypass record). This completes before any `Resume` or `Relax` of that scope can commit.
+    - **Membership.** Any such entry was recorded in the current incident, because a `Resume` or `Relax` cannot commit while an unsatisfied entry exists and removes every satisfied one first (S25).
+    - **Entry no narrower than the head.** The writer appends a `Reconcile` record (S2) in the priority lane (S36), with `reconciles = { bypass, intent }`, where `intent` is the entry's `SubsumedIntent` snapshot: its ref, containment, contributors and `entry_digest`.
+      - The record restates the head, so the incident does not pretend to narrow again.
+      - It is a restrictive commit, anchored before acknowledgement (S1). Only after that anchor does S25 remove the entry, after checking the live bytes against `entry_digest`.
+    - **Entry narrower than the head.** It is applied as a narrowing `Restrict`, as usual, whose `contributors` carry the entry's requests. No `Reconcile` is appended for it.
+    - **Stopper set.** Either way, the entry's contributors are in an anchored chain record before the entry leaves the journal, so S19 excludes them. A progress-only note may still keep the redacted reason for audit (S1), but it carries no exclusion (S19a).
+    - **Resume waits.** Until that record is anchored the entry is unsatisfied. The scope stays `Stopped` with the narrower of the head's and the entry's `allow_containment`, and `Resume` and `Relax` refuse with `StopIntentPending` (S25, S31). The status route reports `stop_reconcile_pending` for the scope.
+    - **Failure.** If the `Reconcile` cannot commit (for example on `SQLITE_FULL`), the writer retries it with backoff in the priority lane, and the entry stays. With the host down, the offline CLI can append the same record under the serving-owner lock (S30). Resume stays refused until the record is anchored.
+      - An unknown commit outcome poisons the owner, as for any transition. The next boot re-reads the chain: an anchored `Reconcile` satisfies the entry and boot removes it; otherwise boot reconciles again.
+      - A crash between the anchor and the removal leaves a satisfied entry, which boot removes without appending a second record.
+    - **Restore and rollover.** A database-only restore behind the `Reconcile` fails the anchor check (S34), so the host fails closed rather than losing the exclusion. A whole-volume restore that predates the `Reconcile` also restores the journal entry, so boot reconciles it again. A later `Rollover` never hides the record, because S19 collects the set across generations.
+    - **Headroom.** A `Reconcile` leaves the head `Stopped`, so it may take slots up to `bound` (S6). In a full generation it waits for the pending `Rollover`, and resume stays refused meanwhile.
 
 ## 14. Failure modes
 
@@ -852,6 +905,9 @@ A stop is reversible, so it is never `Terminal`. Spec 5 adopts `HintSubject::Sto
 | Resume or relax while a same-scope stop or restrict intent is pending | Refused with `StopIntentPending`; the intent applies first (S25, S31) |
 | A committed stop record is wider than, or older than, the merged intent | The entry is not retired; the writer applies it again as a `Restrict` built from the current generation. A crash in between restores the narrower policy at boot (S25) |
 | A latch-only stop, then a narrowing request for the same scope, then a crash | The entry holds both contributors at generation 2. Boot honors it as `Stopped` with containment refused; the first write appends one `Stop` at `head.epoch + 1` that carries both contributors (S25) |
+| Offline bypass while the journal is unreadable, then the journal becomes readable | Each covered entry is applied as an anchored `Reconcile` record carrying its contributors, or as a narrowing `Restrict`, before it is removed. Its contributors join the stopper set. Until then, and while the journal is unreadable, resume and relax refuse with `StopIntentPending` (S19, S25, S25a) |
+| `Reconcile` cannot commit | Retried with backoff in the priority lane; the entry stays; resume and relax refuse with `StopIntentPending`; the status route reports `stop_reconcile_pending` (S25a) |
+| A progress-only stop note or observation row is lost | The stopper set is unchanged, because it reads only chain records (S19a). A lost observation only restarts a cooldown (S19) |
 | Origin response at the shard's position with a different head digest | Fork (for example, a whole-volume restore at the origin): the shard latches the kernel scope `Stopped`, goes `not_ready { stop_origin_forked }`, and never renews. Operator reconciliation clears it (S37) |
 | Artifact signing fails for a rollover or migration record | The record stays committed and enforced. The obligation is retried and re-driven at boot. The status route reports `evidence_pending`, and resume and relax refuse with `StopEvidencePending` until it is signed (S38) |
 | Artifact signing fails for a stop or restrict | The stop stays committed and enforced, and the route returns `stop_durable` with `evidence: pending`. The obligation is retried, and re-driven at boot. Resume and relax refuse with `StopEvidencePending` (S38) |
@@ -942,6 +998,18 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - **Two pending stops for one scope (R-8-01).** Two stop requests for the same scope merge, the second narrowing containment (generation 2). The first, wider record commits carrying generation 1 and is anchored; kill before the follow-up `Restrict`, restart: the entry is unsatisfied, so the scope comes up `Stopped` with containment off and `latch_only`, and the first write appends a `Restrict` carrying generation 2 (S25).
   - **Latch-only stop, then a narrowing request, then a crash (Codex round 5).** The head is `Running` at epoch 4. A stop under `SQLITE_FULL` is recorded as `latch_only` (generation 1); a narrowing request (containment off) joins the entry (generation 2) before any record commits. Kill, restart: the scope is `Stopped` with containment off; the first write appends exactly one `Stop` at epoch 5 with containment off, `satisfies_intent` generation 2 and both contributors; the entry is then removed. No `Restrict` is ever appended over the running head (S2, S25).
   - **S8-01:** stop with caller-executed, native and ordinary operations in `Finalizing`; kill; restart. The host serves `ready_stopped`, status answers, resume succeeds, and the outputs are released exactly once.
+  - **Unreadable-journal bypass keeps every stopper (R-8-03).** Roster principals A, B and C; the default `OperatorPair` resume.
+    - A requests a stop with containment disabled. Its journal entry is fsynced, and the host dies before the chain record commits.
+    - With the journal made unreadable, B runs the offline CLI. The bypass appends a stopped head with containment disabled and `subsumes_unread: true`.
+    - Make the journal readable and boot. Boot appends a `Reconcile` record carrying A's snapshot and only then removes the entry. The stopper set is `{A, B}`.
+    - A's `OperatorPair` resume refuses at every point: while the journal is unreadable (`StopIntentPending`, `journal_unreadable`); after it is readable but before the `Reconcile` is anchored (`StopIntentPending`); and afterward, because A is in the stopper set.
+    - It still refuses after a restart, after the entry is removed, after a rollover into a new generation, after a database-only restore behind the `Reconcile` (the anchor refuses startup), and after a whole-volume restore to before it (boot reconciles again).
+    - C's resume succeeds. Deleting the scope's progress-only notes changes nothing.
+  - **Stopper variants (R-8-03).**
+    - An unread entry with two contributors: both join the stopper set, and neither may resume.
+    - A readable bypass: the `subsumes_intents` snapshot carries A's contributor and recomputes its `entry_digest`. A's resume refuses. A verifier rejects a snapshot whose contributors do not recompute the digest.
+    - An unread entry with containment disabled over a bypass head with containment allowed: it is applied as a narrowing `Restrict` whose contributors include A, no `Reconcile` is appended, and A's resume refuses.
+    - A `Reconcile` that cannot commit (`SQLITE_FULL`): the entry stays, the status route reports `stop_reconcile_pending`, and resume refuses until the record is anchored.
 - **Identity disposition per path (R-8-02).** Each case separate. Each asserts `retryable_after_resume == (identity_disposition == Reusable)` and the behavior of a retry with the same request id after resume:
   - tier-1 early stop denial: `Reusable`; the retry is admitted;
   - fused intent from `Unbegun` refused by a stop: `Reusable`; the retry is admitted;
@@ -988,6 +1056,7 @@ Every phase ships behind `durable-stop` until its conformance scenarios pass. Ha
   - **Shard with an old high epoch (Codex round 7).** A shard replica at `(1, 65,530)` and an origin head at `(2, 3)`. The shard is behind, latches the kernel scope `Stopped`, and is not ready until it replicates the `Rollover` record and generation 2. A comparison of `epoch` alone would wrongly call the shard ahead; the test asserts it is not used.
   - **Artifact identity across generations (Codex round 7).** Artifacts for `(1, 7)` and `(2, 7)` of one scope have distinct signed bodies and identities. A verifier given one cannot accept it as the other, and the SIEM floor check compares `(chain_generation, epoch)`.
   - Cooldown: a resume with a mismatched `cooldown_started` refuses, and a lost observation row restarts the cooldown (S19).
+  - **`Reconcile` field rules (R-8-03).** A verifier rejects a `Reconcile` that narrows or widens `allow_containment`, follows a `Running` head, names a bypass record without `subsumes_unread`, names one from an earlier incident or one followed by a `Relax` or `Resume`, carries an entry narrower than the head, has a non-empty `contributors`, or carries a snapshot whose `entry_digest` does not recompute (S2).
   - Constant-time credential comparison.
   - Host latch independence and its containment implication (S20).
   - Tenant attribution, including the `LOCAL_SYSTEM_TENANT_ID` refusal (S33).
@@ -1218,6 +1287,12 @@ Open decisions:
 | 4187992998 | Persist evidence needed to verify bypass intent references | Fixed now. `subsumes_intents` holds signed `SubsumedIntent { intent_ref, allow_containment, entry_digest }` snapshots. Verification uses the snapshot in the signed record, so later boots and replicas can re-verify after S25 removes the entries, and boot checks live entry bytes against the digest before removal | record fields; S2; S25 |
 | 4187993012 | Represent latch-only denials without a stop epoch | Fixed now. Stop deny receipts carry `observed: StopObservation`: `Epoch(StopEpochId)`, `HostLatch { latch_id }` or `PendingIntent(StopIntentRef)`. A host-latch or latch-only denial is truthfully represented and never names an unrelated head | section 10 deny receipts; S15; S14 |
 | 4187993006 (spec 9) | Match retry advice to the actual release refusal | `OutputWithheld.reason` also admits `AuthoritySpaceClosed`, `Revoked` and `InsufficientIntegrity` for spec 9's reason-specific check-only release refusals | S14 |
+
+### Independent review pass 5 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-8-03 | Unread-journal bypass drops a stopper from the two-person resume predicate | Fixed. Confirmed against the round 24-26 text: the `subsumes_unread` retirement wrote the entry's contributors only to a progress-only note, and `SubsumedIntent` held only a digest, so S19's set lost the stopper on both bypass paths. Now `SubsumedIntent` carries the entry's contributors, bound by an `entry_digest` that verifiers recompute, and they join S19's set. A `subsumes_unread` record satisfies no entry by itself: S25a retires each covered entry only after a new state-preserving `Reconcile` record, a restrictive anchored commit on the same chain, carries its snapshot. A narrower entry is still a `Restrict`. S19a takes exclusions only from chain records, never from notes. Resume refuses with `StopIntentPending` until reconciliation is anchored, and while the journal is unreadable. One chain and one writer; no separate stopper roster | record fields; S2; S6; S19; S19a; S25; S25a; S36; S38; section 14; section 17 |
 
 ## Appendix A. FTL reference
 

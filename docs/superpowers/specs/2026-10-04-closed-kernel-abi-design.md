@@ -262,7 +262,7 @@ Polarities (`deny_only`, `fact_source`, `custody`, `output_transform`) are as in
 | `with_hybrid_signing_backend`, `set_capability_crypto_floor` | `boot`; the signing backend is `custody` (it holds receipt-signing keys) |
 | `install_delegated_work[_with_layout]`, `require_durable_request_retention` | `boot`. The installed guard is `deny_only`; the accepted allocator key list is a `fact_source` |
 | The four `install_*_checkpoint_hook` / `install_durable_finalization_cutpoint` hooks | `test_support` |
-| `QualifiedUnknownPaymentReleaseStore`, `QualifiedContractualCaptureWaiverStore` | `custody` (release authority: they can release holds after an unknown outcome) |
+| `QualifiedUnknownPaymentReleaseStore`, `QualifiedContractualCaptureWaiverStore` | `custody` (release authority: the first releases an unknown hold; the second resolves a known return's positive pending capture in `Finalizing`, spec 9 M7a and M7b) |
 | `X402PaymentAdapter`, `AcpPaymentAdapter`, webhook `ApprovalChannel` | `custody` / `fact_source` implementations; R13 relocates them |
 | `chio-process`: `ProcessRegistry::caller` | `fact_source` (mailbox sender attestation, spawn identity) |
 | `chio-process`: `provision_signers` and its seeds | `custody` |
@@ -494,3 +494,9 @@ The phases are order-independent with respect to merging #1160 and #1173, becaus
 Where the analogy breaks:
 - FTL's ABI is enforced by CPU privilege. Chio's L0 boundary is a governance boundary inside one process, except where it coincides with a process boundary: the wire, the sidecar, FFI, the L1 worker socket and component IPC.
 - Chio's TCB includes signing, a durable saga and budgets, so it gates growth rather than matching FTL's size.
+
+### Independent review pass 5 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-9-04 (cross-reference) | The machine puts contractual capture waivers in the wrong execution phase | Applied here. The custody row now separates the two successor stores: the unknown-release store releases an unknown hold, and the capture-waiver store resolves a known return's positive pending capture (spec 9 M7a, M7b) | custody classification table |

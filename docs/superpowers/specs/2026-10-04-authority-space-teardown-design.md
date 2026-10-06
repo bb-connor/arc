@@ -37,7 +37,7 @@
 ## Revision 4 changes
 
 From round 1 of the PR #1174 review (dispositions at the end of this spec):
-- **Output release is fenced.** The caller-executed and native output-release checks, and the finalization commit of ordinary durable returns, now consult the closure fence (rule 3a and the section 4.3 table). A closure that commits after `DispatchCommitted` but before release now withholds the output. The operation then terminalizes as `DeniedAfterDelivery`, as in spec 9 M11 and spec 10 X16.
+- **Output release is fenced.** The caller-executed and native output-release checks, and the finalization commit of ordinary durable returns, now consult the closure fence (rule 3a and the section 4.3 table). A closure that commits after `DispatchCommitted` but before release now withholds the output. The operation then terminalizes as `DeniedAfterDelivery`, as in spec 9 M11 and spec 10 X16. (Independent review pass 5 adds spec 9 M11a: a positive-cost refused return instead keeps its hold in `Finalizing(DeliveryRefused)`, because closure is not pricing authority.)
 - **Pre-migration operations are fenced.** A migration backfills and verifies authority refs. Any operation it cannot index stays `legacy_unindexed`, and a legacy predicate in the dispatch and release CAS refuses it once any closure fence exists (rule 1a).
 - **Stranded capacity has two snapshots.** One is taken at `Fenced` and one after the drain. The signed `Closed` artifact carries the final one (section 8).
 
@@ -185,9 +185,11 @@ Non-goals:
    - the finalization commit of ordinary durable returns.
 
    On M: these releases check stop and revocation, but not closure. Under spec 10 they become `OutputRelease` crossings, where Fence = yes, and this rule is that check.
-   - **Refusal.** A refused release is `AuthoritySpaceClosed { closure_id }`. Following spec 9 M11 and spec 10 X16, the operation halts and terminalizes as `DeniedAfterDelivery`, with output withheld and retained markers.
-   - **Why the drain terminates.** That terminal is a restrictive, non-crossing commit, so the fence that refused the release cannot refuse the terminal.
-   - **Startup.** Startup reconciliation treats this refusal as that terminal transition, not as a reconciliation failure.
+   - **Refusal.** A refused release is `AuthoritySpaceClosed { closure_id }`. Following spec 9 M11 and M11a and spec 10 X16, the operation halts and its output is withheld for good. Closure decides delivery only, never money:
+     - with no positive reversible-hold obligation (no payment participant, a zero amount, or a prepaid settlement), it terminalizes as `DeniedAfterDelivery` with retained markers;
+     - with one, `RefuseDelivery` records `Finalizing(DeliveryRefused)`. The known return, the hold and the payment journal stay as they were until the payment owner's own successor settles them. Closure never releases, waives or captures that obligation, so payable work stays payable (section 7).
+   - **Why the drain terminates.** The terminal and the refusal record are both restrictive, non-crossing commits, so the fence that refused the release cannot refuse either. A `DeliveryRefused` operation is drained: its output can never leave custody and it can start no effect.
+   - **Startup.** Startup reconciliation treats this refusal as that commit, not as a reconciliation failure, and continues with unrelated operations.
 4. **Ordering.** Fence before dispatch commit means no dispatch. Dispatch commit before fence means the operation is post-dispatch and the drain retains it. Its output release still meets the fence (rule 3a), so a closure that commits before release withholds the output.
 
 ```text
@@ -195,7 +197,8 @@ committed(fence(c)) before cas(op -> DispatchCommitted) and refs(op) intersects 
   -> not DispatchCommitted(op)
 DispatchCommitted(op) before committed(fence(c)) -> drain(op) = retain_post_dispatch
 committed(fence(c)) before release(op) and refs(op) intersects space(c)
-  -> not released(op) and terminal(op) = DeniedAfterDelivery
+  -> not released(op) and (terminal(op) = DeniedAfterDelivery or delivery_refused(op))
+delivery_refused(op) -> hold(op) and journal(op) unchanged by closure
 legacy_unindexed(op) and exists closure_fences -> not DispatchCommitted_after(op) and not released_after(op)
 ```
 
@@ -270,8 +273,9 @@ Rules:
    | `CapturePending` | Look up by operation. No capture: compensate. Capture committed: post-dispatch |
    | `DispatchCommitted`, owned by the drain | Halt the operation (spec 9 `HaltOperation`) and cancel the transport cooperatively where supported (M: `chio-mcp-adapter/src/transport/utils.rs:239`). Then follow spec 9 section 6.1's `X` row: with a `NotAccepted` proof, `NotAcceptedAfterDispatchCommit`; with a recoverable durable return, `Finalizing`, whose release then meets the fence (below); otherwise `OutcomeUnknownAfterDispatch` with holds frozen. Exactly one terminal; never redispatch, release or compensate |
    | `DispatchCommitted`, still owned by a live coordinator | Halt and defer: the drain never steals the lease. The coordinator either terminalizes it under the same `X` row or reaches `Finalizing`, and then follows the next row |
-   | `Finalizing` | The release meets the fence (section 4.1 rule 3a), and the operation terminalizes as `DeniedAfterDelivery` with output withheld (spec 9 M11). It is never terminalized as outcome-unknown, because its return is recorded |
-   | `AwaitingCallerReport` | `HaltOperation { UnsettledCallerCustody }` plus the fault (spec 9 section 6.1). A later authenticated report records the return and moves the operation to `Finalizing`, so its release meets the fence and terminalizes as `DeniedAfterDelivery` |
+   | `Finalizing` | The release meets the fence (section 4.1 rule 3a), and the output is withheld for good (spec 9 M11, M11a). The operation terminalizes as `DeniedAfterDelivery` when no positive reversible-hold obligation remains, and otherwise is recorded as `DeliveryRefused` with its hold retained for the payment owner. It is never terminalized as outcome-unknown, because its return is recorded |
+   | `Finalizing(DeliveryRefused)` | Drained. Record only; the retained obligation is listed in `stranded_final` |
+   | `AwaitingCallerReport` | `HaltOperation { UnsettledCallerCustody }` plus the fault (spec 9 section 6.1). A later authenticated report records the return and moves the operation to `Finalizing`, so its release meets the fence and follows the `Finalizing` row |
    | Recovery workflow bound to the space | `CancelWorkflow` by the closure actor (section 6.5); the same-writer tombstone fences begin and capture |
    | Confined child in the space | `NativeConfinedRuntime::cancel`: native disposition first, then process cancel and pidfd termination (W: `crates/platform/chio-control-plane/src/confinement.rs:258-274`). A plain `ProcessRuntime::cancel` alone would leave the native confined record unterminated |
    | Security operation model, dispatch `NotStarted` | That model's own compensation path |
@@ -282,6 +286,7 @@ Rules:
 2. **Release.** The drain never releases a hold itself.
    - Holds move only through the compensation projection, under `PreDispatchNoEffect`, or by the transport's `TransportNotAccepted`.
    - The drain never produces `MutuallyAgreedUnknown`, `ContractualCaptureWaiver` or `ContractualZeroCharge`. Each requires its own counterparty or contract evidence (V: `payment/journal.rs:88-96`).
+   - A closure refusal is never contract evidence. It does not make `ContractualZeroCharge` eligible, and a positive-cost refused return keeps its hold (spec 9 M11a).
 3. **Concurrency.** The drain uses the version-bound recovery claim and never steals a live lease. A coordinator holding the lease meets the dispatch-commit fence (section 4.1) and compensates on its own path.
 4. **Idempotency.** The drain is idempotent per `operation_id`. Process call slots and sibling shares are consumption and are never compensated (M: `chio-process/ARCHITECTURE.md:22-24`, `:43-44`).
 
@@ -370,12 +375,12 @@ Rules:
 3. CAS the record to `Fenced`.
 4. CAS to `Draining` and run the drain.
 5. Withdraw (section 6.5).
-6. When every ledger entry is terminal or incident-bound, recompute `stranded_final` (section 8), sign the artifact, CAS to `Closed`, and emit exit hints.
+6. When every ledger entry is terminal, delivery-refused (spec 9 M11a) or incident-bound, recompute `stranded_final` (section 8), sign the artifact, CAS to `Closed`, and emit exit hints. A delivery-refused entry needs no financial settlement before `Closed`: its output can never be released, and its obligation stays with the payment owner.
 
 ```text
 fenced(c) and binds(op, space(c)) and durable(op) and fence_in_admission_store(c)
   -> not dispatched_after(op, fence(c))
-state(c) = Closed -> forall op in ledger(c): terminal(op) or incident_bound(op)
+state(c) = Closed -> forall op in ledger(c): terminal(op) or delivery_refused(op) or incident_bound(op)
 ```
 
 ### 6.4 Authorization
@@ -413,7 +418,9 @@ These are quoted from their sources and are normative for every closure kind:
 2. **Escrow follows its agreed deadlines.** The F1 transitions are Fund, Submit, Record accept/reject, Expire (strictly after the refund deadline), Withdraw and Refund (V: `docs/papers/verifiable-work/PROTOCOL.md:48-57`).
    - Closure invokes no chain escrow transition.
    - Funded but unsubmitted children expire or are decided on schedule.
-   - A kernel hold left as outcome-unknown by the drain is released only by `MutuallyAgreedUnknown` or `ContractualCaptureWaiver` under their own preconditions. Neither is ever synthesized by closure.
+   - A kernel hold left as outcome-unknown by the drain is released only by `MutuallyAgreedUnknown` under its own preconditions (spec 9 M7a).
+   - A hold retained with a delivery-refused known return is settled only by the payment owner's own successor, for example a `ContractualCaptureWaiver` once a positive capture is pending (spec 9 M7b, M11a).
+   - Closure never synthesizes any of these.
 3. **Allowance is not money.** "A child has its own actual funding; unused parent allowance is not money" (V: `work-owner-services-design.md:63`).
 4. **Sealed allocations are retained.** "There is deliberately no reset, timeout refund, untrusted absence report or release of sealed allocations" (V: `dynamic-delegation-design.md:86-87`).
 5. **No retargeting.** Provider substitution "does not retarget sealed work" (V: `agentic-work-kernel-design.md:133`). Closure does not either.
@@ -436,6 +443,7 @@ pub struct StrandedCapacity {
     pub s1_unissued_allocations: Vec<PoolAllocationRef>,
     pub process_retained_shares: Vec<ProcessShareRef>,
     pub frozen_holds: Vec<OperationHoldRef>,          // outcome-unknown; released only per 7.2
+    pub retained_delivery_obligations: Vec<OperationHoldRef>, // delivery-refused known returns (spec 9 M11a); settled only by the payment owner
     pub confined_reservations: Vec<ConfinedChildRef>, // P5: at most 16 per scope, never refunded
     pub pinned_artifacts: u64,                        // P4 pins retained by the space (count only)
     pub completeness: EnumerationCompleteness,
@@ -444,11 +452,11 @@ pub struct StrandedCapacity {
 
 The accounting has two snapshots. Both are evidence only.
 - **`stranded_at_fence`** is computed from the owning stores at `Fenced`. It records what the fence cut off, and it is carried in the `Fenced` artifact.
-- **`stranded_final`** is recomputed after every ledger entry is terminal or incident-bound (section 6.3 step 6), immediately before the CAS to `Closed`, and it is carried in the `Closed` artifact. Recomputing matters because the drain changes the picture:
+- **`stranded_final`** is recomputed after every ledger entry is terminal, delivery-refused or incident-bound (section 6.3 step 6), immediately before the CAS to `Closed`, and it is carried in the `Closed` artifact. Recomputing matters because the drain changes the picture:
   - an operation observed as `DispatchCommitted` at the fence can complete and settle under its live lease, or become outcome-unknown and freeze its hold;
   - an in-flight knowledge operation can add a pin after the fence.
 
-  The snapshot at the fence cannot report these, so only `stranded_final` lists the final `frozen_holds` and `pinned_artifacts`.
+  The snapshot at the fence cannot report these, so only `stranded_final` lists the final `frozen_holds`, `retained_delivery_obligations` and `pinned_artifacts`.
 - **After closure.** Changes after `Closed`, such as a frozen hold later released under section 7.2, are recorded by their own evidence, not by amending the artifact.
 - **Reclamation.** A future reclamation design may take a `Closed` artifact's `stranded_final` as a precondition. This spec defines no reclamation.
 
@@ -573,7 +581,8 @@ Every phase ships behind the `authority-space-closure` configuration flag until 
 
     Every new prohibited authority stays refused. Historical reads and already sealed permits keep their documented semantics. Further cases cover interruption mid-migration (the migration resumes or rejects, and never yields empty closure state), a stale legacy owner that writes after retirement (refused by the continuity checks), and both landing orders.
   - AP8 partial progress keeps the record in `Fencing`.
-  - A closure committed after `DispatchCommitted` and before release withholds the output, for caller-executed, native and ordinary durable returns, and the operation terminalizes as `DeniedAfterDelivery`. A restart between the refusal and the terminal completes the terminal.
+  - A closure committed after `DispatchCommitted` and before release withholds the output, for caller-executed, native and ordinary durable returns. With no payment, a zero amount or a prepaid settlement, the operation terminalizes as `DeniedAfterDelivery`. A restart between the refusal and the terminal completes the terminal.
+  - **Closure is not pricing authority (R-9-03).** A positive-cost return on a reversible hold, refused at release by a closure, is recorded as `DeliveryRefused` once. Across restart and closure completion, its hold and journal are unchanged, it is never re-dispatched, and it appears in `stranded_final.retained_delivery_obligations`. The record still reaches `Closed`. A later settlement by the payment owner's own successor terminalizes it once, and that is recorded by the payment evidence, not by amending the artifact.
   - Migration backfill: indexed operations re-derive equal refs. A `legacy_unindexed` operation whose coordinator holds the lease fails its dispatch CAS once any closure fence exists.
   - Stranded accounting: an operation that settles, or becomes outcome-unknown, during the drain, and a pin added after the fence, appear in `stranded_final` and not in `stranded_at_fence`.
 - **Conformance.**
@@ -657,3 +666,9 @@ Where the analogy breaks:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187740955 | Exclude sealed D1 permits from delegation-root fences | Fixed now. A call backed by a permit sealed before admission records `delegation_root_sealed`, which no `DelegationRoot` fence matches. Only issuance-side operations on unsealed slots record `delegation_root`, so closure stops unsealed work only, as section 6.2 requires | section 4.1 rule 1 |
+
+### Independent review pass 5 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-9-03 (spec 4 side) | A withheld result is incorrectly sufficient authority for zero-charge settlement | Fixed with spec 9 M11a. A closure refusal at release decides delivery only. With no positive reversible-hold obligation, the operation terminalizes as `DeniedAfterDelivery`. Otherwise `RefuseDelivery` records `Finalizing(DeliveryRefused)`, and the hold and journal stay with the payment owner. The drain treats that operation as drained, `Closed` admits it, and `stranded_final` lists it as a retained delivery obligation. Closure never releases, waives or captures it, and an outcome-unknown hold is released only by `MutuallyAgreedUnknown` | section 4.1 rule 3a and lemma; section 5 drain table and release rule 2; section 6.3 step 6 and predicate; section 7 item 2; section 8; section 16 test |

@@ -1,6 +1,6 @@
 # Design: pure admission machine
 
-- Status: PROPOSED (revision 3, after the wave 2 cross-spec review of specs 3, 5 and 8, 2026-10-05)
+- Status: PROPOSED (revision 4, 2026-10-05, after independent review pass 5; revision 3 followed the wave 2 cross-spec review of specs 3, 5 and 8)
 - Date: 2026-10-04
 - Scope: one sans-IO transition function over one admission operation model. It becomes the single source of truth for every path that decides what happens to a mediated request: the tool-dispatch evaluators, nested flow, caller-execution reserve, start and report, startup reconciliation, parked-approval retirement, governed active response recovery, recovery's original-operation closure, the closure drain (spec 4) and the stop failure path (spec 8). The seventeen public evaluation methods collapse to one `evaluate` and one blocking adapter. The extractable core is lowered to Lean, checked against a new Apalache model, and used as the deterministic simulation substrate.
 - Out of scope: how commits execute (`2026-10-04-crossing-primitive-design.md`) and what the integrity check means (`2026-10-04-integrity-gated-admission-design.md`).
@@ -11,9 +11,16 @@
   - `formal/`: the Lean theorems, the `AdmissionMachine` Apalache model, and trace validation.
   - `chio-kernel` `tests/dst`: the simulation harness.
 - Related: `2026-07-12-admission-operation-design.md` (saga rules 1-6); M: `docs/security/engineering-standard.md` rules 2.3, 2.5, 5.1 and 5.6; M: `docs/superpowers/specs/2026-09-26-unrepresentable-defects-design.md`; M: `docs/formal/CURRENT_STATE.md`; ADR-0019 item 6 (no wildcard arms over `Constraint`, adopted here by extension); ADR-0022 (kernel decomposition).
-- Citation convention: `M:` = `integration/process-security-m4` at `19df31ad9`, with paths under `crates/kernel/chio-kernel/src/` unless stated. `W:` = the uncommitted recovery working tree at `standalone/arc-worktrees/recoverable-agent-runtime-20261002`; its line references reflect 2026-10-04 and may drift.
+- Citation convention: `M:` = `integration/process-security-m4` at `19df31ad9`, with paths under `crates/kernel/chio-kernel/src/` unless stated. `V:` = `origin/work/verifiable-work-session-20261003` at `14477aaac`, and `V2:` = the same branch at `acf34b074` (the current #1173 head), with the same path convention. `W:` = the uncommitted recovery working tree at `standalone/arc-worktrees/recoverable-agent-runtime-20261002`; its line references reflect 2026-10-04 and may drift.
 - Origin: `docs/research/2026-10-04-chio-kernel-north-star.md` bet 1 (keystone), lever 3 of the internal assessment.
 - Siblings: umbrella `2026-10-04-ftl-lessons-program-design.md`; program specs 1-8 (`closed-kernel-abi`, `authority-faults`, `typed-reservations`, `authority-space-teardown`, `unified-event-queue`, `opaque-adapter-context`, `microkernel-isolation-backend`, `durable-stop-epoch`, each `2026-10-04-<name>-design.md`); north-star specs `2026-10-04-crossing-primitive-design.md` (spec 10) and `2026-10-04-integrity-gated-admission-design.md` (spec 11).
+
+## Revision 4 changes
+
+Independent review pass 5 found that the machine took financial authority from delivery decisions (R-9-03) and put the capture waiver in the wrong execution phase (R-9-04). Section 16 records both. The main changes:
+
+- **Delivery and money are separate facts (R-9-03).** A refusal after the effect now decides only delivery, as a typed `DeliveryRefusal`. The financial disposition comes from the projected payment journal, the recomputed amount and verified contract evidence, never from the terminal name. `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. An ordinary positive-cost refusal keeps its known return and hold in `Finalizing(DeliveryRefused)`, as V2 already does for an ordinary guard denial. Only the payment owner's own explicit successor settles it (M11a).
+- **Each payment successor has its own phase (R-9-04).** `MutuallyAgreedUnknown` stays on the absorbing unknown terminal (M7a). `ContractualCaptureWaiver` resolves a known return's positive pending capture in `Finalizing` (new M7b), through the native journal's fenced `Resolving -> Resolved` protocol, and the original execution result is preserved. The two share rail mechanics, but each keeps its own authority and phase predicate.
 
 ## Revision 3 changes
 
@@ -91,7 +98,10 @@ The machine decides; it never executes. Spec 10 owns how commit effects execute 
 | 20 attachment kinds, including `RuntimeParticipantLedger`, `GovernedApprovalLedger`, `ExecutionNoncePreflight`, `ExecutionNonceIssuance`, `ToolOutcome` and `CallerDispatchContext` | M: `admission_operation.rs:391-412` |
 | Security model: 15 states with a four-valued dispatch state. Its live writer is governed active response. `DelegatedBudgetReserved`, `PaymentAuthorized` and `CallerReserved` have no non-test writer | M: `admission_operation.part1.inc:74-90`, `:144-149`; `kernel/active_response_coordinator.rs:261-272`; `kernel/admission_cleanup/recovery_and_compensation.inc:463-466` |
 | The security store refuses CAS into `CompensationPending`, `CallerReserved` or a terminal without an atomic forward action (a cleanup-action insert) | M: `admission_operation.part2.inc:282-293`, `:326-347` |
-| Payment release authorities on M: are `PreDispatchNoEffect`, `TransportNotAccepted` and `ContractualZeroCharge`. Finalization releases under `ContractualZeroCharge` on denied delivery or zero amount | M: `payment/journal.rs:84-90`; `kernel/admission_coordinator/terminal_payment.rs:23-40`, `:121-125` |
+| Payment release authorities on M: are `PreDispatchNoEffect`, `TransportNotAccepted` and `ContractualZeroCharge`. V: adds `MutuallyAgreedUnknown` and `ContractualCaptureWaiver` | M: `payment/journal.rs:84-90`; V: `payment/journal.rs:88-96` |
+| Finalization chooses `ContractualZeroCharge` only for a zero recomputed amount or a contractual delivery denial. The contractual denials are the committed-digest and finding-delivery contracts, and a checked-output guard that opts in as trusted pricing authority (`output_rejection_is_zero_charge`, "not an inference from an ordinary security denial"). A contractual denial requires a reversible hold | V2: `kernel/delivery_contract.rs:66-175`; `kernel/mod.rs:931-942`; `kernel/output_guard.rs:51-105`; `kernel/admission_coordinator/terminal_payment.rs:111-125` |
+| An ordinary guard denial at release is an error, not a delivery denial. Startup retains the known return and its hold in `Finalizing`, claims the operation under the current fence and continues with unrelated operations. Neither path authorizes another dispatch | V2: `kernel/admission_coordinator/recovery.rs:341-356`; `spec/EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md:138-149` |
+| A contractual capture waiver resolves a known return: `Finalizing`, a recorded tool outcome, a reversible hold, and a positive capture pending in `Settling` or `ReconcileFailed` with no transaction id. Its successor goes fenced `Resolving -> Resolved`, and finalization then projects a settled receipt with zero charged units and the original realized cost. A mutually agreed release instead requires `OutcomeUnknownAfterDispatch` and no known outcome | V2: `payment/contractual_resolution.rs:224-245`; `kernel/admission_coordinator/terminal_payment.rs:24-35`; `spec/EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md:66-134` |
 | Seventeen public evaluation methods: 6 async, 6 blocking and 4 nested `evaluate_tool_call*`, plus `authorize_tool_call_reserving_blocking_with_metadata`, which `chio-api-protect` calls in production | M: `kernel/evaluation/evaluation_entry.rs:98-235`; `sync_evaluation_wrapper.rs:4-110`, `:204-222`; `session_ops/nested_tool_call.rs:36-195`; `crates/products/chio-api-protect/src/proxy/mediated.rs:591` |
 | Five evaluation dispositions: kernel, legacy reservation, caller reservation, caller report, caller start. Caller execution re-runs the full evaluator under the last three | M: `kernel/evaluation/mod.rs:83-121`; `kernel/evaluation/caller_execution.rs:233`, `:412`, `:462` |
 | Deciders of in-flight operations | (1) startup `reconcile_recoverable_admissions` (M: `recovery.rs:133-352`); (2) `retire_expired_parked_admission` (`recovery.rs:368-389`); (3) governed active response recovery `recover_nonterminal_active_response_operations_with_authorities`, which compensates `Prepared` and `ApprovalReserved` and converges a `DispatchCommitted` approval without terminalizing (`kernel/admission_cleanup.rs:633-709`), plus the committed-resume path that rolls a committed approval forward (`kernel/active_response_committed_recovery.rs:204`, `:424`; `admission_cleanup.rs:551-599`); (4) the post-dispatch error arms that terminalize (`async_evaluation_core.rs:1744-1761`, with matching arms in `nested_flow_evaluation.rs`); (5) W:'s `reconcile_recovery_original` (W: `kernel/admission_coordinator/recovery_runtime.rs:184-265`). Specs 4 and 8 would add a sixth and a seventh |
@@ -132,8 +142,29 @@ pub struct AdmissionState {
     pub plan: ParticipantPlan,            // ordered participants required for this request (data)
     pub facts: ParticipantFacts,          // which participants are acknowledged, by digest
     pub capture: CaptureFact,             // NotRequired | NotCommitted | Committed | Unknown
+    pub payment: PaymentFact,             // projection of the native payment journal; the machine never writes it (M7b, M11a)
     pub unknown_hold: UnknownHold,        // None | Frozen | Releasing { .. } | Released(UnknownOutcomeRelease); M7a
     pub version: u64,
+}
+
+pub struct PaymentFact {                  // projected from the payment journal (V: payment/journal.rs); read-only to the machine
+    pub required: bool,                   // the payment requirement flag
+    pub rail_mode: RailMode,              // ReversibleHold | PrepaidFinal
+    pub journal: JournalState,            // the eight journal states, HoldPlaced through ReconcileFailed
+    pub pending_capture: bool,            // settle action Capture with a positive amount and no transaction id
+    pub resolution: Option<PaymentReleaseAuthorityKind>, // the journal's recorded release or successor authority, if any
+}
+
+pub enum PostReturnStage {
+    // the existing post-return stages, from the tool-outcome attachment
+    ..,
+    DeliveryRefused(DeliveryRefusal),     // M11a: output withheld for good; the known return and every hold are retained
+}
+
+pub enum DeliveryRefusal {                // decides delivery only; carries no financial authority (M11a)
+    Fence(CommitFailure),                 // AuthoritySpaceClosed | Revoked | InsufficientIntegrity at a release crossing (M11)
+    Rejected(PostEffectRejection),        // an ordinary post-effect rejection (M16), including an ordinary guard denial; never ContractualDelivery
+    Contractual(DeliveryDenialReason),    // spec 3's ContractualDelivery: a verified, request-bound delivery contract or opted-in checked-output guard (V2: delivery_contract.rs:66-175)
 }
 
 pub enum Phase {
@@ -200,7 +231,7 @@ Rules for the plan and facts:
 | `DispatchCommitted` (both) | `DispatchCommitted` | capture `Committed` when required |
 | `AwaitingCallerReport` (tool) | `AwaitingCallerReport` | as above |
 | `CallerReserved` (security, dormant) | `AwaitingCallerReport` | as above |
-| `Finalizing` (tool) | `Finalizing(stage)` | stage from the tool-outcome attachment |
+| `Finalizing` (tool) | `Finalizing(stage)` | stage from the tool-outcome attachment; `DeliveryRefused(r)` when a delivery-refusal attachment is present (M11a). `payment` comes from the operation's payment journal in every phase |
 | `CompensationPending` (security) | `Compensating` | facts retained for release |
 | `MutationReady`, `MutationSubmitted` (economic) | `Mutation(Ready)`, `Mutation(Submitted)` | `NotRequired` |
 | Every terminal (both) | `Terminal(..)` with the same name | unchanged |
@@ -211,6 +242,8 @@ Rules for the plan and facts:
 - For the security model it also returns the **atomic forward action** (kind and payload digest) that every compensation, caller reservation and terminal requires (M: `part2.inc:282-293`, `:326-347`).
 - `Authorized` persists as the state the prior record already holds (`BudgetAuthorized` or `ApprovalReserved`). `Ready` persists as `ReadyToDispatch`. So `Authorized -> Ready` is exactly the legacy `ReadyToDispatch` step.
 - `persist(project(r), r, model, kind) == r` for every reachable record of both models. This is a unit test and a Kani harness.
+- **The delivery-refusal attachment is new persisted state.** It lands with M11a in migration phase 3, together with spec 4's closure fence, the first new post-effect refusal source. It is not part of phases 0-2, which keep the no-format-change rule. Until it lands, an ordinary guard refusal is re-derived at each startup and the operation is claimed, as V2 does (V2: `kernel/admission_coordinator/recovery.rs:341-356`), and it projects to `Finalizing(stage)`.
+- `payment` is never persisted through `persist`. The payment-journal port owns every journal write, including M7a, M7b and settlement (section 7).
 
 ### 4.3 Security model scope
 
@@ -276,7 +309,9 @@ pub enum AdmissionEvent {
     PostEffectStepFailed { step: PostEffectStep, cause: PostEffectCause },  // M16
     ReceiptAppendFailed { outcome: AppendFailure },                         // M16; spec 10 receipts append
     ReceiptReadBack { original_present: bool },                             // after AppendFailure::Unknown drains
-    ReleaseAuthorized { authority: UnknownOutcomeRelease, evidence: Digest }, // M7a: counterparty-authorized hold release
+    ReleaseAuthorized { authority: UnknownOutcomeRelease, evidence: Digest }, // M7a: counterparty-authorized release of an unknown hold
+    CaptureWaiverAuthorized { evidence: Digest },    // M7b: verified contractual capture waiver for a known return
+    ObligationSettled { journal: Digest },           // M11a: the payment owner settled a retained delivery obligation
     Cut { cause: CutCause, facts: CutFacts, now: AuthorityTime },
     Tick { now: AuthorityTime },
 }
@@ -287,9 +322,9 @@ pub enum CommitFailure {  // spec 10 CrossingRefused, plus two non-policy reason
     Unavailable,          // the fused form is ineligible (its preconditions do not hold): re-plan. Never a storage failure (M19)
 }
 
-pub enum UnknownOutcomeRelease {  // the counterparty-authorized release kinds (V: payment/journal.rs:88-96)
+pub enum UnknownOutcomeRelease {  // the counterparty-authorized release of an unknown hold (V: payment/journal.rs:88-96)
     MutuallyAgreedUnknown,
-    ContractualCaptureWaiver,
+    // ContractualCaptureWaiver is not here: it resolves a known return in Finalizing (M7b), never an unknown one
 }
 
 pub enum UnknownHold {
@@ -365,6 +400,8 @@ pub enum Effect {
     Compensate { cause: CompensationCause, release: Option<MachineRelease>, receipt: ReceiptPlan, expected_version: u64 },
     Terminalize { terminal: Terminal, release: Option<MachineRelease>, receipt: ReceiptPlan, expected_version: u64 },
     ReleaseHold { authority: UnknownOutcomeRelease, evidence: Digest, expected_version: u64 }, // M7a; payment-journal port
+    ResolveCaptureWaiver { evidence: Digest, expected_version: u64 }, // M7b; payment-journal port, fenced Resolving -> Resolved
+    RefuseDelivery { refusal: DeliveryRefusal, expected_version: u64 }, // M11a; restrictive, non-crossing; holds and journal untouched
     FlushChildReceipts,                      // nested flow, before the parent's receipt
     ReplayTerminal,                          // return the bound terminal result
     SignReceipt { decision: ReceiptDecision, metadata: ReceiptMetadataPlan }, // receipts not bound to a state change
@@ -378,7 +415,7 @@ pub enum Effect {
 
 pub enum HaltReason {
     CommitOutcomeUnknown,                    // M12
-    RefusedAfterEffect(CommitFailure),       // M11, before the DeniedAfterDelivery terminal
+    RefusedAfterEffect(CommitFailure),       // M11, before the M11a refusal record or terminal
     RefusedAfterCapture(CommitFailure),      // M10, intent remainder refused after a committed capture
     InvariantViolation,                      // M11 ReservationConflict after the effect
     AuthorityCut,                            // cut table, X column, post-dispatch rows and committed capture
@@ -423,10 +460,26 @@ pub enum IdentityDisposition {
 - `CheckOnlyPlan` lists the crossing checks for a read-only or `NonDurable` call. The receipt rides the release commit for a read, and the receipt append (M16) for a `NonDurable` call.
 - Each plan carries the expected operation version (spec 10 rule X5).
 
-**Release authorities.**
+**Release authorities and financial disposition.**
 - The machine emits `PreDispatchNoEffect` (compensation), `TransportNotAccepted` (proven non-acceptance) and `ContractualZeroCharge`.
-- `ContractualZeroCharge` is emitted only in an `OutcomeCommit` or `Terminalize` whose recomputed amount is zero, or whose terminal is `DeniedAfterDelivery` (M: `terminal_payment.rs:121-125`).
-- Releases after an unknown outcome (`MutuallyAgreedUnknown`, `ContractualCaptureWaiver`) are counterparty-authorized, never machine-originated. They arrive as the typed event `ReleaseAuthorized` and drive the `ReleaseHold` effect (M7a). The payment-journal port executes it and records the release kind (V: `payment/journal.rs:88-96`). When the hold sits on an external rail, the port first runs an `ExternalPrepare { Settle }` crossing (spec 10). The admission phase never changes: `Terminal(OutcomeUnknownAfterDispatch)` stays absorbing, and only the `unknown_hold` fact moves, from `Frozen` through `Releasing` to `Released`. `Released` is recorded only on the `ReleaseHold` acknowledgement (M7a; spec 3; spec 4 section 5 rule 2).
+- **Delivery never decides money.** A refusal after the effect decides only delivery, as a `DeliveryRefusal` (M11a). The financial disposition of an executed call is a separate pure function, `settle_after_return(payment, amount_is_zero, delivery)`. It reads the projected `PaymentFact`, the amount the hydrator recomputes from the recorded return as V2 does (V2: `terminal_payment.rs:82-110`), and the delivery result. It never reads a terminal name:
+
+  | Payment | Delivery | Financial disposition |
+  |---|---|---|
+  | not required | any | none; the terminal carries no payment plan |
+  | recomputed amount zero | any | `ContractualZeroCharge`, as a zero amount (M: `terminal_payment.rs:121-125`) |
+  | `PrepaidFinal`, positive | released, `Fence(..)` or `Rejected(..)` | the prepaid settlement stands. No release, no refund |
+  | `PrepaidFinal`, positive | `Contractual(..)` | not reachable: the pre-dispatch gate rejects non-reversible rails for contract-bound requests (V2: `terminal_payment.rs:111-120`). If reached: `Fault { InvariantViolation }` and `Retain`, never a release |
+  | `ReversibleHold`, positive | released | capture of the recomputed amount |
+  | `ReversibleHold`, positive | `Contractual(reason)` | `ContractualZeroCharge`. The verified, request-bound contract is the pricing authority (V2: `output_guard.rs:51-105`, `delivery_contract.rs:66-175`) |
+  | `ReversibleHold`, positive | `Fence(..)` or `Rejected(..)` | **retained obligation**: no release and no capture. The hold and the journal stay as they are until the payment owner settles them (M11a) |
+
+- `ContractualZeroCharge` is therefore emitted only in an `OutcomeCommit` or `Terminalize` whose recomputed amount is zero, or whose delivery refusal is `Contractual` under a reversible hold. A `DeniedAfterDelivery` terminal is never sufficient on its own.
+- **Payment successors are never machine-originated, and each has its own phase.** They come from the native payment owner with their own signed authority, and the payment-journal port executes them and records the authority kind (V: `payment/journal.rs:88-96`). They share the fenced, idempotent rail mechanics of M7a (spec 10 X17b), not their authority or phase predicates:
+  - `MutuallyAgreedUnknown` releases an unknown hold. It arrives as `ReleaseAuthorized` in `Terminal(OutcomeUnknownAfterDispatch)` and drives `ReleaseHold` (M7a). The phase stays absorbing, and only the `unknown_hold` fact moves, from `Frozen` through `Releasing` to `Released`. `Released` is recorded only on the `ReleaseHold` acknowledgement (M7a; spec 3; spec 4 section 5 rule 2).
+  - `ContractualCaptureWaiver` resolves the positive pending capture of a known return. It arrives as `CaptureWaiverAuthorized` in `Finalizing` and drives `ResolveCaptureWaiver` (M7b). The execution result never changes.
+  - Settlement of a retained delivery obligation arrives as `ObligationSettled` (M11a).
+  - When the hold sits on an external rail, the port first runs an `ExternalPrepare { Settle }` crossing (spec 10).
 
 **Compensation causes map to the legacy policy strings** bound into the no-effect proof:
 
@@ -477,8 +530,13 @@ pub enum IdentityDisposition {
        - **Key rotation only after proof.** A return to `Frozen` happens only through a durable `release_abandoned` record, written after a definitive keyed rejection (`IdempotentPerKey`) or a successful fence (`FenceByKey`). Either one proves that the old request can never execute. The same transaction increments `attempt_generation`, so the next authorization derives a fresh `hold_release_key`. The rail neither replays the cached rejection nor refuses the replacement as fenced.
        - **No rotation without proof.** Without that record the key never rotates. A delayed original therefore stays deduplicated or fenced, and a replacement carrying a new key is only ever submitted after the old key is provably dead.
        - **Required semantics, answering the owner's rail question.** An adapter qualifies for unknown-outcome releases only if it provides at-most-once execution per caller-supplied key for the hold's lifetime, or a terminal fence by key whose success excludes later acceptance. A current-state lookup does not qualify. Chio names no specific rail here. Each adapter declares its capability, and its conformance test covers a delayed original request delivered after a negative status query, both before and after a replacement request.
-     - The driver verifies the evidence (the counterparty's signed agreement, or the contract's capture-waiver term) before it feeds the event. The machine checks only the phase and the hold fact.
+     - The driver verifies the evidence before it feeds the event: the receiver and counterparty signatures over the mutually agreed terms, bound to the original signed terminal projection, an operation with no known tool outcome, and the exact authorized journal (V2: `spec/EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md:66-99`). The machine checks only the phase and the hold fact.
      - This is how a hold frozen by M7, M12 or the cut table is released after migration. It never moves money on the machine's own authority (T4, T6).
+   - **M7b. Contractual capture waiver on a known return.** `CaptureWaiverAuthorized { evidence }` is accepted only in `Finalizing(stage)`, any stage including `DeliveryRefused`, with a recorded tool outcome. Its `payment` fact must show a reversible hold, journal `Settling` or `ReconcileFailed`, and `pending_capture`. These are the native verifier's predicates (V2: `payment/contractual_resolution.rs:224-245`). In every other phase or payment state, `Terminal(OutcomeUnknownAfterDispatch)` included, the event is illegal (M2) and releases nothing. An unknown execution never satisfies this profile. A known return is never re-classified as unknown to satisfy M7a.
+     - It emits `ResolveCaptureWaiver { evidence, expected_version }`. The payment-journal port runs the existing contractual-waiver protocol (V: `QualifiedContractualCaptureWaiverStore`). A fenced `Resolving` successor commits before any rail action, and `Resolved` with authority `ContractualCaptureWaiver` commits only on confirmed release (V2: `spec/EXECUTION_EVIDENCE_AND_PAYMENT_SUCCESSORS.md:101-134`). The phase stays `Finalizing`, and only `payment` moves.
+     - **Finalization then continues.** Once the journal is `Resolved` under `ContractualCaptureWaiver`, the ordinary `OutcomeCommit` or `Terminalize` runs for the same operation. It keeps the original output, delivery decision, operation identity and positive realized and budget cost. It projects a successfully settled receipt with zero charged units (V2: `terminal_payment.rs:24-35`). The terminal is `Completed` or `DeniedAfterDelivery`, chosen by the delivery decision alone. The waiver never authorizes another dispatch.
+     - **Failure, unknown outcome and repeats.** Retries resume the original `Resolving` successor and its rail identity, so a lost acknowledgement never creates a second successor. An unknown outcome yields `HaltOperation { CommitOutcomeUnknown }`, and re-projection resolves it from the `Resolving` or `Resolved` row. A rail-held resolution uses M7a's per-attempt key and adapter capability rules (`IdempotentPerKey` or `FenceByKey`). A duplicate with the same evidence yields `Retain`, and different evidence while `Resolving` is illegal. `StoreUnavailable` retains the same member (M19).
+     - The driver verifies the signed terms, the observation and their bindings to the retained native records before it feeds the event (section 7). The machine checks only the phase and the payment facts.
 8. **M8. Cuts.** A `Cut` event is classified only by the normative table of section 6.1.
 9. **M9. Liveness protection.** `Prepared` with `nonce_issuance_live`, and `Ready` with `caller_reservation_live`, are retained under `StartupRecovery`, and under `RecoveryClosure` only while control is `Active` (M: `recovery.rs:206-221`; W: `recovery_runtime.rs:213-218`). No other cause is protected.
 10. **M10. Pre-dispatch commit failures.** Rows match on the failed effect, its starting phase and the reason. The reason is inspected before any generic row applies, so a non-policy reason (`Unavailable`, `VersionConflict`, `Overloaded`) never compensates. Every `CommitFailure` reason has a row for every pre-dispatch effect, so none reaches M2's illegal-event arm. A store failure arrives as `StoreUnavailable`, not as a `CommitFailure`, and M19 handles it for every effect. M20 assigns each row's identity disposition.
@@ -509,15 +567,15 @@ pub enum IdentityDisposition {
       - On the outcome commit of a two-commit read (spec 10 X14), from `DispatchCommitted` with no return record: emit `ReturnRecord` with the returned bytes, which moves the operation to `Finalizing(stage)` with output withheld. The driver returns `OutputWithheld { operation_id, reason: KernelStopped }` (spec 8). The read is never re-dispatched (S8-18).
       - `ReturnRecord` is progress-only and never stop-checked, so a stop cannot refuse it. That includes the caller report: `CallerReportAuthenticated` in `AwaitingCallerReport` emits `ReturnRecord` and moves to `Finalizing`. Only the later `OutputRelease` inside `OutcomeCommit` is stop-checked (S8-12).
       - The legacy startup reconciler adopts this rule in spec 8 phase 1, before this machine replaces it. The stop heads load before the sweep, and a `KernelStopped` finalization error during the sweep retains the operation instead of failing startup (S8-01; M: `kernel/admission_coordinator/recovery.rs:295-358`).
-    - **`AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`.** `HaltOperation { RefusedAfterEffect(reason) }`, then `Terminalize(DeniedAfterDelivery)` with a `DenyDelivery` receipt naming the reason and retained markers. The release follows the terminal payment plan, and the terminal clears the halt.
+    - **`AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`.** `HaltOperation { RefusedAfterEffect(reason) }`, then M11a with `DeliveryRefusal::Fence(reason)`. The output is withheld for good. The financial disposition, not the refusal, chooses between a `DeniedAfterDelivery` terminal now and a retained obligation. The refusal record or the terminal clears the halt.
       - The `OutputRelease` closure-fence check is spec 4 section 4.1 rule 3a. For operations marked `legacy_unindexed` it includes spec 4 rule 1a's legacy predicate, so an operation admitted before the authority-ref index existed is still fenced.
-      - The mapping holds for every driver that emits the commit. When `StartupReconciler` or `FinalizingRetryDriver` re-emits a retained finalization and the release is refused with `AuthoritySpaceClosed`, the operation terminalizes as `DeniedAfterDelivery`. It is never retained indefinitely, and it is never compensated.
+      - The mapping holds for every driver that emits the commit. When `StartupReconciler` or `FinalizingRetryDriver` re-emits a retained finalization and the release is refused with `AuthoritySpaceClosed`, the operation follows M11a. It terminalizes as `DeniedAfterDelivery` when no positive reversible-hold obligation remains. Otherwise it is recorded as `DeliveryRefused` once and then retained quiescent with its obligation. It never loops on the refused release, and it is never compensated.
     - **`ReservationConflict`.** `HaltOperation { InvariantViolation }` and `Fault`. It is unreachable after the effect, because reservations commit in the intent commit, so reaching it is an invariant violation.
     - **`VersionConflict`.** Re-project.
     - **`Overloaded`.** Not produced for post-effect members, because spec 10 X17b admits them past the queue bound. If received: `Retain`, and the driver re-submits the same plan. Never compensates.
     - **`Unavailable`.** The fused outcome commit's preconditions no longer hold, for example because settlement needs an external rail capture. `Unavailable` never means the store failed; that is `StoreUnavailable` (M19). From `Finalizing`, the driver feeds `Replan { slow_path: true }`. The machine then emits the settlement as `ParticipantCommit` groups (spec 10 `ExternalPrepare { Settle }`), followed by the rest of the `OutcomeCommit`. On a two-commit read with no return record (spec 10 X14), `ReturnRecord` comes first.
     - **Totality.** Every `CommitFailure` reason has a row here for every post-effect effect, so none reaches M2's illegal-event arm.
-      - `Terminalize`, `Compensate` and `ReleaseHold` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project), `CommitOutcomeUnknown` (M12) and `StoreUnavailable` (M19) can fail them. A refused or unknown `ReleaseHold` follows M7a: back to `Frozen`, or `HaltOperation` while `Releasing`. A `StoreUnavailable` keeps `Releasing` and re-submits the same `ReleaseHold` (M19).
+      - `Terminalize`, `Compensate`, `RefuseDelivery`, `ReleaseHold` and `ResolveCaptureWaiver` are non-crossing commits. They run no policy check, so only `VersionConflict` (re-project), `CommitOutcomeUnknown` (M12) and `StoreUnavailable` (M19) can fail them. A refused or unknown `ReleaseHold` follows M7a: back to `Frozen`, or `HaltOperation` while `Releasing`. `ResolveCaptureWaiver` follows M7b. A `StoreUnavailable` keeps `Releasing` and re-submits the same `ReleaseHold` (M19).
       - Every `Retain` above has a re-feed source. The `FinalizingRetryDriver` (section 7) feeds `Tick` when the stop is resumed and with bounded backoff. `StartupReconciler` covers restart.
     - **Classes with no row** (read-only and `NonDurable`). A refused release signs a `Withheld` receipt through a non-crossing commit, `KernelStopped` included. There is no durable custody to retain the output in, so the output is dropped and the receipt records that. Whether a retry is safe differs by class:
       - **Read-only (check-only).** The call is eligible only when `can_redispatch_unknown_read` holds (section 4.4), so a retry is safe whenever the refusal's cause can clear. The retry advice follows the actual reason:
@@ -525,6 +583,19 @@ pub enum IdentityDisposition {
         - `StoreUnavailable`: `retry: AfterStoreRecovery`, `Reusable` (M19);
         - `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity`: `retry: Never`, `Terminal`. A resume cannot clear these, so the client is never told to wait for one.
       - **`NonDurable`.** The effect has executed and nothing binds a retry to it. A retry would redispatch the side effect, as spec 5 confirms for non-durable calls. The `Withheld` receipt therefore records `effect_executed: true`, and its stop block sets `retryable_after_resume: false` (spec 8 S15). The driver returns the terminal `OutputWithheld { retry: Never, effect_executed: true }`, and the result is final for that request. `KernelStopped` is temporary only for refusals before dispatch. A deployment that cannot accept dropped output must not run `Monetary` or development `Off` modes (spec 3 open decision 1).
+    - **M11a. Delivery refusal and retained obligations.** Every durable-class refusal after the effect that withholds output for good applies this rule: the fence reasons above, the M16 rejections, and a contractual delivery denial. `KernelStopped` and `StoreUnavailable` are temporary and never reach it.
+      - The machine computes `settle_after_return` (section 5.2). When the result is terminal (no payment, a zero amount, a prepaid settlement, or `ContractualZeroCharge` for a `Contractual` refusal under a reversible hold), it emits `Terminalize(DeniedAfterDelivery)` with that payment plan. The terminal carries a `DenyDelivery` receipt that names the refusal, with retained markers, and it is a restrictive, non-crossing commit.
+      - When the result is a retained obligation, it emits `RefuseDelivery { refusal }`, a restrictive, non-crossing commit that moves to `Finalizing(DeliveryRefused(refusal))`.
+        - It records the refusal and withholds the output for good. The known return, every hold and the payment journal stay exactly as they were.
+        - No receipt is signed at this point. The driver returns `OutputWithheld { operation_id, reason, retry: Never, effect_executed: true }`.
+        - This is V2's retained ordinary denial (V2: `kernel/admission_coordinator/recovery.rs:341-356`), recorded durably so that no later re-feed can release the output.
+        - A two-commit read with no return record (spec 10 X14) commits its `ReturnRecord` first, as M11 does for `KernelStopped`.
+      - **Quiescent.** A `DeliveryRefused` operation is never re-dispatched, re-released or compensated, and `FinalizingRetryDriver` does not re-feed it. `StartupReconciler` claims it under the current serving fence and continues with unrelated operations, as V2 does. A replay of the request id gets the same `OutputWithheld { retry: Never }` and never a dispatch. Only these events act on it:
+        - `ObligationSettled { journal }`. The native payment owner settled the obligation through one of its own explicit successors, with its own signed authority and the original operation identity. The driver feeds the event only after the journal reads back as `Settled`, `Resolved` or `Closed` with a recorded authority. The machine then emits `Terminalize(DeniedAfterDelivery)` with no `MachineRelease`, and the receipt carries the journal's final financial state.
+        - `CaptureWaiverAuthorized` (M7b), once the journal has a positive pending capture. After `Resolved`, the operation terminalizes as above.
+        - `Tick` and every `Cut` cause yield `Retain`.
+      - **No settlement on the machine's own authority.** The machine never chooses which successor settles a retained obligation, and it never captures or releases one itself. Open decision 8 leaves that choice to the payment owners. Until they make it, the obligation stays retained and visible through `Fault { RetainedDeliveryObligation }` and spec 4's closure progress.
+      - Budget accounting follows the existing terminal rule for an executed call, at whichever terminal ends the operation. A refusal never restores budget, and it never re-classifies the known return as unknown.
 12. **M12. Unknown commit outcome.** `CommitOutcomeUnknown` from any effect yields `HaltOperation { CommitOutcomeUnknown }`, with no compensation, no dispatch and no state change.
     - This is the machine form of spec 3's `BoundaryFailure::CommitUnconfirmed`: every hold and credential is retained.
     - When the unknown commit is pre-dispatch (an `IntentCommit` or a slow-path dispatch-commit step), a second group signs the ambiguous `SignReceipt(Deny)` with retained markers, as M: does today (M: `kernel/evaluation/dispatch_commit_failure.rs:40-75`). That receipt carries `identity_disposition = Retained` (M20). It is evidence of an unresolved attempt, not the operation's terminal record.
@@ -564,7 +635,8 @@ pub enum IdentityDisposition {
 
     | Event | Durable class | Classes with no row (read-only, `NonDurable`) |
     |---|---|---|
-    | `PostEffectStepFailed { cause: Rejected(PostInvocationBlocked or OutputContract or StreamLimit) }` | the pure result enters `OutcomeCommit`, which terminalizes `DeniedAfterDelivery` with a `DenyDelivery` receipt and retained markers (M: `responses/finalization.rs:43`) | `SignReceipt(DenyDelivery)` with retained markers, appended |
+    | `PostEffectStepFailed { cause: Rejected(PostInvocationBlocked or OutputContract or StreamLimit) }` | M11a with `DeliveryRefusal::Rejected(r)`: the pure result enters `OutcomeCommit`, which terminalizes `DeniedAfterDelivery` with a `DenyDelivery` receipt and retained markers (M: `responses/finalization.rs:43`) when `settle_after_return` is terminal, and otherwise records `DeliveryRefused` with the obligation retained. An ordinary rejection never carries `ContractualZeroCharge` | `SignReceipt(DenyDelivery)` with retained markers, appended. A positive monetary authorization is never released by the refusal (spec 3 rule 27) |
+    | `PostEffectStepFailed { cause: Rejected(ContractualDelivery(reason)) }` | M11a with `DeliveryRefusal::Contractual(reason)`: `Terminalize(DeniedAfterDelivery)`, with `ContractualZeroCharge` under a reversible hold (V2: `terminal_payment.rs:111-125`) | not reachable: only the durable finalizer evaluates contract-bound delivery (V2: `kernel/admission_coordinator/terminal.rs:546`, `:1065`), and the checked-output profile requires durable coverage (V2: `kernel/mod.rs:931-942`) |
     | `PostEffectStepFailed { cause: Rejected(Revoked) }` | as M11 `Revoked` | `SignReceipt(DenyDelivery)`, matching M: `allow_responses.rs:53` |
     | `PostEffectStepFailed { cause: Rejected(ReleaseRefused(r)) }` | as M11 for `r` | as M11 for `r` |
     | `PostEffectStepFailed { step: CredentialCommit, .. }` | not reachable: the intent commit holds the credentials | `SignReceipt(Cancelled)` with today's `POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON` and `execution_outcome: "unknown"` |
@@ -622,6 +694,7 @@ pub enum IdentityDisposition {
     | `DenyTombstone` (M10, spec 10 X15) | `Terminal` |
     | `Compensate` of a persisted operation: `Prepared`-intent refusals and slow-path refusals for any reason, `KernelStopped` included (M10, M15), cut-table compensations, drop compensations | `Terminal` |
     | `Terminalize` for any terminal, including `DeniedAfterDelivery`, `OutcomeUnknownAfterDispatch` and `NotAcceptedAfterDispatchCommit` | `Terminal` |
+    | `RefuseDelivery` (M11a) | no receipt at that point. The driver's `OutputWithheld { retry: Never, effect_executed: true }` is a response, and the operation's later `DeniedAfterDelivery` receipt is `Terminal` |
     | Post-effect receipts of classes with no row (M16): `DenyDelivery`, `Cancelled`, a `NonDurable` `Withheld { retry: Never }` | `Terminal` |
     | The ambiguous deny for an unknown pre-dispatch commit (M12; spec 3 `BoundaryFailure::CommitUnconfirmed`; spec 10 X22 members answered `OutcomeUnknown`) | `Retained`: the store may hold a row for the id, and reconciliation supplies the terminal record |
 
@@ -657,6 +730,7 @@ Columns: `S` = `StartupRecovery`; `A` = `RecoveryClosure` with control `Active`;
 | `DispatchCommitted`, `caller_report_custody` | `CallerAwaitReport` to `AwaitingCallerReport` | as S | `Terminalize(OutcomeUnknownAfterDispatch)` (W:) | `HaltOperation { AuthorityCut }`, `CancelTransport`, then as S |
 | `DispatchCommitted`, otherwise | `NotAccepted` proof in `dispatch_status`: `Terminalize(NotAcceptedAfterDispatchCommit, TransportNotAccepted)`; else `Terminalize(OutcomeUnknownAfterDispatch)` | as S | as S | `HaltOperation { AuthorityCut }`, `CancelTransport`, then as S |
 | `AwaitingCallerReport` | Retain | Retain | `HaltOperation { UnsettledCallerCustody }` plus `Fault { UnsettledCallerCustody }` (open decision 1) | `HaltOperation { UnsettledCallerCustody }` plus the same fault |
+| `Finalizing(DeliveryRefused)` | Retain: claim under the current fence and continue with other operations; never re-release, re-dispatch or compensate (M11a) | as S | as S | as S: the output is already withheld for good, and spec 4's closure progress counts the retained obligation |
 | `Finalizing`, return `Recoverable` | next post-return stage | as S | as S | `HaltOperation { AuthorityCut }`, then as S |
 | `Finalizing`, return `Unrecoverable` | Retain plus `Fault { UnrecoverableReturn }` (M: claims recovery and continues, `recovery.rs:308-318`) | as S | as S | as S |
 | `Compensating` | Compensate (drive again) | as S | as S | as S |
@@ -687,6 +761,8 @@ effect_crossed(s, cause, f) = s.phase = DispatchCommitted
 | Wildcard phases | `claim_admission_recovery` | no action | no wildcard; every phase has a row |
 | Governed `ApprovalReserved` with a committed approval | startup recovery stages compensation (`admission_cleanup.rs:661-676`); the resume path rolls forward (`:551-599`) | not covered | roll forward under every cause |
 | Clock | fallible authority clock | infallible system clock (W: `admission_coordinator.rs:192-194`) | authority clock only (umbrella N15) |
+| Ordinary refusal of a positive reversible-hold return | V2: an error each time; startup re-derives it and claims the operation (`recovery.rs:341-356`) | not covered | `RefuseDelivery` records `DeliveryRefused` once, then the operation stays quiescent with its obligation (M11a) |
+| Ordinary refusal with no positive reversible-hold obligation (no payment participant, a zero amount, or a prepaid settlement) | V2: retained in `Finalizing` like every ordinary guard denial | not covered | `Terminalize(DeniedAfterDelivery)` with the M11a disposition. No financial decision remains, so retention would only strand the request id; a prepaid settlement stands and is never refunded |
 | `Finalizing` while the kernel is stopped | the finalization error fails startup (M: `recovery.rs:295-358`), so a host restarted during a stop never starts | not covered | Retain with output withheld (M11); spec 8 phase 1 adopts this in the legacy reconciler (S8-01) |
 
 ## 7. Drivers and ports
@@ -704,8 +780,9 @@ effect_crossed(s, cause, f) = s.phase = DispatchCommitted
 | `DrainDriver` (spec 4) | `Cut(AuthorityCut { trigger })` | as above |
 | `ReservationReconcileDriver` | settlement of a reserved authorization by nonce (M: `kernel/reconciliation.rs:148`) | as above |
 | `DropReconcileJob` | for a driver dropped after submitting its dispatch-commit crossing: the writer's reply for that member, then `Cut(DriverDropped)` (M17) | as above |
-| `FinalizingRetryDriver` | `Tick` to every operation retained in `Finalizing` (stop-withheld output, infrastructure fault, re-submitted plan). It fires on the `StopHeads` watch when a stop is resumed, and with bounded backoff otherwise (M11, M16) | `CrossingPort` |
-| `UnknownReleaseDriver` | `ReleaseAuthorized` after it verifies a counterparty agreement or contractual capture waiver for a frozen hold. From `ReleaseSubmitted` it resolves the release only through the adapter's declared `IdempotentPerKey` or `FenceByKey` capability, never from a status query alone (M7a) | payment-journal port, `CrossingPort` |
+| `FinalizingRetryDriver` | `Tick` to every operation retained in `Finalizing` (stop-withheld output, infrastructure fault, re-submitted plan), except `DeliveryRefused` (M11a). It fires on the `StopHeads` watch when a stop is resumed, and with bounded backoff otherwise (M11, M16) | `CrossingPort` |
+| `UnknownReleaseDriver` | `ReleaseAuthorized` after it verifies a mutually agreed release for a frozen unknown hold. From `ReleaseSubmitted` it resolves the release only through the adapter's declared `IdempotentPerKey` or `FenceByKey` capability, never from a status query alone (M7a) | payment-journal port, `CrossingPort` |
+| `PaymentSuccessorDriver` | `CaptureWaiverAuthorized` after the existing waiver verifier accepts the signed terms, the observation and their bindings to the retained native records (V2: `payment/contractual_resolution.rs`) (M7b). `ObligationSettled` after a retained delivery obligation's journal reads back as settled by the payment owner's own successor (M11a). It never chooses a successor | payment-journal port, `CrossingPort` |
 | `StoreRecoveryDriver` | re-feeds every operation retained under M19 with its same planned member: with bounded backoff, and at once on spec 10's `store_healthy` signal. After a poisoned owner, `StartupReconciler` takes over at restart | `CrossingPort` |
 
 The rules for drivers:
@@ -807,7 +884,7 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 | T1 `prepared_first` | no participant-mutating step precedes `Prepared` | saga rule 1 |
 | T2 `commit_before_dispatch` | `Dispatch` only on `DispatchCommitAcknowledged`, or on `CheckOnlyAcknowledged` for the read-only and `NonDurable` classes | saga rule 3 |
 | T3 `no_compensation_after_commit` | `Compensate` only from pre-dispatch phases with capture not committed, and never while a submitted dispatch-commit crossing has no terminal reply | spec 4 section 5 |
-| T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`, and the last only on a zero recomputed amount or `DeniedAfterDelivery`; it emits `ReleaseHold` only on a `ReleaseAuthorized` event in `Terminal(OutcomeUnknownAfterDispatch)` with a frozen hold | saga rule 6 |
+| T4 `machine_release_authorities` | the machine emits only `PreDispatchNoEffect`, `TransportNotAccepted` or `ContractualZeroCharge`. It emits `ContractualZeroCharge` only on a zero recomputed amount or a `Contractual` delivery refusal under a reversible hold, never from a terminal name alone, a `Fence` or `Rejected` refusal, or a `PrepaidFinal` rail. It emits `ReleaseHold` only on `ReleaseAuthorized(MutuallyAgreedUnknown)` in `Terminal(OutcomeUnknownAfterDispatch)` with a frozen hold, and `ResolveCaptureWaiver` only on `CaptureWaiverAuthorized` in `Finalizing` with a recorded tool outcome and a positive pending capture under a reversible hold. A `DeliveryRefused` operation leaves `Finalizing` only after `ObligationSettled` or a resolved waiver, and no refusal transition changes `payment` | saga rule 6; V2 payment successors |
 | T5 `terminal_absorbing` | no transition leaves a terminal phase; `ReleaseAuthorized` changes only `unknown_hold` | saga rule 4 |
 | T6 `unknown_stays_unknown` | no `Dispatch` and no `MachineRelease` after `OutcomeUnknownAfterDispatch`; the only hold release is a counterparty-authorized `ReleaseHold`; `unknown_hold = Released(a)` only on the acknowledgement of the `ReleaseHold` for `a`, with at most one `ReleaseHold` outstanding per operation; `ReleaseSubmitted` returns to `Frozen` only on a definitive keyed rejection or a successful fence, and within one `attempt_generation` every release of the hold carries the same `hold_release_key`; `attempt_generation` increments only in the transaction that writes `release_abandoned` (definitive keyed rejection or successful fence), so a key rotates only after its request is provably dead | saga rule 6 |
 | T7 `fence_dominance` | a policy refusal on any dispatch-commit step (fast or slow) or check-only crossing never leads to `Dispatch`; a refusal on an outcome or release commit never leads to an `Allow` receipt | spec 8 S7/S15, spec 4 section 4.1, spec 11 |
@@ -833,7 +910,7 @@ Phase 0 extracts a prototype core with payload-carrying enums before committing 
 **Trace validation.** Today's commit log retains digests, not states (section 2). Phase 1 validates that machine-produced states hash to the retained operation digests. Full replay of production histories needs per-version snapshots or an event log (open decision 6).
 
 **Deterministic simulation.**
-- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, a refused fused intent from `Prepared` holding a runtime hook, a counterparty release of a frozen hold (including a duplicate), a rail-held release whose original request is delivered after a negative status query (before and after a replacement request), member retry exhaustion and owner poisoning on every effect (`StoreUnavailable`), and clock unavailability.
+- The DST harness drives the machine directly. A seeded scheduler interleaves events for many operations from all drivers, and injects at every effect group: commit failure for each reason, unknown commit outcome, a crash between effect and acknowledgement, ambiguous transport for each cause, post-effect refusal, post-effect step failure for each `PostEffectCause`, receipt append `Refused` and `Unknown` (with a late commit of the original), driver drop before and after the dispatch-commit acknowledgement, a stop committed and resumed around a parked operation, a refused fused intent from `Prepared` holding a runtime hook, a counterparty release of a frozen hold (including a duplicate), a positive-cost refusal after the effect from each source (closure, revocation, integrity, ordinary guard) with a restart before and after `RefuseDelivery`, a contractual output rejection, a prepaid refusal, a capture waiver on a known return with a lost acknowledgement, a rail-held release whose original request is delivered after a negative status query (before and after a replacement request), member retry exhaustion and owner poisoning on every effect (`StoreUnavailable`), and clock unavailability.
 - The oracles are T1-T14 as runtime assertions, plus the legacy predicates during compatibility.
 
 ## 11. Performance
@@ -855,7 +932,9 @@ Acceptance:
 | Commit outcome unknown | M12: `HaltOperation`, holds retained, ambiguous deny if pre-dispatch; re-project at restart |
 | Store unavailable (member retry exhaustion, poisoned owner) | M19: the same planned member is retained with every hold; never compensated or terminalized because of the failure; `StoreRecoveryDriver` re-feeds on `store_healthy` and with backoff, and `StartupReconciler` after restart |
 | Rail answers "not released" to a status query | M7a: not terminal; `ReleaseSubmitted` is kept. Only a keyed rejection (`IdempotentPerKey`) or a successful fence (`FenceByKey`) returns the hold to `Frozen` |
-| Post-effect step failure | M16: durable classes retain and re-run from frozen inputs or terminalize `DeniedAfterDelivery`; classes with no row append a fault receipt |
+| Post-effect step failure | M16: durable classes retain and re-run from frozen inputs, or apply M11a; classes with no row append a fault receipt |
+| Refusal after the effect with a positive reversible-hold obligation | M11a: `DeliveryRefused` recorded once, holds and journal untouched, quiescent across restart; terminal only after the payment owner's own successor settles it |
+| Capture waiver fed to an unknown terminal, or a mutually agreed release fed to `Finalizing` | illegal (M2, M7a, M7b); nothing is released |
 | Receipt append outcome unknown | M16: `KernelEvidenceLatch` with the buffered fault record; nothing appended until the read-back |
 | Driver future dropped | M17: compensate before submission. If submitted but unacknowledged, retain, then reconcile from the writer's reply and `Cut(DriverDropped)`. After the acknowledgement, `Cut(DriverDropped)`. Never a durable transition in `Drop` |
 | Kernel stopped | M15: receipt only, no tombstone; parked and post-effect operations retained; a host restarted during a stop still starts (section 6.2) |
@@ -883,7 +962,7 @@ Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI
 - **Proptest:** random event sequences per kind, class and plan, checking T1-T14 as executable assertions.
 - **Kani:** `transition` never panics; `classify` is total; the hydrator's plans are well formed.
 - **Lean:** T1-T14, with mirrors registered.
-- **Apalache:** `AdmissionMachine.tla`, with negative mutants: drop the T2 guard, compensate after commit, leave a terminal, dispatch after a deny tombstone, tombstone a `KernelStopped` refusal, compensate a parked operation on `KernelStopped`, compensate or terminalize on `StoreUnavailable`, return a rail-held release to `Frozen` on a status query.
+- **Apalache:** `AdmissionMachine.tla`, with negative mutants: drop the T2 guard, compensate after commit, leave a terminal, dispatch after a deny tombstone, choose `ContractualZeroCharge` from `DeniedAfterDelivery` alone, accept a capture waiver in the unknown terminal, tombstone a `KernelStopped` refusal, compensate a parked operation on `KernelStopped`, compensate or terminalize on `StoreUnavailable`, return a rail-held release to `Frozen` on a status query.
 - **Loom:** two drivers racing on one operation through the CAS adapter; a cut racing a caller report; a driver dropped while its dispatch-commit acknowledgement is in flight, racing the drop-reconcile job.
 - **DST:** one fault-injection seed per effect group and failure reason, added to `tests/dst/seeds.toml`.
 - **Conformance:**
@@ -894,6 +973,8 @@ Gate GT1 applies: no proof or conformance claim until the lanes run in hosted CI
   - an integrity-tracked read takes the durable path, and its influence join commits before delivery;
   - a driver dropped after submitting its intent and before the acknowledgement. Nothing is compensated. If the writer then commits, the operation ends outcome-unknown; if it refuses, it compensates. Loom and DST cover a writer that commits after the reply waiter is gone;
   - `ReleaseAuthorized` then an acknowledged `ReleaseHold` gives `Released`. A failed release returns to `Frozen` and a retry succeeds. A duplicate while `Releasing` emits no second effect. A crash after the release commit re-projects as `Released`;
+  - **delivery is not payment (R-9-03):** a positive-cost call on a reversible hold whose release is refused after the effect by closure, revocation, integrity and an ordinary guard, each case separate. Each records `DeliveryRefused` once, keeps its hold and journal unchanged across restart, is never re-dispatched or re-released, and leaves startup usable for an unrelated operation admitted and completed meanwhile. A later `ObligationSettled` from the payment owner's own successor, under the original operation identity, terminalizes it once as `DeniedAfterDelivery`. A verified checked-output or committed-digest rejection releases exactly its original reversible hold under `ContractualZeroCharge`. A prepaid call refused after the effect terminalizes with its prepaid settlement and no refund. Zero-amount and no-payment refusals terminalize at once;
+  - **capture waiver phase (R-9-04):** reuse the native capture-waiver fixtures (V2: `crates/kernel/chio-kernel/tests/durable_admission_sqlite/contractual_resolution.rs`). A verified waiver on the exact known positive capture, pending in `ReconcileFailed`, resolves once across restart and a lost acknowledgement, and the operation finishes with zero charged units and its original realized cost. The same waiver fed to `Terminal(OutcomeUnknownAfterDispatch)` is illegal and releases nothing. A mutually agreed unknown release leaves the execution unknown. No path creates a second dispatch or a second financial successor;
   - a `KernelStopped` fused denial followed by resume and a retry with the same request id, which is admitted;
   - a parked operation that survives a stop and an approval refused at the edge during it;
   - a caller report accepted during a stop and released after resume;
@@ -920,6 +1001,7 @@ Residual risks:
 - **Migration risk.** Phase 4 touches the two largest evaluator files. The legacy-driver fallback and the differential gate bound the risk, but cannot remove it.
 - **Unsettled caller custody.** Under recovery closure with non-`Active` control, an `AwaitingCallerReport` operation stays non-terminal until a caller report arrives, with its holds frozen. It is visible through a fault, not resolved, until open decision 1.
 - **Withheld output in classes with no row.** A stop or fence that refuses the release of a read-only or `NonDurable` call drops the output, because there is no durable custody to hold it. The `Withheld` receipt records that. Durable coverage (`All`) is the remedy.
+- **Retained delivery obligations wait on the payment owners.** A positive-cost return refused after the effect keeps its hold until the payment owner's own successor settles it (M11a). Until open decision 8 is answered, no such successor exists for an untouched hold, so the hold stays frozen and visible.
 - **Unknown commit outcomes halt one operation, not the kernel.** A halted operation keeps its holds frozen until restart re-projects it. The blast radius is spec 10's batch bound (X22).
 
 Open decisions:
@@ -931,6 +1013,7 @@ Open decisions:
 5. **Governed active response lifecycle.** The response-plan lifecycle (M: `formal/apalache/ResponseLifecycle.tla`) stays separate. This spec covers only its admission rows.
 6. **Trace replay.** Add per-version snapshots or an event log to `admission_operation_commits`, so production histories can be replayed through the machine?
 7. **Overload receipts.** Today's pre-admission overload returns an error with no receipt. Keep that (this draft), or sign an overload deny receipt without a tombstone?
+8. **Settling a retained delivery obligation.** Which existing payment successor settles a positive-cost return refused after the effect without a zero-charge contract? Examples are a payment-owner instruction to capture the realized cost under the original authorization, or a capture waiver once a capture is pending (M7b). This belongs to the payment owners, not the machine. Until they choose, M11a keeps the known return and hold quiescent in `Finalizing(DeliveryRefused)`: nothing is released, captured or re-dispatched, and unrelated operations proceed.
 
 ## 16. Review disposition
 
@@ -1089,6 +1172,13 @@ Findings from the reviews of specs 3, 5 and 8 that this spec had to absorb, per 
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187993006 | Match retry advice to the actual release refusal | Fixed now. A check-only release refusal gets reason-specific advice: `KernelStopped` gives `AfterResume`, `StoreUnavailable` gives `AfterStoreRecovery` (both `Reusable`), and `AuthoritySpaceClosed`, `Revoked` or `InsufficientIntegrity` give `retry: Never` (`Terminal`). M20 lists the new row, and spec 8's `OutputWithheld` admits the reasons | M11; M20 |
+
+### Independent review pass 5 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-9-03 | A withheld result is incorrectly sufficient authority for zero-charge settlement | Fixed. Verified on V2: zero charge needs a zero amount or a contractual delivery denial under a reversible hold, and an ordinary guard denial keeps its return and hold in `Finalizing`. A refusal after the effect is now a typed `DeliveryRefusal` (`Fence`, `Rejected` or `Contractual`) that decides delivery only. A pure `settle_after_return` over the projected `PaymentFact`, the recomputed amount and the delivery result chooses the money, never the terminal name. A positive-cost ordinary refusal (closure, revocation, integrity, ordinary guard) is recorded once as `Finalizing(DeliveryRefused)`. It keeps its hold and journal and stays quiescent, never re-dispatched, and startup claims it and continues. It terminalizes only after `ObligationSettled` from the payment owner's own successor (new open decision 8). A verified contract releases exactly its reversible hold, and a prepaid settlement is never refunded. No second settlement engine is added | revision 4; section 2; sections 4.1, 4.2; 5.1; 5.2 release authorities; M11, M11a, M16, M20; section 6.1 row; section 6.2; section 7; T4; sections 10, 12, 14, 15; specs 3, 4 and 10 |
+| R-9-04 | The machine puts contractual capture waivers in the wrong execution phase | Fixed. `UnknownOutcomeRelease` keeps only `MutuallyAgreedUnknown`, still accepted only on the absorbing unknown terminal (M7a). The new M7b accepts `CaptureWaiverAuthorized` only in `Finalizing`, with a recorded outcome and a positive capture pending in `Settling` or `ReconcileFailed` under a reversible hold, matching V2's verifier. It drives `ResolveCaptureWaiver` through the native fenced `Resolving -> Resolved` protocol, then ordinary finalization finishes with zero charged units and the original realized cost. Both successors share rail mechanics but keep separate phases and authority. Tests reuse the native waiver fixtures | revision 4; section 2; 5.1; 5.2; M7a, M7b; section 7; T4; section 14; spec 3 section 2.6, rule 20, predicates |
 
 ## Appendix A. External and FTL precedent
 

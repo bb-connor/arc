@@ -7,7 +7,7 @@
 - Related: M: `docs/superpowers/specs/2026-09-26-unrepresentable-defects-design.md` (parent design); M: `docs/security/engineering-standard.md` rules 2.1, 2.3, 5.1 and 5.5; `2026-07-12-admission-operation-design.md`; M: `2026-09-07-caller-dispatch-commitment-design.md`; M: `docs/security/session-report-receipts.md`; `docs/adr/ADR-0013-async-receipt-durability.md`; `docs/adr/ADR-0019-kernel-delivery-contract.md`; R:/W: `docs/architecture/recoverable-agent-runtime/02-rust-design.md` and W: `implementation/p1`, `p4` and `p5` `OPERATIONS.md`; V: `2026-10-02-dynamic-delegation-design.md`; V: `2026-09-15-pre-settlement-execution-design.md`; `spec/PROTOCOL.md` section 6
 - Citations:
   - `M:` = `origin/integration/process-security-m4` at `19df31ad9`.
-  - `V:` = `origin/work/verifiable-work-session-20261003` at `14477aaac`.
+  - `V:` = `origin/work/verifiable-work-session-20261003` at `14477aaac`. `V2:` = the same branch at `acf34b074` (the current #1173 head), cited where its payment rules changed after `V:`.
   - `R:` = `origin/research/openappa-recovery-20261001` at `de84fc306` (recovery design documents).
   - `W:` = the uncommitted working tree of `standalone/arc-worktrees/recoverable-agent-runtime-20261002`: recovery P0-P5, built on the #1160 checkpoint `f25cd61f4`. Line references reflect that tree on 2026-10-04, may drift, and W: is treated as shipped.
   - Evaluator line numbers are identical on `M:` and `V:` unless stated. Unprefixed kernel paths are under M: `crates/kernel/chio-kernel/src/`. W1-W4 API names are contract anchors (assumed shipped).
@@ -62,7 +62,7 @@ Revision 4 applies the adversarial review of revision 3 (26 findings: 3 Blocker,
 - **Drop restated as hygiene only.** Revision 1 said "Drop = compensate". Revision 2 made `Drop` latch and request reconciliation. Revision 4 restores best-effort pre-dispatch compensation, which is safe because no effect is possible before the boundary (rule 6).
 - **Ledger split into entry classes.** `Compensable` entries are kernel holds the kernel may reverse before dispatch. `Commitment` entries have no compensator.
 - **Scope narrowed.** Revision 2 limited the uncovered region to `ReadOnly` tools under the default mode. Revision 4 widens it again to `Monetary` and development `Off` (S3-16).
-- **Release exits named.** `MutuallyAgreedUnknown` and `ContractualCaptureWaiver` are the only post-unknown hold releases. The latch and `fail()` never imply release.
+- **Release exits named.** `MutuallyAgreedUnknown` and `ContractualCaptureWaiver` are the only post-unknown hold releases. The latch and `fail()` never imply release. (Independent review pass 5 corrects the phase: only `MutuallyAgreedUnknown` releases an unknown hold, and `ContractualCaptureWaiver` resolves a known return's pending capture; section 2.6.)
 - **Dropped:** the `AdmissionReservation::FaultResolution` entry; the standalone `xtask/src/post_effect_boundary.rs` and its own allowlist file; merge-order open decision 5.
 
 ## 1. Decision summary
@@ -184,8 +184,9 @@ Elsewhere, reservation means consumption. None of the rows marked "outside the e
 ### 2.6 Release authority
 
 `PaymentReleaseAuthorityKind` (V: `payment/journal.rs:88-96`) has five kinds; M: has three (`journal.rs:86`):
-- `PreDispatchNoEffect`, `TransportNotAccepted` and `ContractualZeroCharge` are no-effect or zero-charge exits. Spec 9 calls these `MachineRelease`.
-- `MutuallyAgreedUnknown` and `ContractualCaptureWaiver` are the only releases after an unknown terminal. The first "never establishes that execution had no effect" (V: `payment/unknown_release.rs:1-4`).
+- `PreDispatchNoEffect`, `TransportNotAccepted` and `ContractualZeroCharge` are no-effect or zero-charge exits. Spec 9 calls these `MachineRelease`. `ContractualZeroCharge` needs a zero recomputed amount, or a verified, request-bound contractual delivery denial under a reversible hold (V2: `kernel/admission_coordinator/terminal_payment.rs:111-125`; `kernel/output_guard.rs:51-105`). A delivery refusal alone is never pricing authority (spec 9 M11a).
+- `MutuallyAgreedUnknown` is the only release of an unknown hold. It "never establishes that execution had no effect" (V: `payment/unknown_release.rs:1-4`).
+- `ContractualCaptureWaiver` is not an unknown-outcome release. It resolves a known return's positive capture pending in `Settling` or `ReconcileFailed`, while the operation is `Finalizing` with a recorded tool outcome (V2: `payment/contractual_resolution.rs:224-245`; spec 9 M7b). It never applies to an unknown terminal.
 
 ## 3. Goals and non-goals
 
@@ -421,7 +422,9 @@ pub(crate) enum PostEffectRejection {
     Revoked,                               // persistence re-check, receipt_persistence.rs:250
     PostInvocationBlocked { guard: GuardId },
     StreamLimit,
-    OutputContract,
+    OutputContract,                        // an ordinary output-contract or guard refusal: no pricing authority
+    ContractualDelivery(DeliveryDenialReason), // a verified, request-bound delivery contract or opted-in checked-output guard (V2: delivery_contract.rs:66-175,
+                                           // output_guard.rs:51-105); the only rejection that can carry ContractualZeroCharge (spec 9 M11a)
     ReleaseRefused(CrossingRefused),       // spec 10 release crossing refusal
 }
 
@@ -447,7 +450,8 @@ Rules:
     | `CredentialCommit` | today's `POST_DISPATCH_CREDENTIAL_COMMIT_FAILURE_REASON` cancellation receipt |
     | `PostInvocation`, or `Rejected(PostInvocationBlocked)` | deny-delivery receipt with retained markers, matching the blocked-output arm (M: `finalization.rs:43`) |
     | `Rejected(Revoked)` at `Append` | deny-delivery receipt, matching `allow_responses.rs:53` |
-    | `Rejected(StreamLimit)`, `Rejected(OutputContract)` | deny-delivery receipt with retained markers |
+    | `Rejected(StreamLimit)`, `Rejected(OutputContract)` | deny-delivery receipt with retained markers. The refusal never releases a positive monetary authorization (rule 27) |
+    | `Rejected(ContractualDelivery(..))` | not reachable: only the durable finalizer evaluates contract-bound delivery (V2: `kernel/admission_coordinator/terminal.rs:546`, `:1065`), and spec 9 M11a maps it there |
     | `Rejected(ReleaseRefused(reason))` | `Withheld { reason }` (spec 9 `ReceiptDecision::Withheld`; spec 10 X13a) |
     | `BudgetReconcile`, `PaymentSettlement` | cancellation receipt whose `financial` and settlement metadata carry the state actually reached (reconciled or not; captured, released or unknown; the rail reference) |
     | any other step, `Infrastructure` | cancellation receipt with `chio_runtime.post_effect_fault = { step, code, retained_ids, original_receipt_id }` |
@@ -544,7 +548,7 @@ Rules:
 
 ### 4.10 Release exits
 
-20. No path in this design releases a hold on its own authority. `compensate_before_dispatch` releases only `compensable` entries, and only before `DispatchCommitted`. `CommitUnconfirmed` releases nothing. After an unknown terminal, the only hold releases are `MutuallyAgreedUnknown` and `ContractualCaptureWaiver` (V: `payment/journal.rs:88-96`), and both are separately authorized. Neither `fail`, `Drop`, a latch nor the flusher may construct a release. The post-execution releases inside monetary finalization are named by rule 27.
+20. No path in this design releases a hold on its own authority. `compensate_before_dispatch` releases only `compensable` entries, and only before `DispatchCommitted`. `CommitUnconfirmed` releases nothing. After an unknown terminal, the only hold release is `MutuallyAgreedUnknown` (V: `payment/journal.rs:88-96`; spec 9 M7a). `ContractualCaptureWaiver` resolves only a known return's positive pending capture in `Finalizing` (spec 9 M7b). Both are separately authorized. A post-effect refusal is not financial authority: a positive-cost refusal keeps its hold until the payment owner settles it (spec 9 M11a). Neither `fail`, `Drop`, a latch nor the flusher may construct a release. The post-execution releases inside monetary finalization are named by rule 27.
 
 ### 4.11 Safety predicates
 
@@ -579,8 +583,11 @@ forall entry in Retained or Commitment: never compensated(entry)
 forall entry: compensated_at_most_once(entry)              (move semantics)
 
 security_released(e) -> terminal_receipt_committed(e) or durable_outcome_recorded(e)
-release_hold(op) after unknown(op) ->
-    authority(op) in {MutuallyAgreedUnknown, ContractualCaptureWaiver}
+release_hold(op) after unknown(op) -> authority(op) = MutuallyAgreedUnknown
+waive_capture(op) -> finalizing(op) and known_outcome(op) and reversible_hold(op)
+                     and pending_positive_capture(op)
+zero_charge(op) -> recomputed_amount(op) = 0
+                   or (contractual_delivery_denial(op) and reversible_hold(op))
 work_profile_installed -> forall call: durable_admission(call) or denied(call)
 ```
 
@@ -663,7 +670,7 @@ Sequencing:
     - Both `let _ =` discards disappear, so neither is allowlisted.
 26. **Coverage follows the admission handle, not the mode.** The obligation, the fault mapping and the kernel-evidence latch apply whenever `durable_admission` is `None`, under any `DurableAdmissionMode` (section 2.3).
 27. **No discarded post-execution release.** The two `let _ = adapter.release(..)` sites in monetary finalization are replaced by recorded outcomes:
-    - **`validation.rs:1733` (capture failed after execution; delivery denied).** The release names `ContractualZeroCharge` on a delivery-denied terminal, the authority spec 9 emits for `DeniedAfterDelivery`. The release result goes into the deny receipt's settlement metadata (`release_outcome: released | failed`), with retained markers.
+    - **`validation.rs:1733` (capture failed after execution; delivery denied).** A capture failure is not pricing authority, and the executed call has no zero-charge contract, so this site no longer releases. The authorization stays open for the payment owner's reconciliation. The deny receipt's settlement metadata records `release_outcome: not_released`, the authorization id and the capture error code, with retained markers and an `audit_fault`. `ContractualZeroCharge` applies only under spec 9 M11a's conditions, a zero amount or a verified contractual delivery denial under a reversible hold, and neither holds here. A later release needs the payment owner's own authority.
     - **`validation.rs:1747` (capture returned a status other than `Settled`; output delivered under `Allow`).** This is rail settlement cleanup, not hold compensation. The release result is recorded in `ReceiptSettlement` (`release_outcome`), and a failed release emits `audit_fault`, so the stuck authorization can be reconciled.
 
     Whether this site should release on `Pending` or `Captured` at all is open decision 6. A fault receipt after a successful capture carries the post-reconcile financial state and the settlement reference, never stale `retained_ids`.
@@ -831,6 +838,7 @@ Following the RFC-0002 precedent, each phase ships as the only behavior.
   - a `Discharged` whose binding differs from the region's obligation is never delivered and sets the `KernelEvidence` latch;
   - a panicking host observer during `Drop` does not abort;
   - a payment release failure is recorded in settlement metadata;
+  - a capture error after execution at `validation.rs:1733` leaves the authorization open, records `release_outcome: not_released` with the authorization id, and emits `audit_fault`. No `ContractualZeroCharge` is named (rule 27);
   - work-profile installers refuse without durable coverage and refuse `SideEffecting` with retention.
 - **Gate.** One violating fixture per section 5 rule, including a closure-nested discard and an `.inc` file; the allowlist passes; a stale entry fails.
 - **Mutation.** Per engineering standard rule 10.2: removing the binding check, minting after federation co-sign instead of at the commit point, or moving `record_released` before the receipt must each fail a named test.
@@ -953,6 +961,13 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187142778 | Exclude reusable withheld receipts from the final set | Fixed now. `Withheld` is no longer counted by decision. It is final only through its disposition: `Terminal` for a `NonDurable` `retry: Never` withheld, `Reusable` for a check-only `retry: AfterResume` withheld. A later `Allow` after a reusable withheld therefore satisfies the at-most-one invariant | section 4.11 |
+
+### Independent review pass 5 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-9-03 (spec 3 side) | A withheld result is incorrectly sufficient authority for zero-charge settlement | Fixed with spec 9 M11a. `ContractualZeroCharge` needs a zero recomputed amount or a verified contractual delivery denial under a reversible hold. `PostEffectRejection` splits ordinary `OutputContract` from `ContractualDelivery(DeliveryDenialReason)`, which only the durable finalizer can produce. Rule 27's capture-error site no longer releases: the authorization stays open for the payment owner, with `release_outcome: not_released` and an `audit_fault` | section 2.6; section 4.5 enum and rule 13; rule 20; section 4.11 predicates; rule 27; section 9 unit test |
+| R-9-04 (spec 3 side) | The machine puts contractual capture waivers in the wrong execution phase | Fixed with spec 9 M7b. Only `MutuallyAgreedUnknown` releases an unknown hold. `ContractualCaptureWaiver` resolves a known return's positive pending capture in `Finalizing`, and the predicates state each phase separately | section 2.6; rule 20; section 4.11 predicates; revision 2 note |
 
 ## Appendix A. FTL reference
 

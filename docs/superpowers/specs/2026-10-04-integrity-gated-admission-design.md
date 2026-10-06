@@ -578,6 +578,8 @@ forall ctx: state(ctx) only increases              (I2; SEC-05)
 
     This follows the Design Patterns paper's dual-LLM and action-selector patterns, enforced by the kernel rather than by framework discipline.
 
+    **Origin ownership (spec 2 section 6.10).** The `QuarantinedContinuation` template runs in the recovery owner, and its successor performs the denied action in a new scope, so it is a linked successor of the denied call's original in exactly spec 2's sense. It uses spec 2's contract and no other: the successor hangs from the original's existing origin claim as one chain link (O2-O5), `origins::verify_linked` revalidates the original's native and process evidence at every recheck point (O6), and capture moves the link to `Captured` (O7), so exactly one continuation of the original can capture. A denial that left no verifiable native original, including a crossing check 4 deny tombstone without retained request material, gets no quarantined continuation until spec 2 O8's retained-denial profile exists. The template is not registered before spec 2 section 6.10 ships.
+
     **What it does not guarantee.** The successor's call is admitted on a bounded channel that external content influences. The readers saw untrusted artifacts, and their returned values pass to the successor. A one-bit boolean that a framework uses to choose between publishing and deleting is admitted under `BoundedExternal { n: 1 }` with no endorsement. `BoundedExternal` is therefore an explicit policy allowance of up to `n` attacker-influenced bits. It is not a guarantee that external content cannot select the action.
 
     **I22a. Action-selection contract (optional).** A deployment that needs zero unauthorized action selection sets `action_contract`, typically as `BoundedSelection { max_bits, contract }`. A contract may accompany any level, and attenuation preserves it by digest (I3). The contract is operator-signed:
@@ -762,7 +764,7 @@ pub enum ConfinedReturnTypeV1 {
 0. **Migration (section 4.1)**: legacy seed observations, head build, `knowledge_projection_version`, and conformance vectors. Tracking and gating stay off until it completes.
 1. **Output joins (I4-I8)** behind `integrity-tracking`, recording influence without gating. This also replaces the unconditional external marking.
 2. **The constraint, the guard, and crossing check 4 (I9-I17)** behind `integrity-gating`. Grants opt in.
-3. **The fault, the recovery-approval endorsement adapter and the quarantined continuation (I18-I22)**, with typed returns (I23-I24). The P3 endorsement adapter (I15b) follows separately. Until it ships, gated P3 calls need a recovery integrity approval.
+3. **The fault, the recovery-approval endorsement adapter and the quarantined continuation (I18-I22)**, with typed returns (I23-I24). The P3 endorsement adapter (I15b) follows separately. Until it ships, gated P3 calls need a recovery integrity approval. The quarantined continuation is also gated on spec 2 section 6.10's linked-successor origin contract (I22).
 4. **Evaluation publication**, then optional deployment floors (I12).
 
 GT1 applies: no guarantee is claimed until the conformance scenarios run in hosted CI.
@@ -811,6 +813,7 @@ GT1 applies: no guarantee is claimed until the conformance scenarios run in host
 - **Conformance.**
   - An injected tool output followed by a consequential call is denied.
   - The quarantined continuation succeeds under `BoundedExternal`. The parent holds `External` and `unknown` observations; the successor, created by a verified remedy record in a fresh epoch with a template task under an assertion, starts trusted, receives two typed returns, and its call under `BoundedExternal { n }` is admitted (I7a exception, I22).
+  - Quarantined origin ownership (I22, spec 2 section 6.10): the successor's workflow is a chain link on the denied call's original claim. A second quarantined successor, or the original's own continuation, cannot capture after it, and a denial with no verifiable native original gets no quarantined continuation. Spec 2's origin-ownership cases run with this template.
   - A non-remedy child of that same tainted parent still inherits its full state, and its `BoundedExternal` call is denied (I7a).
   - Unverified transitions fall back to inheritance, and each successor's `BoundedExternal` call is denied. The cases are:
     - a missing or unverifiable remedy record;
@@ -965,6 +968,12 @@ Open decisions:
 | Comment | Title | Disposition | Where |
 |---|---|---|---|
 | 4187433097 | Treat untracked legacy artifacts as unknown | Fixed now. A legacy record with both flags false now projects `unknown = true` unless its producing context's complete mediated history is independently proven. A post-migration context that reads a pre-migration artifact is therefore tainted as unknown and cannot satisfy `Trusted` through it | section 4.1 legacy seeds |
+
+### Independent review pass 5 (PR #1174, Codex agent)
+
+| Finding | Title | Disposition | Where |
+|---|---|---|---|
+| R-2-02 (cross-reference) | Linked authority successors do not compose with W's new exclusive origin ownership | Applied here. The `QuarantinedContinuation` successor is a linked successor of the denied call's original. It uses spec 2 section 6.10's contract: one chain link on the original's existing origin claim, `verify_linked` revalidation of the original's native and process evidence, and capture as the link transfer. A denial with no verifiable native original gets no quarantined continuation until spec 2 O8's profile exists, and the template is not registered before section 6.10 ships | I22; section 17 phase 3; section 18 |
 
 ## Appendix A. CaMeL, FIDES and the FTL lesson
 
