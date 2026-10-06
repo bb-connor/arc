@@ -89,13 +89,12 @@ not invent a branch-protection guarantee or change repository policy.
 
 ## Local qualification
 
-Source `91373484e6feafce458de730c10e5f2e39af5168` passes all 21 terminal qualification commands against
+Source `9be968e6869d706fa5c42aef56ce47e52e17bed0` passes all 21 terminal native commands against
 37,311 unchanged source files and 48 retained outputs. Actual parent
-SIGKILL, evolving funded work, all four earned-child payment cases and 20
+SIGKILL, evolving funded work, all four earned-child payment cases and all 20
 artifact-tool tests pass. The funded suite retains 96 passing tests and six
-explicit opt-in skips. Earlier complete campaigns retain their original scope;
-the c510 campaign was interrupted after four commands when a new A2A defect
-required another source repair, and has no passing aggregate.
+explicit opt-in skips. Earlier complete, failed and interrupted campaigns retain
+their original source identity and scope.
 
 Follow-up platform and structural repairs pass 9 outcome-ledger tests,
 8 API-protect tests, 6 control-plane init tests, the complete 41-test
@@ -204,3 +203,22 @@ the replacement. Its terminal campaign has 108 successes, 13 failures and ten
 skips. Raw failed jobs, authenticated public archives and independent
 receipt verification are retained. Final-head hosted acceptance and the security
 agent's coherent source and signed evidence package remain required.
+
+
+## Newly reviewed JavaScript advisories
+
+Source `9be968e6869d706fa5c42aef56ce47e52e17bed0` fixes the three advisories reported by the
+failed `79d0c8a977` unfiltered scan. Exact published registry fixes replace
+compression 1.8.1, proxy-addr 2.0.7 and source-map-js 1.2.1 in all eight affected
+installation graphs. Package-manager regeneration changes only these identities
+and compression's required edge. Existing private source repairs, upstream
+monitors and advisory policy remain unchanged.
+
+Three actual regressions fail against the originals and all six controls pass
+against the installed fixes. A real aborted HTTP response releases its native
+stream; hostile trust prefixes cannot forge a forwarded caller address; indexed
+maps reject malformed and amplifying offsets. All 397 publishable SDK tests,
+105 conformance tests and both builds pass. Recursive unfiltered OSV 2.3.6 has
+zero findings. The failed job and authenticated public scanner archive remain
+retained. All 21 source-bound native commands are renewed; final-head hosted and
+separately owned signed security-package acceptance remain required.

@@ -671,3 +671,14 @@ in SECOND-REVIEW.md. Preserve all original failed and interrupted campaigns.
 All 116 A2A edge tests, three live client scenarios and both strict Clippy
 commands pass. Final hosted qualification and the independently owned security
 evidence package remain separate acceptance requirements.
+
+
+## Published advisory follow-up
+
+Source `9be968e6869d706fa5c42aef56ce47e52e17bed0` passes all 21 terminal native commands against
+37,311 unchanged inputs and 48 outputs after the three published
+JavaScript fixes. SECOND-REVIEW.md records the original failures, eight repaired
+installation graphs, real behavioral controls, 502 SDK/conformance tests and
+unfiltered zero-finding scan. Rust sources are unchanged from the preceding
+qualified checkpoint. The failed hosted campaign retains its original scope;
+final-head hosted and signed security-package acceptance remain separate.

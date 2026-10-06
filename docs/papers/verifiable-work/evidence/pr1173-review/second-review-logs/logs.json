@@ -996,6 +996,210 @@
       "observed_result": "complete source-bound native qualification",
       "bytes": 539,
       "sha256": "8fb6858abb97c55b074849e542498498cca1d0649c0f1382e7e4b6d2542a91ee"
+    },
+    {
+      "log": "paper-advisory-9be968e686-interrupted-preflight.status.json.gz",
+      "observed_result": "preflight updater stopped before any mutation to correct its artifact gate identifier; native qualification continues",
+      "bytes": 304,
+      "sha256": "f5eb72e86bd9040974f4506c9a8688f2412467e0b735f9341e85e196ab50657b"
+    },
+    {
+      "log": "79d0c8a977-cve-monitor-failure.log.gz",
+      "observed_result": "failed hosted advisory campaign, retained without promotion",
+      "bytes": 147379,
+      "sha256": "9a856c88c6b5fa2e3a24a0e75246b95a85acb2d3a55ba48f1f9ad0d0414aecb9"
+    },
+    {
+      "log": "79d0c8a977-cve-monitor-failure.zip.gz",
+      "observed_result": "authenticated public failed scanner archive",
+      "bytes": 18051,
+      "sha256": "e4c4c0c7303e8229ebc7bebb5e2c54ab410219e19e34af87c3f667b555f4fcb7"
+    },
+    {
+      "log": "79d0c8a977-cve-monitor-failure.artifact.json.gz",
+      "observed_result": "authenticated archive metadata with original candidate identity",
+      "bytes": 788,
+      "sha256": "8d8092c0fbb54891693cafa90d9137495d44ab5fbd142ec4d1fdbb4d6f58ca1b"
+    },
+    {
+      "log": "new-npm-advisories-behavior-red.log.gz",
+      "observed_result": "three original behavioral regressions fail; three existing controls pass",
+      "bytes": 3218,
+      "sha256": "7f561cdfd96470838a4df12f2f75a3f45d80764414ac07cff95c3aa7a3fab48a"
+    },
+    {
+      "log": "new-npm-advisories-bounded-red.log.gz",
+      "observed_result": "same three original failures with an explicit bounded HTTP test",
+      "bytes": 3216,
+      "sha256": "21d1036fa68a0be3a92d4b37255af7e0e37dc8d3b31e8401fbfbabf552b36f48"
+    },
+    {
+      "log": "new-npm-advisories-behavior-green.log.gz",
+      "observed_result": "all six actual installed-package regressions pass",
+      "bytes": 600,
+      "sha256": "460039b080b0c569357a1fcb68721fcc6c5060a07d98fd1bb36d4c7f0303caea"
+    },
+    {
+      "log": "new-npm-advisories-locks.status.json.gz",
+      "observed_result": "package-manager command results; two workspace dependencies still needed explicit updates",
+      "bytes": 2281,
+      "sha256": "2a288a895cdd5ac0abc582a4de0b086f3e3e5fb972f344e193a8dfb15d4b7e6a"
+    },
+    {
+      "log": "new-npm-advisories-lock-workspace-complete.log.gz",
+      "observed_result": "command completed without updating both remaining workspace-resolved dependencies",
+      "bytes": 18,
+      "sha256": "b125771fda8addd462adfe7f7b03299feb35e28badbb2d16ae8589e371216f8f"
+    },
+    {
+      "log": "new-npm-advisories-lock-workspace-explicit.log.gz",
+      "observed_result": "explicit package-manager update fixes both workspace-resolved packages",
+      "bytes": 18,
+      "sha256": "b125771fda8addd462adfe7f7b03299feb35e28badbb2d16ae8589e371216f8f"
+    },
+    {
+      "log": "new-npm-advisories-installed-graph.log.gz",
+      "observed_result": "locked install with lifecycle scripts disabled",
+      "bytes": 27,
+      "sha256": "1914e64c528a754e98d274d1c1a379ffd435e950f59b5d13e25a23819fafa4e7"
+    },
+    {
+      "log": "new-npm-advisories-forks-verified.log.gz",
+      "observed_result": "existing source repairs and upstream advisory monitors pass",
+      "bytes": 246,
+      "sha256": "89e155510efdbf828a36a1938a3008b59d766273b7ae7a52f97eef5f4b98a71b"
+    },
+    {
+      "log": "new-npm-advisories-source-controls.log.gz",
+      "observed_result": "source substitution controls pass",
+      "bytes": 102,
+      "sha256": "60e2f7f6bef9c9e4ca4947fd35ade0c6571af7d746df9f690adf53a5b43cc809"
+    },
+    {
+      "log": "new-npm-advisories-monitor-controls.log.gz",
+      "observed_result": "unchanged advisory gate controls pass",
+      "bytes": 100,
+      "sha256": "d38b6599acb669f0885be38325d46c3ec7b43bfc283ca1aa0ccea87946318460"
+    },
+    {
+      "log": "new-npm-advisories-osv-unfiltered.log.gz",
+      "observed_result": "recursive unfiltered OSV 2.3.6 exits zero",
+      "bytes": 2346,
+      "sha256": "293585ec5ed38eb1ad6fc715bdbbe13c5dc71142f122881646e9b629c55de2d4"
+    },
+    {
+      "log": "new-npm-advisories-osv-unfiltered.json.gz",
+      "observed_result": "zero findings with the empty global config",
+      "bytes": 124,
+      "sha256": "54345d5194d238b6017d0f3181f392109ce35023cc6b4bdfa8c134943dcb578e"
+    },
+    {
+      "log": "new-npm-advisories-source-selection.json.gz",
+      "observed_result": "original manifest hashes and selected published fixes",
+      "bytes": 1793,
+      "sha256": "637cc78acff369accb320581618d4edd24d90163d18637cdf6e61ab08b149c7f"
+    },
+    {
+      "log": "new-npm-advisories-registry-releases.json.gz",
+      "observed_result": "published registry versions, source locations and SRI",
+      "bytes": 945,
+      "sha256": "c53796c66ce9e4149edfa3298eeec76958de2d6559b135823b51e987e5843d70"
+    },
+    {
+      "log": "new-npm-advisories-lock-diff.json.gz",
+      "observed_result": "only three intended dependency identities change",
+      "bytes": 1568,
+      "sha256": "904ca5568a82ef3115364a76a2c6b631c5b1148e23ba1fd42ccaf59c0499f02b"
+    },
+    {
+      "log": "new-npm-advisories-qualification.status.json.gz",
+      "observed_result": "terminal 397 default SDK and 105 conformance tests, builds and advisory controls",
+      "bytes": 926,
+      "sha256": "f7ab96109e0904a8b3d04f8094928ca99d7ae330e198eda0c6780411442499f7"
+    },
+    {
+      "log": "new-npm-advisories-sdk-build.log.gz",
+      "observed_result": "complete publishable workspace build passes",
+      "bytes": 12858,
+      "sha256": "8796d78a9dda24c41e688224254a7e23554923a7ef8b24bdcbd9287893998fca"
+    },
+    {
+      "log": "new-npm-advisories-sdk-tests.log.gz",
+      "observed_result": "397 default publishable workspace tests pass",
+      "bytes": 25419,
+      "sha256": "7603177ee6159a76d44cc2068869ef7913e76f3243bdd24506a70d7eea3e114c"
+    },
+    {
+      "log": "new-npm-advisories-conformance-build.log.gz",
+      "observed_result": "private conformance build passes",
+      "bytes": 49,
+      "sha256": "95ec0b0cd12cd8740e48978d9470e0dbfbbb0efdbbb8912642899486786e062e"
+    },
+    {
+      "log": "new-npm-advisories-conformance-tests.log.gz",
+      "observed_result": "all 105 private conformance tests pass",
+      "bytes": 325,
+      "sha256": "ce513da07284d972ca17d6788516b7fb60b256dc4672eab4f7c5378b536e7711"
+    },
+    {
+      "log": "qualification-9be968e686.status.json.gz",
+      "observed_result": "all 21 native commands pass on repaired source",
+      "bytes": 268,
+      "sha256": "ab459068f95e5ce70536799c6bf8e830a4509f4d98b31aafdeab7e4e8c0eed10"
+    },
+    {
+      "log": "review-native-qualification-9be968e686.log.gz",
+      "observed_result": "full native source-bound qualification",
+      "bytes": 539,
+      "sha256": "8fb6858abb97c55b074849e542498498cca1d0649c0f1382e7e4b6d2542a91ee"
+    },
+    {
+      "log": "new-npm-advisories-lock-express.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 18,
+      "sha256": "b125771fda8addd462adfe7f7b03299feb35e28badbb2d16ae8589e371216f8f"
+    },
+    {
+      "log": "new-npm-advisories-lock-workspace.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 18,
+      "sha256": "b125771fda8addd462adfe7f7b03299feb35e28badbb2d16ae8589e371216f8f"
+    },
+    {
+      "log": "new-npm-advisories-lock-packages-ai-sdk.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 21,
+      "sha256": "42cacdd635be894cbb2bb2c62eb809606433cddf825962306fe7c0736ce905b6"
+    },
+    {
+      "log": "new-npm-advisories-lock-packages-conformance.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 21,
+      "sha256": "ec99a6f730bbd358d3527ed7cfcd5a7881a5851370f070d8957b8697f70c1e65"
+    },
+    {
+      "log": "new-npm-advisories-lock-packages-elysia.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 21,
+      "sha256": "eadb97a27f496dfc06e65c172e78ebccea7e1003e9ea1edf826dab7483ab1586"
+    },
+    {
+      "log": "new-npm-advisories-lock-packages-fastify.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 21,
+      "sha256": "e4fdf6a36c6c3515b7dda3aa398d21dc6f69b326f8bf91da0a3724bc1790070d"
+    },
+    {
+      "log": "new-npm-advisories-lock-packages-node-http.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 21,
+      "sha256": "b6e60ec9e315f46b4817d353fdf3a7db6322b2aa282a5475f6b45c316461be32"
+    },
+    {
+      "log": "new-npm-advisories-lock-bun-root.log.gz",
+      "observed_result": "package-manager lock regeneration; complete final graph separately verified",
+      "bytes": 151,
+      "sha256": "6a75de8258c6154227632116f0595288d06a9d0fe2105b45947d1c6920041f2c"
     }
   ]
 }

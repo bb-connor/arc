@@ -12,16 +12,16 @@ test security_release::exact_v3_migration_retains_real_security_release_and_fina
 test contractual_resolution::capture_waiver_requires_original_terms_and_keeps_positive_budget ... ok
 test malformed_delivery_digests_are_rejected_before_dispatch ... ok
 test security_release::security_refusal_cannot_repeat_or_reverse_captured_payment ... ok
-test security_release::security_refusal_cannot_repeat_zero_charge_release ... ok
 test checked_output::retained_zero_charge_denial_recovers_after_output_authority_expires ... ok
 test checked_output::checked_output_denial_recovers_before_and_after_release_without_becoming_a_capture ... ok
+test security_release::security_refusal_cannot_repeat_zero_charge_release ... ok
 test security_release::zero_charge_release_precedes_checkpoint_and_is_not_repeated ... ok
 test output_digest_delivery_contract_enforces_every_lane ... ok
 test sqlite_durable_admission_atomically_publishes_receipt_and_terminal_outcome ... ok
-test sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly ... ok
 test sqlite_restart_completes_a_committed_capture_without_request_replay ... ok
-test execution_evidence::sqlite_execution_evidence_precedes_payment_and_replays_after_restart has been running for over 60 seconds
+test sqlite_durable_zero_charge_persists_release_evidence_and_reopens_cleanly ... ok
 test sqlite_restart_completes_a_committed_release_without_request_replay ... ok
+test execution_evidence::sqlite_execution_evidence_precedes_payment_and_replays_after_restart has been running for over 60 seconds
 test sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds ... ok
 test unknown_release::mutual_release_cannot_revive_expired_consent_with_a_backdated_decision ... ok
 test unknown_release::mutual_release_rejects_low_order_counterparty_consent ... ok
@@ -32,5 +32,5 @@ test execution_evidence::sqlite_execution_evidence_precedes_payment_and_replays_
 test payment_acknowledgement::sqlite_unacknowledged_authorization_requires_authoritative_recovery has been running for over 60 seconds
 test payment_acknowledgement::sqlite_unacknowledged_authorization_requires_authoritative_recovery ... ok
 
-test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 78.72s
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 76.53s
 
