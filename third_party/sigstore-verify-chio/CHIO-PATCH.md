@@ -1,7 +1,9 @@
 # Chio Sigstore Verifier Patch
 
 This directory contains the crates.io source for `sigstore-verify` 0.6.3 with
-the Chio fail-closed verification patch set used by `nono` 0.53.0.
+the Chio fail-closed verification patch set for `nono` 0.53.0. No lockfile in
+the repository contains `sigstore-verify` or `nono`, so this source is not
+compiled into any Chio artifact.
 
 - Upstream repository: `https://github.com/prefix-dev/sigstore-rust`
 - Upstream source commit: `490f9231ff81b3269f4316a98b95059691d49593`
@@ -28,10 +30,8 @@ enforcement path:
 The package's test coverage exercises successful paths and the missing,
 mismatched, ambiguous, untrusted, and cross-entry cases above.
 
-Chio cannot select `sigstore-verify` 0.6.6 while `nono` 0.53.0 pins
-`sigstore-trust-root` 0.6.3. The workspace uses `[patch.crates-io]` so the
-patched verifier replaces only the affected 0.6.3 package without changing the
-rest of the Sigstore dependency graph.
+`sigstore-verify` 0.6.6 cannot be used with `nono` 0.53.0, which pins
+`sigstore-trust-root` 0.6.3, so this fork patches the 0.6.3 package.
 
 ## Standalone qualification
 

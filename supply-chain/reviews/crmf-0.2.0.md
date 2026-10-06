@@ -1,5 +1,10 @@
 # CRMF 0.2.0 tag recursion and selected repair
 
+Status, October 6, 2026: not in the dependency graph. No lockfile in this
+repository (root, fuzz or the generated Docker workspaces) contains `crmf`,
+so this fork is not compiled into any Chio artifact. It is kept as reviewed
+source.
+
 Reviewed September 16, 2026 by the executing Codex agent. Confidence is high in
 the reproduced defect and repaired tag dispatch. This is a source review and
 local validation, not an independent human certification.
@@ -25,12 +30,11 @@ and does not assert a new advisory or an upstream disclosure.
 
 ## Selected source and validation
 
-The main, fuzz and generated Docker workspaces select
-`third_party/crmf-chio`. The only production-code difference from the registry
-archive is the upstream one-line delegation to `variant.tag()`. Each lockfile
-changes only CRMF's registry source and checksum entry; versions and dependency
-edges stay unchanged. Modified local bytes have explicit cargo-vet ownership,
-not a certificate for the defective registry bytes.
+No lockfile in the repository contains crmf, so `third_party/crmf-chio` is not
+compiled into any artifact. The only production-code difference from the
+registry archive is the upstream one-line delegation to `variant.tag()`.
+Modified local bytes have explicit cargo-vet ownership, not a certificate for
+the defective registry bytes.
 
 The unpublished standalone fork retains the original license texts and tests.
 Its controls test originally references a sibling CMS directory absent from the

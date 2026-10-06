@@ -1,5 +1,10 @@
 # cmpv2 0.2.0 selected repair review
 
+Status, October 6, 2026: not in the dependency graph. No lockfile in this
+repository (root, fuzz or the generated Docker workspaces) contains `cmpv2`,
+so this fork is not compiled into any Chio artifact. It is kept as reviewed
+source.
+
 Reviewed September 16, 2026 by the executing Codex agent. Confidence is high
 in the three reproduced wire defects and their selected repairs. This is direct
 source review and validation, not independent human certification.
@@ -12,8 +17,8 @@ source review and validation, not independent human certification.
   `ca08d8a11fc0b4cf3198adb14040f67ed29d5b0f`.
 - Reviewed all 1,181 original production lines, the normalized and source
   manifests, bundled fixtures and tests.
-- The main, fuzz and generated Docker workspaces select
-  `third_party/cmpv2-chio`, with Chio's selected CRMF repair beneath it.
+- No lockfile in the repository contains cmpv2 or crmf, so
+  `third_party/cmpv2-chio` is not compiled into any artifact.
 
 The local package is unpublished. Cargo-vet treats it as owned source instead
 of applying a registry certificate to different bytes. Its registry

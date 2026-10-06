@@ -1,5 +1,8 @@
 # regress 0.11.1 UTF-8 search-start backport
 
+Status, October 6, 2026: this fork is not in the dependency graph. Every
+lockfile resolves regress to registry 0.10.5; see the selection paragraph below.
+
 ## Inputs and repair
 
 The selected registry release is 0.11.1, with archive SHA-256
@@ -20,11 +23,17 @@ does not contain the later commit's surrounding context. No existing upstream
 test assertions are edited. The manifest disables publication and gives the
 vendored crate a standalone qualification workspace.
 
-The root workspace, standalone fuzz workspace and generated Docker workspace
-select `third_party/regress-chio` for 0.11.1. The separately selected registry
-version 0.10.5 is unchanged. The local fork uses the repository's explicit
-first-party dependency policy, not an audit claiming the registry archive is
-fixed. No safe-to-deploy audit or new exemption is added.
+No workspace selects `third_party/regress-chio`. Every lockfile in the
+repository (root, fuzz and both generated Docker workspaces) resolves regress
+to registry 0.10.5, which `chio-core-types` requires as `regress = "0.10.5"`.
+That version is covered only by the `[[exemptions.regress]]` 0.10.5
+safe-to-deploy entry in `supply-chain/config.toml`, and its `find_from` still
+accepts a start index that is not a character boundary. Chio cannot reach that
+defect: the generated wire types call only `Regex::new` and `Regex::find`, and
+`find` searches from index 0, which is always a boundary. Nothing in the
+workspace calls `find_from`. The fork is not compiled into any artifact; it is
+kept as reviewed source for an upgrade to 0.11. No safe-to-deploy audit or new
+exemption is added.
 
 ## Qualification and scope
 

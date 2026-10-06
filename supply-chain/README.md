@@ -47,7 +47,10 @@ Locally maintained forks `enumflags2_derive`, `crmf`, `cmpv2`, `seccompiler` and
 `audit-as-crates-io = false` ownership entries. Their modified sources are
 reviewed and tested in `third_party/enumflags2-derive-chio`,
 `third_party/crmf-chio`, `third_party/cmpv2-chio`, `third_party/seccompiler-chio` and
-`third_party/sigstore-verify-chio`, with provenance beside each fork. Applying a
+`third_party/sigstore-verify-chio`, with provenance beside each fork. Only
+`enumflags2_derive` and `seccompiler` are in a lockfile; `crmf`, `cmpv2` and
+`sigstore-verify` are kept as reviewed source and are not compiled into any
+artifact. Applying a
 registry certificate to those different bytes would misstate its scope. Their
 registry dependencies remain subject to the normal deployment-audit policy.
 This ownership declaration is not an audit exemption or an independent review.

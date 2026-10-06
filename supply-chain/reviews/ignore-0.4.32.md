@@ -1,5 +1,10 @@
 # ignore 0.4.32 source review and repair
 
+Status, October 6, 2026: not in the dependency graph. No lockfile in this
+repository (root, fuzz or the generated Docker workspaces) contains `ignore`,
+so this fork is not compiled into any Chio artifact. It is kept as reviewed
+source.
+
 September 20, 2026. Confidence is high for the reproduced filtering defects,
 the two production repairs and the package tests. This is direct source
 review by the executing agent, not independent certification.
@@ -54,10 +59,9 @@ No original test assertion changes.
 
 Eighteen original files remain byte-identical. The other four are the two
 production files, the unpublished standalone-test manifest and its lockfile.
-The new files are the patch inventory and regression target. The root, fuzz
-and generated Docker graphs select this local source. Their lock changes only
-remove the registry source and checksum for ignore 0.4.32; all other versions
-and dependency edges remain unchanged.
+The new files are the patch inventory and regression target. No lockfile in
+the repository contains ignore, so this local source is not compiled into any
+artifact.
 
 The original registry release receives no `safe-to-deploy` audit. The selected
 fork is locally maintained source, using the existing policy for owned repairs.

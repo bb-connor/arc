@@ -1,5 +1,10 @@
 # sigstore-merkle 0.6.6 source review and repair
 
+Status, October 6, 2026: not in the dependency graph. No lockfile in this
+repository (root, fuzz or the generated Docker workspaces) contains `sigstore-merkle`,
+so this fork is not compiled into any Chio artifact. It is kept as reviewed
+source.
+
 Reviewed September 16, 2026 by the executing Codex agent. Confidence is high
 for the reproduced arithmetic defect, repair and tested proof behavior. This
 is direct source review, not independent human certification.
@@ -40,10 +45,9 @@ that caller.
 
 ## Verification
 
-The main, fuzz and generated Docker graphs select
-`third_party/sigstore-merkle-chio`. Their lockfile changes only remove this
-package's registry source and checksum; its version and dependencies remain
-unchanged. The fork's standalone lock retains the selected AWS-LC versions.
+No lockfile in the repository contains sigstore-merkle, so
+`third_party/sigstore-merkle-chio` is not compiled into any artifact. The
+fork's standalone lock retains its AWS-LC versions.
 
 On Rust 1.94.1, all 218 tests pass: 214 retained upstream cases and four added
 regressions, with no failures or ignored tests. The upstream vector runner has

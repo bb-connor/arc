@@ -1,5 +1,10 @@
 # sigstore-trust-root 0.6.3 source review and repair
 
+Status, October 6, 2026: not in the dependency graph. No lockfile in this
+repository (root, fuzz or the generated Docker workspaces) contains `sigstore-trust-root`,
+so this fork is not compiled into any Chio artifact. It is kept as reviewed
+source.
+
 Reviewed September 16, 2026 by the executing Codex agent. Confidence is high
 for the reproduced date-parsing defect and the tested repair. This is direct
 source review, not independent human certification.
@@ -70,8 +75,8 @@ certificate chains and authenticated timestamps.
   repaired source.
 - Chio's owned verifier: all 44 library tests pass with selected crypto, Merkle
   and trust-root repairs, including the two new real-evidence date tests.
-- Main/fuzz metadata selects the owned source. Their only lockfile change is
-  removal of the original trust-root registry source and checksum.
+- No lockfile in the repository contains sigstore-trust-root, so the owned
+  source is not compiled into any artifact.
 
 The original package receives no cargo-vet certification. The selected repaired
 source is maintained as owned code, matching the other reviewed dependency
