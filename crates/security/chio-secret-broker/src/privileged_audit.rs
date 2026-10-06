@@ -650,7 +650,14 @@ impl BrokerPrivilegedAuditEndpointConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BrokerPrivilegedAuditServeOutcome {
     EvidenceWritten,
-    ClientFault { diagnostic_code: &'static str },
+    ClientFault {
+        diagnostic_code: &'static str,
+    },
+    /// A dependency failed during the session, for example an authority
+    /// outage or an upstream rejection. The endpoint keeps serving.
+    SessionFailed {
+        diagnostic_code: &'static str,
+    },
 }
 
 #[cfg(unix)]
@@ -742,8 +749,18 @@ impl BrokerPrivilegedAuditEndpoint {
                 )))
             }
         };
+        // Only the faults that end the ordinary endpoint end this one; an audit
+        // must never take down normal tool traffic.
         let outcome = match self.serve_stream(stream) {
             Ok(()) => BrokerPrivilegedAuditServeOutcome::EvidenceWritten,
+            Err(error)
+                if matches!(
+                    &error,
+                    BrokerError::Invariant(_) | BrokerError::Storage(_) | BrokerError::Custody(_)
+                ) =>
+            {
+                return Err(error);
+            }
             Err(error)
                 if matches!(
                     &error,
@@ -757,7 +774,9 @@ impl BrokerPrivilegedAuditEndpoint {
                     diagnostic_code: error.diagnostic_code(),
                 }
             }
-            Err(error) => return Err(error),
+            Err(error) => BrokerPrivilegedAuditServeOutcome::SessionFailed {
+                diagnostic_code: error.diagnostic_code(),
+            },
         };
         Ok(Some(outcome))
     }
