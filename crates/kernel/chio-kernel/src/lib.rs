@@ -89,9 +89,6 @@ pub mod federation_artifact_store;
 pub mod finding_denial;
 #[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_pool;
-#[cfg(not(loom))]
-#[cfg(not(loom))]
-pub mod security_admission_operation;
 /// With the market lane compiled out, only the ledger error vocabulary
 /// remains so integration seams keep one signature in both builds.
 #[cfg(all(not(loom), not(feature = "finding-market")))]
@@ -145,6 +142,8 @@ pub mod revocation_store;
 pub mod runtime;
 #[cfg(not(loom))]
 mod runtime_trace;
+#[cfg(not(loom))]
+pub mod security_admission_operation;
 pub mod session;
 #[cfg(not(loom))]
 mod settlement_routing;
