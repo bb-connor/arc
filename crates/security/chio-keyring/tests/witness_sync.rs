@@ -664,3 +664,35 @@ fn witness_and_audit_storage_identities_survive_database_path_swap() {
         verifier_identity
     );
 }
+
+#[test]
+fn witness_refuses_to_sign_a_candidate_that_conflicts_with_retained_gossip() {
+    let directory = private_tempdir().test_unwrap();
+    let fixture = Fixture::new();
+    let store = fixture.store(&trusted_temp_path(&directory, "operator.sqlite"));
+    let checkpoint = store
+        .append_event(&fixture.genesis(), &fixture.operator)
+        .test_unwrap();
+    let response = store.synchronization_response(None).test_unwrap();
+
+    let mut fork_body = checkpoint.body.clone();
+    fork_body.root_hash = chio_core_types::sha256(b"fork");
+    let fork = SignedKeyLogCheckpoint::sign(fork_body, &fixture.operator).test_unwrap();
+    let gossip = CheckpointGossip {
+        checkpoint: fork.clone(),
+        witness_signature: WitnessSignature::sign(
+            &fork,
+            WitnessId::new("witness.b").test_unwrap(),
+            &fixture.witnesses[1],
+        )
+        .test_unwrap(),
+    };
+
+    let witness = fixture.witness(&trusted_temp_path(&directory, "lagging-witness.sqlite"), 0);
+    witness.import_gossip(&gossip).test_unwrap();
+    assert!(matches!(
+        witness.sign_candidate(&checkpoint, &response),
+        Err(KeyringError::EquivocationDetected)
+    ));
+    assert_eq!(witness.conflicts().test_unwrap().len(), 1);
+}

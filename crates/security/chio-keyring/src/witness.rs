@@ -207,6 +207,13 @@ impl SqliteKeyLogWitness {
             transaction.commit()?;
             return Err(KeyringError::EquivocationDetected);
         }
+        for checkpoint in std::iter::once(candidate).chain(&response.checkpoints) {
+            if let Some((retained, kind)) = gossip_conflict(&transaction, checkpoint)? {
+                persist_conflict(&transaction, &retained, checkpoint, kind, now)?;
+                transaction.commit()?;
+                return Err(KeyringError::EquivocationDetected);
+            }
+        }
 
         if let Some(existing) =
             decision_for_sequence(&transaction, candidate.body.checkpoint_sequence)?
@@ -757,6 +764,29 @@ fn checkpoint_for_tree_size(
         "SELECT CASE WHEN length(canonical_checkpoint) <= 1048576 THEN canonical_checkpoint END FROM witness_checkpoints WHERE tree_size = ?1",
         to_i64(tree_size)?,
     )
+}
+
+/// Retained gossip that names a different checkpoint at the same sequence or
+/// tree size is signed evidence of a split view.
+fn gossip_conflict(
+    connection: &Connection,
+    checkpoint: &SignedKeyLogCheckpoint,
+) -> Result<Option<(SignedKeyLogCheckpoint, CheckpointConflictKind)>> {
+    let hash = checkpoint.checkpoint_hash()?;
+    if let Some(retained) =
+        gossip_checkpoint_for_sequence(connection, checkpoint.body.checkpoint_sequence)?
+    {
+        if retained.checkpoint_hash()? != hash {
+            return Ok(Some((retained, CheckpointConflictKind::CheckpointSequence)));
+        }
+    }
+    if let Some(retained) = gossip_checkpoint_for_tree_size(connection, checkpoint.body.tree_size)?
+    {
+        if retained.checkpoint_hash()? != hash {
+            return Ok(Some((retained, CheckpointConflictKind::TreeSize)));
+        }
+    }
+    Ok(None)
 }
 
 fn gossip_checkpoint_for_sequence(
