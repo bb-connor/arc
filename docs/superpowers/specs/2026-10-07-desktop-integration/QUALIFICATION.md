@@ -21,6 +21,15 @@ adversarial stimulus, observed native result, and proof that no forbidden effect
 occurred. Omitted cases, zero evaluated profiles, skipped commands, stale logs,
 unknown evidence kinds and missing signatures cannot yield a ready state.
 
+The existing release owner must reject raw ambiguous, noncanonical or over-limit
+manifests under its selected format before they contribute evidence or profile
+state. Exercise duplicate/escaped member aliases, invalid numeric/Unicode forms
+and byte/depth/count limits using payloads authenticated by an authorized fixture
+signer so signature rejection cannot mask a decoding defect. Signature checking
+and semantic consumption share the exact accepted bytes and one unambiguous
+decode; normalization must not turn rejected input into a different accepted
+tuple. Pair each negative with the owner-format canonical positive control.
+
 All profile checks use ADR-0011 `boundary_class` and `planning_status` separately.
 Hook activity is `detect_only`; local effects outside mediation are `cannot_see`;
 UI guidance is `advisory_only`; only a proven pre-effect gate is `prevent`.
@@ -46,13 +55,13 @@ The delivery plan covers the handoff and desktop tests after those contracts lan
 | Q11 | Host owner/doc 19: crash/omit/timeout hooks, enable alternate native tool/shell, change host version | Hook mode stays detect_only; protected mode fails closed and requires I01-I08 for that host tuple |
 | Q12 | S7/backend: unknown kind, stale policy/hash, launcher bypass, inherited FD, direct IP/DNS/IPv6 egress, child escape | No confinement claim without native evidence; fail launch or restrict; no unconfined fallback |
 | Q13 | Secret broker/relay: malicious host tries environment/file/process-list/log access or alternate provider route | Raw credentials absent from agent/client; every permitted model route bound to enrolled scope |
-| Q14 | Work resource/mini-swe: symlink replacement, path traversal, descriptor race, oversized/archive/device artifact, changed base | Bounded descriptor-based export rejects unsafe input; result hash/base/review identity bind acceptance and publication |
+| Q14 | Applicable artifact/evidence export owner: symlink/hardlink replacement or alias, path traversal, descriptor race, oversized/archive/device artifact, changed base, unauthorized staging reads | Bounded audience-private staging and descriptor-based export reject unsafe input; result hash/base/review identity bind applicable acceptance and publication, and unrelated alias contents/identity/access policy remain unchanged |
 | Q15 | Budget owner: zero, max, overflow, fraction, missing/unknown units, duplicate dimensions, unavailable observations | Exact typed bounds and unique dimensions; unavailable never interpreted as unlimited; native enforcement independently proven |
 | Q16 | Controller health: no evaluated profiles, stale session, expired evidence, missing backend | Feature unavailable with a reason; no empty healthy/ready response |
 | Q17 | UI/workbench: forged artifact text, injected commands/links, notification click, out-of-order response | Treat content as untrusted; no automatic execution or authority transition; keyboard/screen-reader state remains accurate |
-| Q18 | Release: swap one artifact/tuple field or remove required evidence | Positive baseline passes; each one-field mutation independently fails the intended gate |
-| Q19 | Process backend: timeout and descendants, unrelated exited child, unkillable/pending child | Bounded cleanup and complete custody evidence; do not reap another task's status or report false completion |
-| Q20 | Install/update: unsigned/tampered/wrong-arch artifact, downgrade, mid-update crash, reboot/uninstall | Reject invalid package, preserve recoverable state, revalidate profile before enablement; explicit custody cleanup |
+| Q18 | Release: swap one artifact/tuple field, remove required evidence or submit authenticated ambiguous/noncanonical/over-limit manifest bytes | Positive baseline passes; each mutation fails its intended gate before evidence admission or profile state changes; signature and semantic consumption use one strict bounded owner decode |
+| Q19 | Process backend: timeout and descendants, spawn/exec/reparent during closure, unrelated exited child, unkillable/pending child | Bounded cleanup and complete custody evidence; do not reap another task's status or report false completion |
+| Q20 | Install/update: unsigned/tampered/wrong-arch artifact, downgrade across installation users, competing update/removal, mid-update crash, reboot/uninstall | Reject invalid package; native single-writer custody and installation-scoped floor guard shared mutations, preserve recoverable state and revalidate before enablement; explicit cleanup |
 | Q21 | Observation/S5 owners, plus recovery when exposed: subscriber idle for long periods and sustained event traffic | No observation path spends recovery-command quota or drains settlement reserve; configured buffer and resource limits enforced; exposed recovery additionally passes native saturation/finality controls |
 | Q22 | Isolation profile: attempt an in-workspace write through the host's native shell, outside an explicitly granted runner operation | Boundary interactive labels a permitted write cannot_see with no per-write receipt; protected/sealed profiles reject the alternate native-shell route. An expressly granted sealed recipe's internal shell is a separate bounded execution and cannot qualify this negative. |
 
