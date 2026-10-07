@@ -8,7 +8,7 @@ This annex extends the [shared desktop operator program](../2026-10-07-desktop-i
 
 - [Platform design and qualification](ANNEX.md)
 - [Implementation plan](../../plans/2026-10-07-macos-integration/IMPLEMENTATION.md)
-- [Shared operator projection](../../../../spec/OPERATOR.md)
+- [Shared operator projection](../2026-10-07-desktop-integration/OPERATOR.md)
 - [Shared acceptance matrix](../2026-10-07-desktop-integration/QUALIFICATION.md)
 - [Apple platform research](research/apple-platform.md)
 - [Distribution research](research/distribution.md)
