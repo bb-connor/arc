@@ -823,6 +823,12 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
                     .to_string(),
             ));
         }
+        if action.kind() == AdmissionCleanupActionKind::TerminalReceipt {
+            return Err(AdmissionOperationError::Invalid(
+                "terminal receipt outbox must be inserted by its atomic terminal transition"
+                    .to_string(),
+            ));
+        }
         let mut connection = self.connection()?;
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)

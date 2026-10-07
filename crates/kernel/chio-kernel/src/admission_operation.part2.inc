@@ -401,6 +401,12 @@ impl AdmissionOperationStore for InMemoryAdmissionOperationStore {
                     .to_string(),
             ));
         }
+        if action.kind() == AdmissionCleanupActionKind::TerminalReceipt {
+            return Err(AdmissionOperationError::Invalid(
+                "terminal receipt outbox must be inserted by its atomic terminal transition"
+                    .to_string(),
+            ));
+        }
         let mut state = self.lock()?;
         let operation = state.operations.get(action.operation_id()).ok_or_else(|| {
             AdmissionOperationError::Invalid(
