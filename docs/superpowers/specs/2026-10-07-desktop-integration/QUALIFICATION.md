@@ -173,6 +173,17 @@ receipts or cancel work; explain both retention and active custody to the user.
    qualification as separate statuses. This docs PR satisfies none of the
    executable release gates by itself.
 
+Enforce the ADR's sealed-first product order at release promotion, independently
+of candidate construction. A platform's protected-interactive production entry
+requires a recorded earlier qualified sealed-W1 release for that platform.
+Promote the sealed cell using its own complete owner/installed evidence, then
+consider the protected cell; neither candidate assembly nor protected promotion
+is a prerequisite for that first sealed release. Test rejection of an otherwise
+passing protected cell when the sealed release is missing, failed or unpromoted,
+and acceptance only with the authenticated prior release plus its own current
+qualification. Observe, approval and qualified stop remain independent. This
+order requires one qualified first sealed tuple, not six-of-six host completion.
+
 ## Superseded-review trace
 
 Prior review repairs are retained semantically: typed exact bounds and unique
