@@ -1,0 +1,116 @@
+name: Lane test
+run-name: lane-test ${{ inputs.item }} ${{ inputs.nonce }}
+
+# Dispatched by the swarm CLI (`swarm ci`) on `main`; it checks out the lane
+# ref itself because lane branches do not carry this workflow file.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Branch or commit to test
+        required: true
+        type: string
+      item:
+        description: Swarm item ID
+        required: true
+        type: string
+      packages:
+        description: Space-separated cargo packages
+        required: true
+        type: string
+      filter:
+        description: Optional test name filter
+        required: false
+        default: ""
+        type: string
+      features:
+        description: Optional comma-separated cargo features
+        required: false
+        default: ""
+        type: string
+      nonce:
+        description: Correlation token from the swarm CLI
+        required: true
+        type: string
+
+concurrency:
+  group: lane-test-${{ inputs.item }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CHIO_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
+
+jobs:
+  test:
+    name: Lane test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Validate inputs
+        env:
+          ITEM: ${{ inputs.item }}
+          PACKAGES: ${{ inputs.packages }}
+          FILTER: ${{ inputs.filter }}
+          FEATURES: ${{ inputs.features }}
+        run: |
+          set -euo pipefail
+          [[ "$ITEM" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || { echo "bad item"; exit 1; }
+          [[ "$PACKAGES" =~ ^[A-Za-z0-9_\ -]+$ ]] || { echo "bad packages"; exit 1; }
+          [[ "$FILTER" =~ ^[A-Za-z0-9_:.\ -]*$ ]] || { echo "bad filter"; exit 1; }
+          [[ "$FEATURES" =~ ^[A-Za-z0-9_,/\ -]*$ ]] || { echo "bad features"; exit 1; }
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ inputs.target_ref }}
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install --profile minimal
+          rustup show active-toolchain
+
+      - name: Install protobuf compiler
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          sudo rm -f /etc/apt/sources.list.d/azure-cli.list /etc/apt/sources.list.d/azure-cli.sources \
+            /etc/apt/sources.list.d/microsoft-prod.list /etc/apt/sources.list.d/microsoft-prod.sources
+          for attempt in 1 2 3; do
+            if timeout 180s sudo apt-get update && timeout 180s sudo apt-get install -y protobuf-compiler; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with:
+          shared-key: lane-test
+
+      - name: Test
+        env:
+          PACKAGES: ${{ inputs.packages }}
+          FILTER: ${{ inputs.filter }}
+          FEATURES: ${{ inputs.features }}
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: |
+          set -euo pipefail
+          args=()
+          for package in $PACKAGES; do args+=(-p "$package"); done
+          if [ -n "$FEATURES" ]; then args+=(--features "$FEATURES"); fi
+          filter=()
+          if [ -n "$FILTER" ]; then filter+=("$FILTER"); fi
+          cargo test --locked "${args[@]}" -- "${filter[@]}" 2>&1 | tee lane-test.log
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: lane-test-${{ inputs.item }}-${{ inputs.nonce }}
+          path: lane-test.log
+          if-no-files-found: ignore
