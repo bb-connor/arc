@@ -37,12 +37,14 @@ impl fmt::Debug for NativeSecurityFlowJoinAuthority<'_> {
 
 impl NativeSecurityFlowJoinAuthority<'_> {
     fn resumes_native_caller(&self) -> bool {
-        self.admission.operation.state() == AdmissionOperationState::ReadyToDispatch
-            && self
-                .admission
-                .operation
-                .provider_attempt()
-                .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+        matches!(
+            self.admission.operation.state(),
+            AdmissionOperationState::ReadyToDispatch | AdmissionOperationState::ApprovalRequired
+        ) && self
+            .admission
+            .operation
+            .provider_attempt()
+            .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
     }
 
     pub fn binding(&self) -> &NativeSecurityAuthorityBindingV1 {
@@ -263,11 +265,16 @@ impl ChioKernel {
             original.ok_or_else(|| invalid("native preparation requires original request"))?;
         let context =
             context.ok_or_else(|| invalid("native preparation requires trusted context"))?;
-        let caller_resume = admission.operation.state() == AdmissionOperationState::ReadyToDispatch
-            && admission
-                .operation
-                .provider_attempt()
-                .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
+        let caller_resume = match admission.operation.state() {
+            AdmissionOperationState::ReadyToDispatch => true,
+            AdmissionOperationState::ApprovalRequired => {
+                resumes_parked_approval(admission, request)
+            }
+            _ => false,
+        } && admission
+            .operation
+            .provider_attempt()
+            .is_some_and(ProviderAttemptBindingV1::is_native_caller_report)
             && original.authority_profile().caller_executor().is_some();
         if (admission.operation.state() != AdmissionOperationState::BrokerAttemptRegistered
             && !caller_resume)
@@ -314,6 +321,23 @@ impl ChioKernel {
         }
         self.validate_live_admission_authority_profile(Some(admission))
     }
+}
+
+/// A parked native caller resumes only by presenting its original issued nonce
+/// and the exact proposal retained over its parked hold. Resuming grants
+/// nothing: the join authority only reads back the original input join, and
+/// approval, budget and nonce admission still run unchanged afterwards.
+fn resumes_parked_approval(admission: &DurableToolAdmission, request: &ToolCallRequest) -> bool {
+    let operation = &admission.operation;
+    operation.binding().participant_requirements().approval
+        && operation.budget_hold_id().is_some()
+        && operation.threshold_proposal().is_some_and(|proposal| {
+            proposal.body.proposal_id == operation.binding().operation_id().as_str()
+                && request.threshold_approval_proposal.as_ref() == Some(proposal)
+        })
+        && admission
+            .issued_execution_nonce()
+            .is_some_and(|issued| request.execution_nonce.as_ref() == Some(issued.signed_nonce()))
 }
 
 pub(super) fn store_call<T>(
