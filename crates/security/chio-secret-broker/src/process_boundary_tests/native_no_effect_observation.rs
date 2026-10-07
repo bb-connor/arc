@@ -57,6 +57,17 @@ pub(super) fn observe_until_owned_done(listener: &TcpListener) -> io::Result<()>
     Ok(())
 }
 
+fn require_no_connection(listener: &TcpListener) {
+    match listener.accept() {
+        Ok(_) => {
+            eprintln!("broker death before send still reached the provider");
+            panic!("broker death before send still reached the provider");
+        }
+        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
+        Err(error) => panic!("zero-effect provider observation failed: {error}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::super::observation_owner::ObservationOwner;
@@ -146,16 +157,5 @@ mod tests {
         probe.assert_absent(&output.stdout, "completed observation stdout");
         probe.assert_absent(&output.stderr, "completed observation stderr");
         Ok(())
-    }
-}
-
-fn require_no_connection(listener: &TcpListener) {
-    match listener.accept() {
-        Ok(_) => {
-            eprintln!("broker death before send still reached the provider");
-            panic!("broker death before send still reached the provider");
-        }
-        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
-        Err(error) => panic!("zero-effect provider observation failed: {error}"),
     }
 }

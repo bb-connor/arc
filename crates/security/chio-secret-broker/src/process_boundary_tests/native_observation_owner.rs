@@ -40,6 +40,8 @@ impl ObservationOwner {
             if flags < 0 {
                 return Err(io::Error::last_os_error());
             }
+            // SAFETY: the child owns the live transferred endpoint exclusively;
+            // setting its descriptor flags is async-signal-safe before exec.
             #[allow(unsafe_code)]
             if unsafe { libc::fcntl(raw, libc::F_SETFD, flags & !libc::FD_CLOEXEC) } < 0 {
                 return Err(io::Error::last_os_error());
@@ -150,6 +152,8 @@ pub(super) unsafe fn adopt_inherited_observation() -> io::Result<UnixStream> {
     }
     // SAFETY: fcntl observes and marks the live exclusive slot close-on-exec.
     let flags = unsafe { libc::fcntl(raw, libc::F_GETFD) };
+    // SAFETY: the validated live Unix stream slot is exclusively inherited by
+    // this helper; restoring close-on-exec does not transfer or close ownership.
     if flags < 0 || unsafe { libc::fcntl(raw, libc::F_SETFD, flags | libc::FD_CLOEXEC) } < 0 {
         return Err(io::Error::last_os_error());
     }
