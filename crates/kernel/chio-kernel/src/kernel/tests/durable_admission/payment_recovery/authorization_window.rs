@@ -57,7 +57,13 @@ fn review_payment_authorization_window_lost_ack_queries_original_reference_befor
         payment_fixture("review-payment-lost-ack", false);
     calls.authorization_failed.store(true, Ordering::SeqCst);
     calls.query_supported.store(true, Ordering::SeqCst);
-    assert!(authorize_without_dispatch(&kernel, &request).is_err());
+    let error = authorize_without_dispatch(&kernel, &request)
+        .err()
+        .ok_or("lost authorization acknowledgement was accepted")?;
+    assert!(
+        matches!(error.downcast_ref::<PaymentError>(), Some(PaymentError::Unavailable(detail))
+        if detail == "authorization acknowledgement lost")
+    );
     let operation = store.operation();
     assert_eq!(
         store.payment_journal().ok_or("ambiguous journal")?.state,

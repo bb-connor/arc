@@ -321,7 +321,10 @@ fn review_activated_checkpoint_preserves_committed_witness_set_after_late_signat
         .witness_a
         .sign_bytes(b"not a witness statement")
         .test_unwrap();
-    assert!(store.store_witness_signature(&hash, &forged).is_err());
+    assert!(matches!(
+        store.store_witness_signature(&hash, &forged),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
     assert_eq!(store.load_enterprise_receipts().test_unwrap(), receipts);
     assert_eq!(
         store

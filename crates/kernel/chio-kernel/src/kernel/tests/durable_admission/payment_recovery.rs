@@ -66,14 +66,20 @@ fn review_payment_compensation_retries_original_release_intent() -> TestResult {
     calls.release_failed.store(true, Ordering::SeqCst);
     let operation = store.operation();
     let policy = serde_json::json!({"authority": "review-regression"});
-    assert!(kernel
+    let error = kernel
         .compensate_durable_admission_before_dispatch(
             &operation,
             policy.clone(),
             current_unix_timestamp_ms(),
-            None
+            None,
         )
-        .is_err());
+        .err()
+        .ok_or("release failure was accepted")?;
+    assert!(matches!(error, KernelError::AdmissionRecovery(failure)
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Payment {
+            kind: crate::admission_operation::AdmissionRecoveryFailureKind::ParticipantUnavailable,
+            source: PaymentError::Unavailable(detail),
+        } if detail == "temporary release failure")));
     assert_eq!(
         store.payment_journal().ok_or("pending journal")?.state,
         PaymentJournalState::Settling
@@ -198,7 +204,15 @@ fn review_payment_resolved_replay_preserves_original_fx_disposition() -> TestRes
         invocations: invocations.clone(),
     }));
     calls.capture_pending.store(true, Ordering::SeqCst);
-    assert!(kernel.evaluate_tool_call_blocking(&request).is_err());
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .err()
+        .ok_or("pending payment capture was accepted")?;
+    assert!(matches!(error, KernelError::AdmissionRecovery(failure)
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Item {
+            kind: crate::admission_operation::AdmissionRecoveryFailureKind::PaymentPending,
+            detail,
+        } if detail == "payment settlement remains pending")));
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Finalizing
@@ -249,7 +263,14 @@ fn review_payment_startup_isolates_an_unrecoverable_operation() -> TestResult {
         replacement: "original",
     }));
     store.fail_next_evaluation_begin();
-    assert!(kernel.evaluate_tool_call_blocking(&request).is_err());
+    let error = kernel
+        .evaluate_tool_call_blocking(&request)
+        .err()
+        .ok_or("injected evaluation begin failure was accepted")?;
+    assert!(matches!(error, KernelError::AdmissionRecovery(failure)
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Outcome(
+            crate::tool_outcome::ToolOutcomeStoreError::Unavailable(detail)
+        ) if detail == "injected evaluation begin failure")));
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Finalizing

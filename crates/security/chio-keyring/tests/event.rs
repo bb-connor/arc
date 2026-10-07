@@ -54,10 +54,16 @@ fn review_rotation_rejects_identity_key_and_universal_proof() {
     );
     let possession = event.verify_rotation(&old.public_key());
     assert!(
-        common.is_err(),
+        matches!(common, Err(chio_keyring::KeyringError::WeakKey)),
         "weak lifecycle key passed common validation"
     );
-    assert!(possession.is_err(), "universal proof was accepted");
+    assert!(
+        matches!(
+            possession,
+            Err(chio_keyring::KeyringError::InvalidSignature)
+        ),
+        "universal proof was accepted"
+    );
 }
 
 #[test]
@@ -69,7 +75,10 @@ fn review_genesis_rejects_universal_bootstrap_authorization() {
         algorithm: key.algorithm(),
         signature,
     });
-    assert!(event.verify_genesis(&key).is_err());
+    assert!(matches!(
+        event.verify_genesis(&key),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
 }
 
 #[test]
@@ -395,7 +404,10 @@ fn rotation_to_the_identity_point_fails_proof_of_possession() {
     let old = backend(2);
     let genesis = genesis(&backend(1), &old);
     let rotation = identity_point_rotation(&genesis, &old);
-    assert!(rotation.verify_rotation(&old.public_key()).is_err());
+    assert!(matches!(
+        rotation.verify_rotation(&old.public_key()),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
 }
 
 #[test]
@@ -403,13 +415,14 @@ fn common_validation_rejects_a_small_order_event_key() {
     let old = backend(2);
     let genesis = genesis(&backend(1), &old);
     let rotation = identity_point_rotation(&genesis, &old);
-    assert!(rotation
-        .validate_common(
+    assert!(matches!(
+        rotation.validate_common(
             1,
             Some(&genesis.envelope_hash().test_unwrap()),
             &genesis.body.log_id,
             &genesis.body.authority_id,
             Some(genesis.body.issued_at),
-        )
-        .is_err());
+        ),
+        Err(chio_keyring::KeyringError::WeakKey)
+    ));
 }

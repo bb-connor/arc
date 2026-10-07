@@ -121,12 +121,22 @@ mod tests {
     #[test]
     fn acl_return_code_linux_success_is_rejected() {
         let stale_error = io::Error::from_raw_os_error(rustix::io::Errno::INVAL.raw_os_error());
-        assert!(acl_entry_returned(1, stale_error).is_err());
+        assert!(matches!(
+            acl_entry_returned(1, stale_error),
+            Err(error) if error.kind() == io::ErrorKind::Other
+                && error.raw_os_error().is_none()
+                && error.to_string() == "unexpected Darwin ACL entry result"
+        ));
     }
 
     #[test]
     fn acl_return_code_unexpected_status_fails_closed() {
         let stale_error = io::Error::from_raw_os_error(rustix::io::Errno::INVAL.raw_os_error());
-        assert!(acl_entry_returned(2, stale_error).is_err());
+        assert!(matches!(
+            acl_entry_returned(2, stale_error),
+            Err(error) if error.kind() == io::ErrorKind::Other
+                && error.raw_os_error().is_none()
+                && error.to_string() == "unexpected Darwin ACL entry result"
+        ));
     }
 }

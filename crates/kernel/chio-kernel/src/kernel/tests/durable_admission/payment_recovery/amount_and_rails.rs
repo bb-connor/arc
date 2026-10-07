@@ -66,7 +66,16 @@ fn review_payment_amount_refund_uses_quote_five_and_preserves_exposure_ten() -> 
 fn assert_quote_refused_before_any_hold(units: u64, currency: &str) -> TestResult {
     let (kernel, request, store, invocations, calls) =
         quoted_payment("review-payment-unsupported-quote", units, currency);
-    assert!(authorize_without_dispatch(&kernel, &request).is_err());
+    let error = authorize_without_dispatch(&kernel, &request)
+        .err()
+        .ok_or("unsupported quote was authorized")?;
+    assert!(
+        matches!(error.downcast_ref::<KernelError>(), Some(KernelError::AdmissionRecovery(failure))
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Item {
+            kind: crate::admission_operation::AdmissionRecoveryFailureKind::UnsupportedState,
+            detail,
+        } if detail == "durable rail debit must be positive, within exposure, and in its currency"))
+    );
     assert!(store.payment_journal().is_none());
     assert!(store.operation().budget_hold_id().is_none());
     assert!(calls
@@ -91,17 +100,19 @@ fn review_payment_amount_currency_mismatch_refuses_before_effect() -> TestResult
 #[test]
 fn review_payment_x402_refund_requires_actual_remote_evidence() -> TestResult {
     let adapter = crate::payment::X402PaymentAdapter::new("http://127.0.0.1:1");
-    assert!(adapter
-        .refund("original-prepayment", 5, "USD", "original-operation")
-        .is_err());
+    assert!(
+        matches!(adapter.refund("original-prepayment", 5, "USD", "original-operation"),
+        Err(PaymentError::Unavailable(detail)) if detail == "x402 remote refund is unsupported")
+    );
     Ok(())
 }
 
 #[test]
 fn review_payment_x402_release_cannot_undo_final_prepayment() -> TestResult {
     let adapter = crate::payment::X402PaymentAdapter::new("http://127.0.0.1:1");
-    assert!(adapter
-        .release("original-prepayment", "original-operation")
-        .is_err());
+    assert!(
+        matches!(adapter.release("original-prepayment", "original-operation"),
+        Err(PaymentError::Unavailable(detail)) if detail == "x402 final prepayment has no releasable hold")
+    );
     Ok(())
 }

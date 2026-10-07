@@ -9,6 +9,7 @@ use chio_kernel::security_admission_operation::{
     AdmissionOperationCompareAndSwap, AdmissionOperationCreateOutcome, AdmissionOperationError,
     AdmissionOperationStoreProfile,
 };
+use chio_test_support::prelude::TestResultOk;
 
 struct AnchorReadFault {
     inner: Arc<SqliteSecurityAdmissionOperationStore>,
@@ -152,7 +153,7 @@ fn assert_retry_preserved(
             .runtime
             .admission_operations
             .load(id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(operation)
     );
@@ -161,7 +162,7 @@ fn assert_retry_preserved(
             .runtime
             .approvals
             .get_approval_reservation(id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(approvals)
     );
@@ -171,7 +172,7 @@ fn assert_retry_preserved(
         .runtime
         .kernel
         .prepare_active_response_admission(fixture.native_request())
-        .expect("healthy preparation retry");
+        .test_expect("healthy preparation retry");
     assert_eq!(retry, *prepared);
 }
 
@@ -196,20 +197,20 @@ fn transient_anchor_read_cannot_compensate_an_existing_preparation() {
         .runtime
         .kernel
         .prepare_active_response_admission(fixture.native_request())
-        .unwrap();
+        .test_unwrap();
     let id = operation_id(&prepared);
     let operation = fixture
         .runtime
         .admission_operations
         .load(id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     let approvals = fixture
         .runtime
         .approvals
         .get_approval_reservation(id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     fault.store(true, Ordering::Release);
     assert!(matches!(
         fixture
@@ -243,20 +244,20 @@ fn transient_approval_readback_cannot_compensate_an_existing_preparation() {
         .runtime
         .kernel
         .prepare_active_response_admission(fixture.native_request())
-        .unwrap();
+        .test_unwrap();
     let id = operation_id(&prepared);
     let operation = fixture
         .runtime
         .admission_operations
         .load(id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     let approvals = fixture
         .runtime
         .approvals
         .get_approval_reservation(id)
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     fault.store(true, Ordering::Release);
     let failed = fixture
         .runtime
@@ -269,7 +270,7 @@ fn transient_approval_readback_cannot_compensate_an_existing_preparation() {
             .runtime
             .admission_operations
             .load(id)
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(&operation)
     );
@@ -314,22 +315,22 @@ fn published_deactivation_blocks_prepare_commit_execute_and_resume() {
         .runtime
         .kernel
         .prepare_active_response_admission(&request)
-        .unwrap();
+        .test_unwrap();
     let binding = prepared
         .durable_dispatch_binding(request.response_plan())
-        .unwrap();
+        .test_unwrap();
     let operation = fixture
         .runtime
         .admission_operations
         .load(operation_id(&prepared))
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     let approvals = fixture
         .runtime
         .approvals
         .get_approval_reservation(operation_id(&prepared))
-        .unwrap()
-        .unwrap();
+        .test_unwrap()
+        .test_unwrap();
     let before = fixture.runtime.kernel.governed_security_runtime_status();
     let RealAdapterRuntime {
         mut kernel,
@@ -341,7 +342,7 @@ fn published_deactivation_blocks_prepare_commit_execute_and_resume() {
     } = fixture.runtime;
     drop(coordinator);
     Arc::get_mut(&mut kernel)
-        .expect("exclusive kernel")
+        .test_expect("exclusive kernel")
         .deactivate_governed_active_response_plans();
     assert_disabled(kernel.prepare_active_response_admission(&request));
     assert_disabled(kernel.commit_prepared_active_response_admission(&request, &prepared));
@@ -359,14 +360,14 @@ fn published_deactivation_blocks_prepare_commit_execute_and_resume() {
     assert_eq!(
         admission_operations
             .load(operation_id(&prepared))
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(&operation)
     );
     assert_eq!(
         approval_store
             .get_approval_reservation(operation_id(&prepared))
-            .unwrap()
+            .test_unwrap()
             .as_ref(),
         Some(&approvals)
     );
@@ -393,7 +394,7 @@ fn published_clear_methods_disable_without_replacing_authorities() {
             ..
         } = fixture.runtime;
         drop(coordinator);
-        clear(Arc::get_mut(&mut kernel).expect("exclusive kernel"));
+        clear(Arc::get_mut(&mut kernel).test_expect("exclusive kernel"));
         assert_disabled(kernel.prepare_active_response_admission(&request));
         assert_eq!(kernel.governed_security_runtime_status(), expected);
         assert_eq!(executor.calls(), 0);
@@ -409,12 +410,12 @@ fn deactivation_blocks_signed_simulation() {
         .artifacts
         .clone()
         .into_simulation_request(fixture.plan.response_plan().clone())
-        .unwrap();
+        .test_unwrap();
     fixture
         .runtime
         .kernel
         .verify_active_response_simulation(&request)
-        .expect("enabled signed simulation");
+        .test_expect("enabled signed simulation");
     let RealAdapterRuntime {
         mut kernel,
         coordinator,
@@ -424,7 +425,7 @@ fn deactivation_blocks_signed_simulation() {
     } = fixture.runtime;
     drop(coordinator);
     Arc::get_mut(&mut kernel)
-        .expect("exclusive kernel")
+        .test_expect("exclusive kernel")
         .deactivate_governed_active_response_plans();
     assert_disabled(kernel.verify_active_response_simulation(&request));
     assert_eq!(executor.calls(), 0);

@@ -3283,6 +3283,17 @@ codes:
     consumed_by:
       - chio-kernel
 
+  - urn: "urn:chio:error:kernel:mediated-denial"
+    domain: kernel
+    severity: error
+    summary: "The kernel runtime refused a tool call that `chio mcp wrap` mediated for its MCP client."
+    help: "Read the denial reason and the signed receipt, then change the capability or policy before retrying the call."
+    string_code: "CHIO-KERNEL-MEDIATED-DENIAL"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-cli
+
   - urn: "urn:chio:error:transport:untrusted-proxy"
     domain: transport
     severity: error

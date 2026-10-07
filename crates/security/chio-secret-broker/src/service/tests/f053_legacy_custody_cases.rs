@@ -268,7 +268,10 @@ fn f053_legacy_open_preserves_auth_phase_order_and_healthy_comparison() -> TestR
     use std::os::unix::net::UnixStream;
     let (fixture, open) = open_fixture(false)?;
     let before_calls = fixture.live_authority_calls.load(Ordering::SeqCst);
-    assert!(decode_open_wire(b"{\"referenceRequestHead\":[80").is_err());
+    assert!(matches!(
+        decode_open_wire(b"{\"referenceRequestHead\":[80"),
+        Err(BrokerError::UntrustedInput(UntrustedJsonError::Decode(error))) if error.is_eof()
+    ));
     assert_eq!(
         fixture.live_authority_calls.load(Ordering::SeqCst),
         before_calls

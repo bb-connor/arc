@@ -327,14 +327,12 @@ fn active_response_recovery_defers_wrong_authority_after_processing_other_operat
         .ok_or("later recovery candidate")?;
     store.create_prepared(poison.clone())?;
     store.create_prepared(original.clone())?;
-    assert!(
-        kernel
-            .recover_nonterminal_active_response_operations_with_authorities(
-                &store, None, &authority,
-            )
-            .is_err(),
-        "a refused row still fails publication closed"
-    );
+    let error = kernel
+        .recover_nonterminal_active_response_operations_with_authorities(&store, None, &authority)
+        .err()
+        .ok_or("wrong executor authority was recovered")?;
+    assert!(matches!(error, KernelError::Internal(detail)
+        if detail == format!("governed active-response operation {} belongs to a different executor authority", poison.operation_id())));
     assert_eq!(
         store
             .load(poison.operation_id())?

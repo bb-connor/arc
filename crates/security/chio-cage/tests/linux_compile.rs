@@ -716,13 +716,18 @@ fn a_failed_compile_keeps_its_created_grant_and_the_other_creators_file() {
     let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
     assert_eq!(admitted.pending_write_grants().len(), 2);
     std::fs::write(&second, b"created by someone else").test_unwrap();
-    assert!(compile(
-        admitted,
-        retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
-        &BTreeMap::new(),
-        None,
-    )
-    .is_err());
+    assert!(matches!(
+        compile(
+            admitted,
+            retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
+            &BTreeMap::new(),
+            None,
+        ),
+        Err(CageError::RetainPath { path, source })
+            if path == second
+                && source.kind() == std::io::ErrorKind::AlreadyExists
+                && source.raw_os_error() == Some(libc::EEXIST)
+    ));
     // Compile never removes a name: a pathname cannot be deleted conditionally
     // on the inode it names, so the created grant stays as an owned empty file.
     let created = std::fs::symlink_metadata(&first).test_unwrap();
@@ -750,13 +755,18 @@ fn the_next_compile_retains_a_grant_left_by_a_failed_compile() {
     );
     let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();
     std::fs::write(&second, b"created by someone else").test_unwrap();
-    assert!(compile(
-        admitted,
-        retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
-        &BTreeMap::new(),
-        None,
-    )
-    .is_err());
+    assert!(matches!(
+        compile(
+            admitted,
+            retain_runtime_resources(&tree.runtime_paths()).test_unwrap(),
+            &BTreeMap::new(),
+            None,
+        ),
+        Err(CageError::RetainPath { path, source })
+            if path == second
+                && source.kind() == std::io::ErrorKind::AlreadyExists
+                && source.raw_os_error() == Some(libc::EEXIST)
+    ));
     let left = std::fs::symlink_metadata(&first).test_unwrap();
     std::fs::remove_file(&second).test_unwrap();
     let admitted = admit(&signed, &keypair.public_key(), &ceilings).test_unwrap();

@@ -521,7 +521,12 @@ fn run_native_delivery_with_observer_delay(
             "options" => changed.request.options.timeout_ms -= 1,
             _ => changed.proof.body.nonce.push_str("-replayed"),
         }
-        assert!(client.execute(&changed).is_err(), "{substitution}");
+        let denied = client.execute(&changed);
+        assert!(
+            matches!(&denied, Err(crate::BrokerError::AuthorizationDenied(code))
+                if code == "chio.broker.authorization_denied"),
+            "{substitution}: {denied:?}"
+        );
     }
     let death_socket = client.connect_authenticated()?;
     let broker_output = broker.kill_and_output();
@@ -595,26 +600,30 @@ fn run_native_delivery_with_observer_delay(
     )?;
     let mut changed = public.clone();
     changed.capture.authority_commit_index += 1;
-    assert!(changed
-        .verify(
+    assert!(matches!(
+        changed.verify(
             operation.binding(),
             &host.execute,
             &response,
             &broker_key.public_key(),
             now_ms()?
-        )
-        .is_err());
+        ),
+        Err(crate::BrokerError::AuthorizationDenied(reason))
+            if reason == "broker request differs from installed kernel authority"
+    ));
     let mut changed = public;
     changed.registration.authority_metadata_digest = "00".repeat(32);
-    assert!(changed
-        .verify(
+    assert!(matches!(
+        changed.verify(
             operation.binding(),
             &host.execute,
             &response,
             &broker_key.public_key(),
             now_ms()?
-        )
-        .is_err());
+        ),
+        Err(crate::BrokerError::AuthorizationDenied(reason))
+            if reason == "broker request differs from installed kernel authority"
+    ));
     let (after_verification, _) = store
         .load_unambiguous_retained_tool_request(
             &AdmissionIdentifier::try_new("request", &host.request.request_id)?,

@@ -86,7 +86,9 @@ fn a_transient_delivery_failure_backs_off_as_pending_work() {
     let port: Arc<dyn DeclassificationReceiptOutboxPort> = scripted.clone();
     let outbox = ProductionDeclassificationReceiptOutbox::new_for_test(port);
 
-    assert!(outbox.drain_one_batch().is_err());
+    assert!(matches!(outbox.drain_one_batch(),
+        Err(ResponseWorkerTickError::DeclassificationOutbox(source))
+            if source.kind() == PortErrorKind::Unavailable));
     let backed_off = outbox
         .drain_one_batch()
         .unwrap_or_else(|error| panic!("transient backoff: {error}"));

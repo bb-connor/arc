@@ -38,7 +38,10 @@ fn an_in_flight_tick_keeps_the_last_degraded_outcome() {
         ProductionResponseWorker::new_for_test(Arc::clone(&port))
             .unwrap_or_else(|error| panic!("worker: {error}")),
     );
-    assert!(worker.tick_once().is_err());
+    assert!(
+        matches!(worker.tick_once(), Err(ResponseWorkerTickError::Port(source))
+        if source.kind() == chio_security_types::ports::PortErrorKind::Unavailable)
+    );
     assert_eq!(worker.health().lifecycle, ResponseWorkerLifecycle::Degraded);
 
     let ticking = Arc::clone(&worker);

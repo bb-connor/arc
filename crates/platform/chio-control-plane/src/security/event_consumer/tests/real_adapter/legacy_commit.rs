@@ -13,6 +13,7 @@ use chio_kernel::admission_operation::{
 };
 use chio_kernel::governed_active_response::GovernedActiveResponseRequest;
 use chio_kernel::KernelError;
+use chio_test_support::prelude::{TestResultErr, TestResultOk};
 
 fn legacy_grant(server: &str, tool: &str) -> ToolGrant {
     ToolGrant {
@@ -59,14 +60,14 @@ impl LegacyResponseFixture<'_> {
             },
             self.issuer,
         )
-        .unwrap();
+        .test_unwrap();
         let canonical_plan_body = serde_json::json!({
             "actionId": request_id,
             "effects": effects,
             "target": {"sessionId": "session-active-1"}
         });
         let plan_body_hash =
-            GovernedResponsePlanIntentBody::plan_body_hash(&canonical_plan_body).unwrap();
+            GovernedResponsePlanIntentBody::plan_body_hash(&canonical_plan_body).test_unwrap();
         let expires_at = self.now + 240;
         let intent = GovernedTransactionIntent {
             id: request_id.to_owned(),
@@ -86,7 +87,7 @@ impl LegacyResponseFixture<'_> {
                     plan_id: request_id.to_owned(),
                     operator_capability_id: capability.id.clone(),
                     operator_capability_hash: sha256_hex(
-                        &canonical_json_bytes(&capability).unwrap(),
+                        &canonical_json_bytes(&capability).test_unwrap(),
                     ),
                     operator_capability_expires_at: capability.expires_at,
                     executor_subject: capability.subject.clone(),
@@ -99,7 +100,7 @@ impl LegacyResponseFixture<'_> {
                 },
             )),
         };
-        let governed_intent_hash = intent.binding_hash().unwrap();
+        let governed_intent_hash = intent.binding_hash().test_unwrap();
         let proposal_created_at = self.now;
         let proposal_deadline = ThresholdApprovalProposalBody::proposal_deadline(
             proposal_created_at,
@@ -107,7 +108,7 @@ impl LegacyResponseFixture<'_> {
             capability.expires_at,
             Some(expires_at),
         )
-        .unwrap();
+        .test_unwrap();
         let proposal = ThresholdApprovalProposal::sign(
             ThresholdApprovalProposalBody {
                 schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
@@ -116,7 +117,7 @@ impl LegacyResponseFixture<'_> {
                 governed_intent_hash: governed_intent_hash.clone(),
                 subject: capability.subject.clone(),
                 authorizing_capability_digest: sha256_hex(
-                    &canonical_json_bytes(&capability).unwrap(),
+                    &canonical_json_bytes(&capability).test_unwrap(),
                 ),
                 policy_hash: self.requirement.policy_hash.clone(),
                 threshold: self.requirement.threshold,
@@ -127,8 +128,8 @@ impl LegacyResponseFixture<'_> {
             },
             self.policy_authority,
         )
-        .unwrap();
-        let proposal_hash = proposal.artifact_digest().unwrap();
+        .test_unwrap();
+        let proposal_hash = proposal.artifact_digest().test_unwrap();
         let approval_tokens = self
             .approvers
             .into_iter()
@@ -148,7 +149,7 @@ impl LegacyResponseFixture<'_> {
                     },
                     approver,
                 )
-                .unwrap()
+                .test_unwrap()
             })
             .collect();
         GovernedActiveResponseRequest {
@@ -198,7 +199,7 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
         "legacy-retirement-directory".into(),
         300,
     )
-    .unwrap();
+    .test_unwrap();
     let runtime = build_real_adapter_runtime(
         &paths,
         &operator_authority,
@@ -219,7 +220,7 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
         ..
     } = runtime;
     drop(coordinator);
-    let kernel = Arc::get_mut(&mut kernel).expect("sole published kernel handle");
+    let kernel = Arc::get_mut(&mut kernel).test_expect("sole published kernel handle");
     assert!(
         kernel
             .governed_security_runtime_status()
@@ -227,14 +228,14 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     );
     let database = _directory.path().join("legacy-v1.db");
     let locks = _directory.path().join("legacy-v1-locks");
-    crate::create_private_directory(&locks).unwrap();
-    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks).unwrap();
+    crate::create_private_directory(&locks).test_unwrap();
+    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks).test_unwrap();
     let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
         database,
         locks,
         kernel.authority_clock(),
     )
-    .unwrap();
+    .test_unwrap();
     let store = authority.admission_operation_store();
     kernel
         .set_durable_admission_store(
@@ -242,11 +243,11 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
             Arc::new(authority.tool_outcome_store()),
             authority.mutation_fence(),
         )
-        .unwrap();
+        .test_unwrap();
     kernel.set_revocation_store_handle(Arc::new(authority.revocation_store()));
     let now = kernel
         .authority_clock_reading()
-        .unwrap()
+        .test_unwrap()
         .unix_millis()
         .as_secs();
     let executor = Keypair::generate();
@@ -279,7 +280,7 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     plan.canonical_plan_body["actionId"] = serde_json::json!("substituted-response");
     assert!(kernel
         .admit_governed_active_response(&mismatched)
-        .unwrap_err()
+        .test_unwrap_err()
         .to_string()
         .contains("body hash"));
 
@@ -301,10 +302,10 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
         GovernedResponseEffect::SuspendSession
     ]);
     plan.plan_body_hash =
-        GovernedResponsePlanIntentBody::plan_body_hash(&plan.canonical_plan_body).unwrap();
+        GovernedResponsePlanIntentBody::plan_body_hash(&plan.canonical_plan_body).test_unwrap();
     assert!(kernel
         .admit_governed_active_response(&mismatched_effects)
-        .unwrap_err()
+        .test_unwrap_err()
         .to_string()
         .contains("effects do not match"));
 
@@ -318,11 +319,11 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     let mut substituted_proposal = raw_plan_hash.threshold_approval_proposal.body.clone();
     substituted_proposal.governed_intent_hash = substituted_hash.clone();
     raw_plan_hash.threshold_approval_proposal =
-        ThresholdApprovalProposal::sign(substituted_proposal, &operator_authority).unwrap();
+        ThresholdApprovalProposal::sign(substituted_proposal, &operator_authority).test_unwrap();
     let substituted_proposal_hash = raw_plan_hash
         .threshold_approval_proposal
         .artifact_digest()
-        .unwrap();
+        .test_unwrap();
     raw_plan_hash.approval_tokens = [&approver_a, &approver_b]
         .into_iter()
         .enumerate()
@@ -344,12 +345,12 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
                 },
                 approver,
             )
-            .unwrap()
+            .test_unwrap()
         })
         .collect();
     let raw_plan_error = kernel
         .admit_governed_active_response(&raw_plan_hash)
-        .unwrap_err();
+        .test_unwrap_err();
     assert!(
         matches!(&raw_plan_error, KernelError::GovernedTransactionDenied(_)),
         "raw plan substitution returned a different typed family: {raw_plan_error:?}"
@@ -371,7 +372,7 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     );
     assert!(kernel
         .admit_governed_active_response(&missing_grant)
-        .unwrap_err()
+        .test_unwrap_err()
         .to_string()
         .contains("suspend_session"));
 
@@ -385,13 +386,15 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     );
     kernel
         .revoke_capability(&revoked.operator_capability.id)
-        .unwrap();
+        .test_unwrap();
     assert!(matches!(
         kernel.admit_governed_active_response(&revoked),
         Err(KernelError::CapabilityRevoked(id)) if id == revoked.operator_capability.id
     ));
 
-    let admitted = kernel.admit_governed_active_response(&request).unwrap();
+    let admitted = kernel
+        .admit_governed_active_response(&request)
+        .test_unwrap();
     assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
     assert_eq!(admitted.requirement(), &requirement);
     assert_eq!(
@@ -410,7 +413,7 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
         }
     );
     assert_eq!(
-        admitted.approval_set().approval_set_hash().unwrap(),
+        admitted.approval_set().approval_set_hash().test_unwrap(),
         admitted.approval_set_hash()
     );
     let operation_id = admitted.operation_id().to_owned();
@@ -425,17 +428,17 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
             let mut body = token.body();
             let replacement_token_id = format!("replacement-active-response-token-{index}");
             body.id = replacement_token_id;
-            GovernedApprovalToken::sign(body, approver).unwrap()
+            GovernedApprovalToken::sign(body, approver).test_unwrap()
         })
         .collect();
     assert!(kernel
         .admit_governed_active_response(&mismatched_approval_set)
-        .unwrap_err()
+        .test_unwrap_err()
         .to_string()
         .contains("retained approval reservation"));
     let mut admitted = kernel
         .admit_governed_active_response(&request)
-        .expect("mismatched replay must not compensate retained admission");
+        .test_expect("mismatched replay must not compensate retained admission");
     assert_eq!(admitted.state(), AdmissionOperationState::ApprovalReserved);
     assert!(matches!(
         kernel.commit_governed_active_response_dispatch(&mut admitted),
@@ -445,13 +448,15 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     assert_eq!(
         store
             .load_by_operation_id(&typed_operation_id)
-            .unwrap()
-            .unwrap()
+            .test_unwrap()
+            .test_unwrap()
             .state(),
         AdmissionOperationState::ApprovalReserved
     );
 
-    let mut recovered = kernel.admit_governed_active_response(&request).unwrap();
+    let mut recovered = kernel
+        .admit_governed_active_response(&request)
+        .test_unwrap();
     assert_eq!(recovered.operation_id(), operation_id);
     assert_eq!(recovered.state(), AdmissionOperationState::ApprovalReserved);
     assert!(matches!(
@@ -461,19 +466,21 @@ fn legacy_active_response_commit_refuses_without_consuming_approval() {
     assert_eq!(
         store
             .load_by_operation_id(&typed_operation_id)
-            .unwrap()
-            .unwrap()
+            .test_unwrap()
+            .test_unwrap()
             .state(),
         AdmissionOperationState::ApprovalReserved
     );
-    kernel.cancel_governed_active_response(&recovered).unwrap();
+    kernel
+        .cancel_governed_active_response(&recovered)
+        .test_unwrap();
     assert_eq!(executor_authority.calls(), 0);
     assert_eq!(effects_authority.executions(), 0);
     assert_eq!(
         store
             .load_by_operation_id(&typed_operation_id)
-            .unwrap()
-            .unwrap()
+            .test_unwrap()
+            .test_unwrap()
             .state(),
         AdmissionOperationState::CompensatedBeforeDispatch
     );

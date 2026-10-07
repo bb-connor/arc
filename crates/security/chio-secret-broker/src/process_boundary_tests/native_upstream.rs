@@ -159,8 +159,17 @@ fn native_upstream_owner_cancellation_joins_without_child_or_effect() -> io::Res
         let _invocation_owner = observer;
         panic!("fixed owned invocation failure before provider dispatch");
     }));
-    assert!(failure.is_err());
-    assert!(TcpStream::connect_timeout(&address, Duration::from_secs(1)).is_err());
+    let Err(payload) = failure else {
+        panic!("owned invocation fixture must unwind");
+    };
+    assert_eq!(
+        payload.downcast_ref::<&'static str>(),
+        Some(&"fixed owned invocation failure before provider dispatch")
+    );
+    let Err(error) = TcpStream::connect_timeout(&address, Duration::from_secs(1)) else {
+        panic!("cancelled observer listener remained reachable");
+    };
+    assert_eq!(error.kind(), io::ErrorKind::ConnectionRefused);
 
     // Cancellation also wins when a real connection is already queued.
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;

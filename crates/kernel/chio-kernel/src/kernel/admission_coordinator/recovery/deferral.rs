@@ -33,6 +33,7 @@ impl ChioKernel {
             }
             return Ok(());
         }
+        let now = runtime.refresh_trusted_time(now)?;
         let deferral = AdmissionRecoveryDeferralV1::after_failure(
             &current,
             previous.map(|previous| &previous.deferral),
@@ -74,6 +75,7 @@ impl ChioKernel {
             return Ok(());
         }
         let runtime = self.durable_runtime()?;
+        let now = runtime.refresh_trusted_time(now)?;
         let lease = if operation.state().is_terminal() {
             None
         } else {

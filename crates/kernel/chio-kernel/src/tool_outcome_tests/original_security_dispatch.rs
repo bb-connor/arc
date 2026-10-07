@@ -51,7 +51,12 @@ fn legacy_raw_security_formats_decode_without_fresh_release_authority(
         assert_eq!(decoded.canonical_blob()?.bytes(), bytes);
         assert_eq!(decoded.to_persisted().schema, legacy.to_persisted().schema);
         assert!(decoded.original_security_dispatch_binding().is_none());
-        assert!(decoded.security_dispatch_commitment_id().is_err());
+        assert!(matches!(
+            decoded.security_dispatch_commitment_id(),
+            Err(ToolOutcomeError::Binding(
+                "security_release.original_dispatch"
+            ))
+        ));
     }
     Ok(())
 }

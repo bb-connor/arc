@@ -126,9 +126,19 @@ fn native_raw_store_rejects_substituted_original_dispatch_bindings() -> TestResu
             let record =
                 test_support::record_returned_blob(&operation, &blob, fence.clone(), now_ms()?)?;
             assert!(
-                outcomes
-                    .record_tool_returned(&operation, &lease, &blob, &record, &fence, now_ms()?,)
-                    .is_err(),
+                matches!(
+                    outcomes.record_tool_returned(
+                        &operation,
+                        &lease,
+                        &blob,
+                        &record,
+                        &fence,
+                        now_ms()?
+                    ),
+                    Err(chio_kernel::tool_outcome::ToolOutcomeStoreError::Invariant(
+                        _
+                    ))
+                ),
                 "egress={egress} substitution={substitution}"
             );
             assert_eq!(snapshot(&fixture, &captured.operation_id)?, before);

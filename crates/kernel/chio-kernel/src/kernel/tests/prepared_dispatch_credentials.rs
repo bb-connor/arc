@@ -35,7 +35,9 @@ fn dispatch_deadline_cannot_outlive_a_shorter_signed_approval() -> TestResult {
     assert_eq!(prepared.valid_until_unix_ms(None)?, expires * 1000);
     fixture.assert_no_writes()?;
     // Legacy proof verification cannot manufacture a durable proof horizon.
-    assert!(fixture.prepare()?.valid_until_unix_ms(None).is_err());
+    assert!(matches!(fixture.prepare()?.valid_until_unix_ms(None),
+        Err(KernelError::DurableAdmission(detail))
+            if detail == "dispatch deadline requires operation-owned DPoP custody"));
     Ok(())
 }
 

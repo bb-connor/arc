@@ -836,7 +836,10 @@ fn review_recovery_requires_new_key_proof_and_distinct_threshold_authorizers() {
         "fresh append accepted recovery without possession"
     );
     assert!(
-        KeyLogState::replay([&genesis, &recovery], &unproven_history, &policy).is_err(),
+        matches!(
+            KeyLogState::replay([&genesis, &recovery], &unproven_history, &policy),
+            Err(chio_keyring::KeyringError::InvalidAuthorizationSet)
+        ),
         "recovery quorum activated a key without proof of possession"
     );
     recovery.authorizations.new_key =
@@ -859,13 +862,19 @@ fn review_recovery_requires_new_key_proof_and_distinct_threshold_authorizers() {
     wrong_proof.authorizations.new_key =
         Some(NewKeyProofOfPossession::sign(&wrong_proof.body, &fixture.new).test_unwrap());
     let wrong_proof_history = fixture.history(&[&genesis, &wrong_proof], None);
-    assert!(KeyLogState::replay([&genesis, &wrong_proof], &wrong_proof_history, &policy).is_err());
+    assert!(matches!(
+        KeyLogState::replay([&genesis, &wrong_proof], &wrong_proof_history, &policy),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
 
     let mut oversized = recovery;
     oversized.authorizations.recovery =
         vec![oversized.authorizations.recovery[0].clone(); MAX_RECOVERY_AUTHORIZATIONS + 1];
     let oversized_history = fixture.history(&[&genesis, &oversized], None);
-    assert!(KeyLogState::replay([&genesis, &oversized], &oversized_history, &policy).is_err());
+    assert!(matches!(
+        KeyLogState::replay([&genesis, &oversized], &oversized_history, &policy),
+        Err(chio_keyring::KeyringError::InvalidAuthorizationSet)
+    ));
 }
 
 #[test]

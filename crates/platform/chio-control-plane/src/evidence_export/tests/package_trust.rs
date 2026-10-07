@@ -247,7 +247,7 @@ fn package_reader_rejects_non_regular_and_oversized_inputs() {
 #[cfg(unix)]
 #[test]
 fn package_reader_rejects_leaf_and_parent_symlinks_and_fifo() {
-    use std::os::unix::fs::symlink;
+    use std::os::unix::fs::{symlink, FileTypeExt};
     let directory = chio_test_support::private_tempdir().test_unwrap();
     let outside = chio_test_support::private_tempdir().test_unwrap();
     fs::write(outside.path().join("file.json"), b"{}").test_unwrap();
@@ -268,14 +268,17 @@ fn package_reader_rejects_leaf_and_parent_symlinks_and_fifo() {
             Ok(bytes) => panic!("untrusted path {name} was followed: {bytes:?}"),
         }
     }
-    rustix::fs::mknodat(
-        rustix::fs::CWD,
-        directory.path().join("fifo"),
-        rustix::fs::FileType::Fifo,
-        rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
-        0,
-    )
-    .test_unwrap();
+    let fifo = directory.path().join("fifo");
+    let created = std::process::Command::new("mkfifo")
+        .args(["-m", "600"])
+        .arg(&fifo)
+        .status()
+        .test_unwrap();
+    assert!(created.success(), "private FIFO fixture creation failed");
+    assert!(fs::symlink_metadata(&fifo)
+        .test_unwrap()
+        .file_type()
+        .is_fifo());
     let error = package_io::read_bytes(directory.path(), "fifo").test_unwrap_err();
     assert!(error.to_string().contains("regular file"), "{error}");
 }

@@ -111,7 +111,11 @@ fn review_target_retained_finalization_does_not_mint_fresh_execution_nonce() -> 
     calls.capture_pending.store(true, Ordering::SeqCst);
     let first = kernel.evaluate_tool_call_blocking(&request);
     assert!(
-        first.is_err(),
+        matches!(&first, Err(KernelError::AdmissionRecovery(failure))
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Item {
+            kind: crate::admission_operation::AdmissionRecoveryFailureKind::PaymentPending,
+            detail,
+        } if detail == "payment settlement remains pending")),
         "original valid call must reach pending settlement: {first:?}"
     );
     assert_eq!(
@@ -211,7 +215,13 @@ fn review_continuation_due_tick_visits_one_physical_page_then_resumes_cursor() -
 fn review_continuation_due_tick_rejects_invalid_count_before_store_work() -> TestResult {
     let (kernel, _, store, _) = durable_admission_fixture("review-bounded-due-tick-invalid");
     for invalid in [0, 257] {
-        assert!(due_tick(&kernel, invalid).is_err());
+        let error = due_tick(&kernel, invalid)
+            .err()
+            .ok_or("invalid recovery count was accepted")?;
+        assert!(matches!(error, KernelError::AdmissionRecovery(failure)
+            if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Store(
+                AdmissionOperationStoreError::Invariant(detail)
+            ) if detail == "recovery batch candidate limit must be between 1 and 256")));
     }
     assert!(store.recovery_page_trace().is_empty());
     Ok(())

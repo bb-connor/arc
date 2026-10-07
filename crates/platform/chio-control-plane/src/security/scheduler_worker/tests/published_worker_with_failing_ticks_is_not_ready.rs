@@ -49,7 +49,12 @@ async fn published_worker_with_failing_ticks_is_not_ready() {
     .await
     .unwrap_or_else(|_| panic!("failing ticks were not observed"));
 
-    assert!(services.ensure_ready().is_err());
+    assert!(matches!(
+        services.ensure_ready(),
+        Err(ResponseWorkerTickError::WorkerNotReady(
+            ResponseWorkerLifecycle::Degraded
+        ))
+    ));
     handle
         .shutdown()
         .await

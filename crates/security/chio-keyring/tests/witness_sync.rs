@@ -1535,11 +1535,12 @@ fn an_auditor_refuses_to_pin_a_witness_outside_its_policy() {
     let fixture = Fixture::new();
     let directory = private_tempdir().test_unwrap();
     let auditor = audit_store(&fixture, &trusted_temp_path(&directory, "audit.sqlite"));
-    assert!(auditor
-        .pin_witness_observation(
+    assert!(matches!(
+        auditor.pin_witness_observation(
             &WitnessId::new("witness.unknown").test_unwrap(),
             chio_core_types::sha256(b"unknown-store"),
             None,
-        )
-        .is_err());
+        ),
+        Err(KeyringError::InvalidSignature)
+    ));
 }

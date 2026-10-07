@@ -123,7 +123,11 @@ fn review_target_current_finding_status_withholds_resolved_output() -> TestResul
     }));
     let first = kernel.evaluate_tool_call_blocking(&request);
     assert!(
-        first.is_err(),
+        matches!(&first, Err(KernelError::AdmissionRecovery(failure))
+        if matches!(failure.as_ref(), crate::admission_operation::AdmissionRecoveryError::Item {
+            kind: crate::admission_operation::AdmissionRecoveryFailureKind::PaymentPending,
+            detail,
+        } if detail == "payment settlement remains pending")),
         "purchase must reach pending settlement: {first:?}"
     );
     assert_eq!(

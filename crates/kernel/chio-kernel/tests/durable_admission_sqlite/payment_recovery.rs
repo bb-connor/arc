@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "payment_recovery/advancing_clock.rs"]
+mod advancing_clock;
+
 #[path = "payment_recovery/prepay_restart.rs"]
 mod prepay_restart;
 #[path = "payment_recovery/pricing_restart.rs"]

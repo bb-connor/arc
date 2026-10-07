@@ -3612,6 +3612,19 @@ pub const KERNEL_APPROVAL_REPLAY_INVALID_CAPACITY: ErrorCodeSpec = ErrorCodeSpec
     consumed_by: &["chio-kernel"],
 };
 
+pub const KERNEL_MEDIATED_DENIAL: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:mediated-denial",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The kernel runtime refused a tool call that `chio mcp wrap` mediated for its MCP client.",
+    help: "Read the denial reason and the signed receipt, then change the capability or policy before retrying the call.",
+    string_code: "CHIO-KERNEL-MEDIATED-DENIAL",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-cli"],
+};
+
 pub const TRANSPORT_UNTRUSTED_PROXY: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:transport:untrusted-proxy",
     domain: Domain::Transport,
@@ -3908,6 +3921,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_INVALID_CAPACITY,
     KERNEL_DPOP_MALFORMED,
     KERNEL_APPROVAL_REPLAY_INVALID_CAPACITY,
+    KERNEL_MEDIATED_DENIAL,
     TRANSPORT_UNTRUSTED_PROXY,
     TRANSPORT_INVALID_PROXY_HEADER,
 ];

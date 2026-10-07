@@ -129,6 +129,9 @@ jobs:
           run_gate python3 ./scripts/check-rust-toolchain-parity.py
           run_gate bash ./scripts/tests/check-rust-toolchain-parity.test.sh
           run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --check
+          run_gate bash ./deploy/docker/chio-workspace/regenerate.sh --check --proof-room
+          run_gate python3 scripts/check-cargo-lock-unused-patches.py
+          run_gate python3 scripts/tests/check-cargo-lock-unused-patches.test.py
           run_gate python3 scripts/check-docker-build-contexts.py
           run_gate python3 scripts/tests/check-docker-build-contexts.test.py
           run_gate bash ./scripts/tests/check-sidecar-docker-context.test.sh
@@ -202,6 +205,8 @@ jobs:
           run_gate python3 scripts/tests/rust-hardening-compiler-probes.py
           run_gate python3 scripts/check-wire-schemas.py
           run_gate cargo xtask errors regen --check
+          run_gate python3 scripts/check-error-urn-registry.py
+          run_gate python3 scripts/tests/check-error-urn-registry.test.py
           run_gate bash scripts/tests/check-wire-schemas.test.sh
           run_gate python3 scripts/check-dependency-budget.py
           run_gate bash scripts/tests/check-dependency-budget.test.sh

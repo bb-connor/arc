@@ -491,12 +491,20 @@ mod tests {
     /// create a process must not enter this vocabulary until descendants are
     /// traced too.
     #[test]
-    fn the_syscall_vocabulary_cannot_name_process_creation() {
+    fn the_syscall_vocabulary_cannot_name_process_creation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
         for name in ["clone", "clone3", "fork", "vfork"] {
+            let error = serde_json::from_value::<Syscall>(serde_json::json!(name))
+                .err()
+                .ok_or("process creation entered the syscall vocabulary")?;
+            assert_eq!(error.classify(), serde_json::error::Category::Data);
             assert!(
-                serde_json::from_value::<Syscall>(serde_json::json!(name)).is_err(),
-                "{name} entered the syscall vocabulary"
+                error
+                    .to_string()
+                    .starts_with(&format!("unknown variant `{name}`")),
+                "{error}"
             );
         }
+        Ok(())
     }
 }

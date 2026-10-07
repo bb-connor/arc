@@ -103,9 +103,9 @@ fn terminal_snapshot_wire_requires_canonical_json() {
     let original = seal(Some(json!({"original_units": 5}))).unwrap();
     let mut bytes = vec![b' '];
     bytes.extend(canonical_json_bytes(&original.to_persisted()).unwrap());
-    assert!(
+    assert!(matches!(
         chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 65_536)
-            .and_then(|input| input.decode_canonical::<PersistedPostReturnEvaluationRecordV1>())
-            .is_err()
-    );
+            .and_then(|input| input.decode_canonical::<PersistedPostReturnEvaluationRecordV1>()),
+        Err(chio_core::canonical::UntrustedJsonError::NonCanonical)
+    ));
 }
