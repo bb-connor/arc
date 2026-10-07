@@ -1,5 +1,8 @@
 //! Dedicated native capture evidence, valid only in the physical transaction.
 use super::*;
+use crate::admission_operation_store::threshold_approval::{
+    reserved_nonce_capture_approval, ReservedThresholdApproval,
+};
 use chio_kernel::admission_operation::{
     dpop_claim::DpopReplayCredentialV1, governed_approval_claim::GovernedApprovalCredentialV1,
 };
@@ -28,6 +31,7 @@ pub(crate) struct VerifiedNativeCapture<'tx> {
     nonce_valid_until_unix_ms: Option<u64>,
     approval_credential: Option<GovernedApprovalCredentialV1>,
     dpop_credential: Option<DpopReplayCredentialV1>,
+    threshold: Option<ReservedThresholdApproval>,
 }
 
 impl<'tx> VerifiedNativeCapture<'tx> {
@@ -157,6 +161,21 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                 "native capture nonce differs from its physical reservation",
             ));
         }
+        // Qualify the exact original reserved approval before any budget or
+        // admission mutation in this transaction can commit its lifecycle row.
+        let threshold = operation
+            .threshold_proposal_hash()
+            .map(|_| {
+                reserved_nonce_capture_approval(
+                    tx,
+                    operation,
+                    now,
+                    owner,
+                    nonce.as_ref().map(|value| value.nonce_id()),
+                )?
+                .ok_or_else(|| invalid("native capture lost its reserved threshold approval"))
+            })
+            .transpose()?;
         let nonce_valid_until_unix_ms = nonce
             .as_ref()
             .map(|value| {
@@ -170,9 +189,6 @@ impl<'tx> VerifiedNativeCapture<'tx> {
                     {
                         return Err(invalid("native capture nonce changed its original approval binding time"));
                     }
-                    crate::admission_operation_store::threshold_approval::verify_nonce_capture_approval(
-                        tx, operation, now, owner,
-                    )?;
                     chio_kernel::admission_operation::AdmissionExecutionNonceReservationV1::from_canonical_bytes(
                         value.canonical_bytes(), operation, &original, value.issuer(), bound_at,
                     )?;
@@ -208,6 +224,7 @@ impl<'tx> VerifiedNativeCapture<'tx> {
             nonce_valid_until_unix_ms,
             approval_credential: approval.map(|claim| claim.intent.credential().clone()),
             dpop_credential: dpop.map(|claim| claim.intent.credential().clone()),
+            threshold,
         })
     }
 
@@ -286,6 +303,14 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         if !std::ptr::eq(self.connection, &**tx) {
             return Err(invalid("native capture witness changed transactions"));
         }
+        if self.threshold.as_ref().map_or(
+            self.operation.threshold_proposal_hash().is_some(),
+            |threshold| !threshold.binds(&self.operation, owner),
+        ) {
+            return Err(invalid(
+                "native capture lost its reserved threshold approval witness",
+            ));
+        }
         let now = observed_time(tx, self.observed_at, owner)?;
         self.validate_time(now)?;
         governed_approval_claim::verify_fresh_approval_tx(tx, &self.operation, now, owner)?;
@@ -315,13 +340,8 @@ impl<'tx> VerifiedNativeCapture<'tx> {
         if commit_now < now {
             return Err(invalid("native capture clock regressed before commit"));
         }
-        if self.operation.threshold_proposal_hash().is_some() {
-            crate::admission_operation_store::threshold_approval::verify_nonce_capture_approval(
-                tx,
-                &self.operation,
-                commit_now,
-                owner,
-            )?;
+        if let Some(threshold) = &self.threshold {
+            threshold.validate_at(commit_now)?;
         }
         #[cfg(feature = "admission-test-support")]
         {

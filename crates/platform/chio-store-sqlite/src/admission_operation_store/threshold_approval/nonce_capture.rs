@@ -6,14 +6,70 @@ use chio_core::capability::governance::{
 };
 use chio_kernel::ThresholdApprovalReplayReservationV1;
 
+/// The exact original reserved threshold approval, physically qualified in the
+/// native capture write transaction before any budget or admission mutation.
+/// It holds no store handle, so its later use performs no database, parsing or
+/// signature work, only comparisons against its already verified signed times.
+pub(in crate::admission_operation_store) struct ReservedThresholdApproval {
+    operation_id: AdmissionOperationId,
+    operation_version: u64,
+    nonce_id: Option<AdmissionIdentifier>,
+    fence: StoreMutationFence,
+    proposal_hash: String,
+    approval_set_hash: String,
+    reservation: ThresholdApprovalReplayReservationV1,
+}
+
+impl ReservedThresholdApproval {
+    /// Whether this witness was qualified for exactly this operation version,
+    /// physical nonce, approval artifacts and serving fence.
+    pub(in crate::admission_operation_store) fn binds(
+        &self,
+        operation: &AdmissionOperationV1,
+        owner: &SqliteServingOwner,
+    ) -> bool {
+        operation.binding().operation_id() == &self.operation_id
+            && operation.version() == self.operation_version
+            && operation.execution_nonce_id() == self.nonce_id.as_ref()
+            && operation
+                .threshold_proposal_hash()
+                .map(AdmissionDigest::as_str)
+                == Some(self.proposal_hash.as_str())
+            && operation.approval_set_hash().map(AdmissionDigest::as_str)
+                == Some(self.approval_set_hash.as_str())
+            && owner.fence == self.fence
+    }
+
+    /// Bounded comparison of the original signed proposal and token windows.
+    pub(in crate::admission_operation_store) fn validate_at(
+        &self,
+        now_unix_ms: u64,
+    ) -> Result<(), AdmissionOperationStoreError> {
+        qualification::verify_window(&self.reservation, now_unix_ms)
+    }
+}
+
 pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
     transaction: &Transaction<'_>,
     operation: &AdmissionOperationV1,
     now: u64,
     owner: &SqliteServingOwner,
 ) -> Result<(), AdmissionOperationStoreError> {
+    reserved_nonce_capture_approval(transaction, operation, now, owner, None).map(|_| ())
+}
+
+/// Qualify the operation's approval exactly as nonce capture does. A threshold
+/// operation returns its strict reserved witness bound to `nonce_id`; a single
+/// owned approval or an operation without approval returns no witness.
+pub(in crate::admission_operation_store) fn reserved_nonce_capture_approval(
+    transaction: &Transaction<'_>,
+    operation: &AdmissionOperationV1,
+    now: u64,
+    owner: &SqliteServingOwner,
+    nonce_id: Option<&AdmissionIdentifier>,
+) -> Result<Option<ReservedThresholdApproval>, AdmissionOperationStoreError> {
     if !operation.binding().participant_requirements().approval {
-        return Ok(());
+        return Ok(None);
     }
     let Some(proposal) = load_retained_proposal(transaction, operation)? else {
         if operation.governed_approval_ledger_digest().is_some()
@@ -28,7 +84,8 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
                 operation,
                 now,
                 owner,
-            );
+            )
+            .map(|()| None);
         }
         return Err(invariant(
             "nonce capture requires bounded durable threshold approval evidence",
@@ -108,7 +165,16 @@ pub(in crate::admission_operation_store) fn verify_nonce_capture_approval(
         &proposal_hash,
         &set_hash,
         now,
-    )
+    )?;
+    Ok(Some(ReservedThresholdApproval {
+        operation_id: operation.binding().operation_id().clone(),
+        operation_version: operation.version(),
+        nonce_id: nonce_id.cloned(),
+        fence: owner.fence.clone(),
+        proposal_hash,
+        approval_set_hash: set_hash,
+        reservation,
+    }))
 }
 
 /// The bounded, canonical threshold proposal retained for an operation.
