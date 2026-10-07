@@ -26,6 +26,7 @@ KB_DIR ?= tools/knowledge-base
 	codegen codegen-rust codegen-python codegen-ts codegen-go \
 	codegen-errors codegen-snippets codegen-vectors codegen-eval-receipt \
 	codegen-check codegen-check-rust codegen-check-python codegen-check-ts codegen-check-go \
+	codegen-check-errors error-urn-check \
 	ts-codegen-deps spec-drift \
 	sdk-parity sdk-bindings-parity sdk-py sdk-go sdk-cpp sdk-drogon sdk-ts-deps \
 	vet deny supply-chain \
@@ -58,6 +59,7 @@ help:
 	@echo "  codegen codegen-rust codegen-python codegen-ts codegen-go"
 	@echo "  codegen-errors codegen-snippets codegen-vectors codegen-eval-receipt"
 	@echo "  codegen-check codegen-check-rust codegen-check-python codegen-check-ts codegen-check-go"
+	@echo "  codegen-check-errors error-urn-check"
 	@echo "  spec-drift"
 	@echo ""
 	@echo "Tier 4 - SDK and supply chain:"
@@ -154,10 +156,20 @@ codegen-vectors:
 codegen-eval-receipt:
 	$(CARGO) xtask eval-receipt-regen
 
-# Aggregator: runs all four codegen --check lanes. Used by spec-drift CI
-# (.github/workflows/spec-drift.yml) and humans running the gate locally.
-codegen-check: codegen-check-rust codegen-check-python codegen-check-ts codegen-check-go
-	@echo "codegen-check: all four lanes (rust, python, ts, go) in sync with committed bytes"
+# Aggregator: runs the four codegen --check lanes and the error registry
+# checks. Used by spec-drift CI (.github/workflows/spec-drift.yml) and humans
+# running the gate locally.
+codegen-check: codegen-check-rust codegen-check-python codegen-check-ts codegen-check-go codegen-check-errors error-urn-check
+	@echo "codegen-check: all four lanes (rust, python, ts, go) and the error registry in sync with committed bytes"
+
+# The generated chio-errors table matches spec/errors/registry.yaml.
+codegen-check-errors:
+	$(CARGO) xtask errors regen --check
+
+# Every urn:chio:error literal in shipped source is registered.
+error-urn-check:
+	python3 scripts/check-error-urn-registry.py
+	python3 scripts/tests/check-error-urn-registry.test.py
 
 codegen-check-rust:
 	$(CARGO) xtask codegen --lang rust --check
