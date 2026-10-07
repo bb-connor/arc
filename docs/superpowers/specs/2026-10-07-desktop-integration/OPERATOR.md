@@ -82,6 +82,16 @@ atomic snapshot. Native `UnknownEffect`, successful execution with refused
 acceptance, withheld result, unpaid obligation and incomplete delivery must remain
 distinguishable. A reference is not proof, a permit, funding or release authority. `WorkAcceptanceV1` derives from the original configured evaluator and evidence contract, never a caller acceptance boolean. Human patch-application approval is separate from work acceptance.
 
+Source capture is a separate boundary before agent/evaluator launch. The existing
+resource owner must disable or reject repository-controlled execution, implicit
+fetching and object indirection outside authorized captured input. Hostile Git
+configuration, attributes, helpers, hooks, replacement refs, alternates and
+promisor/submodule sources cannot trigger ambient host reads, processes or
+egress. Qualify capture with independent observers already active before import
+and a useful self-contained repository control; later confinement cannot repair
+an unsafe capture. These are execution/input-intake gates, not basic Observe
+prerequisites.
+
 An evaluator that imports, builds or runs candidate-controlled code MUST use a
 separately qualified bounded execution boundary at the existing runner/work
 owner. Immutable oracle fixtures alone do not confine the code they evaluate.
@@ -262,7 +272,7 @@ read-only freeze or become accepted by that freeze.
 | Wrong peer, replaced/symlinked socket, guest access, Darwin unsupported path; reconnect/version mismatch | IPC owner plus operator: real process probes, bounded transcripts and zero unauthorized dispatch. |
 | Enrolled browser meets an impostor at its permitted origin; captured material is replayed with an allowed Origin | Browser delivery/session owners: no private bytes or reusable credentials at the impostor, no replayed admission; genuine authenticated reconnect succeeds. |
 | Duplicate keys, invalid numeric/Unicode tokens, maximal escaping, one-over aggregate size; wrong method/request/session result | Owner decoders plus operator: original-byte rejection and dispatch counters; no truncated identity. |
-| Same ID with each semantic field changed; exact replay after restart, revision advance and full capacity; barrier-synchronized duplicate approval submissions | Work/recovery/native owners: atomic full-body lookup/retention with one transition/effect; concurrent changed intent conflicts before retention and current audience rejection still works. |
+| Same ID with each semantic field changed; exact replay after restart, revision advance and full capacity; barrier-synchronized duplicate work-create and approval submissions | Work/recovery/native owners: atomic full-body lookup/retention with one transition/effect; concurrent changed intent conflicts before retention and current audience rejection still works. |
 | Crash before dispatch, after native effect and before response/index persistence | Owning mutation services: independent effect marker, original-ID lookup before handle, no second invocation. |
 | Six work axes disagree; result exists but release is refused; payment remains unresolved | W1/recovery/payment owners: faithful separate observations and no unauthorized result bytes. |
 | Changed catalog/snapshot between pages; snapshot expiry; lag, restore, missed terminal and lost ack | Enumeration owner and S5: either consistent authoritative reconstruction or explicit gap; bounded queues and idempotent scoped ack. |
