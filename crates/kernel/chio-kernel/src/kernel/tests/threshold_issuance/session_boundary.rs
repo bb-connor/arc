@@ -2,6 +2,8 @@
 
 use super::*;
 
+#[path = "session_boundary/current_thread_bridge.rs"]
+mod current_thread_bridge;
 #[path = "session_boundary/pre_dispatch_cancellation.rs"]
 mod pre_dispatch_cancellation;
 
