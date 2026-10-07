@@ -72,3 +72,6 @@ fn reserved_plan_reconstruction_rejects_rebound_or_corrupt_publication() {
         );
     }
 }
+
+#[path = "reservation_ownership/publication_cleanup_progress.rs"]
+mod publication_cleanup_progress;

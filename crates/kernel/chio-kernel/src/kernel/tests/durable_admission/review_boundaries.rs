@@ -434,3 +434,6 @@ fn active_response_recovery_reconciles_committed_approval_before_compensation() 
     }), "committed approvals cannot yield a compensated receipt");
     Ok(())
 }
+
+#[path = "review_boundaries/publication_cleanup_progress.rs"]
+mod publication_cleanup_progress;
