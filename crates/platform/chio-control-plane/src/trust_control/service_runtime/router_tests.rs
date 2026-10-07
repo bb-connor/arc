@@ -870,12 +870,18 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
         request_timeout: None,
         ..ServeHygieneConfig::default()
     };
-    let build = || apply_server_hygiene(super::build_router(metrics_state("secret")), &hygiene);
+    let state = || {
+        let mut state = metrics_state("secret");
+        state.config.authority_workload_token = Some("workload-secret".into());
+        state
+    };
+    let build = || apply_server_hygiene(super::build_router(state()), &hygiene);
 
     // Over the 1 MiB service cap but well under the receipt cap. The bytes are
     // not a valid receipt, so the handler's own decode still rejects them, but
     // NOT with 413: the point is the larger route limit lets the request reach
-    // the handler at all.
+    // the handler at all. Each request carries its route's credential, because
+    // authentication runs before any body byte is read.
     let oversized = vec![b'x'; 2 * 1024 * 1024];
 
     for path in [TOOL_RECEIPTS_PATH, CHILD_RECEIPTS_PATH] {
@@ -883,6 +889,7 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
             .method("POST")
             .uri(path)
             .header("content-type", "application/json")
+            .header(AUTHORIZATION, "Bearer secret")
             .body(Body::from(oversized.clone()))
             .test_unwrap();
         let response = build().oneshot(request).await.test_unwrap();
@@ -891,12 +898,18 @@ async fn receipt_append_routes_accept_bodies_above_the_service_body_cap() {
             StatusCode::PAYLOAD_TOO_LARGE,
             "{path} must accept a receipt body above the 1 MiB service cap"
         );
+        assert_ne!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "{path} must reach its handler with the service credential"
+        );
     }
 
     let request = Request::builder()
         .method("POST")
         .uri(ISSUE_CAPABILITY_PATH)
         .header("content-type", "application/json")
+        .header(AUTHORIZATION, "Bearer workload-secret")
         .body(Body::from(oversized))
         .test_unwrap();
     let response = build().oneshot(request).await.test_unwrap();
