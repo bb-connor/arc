@@ -1790,6 +1790,8 @@ mod synchronous_batch_recovery_targets_its_batch_instead_of_the_global_backlog;
 
 mod synchronous_batch_recovery_processes_every_binding_and_preserves_the_first_error;
 
+mod published_batch_acknowledgement_fails_closed_without_durable_response_work;
+
 pub(super) fn recovery_outbox_key(
     publication: &AttestedFindingBatchPublication,
     ordinal: usize,
