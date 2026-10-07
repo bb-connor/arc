@@ -201,6 +201,7 @@ jobs:
           run_gate python3 scripts/tests/check-rust-hardening.test.py
           run_gate python3 scripts/tests/rust-hardening-compiler-probes.py
           run_gate python3 scripts/check-wire-schemas.py
+          run_gate cargo xtask errors regen --check
           run_gate bash scripts/tests/check-wire-schemas.test.sh
           run_gate python3 scripts/check-dependency-budget.py
           run_gate bash scripts/tests/check-dependency-budget.test.sh

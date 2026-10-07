@@ -86,15 +86,29 @@ real_rg="$(command -v rg)"
 mkdir "${fixture}/tools"
 cat > "${fixture}/tools/rg" <<'MOCK_RG'
 #!/usr/bin/env bash
-if [[ "${1:-}" == "-q" ]]; then
-  exit 2
+# Only the broad post-v2-strip recheck on this fixture gets an I/O error.
+# The later authority-namespace query must use the real scanner result.
+if [[ "${1:-}" == "-q" && "${2:-}" == *'ReceiptV[2-9]'* ]]; then
+  scanner_input="$(cat)"
+  if [[ "$scanner_input" == 'SCHEMA = ' ]]; then
+    printf '%s\n' 'auditor-post-strip-recheck' >> "$CHIO_V1_TEST_TARGET_REACHED"
+    exit 2
+  fi
+  printf '%s\n' "$scanner_input" | "$CHIO_V1_TEST_REAL_RG" "$@"
+  exit "$?"
 fi
 exec "$CHIO_V1_TEST_REAL_RG" "$@"
 MOCK_RG
 chmod +x "${fixture}/tools/rg"
 scanner_status=0
-CHIO_V1_TEST_REAL_RG="$real_rg" PATH="${fixture}/tools:$PATH" \
+scanner_target_reached="${fixture}/scanner-target-reached"
+CHIO_V1_TEST_REAL_RG="$real_rg" CHIO_V1_TEST_TARGET_REACHED="$scanner_target_reached" PATH="${fixture}/tools:$PATH" \
   bash "${fixture}/scripts/check-chio-owned-v1-only.sh" >/dev/null 2>&1 || scanner_status=$?
+if [[ ! -f "$scanner_target_reached" ]] || \
+   [[ "$(cat "$scanner_target_reached")" != 'auditor-post-strip-recheck' ]]; then
+  echo "auditor post-strip recheck fault was not reached exactly once" >&2
+  exit 1
+fi
 if ((scanner_status != 2)); then
   echo "scanner failure did not preserve its operational exit" >&2
   exit 1
