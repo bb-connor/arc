@@ -15,8 +15,9 @@ pub(crate) fn decode<T: DeserializeOwned>(
     UntrustedJsonText::from_wire(bytes, bound)?.decode_signed()
 }
 
-/// Requests carry unsigned arguments alongside signed credentials. Preserve each
-/// original credential lexeme instead of validating a rounded Value projection.
+/// Requests carry unsigned arguments and cost reports alongside signed credentials.
+/// Preserve each original credential lexeme instead of validating a rounded Value
+/// projection.
 pub(crate) fn decode_arguments<T: DeserializeOwned>(
     bytes: &[u8],
     bound: usize,
@@ -26,7 +27,7 @@ pub(crate) fn decode_arguments<T: DeserializeOwned>(
         serde_json::from_slice(bytes).map_err(UntrustedJsonError::Decode)?;
     for (name, value) in fields {
         match name.as_str() {
-            "arguments" | "parameters" => {}
+            "arguments" | "parameters" | "realized_cost" => {}
             "governed_intent" => validate_governed_fields(value, bound)?,
             _ => validate_signed_value(value, bound)?,
         }
