@@ -200,7 +200,9 @@ fn load_preparation(
         return Err(PortError::integrity_failure());
     }
     let decoded: PreparedActiveResponseDispatchBinding =
-        serde_json::from_slice(&bytes).map_err(|_| PortError::integrity_failure())?;
+        chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 1_048_576)
+            .and_then(|input| input.decode_signed())
+            .map_err(|_| PortError::integrity_failure())?;
     let (canonical, canonical_hash) = canonical_prepared_dispatch_binding(&decoded)?;
     if canonical != bytes
         || canonical_hash != decode_digest(hash)?
@@ -340,7 +342,9 @@ pub(super) fn validate_all_automatic_preparations(connection: &Connection) -> Po
             return Err(PortError::integrity_failure());
         }
         let binding: PreparedActiveResponseDispatchBinding =
-            serde_json::from_slice(&bytes).map_err(|_| PortError::integrity_failure())?;
+            chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 1_048_576)
+                .and_then(|input| input.decode_signed())
+                .map_err(|_| PortError::integrity_failure())?;
         if binding.tenant_id.as_str() != tenant || binding.action_id.as_str() != action {
             return Err(PortError::integrity_failure());
         }
