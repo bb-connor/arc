@@ -123,7 +123,7 @@ fn signing_callback(mode: Mode) -> TestResult {
     );
     assert_eq!(probe.calls.load(Ordering::SeqCst), 1);
     assert_eq!(probe.entered.load(Ordering::SeqCst), 1);
-    let _guard = sequencer.lock()?;
+    drop(sequencer.lock()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     match mode {
         Mode::Reenter => {
@@ -138,10 +138,23 @@ fn signing_callback(mode: Mode) -> TestResult {
         Mode::Panic | Mode::Replace | Mode::Expire => {
             assert!(result.is_err(), "callback fault published a receipt");
             if matches!(mode, Mode::Expire) {
-                assert!(
-                    matches!(result, Err(KernelError::DurableAdmission(_))),
-                    "expiry must fail at the original lease readback: {result:?}"
-                );
+                let error = result.as_ref().expect_err("expired finalization lease");
+                assert_eq!(error.report().code, "CHIO-KERNEL-DURABLE-ADMISSION");
+                let KernelError::AdmissionRecovery(retained) = error else {
+                    return Err("expected the original typed expiry error".into());
+                };
+                let source = std::error::Error::source(error).ok_or("original expiry cause")?;
+                let cause = source
+                    .downcast_ref::<Box<crate::admission_operation::AdmissionRecoveryError>>()
+                    .ok_or("original boxed expiry cause")?;
+                assert!(std::ptr::eq(cause, retained));
+                assert!(std::error::Error::source(cause).is_none());
+                assert!(matches!(
+                    cause.as_ref(),
+                    crate::admission_operation::AdmissionRecoveryError::Store(
+                        AdmissionOperationStoreError::Fenced
+                    )
+                ));
             } else {
                 assert!(
                     matches!(result, Err(KernelError::ReceiptSigningFailed(_))),

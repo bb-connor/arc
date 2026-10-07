@@ -1,6 +1,5 @@
 //! A Resolved financial plan survives a new owner and changed FX availability.
 use super::*;
-use chio_kernel::admission_operation::AdmissionIdentifier;
 #[path = "pricing_restart/fixture.rs"]
 mod fixture;
 use fixture::*;
@@ -89,18 +88,23 @@ fn restart_pricing(
         let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
         let mut request = paid_request(&capability);
         request.request_id = request_id.into();
-        assert!(
-            kernel.evaluate_tool_call_blocking(&request).is_err(),
-            "original confirmed capture was interrupted"
-        );
-        let original = operations
-            .load_unambiguous_retained_tool_request(
-                &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
-                &fence,
-                at,
-            )?
-            .ok_or("retained original request")?
-            .0;
+        let error = kernel
+            .evaluate_tool_call_blocking(&request)
+            .err()
+            .ok_or("original capture must be interrupted")?;
+        ordinary_operation::assert_interrupted_payment(&error, "injected capture interruption")?;
+        let traces = facts.captures.lock().map_err(|_| "capture trace lock")?;
+        let [(reference, amount, currency)] = traces.as_slice() else {
+            return Err("expected one original capture reference".into());
+        };
+        assert_eq!(*amount, charged);
+        assert_eq!(currency, "USD");
+        let original = ordinary_operation::from_rail_reference(
+            operations.as_ref(),
+            &fence,
+            &request,
+            reference,
+        )?;
         assert_eq!(original.state(), AdmissionOperationState::Finalizing);
         let id = original.binding().operation_id().clone();
         let journal = operations

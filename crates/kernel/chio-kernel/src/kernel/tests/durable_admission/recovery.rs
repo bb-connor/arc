@@ -234,10 +234,17 @@ fn failed_terminal_projection_retains_finalizing_operation_and_blocks_redispatch
     let error = kernel
         .evaluate_tool_call_blocking(&request)
         .expect_err("terminal projection failure must fail closed");
+    assert_eq!(error.report().code, "CHIO-KERNEL-RECEIPT-PERSISTENCE");
     assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason)
-            if reason.contains("injected terminal projection failure")
+        &error,
+        KernelError::ReceiptPersistence(ReceiptStoreError::Conflict(reason))
+            if reason == "injected terminal projection failure"
+    ));
+    let source = std::error::Error::source(&error).expect("native receipt-store error");
+    assert!(matches!(
+        source.downcast_ref::<ReceiptStoreError>(),
+        Some(ReceiptStoreError::Conflict(reason))
+            if reason == "injected terminal projection failure"
     ));
     assert_eq!(
         store.operation().state(),

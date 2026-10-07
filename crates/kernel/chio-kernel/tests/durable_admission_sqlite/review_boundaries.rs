@@ -38,7 +38,7 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> TestResult<Self> {
-        let directory = tempfile::tempdir()?;
+        let directory = chio_test_support::private_tempdir()?;
         let locks = directory.path().join("locks");
         create_private_directory(&locks)?;
         let database = directory.path().join("authority.db");

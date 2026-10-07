@@ -1,6 +1,5 @@
 //! Current qualified joint-store prepay closure survives a native owner restart.
 use super::*;
-use chio_kernel::admission_operation::AdmissionIdentifier;
 use chio_kernel::payment::PaymentAuthorizationAttempt;
 #[path = "prepay_restart/fixture.rs"]
 mod fixture;
@@ -50,14 +49,12 @@ fn sqlite_review_prepay_restart_retains_exact_debit_and_original_receipt_without
         let response = kernel.evaluate_tool_call_blocking(&request)?;
         assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
         assert!(response.receipt.verify_signature()?);
-        let original = operations
-            .load_unambiguous_retained_tool_request(
-                &AdmissionIdentifier::try_new("request_id", &request.request_id)?,
-                &fence,
-                at,
-            )?
-            .ok_or("completed original request")?
-            .0;
+        let original = ordinary_operation::from_signed_response(
+            operations.as_ref(),
+            &fence,
+            &request,
+            &response,
+        )?;
         assert_eq!(original.state(), AdmissionOperationState::Completed);
         let operation_id = original.binding().operation_id().clone();
         let journal = operations

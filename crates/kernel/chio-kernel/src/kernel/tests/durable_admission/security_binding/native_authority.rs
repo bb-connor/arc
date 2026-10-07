@@ -229,18 +229,62 @@ fn native_raw_return_recovery_requires_original_selection() -> TestResult {
     assert!(historical_native_response(&kernel, &request, &context(&request, 1)?).is_err());
     let operation = store.operation();
     assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
-    let _clock = chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61);
-    for changed in [
+    let expected_failure = KernelError::AdmissionRecovery(Box::new(
+        crate::admission_operation::AdmissionRecoveryError::Item {
+            kind: crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged,
+            detail: "recovered post-return plan does not match durable admission".into(),
+        },
+    ));
+    assert_eq!(
+        expected_failure.report().code,
+        "CHIO-KERNEL-DURABLE-ADMISSION"
+    );
+    let expected_diagnostic = sha256_hex(expected_failure.to_string().as_bytes());
+    let fence = store.fence.lock().map_err(|_| "test fence lock")?.clone();
+    let mut clock = chio_test_support::clock::scope_unix_secs(current_unix_timestamp() + 61);
+    for (attempt, changed) in [
         None,
         Some(binding("native-store", "other", b"initialization")?),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         hook.select(changed);
-        assert!(matches!(
-            kernel.reconcile_recoverable_admissions(),
-            Err(KernelError::DurableAdmission(_))
-        ));
+        assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
+        let status = store
+            .load_recovery_status(
+                operation.binding().operation_id(),
+                &fence,
+                current_unix_timestamp_ms(),
+            )?
+            .ok_or("native recovery must retain its fenced deferral")?;
+        status.deferral.validate_for(&operation)?;
+        assert!(status.quarantined);
+        assert_eq!(
+            status.deferral.phase,
+            crate::admission_operation::AdmissionRecoveryPhase::Returned
+        );
+        assert_eq!(
+            status.deferral.failure_kind,
+            crate::admission_operation::AdmissionRecoveryFailureKind::ContractChanged
+        );
+        assert_eq!(status.deferral.attempt_count, u32::try_from(attempt)? + 1);
+        assert_eq!(
+            status.deferral.diagnostic_digest.as_str(),
+            expected_diagnostic
+        );
+        let unpublished = {
+            let state = store.state.lock().map_err(|_| "test store lock")?;
+            state.post_return_evaluation.is_none()
+                && state.resolved_output.is_none()
+                && state.receipt.is_none()
+        };
+        assert!(unpublished, "changed selection published terminal work");
         assert_eq!(store.operation(), operation);
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
+        let retry_seconds = status.deferral.retry_not_before_unix_ms.div_ceil(1_000);
+        drop(clock);
+        clock = chio_test_support::clock::scope_unix_secs(retry_seconds);
     }
     hook.select(Some(selected));
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 1);

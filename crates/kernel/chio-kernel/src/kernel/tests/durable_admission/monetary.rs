@@ -419,7 +419,12 @@ fn durable_monetary_lifecycle_uses_the_qualified_projection_store() {
     assert_eq!(authorization.authorization_id, "authorization-durable");
     let authorized_journal = store.payment_journal().expect("authorized payment journal");
     assert_eq!(authorized_journal.state, PaymentJournalState::Authorized);
-    assert_eq!(authorized_journal.journal_version, 2);
+    assert_eq!(authorized_journal.journal_version, 3);
+    assert_eq!(
+        authorized_journal.authorization_attempt,
+        Some(crate::payment::PaymentAuthorizationAttempt::Started)
+    );
+    assert_eq!(authorized_journal.authorized_amount_units, Some(10));
     assert_eq!(
         authorization_references
             .lock()
@@ -546,10 +551,21 @@ fn durable_recovery_captures_after_tool_return_and_never_releases_from_authorize
     let error = kernel
         .evaluate_tool_call_blocking(&request)
         .expect_err("settlement intent crash must fail closed");
+    assert_eq!(error.report().code, "CHIO-KERNEL-DURABLE-ADMISSION");
+    let KernelError::AdmissionRecovery(retained) = &error else {
+        panic!("expected the original typed recovery error");
+    };
+    let source = std::error::Error::source(&error).expect("native recovery error");
+    let cause = source
+        .downcast_ref::<Box<crate::admission_operation::AdmissionRecoveryError>>()
+        .expect("original boxed recovery error type");
+    assert!(std::ptr::eq(cause, retained));
+    assert!(std::error::Error::source(cause).is_none());
     assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason)
-            if reason.contains("injected payment settlement intent failure")
+        cause.as_ref(),
+        crate::admission_operation::AdmissionRecoveryError::PaymentJournal(
+            crate::receipt_store::AdmissionPaymentJournalError::OutcomeUnknown(reason)
+        ) if reason == "injected payment settlement intent failure"
     ));
     assert_eq!(
         store.operation().state(),

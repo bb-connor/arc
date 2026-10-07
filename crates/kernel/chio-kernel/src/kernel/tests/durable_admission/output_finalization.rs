@@ -171,12 +171,24 @@ fn durable_post_invocation_identity_change_cannot_replace_recovered_finalization
         store: store.clone(),
     }));
 
-    let error = recovered_kernel
+    let retained = store.operation();
+    let denial = recovered_kernel
         .evaluate_tool_call_blocking(&request)
-        .expect_err("identity substitution must fail closed");
-    assert!(error
-        .to_string()
-        .contains("recovered post-return plan does not match durable admission"));
+        .expect("identity substitution must produce a signed denial");
+    assert_eq!(denial.verdict, Verdict::Deny);
+    assert!(denial.output.is_none());
+    assert!(denial.receipt.verify_signature().expect("denial signature"));
+    assert_eq!(
+        denial.reason.as_deref(),
+        Some(
+            format!(
+                "durable admission failed: request id conflicts with retained operation {}",
+                retained.binding().operation_id().as_str()
+            )
+            .as_str()
+        )
+    );
+    assert_eq!(store.operation(), retained);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Finalizing

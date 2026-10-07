@@ -1328,9 +1328,21 @@ fn assert_finalization_crash_recovers(
     let error = kernel
         .evaluate_tool_call_blocking(&request)
         .expect_err("injected finalization crash must fail closed");
+    assert_eq!(error.report().code, "CHIO-KERNEL-DURABLE-ADMISSION");
+    let KernelError::AdmissionRecovery(retained) = &error else {
+        panic!("expected the original typed recovery error");
+    };
+    let source = std::error::Error::source(&error).expect("native recovery error");
+    let cause = source
+        .downcast_ref::<Box<crate::admission_operation::AdmissionRecoveryError>>()
+        .expect("original boxed recovery error type");
+    assert!(std::ptr::eq(cause, retained));
+    assert!(std::error::Error::source(cause).is_none());
     assert!(matches!(
-        error,
-        KernelError::DurableAdmission(ref reason) if reason.contains(expected_error)
+        cause.as_ref(),
+        crate::admission_operation::AdmissionRecoveryError::Outcome(
+            ToolOutcomeStoreError::Unavailable(reason)
+        ) if reason == expected_error
     ));
     assert_eq!(
         store.operation().state(),

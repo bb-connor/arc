@@ -114,7 +114,7 @@ fn sqlite_review_payment_missing_original_adapter_isolates_other_requests(
         kernel.set_durable_admission_store(
             operations.clone(),
             Arc::new(authority.tool_outcome_store()),
-            fence,
+            fence.clone(),
         )?;
         kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
         kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
@@ -126,16 +126,27 @@ fn sqlite_review_payment_missing_original_adapter_isolates_other_requests(
         let agent = Keypair::generate();
         let capability = kernel.issue_capability(&agent.public_key(), paid_scope(), 300)?;
         calls.fail_next_capture.store(true, Ordering::SeqCst);
-        assert!(kernel
-            .evaluate_tool_call_blocking(&paid_request(&capability))
-            .is_err());
-        let rows = operations.list_recoverable(
-            now_unix_ms()?.checked_add(120_000).ok_or("recovery time")?,
-            10,
+        let request = paid_request(&capability);
+        let error = kernel
+            .evaluate_tool_call_blocking(&request)
+            .err()
+            .ok_or("original capture must be interrupted")?;
+        ordinary_operation::assert_interrupted_payment(&error, "injected capture interruption")?;
+        let references = calls
+            .authorization_references
+            .lock()
+            .map_err(|_| "authorization trace lock")?;
+        let [reference] = references.as_slice() else {
+            return Err("expected one original authorization reference".into());
+        };
+        let original = ordinary_operation::from_rail_reference(
+            operations.as_ref(),
+            &fence,
+            &request,
+            reference,
         )?;
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].state(), AdmissionOperationState::Finalizing);
-        rows[0].binding().operation_id().clone()
+        assert_eq!(original.state(), AdmissionOperationState::Finalizing);
+        original.binding().operation_id().clone()
     };
     let authority = SqliteAuthorityStore::open_serving_with_clock(
         &database,
@@ -158,7 +169,11 @@ fn sqlite_review_payment_missing_original_adapter_isolates_other_requests(
     }));
     assert_eq!(recovered.reconcile_durable_admission_startup()?, 0);
     let status = operations
-        .load_recovery_status(&operation_id, &fence, now_unix_ms()?)?
+        .load_recovery_status(
+            &operation_id,
+            &fence,
+            chio_test_support::clock::clock().unix_millis()?.get(),
+        )?
         .ok_or("quarantined original operation")?;
     assert!(status.quarantined);
     assert_eq!(

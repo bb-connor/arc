@@ -34,6 +34,8 @@ use chio_store_sqlite::{SqliteAuthorityStore, SqliteToolOutcomeStore};
 
 #[path = "durable_admission_sqlite/federation_context.rs"]
 mod federation_context;
+#[path = "durable_admission_sqlite/ordinary_operation.rs"]
+mod ordinary_operation;
 #[path = "durable_admission_sqlite/payment_recovery.rs"]
 mod payment_recovery;
 #[path = "durable_admission_sqlite/review_boundaries.rs"]
@@ -81,6 +83,7 @@ struct ReversiblePaymentAdapter {
 #[derive(Default)]
 struct PaymentCalls {
     authorizations: AtomicU64,
+    authorization_references: std::sync::Mutex<Vec<String>>,
     captures: AtomicU64,
     releases: AtomicU64,
     refunds: AtomicU64,
@@ -256,6 +259,11 @@ impl PaymentAdapter for ReversiblePaymentAdapter {
     ) -> Result<PaymentAuthorization, PaymentError> {
         if let Some(calls) = &self.calls {
             calls.authorizations.fetch_add(1, Ordering::SeqCst);
+            calls
+                .authorization_references
+                .lock()
+                .map_err(|_| PaymentError::Unavailable("authorization trace lock".into()))?
+                .push(request.reference.clone());
         }
         Ok(PaymentAuthorization {
             authorization_id: format!("authorization:{}", request.reference),
@@ -764,17 +772,20 @@ fn sqlite_restart_terminalizes_an_unrecorded_dispatch_without_moving_funds(
         assert!(operations
             .list_recoverable(now_unix_ms()? + 120_000, 10)?
             .is_empty());
-        let operation = operations
-            .load_unambiguous_retained_tool_request(
-                &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
-                    "request_id",
-                    &request.request_id,
-                )?,
-                &fence,
-                now_unix_ms()?,
-            )?
-            .ok_or_else(|| std::io::Error::other("original unknown operation is absent"))?
-            .0;
+        let references = payment_calls
+            .authorization_references
+            .lock()
+            .map_err(|_| "authorization trace lock")?;
+        let [reference] = references.as_slice() else {
+            return Err("expected one original authorization reference".into());
+        };
+        let operation = ordinary_operation::from_retained_payment_response(
+            operations.as_ref(),
+            &fence,
+            &request,
+            &denied,
+            reference,
+        )?;
         assert_eq!(
             operation.state(),
             AdmissionOperationState::OutcomeUnknownAfterDispatch
@@ -895,14 +906,20 @@ fn sqlite_restart_completes_a_committed_capture_without_request_replay(
             .evaluate_tool_call_blocking(&request)
             .err()
             .ok_or_else(|| std::io::Error::other("the injected capture must fail"))?;
-        assert!(matches!(
-            error,
-            KernelError::DurableAdmission(ref reason)
-                if reason.contains("injected capture interruption")
-        ));
-        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
-        assert_eq!(recoverable.len(), 1);
-        let operation = &recoverable[0];
+        ordinary_operation::assert_interrupted_payment(&error, "injected capture interruption")?;
+        let references = payment_calls
+            .authorization_references
+            .lock()
+            .map_err(|_| "authorization trace lock")?;
+        let [reference] = references.as_slice() else {
+            return Err("expected one original authorization reference".into());
+        };
+        let operation = ordinary_operation::from_rail_reference(
+            operations.as_ref(),
+            &fence,
+            &request,
+            reference,
+        )?;
         assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
         let journal = operations
             .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
@@ -997,14 +1014,20 @@ fn sqlite_restart_completes_a_committed_release_without_request_replay(
             .evaluate_tool_call_blocking(&request)
             .err()
             .ok_or_else(|| std::io::Error::other("the injected release must fail"))?;
-        assert!(matches!(
-            error,
-            KernelError::DurableAdmission(ref reason)
-                if reason.contains("injected release interruption")
-        ));
-        let recoverable = operations.list_recoverable(now_unix_ms()? + 120_000, 10)?;
-        assert_eq!(recoverable.len(), 1);
-        let operation = &recoverable[0];
+        ordinary_operation::assert_interrupted_payment(&error, "injected release interruption")?;
+        let references = payment_calls
+            .authorization_references
+            .lock()
+            .map_err(|_| "authorization trace lock")?;
+        let [reference] = references.as_slice() else {
+            return Err("expected one original authorization reference".into());
+        };
+        let operation = ordinary_operation::from_rail_reference(
+            operations.as_ref(),
+            &fence,
+            &request,
+            reference,
+        )?;
         assert_eq!(operation.state(), AdmissionOperationState::Finalizing);
         let journal = operations
             .load_payment_journal(operation.binding().operation_id().as_str(), &fence)?
