@@ -1,6 +1,9 @@
 //! Untrusted metadata must reject before request ownership or runtime release.
 use super::*;
 
+#[path = "reserved_session_metadata/runtime_hook.rs"]
+mod runtime_hook;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const RESERVED_KEYS: [&str; 9] = [
