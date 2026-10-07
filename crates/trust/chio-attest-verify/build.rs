@@ -2,10 +2,15 @@
 // disk under `sigstore-root/`. The trust root is shipped in-tree and refreshed
 // via a quarterly CODEOWNERS-reviewed re-bake job; no network access at build time.
 
-use std::path::Path;
+use std::path::PathBuf;
 
 fn main() {
-    let root_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("sigstore-root");
+    // A cached build-script binary may have been compiled in another checkout.
+    // Cargo supplies the current crate directory when it executes this script.
+    let Some(manifest_dir) = std::env::var_os("CARGO_MANIFEST_DIR") else {
+        panic!("chio-attest-verify build aborted: CARGO_MANIFEST_DIR is unavailable");
+    };
+    let root_dir = PathBuf::from(manifest_dir).join("sigstore-root");
     let trusted_root = root_dir.join("trusted_root.json");
     let tuf_root = root_dir.join("root.json");
 

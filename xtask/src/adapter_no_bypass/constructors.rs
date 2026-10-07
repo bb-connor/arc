@@ -174,6 +174,11 @@ struct ConstructorVisitor {
 }
 
 impl<'ast> Visit<'ast> for ConstructorVisitor {
+    fn visit_file(&mut self, node: &'ast syn::File) {
+        if !test_only(&node.attrs) {
+            visit::visit_file(self, node);
+        }
+    }
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         if test_only(&node.attrs) {
             return;
@@ -298,6 +303,16 @@ fn contains_constructor_identifier(tokens: proc_macro2::TokenStream) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_level_test_cfg_does_not_inventory_constructor_helpers() -> Result<(), syn::Error> {
+        let visitor = inspect("#![cfg(test)]\nfn helper() { ChioKernel::new(); }")?;
+        assert!(visitor.references.is_empty());
+        let production =
+            inspect("#![cfg(any(test, feature = \"live\"))]\nfn host() { ChioKernel::new(); }")?;
+        assert_eq!(production.references.len(), 1);
+        Ok(())
+    }
 
     fn inspect(source: &str) -> Result<ConstructorVisitor, syn::Error> {
         let mut visitor = ConstructorVisitor::default();

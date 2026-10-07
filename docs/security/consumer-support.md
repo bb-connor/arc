@@ -47,7 +47,7 @@ experimental funded-work source. Historical qualification remains scoped to its
 recorded source; this merge requires its own focused execution evidence.
 
 Paths are relative to the repository. The physical-source inventory records
-36 construction sites and 89 dispatch/caller sites. This is an exact source
+41 construction sites and 91 dispatch/caller sites. This is an exact source
 inventory, not Rust macro expansion or a semantic proof of all network effects.
 
 | ID | Exact path and symbol | Role / selected profile | Acceptance owner and current state |
@@ -82,7 +82,7 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C27 | `crates/protocol/chio-acp-edge/src/fuzz.rs::make_kernel` | Fuzz harness | Adversarial parser/edge input; not production authority |
 | C28 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support.rs::open_kernel` (retired physical production-site entry) | Included test fixture | Included by native-flow tests under `cfg(test)`; M3 native host acceptance fixture |
 | C29 | `crates/platform/chio-control-plane/src/security/event_consumer/tests/real_adapter.rs::build_real_adapter_runtime` (retired physical production-site entry) | Included test fixture | Event-consumer test composition; not a separate public factory |
-| C30 | `crates/products/chio-cli/src/cli/process_host/state.rs::kernel` | Durable process host factory | Process host, crash/recovery, nonce-custody and run/call-evidence gates; native deployment also requires its configured cage/broker authorities |
+| C30 | `crates/products/chio-cli/src/cli/process_host/state.rs::kernel_with_clock` | Durable process host factory with its trusted host clock | Process host, crash/recovery, nonce-custody and run/call-evidence gates; native deployment also requires its configured cage/broker authorities |
 | C31 | `examples/rust-runtime-consumer/src/main.rs::open` | Offline Rust embedding example | The standalone consumer in [Rust preview packages](rust-preview-packages.md) runs allowed and denied calls, verifies receipts and checks one effect after process restart. Fixed demonstration identity, ephemeral transparency/revocation stores; no production deployment claim |
 | C33 | `crates/kernel/chio-runtime-core/benches/fixtures/admission_scaling_fixture.rs::AdmissionScalingFixture::new` (D092) | Fixed-clock admission scaling benchmark | Configured runtime hook, pinned peer and local counted connector. A benchmark fixture does not qualify an operator deployment. |
 | C34 | `crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_allow_fixture.rs::TreatyPredispatchAllowFixture::new` (D093) | Fixed-clock treaty allow benchmark | Configured runtime evidence and co-signer, local counted connector and receipt store; no native flow/confinement claim. |
@@ -90,6 +90,11 @@ inventory, not Rust macro expansion or a semantic proof of all network effects.
 | C36 | `crates/trust/chio-federation-transport-iroh/examples/federated_call_pair.rs::run_receiver` (D095) | Controlled two-process federation experiment | Configured peer/CA pins, receiver-owned admission state and local connector; no independent-operator or general native confinement claim. |
 | C37 | `examples/federated-work/src/provider.rs::serve_transport` | Public-only local paid-work provider | Signed manifest registry, configured publisher pin, durable admission and original payment holds. A2A owns dispatch. Rust/Python/HTTPS and crash suites qualify the bounded example; optional worker isolation is separate from native flow. |
 | C38 | `examples/outcome-ledger-comparison/src/workload.rs::configured_kernel` (D096) | Local comparison experiment | Fresh signed receiver capabilities and SQLite receipts; no declassification grant. Composed/outcome checks are separate from native security qualification. |
+| C39 | `crates/kernel/chio-kernel/examples/dynamic_delegation_support/mod.rs::open_configured` (D097) | Configured dynamic-delegation research host | Trusted fixture clock, durable authority, receipts, budgets, payment and delegated-work installation. Current dynamic-delegation qualification owns execution/replay; no deployment claim. |
+| C40 | Same file, `unconfigured` | Unconfigured comparison kernel | Fixture-owned clock and signed kernel configuration; missing participant installation must deny. This constructor does not confer the configured example's profile. |
+| C41 | `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs::RemoteSessionFactory::new` | Remote MCP configured-factory validation | Operator-selected clock and loaded policy, with the existing runtime/store validation; P02 owns the remote session and nonce-custody cases. |
+| C42 | Same file, `RemoteSessionFactory::bind_approval_intent` | Session-bound approval preparation | Trusted factory clock, session-owned kernel key and policy; approval binding does not authorize an unmediated invocation. P02 owns its existing approval and session tests. |
+| C43 | `examples/federated-work/src/funded_work/native.rs::Native::open_mode` (D098) | Funded-work kernel/store research composition | Durable receipts, budgets, revocation, original payment journal and admission stores; full-admission mode and optional composed-work installation. Existing funded-work qualification owns this example; no independent-operator or general confinement claim. |
 
 Remote construction is gated by the public factory's
 `RemoteSessionFactory::new`, before C04/C05. Its new
@@ -395,6 +400,8 @@ separate requirements; this table alone does not qualify a deployment.
 | D087, D089 | `crates/kernel/chio-process/src/lib.rs::ProcessRuntime::invoke_with_recovery` | Original operation/request and ancestor capability binding; optional trusted security context is refreshed before kernel evaluation | C30, `host_flow_identity_is_bound_to_the_original_process_operation`, nonce and crash/recovery gates |
 | D088 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
 | D090-D091 | `examples/rust-runtime-consumer/src/main.rs::{initial,recover}` | Two initial kernel calls (allow/deny) and original-outcome recovery | C31, offline Rust package consumer with independently counted effect |
+| D097 | `crates/kernel/chio-kernel/examples/dynamic_delegation_support/mod.rs::demonstration` | Three configured/reopened delegation and sibling evaluations | C39-C40, existing dynamic-delegation execution and exact replay qualification |
+| D098 | `examples/federated-work/src/funded_work/native.rs::Native::execute` | Funded-work request evaluation with retained metadata and original authority | C43, existing funded-work execution, payment journal and composed-work qualification |
 
 The September 29 enforced-native batch teaches the constructor inventory to
 recognize `new_*` constructors, including injected clocks and function pointers.

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 0c05c693bd501d20c5d787ce557e1341f1f5ff2c819d21045707090ba7976ed4
+// Schema SHA: e419015f6043565519de9036b8f265c77ac9cd64a1fc27a065c2bb712186a6f7
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -136,6 +136,7 @@ export namespace Agent_ToolCallRequest {
     approval_tokens?: ChioGovernedApprovalToken[];
     threshold_approval_proposal?: ChioThresholdApprovalProposal;
     supplemental_authorization?: ChioOpaqueSupplementalAuthorization;
+    dpop_proof?: ChioInvocationProofOfPossession;
     execution_nonce?: ChioSignedExecutionNonce;
   };
   /**
@@ -447,6 +448,12 @@ export namespace Agent_ToolCallRequest {
      * Opaque authenticated extension bytes. Adapters must not interpret these bytes as quota authority.
      */
     signed_extension: string;
+  }
+  export interface ChioInvocationProofOfPossession {
+    signature: string;
+    body: {
+      [k: string]: unknown;
+    };
   }
   export interface ChioSignedExecutionNonce {
     nonce: {
@@ -1817,6 +1824,17 @@ export namespace Kernel_CombinedCaptureMetadata {
     budget_commit_index: number;
     revocation_commit_index: number;
     leader_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/dpop_proof.schema.json
+export namespace Kernel_DpopProof {
+  export interface ChioInvocationProofOfPossession {
+    signature: string;
+    body: {
+      [k: string]: unknown;
+    };
   }
 }
 
@@ -6306,9 +6324,957 @@ export namespace Security_CageInitPlanV2 {
     allowed_syscalls: [string, ...string[]];
     argument_constraints: {
       /**
+       * OR alternatives of ANDed argument constraints; no alternative grants an unconditional syscall.
+       *
        * @minItems 1
+       * @maxItems 8
        */
-      [k: string]: [SyscallArgumentConstraint, ...SyscallArgumentConstraint[]];
+      [k: string]:
+        | [
+            | [SyscallArgumentConstraint]
+            | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+            | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+            | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+            | [
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint
+              ]
+            | [
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint,
+                SyscallArgumentConstraint
+              ]
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ]
+        | [
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            ),
+            (
+              | [SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [SyscallArgumentConstraint, SyscallArgumentConstraint, SyscallArgumentConstraint]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+              | [
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint,
+                  SyscallArgumentConstraint
+                ]
+            )
+          ];
     };
   }
   export interface SyscallArgumentConstraint {
