@@ -4,7 +4,9 @@ Status: Proposed research baseline, inspected 2026-10-07.
 
 Confidence: high in the distinctions below because they follow inspected implementation and upstream manuals; moderate in the proposed Omarchy deployment because no clean x86_64 Omarchy runtime was exercised during this research. This is source research, not confinement, install, update or release qualification.
 
-Scope: Linux enforcement, lifecycle and Arch packaging. The normative contracts are [Linux confinement](../08-linux-confinement.md) and [distribution operations](../12-distribution-operations.md). Desktop protocol and authority decisions belong to the shared architecture specifications.
+Scope: Linux enforcement, lifecycle and Arch packaging. The current platform contract is the [Omarchy annex](../ANNEX.md), under the [shared desktop program](../../2026-10-07-desktop-integration/README.md). The numbered platform contracts were retired. Retained source observations below remain research evidence, not installed qualification.
+
+Consolidation decision (2026-10-07): isolation denies and Chio grants. Reuse the restricted Pi bubblewrap profile and Docker-based `chio-mini-swe` through thin S7 evidence adapters, with `chio-process` custody and `chio-secure-ipc` peer authentication. Extend those owners instead of building an Omarchy runner, sandbox or peer-auth stack. The workbench is the first client of one shared C-layer controller outside the TCB. The cage observations below constrain its tool-server profile; they do not propose using it for Node/Pi. Delegation belongs to kernel/work/process owners and remains deferred for this desktop delivery.
 
 ## Findings that change the design
 
@@ -65,7 +67,9 @@ Arch is a moving host environment. The proposed support tuple binds the exact Om
 
 ## Decision and alternatives
 
-Select a native QML presentation plugin plus separately packaged Rust controller and explicit Chio runtime dependencies. Qualify one x86_64 Omarchy/Pi project profile first. Retain dedicated runtime manifests for the Pi guest and each protected resource. Do not force Node into the strict native cage or relax that cage's policy to make a demo start.
+Select a thin native QML plugin over the shared Rust controller and browser workbench, with separate pacman delivery and explicit Chio dependencies. Qualify one x86_64 Omarchy/Pi sealed W1 work composition first, reusing mini-swe/restricted Pi/resource owners. Retain their runtime inventories for the Pi guest and each protected resource. Do not force Node into the strict native cage or relax that cage's policy to make a demo start.
+
+Preserve bounded hostile-descendant cleanup as an acceptance gate in shared Linux qualification tooling. A dedicated fixture worker verifies child-subreaper custody before launch, remains alive while reaping within bounded deadlines and reports unavailable custody explicitly. Exercise double-fork, process-group escape, detached descendants, full pipes and timeout escalation. Independent census/cgroup observations must prove absence; a timeout return or worker exit is insufficient. This is a harness requirement, not a new Omarchy process runner or a change to controller subreaper state.
 
 A single unsandboxed desktop process would have the smallest package surface but cannot enforce the chosen guest boundary. A privileged system daemon could protect against a stronger local adversary but adds root and account-boundary complexity beyond the first threat profile. A universal container image simplifies dependency capture yet does not prove access to actual Omarchy lifecycle/compositor interfaces or ordinary user-namespace support. A plugin-managed download script bypasses the plugin model and creates an unreviewed updater.
 

@@ -61,7 +61,7 @@ may call, and how much it may spend. Chio checks the token, runs the call, and w
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/one-call-mobile.svg" />
-    <img src="docs/assets/one-call.svg" alt="One tool call through Chio: the agent presents a signed token, the kernel verifies it, screens the request and result, dispatches to a sandboxed tool server, and signs a receipt. An expired token stops at verify and still produces a signed deny receipt." width="900" />
+    <img src="docs/assets/one-call.svg" alt="One tool call through Chio: the agent presents a signed token, the kernel verifies it, screens the request and result, dispatches to a tool server, and signs a receipt. OS isolation depends on the selected runtime profile. An expired token stops at verify and still produces a signed deny receipt." width="900" />
   </picture>
 </p>
 
@@ -132,7 +132,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 | In an operating system | In Chio |
 | --- | --- |
 | **[Syscalls](crates/kernel/chio-kernel)** | Every tool call, file read, API request, and payment is dispatched by the kernel. An agent never holds a direct handle to a tool. |
-| **[Process isolation](spec/PROTOCOL.md#3-components-and-trust-boundaries)** | The kernel is the only trusted component. Agents and tool servers run as untrusted, sandboxed processes, isolated from each other and from the agent. |
+| **[Process isolation](spec/PROTOCOL.md#3-components-and-trust-boundaries)** | Agents and tool servers are untrusted processes or services. The selected host/runtime profile owns OS isolation; ordinary stdio launch does not establish sandboxing. |
 | **[Permissions](spec/PROTOCOL.md#5-capability-contract)** | Capability tokens: signed, expiring, budgeted, and only ever narrowable. |
 | **[Syscall filters](crates/guards)** | A guard pipeline screens every request and every result. Custom guards run as [fuel-metered WASM](crates/guards/chio-wasm-guards) with no host access. |
 | **[Drivers](crates/protocol)** | MCP, A2A, ACP-Client, AG-UI, OpenAPI, and eight provider tool-call formats each lift to the same kernel verdict and lower back to their own wire format. |
@@ -298,7 +298,7 @@ The `--server-id fs` must stay `fs`: the `code-agent` preset only grants capabil
 Either way, you use the agent exactly as before; every tool call it routes through that server
 is now checked against policy and sealed into a receipt.
 
-To govern an entire session, including the agent's native tools, install the host plugin.
+Host plugins add session diagnostics and authorization prechecks. Hook-mode native tools can bypass those checks when hooks fail or are skipped, so their boundary is `detect_only`. Protection requires a separately qualified restricted profile that removes bypass paths.
 
 **Claude Code** ([chio-claude-code-plugin](https://github.com/backbay-labs/chio-claude-code-plugin)) installs from the marketplace, then bond a session with `/chio:bond <policy>`:
 
@@ -609,12 +609,13 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 
 Beyond this repository, the [`backbay-labs`](https://github.com/backbay-labs) org ships
 companion plugins that bond an agent, IDE, or chat platform to a Chio policy. Each is a
-separate repo built on the shared `@chio/bridge` library and the `chio` CLI, so any host can
-mediate every tool call through the kernel and stream signed receipts.
+separate repo built on the shared `@chio/bridge` library and the `chio` CLI. Calls routed
+through the kernel can be mediated and receipt-signed. Hook-mode native activity is
+`detect_only`; complete host protection requires its separately qualified restricted profile.
 
 | Plugin | Repo | What it does |
 | --- | --- | --- |
-| **Claude Code** | [chio-claude-code-plugin](https://github.com/backbay-labs/chio-claude-code-plugin) | Bonds any Claude Code session; mediates Bash/Write/Edit/Read and every MCP server, metered and receipt-signed |
+| **Claude Code** | [chio-claude-code-plugin](https://github.com/backbay-labs/chio-claude-code-plugin) | Hook-mode diagnostics and authorization prechecks (`detect_only`); a separate restricted-launcher candidate disables native tools and exposes kernel-controlled tools |
 | **Cursor** | [chio-cursor-plugin](https://github.com/backbay-labs/chio-cursor-plugin) | Bonds Composer, the Agent tab, inline AI, and mounted MCP servers via native Cursor hooks |
 | **Codex** | [chio-codex-plugin](https://github.com/backbay-labs/chio-codex-plugin) | Bonds the OpenAI Codex CLI plan-then-act loop through the guard pipeline, with attested plans |
 | **OpenCode** | [chio-open-code-plugin](https://github.com/backbay-labs/chio-open-code-plugin) | Native OpenCode TUI plugin: scaffold, wrap, and ship bonded agents |
@@ -636,10 +637,10 @@ receipts).
   </picture>
 </p>
 
-The kernel is the entire trusted base. Around it, five layers of defense, each one fail-closed:
+For kernel-routed calls, the following controls define the mediation path. Host isolation and hook coverage must be assessed separately:
 
-- **Trusted core.** Only the Runtime Kernel is trusted (the TCB). The agent and tool servers are
-  untrusted and isolated, and the kernel never leaks its address or signing key.
+- **Trusted core.** The Runtime Kernel and its authority-bearing services form the trusted path.
+  Agents and tool servers are untrusted; their OS isolation depends on the selected runtime profile.
 - **Fail-closed by construction.** Errors deny access, invalid policy is rejected at load, and
   the kernel will not allow a call it cannot also sign a receipt for.
 - **Guard pipeline.** Native, data-layer, sandboxed WASM, and external guards screen every input
@@ -658,7 +659,7 @@ required mitigations, and residual risk. Eight of them:
 | --- | --- |
 | [Capability token theft](spec/SECURITY.md#21-capability-token-theft) | Tokens are bound to a subject key, expire, and can require DPoP proof of possession. Revocation is an epoch-rooted Merkle oracle every ancestor is checked against. |
 | [Kernel impersonation](spec/SECURITY.md#22-kernel-impersonation) | Receipts verify against a pinned kernel key, and the kernel recomputes a receipt's content hash inside its trust boundary before signing. |
-| [Tool server escape](spec/SECURITY.md#23-tool-server-escape) | Tool servers run as sandboxed processes with no handle to the kernel or to each other. Only the kernel dispatches. |
+| [Tool server escape](spec/SECURITY.md#23-tool-server-escape) | Isolation must be established by the selected runtime profile. Ordinary stdio transport spawns a child process; it does not itself sandbox the server. |
 | [Delegation chain abuse](spec/SECURITY.md#26-delegation-chain-abuse) | Scope-hash chain binding, the sibling-sum budget registry, and ancestor revocation checks, covered in [Delegation and swarms](#delegation-and-swarms). |
 | [SSRF via the HTTP substrate](spec/SECURITY.md#27-ssrf-via-http-substrate) | Every outbound target passes a declared [egress contract](crates/protocol/chio-egress-contract). A missing or invalid contract fails closed. |
 | [PII and PHI in responses](spec/SECURITY.md#28-piiphi-exposure-in-responses) | Response sanitization guards redact secrets, PII, and internal data from tool results before they reach the agent. |

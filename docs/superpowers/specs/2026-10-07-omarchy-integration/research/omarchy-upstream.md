@@ -4,6 +4,8 @@ Status: Proposed research baseline, verified 2026-10-07. Confidence: high for th
 
 Scope: release versus development compatibility, shell plugin API, launch/menu paths, lifecycle, theme, input, notification privacy, and distribution. This research supports the desktop experience and plugin specifications. Native authority, isolation, and provider qualification remain separate prerequisites.
 
+Consolidation note (2026-10-07): retained source observations support the accepted [platform annex](../ANNEX.md) and [shared desktop program](../../2026-10-07-desktop-integration/README.md). The former P0-P7 labels below identify historical research gates, not an active second implementation roadmap. The current [implementation packets](../../../plans/2026-10-07-omarchy-integration/IMPLEMENTATION.md) reuse one controller, the browser workbench, W1/recovery, secure IPC and process owners. QML is a thin shell. This amendment makes no new runtime qualification claim.
+
 ## Evidence baseline
 
 The current public repository redirects the old `basecamp/omarchy` URL to `omacom/omarchy`. Live `git ls-remote` returned the following exact revisions. GitHub's latest-release URL resolved to v4.0.4 on the research date. A checkout of HEAD is not equivalent to the released ISO or to the user's installed rolling package set.
@@ -84,7 +86,7 @@ Decision: first qualified profile requires `omarchy.bar`. Detect missing own-ser
 
 The agent setter and launcher dispatch through explicit cases. Pi is recognized, but launching upstream `pi` is not equivalent to launching a confined Chio Pi task. Several other agents are deliberately launched with unattended or permission-skipping flags; those flags do not establish Chio authorization. `SUPER+SHIFT+CTRL+A` already launches the selected agent. `SUPER+A` and related A shortcuts have existing meanings. [O-12, O-14]
 
-Decision: install a distinct Chio desktop/menu opener. Do not overwrite the user's default-agent selection, shadow `pi`, or rewrite `omarchy-agent`. An upstream default-agent entry is an optional contribution after interactive adapter and lifecycle qualification. The initial Pi candidate is a controlled task runner, not a promise of interactive drop-in parity.
+Decision: install a distinct Chio desktop/menu opener and an opt-in menu or Walker action, **Launch default agent in protected mode**, after the selected host passes doc 19 I01-I08. Do not overwrite the user's default-agent selection, shadow `pi`, or rewrite `omarchy-agent`; no upstream contribution is a prerequisite for a separately owned entry. The action resolves and displays the default host, refuses unsupported tuples and never falls back to the upstream auto mode. Pi is first by evidence within the six-host program (Claude Code, Codex, Cursor, Hermes, Pi, OpenClaw). Sealed W1 work remains the first execution product; interactive qualification is separate.
 
 ### Menu customization is possible, but not a dynamic authorization API
 
@@ -114,7 +116,7 @@ Decision: a post-update hook can invalidate cached compatibility but cannot cert
 
 Plugin add clones a repository, validates manifest/files, then can enable it. It has no package installation hook and does not install a Rust daemon, native authority, confinement backend, Qt module, or credential store. Update fetches origin HEAD, shows a diff in the ordinary interactive path, fast-forwards and validates. Validation rollback is a repository rollback, not transactional coordination with a running controller. [O-08, O-09]
 
-Decision: publish pinned public qualification candidates for the native package and plugin repository before the P7 clean-host retrieval gate, explicitly marked unqualified. Promote a supported release only after P7 passes for the selected pair. P1 prepares the generated plugin source/export handoff; P7 publishes, pins and installs the candidate through the real plugin lifecycle. Pin the qualified pair in a release manifest. Treat upstream plugin update as an independently occurring version change and fail closed on protocol mismatch. Provide no invented public install URL in this proposal.
+Decision: publish pinned public qualification candidates for the native package and plugin repository before the clean-host retrieval gate, explicitly marked unqualified; promote a supported release only after the selected pair passes. Current packets O6/O7 own that order. Both inspected pins accept `omarchy plugin add <URL> --yes` without a revision selector; omitting `--enable` leaves the installation disabled. Select the locked public commit with Git detached checkout, verify the complete signed inventory and disabled state, validate using the real upstream command, then explicitly enable. Do not invent `--revision`, `--ref` or archive-install options. Treat later plugin updates as independently changing the qualified tuple. Provide no invented public install URL.
 
 ## Existing adjacent work and differentiation
 
@@ -133,4 +135,4 @@ The community [Omarchy OMCP project](https://github.com/btsouth/omarchy-omcp) al
 | Paired-package upgrade record | Release maintainer | Native/plugin version skew, state backup and forward/backward migration, package rollback and resumed task reconciliation. |
 | Community comparison revision record | Research maintainer | Public OMCP commit pinned with source-level capability comparison. |
 
-Research completion does not close any P0-P7 runtime gate. Release claims require the independently collected evidence named by the implementation roadmap.
+Research completion does not close any runtime gate. Release claims require the independently collected evidence named by the shared qualification contract and current Omarchy implementation packets.
