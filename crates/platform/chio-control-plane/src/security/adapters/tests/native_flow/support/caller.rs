@@ -11,6 +11,9 @@ mod dispatch_binding;
 #[cfg(unix)]
 mod restart;
 
+#[cfg(unix)]
+mod approval_wait;
+
 enum DeliveryMode {
     Live,
     #[cfg(unix)]
