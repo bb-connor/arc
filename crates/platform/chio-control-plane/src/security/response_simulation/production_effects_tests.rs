@@ -179,9 +179,13 @@ struct ProductionEffectsFixture {
 
 impl ProductionEffectsFixture {
     fn new() -> Self {
+        Self::with_skew(TRUSTED_SKEW_MS)
+    }
+
+    fn with_skew(skew_ms: u64) -> Self {
         let directory =
             chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-        let trusted_now = wall_now_unix_ms().saturating_add(TRUSTED_SKEW_MS);
+        let trusted_now = wall_now_unix_ms().saturating_add(skew_ms);
         let trusted_clock: Arc<dyn Clock> = Arc::new(FixedClock::from_millis(trusted_now));
         let store = Arc::new(
             SqliteSecurityStateStore::open_with_trusted_clock(
@@ -227,6 +231,10 @@ impl ProductionEffectsFixture {
     }
 
     fn freeze_spec(&self, action_id: &str) -> ResponseEffectSpec {
+        self.freeze_spec_expiring(action_id, self.trusted_now.saturating_add(30_000))
+    }
+
+    fn freeze_spec_expiring(&self, action_id: &str, fence_expires_at: u64) -> ResponseEffectSpec {
         let request = BlastRadiusRequest {
             tenant_id: tenant(),
             action_id: chio_security_types::ports::ActionId::new(action_id)
@@ -249,7 +257,7 @@ impl ProductionEffectsFixture {
             acquisition: BlastRadiusFenceAcquisition {
                 request,
                 approved_result,
-                expires_at_unix_ms: self.trusted_now.saturating_add(30_000),
+                expires_at_unix_ms: fence_expires_at,
             },
         });
         let empty = empty_issuance_freeze_snapshot(IssuanceFreezeKey {
@@ -492,5 +500,59 @@ fn production_effects_use_the_trusted_clock_for_freeze_leases_and_alert_time() {
         (freeze_outcome, fixture.stored_alert_occurred_at()),
         (Ok(true), vec![fixture.trusted_now]),
         "production effects judge the freeze lease and stamp the alert with trusted time"
+    );
+}
+
+#[test]
+fn production_effects_refuse_a_freeze_lease_already_stale_in_trusted_time() {
+    let fixture = ProductionEffectsFixture::with_skew(20_000);
+    let stale_expiry = fixture.trusted_now.saturating_sub(1_000);
+    assert!(
+        stale_expiry > wall_now_unix_ms(),
+        "the wall clock alone would still accept this lease"
+    );
+    let freeze = fixture.freeze_spec_expiring("production-effects-stale-action", stale_expiry);
+    let (plan, work) = fixture.dispatch(
+        "production-effects-stale-action",
+        vec![record("capability-child"), record("capability-root")],
+        vec![freeze],
+    );
+    let effects = fixture.effects();
+    let freeze_effect = plan
+        .effects
+        .as_slice()
+        .first()
+        .unwrap_or_else(|| panic!("planned freeze effect missing"));
+    let refused = effects
+        .execute(&effect_request(&plan, freeze_effect, &work, "stale-freeze"))
+        .err()
+        .unwrap_or_else(|| panic!("a lease stale in trusted time was accepted"));
+    assert_eq!(
+        refused.kind(),
+        chio_security_types::ports::PortErrorKind::InvalidData
+    );
+    assert_eq!(
+        LineageFenceStore::query(
+            fixture.store.as_ref(),
+            &TenantScopedId {
+                tenant_id: tenant(),
+                id: record("production-effects-stale-action"),
+            },
+        )
+        .unwrap_or_else(|error| panic!("query fence: {error}")),
+        None
+    );
+    assert_eq!(
+        chio_security_types::ports::IssuanceFreezeStore::load_issuance_freezes(
+            fixture.store.as_ref(),
+            &IssuanceFreezeKey {
+                tenant_id: tenant(),
+                lineage_id: lineage(),
+            },
+        )
+        .unwrap_or_else(|error| panic!("load freezes: {error}"))
+        .map(|snapshot| snapshot.contributions.len())
+        .unwrap_or(0),
+        0
     );
 }
