@@ -96,17 +96,14 @@ fn compliance_bundle_full_mode_refuses_empty_receipts() -> TestResult {
     Ok(())
 }
 
-fn signed_fixture(
-    sequences: &[u64],
-) -> Result<
-    (
-        Keypair,
-        Vec<ComplianceReceiptEntry>,
-        ComplianceConfig,
-        ComplianceCertificate,
-    ),
-    Box<dyn std::error::Error>,
-> {
+type SignedFixture = (
+    Keypair,
+    Vec<ComplianceReceiptEntry>,
+    ComplianceConfig,
+    ComplianceCertificate,
+);
+
+fn signed_fixture(sequences: &[u64]) -> Result<SignedFixture, Box<dyn std::error::Error>> {
     let signer = Keypair::from_seed(&[71; 32]);
     let entries = sequences
         .iter()
