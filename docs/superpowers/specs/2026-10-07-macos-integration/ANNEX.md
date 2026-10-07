@@ -68,6 +68,15 @@ Lock, fast user switching, logout, sleep/wake, service death, and reboot invalid
 
 Per-task closure on descendant-capable backends must fence new creation or retain incarnation-safe custody for processes that spawn, exec or reparent during enumeration and termination. Independent process/handle observations must account for late members before completion; a one-time family snapshot cannot establish closure. Unresolved members keep original custody and pending status across restart.
 
+Selected execution profiles bind admitted lifetime to the native owner's
+boot/incarnation-associated timebase that advances through host sleep, alongside
+authority-issued absolute expiry. Suspend and realtime changes cannot extend or
+revive a task. Installed acceptance measures expired continuation/dispatch and
+remaining custody independently after wake, with original-operation recovery
+and no claim that a prior external effect was undone. A UI freshness refresh or
+guest-only timer cannot qualify this bound; unavailable native time semantics
+leave that execution profile unavailable without blocking basic Observe.
+
 ## Isolation adapters and runtime evaluation
 
 ### Lower-assurance native Seatbelt adapter
@@ -132,6 +141,8 @@ Safe artifact handling extends existing mini-swe/workbench owners:
 - Redacted receipt derivatives identify omissions; preserve original signed bytes or verified commitments separately. An edited payload cannot retain the original signature claim.
 
 ## Installation, signing, upgrade, and removal
+
+The distribution inventory includes shared packet 4a's existing `chio` CLI operator consumer and its exact controller/protocol compatibility. The installed CLI must pass its selected-surface native and cross-client conformance alongside workbench/Swift; a platform UI does not fulfill the promised terminal client. These are delivery obligations, not claims of an existing operator subcommand.
 
 The initial application-build experiment targets Apple silicon arm64 with `MACOSX_DEPLOYMENT_TARGET=15.0`; this is a product experiment, not an announced support matrix or a claim about runtime API minima. Release only exact OS/CPU/runtime rows that pass. Intel, Rosetta, older OS versions and each new OS update remain unavailable until separately qualified.
 
