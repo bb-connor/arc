@@ -1,0 +1,336 @@
+{
+  "schema": "chio.pr1160.integration-resume-checkpoint.v1",
+  "observed_source_head": "1ca4f7259e8d9de960ce29845133b84a1e7ff58e",
+  "published_head": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+  "source_scope": "Source at the stated local head plus uncommitted canonical AR repair and genuine Original controls. Not a frozen or hosted-qualified candidate.",
+  "findings": [
+    {
+      "id": "AR-OUT",
+      "priority": "P2",
+      "requirement": "Preserve retryable finding, requirement resolver, submission and executor availability separately from authenticated permanent rejection.",
+      "current_state": "source-repaired-current22-green-final-acceptance-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-CAS",
+      "priority": "P2",
+      "requirement": "Compensate a reserved active response only after an authenticated bound definitive denial; preserve authority outages and exact retry.",
+      "current_state": "source-repaired-current22-green-final-acceptance-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-TERM",
+      "priority": "P2",
+      "requirement": "Bind never-committed termination to the original verified capability and exact approval set before any durable mutation.",
+      "current_state": "partial-source-repair-original-artifact-binding-still-open",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-PROOF",
+      "priority": "P1",
+      "requirement": "Bind original signed artifact and proof to governed durable identity and canonical automatic preparation before expiry cleanup.",
+      "current_state": "five-current-artifact-and-canonical-counterexamples-red-producer-staged",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-LATE",
+      "priority": "P1",
+      "requirement": "Preserve typed late executor unavailability after prepared-operation creation.",
+      "current_state": "source-repaired-current-owning-control-green-final-acceptance-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-EXPIRY",
+      "priority": "P2",
+      "requirement": "Authenticate prepared capability at its recorded time without converting historical evidence into live authority.",
+      "current_state": "source-repaired-current-owning-control-green-final-acceptance-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-VIEW",
+      "priority": "P2",
+      "requirement": "Separate current revocation-view checks from immutable preparation authentication so exact revocation can recover safely.",
+      "current_state": "source-repaired-current-owning-controls-green-final-acceptance-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "NF-CAP",
+      "priority": "P2",
+      "requirement": "Check capture authority before the first retaining write and classify every later uncertainty truthfully through supported public hooks.",
+      "current_state": "claude-complete-partial-gates-public-direct-path-amendment-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "SIEM-BE",
+      "priority": "P2",
+      "requirement": "Track confirmed backend delivery independently and progress healthy rows without resending confirmed peers.",
+      "current_state": "ready-claude-source-and-schema-amendment-integration-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "SIEM-SCHEMA",
+      "priority": "P2",
+      "requirement": "Refuse foreign backend tables before schema mutation and reject duplicate records as integrity failure.",
+      "current_state": "genuine-rust-red-green-on-claude-integration-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "PIPC",
+      "priority": "P2",
+      "requirement": "Stop new planning after admission closes while bounded scheduler expiry and restrictive rollback continue.",
+      "current_state": "pipeline-source-reviewed-one-ttl-amendment-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "TEARDOWN-TTL",
+      "priority": "P2",
+      "requirement": "Distinguish healthy overlay TTL waits from cleanup failures and their parked fault budget.",
+      "current_state": "independent-source-confirmed-original-first-amendment-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "PG-HISTORY",
+      "priority": "P1",
+      "requirement": "Bound per-call participant journal verification so native capture remains inside its unchanged fence as a session grows.",
+      "current_state": "genuine-native-growth-attributed-checkpoint-original-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "MINISW-ATTACH",
+      "priority": "P2",
+      "requirement": "Diagnose and repair actual native container attachment loss without changing terminal assertions or hiding the underlying failure.",
+      "current_state": "published-failure-fixed-diagnostics-and-authorized-reproduction-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F016-TC",
+      "priority": "P2",
+      "requirement": "Service healthy later publish recovery while a TerminalReceipt lease is busy, refusing publication until all obligations finish.",
+      "current_state": "claude-composed-original-first-and-internal-consumer-proposal-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-BIND",
+      "priority": "P2",
+      "requirement": "Enforce the same schema and original artifact fingerprint across execution snapshot, dispatch authorization and sealed execution request.",
+      "current_state": "source-verified-original-first-controls-staging",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "AR-SCHEMA",
+      "priority": "P2",
+      "requirement": "Refuse case-insensitive foreign canonical-preparation schema objects before any migration mutation.",
+      "current_state": "source-hypothesis-runtime-original-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "MCP-ROOTS",
+      "priority": "P1",
+      "requirement": "Refresh declared roots on a deliverable request carrier; invalidate stale roots and preserve bounded fail-closed admission across cancellation and restart.",
+      "current_state": "claude-real-native-red-repair-and-controls-running",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "FUZZ-FRAMING",
+      "priority": "P2",
+      "requirement": "Compile the locked MCP edge fuzz feature against the production bounded framing reader and replay its corpus without weakening limits.",
+      "current_state": "published-E0425-claude-narrow-fuzz-feature-repair-running",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F042-CURRENT",
+      "priority": "P2",
+      "requirement": "Quarantine known configured verification incompatibility of an authenticated sealed ingress row while progressing healthy rows; keep actual integrity/history faults global.",
+      "current_state": "promoted-current-genuine-original-red-claude-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F044-CURRENT",
+      "priority": "P2",
+      "requirement": "Require each verified-receipt producer to bind its one declared policy version rather than reuse an unrelated detector policy.",
+      "current_state": "promoted-current-genuine-original-red-claude-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR01",
+      "priority": "P1",
+      "requirement": "Require the actual offline-source closure gates in both Source and trusted definition workflows, with deletion mutants.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR02",
+      "priority": "P1",
+      "requirement": "Retain complete applicable copyright notices from exact source members, including notices in code headers.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR03",
+      "priority": "P2",
+      "requirement": "Bind each retained notice to a proven original member; narrowly prove any no-material exception.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR04",
+      "priority": "P2",
+      "requirement": "Bound APK metadata by logical bytes and reject duplicate, aliased or sparse metadata members.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR05",
+      "priority": "P2",
+      "requirement": "Retain actual aports commit/tree/path evidence and verify expanded source URL selections.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR06",
+      "priority": "P2",
+      "requirement": "Refuse symlink ancestor escapes and retain stable input identity throughout source inspection.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    },
+    {
+      "id": "F075-IR07",
+      "priority": "P2",
+      "requirement": "Use accurate valid license identifiers and retain unresolved classification rather than infer missing permissions.",
+      "current_state": "local-proposal-independent-request-changes-claude-original-first-repair-pending",
+      "landing_pr": 1160,
+      "qualified": false,
+      "merged": false
+    }
+  ],
+  "existing_requirement_promotions": {
+    "F042": "now-current-retired-key-ingress-progress",
+    "F044": "now-required-receipt-producer-policy-binding",
+    "F043": "only-control-mutex-now-healthcache/audit-later"
+  },
+  "f075_distribution_review": "All seven independent repair findings assigned; local/unpublished; not foundation r1 closure.",
+  "independent_reports": [
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/active-response-independent/report.json",
+      "sha256": "01d7bf1837f415154cb645ddc633656e440bade97c0ab819e042b002a15ebd93"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/siem-independent/report.json",
+      "sha256": "8c56787ee89697bf9425431a8bed80b066d27048c419464f479ffffa179ba7a4"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/pipeline-independent/report.json",
+      "sha256": "b1ecb7bd34e9dfe667c2283436d4953fcd5070a013e591b39ec59d9f203cca46"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/f075-source-independent/findings.json",
+      "sha256": "5cbebfefc333f27e555f4dafca1d5fef1bdb6967b2c338140c580869fe36b6cd"
+    }
+  ],
+  "canonical_audit": "supply-chain-current-receipt.json exit0 with unchanged audits/exemptions; whole candidate false",
+  "remaining_acceptance": [
+    "Finish every confirmed current P0/P1 and now P2; genuine original/green and owning checks.",
+    "Complete exact-source independent slices, native/cold/trusted and terminal hosted acceptance.",
+    "Select frozen Source/D/E only after code and documents are complete; protected landing remains open."
+  ],
+  "candidate_qualified": false,
+  "foundation_merged": false,
+  "hosted_snapshot": {
+    "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/hosted-watch-current.json",
+    "sha256": "0c8d0de84b6310ed57780e71c4f03a3226747ee5961a7f299b48d82c2e6797ea",
+    "published_head": "89d79ac6ab79de5d55b99a7c8ec611bc8b021cb2",
+    "success": 118,
+    "failure": 21,
+    "skipped": 12,
+    "all_terminal": true,
+    "qualification": false
+  },
+  "retained_local_evidence": [
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/security-store-current-green.log",
+      "sha256": "645d45b7dd1b4a91077dd09c721c53b8c5909f6f2036fd00945e1fd8143b4c46",
+      "scope": "kernel33 plus SQLite31 focused; no full-owner qualification"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/native-races-current-green.log",
+      "sha256": "372890ff0fa5c0df9ba3ff606796614d4c225e27f72e6d6214193569d10ca8ca",
+      "scope": "six native race fixture tests under default concurrency; other packages filter zero"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/store-and-race-three-owner-strict.log",
+      "sha256": "4184705e29071396dd1e1bae9a13aca08b21bc5a69cdba2e20e739d52c06e1e5",
+      "scope": "owning strict Clippy exit0 before canonical46 installation"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/supply-chain-current-receipt.json",
+      "sha256": "a9e643ab40686868176eb418df2fb2e3fcd820eb769137ff3b77c4fa167cb1eb",
+      "scope": "canonical genuine audit/fork checks; scoped capture at bdc8f63; no exemption changes"
+    },
+    {
+      "path": "/tmp/chio-pr1160-qualification-20261007/resume-integration/active-authority-and-canonical-receipt.json",
+      "sha256": "48f28fdb8447ec22950a61749212443ec6c216637ae52e898f4b599ee2c82d44",
+      "scope": "22pass5fail genuine pre-canonical runtime; preserved failed capture"
+    }
+  ],
+  "canonical_producer": {
+    "manifest_sha256": "0d10bbede2908f243f736039d03affbd0da9c1effe60556241be6556d1084a3d",
+    "files": 46,
+    "mode": "actual 0002; existing source modes preserved",
+    "current_runtime": "running Original27; not yet a result",
+    "independent_review": "new cross-binding omission open"
+  }
+}
