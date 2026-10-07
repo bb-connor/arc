@@ -48,6 +48,17 @@ pub(super) enum EdgeState {
     Ready { session_id: SessionId },
 }
 
+/// Where queued client-directed actions are serviced.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PendingActionRoute {
+    /// Every write reaches the client, so actions are serviced once queued.
+    Immediate,
+    /// Writes reach the client only on a client request's own response
+    /// stream, so actions are serviced on the next client request, before
+    /// that request is dispatched.
+    NextClientRequest,
+}
+
 #[derive(Debug, Clone)]
 pub(super) enum EdgeAction {
     RefreshRoots {

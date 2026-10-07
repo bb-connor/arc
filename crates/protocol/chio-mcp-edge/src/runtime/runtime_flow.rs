@@ -1,5 +1,12 @@
 use super::*;
 
+/// The outcome of a client request carried by another client request's stream.
+pub(super) enum Carried<T> {
+    Reply(T),
+    /// The carrying client request was cancelled, with the client's reason.
+    CarrierCancelled(String),
+}
+
 impl ChioMcpEdge {
     /// Borrowed readers cannot interrupt a withheld reply. Use the inbox API
     /// or the owned-reader serving entrypoint for bounded nested client flows.
@@ -143,7 +150,67 @@ impl ChioMcpEdge {
         Ok(())
     }
 
+    /// On the next-request route, service queued actions on this client
+    /// request's own stream before it is dispatched. Returns the request's
+    /// terminal response if the client cancelled it meanwhile; it is then not
+    /// dispatched and the interrupted action stays queued.
+    pub(super) fn service_pending_actions_before_request<W: Write + Send>(
+        &mut self,
+        request: &Value,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        writer: &mut W,
+    ) -> Option<Value> {
+        if self.pending_action_route != PendingActionRoute::NextClientRequest
+            || request.get("method").is_none()
+        {
+            return None;
+        }
+        let request_id = request.get("id")?.clone();
+        while let Some(action) = self.pending_actions.pop() {
+            match action {
+                EdgeAction::RefreshRoots { session_id, reason } => {
+                    match self.refresh_roots_carried_by(
+                        &session_id,
+                        client_rx,
+                        writer,
+                        Some(&request_id),
+                    ) {
+                        Ok(Carried::Reply(())) => {}
+                        Ok(Carried::CarrierCancelled(cancellation)) => {
+                            self.pending_actions
+                                .push(EdgeAction::RefreshRoots { session_id, reason });
+                            return Some(jsonrpc_error(request_id, -32800, &cancellation));
+                        }
+                        Err(error) => self.emit_log(
+                            LogLevel::Warning,
+                            "chio.mcp.roots",
+                            json!({
+                                "event": "roots_refresh_failed",
+                                "reason": reason,
+                                "error": error.to_string(),
+                            }),
+                        ),
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub(super) fn queue_roots_refresh(&mut self, session_id: SessionId, reason: &'static str) {
+        // A required refresh withdraws the previous roots. Only a fresh reply
+        // makes roots usable again.
+        if let Err(error) = self.kernel.replace_session_roots(&session_id, Vec::new()) {
+            self.emit_log(
+                LogLevel::Error,
+                "chio.mcp.roots",
+                json!({
+                    "event": "roots_withdrawal_failed",
+                    "reason": reason,
+                    "error": error.to_string(),
+                }),
+            );
+        }
         if self.pending_actions.iter().any(|action| {
             matches!(
                 action,
@@ -166,9 +233,34 @@ impl ChioMcpEdge {
         client_rx: &mut mpsc::Receiver<ClientInbound>,
         writer: &mut W,
     ) -> Result<(), AdapterError> {
-        let (mut result, _reservation) = self
-            .send_client_request_with_channel(client_rx, writer, "roots/list", json!({}))?
-            .into_parts();
+        match self.refresh_roots_carried_by(session_id, client_rx, writer, None)? {
+            Carried::Reply(()) => Ok(()),
+            Carried::CarrierCancelled(reason) => Err(AdapterError::McpError {
+                code: -32800,
+                message: reason,
+                data: None,
+            }),
+        }
+    }
+
+    fn refresh_roots_carried_by<W: Write + Send>(
+        &mut self,
+        session_id: &SessionId,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        writer: &mut W,
+        carrier: Option<&Value>,
+    ) -> Result<Carried<()>, AdapterError> {
+        let reply = match self.send_client_request_carried_by(
+            client_rx,
+            writer,
+            "roots/list",
+            json!({}),
+            carrier,
+        )? {
+            Carried::Reply(reply) => reply,
+            Carried::CarrierCancelled(reason) => return Ok(Carried::CarrierCancelled(reason)),
+        };
+        let (mut result, _reservation) = reply.into_parts();
         let roots_value = result
             .as_object_mut()
             .and_then(|object| object.remove("roots"))
@@ -194,7 +286,7 @@ impl ChioMcpEdge {
                 "rootCount": root_count,
             }),
         );
-        Ok(())
+        Ok(Carried::Reply(()))
     }
 
     #[cfg(test)]
@@ -216,6 +308,27 @@ impl ChioMcpEdge {
         method: &str,
         params: Value,
     ) -> Result<AccountedMessage, AdapterError> {
+        match self.send_client_request_carried_by(client_rx, writer, method, params, None)? {
+            Carried::Reply(reply) => Ok(reply),
+            Carried::CarrierCancelled(reason) => Err(AdapterError::McpError {
+                code: -32800,
+                message: reason,
+                data: None,
+            }),
+        }
+    }
+
+    /// Send a client request and wait for its reply. When `carrier` names the
+    /// client request whose stream carries it, that request's cancellation
+    /// ends the wait and cancels this request toward the client.
+    fn send_client_request_carried_by<W: Write + Send>(
+        &mut self,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        writer: &mut W,
+        method: &str,
+        params: Value,
+        carrier: Option<&Value>,
+    ) -> Result<Carried<AccountedMessage>, AdapterError> {
         self.client_request_counter = self
             .client_request_counter
             .checked_add(1)
@@ -244,7 +357,7 @@ impl ChioMcpEdge {
                     return Err(adapter_jsonrpc_error(error));
                 }
 
-                return message.into_accounted_result();
+                return message.into_accounted_result().map(Carried::Reply);
             }
 
             if cancellation_matches_request(&message, &request_id) {
@@ -253,6 +366,22 @@ impl ChioMcpEdge {
                     message: cancellation_reason(&message),
                     data: None,
                 });
+            }
+
+            if carrier.is_some_and(|carrier| cancellation_matches_client_request(&message, carrier))
+            {
+                let _ = write_jsonrpc_line(
+                    writer,
+                    &json!({
+                        "jsonrpc": "2.0",
+                        "method": "notifications/cancelled",
+                        "params": {
+                            "requestId": request_id,
+                            "reason": "the client request carrying it was cancelled",
+                        },
+                    }),
+                );
+                return Ok(Carried::CarrierCancelled(cancellation_reason(&message)));
             }
 
             if message.get("method").is_some() {

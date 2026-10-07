@@ -650,7 +650,9 @@ impl ChioMcpEdge {
             Ok(_) | Err(AdapterError::Clock(_)) => {}
             Err(error) => return Err(error),
         }
-        self.process_pending_actions_with_channel(client_rx, writer)?;
+        if self.pending_action_route == PendingActionRoute::Immediate {
+            self.process_pending_actions_with_channel(client_rx, writer)?;
+        }
         self.forward_runtime_events();
         self.flush_pending_notifications(writer)?;
         Ok(())

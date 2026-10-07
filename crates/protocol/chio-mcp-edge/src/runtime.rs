@@ -81,7 +81,7 @@ use discovery::{build_exposed_tool_bindings, ExposedToolBinding};
 use jsonrpc::negotiate_protocol_version;
 use nested_flow::*;
 use protocol::*;
-use state::{EdgeAction, EdgeState, LogLevel};
+use state::{EdgeAction, EdgeState, LogLevel, PendingActionRoute};
 use tasks::{EdgeTask, EdgeTaskFinalOutcome, EdgeTaskStatus, ToolCallEdgeOutcome};
 #[cfg(test)]
 use tool_calls::{
@@ -156,6 +156,7 @@ pub struct ChioMcpEdge {
     state: EdgeState,
     minimum_log_level: LogLevel,
     pending_actions: Vec<EdgeAction>,
+    pending_action_route: PendingActionRoute,
     pending_notifications: Vec<Value>,
     deferred_client_messages: VecDeque<AccountedMessage>,
     inbox_admission: InboxAdmission,
@@ -242,6 +243,7 @@ impl ChioMcpEdge {
             state: EdgeState::Uninitialized,
             minimum_log_level: LogLevel::Info,
             pending_actions: Vec::new(),
+            pending_action_route: PendingActionRoute::Immediate,
             pending_notifications: Vec::new(),
             deferred_client_messages: VecDeque::new(),
             inbox_admission: InboxAdmission::new(),
@@ -437,7 +439,7 @@ impl ChioMcpEdge {
                 }
             }
         });
-        self.serve_inbox(receiver, &mut writer)
+        self.serve_inbox_on_route(receiver, &mut writer, PendingActionRoute::Immediate)
     }
 
     /// Compatibility with an already-decoded caller-owned channel. The caller's
@@ -463,16 +465,27 @@ impl ChioMcpEdge {
                 }
             }
         });
-        self.serve_inbox(receiver, writer)
+        self.serve_inbox_on_route(receiver, writer, PendingActionRoute::Immediate)
     }
 
     /// Serve original-byte-admitted messages while retaining their reservations
     /// through handling and deferred storage. Control delivery shares the same
     /// aggregate budget and only recognizes the currently active identities.
+    /// Writes reach the client only on a client request's own response stream,
+    /// so a queued client request rides the next client request.
     pub fn serve_inbox<W: Write + Send>(
+        &mut self,
+        inbox: McpInboxReceiver,
+        writer: W,
+    ) -> Result<(), AdapterError> {
+        self.serve_inbox_on_route(inbox, writer, PendingActionRoute::NextClientRequest)
+    }
+
+    fn serve_inbox_on_route<W: Write + Send>(
         &mut self,
         mut inbox: McpInboxReceiver,
         mut writer: W,
+        route: PendingActionRoute,
     ) -> Result<(), AdapterError> {
         if self
             .deferred_client_messages
@@ -482,8 +495,36 @@ impl ChioMcpEdge {
             return Err(AdapterError::IngressCapacity);
         }
         self.inbox_admission = inbox.admission.clone();
+        self.pending_action_route = route;
         let (_cancel_tx, mut cancel_rx) = mpsc::channel();
         self.serve_inbound_loop(&mut inbox.receiver, &mut cancel_rx, &mut writer)
+    }
+
+    /// Handle one client message. On the next-request route, actions queued
+    /// for the next client request are serviced on this request's stream
+    /// first; a request the client cancels meanwhile is answered and never
+    /// dispatched.
+    fn handle_inbound_with_channel<W: Write + Send>(
+        &mut self,
+        message: Value,
+        digest: Option<chio_kernel::ProtocolRequestDigest>,
+        client_rx: &mut mpsc::Receiver<ClientInbound>,
+        cancel_rx: &mut mpsc::Receiver<Value>,
+        writer: &mut W,
+    ) -> Result<Option<Value>, AdapterError> {
+        if let Some(cancelled) =
+            self.service_pending_actions_before_request(&message, client_rx, writer)
+        {
+            return Ok(Some(cancelled));
+        }
+        self.active_protocol_request_digest = digest;
+        let response =
+            self.handle_jsonrpc_with_transport_channel(message, client_rx, cancel_rx, writer);
+        self.active_protocol_request_digest = None;
+        if self.pending_action_route == PendingActionRoute::Immediate {
+            self.process_pending_actions_with_channel(client_rx, writer)?;
+        }
+        Ok(response)
     }
 
     fn serve_inbound_loop<W: Write + Send>(
@@ -498,11 +539,13 @@ impl ChioMcpEdge {
 
             if let Some(message) = self.take_deferred_client_message() {
                 let (message, reservation) = message.into_parts();
-                self.active_protocol_request_digest = reservation.request_digest().cloned();
-                let response = self
-                    .handle_jsonrpc_with_transport_channel(message, client_rx, cancel_rx, writer);
-                self.active_protocol_request_digest = None;
-                self.process_pending_actions_with_channel(client_rx, writer)?;
+                let response = self.handle_inbound_with_channel(
+                    message,
+                    reservation.request_digest().cloned(),
+                    client_rx,
+                    cancel_rx,
+                    writer,
+                )?;
                 self.forward_runtime_events();
                 self.flush_pending_notifications(writer)?;
                 if let Some(response) = response {
@@ -515,12 +558,13 @@ impl ChioMcpEdge {
             match client_rx.recv_timeout(CLIENT_IDLE_POLL_INTERVAL) {
                 Ok(ClientInbound::Accounted(message)) => {
                     let (message, reservation) = message.into_parts();
-                    self.active_protocol_request_digest = reservation.request_digest().cloned();
-                    let response = self.handle_jsonrpc_with_transport_channel(
-                        message, client_rx, cancel_rx, writer,
-                    );
-                    self.active_protocol_request_digest = None;
-                    self.process_pending_actions_with_channel(client_rx, writer)?;
+                    let response = self.handle_inbound_with_channel(
+                        message,
+                        reservation.request_digest().cloned(),
+                        client_rx,
+                        cancel_rx,
+                        writer,
+                    )?;
                     self.forward_runtime_events();
                     self.flush_pending_notifications(writer)?;
                     if let Some(response) = response {
